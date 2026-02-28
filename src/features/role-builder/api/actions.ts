@@ -58,6 +58,7 @@ export async function getWorkspaceRolesForBuilder(
   const supabase = await createClient();
 
   const { data: roles, error } = await supabase
+    .schema('ops')
     .from('workspace_roles')
     .select('id, name, slug, is_system, workspace_id, workspace_role_permissions(workspace_permissions(key))')
     .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
@@ -116,6 +117,7 @@ export async function createCustomRole(
   const supabase = await createClient();
 
   const { data: role, error: roleError } = await supabase
+    .schema('ops')
     .from('workspace_roles')
     .insert({
       name: payload.name,
@@ -131,10 +133,10 @@ export async function createCustomRole(
   }
 
   if (payload.permissionKeys.length > 0) {
-    const { data: perms } = await supabase.from('workspace_permissions').select('id, key').in('key', payload.permissionKeys);
+    const { data: perms } = await supabase.schema('ops').from('workspace_permissions').select('id, key').in('key', payload.permissionKeys);
     const permissionIds = (perms ?? []).map((p) => p.id);
     if (permissionIds.length > 0) {
-      await supabase.from('workspace_role_permissions').insert(
+      await supabase.schema('ops').from('workspace_role_permissions').insert(
         permissionIds.map((permission_id) => ({ role_id: role.id, permission_id }))
       );
     }
@@ -173,6 +175,7 @@ export async function updateCustomRole(
 
   if (Object.keys(updates).length > 0) {
     const { error: updateError } = await supabase
+      .schema('ops')
       .from('workspace_roles')
       .update(updates)
       .eq('id', roleId)
@@ -182,12 +185,12 @@ export async function updateCustomRole(
   }
 
   if (payload.permissionKeys != null) {
-    await supabase.from('workspace_role_permissions').delete().eq('role_id', roleId);
+    await supabase.schema('ops').from('workspace_role_permissions').delete().eq('role_id', roleId);
     if (payload.permissionKeys.length > 0) {
-      const { data: perms } = await supabase.from('workspace_permissions').select('id, key').in('key', payload.permissionKeys);
+      const { data: perms } = await supabase.schema('ops').from('workspace_permissions').select('id, key').in('key', payload.permissionKeys);
       const permissionIds = (perms ?? []).map((p) => p.id);
       if (permissionIds.length > 0) {
-        await supabase.from('workspace_role_permissions').insert(
+        await supabase.schema('ops').from('workspace_role_permissions').insert(
           permissionIds.map((permission_id) => ({ role_id: roleId, permission_id }))
         );
       }
@@ -215,6 +218,7 @@ export async function deleteCustomRole(
   const supabase = await createClient();
 
   const { data: role } = await supabase
+    .schema('ops')
     .from('workspace_roles')
     .select('id, is_system, workspace_id')
     .eq('id', roleId)
@@ -238,8 +242,9 @@ export async function deleteCustomRole(
     };
   }
 
-  await supabase.from('workspace_role_permissions').delete().eq('role_id', roleId);
+  await supabase.schema('ops').from('workspace_role_permissions').delete().eq('role_id', roleId);
   const { error: deleteErr } = await supabase
+    .schema('ops')
     .from('workspace_roles')
     .delete()
     .eq('id', roleId)

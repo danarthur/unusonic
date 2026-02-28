@@ -373,6 +373,7 @@ export async function updateMemberRole(
   }
 
   const { data: roleRow } = await supabase
+    .schema('ops')
     .from('workspace_roles')
     .select('id, slug')
     .eq('id', roleId)
@@ -806,6 +807,7 @@ export async function inviteTeamMember(
   const invitedUserId = invitedUser.user.id;
 
   const { data: roleRow } = await supabase
+    .schema('ops')
     .from('workspace_roles')
     .select('id, slug')
     .eq('id', workspace_role_id)

@@ -262,34 +262,118 @@ export type Database = {
       }
       events: {
         Row: {
+          actor: string | null
+          client_id: string | null
+          compliance_docs: Json | null
+          confidentiality_level: string | null
           created_at: string | null
-          end_at: string
+          crm_estimated_value: number | null
+          crm_probability: number | null
+          dates_load_in: string | null
+          dates_load_out: string | null
+          ends_at: string
+          guest_count_actual: number | null
+          guest_count_expected: number | null
           id: string
-          name: string
+          internal_code: string | null
+          lead_source: string | null
+          lifecycle_status: string | null
+          location_address: string | null
+          location_name: string | null
+          logistics_dock_info: string | null
+          logistics_power_info: string | null
+          notes: string | null
+          pm_id: string | null
+          producer_id: string | null
           project_id: string | null
           run_of_show_data: Json | null
-          start_at: string
+          slug: string | null
+          starts_at: string
+          status: string
+          tech_requirements: Json | null
+          title: string
+          updated_at: string | null
+          venue_address: string | null
           venue_entity_id: string | null
+          venue_google_maps_id: string | null
+          venue_name: string | null
+          workspace_id: string | null
         }
         Insert: {
+          actor?: string | null
+          client_id?: string | null
+          compliance_docs?: Json | null
+          confidentiality_level?: string | null
           created_at?: string | null
-          end_at: string
+          crm_estimated_value?: number | null
+          crm_probability?: number | null
+          dates_load_in?: string | null
+          dates_load_out?: string | null
+          ends_at: string
+          guest_count_actual?: number | null
+          guest_count_expected?: number | null
           id?: string
-          name: string
+          internal_code?: string | null
+          lead_source?: string | null
+          lifecycle_status?: string | null
+          location_address?: string | null
+          location_name?: string | null
+          logistics_dock_info?: string | null
+          logistics_power_info?: string | null
+          notes?: string | null
+          pm_id?: string | null
+          producer_id?: string | null
           project_id?: string | null
           run_of_show_data?: Json | null
-          start_at: string
+          slug?: string | null
+          starts_at: string
+          status?: string
+          tech_requirements?: Json | null
+          title: string
+          updated_at?: string | null
+          venue_address?: string | null
           venue_entity_id?: string | null
+          venue_google_maps_id?: string | null
+          venue_name?: string | null
+          workspace_id?: string | null
         }
         Update: {
+          actor?: string | null
+          client_id?: string | null
+          compliance_docs?: Json | null
+          confidentiality_level?: string | null
           created_at?: string | null
-          end_at?: string
+          crm_estimated_value?: number | null
+          crm_probability?: number | null
+          dates_load_in?: string | null
+          dates_load_out?: string | null
+          ends_at?: string
+          guest_count_actual?: number | null
+          guest_count_expected?: number | null
           id?: string
-          name?: string
+          internal_code?: string | null
+          lead_source?: string | null
+          lifecycle_status?: string | null
+          location_address?: string | null
+          location_name?: string | null
+          logistics_dock_info?: string | null
+          logistics_power_info?: string | null
+          notes?: string | null
+          pm_id?: string | null
+          producer_id?: string | null
           project_id?: string | null
           run_of_show_data?: Json | null
-          start_at?: string
+          slug?: string | null
+          starts_at?: string
+          status?: string
+          tech_requirements?: Json | null
+          title?: string
+          updated_at?: string | null
+          venue_address?: string | null
           venue_entity_id?: string | null
+          venue_google_maps_id?: string | null
+          venue_name?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -331,6 +415,81 @@ export type Database = {
           start_date?: string | null
           status?: string | null
           workspace_id?: string
+        }
+        Relationships: []
+      }
+      workspace_permissions: {
+        Row: {
+          id: string
+          key: string
+        }
+        Insert: {
+          id?: string
+          key: string
+        }
+        Update: {
+          id?: string
+          key?: string
+        }
+        Relationships: []
+      }
+      workspace_role_permissions: {
+        Row: {
+          permission_id: string
+          role_id: string
+        }
+        Insert: {
+          permission_id: string
+          role_id: string
+        }
+        Update: {
+          permission_id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_roles: {
+        Row: {
+          created_at: string
+          id: string
+          is_system: boolean
+          name: string
+          slug: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+          workspace_id?: string | null
         }
         Relationships: []
       }
@@ -1405,16 +1564,19 @@ export type Database = {
       workspace_members: {
         Row: {
           role: string | null
+          role_id: string | null
           user_id: string
           workspace_id: string
         }
         Insert: {
           role?: string | null
+          role_id?: string | null
           user_id: string
           workspace_id: string
         }
         Update: {
           role?: string | null
+          role_id?: string | null
           user_id?: string
           workspace_id?: string
         }
@@ -1594,6 +1756,10 @@ export type Database = {
           similarity: number
           summary: string
         }[]
+      }
+      member_has_capability: {
+        Args: { p_permission_key: string; p_workspace_id: string }
+        Returns: boolean
       }
       member_has_permission: {
         Args: { p_permission_key: string; p_workspace_id: string }
@@ -1865,13 +2031,6 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
-// Convenience aliases for app imports (generated types use Database['public']['Tables']['table']['Row'])
-export type Package = Database['public']['Tables']['packages']['Row'];
-export type Proposal = Database['public']['Tables']['proposals']['Row'];
-export type ProposalItem = Database['public']['Tables']['proposal_items']['Row'];
-export type CueType = Database['public']['Enums']['cue_type'];
-export type PaymentMethod = Database['public']['Enums']['payment_method'];
 
 export const Constants = {
   cortex: {

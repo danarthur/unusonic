@@ -152,30 +152,24 @@ async function resolveWorkspaceIdForEvent(
   supabase: Awaited<ReturnType<typeof createClient>>,
   eventId: string
 ): Promise<string | null> {
-  const { data: pubEvent } = await supabase
+  const { data } = await supabase
+    .schema('ops')
     .from('events')
-    .select('workspace_id')
+    .select('workspace_id, project_id')
     .eq('id', eventId)
     .maybeSingle();
-  if (pubEvent && (pubEvent as { workspace_id?: string }).workspace_id) {
-    return (pubEvent as { workspace_id: string }).workspace_id;
+  const row = data as { workspace_id?: string | null; project_id?: string | null } | null;
+  if (row?.workspace_id) return row.workspace_id;
+  if (row?.project_id) {
+    const { data: proj } = await supabase
+      .schema('ops')
+      .from('projects')
+      .select('workspace_id')
+      .eq('id', row.project_id)
+      .maybeSingle();
+    return (proj as { workspace_id?: string } | null)?.workspace_id ?? null;
   }
-  const { data: opsEvent } = await supabase
-    .schema('ops')
-    .from('events')
-    .select('project_id')
-    .eq('id', eventId)
-    .maybeSingle();
-  if (!opsEvent || !(opsEvent as { project_id?: string }).project_id) return null;
-  const { data: proj } = await supabase
-    .schema('ops')
-    .from('projects')
-    .select('workspace_id')
-    .eq('id', (opsEvent as { project_id: string }).project_id)
-    .maybeSingle();
-  return proj && (proj as { workspace_id?: string }).workspace_id
-    ? (proj as { workspace_id: string }).workspace_id
-    : null;
+  return null;
 }
 
 // =============================================================================
