@@ -6,7 +6,7 @@
 import 'server-only';
 
 import { createClient } from '@/shared/api/supabase/server';
-import type { EventCommandDTO } from '../model/types';
+import type { EventCommandDTO, EventLifecycleStatus } from '../model/types';
 
 export async function getEventCommand(eventId: string): Promise<EventCommandDTO | null> {
   const supabase = await createClient();
@@ -47,7 +47,7 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
     title: (r.title as string) ?? null,
     internal_code: null,
     status: (r.status as string) ?? null,
-    lifecycle_status: (r.lifecycle_status as string) ?? null,
+    lifecycle_status: (r.lifecycle_status as EventLifecycleStatus | null) ?? null,
     confidentiality_level: null,
     slug: null,
     starts_at: (r.starts_at as string) ?? '',

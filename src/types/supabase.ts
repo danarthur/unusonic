@@ -2157,3 +2157,17 @@ export const Constants = {
     },
   },
 } as const
+
+// ---------------------------------------------------------------------------
+// Convenience type aliases — manually maintained, re-add after each db:types run
+// ---------------------------------------------------------------------------
+/** Enum for cue type (stage, audio, lighting, video, logistics) */
+export type CueType = Enums<"cue_type">
+/** Row type for proposals table */
+export type Proposal = Tables<"proposals">
+/** Row type for proposal_items table */
+export type ProposalItem = Tables<"proposal_items">
+/** Row type for packages table */
+export type Package = Tables<"packages">
+/** Enum for payment method */
+export type PaymentMethod = Enums<"payment_method">

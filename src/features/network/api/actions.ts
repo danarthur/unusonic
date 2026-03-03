@@ -1,5 +1,6 @@
 /**
  * Network Manager – Server Actions for graph data, invitation validation, and private notes.
+ * Session 9: fully migrated to directory.entities + cortex.relationships.
  * @module features/network/api/actions
  */
 
@@ -9,12 +10,10 @@ import 'server-only';
 import { unstable_noStore } from 'next/cache';
 import { cookies } from 'next/headers';
 import { createClient } from '@/shared/api/supabase/server';
-import { getSystemClient } from '@/shared/api/supabase/system';
 import type { NetworkGraph, ValidateInvitationResult } from '../model/types';
 
 const CURRENT_ORG_COOKIE = 'signal_current_org_id';
 
-/** HQ role priority: owner, admin, manager, member, restricted (Observer). */
 const ORG_ROLE_PRIORITY: Record<string, number> = {
   owner: 0,
   admin: 1,
@@ -24,113 +23,136 @@ const ORG_ROLE_PRIORITY: Record<string, number> = {
 };
 
 /**
- * Resolves the current user's "Home Organization" (HQ) for Network/Team context.
- * Priority: 1) Org they OWN, 2) first ADMIN org, 3) first MEMBER org.
- * Returns null if not authenticated or no org (user should complete onboarding / Create HQ).
+ * Resolve current user's entity (directory.entities) and their HQ org.
+ * Returns directory.entities.id for entityId, and legacy_org_id for orgId.
+ */
+async function getCurrentEntityAndOrg(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return { entityId: null, orgId: null };
+
+  const { data: entity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id')
+    .eq('claimed_by_user_id', user.id)
+    .maybeSingle();
+  if (!entity) return { entityId: null, orgId: null };
+
+  // Get their org memberships from cortex.relationships
+  const { data: rels } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('target_entity_id, context_data')
+    .eq('source_entity_id', entity.id)
+    .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER']);
+
+  if (rels?.length) {
+    const sorted = [...rels].sort(
+      (a, b) =>
+        (ORG_ROLE_PRIORITY[(a.context_data as Record<string, string>)?.role] ?? 99) -
+        (ORG_ROLE_PRIORITY[(b.context_data as Record<string, string>)?.role] ?? 99)
+    );
+    const orgEntityId = sorted[0].target_entity_id;
+    const { data: orgEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('legacy_org_id')
+      .eq('id', orgEntityId)
+      .maybeSingle();
+    if (orgEntity?.legacy_org_id) {
+      return { entityId: entity.id, orgId: orgEntity.legacy_org_id as string };
+    }
+  }
+
+  return { entityId: entity.id, orgId: null };
+}
+
+/**
+ * Resolves the current user's HQ org ID.
+ * Returns legacy_org_id UUID (used in all operational tables).
  */
 export async function getCurrentOrgId(): Promise<string | null> {
   unstable_noStore();
   const supabase = await createClient();
-  const { entityId, orgId } = await getCurrentEntityAndOrg(supabase);
-  if (orgId) return orgId;
 
-  // RPC (if present) uses auth.uid() and bypasses RLS
-  const { data: rpcOrgId } = await supabase.rpc('get_current_org_id');
-  if (rpcOrgId) return rpcOrgId as string;
-
-  if (!entityId) {
-    // User has no entity (e.g. onboarding only created commercial_organizations + organization_members).
-    // Resolve org from organization_members first so onboarding-created orgs are found.
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id) {
-      const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .order('role', { ascending: false }) // owner before admin before member
-        .limit(1)
-        .maybeSingle();
-      if (membership?.organization_id) return membership.organization_id;
-      const resolved = await resolveCurrentOrgIdWithServiceRole(user.id);
-      if (resolved) return resolved;
-    }
-    return null;
-  }
-
-  const cookieStore = await cookies();
-  const lastOrg = cookieStore.get(CURRENT_ORG_COOKIE)?.value;
-  if (lastOrg?.trim()) {
-    const { data: member } = await supabase
-      .from('org_members')
-      .select('org_id')
-      .eq('entity_id', entityId)
-      .eq('org_id', lastOrg.trim())
-      .limit(1)
-      .maybeSingle();
-    if (member?.org_id) return member.org_id;
-  }
-
-  // Fallback: service role lookup (bypasses RLS)
   const { data: { user } } = await supabase.auth.getUser();
-  if (user?.id) {
-    const resolved = await resolveCurrentOrgIdWithServiceRole(user.id);
-    if (resolved) return resolved;
+  if (!user) return null;
+
+  const { data: entity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id')
+    .eq('claimed_by_user_id', user.id)
+    .maybeSingle();
+
+  if (entity) {
+    const cookieStore = await cookies();
+    const lastOrg = cookieStore.get(CURRENT_ORG_COOKIE)?.value;
+
+    // Try cookie org first (validate membership still exists)
+    if (lastOrg?.trim()) {
+      const { data: cookieOrgEntity } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('id')
+        .eq('legacy_org_id', lastOrg.trim())
+        .maybeSingle();
+
+      if (cookieOrgEntity) {
+        const { data: cookieMembership } = await supabase
+          .schema('cortex')
+          .from('relationships')
+          .select('id')
+          .eq('source_entity_id', entity.id)
+          .eq('target_entity_id', cookieOrgEntity.id)
+          .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+          .maybeSingle();
+        if (cookieMembership) return lastOrg.trim();
+      }
+    }
+
+    // Resolve HQ via cortex.relationships
+    const { data: rels } = await supabase
+      .schema('cortex')
+      .from('relationships')
+      .select('target_entity_id, context_data')
+      .eq('source_entity_id', entity.id)
+      .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER']);
+
+    if (rels?.length) {
+      const sorted = [...rels].sort(
+        (a, b) =>
+          (ORG_ROLE_PRIORITY[(a.context_data as Record<string, string>)?.role] ?? 99) -
+          (ORG_ROLE_PRIORITY[(b.context_data as Record<string, string>)?.role] ?? 99)
+      );
+      const { data: orgEnt } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('legacy_org_id')
+        .eq('id', sorted[0].target_entity_id)
+        .maybeSingle();
+      if (orgEnt?.legacy_org_id) return orgEnt.legacy_org_id as string;
+    }
   }
 
-  // Fallback when directory org tables (organizations / org_members / entities) are missing or empty:
-  // use public commercial_organizations via organization_members so Network tab works.
-  if (user?.id) {
-    const { data: membership } = await supabase
-      .from('organization_members')
-      .select('organization_id, role')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    if (membership?.organization_id) return membership.organization_id;
-  }
+  // Fallback: organization_members (workspace-based onboarding path)
+  const { data: membership } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle();
+  if (membership?.organization_id) return membership.organization_id;
+
   return null;
 }
 
 /**
- * Resolve current user's HQ org using service role (bypasses RLS).
- * Only call with auth user id from session — never expose service client to client.
- */
-async function resolveCurrentOrgIdWithServiceRole(authUserId: string): Promise<string | null> {
-  try {
-    const sys = getSystemClient();
-    const { data: entity } = await sys
-      .from('entities')
-      .select('id')
-      .eq('auth_id', authUserId)
-      .maybeSingle();
-    if (!entity) return null;
-
-    const { data: members } = await sys
-      .from('org_members')
-      .select('org_id, role')
-      .eq('entity_id', entity.id);
-    if (members?.length) {
-      const sorted = [...members].sort(
-        (a, b) => (ORG_ROLE_PRIORITY[a.role] ?? 99) - (ORG_ROLE_PRIORITY[b.role] ?? 99)
-      );
-      return sorted[0].org_id;
-    }
-
-    const { data: owned } = await sys
-      .from('organizations')
-      .select('id')
-      .eq('owner_id', entity.id)
-      .limit(1)
-      .maybeSingle();
-    return owned?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolve current user's entity id (anon first, then service-role fallback).
- * Use this whenever a flow needs "current user's entity" for permissions (e.g. ghost profile, invite).
+ * Resolve current user's directory entity id.
+ * Returns directory.entities.id.
  */
 export async function getCurrentEntityId(): Promise<string | null> {
   unstable_noStore();
@@ -142,66 +164,15 @@ export async function getCurrentEntityId(): Promise<string | null> {
   if (authError || !user) return null;
 
   const { data: entity } = await supabase
+    .schema('directory')
     .from('entities')
     .select('id')
-    .eq('auth_id', user.id)
+    .eq('claimed_by_user_id', user.id)
     .maybeSingle();
-  if (entity?.id) return entity.id;
-
-  try {
-    const sys = getSystemClient();
-    const { data: sysEntity } = await sys
-      .from('entities')
-      .select('id')
-      .eq('auth_id', user.id)
-      .maybeSingle();
-    return sysEntity?.id ?? null;
-  } catch {
-    return null;
-  }
+  return entity?.id ?? null;
 }
 
-/** Resolve current user's entity id and their HQ org (org_members with role priority: owner → admin → member). */
-async function getCurrentEntityAndOrg(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) return { entityId: null, orgId: null };
-
-  const { data: entity } = await supabase
-    .from('entities')
-    .select('id')
-    .eq('auth_id', user.id)
-    .maybeSingle();
-  if (!entity) return { entityId: null, orgId: null };
-
-  const { data: members } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('entity_id', entity.id);
-
-  if (members?.length) {
-    const sorted = [...members].sort(
-      (a, b) => (ORG_ROLE_PRIORITY[a.role] ?? 99) - (ORG_ROLE_PRIORITY[b.role] ?? 99)
-    );
-    return { entityId: entity.id, orgId: sorted[0].org_id };
-  }
-
-  // Fallback: you own an org (organizations.owner_id) but org_members row missing or not visible (e.g. RLS).
-  // Organizations RLS (workspace_isolate) lets you see orgs in your workspace, so we can resolve HQ here.
-  const { data: owned } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('owner_id', entity.id)
-    .limit(1)
-    .maybeSingle();
-  if (owned?.id) return { entityId: entity.id, orgId: owned.id };
-
-  return { entityId: entity.id, orgId: null };
-}
-
-/** Call from pages when you have a valid currentOrgId so it can be restored after nav (cookie fallback). */
+/** Call from pages when you have a valid currentOrgId so it can be restored after nav. */
 export async function setCurrentOrgCookie(orgId: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(CURRENT_ORG_COOKIE, orgId, {
@@ -214,8 +185,8 @@ export async function setCurrentOrgCookie(orgId: string): Promise<void> {
 }
 
 /**
- * Fetch the network graph scoped to current_org_id (Operator view – e.g. Invisible Touch).
- * Only returns orgs created by or owned by the current org, plus their rosters and our private notes.
+ * Fetch the network graph scoped to current_org_id.
+ * Session 9: reads from directory.entities + cortex.relationships only.
  */
 export async function getNetworkGraph(
   current_org_id: string
@@ -226,155 +197,220 @@ export async function getNetworkGraph(
     return null;
   }
 
-  const { data: orgs, error: orgsError } = await supabase
-    .from('organizations')
-    .select('id, name, slug, is_claimed, claimed_at, created_by_org_id, category')
-    .or(`id.eq.${current_org_id},created_by_org_id.eq.${current_org_id}`);
+  // Get current org entity
+  const { data: currentOrgEnt } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name, handle, attributes, avatar_url, owner_workspace_id')
+    .eq('legacy_org_id', current_org_id)
+    .maybeSingle();
 
-  if (orgsError || !orgs?.length) {
+  if (!currentOrgEnt) {
     return { current_org_id, organizations: [], entities: [] };
   }
 
-  const orgIds = orgs.map((o) => o.id);
+  // Get all org entities linked to current org via any org-level relationship
+  // Plus the current org itself
+  const { data: partnerRels } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('target_entity_id, relationship_type, context_data')
+    .eq('source_entity_id', currentOrgEnt.id)
+    .in('relationship_type', ['PARTNER', 'VENDOR', 'VENUE_PARTNER', 'CLIENT']);
 
-  const { data: privateData } = await supabase
-    .from('org_private_data')
-    .select('subject_org_id, private_notes, internal_rating')
-    .eq('owner_org_id', current_org_id)
-    .in('subject_org_id', orgIds);
+  const linkedOrgEntityIds = [currentOrgEnt.id, ...(partnerRels ?? []).map((r) => r.target_entity_id)];
+  const uniqueOrgEntityIds = [...new Set(linkedOrgEntityIds)];
 
-  const privateBySubject = new Map(
-    (privateData ?? []).map((p) => [p.subject_org_id, { private_notes: p.private_notes, internal_rating: p.internal_rating }])
+  // Get all org entities
+  const { data: orgEntities } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name, handle, attributes, avatar_url, legacy_org_id, owner_workspace_id')
+    .in('id', uniqueOrgEntityIds);
+
+  const orgEntityMap = new Map((orgEntities ?? []).map((e) => [e.id, e]));
+
+  // Private data (org_private_data is still in public schema)
+  const legacyOrgIds = (orgEntities ?? [])
+    .map((e) => e.legacy_org_id)
+    .filter(Boolean) as string[];
+
+  const { data: privateData } = legacyOrgIds.length > 0
+    ? await supabase
+        .from('org_private_data')
+        .select('subject_org_id, private_notes, internal_rating')
+        .eq('owner_org_id', current_org_id)
+        .in('subject_org_id', legacyOrgIds)
+    : { data: [] };
+
+  const privateByLegacyOrgId = new Map(
+    (privateData ?? []).map((p) => [p.subject_org_id, p])
   );
 
-  const { data: affiliations } = await supabase
-    .from('affiliations')
-    .select('organization_id, entity_id, role_label, access_level')
-    .in('organization_id', orgIds)
-    .eq('status', 'active');
+  // Get all MEMBER/ROSTER_MEMBER relationships for these org entities
+  const { data: memberRels } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('id, source_entity_id, target_entity_id, relationship_type, context_data')
+    .in('target_entity_id', uniqueOrgEntityIds)
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']);
 
-  const { data: entityRows } = await supabase
-    .from('entities')
-    .select('id, email, is_ghost, auth_id')
-    .in(
-      'id',
-      [...new Set((affiliations ?? []).map((a) => a.entity_id))]
-    );
-
-  const entityMap = new Map((entityRows ?? []).map((e) => [e.id, e]));
-  const affByOrg = new Map<string, typeof affiliations>();
-  for (const a of affiliations ?? []) {
-    if (!affByOrg.has(a.organization_id)) affByOrg.set(a.organization_id, []);
-    affByOrg.get(a.organization_id)!.push(a);
+  // Deduplicate: prefer ROSTER_MEMBER over MEMBER for same person+org
+  type MemberRel = NonNullable<typeof memberRels>[number];
+  const memberRelByKey = new Map<string, MemberRel>();
+  for (const rel of memberRels ?? []) {
+    const key = `${rel.source_entity_id}:${rel.target_entity_id}`;
+    const existing = memberRelByKey.get(key);
+    if (!existing || rel.relationship_type === 'ROSTER_MEMBER') {
+      memberRelByKey.set(key, rel);
+    }
   }
-  const affByEntity = new Map<string, { org_id: string; role_label: string | null; access_level: string }[]>();
-  for (const a of affiliations ?? []) {
-    if (!affByEntity.has(a.entity_id)) affByEntity.set(a.entity_id, []);
-    affByEntity.get(a.entity_id)!.push({
-      org_id: a.organization_id,
-      role_label: a.role_label,
-      access_level: a.access_level as 'admin' | 'member' | 'read_only',
-    });
-  }
+  const deduped = [...memberRelByKey.values()];
 
-  const entityIds = [...new Set((affiliations ?? []).map((a) => a.entity_id))];
-  const { data: orgMembers } = entityIds.length > 0
+  const personEntityIds = [...new Set(deduped.map((r) => r.source_entity_id))];
+
+  // Get person entities
+  const { data: personEntities } = personEntityIds.length > 0
     ? await supabase
-        .from('org_members')
-        .select('id, org_id, entity_id')
-        .in('org_id', orgIds)
-        .in('entity_id', entityIds)
+        .schema('directory')
+        .from('entities')
+        .select('id, display_name, attributes, avatar_url, claimed_by_user_id')
+        .in('id', personEntityIds)
     : { data: [] };
-  const orgMemberIds = (orgMembers ?? []).map((m) => m.id);
+
+  const personEntityMap = new Map((personEntities ?? []).map((e) => [e.id, e]));
+
+  // Get skills via stored org_member_id in ROSTER_MEMBER context_data
+  const orgMemberIds = deduped
+    .filter((r) => r.relationship_type === 'ROSTER_MEMBER')
+    .map((r) => (r.context_data as Record<string, string>)?.org_member_id)
+    .filter(Boolean) as string[];
+
   const { data: skillRows } = orgMemberIds.length > 0
     ? await supabase
         .from('talent_skills')
         .select('org_member_id, skill_tag')
         .in('org_member_id', orgMemberIds)
     : { data: [] };
+
   const skillsByOrgMemberId = new Map<string, string[]>();
   for (const s of skillRows ?? []) {
     const list = skillsByOrgMemberId.get(s.org_member_id) ?? [];
     list.push(s.skill_tag);
     skillsByOrgMemberId.set(s.org_member_id, list);
   }
-  const orgMemberByOrgAndEntity = new Map<string, { id: string }>();
-  for (const m of orgMembers ?? []) {
-    const eid = (m as { entity_id?: string | null }).entity_id;
-    if (eid) orgMemberByOrgAndEntity.set(`${m.org_id}:${eid}`, { id: m.id });
+
+  // Build a map from relationship_id to skill_tags (via org_member_id in context_data)
+  const skillsByRelId = new Map<string, string[]>();
+  for (const rel of deduped) {
+    if (rel.relationship_type !== 'ROSTER_MEMBER') continue;
+    const omId = (rel.context_data as Record<string, string>)?.org_member_id;
+    if (omId) skillsByRelId.set(rel.id, skillsByOrgMemberId.get(omId) ?? []);
   }
 
-  const orgNameById = new Map(orgs.map((o) => [o.id, o.name]));
+  // Group rels by org entity
+  const relsByOrgEntityId = new Map<string, typeof deduped>();
+  for (const rel of deduped) {
+    const list = relsByOrgEntityId.get(rel.target_entity_id) ?? [];
+    list.push(rel);
+    relsByOrgEntityId.set(rel.target_entity_id, list);
+  }
 
-  const organizations: NetworkGraph['organizations'] = orgs.map((org) => {
-    const priv = privateBySubject.get(org.id);
-    const affs = affByOrg.get(org.id) ?? [];
-    const roster = affs
-      .map((a) => {
-        const e = entityMap.get(a.entity_id);
-        if (!e) return null;
-        const entityOrgs = affByEntity.get(a.entity_id) ?? [];
-        const om = orgMemberByOrgAndEntity.get(`${org.id}:${a.entity_id}`);
-        const skill_tags = om ? (skillsByOrgMemberId.get(om.id) ?? []) : [];
+  // Build organizations list
+  const organizations: NetworkGraph['organizations'] = uniqueOrgEntityIds.map((orgEntityId) => {
+    const orgEnt = orgEntityMap.get(orgEntityId);
+    if (!orgEnt) return null;
+    const attrs = (orgEnt.attributes as Record<string, unknown>) ?? {};
+    const legacyOrgId = orgEnt.legacy_org_id as string | null;
+    const priv = legacyOrgId ? privateByLegacyOrgId.get(legacyOrgId) : null;
+    const orgRels = relsByOrgEntityId.get(orgEntityId) ?? [];
+
+    const roster = orgRels
+      .map((rel) => {
+        const person = personEntityMap.get(rel.source_entity_id);
+        if (!person) return null;
+        const ctx = (rel.context_data as Record<string, unknown>) ?? {};
+        const personAttrs = (person.attributes as Record<string, unknown>) ?? {};
+        const skill_tags = rel.relationship_type === 'ROSTER_MEMBER'
+          ? (skillsByRelId.get(rel.id) ?? [])
+          : [];
         return {
-          id: e.id,
-          email: e.email,
-          is_ghost: e.is_ghost,
-          role_label: a.role_label,
-          access_level: a.access_level as 'admin' | 'member' | 'read_only',
-          organization_ids: entityOrgs.map((x) => x.org_id),
+          id: person.id,
+          email: (personAttrs.email as string) ?? null,
+          is_ghost: person.claimed_by_user_id == null,
+          role_label: (ctx.role_label ?? ctx.job_title ?? null) as string | null,
+          access_level: (ctx.access_level ?? 'member') as 'admin' | 'member' | 'read_only',
+          organization_ids: [legacyOrgId ?? orgEntityId],
           skill_tags,
-          org_member_id: om?.id ?? null,
+          org_member_id: rel.id,
         };
       })
       .filter(Boolean) as NetworkGraph['organizations'][0]['roster'];
-    const category = (org as { category?: string | null }).category ?? null;
+
     return {
-      id: org.id,
-      name: org.name,
-      slug: org.slug,
-      is_claimed: org.is_claimed ?? false,
-      claimed_at: org.claimed_at,
-      created_by_org_id: org.created_by_org_id,
-      category: category as NetworkGraph['organizations'][0]['category'],
+      id: legacyOrgId ?? orgEntityId,
+      name: orgEnt.display_name,
+      slug: orgEnt.handle ?? null,
+      is_claimed: (attrs.is_claimed as boolean) ?? true,
+      claimed_at: null,
+      created_by_org_id: (attrs.created_by_org_id as string | null) ?? null,
+      category: (attrs.category as NetworkGraph['organizations'][0]['category']) ?? null,
       private_notes: priv?.private_notes ?? null,
       internal_rating: priv?.internal_rating ?? null,
       roster,
     };
-  });
+  }).filter(Boolean) as NetworkGraph['organizations'];
 
-  const entities: NetworkGraph['entities'] = [];
-  for (const [entityId, affs] of affByEntity) {
-    const e = entityMap.get(entityId);
-    if (!e) continue;
-    const organization_names = affs.map((a) => orgNameById.get(a.org_id) ?? '').filter(Boolean);
-    const first = affs[0];
-    const allSkillTags = new Set<string>();
-    for (const a of affs) {
-      const om = orgMemberByOrgAndEntity.get(`${a.org_id}:${entityId}`);
-      if (om) (skillsByOrgMemberId.get(om.id) ?? []).forEach((t) => allSkillTags.add(t));
-    }
-    const currentOrgMemberId = current_org_id
-      ? orgMemberByOrgAndEntity.get(`${current_org_id}:${entityId}`)?.id ?? null
-      : null;
-    entities.push({
-      id: e.id,
-      email: e.email,
-      is_ghost: e.is_ghost,
-      role_label: first?.role_label ?? null,
-      access_level: (first?.access_level ?? 'member') as 'admin' | 'member' | 'read_only',
-      organization_ids: affs.map((a) => a.org_id),
-      organization_names,
-      skill_tags: [...allSkillTags],
-      org_member_id: currentOrgMemberId,
-    });
+  // Build entities list (deduplicated people with all their org affiliations)
+  const entityOrgIds = new Map<string, string[]>();
+  for (const rel of deduped) {
+    const orgEnt = orgEntityMap.get(rel.target_entity_id);
+    const orgId = (orgEnt?.legacy_org_id as string | null) ?? rel.target_entity_id;
+    const list = entityOrgIds.get(rel.source_entity_id) ?? [];
+    if (!list.includes(orgId)) list.push(orgId);
+    entityOrgIds.set(rel.source_entity_id, list);
   }
+
+  const orgNameById = new Map(
+    (orgEntities ?? []).map((o) => [o.legacy_org_id as string, o.display_name])
+  );
+
+  const entities: NetworkGraph['entities'] = personEntityIds.map((personEntityId) => {
+    const person = personEntityMap.get(personEntityId);
+    if (!person) return null;
+    const personAttrs = (person.attributes as Record<string, unknown>) ?? {};
+    const orgIds = entityOrgIds.get(personEntityId) ?? [];
+    const orgNames = orgIds.map((id) => orgNameById.get(id) ?? '').filter(Boolean);
+
+    const allSkills = new Set<string>();
+    for (const rel of deduped.filter((r) => r.source_entity_id === personEntityId && r.relationship_type === 'ROSTER_MEMBER')) {
+      (skillsByRelId.get(rel.id) ?? []).forEach((t) => allSkills.add(t));
+    }
+
+    // Find the best relationship for role/access info
+    const primaryRel = deduped.find(
+      (r) => r.source_entity_id === personEntityId && r.target_entity_id === currentOrgEnt.id
+    ) ?? deduped.find((r) => r.source_entity_id === personEntityId);
+    const ctx = (primaryRel?.context_data as Record<string, unknown>) ?? {};
+
+    return {
+      id: person.id,
+      email: (personAttrs.email as string) ?? null,
+      is_ghost: person.claimed_by_user_id == null,
+      role_label: (ctx.role_label ?? ctx.job_title ?? null) as string | null,
+      access_level: (ctx.access_level ?? 'member') as 'admin' | 'member' | 'read_only',
+      organization_ids: orgIds,
+      organization_names: orgNames,
+      skill_tags: [...allSkills],
+      org_member_id: primaryRel?.id ?? null,
+    };
+  }).filter(Boolean) as NetworkGraph['entities'];
 
   return { current_org_id, organizations, entities };
 }
 
 /**
- * Validate an invitation token (for the claim page). Returns email + org name if valid.
+ * Validate an invitation token (for the claim page).
  */
 export async function validateInvitation(
   token: string
@@ -392,21 +428,22 @@ export async function validateInvitation(
   if (new Date(inv.expires_at) <= new Date())
     return { ok: false, error: 'This invitation has expired.' };
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('name')
-    .eq('id', inv.organization_id)
-    .single();
+  const { data: orgEnt } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('display_name')
+    .eq('legacy_org_id', inv.organization_id)
+    .maybeSingle();
   return {
     ok: true,
     email: inv.email,
-    org_name: org?.name ?? 'Organization',
+    org_name: orgEnt?.display_name ?? 'Organization',
     organization_id: inv.organization_id,
   };
 }
 
 /**
- * Update private notes for an org (owner_org_id = current user's org). For useOptimistic.
+ * Update private notes for an org.
  */
 export async function updatePrivateNotes(
   subject_org_id: string,
