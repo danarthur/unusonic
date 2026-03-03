@@ -223,6 +223,40 @@ export async function claimGhostOrganizationBySlug(
       .eq('legacy_org_id', orgId);
   }
 
+  // Non-fatal: ensure person entity is in directory.entities + create ROSTER_MEMBER edge
+  {
+    const { data: personDirEnt } = await supabase
+      .schema('directory').from('entities')
+      .select('id').eq('claimed_by_user_id', user.id).maybeSingle();
+    let personDirId = personDirEnt?.id ?? null;
+    if (!personDirId) {
+      const { data: profileRow } = await supabase
+        .from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+      const { data: newPersonDir } = await supabase
+        .schema('directory').from('entities').insert({
+          display_name: (profileRow as { full_name?: string | null } | null)?.full_name ?? user.email ?? 'Owner',
+          type: 'person',
+          claimed_by_user_id: user.id,
+          owner_workspace_id: orgWorkspaceId,
+          legacy_entity_id: entityId,
+          attributes: { email: user.email ?? '', is_ghost: false },
+        }).select('id').maybeSingle();
+      personDirId = newPersonDir?.id ?? null;
+    }
+    if (personDirId) {
+      const { data: orgDirEnt } = await supabase
+        .schema('directory').from('entities').select('id').eq('legacy_org_id', orgId).maybeSingle();
+      if (orgDirEnt?.id) {
+        await supabase.rpc('upsert_relationship', {
+          p_source_entity_id: personDirId,
+          p_target_entity_id: orgDirEnt.id,
+          p_type: 'ROSTER_MEMBER',
+          p_context_data: { role: 'owner', employment_status: 'internal_employee' },
+        });
+      }
+    }
+  }
+
   // Mark onboarding complete so user isn't redirected back to /onboarding
   await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
 
@@ -527,6 +561,24 @@ export async function claimOrganization(
     .update({ status: 'accepted' })
     .eq('id', invitation.id);
 
+  // Non-fatal: create ROSTER_MEMBER edge in cortex for the claimer
+  {
+    const { data: personDirEnt } = await supabase
+      .schema('directory').from('entities')
+      .select('id').eq('legacy_entity_id', entityId).maybeSingle();
+    const { data: orgDirEnt } = await supabase
+      .schema('directory').from('entities')
+      .select('id').eq('legacy_org_id', invitation.organization_id).maybeSingle();
+    if (personDirEnt?.id && orgDirEnt?.id) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: personDirEnt.id,
+        p_target_entity_id: orgDirEnt.id,
+        p_type: 'ROSTER_MEMBER',
+        p_context_data: { role: 'owner', employment_status: 'internal_employee' },
+      });
+    }
+  }
+
   return { ok: true, organizationId: invitation.organization_id };
 }
 
@@ -671,6 +723,41 @@ export async function createGenesisOrganization(
     await supabase.from('affiliations').delete().eq('entity_id', entityId).eq('organization_id', orgId);
     await supabase.from('organizations').delete().eq('id', orgId);
     return { ok: false, error: memberError.message ?? 'Failed to add you as owner.' };
+  }
+
+  // Non-fatal: ensure person entity is in directory.entities + create ROSTER_MEMBER edge
+  // Required so getCurrentEntityAndOrg() resolves correctly on /network after genesis.
+  {
+    const { data: personDirEnt } = await supabase
+      .schema('directory').from('entities')
+      .select('id').eq('claimed_by_user_id', user.id).maybeSingle();
+    let personDirId = personDirEnt?.id ?? null;
+    if (!personDirId) {
+      const { data: profileRow } = await supabase
+        .from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+      const { data: newPersonDir } = await supabase
+        .schema('directory').from('entities').insert({
+          display_name: (profileRow as { full_name?: string | null } | null)?.full_name ?? user.email ?? 'Owner',
+          type: 'person',
+          claimed_by_user_id: user.id,
+          owner_workspace_id: workspaceId,
+          legacy_entity_id: entityId,
+          attributes: { email: user.email ?? '', is_ghost: false },
+        }).select('id').maybeSingle();
+      personDirId = newPersonDir?.id ?? null;
+    }
+    if (personDirId) {
+      const { data: orgDirEnt } = await supabase
+        .schema('directory').from('entities').select('id').eq('legacy_org_id', orgId).maybeSingle();
+      if (orgDirEnt?.id) {
+        await supabase.rpc('upsert_relationship', {
+          p_source_entity_id: personDirId,
+          p_target_entity_id: orgDirEnt.id,
+          p_type: 'ROSTER_MEMBER',
+          p_context_data: { role: 'owner', employment_status: 'internal_employee' },
+        });
+      }
+    }
   }
 
   revalidatePath('/network');

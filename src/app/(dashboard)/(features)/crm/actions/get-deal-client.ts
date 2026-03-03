@@ -122,7 +122,7 @@ export async function getDealClientContext(
       personEmail = (legacyEnt as { email?: string | null } | null)?.email ?? null;
     }
 
-    // Contact name: prefer cortex ROSTER_MEMBER edge, fallback to org_members
+    // Contact name: cortex ROSTER_MEMBER edge
     let contactFirstName = '';
     let contactLastName = '';
     if (orgDirRes.data?.id && personDirRes.data?.id) {
@@ -135,13 +135,6 @@ export async function getDealClientContext(
       const ctx = (rosterEdge?.context_data as Record<string, unknown>) ?? {};
       contactFirstName = (ctx.first_name as string) ?? '';
       contactLastName = (ctx.last_name as string) ?? '';
-    }
-    if (!contactFirstName && !contactLastName) {
-      const { data: memberRow } = await supabase
-        .from('org_members').select('first_name, last_name')
-        .eq('org_id', orgId).eq('entity_id', entityIdFromStakeholder).maybeSingle();
-      contactFirstName = (memberRow as { first_name?: string | null } | null)?.first_name ?? '';
-      contactLastName = (memberRow as { last_name?: string | null } | null)?.last_name ?? '';
     }
 
     if (orgDisplayData) {
@@ -282,7 +275,7 @@ export async function getDealClientContext(
     }
   }
 
-  // Relationship ID: cortex preferred, fallback to org_relationships
+  // Relationship ID: cortex only
   let relId: string | null = null;
   if (sourceOrgId) {
     const { data: srcDirEnt } = await supabase
@@ -295,12 +288,6 @@ export async function getDealClientContext(
         .in('relationship_type', ['VENDOR', 'PARTNER', 'CLIENT', 'VENUE_PARTNER'])
         .maybeSingle();
       relId = (cortexRel as { id?: string } | null)?.id ?? null;
-    }
-    if (!relId) {
-      const { data: orgRel } = await supabase
-        .from('org_relationships').select('id')
-        .eq('source_org_id', sourceOrgId).eq('target_org_id', orgId).maybeSingle();
-      relId = (orgRel as { id?: string } | null)?.id ?? null;
     }
   }
 

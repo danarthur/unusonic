@@ -474,19 +474,14 @@ export async function createContactForOrg(
     return { success: false, error: msg };
   }
 
-  const result = rpcResult as { ok?: boolean; id?: string; error?: string } | null;
-  if (!result?.ok || !result.id) {
+  // Migrated RPC returns { ok, id (cortex rel id), entity_id (directory entity id), ... }
+  const result = rpcResult as { ok?: boolean; id?: string; entity_id?: string; error?: string } | null;
+  if (!result?.ok) {
     return { success: false, error: result?.error ?? 'Failed to add contact.' };
   }
 
-  // RPC returns org_member id; we need entity_id for deal_stakeholders.contact_node_id
-  const { data: member } = await supabase
-    .from('org_members')
-    .select('entity_id')
-    .eq('id', result.id)
-    .eq('org_id', orgId)
-    .maybeSingle();
-  const entityId = (member as { entity_id?: string | null } | null)?.entity_id ?? null;
+  // entity_id from RPC is the directory.entities.id (deal_stakeholders.entity_id FK dropped — soft ref)
+  const entityId = result.entity_id ?? null;
   if (!entityId) return { success: false, error: 'Contact was created but could not be linked.' };
 
   return { success: true, entityId };

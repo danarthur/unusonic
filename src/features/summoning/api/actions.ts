@@ -24,20 +24,43 @@ async function getCurrentOrgId(supabase: Awaited<ReturnType<typeof createClient>
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) return null;
-  const { data: entity } = await supabase
+
+  // Session 9: use directory.entities (claimed_by_user_id) + cortex.relationships
+  const { data: personEnt } = await supabase
+    .schema('directory')
     .from('entities')
     .select('id')
-    .eq('auth_id', user.id)
+    .eq('claimed_by_user_id', user.id)
     .maybeSingle();
-  if (!entity) return null;
-  const { data: aff } = await supabase
-    .from('affiliations')
-    .select('organization_id')
-    .eq('entity_id', entity.id)
-    .in('access_level', ['admin', 'member', 'read_only'])
-    .limit(1)
+  if (!personEnt) return null;
+
+  const { data: rels } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('target_entity_id, context_data')
+    .eq('source_entity_id', personEnt.id)
+    .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+    .limit(5);
+
+  if (!rels?.length) return null;
+
+  // Pick highest-priority role
+  const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2, restricted: 3 };
+  const sorted = [...rels].sort((a, b) => {
+    const ra = (a.context_data as Record<string, unknown>)?.role as string ?? '';
+    const rb = (b.context_data as Record<string, unknown>)?.role as string ?? '';
+    return (roleOrder[ra] ?? 99) - (roleOrder[rb] ?? 99);
+  });
+  const best = sorted[0];
+
+  const { data: orgEnt } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('legacy_org_id')
+    .eq('id', best.target_entity_id)
     .maybeSingle();
-  return aff?.organization_id ?? null;
+
+  return orgEnt?.legacy_org_id ?? null;
 }
 
 /**
@@ -66,41 +89,54 @@ export async function createPartnerSummon(
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail) return { ok: false, error: 'Email is required.' };
 
-  // Cure: already a real user with this email?
-  const { data: entity } = await supabase
+  // Cure: already a real user with this email? Check via directory.entities
+  const { data: claimedEntity } = await supabase
+    .schema('directory')
     .from('entities')
-    .select('id, auth_id')
-    .ilike('email', normalizedEmail)
+    .select('id, claimed_by_user_id, attributes')
+    .ilike('attributes->>email', normalizedEmail)
     .maybeSingle();
 
-  if (entity?.auth_id) {
-    // Find the sovereign org they own (claimed org where they are owner)
-    const { data: aff } = await supabase
-      .from('affiliations')
-      .select('organization_id')
-      .eq('entity_id', entity.id)
-      .eq('access_level', 'admin')
-      .limit(1)
-      .maybeSingle();
-    if (aff) {
-      const { data: orgEntity } = await supabase
+  if (claimedEntity?.claimed_by_user_id) {
+    // Find the sovereign org via cortex MEMBER/ROSTER_MEMBER edge (owner role)
+    const { data: rels } = await supabase
+      .schema('cortex')
+      .from('relationships')
+      .select('target_entity_id, context_data')
+      .eq('source_entity_id', claimedEntity.id)
+      .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+      .limit(5);
+    const ownerRel = (rels ?? []).find((r) => {
+      const ctx = (r.context_data as Record<string, unknown>) ?? {};
+      return ctx.role === 'owner' || ctx.role === 'admin';
+    });
+    if (ownerRel) {
+      const { data: sovereignOrgEnt } = await supabase
         .schema('directory')
         .from('entities')
-        .select('legacy_org_id, attributes')
-        .eq('legacy_org_id', aff.organization_id)
+        .select('id, legacy_org_id, attributes')
+        .eq('id', ownerRel.target_entity_id)
         .maybeSingle();
-      const orgAttrs = (orgEntity?.attributes as Record<string, unknown>) ?? {};
-      if (orgEntity?.legacy_org_id && orgAttrs.is_claimed === true) {
-        const sovereignOrgId = orgEntity.legacy_org_id;
-        const { error: updateError } = await supabase
-          .from('org_relationships')
-          .update({ target_org_id: sovereignOrgId })
-          .eq('source_org_id', originOrgId)
-          .eq('target_org_id', ghostOrgId);
-        if (!updateError) {
-          revalidatePath('/network');
-          return { ok: true, cured: true, message: 'Partner already on Signal. Relationship updated.' };
+      const orgAttrs = (sovereignOrgEnt?.attributes as Record<string, unknown>) ?? {};
+      if (sovereignOrgEnt && orgAttrs.is_claimed === true) {
+        // Update cortex: change ghost edge to sovereign edge
+        const { data: originDirEnt } = await supabase
+          .schema('directory').from('entities')
+          .select('id').eq('legacy_org_id', originOrgId).maybeSingle();
+        const { data: ghostDirEnt } = await supabase
+          .schema('directory').from('entities')
+          .select('id').eq('legacy_org_id', ghostOrgId).maybeSingle();
+        if (originDirEnt && ghostDirEnt) {
+          // Upsert new edge pointing to sovereign org (old ghost edge remains; sovereign takes precedence)
+          await supabase.rpc('upsert_relationship', {
+            p_source_entity_id: originDirEnt.id,
+            p_target_entity_id: sovereignOrgEnt.id,
+            p_type: 'PARTNER',
+            p_context_data: { tier: 'preferred', lifecycle_status: 'active' },
+          });
         }
+        revalidatePath('/network');
+        return { ok: true, cured: true, message: 'Partner already on Signal. Relationship updated.' };
       }
     }
   }

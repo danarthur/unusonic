@@ -49,22 +49,30 @@ export async function inviteTalent(
     return { ok: false, error: 'You must be signed in to add talent.' };
   }
 
-  const myEntityId = await getCurrentEntityId();
-  if (!myEntityId) {
+  // Session 9: membership check via directory.entities + cortex.relationships
+  const { data: myDirEnt } = await supabase
+    .schema('directory').from('entities')
+    .select('id').eq('claimed_by_user_id', user.id).maybeSingle();
+  if (!myDirEnt) {
     return { ok: false, error: 'Your account is not linked to an organization.' };
   }
 
-  const { data: aff } = await supabase
-    .from('affiliations')
-    .select('organization_id')
-    .eq('entity_id', myEntityId)
-    .eq('organization_id', orgId)
-    .in('access_level', ['admin', 'member'])
-    .eq('status', 'active')
-    .maybeSingle();
-  if (!aff) {
+  const { data: orgDirEnt } = await supabase
+    .schema('directory').from('entities')
+    .select('id').eq('legacy_org_id', orgId).maybeSingle();
+
+  const { data: membershipRel } = orgDirEnt ? await supabase
+    .schema('cortex').from('relationships')
+    .select('id').eq('source_entity_id', myDirEnt.id).eq('target_entity_id', orgDirEnt.id)
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).maybeSingle()
+    : { data: null };
+
+  if (!membershipRel) {
     return { ok: false, error: 'You do not have permission to add members to this organization.' };
   }
+
+  // Keep myEntityId compatible for legacy writes below (resolve from directory.legacy_entity_id)
+  const myEntityId = myDirEnt.id;
 
   const emailTrim = email.trim();
   const { data: profile } = await supabase

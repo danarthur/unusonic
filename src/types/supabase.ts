@@ -775,13 +775,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "deal_stakeholders_entity_id_fkey"
-            columns: ["entity_id"]
-            isOneToOne: false
-            referencedRelation: "entities"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "deal_stakeholders_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
