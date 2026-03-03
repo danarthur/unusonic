@@ -37,5 +37,26 @@ export async function createGhostOrg(input: CreateGhostOrgInput): Promise<Create
     .single();
 
   if (error) return { ok: false, error: error.message };
+
+  // Dual-write: mirror to directory.entities (new schema)
+  const entityType = type === 'venue' ? 'venue' : 'company';
+  await supabase
+    .schema('directory')
+    .from('entities')
+    .insert({
+      owner_workspace_id: workspace_id,
+      type: entityType,
+      display_name: name,
+      claimed_by_user_id: null, // ghost — not yet claimed
+      attributes: {
+        is_ghost: true,
+        is_claimed: false,
+        category,
+        address: { city, state: state ?? null },
+      },
+      legacy_org_id: data.id,
+    });
+  // Non-fatal: if directory.entities insert fails, org was still created in public.organizations.
+
   return { ok: true, id: data.id };
 }

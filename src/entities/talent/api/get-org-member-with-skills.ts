@@ -35,7 +35,19 @@ export async function getOrgMemberWithSkills(
       .select('email')
       .eq('id', member.entity_id)
       .maybeSingle();
-    entityEmail = ent?.email ?? null;
+    if (ent?.email) {
+      entityEmail = ent.email;
+    } else {
+      // Fallback: directory.entities (email stored in attributes for ghost people)
+      const { data: dirEnt } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('attributes')
+        .eq('legacy_entity_id', member.entity_id)
+        .maybeSingle();
+      const attrs = (dirEnt?.attributes as Record<string, unknown>) ?? {};
+      entityEmail = (attrs.email as string | null) ?? null;
+    }
   }
 
   const skills = await getTalentSkillsByOrgMemberId(member.id);
@@ -87,7 +99,19 @@ export async function getOrgMemberByProfileAndOrg(
       .select('email')
       .eq('id', member.entity_id)
       .maybeSingle();
-    entityEmail = ent?.email ?? null;
+    if (ent?.email) {
+      entityEmail = ent.email;
+    } else {
+      // Fallback: directory.entities (email stored in attributes for ghost people)
+      const { data: dirEnt } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('attributes')
+        .eq('legacy_entity_id', member.entity_id)
+        .maybeSingle();
+      const attrs = (dirEnt?.attributes as Record<string, unknown>) ?? {};
+      entityEmail = (attrs.email as string | null) ?? null;
+    }
   }
 
   const skills = await getTalentSkillsByOrgMemberId(member.id);

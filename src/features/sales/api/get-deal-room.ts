@@ -62,8 +62,9 @@ function probabilityFromStage(stage: number): number {
 export async function getGigDealRoom(eventId: string): Promise<DealRoomDTO | null> {
   const supabase = await createClient();
 
-  // 1. Event details (client from organizations relation)
+  // 1. Event details
   const { data: eventRow, error: eventError } = await supabase
+    .schema('ops')
     .from('events')
     .select(
       `
@@ -71,7 +72,7 @@ export async function getGigDealRoom(eventId: string): Promise<DealRoomDTO | nul
       workspace_id,
       title,
       lifecycle_status,
-      organizations:client_id(name)
+      client_entity_id
     `
     )
     .eq('id', eventId)
@@ -84,13 +85,19 @@ export async function getGigDealRoom(eventId: string): Promise<DealRoomDTO | nul
     return null;
   }
 
-  const row = eventRow as {
-    client_id?: string | null;
-    organizations?: { name?: string } | null;
-  };
-  const client = row.organizations;
-  const clientName =
-    (client && typeof client === 'object' && 'name' in client ? (client.name as string) ?? null : null) ?? null;
+  const row = eventRow as { client_entity_id?: string | null };
+
+  // Resolve client name from directory.entities
+  let clientName: string | null = null;
+  if (row.client_entity_id) {
+    const { data: dirEnt } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('id', row.client_entity_id)
+      .maybeSingle();
+    clientName = dirEnt?.display_name ?? null;
+  }
   const clientEmail: string | null = null;
 
   const gig: DealRoomGig = {

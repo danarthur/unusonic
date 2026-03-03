@@ -25,6 +25,7 @@ export function useGigs() {
   const fetchGigs = async () => {
     try {
       const { data, error } = await supabase
+        .schema('ops')
         .from('events')
         .select(
           `
@@ -34,7 +35,7 @@ export function useGigs() {
           starts_at,
           location_name,
           crm_estimated_value,
-          organizations:client_id(name, type)
+          client_entity_id
         `
         )
         .in('lifecycle_status', ['lead', 'tentative', 'confirmed', 'production', 'live'])
@@ -42,9 +43,30 @@ export function useGigs() {
 
       if (error) throw error;
       const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+      // Batch-resolve client names from directory.entities
+      const clientEntityIds = [...new Set(
+        rows.map((e) => e.client_entity_id as string | null).filter((id): id is string => !!id)
+      )];
+      const clientMap = new Map<string, { name: string; type: string }>();
+      if (clientEntityIds.length > 0) {
+        const { data: dirEnts } = await supabase
+          .schema('directory')
+          .from('entities')
+          .select('id, display_name, attributes')
+          .in('id', clientEntityIds);
+        for (const ent of dirEnts ?? []) {
+          const attrs = (ent.attributes as Record<string, unknown>) ?? {};
+          clientMap.set(ent.id, {
+            name: ent.display_name ?? '',
+            type: (attrs.category as string) ?? '',
+          });
+        }
+      }
+
       setGigs(
         rows.map((e) => {
-          const org = e.organizations as { name?: string; type?: string } | null;
+          const clientEntityId = e.client_entity_id as string | null;
           return {
             id: e.id as string,
             title: (e.title as string) ?? '',
@@ -52,9 +74,7 @@ export function useGigs() {
             event_date: e.starts_at ? String((e.starts_at as string).slice(0, 10)) : '',
             event_location: (e.location_name as string) ?? '',
             budget_estimated: (e.crm_estimated_value as number) ?? undefined,
-            client: org
-              ? { name: org.name ?? '', type: org.type ?? '' }
-              : null,
+            client: clientEntityId ? (clientMap.get(clientEntityId) ?? null) : null,
           };
         })
       );
@@ -70,7 +90,7 @@ export function useGigs() {
 
     const channel = supabase
       .channel('crm_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'ops', table: 'events' }, () => {
         fetchGigs();
       })
       .subscribe();

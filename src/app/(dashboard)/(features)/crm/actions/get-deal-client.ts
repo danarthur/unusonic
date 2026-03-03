@@ -74,33 +74,93 @@ export async function getDealClientContext(
 
   // Dual-node bill_to: org + contact — use contact for mainContact (email/signing), org for organization (address)
   if (orgId && entityIdFromStakeholder) {
-    const [orgRes, entityRes, memberRes] = await Promise.all([
-      supabase.from('organizations').select('id, name, category, support_email, website, address').eq('id', orgId).eq('workspace_id', workspaceId).maybeSingle(),
-      supabase.from('entities').select('id, email').eq('id', entityIdFromStakeholder).maybeSingle(),
-      supabase.from('org_members').select('first_name, last_name').eq('org_id', orgId).eq('entity_id', entityIdFromStakeholder).maybeSingle(),
+    // Prefer directory.entities for both org and person lookups
+    const [orgDirRes, personDirRes] = await Promise.all([
+      supabase.schema('directory').from('entities')
+        .select('id, display_name, attributes')
+        .eq('legacy_org_id', orgId)
+        .maybeSingle(),
+      supabase.schema('directory').from('entities')
+        .select('id, attributes')
+        .eq('legacy_entity_id', entityIdFromStakeholder)
+        .maybeSingle(),
     ]);
-    const org = orgRes.data as Record<string, unknown> | null;
-    const entity = entityRes.data as { id?: string; email?: string | null } | null;
-    const member = memberRes.data as { first_name?: string | null; last_name?: string | null } | null;
-    if (org && entity) {
-      const firstName = (member?.first_name ?? '') as string;
-      const lastName = (member?.last_name ?? '') as string;
+
+    let orgDisplayData: { name: string; category: string | null; support_email: string | null; website: string | null; address: DealClientContext['organization']['address'] } | null = null;
+    if (orgDirRes.data) {
+      const attrs = (orgDirRes.data.attributes as Record<string, unknown>) ?? {};
+      orgDisplayData = {
+        name: orgDirRes.data.display_name ?? '',
+        category: (attrs.category as string | null) ?? null,
+        support_email: (attrs.support_email as string | null) ?? null,
+        website: (attrs.website as string | null) ?? null,
+        address: (attrs.address as DealClientContext['organization']['address']) ?? null,
+      };
+    } else {
+      const { data: legacyOrg } = await supabase
+        .from('organizations').select('name, category, support_email, website, address')
+        .eq('id', orgId).eq('workspace_id', workspaceId).maybeSingle();
+      if (legacyOrg) {
+        const lo = legacyOrg as Record<string, unknown>;
+        orgDisplayData = {
+          name: (lo.name as string) ?? '',
+          category: (lo.category as string | null) ?? null,
+          support_email: (lo.support_email as string | null) ?? null,
+          website: (lo.website as string | null) ?? null,
+          address: (lo.address as DealClientContext['organization']['address']) ?? null,
+        };
+      }
+    }
+
+    let personEmail: string | null = null;
+    if (personDirRes.data) {
+      const attrs = (personDirRes.data.attributes as Record<string, unknown>) ?? {};
+      personEmail = (attrs.email as string | null) ?? null;
+    } else {
+      const { data: legacyEnt } = await supabase
+        .from('entities').select('email').eq('id', entityIdFromStakeholder).maybeSingle();
+      personEmail = (legacyEnt as { email?: string | null } | null)?.email ?? null;
+    }
+
+    // Contact name: prefer cortex ROSTER_MEMBER edge, fallback to org_members
+    let contactFirstName = '';
+    let contactLastName = '';
+    if (orgDirRes.data?.id && personDirRes.data?.id) {
+      const { data: rosterEdge } = await supabase.schema('cortex').from('relationships')
+        .select('context_data')
+        .eq('source_entity_id', personDirRes.data.id)
+        .eq('target_entity_id', orgDirRes.data.id)
+        .eq('relationship_type', 'ROSTER_MEMBER')
+        .maybeSingle();
+      const ctx = (rosterEdge?.context_data as Record<string, unknown>) ?? {};
+      contactFirstName = (ctx.first_name as string) ?? '';
+      contactLastName = (ctx.last_name as string) ?? '';
+    }
+    if (!contactFirstName && !contactLastName) {
+      const { data: memberRow } = await supabase
+        .from('org_members').select('first_name, last_name')
+        .eq('org_id', orgId).eq('entity_id', entityIdFromStakeholder).maybeSingle();
+      contactFirstName = (memberRow as { first_name?: string | null } | null)?.first_name ?? '';
+      contactLastName = (memberRow as { last_name?: string | null } | null)?.last_name ?? '';
+    }
+
+    if (orgDisplayData) {
       return {
         organization: {
-          id: org.id as string,
-          name: (org.name as string) ?? '',
-          category: (org.category as string) ?? null,
-          support_email: (org.support_email as string) ?? null,
-          website: (org.website as string) ?? null,
-          address: org.address && typeof org.address === 'object' ? (org.address as DealClientContext['organization']['address']) : null,
+          id: orgId,
+          name: orgDisplayData.name,
+          category: orgDisplayData.category,
+          support_email: orgDisplayData.support_email,
+          website: orgDisplayData.website,
+          address: orgDisplayData.address && typeof orgDisplayData.address === 'object' ? orgDisplayData.address : null,
         },
-        mainContact: {
-          id: entity.id as string,
-          first_name: firstName,
-          last_name: lastName,
-          email: entity.email ?? null,
+        mainContact: personDirRes.data || personEmail !== null ? {
+          id: entityIdFromStakeholder,
+          first_name: contactFirstName,
+          last_name: contactLastName,
+          email: personEmail,
           phone: null,
-        },
+        } : null,
         pastDealsCount: 0,
         privateNotes: null,
         relationshipId: null,
@@ -110,19 +170,28 @@ export async function getDealClientContext(
 
   // If bill_to is an entity only (person, e.g. Bride), build minimal context from entity
   if (entityIdFromStakeholder && !orgId) {
-    const { data: entity } = await supabase
-      .from('entities')
-      .select('id, email')
-      .eq('id', entityIdFromStakeholder)
+    // Prefer directory.entities; fallback to public.entities
+    let personOnlyEmail: string | null = null;
+    const { data: personOnlyDir } = await supabase
+      .schema('directory').from('entities')
+      .select('display_name, attributes')
+      .eq('legacy_entity_id', entityIdFromStakeholder)
       .maybeSingle();
-    if (entity) {
-      const e = entity as { id: string; email?: string | null };
+    if (personOnlyDir) {
+      const attrs = (personOnlyDir.attributes as Record<string, unknown>) ?? {};
+      personOnlyEmail = (attrs.email as string | null) ?? personOnlyDir.display_name ?? null;
+    } else {
+      const { data: legacyEnt } = await supabase
+        .from('entities').select('email').eq('id', entityIdFromStakeholder).maybeSingle();
+      personOnlyEmail = (legacyEnt as { email?: string | null } | null)?.email ?? null;
+    }
+    if (personOnlyEmail !== null || personOnlyDir) {
       return {
         organization: {
-          id: e.id,
-          name: e.email ?? 'Unknown',
+          id: entityIdFromStakeholder,
+          name: personOnlyEmail ?? 'Unknown',
           category: null,
-          support_email: e.email ?? null,
+          support_email: personOnlyEmail ?? null,
           website: null,
           address: null,
         },
@@ -136,71 +205,119 @@ export async function getDealClientContext(
 
   if (!orgId) return null;
 
-  const [orgRes, contactRes, countRes, notesRes, relRes] = await Promise.all([
-    supabase
-      .from('organizations')
-      .select('id, name, category, support_email, website, address')
-      .eq('id', orgId)
-      .eq('workspace_id', workspaceId)
+  // Prefer directory.entities for org; parallel with count + notes
+  const [orgDirMainRes, countRes, notesRes] = await Promise.all([
+    supabase.schema('directory').from('entities')
+      .select('id, display_name, attributes')
+      .eq('legacy_org_id', orgId)
       .maybeSingle(),
-    mainContactId
-      ? supabase
-          .from('contacts')
-          .select('id, first_name, last_name, email, phone')
-          .eq('id', mainContactId)
-          .eq('workspace_id', workspaceId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase
-      .from('deals')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .eq('workspace_id', workspaceId),
-    supabase
-      .from('org_private_data')
-      .select('private_notes')
-      .eq('subject_org_id', orgId)
-      .maybeSingle(),
-    sourceOrgId
-      ? supabase
-          .from('org_relationships')
-          .select('id')
-          .eq('source_org_id', sourceOrgId)
-          .eq('target_org_id', orgId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    supabase.from('deals').select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId).eq('workspace_id', workspaceId),
+    supabase.from('org_private_data').select('private_notes').eq('subject_org_id', orgId).maybeSingle(),
   ]);
 
-  const org = orgRes.data as Record<string, unknown> | null;
-  if (!org) return null;
+  let mainOrgName = '';
+  let mainOrgCategory: string | null = null;
+  let mainOrgSupportEmail: string | null = null;
+  let mainOrgWebsite: string | null = null;
+  let mainOrgAddress: DealClientContext['organization']['address'] = null;
+  let foundOrg = false;
 
-  const contact = contactRes.data as Record<string, unknown> | null;
+  if (orgDirMainRes.data) {
+    const attrs = (orgDirMainRes.data.attributes as Record<string, unknown>) ?? {};
+    mainOrgName = orgDirMainRes.data.display_name ?? '';
+    mainOrgCategory = (attrs.category as string | null) ?? null;
+    mainOrgSupportEmail = (attrs.support_email as string | null) ?? null;
+    mainOrgWebsite = (attrs.website as string | null) ?? null;
+    mainOrgAddress = (attrs.address as DealClientContext['organization']['address']) ?? null;
+    foundOrg = true;
+  } else {
+    const { data: legacyOrg } = await supabase
+      .from('organizations').select('name, category, support_email, website, address')
+      .eq('id', orgId).eq('workspace_id', workspaceId).maybeSingle();
+    if (legacyOrg) {
+      const lo = legacyOrg as Record<string, unknown>;
+      mainOrgName = (lo.name as string) ?? '';
+      mainOrgCategory = (lo.category as string | null) ?? null;
+      mainOrgSupportEmail = (lo.support_email as string | null) ?? null;
+      mainOrgWebsite = (lo.website as string | null) ?? null;
+      mainOrgAddress = (lo.address as DealClientContext['organization']['address']) ?? null;
+      foundOrg = true;
+    }
+  }
+
+  if (!foundOrg) return null;
+
+  // Contact: directory.entities preferred (contacts table migrating); fallback to public.contacts
+  let contactData: DealClientContact | null = null;
+  if (mainContactId) {
+    const { data: dirContact } = await supabase
+      .schema('directory').from('entities')
+      .select('display_name, attributes')
+      .eq('legacy_entity_id', mainContactId)
+      .maybeSingle();
+    if (dirContact) {
+      const attrs = (dirContact.attributes as Record<string, unknown>) ?? {};
+      contactData = {
+        id: mainContactId,
+        first_name: (attrs.first_name as string) ?? '',
+        last_name: (attrs.last_name as string) ?? '',
+        email: (attrs.email as string | null) ?? null,
+        phone: (attrs.phone as string | null) ?? null,
+      };
+    } else {
+      const { data: legacyContact } = await supabase
+        .from('contacts').select('id, first_name, last_name, email, phone')
+        .eq('id', mainContactId).eq('workspace_id', workspaceId).maybeSingle();
+      if (legacyContact) {
+        const lc = legacyContact as Record<string, unknown>;
+        contactData = {
+          id: lc.id as string,
+          first_name: (lc.first_name as string) ?? '',
+          last_name: (lc.last_name as string) ?? '',
+          email: (lc.email as string | null) ?? null,
+          phone: (lc.phone as string | null) ?? null,
+        };
+      }
+    }
+  }
+
+  // Relationship ID: cortex preferred, fallback to org_relationships
+  let relId: string | null = null;
+  if (sourceOrgId) {
+    const { data: srcDirEnt } = await supabase
+      .schema('directory').from('entities').select('id').eq('legacy_org_id', sourceOrgId).maybeSingle();
+    if (srcDirEnt?.id && orgDirMainRes.data?.id) {
+      const { data: cortexRel } = await supabase.schema('cortex').from('relationships')
+        .select('id')
+        .eq('source_entity_id', srcDirEnt.id)
+        .eq('target_entity_id', orgDirMainRes.data.id)
+        .in('relationship_type', ['VENDOR', 'PARTNER', 'CLIENT', 'VENUE_PARTNER'])
+        .maybeSingle();
+      relId = (cortexRel as { id?: string } | null)?.id ?? null;
+    }
+    if (!relId) {
+      const { data: orgRel } = await supabase
+        .from('org_relationships').select('id')
+        .eq('source_org_id', sourceOrgId).eq('target_org_id', orgId).maybeSingle();
+      relId = (orgRel as { id?: string } | null)?.id ?? null;
+    }
+  }
+
   const count = countRes.count ?? 0;
-  const priv = notesRes.data as { private_notes?: string | null } | null;
-  const rel = relRes.data as { id?: string } | null;
-
-  const address = org.address as DealClientContext['organization']['address'];
   return {
     organization: {
-      id: org.id as string,
-      name: (org.name as string) ?? '',
-      category: (org.category as string) ?? null,
-      support_email: (org.support_email as string) ?? null,
-      website: (org.website as string) ?? null,
-      address: address && typeof address === 'object' ? address : null,
+      id: orgId,
+      name: mainOrgName,
+      category: mainOrgCategory,
+      support_email: mainOrgSupportEmail,
+      website: mainOrgWebsite,
+      address: mainOrgAddress && typeof mainOrgAddress === 'object' ? mainOrgAddress : null,
     },
-    mainContact: contact
-      ? {
-          id: contact.id as string,
-          first_name: (contact.first_name as string) ?? '',
-          last_name: (contact.last_name as string) ?? '',
-          email: (contact.email as string) ?? null,
-          phone: (contact.phone as string) ?? null,
-        }
-      : null,
+    mainContact: contactData,
     pastDealsCount: typeof count === 'number' ? count : 0,
     /** Fetched separately in drawer via updatePrivateNotes / network API (owner_org_id required). */
     privateNotes: null,
-    relationshipId: rel?.id ?? null,
+    relationshipId: relId,
   };
 }

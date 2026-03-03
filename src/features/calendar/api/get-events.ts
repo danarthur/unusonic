@@ -20,9 +20,9 @@ export type GetCalendarEventsInput = import('../model/schema').GetCalendarEvents
 
 interface OpsEventsRow {
   id: string;
-  name: string | null;
-  start_at: string;
-  end_at: string;
+  title: string | null;
+  starts_at: string;
+  ends_at: string;
   project?: { workspace_id: string; name: string } | null;
   projects?: { workspace_id: string; name: string } | { workspace_id: string; name: string }[] | null;
 }
@@ -37,11 +37,11 @@ function projectFromRow(row: OpsEventsRow): { workspace_id: string; name: string
 function toCalendarEvent(row: OpsEventsRow): CalendarEvent | null {
   const project = projectFromRow(row);
   if (!project) return null;
-  const start = row.start_at ?? new Date().toISOString();
-  const end = row.end_at ?? start;
+  const start = row.starts_at ?? new Date().toISOString();
+  const end = row.ends_at ?? start;
   return {
     id: String(row.id ?? ''),
-    title: row.name ?? '',
+    title: row.title ?? '',
     start,
     end,
     status: 'planned',
@@ -84,11 +84,11 @@ export async function getCalendarEvents(
     const { data: eventRowsRaw, error } = await supabase
       .schema('ops')
       .from('events')
-      .select('id, name, start_at, end_at, project:projects!inner(workspace_id, name)')
+      .select('id, title, starts_at, ends_at, project:projects!inner(workspace_id, name)')
       .eq('projects.workspace_id', workspaceId)
-      .lte('start_at', end)
-      .gte('end_at', start)
-      .order('start_at', { ascending: true })
+      .lte('starts_at', end)
+      .gte('ends_at', start)
+      .order('starts_at', { ascending: true })
       .limit(5000);
 
     if (error) {

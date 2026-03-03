@@ -59,8 +59,8 @@ export async function checkDateFeasibility(
         .from('events')
         .select('id, project:projects!inner(workspace_id)', { count: 'exact', head: true })
         .eq('projects.workspace_id', workspaceId)
-        .lte('start_at', dayEnd)
-        .gte('end_at', dayStart),
+        .lte('starts_at', dayEnd)
+        .gte('ends_at', dayStart),
       supabase
         .from('deals')
         .select('*', { count: 'exact', head: true })

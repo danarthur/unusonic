@@ -1,5 +1,5 @@
 /**
- * Event entity – Command Center types.
+ * Event entity – Event Studio types.
  * Aligns with events table + Event Genome columns.
  */
 
@@ -55,7 +55,7 @@ export interface EventCommandRow {
   location_address: string | null;
   logistics_dock_info: string | null;
   logistics_power_info: string | null;
-  client_id: string | null;
+  client_entity_id: string | null;
   producer_id: string | null;
   pm_id: string | null;
   guest_count_expected: number | null;
@@ -71,7 +71,7 @@ export interface EventCommandRow {
   updated_at: string;
 }
 
-/** Hydrated for Command Center UI (client/PM names, etc.). */
+/** Hydrated for Event Studio UI (client/PM names, etc.). */
 export interface EventCommandDTO extends EventCommandRow {
   client_name?: string | null;
   producer_name?: string | null;

@@ -15,6 +15,74 @@ import { createGhostOrg } from '@/entities/organization';
 
 const ROLE_ORDER: Record<string, number> = { owner: 0, admin: 1, member: 2, restricted: 3 };
 
+/** HQ org resolution: must match features/network/api/actions (org_members, not affiliations). */
+const ORG_ROLE_PRIORITY: Record<string, number> = {
+  owner: 0,
+  admin: 1,
+  manager: 2,
+  member: 3,
+  restricted: 4,
+};
+
+/** Maps public.org_relationships.type to cortex relationship_type. */
+function orgTypeToCortex(type: string): string {
+  switch (type) {
+    case 'vendor':         return 'VENDOR';
+    case 'venue':          return 'VENUE_PARTNER';
+    case 'client_company': return 'CLIENT';
+    case 'client':         return 'CLIENT';
+    case 'partner':        return 'PARTNER';
+    default:               return type.toUpperCase();
+  }
+}
+
+/**
+ * Dual-write helper: syncs a single org_relationship row to cortex.relationships.
+ * Fetches the current state of the row, looks up directory entities, calls upsert_relationship RPC.
+ * Non-fatal — cortex sync failure does not block the primary write.
+ */
+async function syncOrgRelToCortex(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  relationshipId: string
+): Promise<void> {
+  try {
+    const { data: rel } = await supabase
+      .from('org_relationships')
+      .select('source_org_id, target_org_id, type, tier, notes, tags, lifecycle_status, blacklist_reason, deleted_at')
+      .eq('id', relationshipId)
+      .maybeSingle();
+    if (!rel) return;
+
+    const [sourceRes, targetRes] = await Promise.all([
+      supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', rel.source_org_id).maybeSingle(),
+      supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', rel.target_org_id).maybeSingle(),
+    ]);
+    if (!sourceRes.data?.id || !targetRes.data?.id) return;
+
+    const row = rel as Record<string, unknown>;
+    await supabase.rpc('upsert_relationship', {
+      p_source_entity_id: sourceRes.data.id,
+      p_target_entity_id: targetRes.data.id,
+      p_type: orgTypeToCortex(String(row.type)),
+      p_context_data: {
+        tier:                      row.tier,
+        notes:                     row.notes,
+        tags:                      row.tags,
+        lifecycle_status:          row.lifecycle_status,
+        blacklist_reason:          row.blacklist_reason,
+        deleted_at:                row.deleted_at,
+        legacy_org_relationship_id: relationshipId,
+      },
+    });
+  } catch {
+    // Non-fatal: cortex sync is best-effort during the dual-write transition phase.
+  }
+}
+
+/**
+ * Resolve current user's entity id and HQ org (org_members, role priority: owner → admin → member).
+ * Must match features/network/api/actions so getCurrentOrgId() and getNetworkStream use the same org.
+ */
 async function getCurrentEntityAndOrg(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
     data: { user },
@@ -29,25 +97,50 @@ async function getCurrentEntityAndOrg(supabase: Awaited<ReturnType<typeof create
     .maybeSingle();
   if (!entity) return { entityId: null, orgId: null };
 
-  const { data: aff } = await supabase
-    .from('affiliations')
-    .select('organization_id')
-    .eq('entity_id', entity.id)
-    .in('access_level', ['admin', 'member', 'read_only'])
+  const { data: members } = await supabase
+    .from('org_members')
+    .select('org_id, role')
+    .eq('entity_id', entity.id);
+
+  if (members?.length) {
+    const sorted = [...members].sort(
+      (a, b) => (ORG_ROLE_PRIORITY[a.role] ?? 99) - (ORG_ROLE_PRIORITY[b.role] ?? 99)
+    );
+    return { entityId: entity.id, orgId: sorted[0].org_id };
+  }
+
+  const { data: owned } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('owner_id', entity.id)
     .limit(1)
     .maybeSingle();
+  if (owned?.id) return { entityId: entity.id, orgId: owned.id };
 
-  return { entityId: entity.id, orgId: aff?.organization_id ?? null };
+  return { entityId: entity.id, orgId: null };
 }
 
 /**
  * Fetch the unified Network Orbit stream: Core (employees) + Inner Circle (preferred partners).
  * Only returns data if the current user belongs to orgId (RLS + explicit check).
+ * Authorize when: (1) resolved HQ org matches orgId, or (2) user is a member of orgId via org_members (e.g. org switcher/cookie).
  */
 export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const supabase = await createClient();
-  const { orgId: currentOrgId } = await getCurrentEntityAndOrg(supabase);
-  if (!currentOrgId || currentOrgId !== orgId) return [];
+  const { entityId, orgId: resolvedOrgId } = await getCurrentEntityAndOrg(supabase);
+
+  const isMemberOfRequestedOrg =
+    entityId != null &&
+    (await supabase
+      .from('org_members')
+      .select('org_id')
+      .eq('org_id', orgId)
+      .eq('entity_id', entityId)
+      .maybeSingle()).data != null;
+
+  const allowed = resolvedOrgId === orgId || isMemberOfRequestedOrg;
+
+  if (!allowed) return [];
 
   const [membersResult, relsResult] = await Promise.all([
     supabase
@@ -68,17 +161,35 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const entityIds = [...new Set(members.map((m) => m.entity_id).filter(Boolean))] as string[];
   const targetOrgIds = [...new Set(rels.map((r) => r.target_org_id))];
 
-  const [entityRows, orgRows] = await Promise.all([
+  const [entityRows, dirPersonRows, orgEntityRows, legacyOrgRows] = await Promise.all([
     entityIds.length > 0
       ? supabase.from('entities').select('id, email').in('id', entityIds)
       : { data: [] as { id: string; email: string }[] },
+    entityIds.length > 0
+      ? supabase.schema('directory').from('entities').select('display_name, legacy_entity_id').in('legacy_entity_id', entityIds)
+      : { data: [] as { display_name: string; legacy_entity_id: string | null }[] },
+    targetOrgIds.length > 0
+      ? supabase.schema('directory').from('entities').select('display_name, legacy_org_id').in('legacy_org_id', targetOrgIds)
+      : { data: [] as { display_name: string; legacy_org_id: string | null }[] },
     targetOrgIds.length > 0
       ? supabase.from('organizations').select('id, name').in('id', targetOrgIds)
       : { data: [] as { id: string; name: string }[] },
   ]);
 
   const entityMap = new Map((entityRows.data ?? []).map((e) => [e.id, e]));
-  const orgMap = new Map((orgRows.data ?? []).map((o) => [o.id, o]));
+  const dirPersonNameByLegacyId = new Map(
+    (dirPersonRows.data ?? [])
+      .filter((e) => e.legacy_entity_id != null)
+      .map((e) => [e.legacy_entity_id!, e.display_name ?? ''])
+  );
+  const orgMap = new Map(
+    (orgEntityRows.data ?? [])
+      .filter((e) => e.legacy_org_id)
+      .map((e) => [e.legacy_org_id!, { id: e.legacy_org_id!, name: e.display_name }])
+  );
+  for (const o of legacyOrgRows.data ?? []) {
+    if (!orgMap.has(o.id)) orgMap.set(o.id, { id: o.id, name: o.name });
+  }
 
   const { data: avatarRows } = await supabase
     .from('org_members')
@@ -95,8 +206,12 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     .filter((m) => m.entity_id)
     .map((m): NetworkNode => {
       const e = entityMap.get(m.entity_id!);
+      const dirName = dirPersonNameByLegacyId.get(m.entity_id!);
       const name =
-        [m.first_name, m.last_name].filter(Boolean).join(' ') || e?.email || 'Unknown';
+        [m.first_name, m.last_name].filter(Boolean).join(' ') ||
+        e?.email ||
+        (dirName?.trim() ? dirName : null) ||
+        'Unknown';
       const avatarUrl = avatarByMemberId.get(m.id) ?? null;
       return {
         id: m.id,
@@ -167,6 +282,7 @@ export async function pinToInnerCircle(
     .eq('source_org_id', orgId);
 
   if (error) return { ok: false, error: error.message };
+  await syncOrgRelToCortex(supabase, relationshipId);
   revalidatePath('/network');
   return { ok: true };
 }
@@ -189,6 +305,7 @@ export async function unpinFromInnerCircle(
     .eq('source_org_id', orgId);
 
   if (error) return { ok: false, error: error.message };
+  await syncOrgRelToCortex(supabase, relationshipId);
   revalidatePath('/network');
   return { ok: true };
 }
@@ -206,12 +323,14 @@ export async function summonPartner(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return { ok: false, error: 'Not authorized.' };
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('workspace_id')
-    .eq('id', sourceOrgId)
-    .single();
-  if (!org?.workspace_id) return { ok: false, error: 'Organization not found.' };
+  const { data: srcEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('owner_workspace_id')
+    .eq('legacy_org_id', sourceOrgId)
+    .maybeSingle();
+  const workspaceId = srcEntity?.owner_workspace_id ?? null;
+  if (!workspaceId) return { ok: false, error: 'Organization not found.' };
 
   const { data: existing } = await supabase
     .from('org_relationships')
@@ -226,6 +345,7 @@ export async function summonPartner(
       .update({ tier: 'preferred', deleted_at: null })
       .eq('id', existing.id);
     if (error) return { ok: false, error: error.message };
+    await syncOrgRelToCortex(supabase, existing.id);
     revalidatePath('/network');
     return { ok: true, id: existing.id };
   }
@@ -237,12 +357,13 @@ export async function summonPartner(
       target_org_id: targetOrgId,
       type,
       tier: 'preferred',
-      workspace_id: org.workspace_id,
+      workspace_id: workspaceId,
     })
     .select('id')
     .single();
 
   if (error) return { ok: false, error: error.message };
+  await syncOrgRelToCortex(supabase, inserted.id);
   revalidatePath('/network');
   return { ok: true, id: inserted.id };
 }
@@ -259,18 +380,20 @@ export async function summonPartnerAsGhost(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return { ok: false, error: 'Not authorized.' };
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('workspace_id')
-    .eq('id', sourceOrgId)
-    .single();
-  if (!org?.workspace_id) return { ok: false, error: 'Organization not found.' };
+  const { data: srcEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('owner_workspace_id')
+    .eq('legacy_org_id', sourceOrgId)
+    .maybeSingle();
+  const workspaceId = srcEntity?.owner_workspace_id ?? null;
+  if (!workspaceId) return { ok: false, error: 'Organization not found.' };
 
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: 'Name is required.' };
 
   const ghost = await createGhostOrg({
-    workspace_id: org.workspace_id,
+    workspace_id: workspaceId,
     name: trimmed,
     city: '—',
     type: 'partner',
@@ -305,19 +428,21 @@ export async function createGhostWithContact(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return { success: false, error: 'Not authorized.' };
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('workspace_id')
-    .eq('id', sourceOrgId)
-    .single();
-  if (!org?.workspace_id) return { success: false, error: 'Organization not found.' };
+  const { data: srcEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('owner_workspace_id')
+    .eq('legacy_org_id', sourceOrgId)
+    .maybeSingle();
+  const workspaceId = srcEntity?.owner_workspace_id ?? null;
+  if (!workspaceId) return { success: false, error: 'Organization not found.' };
 
   const nameTrim = payload.name.trim();
   if (!nameTrim) return { success: false, error: 'Name is required.' };
 
   const orgName = payload.type === 'person' ? `${nameTrim} (Personal)` : nameTrim;
   const ghost = await createGhostOrg({
-    workspace_id: org.workspace_id,
+    workspace_id: workspaceId,
     name: orgName,
     city: '—',
     type: 'partner',
@@ -339,7 +464,7 @@ export async function createGhostWithContact(
     const lastName = parts.slice(1).join(' ') || '';
     const { data: rpcData, error: rpcError } = await supabase.rpc('add_contact_to_ghost_org', {
       p_ghost_org_id: ghost.id,
-      p_workspace_id: org.workspace_id,
+      p_workspace_id: workspaceId,
       p_creator_org_id: sourceOrgId,
       p_first_name: firstName,
       p_last_name: lastName,
@@ -385,16 +510,18 @@ export async function createConnectionFromScout(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return { success: false, error: 'Not authorized.' };
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('workspace_id')
-    .eq('id', sourceOrgId)
-    .single();
-  if (!org?.workspace_id) return { success: false, error: 'Organization not found.' };
+  const { data: srcEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('owner_workspace_id')
+    .eq('legacy_org_id', sourceOrgId)
+    .maybeSingle();
+  const workspaceId = srcEntity?.owner_workspace_id ?? null;
+  if (!workspaceId) return { success: false, error: 'Organization not found.' };
 
   const name = (data.name ?? data.website ?? 'From ION').trim() || 'From ION';
   const ghost = await createGhostOrg({
-    workspace_id: org.workspace_id,
+    workspace_id: workspaceId,
     name,
     city: '—',
     type: 'partner',
@@ -457,58 +584,141 @@ export async function searchNetworkOrgs(
   const q = query.trim();
   if (q.length < 1) return [];
 
-  const { data: sourceOrg } = await supabase
-    .from('organizations')
-    .select('workspace_id')
-    .eq('id', sourceOrgId)
-    .single();
-  if (!sourceOrg?.workspace_id) return [];
-
-  // 1. MY CONNECTIONS (private + public links) — rolodex first so we don't create duplicates; exclude soft-deleted
-  const { data: rels } = await supabase
-    .from('org_relationships')
-    .select('target_org_id')
-    .eq('source_org_id', sourceOrgId)
-    .is('deleted_at', null);
-  const myTargetIds = (rels ?? []).map((r) => r.target_org_id).filter(Boolean);
+  // Prefer directory.entities for workspace lookup
+  const { data: srcEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, owner_workspace_id')
+    .eq('legacy_org_id', sourceOrgId)
+    .maybeSingle();
+  let workspaceId: string | null = srcEntity?.owner_workspace_id ?? null;
   let connectionResults: NetworkSearchOrg[] = [];
-  if (myTargetIds.length > 0) {
-    const { data: connectionOrgs } = await supabase
+  let connectionIds: string[] = [];
+
+  if (srcEntity?.id && workspaceId) {
+    // CORTEX PATH: get my active connection target entity IDs
+    const { data: cortexRels } = await supabase
+      .schema('cortex')
+      .from('relationships')
+      .select('target_entity_id, context_data')
+      .eq('source_entity_id', srcEntity.id)
+      .in('relationship_type', ['VENDOR', 'VENUE_PARTNER', 'CLIENT', 'PARTNER']);
+
+    const activeTargetIds = (cortexRels ?? [])
+      .filter((r) => !(r.context_data as Record<string, unknown>)?.deleted_at)
+      .map((r) => r.target_entity_id);
+
+    if (activeTargetIds.length > 0) {
+      const { data: targetEntities } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('id, display_name, avatar_url, attributes, legacy_org_id')
+        .in('id', activeTargetIds)
+        .ilike('display_name', `%${q}%`)
+        .limit(10);
+
+      connectionResults = (targetEntities ?? []).map((e) => {
+        const attrs = (e.attributes as Record<string, unknown>) ?? {};
+        const legacyId = (e.legacy_org_id as string | null) ?? e.id;
+        return {
+          id: legacyId,
+          name: e.display_name,
+          logo_url: (e.avatar_url as string | null) ?? null,
+          is_ghost: (attrs.is_ghost as boolean) ?? false,
+          _source: 'connection' as const,
+        };
+      });
+    }
+    connectionIds = connectionResults.map((r) => r.id);
+  } else {
+    // LEGACY FALLBACK: org_relationships + organizations
+    if (!workspaceId) {
+      const { data: sourceOrg } = await supabase
+        .from('organizations')
+        .select('workspace_id')
+        .eq('id', sourceOrgId)
+        .single();
+      workspaceId = sourceOrg?.workspace_id ?? null;
+    }
+    if (workspaceId) {
+      const { data: rels } = await supabase
+        .from('org_relationships')
+        .select('target_org_id')
+        .eq('source_org_id', sourceOrgId)
+        .is('deleted_at', null);
+      const myTargetIds = (rels ?? []).map((r) => r.target_org_id).filter(Boolean);
+      if (myTargetIds.length > 0) {
+        const { data: connectionOrgs } = await supabase
+          .from('organizations')
+          .select('id, name, logo_url, is_ghost')
+          .in('id', myTargetIds)
+          .ilike('name', `%${q}%`)
+          .limit(10);
+        connectionResults = (connectionOrgs ?? []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          logo_url: (r as { logo_url?: string | null }).logo_url ?? null,
+          is_ghost: (r as { is_ghost?: boolean }).is_ghost ?? false,
+          _source: 'connection' as const,
+        }));
+      }
+      connectionIds = connectionResults.map((r) => r.id);
+    }
+  }
+
+  if (!workspaceId) return connectionResults;
+
+  const excludeSet = new Set([sourceOrgId, ...connectionIds]);
+
+  // 2. GLOBAL DIRECTORY — preferred: directory.entities; fallback: organizations
+  let globalResults: NetworkSearchOrg[] = [];
+  const { data: globalEntities } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name, avatar_url, attributes, legacy_org_id')
+    .eq('owner_workspace_id', workspaceId)
+    .ilike('display_name', `%${q}%`)
+    .limit(15);
+
+  if (globalEntities?.length) {
+    const globalFiltered = globalEntities
+      .filter((e) => {
+        const attrs = (e.attributes as Record<string, unknown>) ?? {};
+        const isGhost = (attrs.is_ghost as boolean) ?? false;
+        const eid = (e.legacy_org_id as string | null) ?? e.id;
+        return !isGhost && !excludeSet.has(eid);
+      })
+      .slice(0, 10);
+    globalResults = globalFiltered.map((e) => {
+      const attrs = (e.attributes as Record<string, unknown>) ?? {};
+      const eid = (e.legacy_org_id as string | null) ?? e.id;
+      return {
+        id: eid,
+        name: e.display_name,
+        logo_url: (e.avatar_url as string | null) ?? null,
+        is_ghost: (attrs.is_ghost as boolean) ?? false,
+        _source: 'global' as const,
+      };
+    });
+  } else {
+    // Fallback: organizations table
+    const { data: globalRows } = await supabase
       .from('organizations')
       .select('id, name, logo_url, is_ghost')
-      .in('id', myTargetIds)
+      .eq('workspace_id', workspaceId)
+      .eq('is_ghost', false)
+      .neq('id', sourceOrgId)
       .ilike('name', `%${q}%`)
-      .limit(10);
-    connectionResults = (connectionOrgs ?? []).map((r) => ({
+      .limit(15);
+    const globalFiltered = (globalRows ?? []).filter((r) => !excludeSet.has(r.id)).slice(0, 10);
+    globalResults = globalFiltered.map((r) => ({
       id: r.id,
       name: r.name,
       logo_url: (r as { logo_url?: string | null }).logo_url ?? null,
       is_ghost: (r as { is_ghost?: boolean }).is_ghost ?? false,
-      _source: 'connection' as const,
+      _source: 'global' as const,
     }));
   }
-
-  const connectionIds = connectionResults.map((r) => r.id);
-
-  // 2. GLOBAL DIRECTORY — verified (non-ghost) orgs only; exclude self and already-found
-  const { data: globalRows } = await supabase
-    .from('organizations')
-    .select('id, name, logo_url, is_ghost')
-    .eq('workspace_id', sourceOrg.workspace_id)
-    .eq('is_ghost', false)
-    .neq('id', sourceOrgId)
-    .ilike('name', `%${q}%`)
-    .limit(15);
-  const excludeSet = new Set([sourceOrgId, ...connectionIds]);
-  const globalFiltered = (globalRows ?? []).filter((r) => !excludeSet.has(r.id)).slice(0, 10);
-
-  const globalResults: NetworkSearchOrg[] = globalFiltered.map((r) => ({
-    id: r.id,
-    name: r.name,
-    logo_url: (r as { logo_url?: string | null }).logo_url ?? null,
-    is_ghost: (r as { is_ghost?: boolean }).is_ghost ?? false,
-    _source: 'global' as const,
-  }));
 
   return [...connectionResults, ...globalResults];
 }
@@ -662,12 +872,14 @@ export async function getNetworkNodeDetails(
   const lifecycleStatus = relRow.lifecycle_status as NodeDetail['lifecycleStatus'];
   const blacklistReason = relRow.blacklist_reason ?? null;
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('id, name, is_claimed, is_ghost, logo_url, slug, brand_color, website, support_email, address, default_currency, category, operational_settings')
-    .eq('id', rel.target_org_id)
-    .single();
-  const isGhost = (org as { is_ghost?: boolean } | null)?.is_ghost === true;
+  const { data: orgEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name, handle, avatar_url, attributes')
+    .eq('legacy_org_id', rel.target_org_id)
+    .maybeSingle();
+  const orgAttrs = (orgEntity?.attributes as Record<string, unknown>) ?? {};
+  const isGhost = (orgAttrs.is_ghost as boolean) ?? false;
 
   const relType = String(rel.type);
   const typeLabel =
@@ -745,18 +957,13 @@ export async function getNetworkNodeDetails(
     });
   }
 
-  const orgRow = org as {
-    logo_url?: string | null; slug?: string | null; brand_color?: string | null; website?: string | null;
-    support_email?: string | null; address?: Record<string, unknown> | null;
-    default_currency?: string | null; category?: string | null; operational_settings?: Record<string, unknown> | null;
-  } | null;
   const relWithExtra = rel as { tier?: string | null; tags?: string[] | null };
   return {
     id: rel.id,
     kind: 'external_partner',
     identity: {
-      name: org?.name ?? 'Unknown',
-      avatarUrl: orgRow?.logo_url ?? null,
+      name: orgEntity?.display_name ?? 'Unknown',
+      avatarUrl: orgEntity?.avatar_url ?? null,
       label: typeLabel,
     },
     direction,
@@ -766,16 +973,16 @@ export async function getNetworkNodeDetails(
     relationshipId: rel.id,
     isGhost,
     targetOrgId: rel.target_org_id,
-    orgSlug: orgRow?.slug ?? null,
-    orgLogoUrl: orgRow?.logo_url ?? null,
-    orgBrandColor: orgRow?.brand_color ?? null,
-    orgWebsite: orgRow?.website ?? null,
+    orgSlug: orgEntity?.handle ?? null,
+    orgLogoUrl: orgEntity?.avatar_url ?? null,
+    orgBrandColor: (orgAttrs.brand_color as string | null) ?? null,
+    orgWebsite: (orgAttrs.website as string | null) ?? null,
     crew,
-    orgSupportEmail: orgRow?.support_email ?? null,
-    orgAddress: (orgRow?.address as NodeDetail['orgAddress']) ?? null,
-    orgDefaultCurrency: orgRow?.default_currency ?? null,
-    orgCategory: orgRow?.category ?? null,
-    orgOperationalSettings: orgRow?.operational_settings ?? null,
+    orgSupportEmail: (orgAttrs.support_email as string | null) ?? null,
+    orgAddress: (orgAttrs.address as NodeDetail['orgAddress']) ?? null,
+    orgDefaultCurrency: (orgAttrs.default_currency as string | null) ?? null,
+    orgCategory: (orgAttrs.category as string | null) ?? null,
+    orgOperationalSettings: (orgAttrs.operational_settings as Record<string, unknown> | null) ?? null,
     relationshipTier: relWithExtra.tier ?? null,
     relationshipTags: relWithExtra.tags ?? null,
     lifecycleStatus: lifecycleStatus ?? null,
@@ -801,6 +1008,7 @@ export async function updateRelationshipNotes(
     .eq('source_org_id', orgId);
 
   if (error) return { ok: false, error: error.message };
+  await syncOrgRelToCortex(supabase, relationshipId);
   revalidatePath('/network');
   return { ok: true };
 }
@@ -842,6 +1050,7 @@ export async function updateRelationshipMeta(
     .eq('source_org_id', sourceOrgId);
 
   if (error) return { ok: false, error: error.message };
+  await syncOrgRelToCortex(supabase, relationshipId);
   revalidatePath('/network');
   return { ok: true };
 }
@@ -866,6 +1075,7 @@ export async function softDeleteGhostRelationship(
     .eq('source_org_id', sourceOrgId);
 
   if (error) return { ok: false, error: error.message };
+  await syncOrgRelToCortex(supabase, relationshipId);
   revalidatePath('/network');
   return { ok: true };
 }
@@ -888,6 +1098,7 @@ export async function restoreGhostRelationship(
     .eq('source_org_id', sourceOrgId);
 
   if (error) return { ok: false, error: error.message };
+  await syncOrgRelToCortex(supabase, relationshipId);
   revalidatePath('/network');
   return { ok: true };
 }
@@ -922,11 +1133,16 @@ export async function getDeletedRelationships(sourceOrgId: string): Promise<Dele
 
   if (!rels?.length) return [];
   const targetIds = [...new Set(rels.map((r) => r.target_org_id))];
-  const { data: orgs } = await supabase
-    .from('organizations')
-    .select('id, name')
-    .in('id', targetIds);
-  const nameByOrg = new Map((orgs ?? []).map((o) => [o.id, o.name ?? 'Unknown']));
+  const { data: orgEntities } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('display_name, legacy_org_id')
+    .in('legacy_org_id', targetIds);
+  const nameByOrg = new Map(
+    (orgEntities ?? [])
+      .filter((e) => e.legacy_org_id)
+      .map((e) => [e.legacy_org_id!, e.display_name ?? 'Unknown'])
+  );
 
   return rels.map((r) => ({
     id: r.id,
@@ -980,14 +1196,30 @@ export async function addContactToGhostOrg(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return { ok: false, error: 'Unauthorized.' };
 
-  const { data: ghostOrg } = await supabase
-    .from('organizations')
-    .select('id, workspace_id, created_by_org_id')
-    .eq('id', ghostOrgId)
-    .single();
-  if (!ghostOrg?.workspace_id) return { ok: false, error: 'Partner org not found.' };
-  const createdBy = (ghostOrg as { created_by_org_id?: string | null }).created_by_org_id;
-  if (createdBy !== sourceOrgId) return { ok: false, error: 'Only the org that created this partner can add crew.' };
+  // Prefer directory.entities for ghost org lookup; fallback to public.organizations
+  const { data: ghostOrgDir } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('owner_workspace_id, attributes')
+    .eq('legacy_org_id', ghostOrgId)
+    .maybeSingle();
+  let ghostWorkspaceId: string | null = ghostOrgDir?.owner_workspace_id ?? null;
+  let createdByOrgId: string | null = null;
+  if (ghostOrgDir) {
+    const attrs = (ghostOrgDir.attributes as Record<string, unknown>) ?? {};
+    createdByOrgId = (attrs.created_by_org_id as string | null) ?? null;
+  }
+  if (!ghostWorkspaceId || !createdByOrgId) {
+    const { data: ghostOrgLegacy } = await supabase
+      .from('organizations')
+      .select('workspace_id, created_by_org_id')
+      .eq('id', ghostOrgId)
+      .maybeSingle();
+    if (!ghostWorkspaceId) ghostWorkspaceId = ghostOrgLegacy?.workspace_id ?? null;
+    if (!createdByOrgId) createdByOrgId = (ghostOrgLegacy as { created_by_org_id?: string | null } | null)?.created_by_org_id ?? null;
+  }
+  if (!ghostWorkspaceId) return { ok: false, error: 'Partner org not found.' };
+  if (createdByOrgId !== sourceOrgId) return { ok: false, error: 'Only the org that created this partner can add crew.' };
 
   const firstName = (payload.firstName ?? '').trim() || 'Contact';
   const lastName = (payload.lastName ?? '').trim() ?? '';
@@ -1009,7 +1241,7 @@ export async function addContactToGhostOrg(
   const { error: memberErr } = await sys.from('org_members').insert({
     org_id: ghostOrgId,
     entity_id: entity.id,
-    workspace_id: ghostOrg.workspace_id,
+    workspace_id: ghostWorkspaceId,
     first_name: firstName,
     last_name: lastName,
     role: (role as OrgMemberRole) || 'member',
@@ -1019,6 +1251,31 @@ export async function addContactToGhostOrg(
     await sys.from('entities').delete().eq('id', entity.id);
     return { ok: false, error: memberErr.message ?? 'Failed to add to crew.' };
   }
+
+  // Non-fatal: sync ghost person to directory.entities + create cortex ROSTER_MEMBER edge
+  const { data: dirOrg } = await supabase
+    .schema('directory').from('entities').select('id').eq('legacy_org_id', ghostOrgId).maybeSingle();
+  let dirPersonId: string | null = null;
+  const { data: existingDirPerson } = await sys
+    .schema('directory').from('entities').select('id').eq('legacy_entity_id', entity.id).maybeSingle();
+  if (existingDirPerson?.id) {
+    dirPersonId = existingDirPerson.id;
+  } else {
+    const { data: newDirPerson } = await sys
+      .schema('directory').from('entities')
+      .insert({ legacy_entity_id: entity.id, display_name: [firstName, lastName].filter(Boolean).join(' ').trim() || email, type: 'person', owner_workspace_id: ghostWorkspaceId, claimed_by_user_id: null, attributes: { is_ghost: true, email } })
+      .select('id').maybeSingle();
+    dirPersonId = newDirPerson?.id ?? null;
+  }
+  if (dirPersonId && dirOrg?.id) {
+    await supabase.rpc('upsert_relationship', {
+      p_source_entity_id: dirPersonId,
+      p_target_entity_id: dirOrg.id,
+      p_type: 'ROSTER_MEMBER',
+      p_context_data: { first_name: firstName, last_name: lastName, role, job_title: jobTitle },
+    });
+  }
+
   revalidatePath('/network');
   return { ok: true };
 }
@@ -1034,14 +1291,31 @@ export async function addScoutRosterToGhostOrg(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return { ok: false, addedCount: 0, error: 'Unauthorized.' };
 
-  const { data: ghostOrg } = await supabase
-    .from('organizations')
-    .select('id, workspace_id, created_by_org_id')
-    .eq('id', ghostOrgId)
-    .single();
-  if (!ghostOrg?.workspace_id) return { ok: false, addedCount: 0, error: 'Partner org not found.' };
-  const createdBy = (ghostOrg as { created_by_org_id?: string | null }).created_by_org_id;
-  if (createdBy !== sourceOrgId) return { ok: false, addedCount: 0, error: 'Only the org that created this partner can add crew.' };
+  // Prefer directory.entities for ghost org lookup; fallback to public.organizations
+  const { data: ghostOrgDir2 } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, owner_workspace_id, attributes')
+    .eq('legacy_org_id', ghostOrgId)
+    .maybeSingle();
+  let ghostWorkspaceId2: string | null = ghostOrgDir2?.owner_workspace_id ?? null;
+  let createdByOrgId2: string | null = null;
+  if (ghostOrgDir2) {
+    const attrs = (ghostOrgDir2.attributes as Record<string, unknown>) ?? {};
+    createdByOrgId2 = (attrs.created_by_org_id as string | null) ?? null;
+  }
+  if (!ghostWorkspaceId2 || !createdByOrgId2) {
+    const { data: ghostOrgLegacy2 } = await supabase
+      .from('organizations')
+      .select('workspace_id, created_by_org_id')
+      .eq('id', ghostOrgId)
+      .maybeSingle();
+    if (!ghostWorkspaceId2) ghostWorkspaceId2 = ghostOrgLegacy2?.workspace_id ?? null;
+    if (!createdByOrgId2) createdByOrgId2 = (ghostOrgLegacy2 as { created_by_org_id?: string | null } | null)?.created_by_org_id ?? null;
+  }
+  if (!ghostWorkspaceId2) return { ok: false, addedCount: 0, error: 'Partner org not found.' };
+  if (createdByOrgId2 !== sourceOrgId) return { ok: false, addedCount: 0, error: 'Only the org that created this partner can add crew.' };
+  const dirOrgId2 = ghostOrgDir2?.id ?? null;
 
   const sys = getSystemClient();
   let addedCount = 0;
@@ -1068,7 +1342,7 @@ export async function addScoutRosterToGhostOrg(
       .insert({
         org_id: ghostOrgId,
         entity_id: entity.id,
-        workspace_id: ghostOrg.workspace_id,
+        workspace_id: ghostWorkspaceId2,
         first_name: firstName,
         last_name: lastName,
         role: 'member',
@@ -1084,6 +1358,28 @@ export async function addScoutRosterToGhostOrg(
     addedCount += 1;
     if (member?.id && avatarUrl) {
       await sys.from('org_members').update({ avatar_url: avatarUrl }).eq('id', member.id).eq('org_id', ghostOrgId);
+    }
+
+    // Non-fatal: sync ghost person to directory.entities + create cortex ROSTER_MEMBER edge
+    let dirPersonId2: string | null = null;
+    const { data: existingDirP } = await sys
+      .schema('directory').from('entities').select('id').eq('legacy_entity_id', entity.id).maybeSingle();
+    if (existingDirP?.id) {
+      dirPersonId2 = existingDirP.id;
+    } else {
+      const { data: newDirP } = await sys
+        .schema('directory').from('entities')
+        .insert({ legacy_entity_id: entity.id, display_name: [firstName, lastName].filter(Boolean).join(' ').trim() || email, type: 'person', owner_workspace_id: ghostWorkspaceId2, claimed_by_user_id: null, attributes: { is_ghost: true, email } })
+        .select('id').maybeSingle();
+      dirPersonId2 = newDirP?.id ?? null;
+    }
+    if (dirPersonId2 && dirOrgId2) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: dirPersonId2,
+        p_target_entity_id: dirOrgId2,
+        p_type: 'ROSTER_MEMBER',
+        p_context_data: { first_name: firstName, last_name: lastName, role: 'member', job_title: jobTitle },
+      });
     }
   }
   revalidatePath('/network');

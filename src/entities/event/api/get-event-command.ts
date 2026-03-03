@@ -1,5 +1,5 @@
 /**
- * Event entity – fetch full Event Genome for Command Center.
+ * Event entity – fetch full Event Genome for Event Studio.
  * Reads from ops.events (project-scoped); workspace via project join.
  */
 
@@ -27,7 +27,7 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
   const { data: row, error } = await supabase
     .schema('ops')
     .from('events')
-    .select('id, project_id, name, start_at, end_at, venue_entity_id, created_at, project:projects!inner(workspace_id)')
+    .select('id, project_id, title, starts_at, ends_at, venue_entity_id, workspace_id, lifecycle_status, status, location_name, client_entity_id, producer_id, pm_id, crm_probability, crm_estimated_value, lead_source, notes, created_at, updated_at, project:projects!inner(workspace_id)')
     .eq('id', eventId)
     .eq('projects.workspace_id', workspaceId)
     .maybeSingle();
@@ -44,37 +44,37 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
   const dto: EventCommandDTO = {
     id: r.id as string,
     workspace_id: wsId,
-    title: (r.name as string) ?? null,
+    title: (r.title as string) ?? null,
     internal_code: null,
-    status: null,
-    lifecycle_status: null,
+    status: (r.status as string) ?? null,
+    lifecycle_status: (r.lifecycle_status as string) ?? null,
     confidentiality_level: null,
     slug: null,
-    starts_at: (r.start_at as string) ?? '',
-    ends_at: (r.end_at as string) ?? '',
+    starts_at: (r.starts_at as string) ?? '',
+    ends_at: (r.ends_at as string) ?? '',
     dates_load_in: null,
     dates_load_out: null,
     venue_name: null,
     venue_address: null,
     venue_google_maps_id: null,
-    location_name: null,
+    location_name: (r.location_name as string) ?? null,
     location_address: null,
     logistics_dock_info: null,
     logistics_power_info: null,
-    client_id: null,
-    producer_id: null,
-    pm_id: null,
+    client_entity_id: (r.client_entity_id as string) ?? null,
+    producer_id: (r.producer_id as string) ?? null,
+    pm_id: (r.pm_id as string) ?? null,
     guest_count_expected: null,
     guest_count_actual: null,
     tech_requirements: null,
     compliance_docs: null,
     project_id: (r.project_id as string) ?? null,
-    crm_probability: null,
-    crm_estimated_value: null,
-    lead_source: null,
-    notes: null,
+    crm_probability: (r.crm_probability as number) ?? null,
+    crm_estimated_value: (r.crm_estimated_value as number) ?? null,
+    lead_source: (r.lead_source as string) ?? null,
+    notes: (r.notes as string) ?? null,
     created_at: (r.created_at as string) ?? '',
-    updated_at: (r.created_at as string) ?? '',
+    updated_at: (r.updated_at as string) ?? (r.created_at as string) ?? '',
     client_name: null,
     producer_name: null,
     pm_name: null,

@@ -119,6 +119,8 @@ export type Database = {
           embedding: string | null
           handle: string | null
           id: string
+          legacy_entity_id: string | null
+          legacy_org_id: string | null
           owner_workspace_id: string | null
           search_vector: unknown
           type: string
@@ -133,6 +135,8 @@ export type Database = {
           embedding?: string | null
           handle?: string | null
           id?: string
+          legacy_entity_id?: string | null
+          legacy_org_id?: string | null
           owner_workspace_id?: string | null
           search_vector?: unknown
           type: string
@@ -147,6 +151,8 @@ export type Database = {
           embedding?: string | null
           handle?: string | null
           id?: string
+          legacy_entity_id?: string | null
+          legacy_org_id?: string | null
           owner_workspace_id?: string | null
           search_vector?: unknown
           type?: string
@@ -263,7 +269,7 @@ export type Database = {
       events: {
         Row: {
           actor: string | null
-          client_id: string | null
+          client_entity_id: string | null
           compliance_docs: Json | null
           confidentiality_level: string | null
           created_at: string | null
@@ -301,7 +307,7 @@ export type Database = {
         }
         Insert: {
           actor?: string | null
-          client_id?: string | null
+          client_entity_id?: string | null
           compliance_docs?: Json | null
           confidentiality_level?: string | null
           created_at?: string | null
@@ -339,7 +345,7 @@ export type Database = {
         }
         Update: {
           actor?: string | null
-          client_id?: string | null
+          client_entity_id?: string | null
           compliance_docs?: Json | null
           confidentiality_level?: string | null
           created_at?: string | null
@@ -1801,6 +1807,15 @@ export type Database = {
           p_role?: string
         }
         Returns: Json
+      }
+      upsert_relationship: {
+        Args: {
+          p_context_data?: Json
+          p_source_entity_id: string
+          p_target_entity_id: string
+          p_type: string
+        }
+        Returns: string
       }
       user_has_workspace_role: {
         Args: { p_roles: string[]; p_workspace_id: string }

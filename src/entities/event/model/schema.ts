@@ -44,7 +44,7 @@ export const createEventSchema = z.object({
   crm_estimated_value: crmEstimatedValueSchema,
   lead_source: leadSourceSchema,
   location_name: z.string().max(1000).optional().nullable(),
-  client_id: z.string().uuid().optional().nullable(),
+  client_entity_id: z.string().uuid().optional().nullable(),
 }).strict();
 
 export const updateEventSchema = z.object({
@@ -62,7 +62,7 @@ export const updateEventSchema = z.object({
   venue_google_maps_id: z.string().max(200).optional().nullable(),
   logistics_dock_info: z.string().max(2000).optional().nullable(),
   logistics_power_info: z.string().max(2000).optional().nullable(),
-  client_id: z.string().uuid().optional().nullable(),
+  client_entity_id: z.string().uuid().optional().nullable(),
   producer_id: z.string().uuid().optional().nullable(),
   pm_id: z.string().uuid().optional().nullable(),
   guest_count_expected: z.number().int().min(0).optional().nullable(),

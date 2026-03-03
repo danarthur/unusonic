@@ -83,13 +83,15 @@ export async function createPartnerSummon(
       .limit(1)
       .maybeSingle();
     if (aff) {
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('id, is_claimed')
-        .eq('id', aff.organization_id)
-        .single();
-      if (org?.is_claimed) {
-        const sovereignOrgId = org.id;
+      const { data: orgEntity } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('legacy_org_id, attributes')
+        .eq('legacy_org_id', aff.organization_id)
+        .maybeSingle();
+      const orgAttrs = (orgEntity?.attributes as Record<string, unknown>) ?? {};
+      if (orgEntity?.legacy_org_id && orgAttrs.is_claimed === true) {
+        const sovereignOrgId = orgEntity.legacy_org_id;
         const { error: updateError } = await supabase
           .from('org_relationships')
           .update({ target_org_id: sovereignOrgId })
@@ -135,12 +137,13 @@ export async function createPartnerSummon(
 
   if (error) return { ok: false, error: error.message };
 
-  const { data: originOrg } = await supabase
-    .from('organizations')
-    .select('name')
-    .eq('id', originOrgId)
-    .single();
-  const originName = originOrg?.name ?? 'A partner';
+  const { data: originEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('display_name')
+    .eq('legacy_org_id', originOrgId)
+    .maybeSingle();
+  const originName = originEntity?.display_name ?? 'A partner';
   const sendResult = await sendSummonEmail(normalizedEmail, token, originName);
   if (!sendResult.ok) {
     // Invite is created; link can be shared manually. Do not fail the action.
@@ -226,12 +229,12 @@ export async function getInvitationForClaim(
 
   const targetOrgId = invRow.target_org_id ?? invRow.organization_id;
   const [originRes, targetRes] = await Promise.all([
-    supabase.from('organizations').select('name').eq('id', invRow.created_by_org_id).single(),
-    supabase.from('organizations').select('name, logo_url').eq('id', targetOrgId).single(),
+    supabase.schema('directory').from('entities').select('display_name').eq('legacy_org_id', invRow.created_by_org_id).maybeSingle(),
+    supabase.schema('directory').from('entities').select('display_name, avatar_url').eq('legacy_org_id', targetOrgId).maybeSingle(),
   ]);
-  const originName = originRes.data?.name ?? 'A partner';
-  const targetName = targetRes.data?.name ?? (inv as { email: string }).email.split('@')[0] ?? 'Your organization';
-  const targetLogoUrl = targetRes.data?.logo_url ?? null;
+  const originName = originRes.data?.display_name ?? 'A partner';
+  const targetName = targetRes.data?.display_name ?? (inv as { email: string }).email.split('@')[0] ?? 'Your organization';
+  const targetLogoUrl = targetRes.data?.avatar_url ?? null;
   const payload = (invRow.payload as { redirectTo?: string } | null) ?? null;
 
   return {
@@ -304,12 +307,22 @@ export async function finishPartnerClaim(
   const orgName = name?.trim() || inv.email.split('@')[0] || 'My Organization';
   const orgSlug = (slug?.trim() || orgName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')).slice(0, 64) || 'org';
   const ghostOrgId = inv.target_org_id ?? inv.organization_id;
-  const { data: ghostOrg } = await supabase
-    .from('organizations')
-    .select('workspace_id')
-    .eq('id', ghostOrgId)
-    .single();
-  const workspaceId = ghostOrg?.workspace_id;
+  const { data: ghostOrgEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('owner_workspace_id')
+    .eq('legacy_org_id', ghostOrgId)
+    .maybeSingle();
+  let workspaceId: string | undefined = ghostOrgEntity?.owner_workspace_id ?? undefined;
+  if (!workspaceId) {
+    // Fallback: ghost org not yet in directory
+    const { data: ghostOrg } = await supabase
+      .from('organizations')
+      .select('workspace_id')
+      .eq('id', ghostOrgId)
+      .single();
+    workspaceId = ghostOrg?.workspace_id;
+  }
   if (!workspaceId) return { ok: false, error: 'Workspace not found.' };
 
   const { data: sovereignOrg, error: orgError } = await supabase
@@ -326,6 +339,20 @@ export async function finishPartnerClaim(
     .single();
 
   if (orgError || !sovereignOrg) return { ok: false, error: 'Failed to create organization.' };
+
+  // Non-fatal: mirror sovereign org to directory.entities
+  await supabase.schema('directory').from('entities').insert({
+    legacy_org_id: sovereignOrg.id,
+    display_name: orgName,
+    handle: orgSlug,
+    type: 'company',
+    owner_workspace_id: workspaceId,
+    attributes: { is_claimed: true, is_ghost: false },
+  });
+  // Non-fatal: sync claimed person entity to directory (set claimed_by_user_id)
+  await supabase.schema('directory').from('entities')
+    .update({ claimed_by_user_id: user.id, owner_workspace_id: workspaceId })
+    .eq('legacy_entity_id', entityId);
 
   await supabase.from('affiliations').insert({
     entity_id: entityId,
@@ -346,13 +373,26 @@ export async function finishPartnerClaim(
   ].filter(Boolean) as string[];
   const uniqueGhostIds = [...new Set(ghostOrgIds)];
 
-  const { data: ghostOrgs } = await supabase
-    .from('organizations')
-    .select('id, created_by_org_id')
-    .in('id', uniqueGhostIds)
-    .eq('is_claimed', false);
+  const { data: ghostOrgEntities } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('legacy_org_id, attributes')
+    .in('legacy_org_id', uniqueGhostIds)
+    .eq('type', 'company');
+  const ghostOrgs = (ghostOrgEntities ?? [])
+    .filter((e) => {
+      const attrs = (e.attributes as Record<string, unknown>) ?? {};
+      return attrs.is_claimed !== true && e.legacy_org_id;
+    })
+    .map((e) => {
+      const attrs = (e.attributes as Record<string, unknown>) ?? {};
+      return {
+        id: e.legacy_org_id!,
+        created_by_org_id: (attrs.created_by_org_id as string | null) ?? null,
+      };
+    });
 
-  for (const ghost of ghostOrgs ?? []) {
+  for (const ghost of ghostOrgs) {
     const plannerOrgId = ghost.created_by_org_id;
     if (!plannerOrgId || plannerOrgId === sovereignOrg.id) continue;
 
@@ -363,13 +403,14 @@ export async function finishPartnerClaim(
       .eq('target_org_id', ghost.id)
       .maybeSingle();
 
-    const { data: orgWorkspace } = await supabase
-      .from('organizations')
-      .select('workspace_id')
-      .eq('id', plannerOrgId)
-      .single();
+    const { data: plannerEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('owner_workspace_id')
+      .eq('legacy_org_id', plannerOrgId)
+      .maybeSingle();
 
-    if (orgWorkspace?.workspace_id) {
+    if (plannerEntity?.owner_workspace_id) {
       await supabase.from('org_relationships').upsert(
         {
           source_org_id: plannerOrgId,
@@ -377,7 +418,7 @@ export async function finishPartnerClaim(
           type: 'partner',
           tier: 'preferred',
           notes: rel?.notes ?? null,
-          workspace_id: orgWorkspace.workspace_id,
+          workspace_id: plannerEntity.owner_workspace_id,
         },
         { onConflict: 'source_org_id,target_org_id' }
       );
@@ -399,10 +440,6 @@ export async function finishPartnerClaim(
       }, { onConflict: 'subject_org_id,owner_org_id' });
     }
 
-    await supabase
-      .from('organizations')
-      .update({ merged_into_org_id: sovereignOrg.id })
-      .eq('id', ghost.id);
   }
 
   await supabase.from('invitations').update({ status: 'accepted' }).eq('id', inv.id);

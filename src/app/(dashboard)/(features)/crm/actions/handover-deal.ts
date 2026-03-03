@@ -158,9 +158,9 @@ export async function handoverDeal(
     .from('events')
     .insert({
       project_id: projectId,
-      name: eventName,
-      start_at: startAt,
-      end_at: endAt,
+      title: eventName,
+      starts_at: startAt,
+      ends_at: endAt,
       venue_entity_id: venueEntityId,
       run_of_show_data: runOfShowData,
     })

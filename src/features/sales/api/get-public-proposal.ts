@@ -57,44 +57,50 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
       .maybeSingle();
     const billTo = billToRow as { organization_id?: string | null; entity_id?: string | null } | null;
     if (billTo?.organization_id) {
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', billTo.organization_id)
-        .maybeSingle();
-      if (org) clientName = (org as { name?: string }).name ?? null;
-    } else if (billTo?.entity_id) {
-      const { data: entity } = await supabase
+      const { data: orgEntity } = await supabase
+        .schema('directory')
         .from('entities')
-        .select('email')
-        .eq('id', billTo.entity_id)
+        .select('display_name')
+        .eq('legacy_org_id', billTo.organization_id)
         .maybeSingle();
-      if (entity) clientName = (entity as { email?: string }).email ?? null;
+      if (orgEntity) clientName = orgEntity.display_name ?? null;
+    } else if (billTo?.entity_id) {
+      const { data: personEntity } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('attributes')
+        .eq('legacy_entity_id', billTo.entity_id)
+        .maybeSingle();
+      if (personEntity) {
+        const attrs = (personEntity.attributes as Record<string, unknown>) ?? {};
+        clientName = (attrs.email as string | null) ?? null;
+      }
     }
   } catch {
     // deal_stakeholders may not exist; clientName stays null
   }
   if (!clientName && deal.organization_id) {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('name')
-      .eq('id', deal.organization_id)
+    const { data: orgEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('legacy_org_id', deal.organization_id)
       .maybeSingle();
-    if (org) clientName = (org as { name?: string }).name ?? null;
+    if (orgEntity) clientName = orgEntity.display_name ?? null;
   }
 
   if (deal.event_id) {
     const { data: ev } = await supabase
       .schema('ops')
       .from('events')
-      .select('id, name, start_at')
+      .select('id, title, starts_at')
       .eq('id', deal.event_id)
       .maybeSingle();
     if (ev) {
       eventRow = {
         id: ev.id,
-        title: (ev as { name?: string }).name ?? null,
-        starts_at: (ev as { start_at?: string }).start_at ?? null,
+        title: (ev as { title?: string }).title ?? null,
+        starts_at: (ev as { starts_at?: string }).starts_at ?? null,
         organizations: null,
       };
     }

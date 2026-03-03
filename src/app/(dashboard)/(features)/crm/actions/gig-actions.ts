@@ -65,7 +65,20 @@ export async function createGig(input: CreateGigInput): Promise<CreateGigResult>
     const startsAt = eventStartAt ?? (eventDate ? `${eventDate}T08:00:00.000Z` : new Date().toISOString());
     const endsAt = eventEndAt ?? (eventDate ? `${eventDate}T18:00:00.000Z` : new Date(Date.now() + 10 * 60 * 60 * 1000).toISOString());
 
+    // Resolve directory entity for the client org (organizationId is a public.organizations.id)
+    let clientEntityId: string | null = null;
+    if (organizationId) {
+      const { data: dirEnt } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('id')
+        .eq('legacy_org_id', organizationId)
+        .maybeSingle();
+      clientEntityId = dirEnt?.id ?? null;
+    }
+
     const { data: event, error } = await supabase
+      .schema('ops')
       .from('events')
       .insert({
         workspace_id: workspaceId,
@@ -75,7 +88,7 @@ export async function createGig(input: CreateGigInput): Promise<CreateGigResult>
         status: 'planned',
         lifecycle_status: lifecycleStatus,
         location_name: location?.trim() ?? null,
-        client_id: organizationId ?? null,
+        client_entity_id: clientEntityId,
         actor: 'user',
       })
       .select('id')

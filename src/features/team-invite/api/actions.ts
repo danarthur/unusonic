@@ -230,6 +230,26 @@ export async function upsertGhostMember(
     await supabase.from('org_members').update({ avatar_url: inputAvatarUrl }).eq('id', result.id);
   }
 
+  // Non-fatal cortex ROSTER_MEMBER edge mirror for newly created ghost member
+  if (result.id) {
+    const { data: newOm } = await supabase
+      .from('org_members').select('entity_id').eq('id', result.id).maybeSingle();
+    if (newOm?.entity_id) {
+      const [personDirRes, orgDirRes] = await Promise.all([
+        supabase.schema('directory').from('entities').select('id').eq('legacy_entity_id', newOm.entity_id).maybeSingle(),
+        supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', orgId).maybeSingle(),
+      ]);
+      if (personDirRes.data?.id && orgDirRes.data?.id) {
+        await supabase.rpc('upsert_relationship', {
+          p_source_entity_id: personDirRes.data.id,
+          p_target_entity_id: orgDirRes.data.id,
+          p_type: 'ROSTER_MEMBER',
+          p_context_data: { first_name: result.first_name ?? first_name, last_name: result.last_name ?? last_name, role: result.role ?? role, job_title: result.job_title ?? job_title?.trim() ?? null },
+        });
+      }
+    }
+  }
+
   const name = (result.name ?? [result.first_name, result.last_name].filter(Boolean).join(' ').trim()) || result.email || emailTrim;
   revalidatePath('/settings/team');
   return {

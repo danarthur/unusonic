@@ -61,7 +61,7 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
   const { data: current, error: currentErr } = await supabase
     .schema('ops')
     .from('events')
-    .select('id, name, start_at, end_at, run_of_show_data, project_id')
+    .select('id, title, starts_at, ends_at, run_of_show_data, project_id')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -71,9 +71,9 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
 
   const curr = current as {
     id: string;
-    name: string;
-    start_at: string;
-    end_at: string;
+    title: string;
+    starts_at: string;
+    ends_at: string;
     run_of_show_data: RunOfShowRow | null;
     project_id: string | null;
   };
@@ -90,17 +90,17 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
     return { conflicts: [] };
   }
 
-  const startAt = curr.start_at;
-  const endAt = curr.end_at;
+  const startAt = curr.starts_at;
+  const endAt = curr.ends_at;
 
   const { data: overlapping, error: overlapErr } = await supabase
     .schema('ops')
     .from('events')
-    .select('id, name, run_of_show_data, project:projects!inner(workspace_id)')
+    .select('id, title, run_of_show_data, project:projects!inner(workspace_id)')
     .eq('projects.workspace_id', workspaceId)
     .neq('id', eventId)
-    .lte('start_at', endAt)
-    .gte('end_at', startAt);
+    .lte('starts_at', endAt)
+    .gte('ends_at', startAt);
 
   if (overlapErr || !overlapping?.length) {
     return { conflicts: [] };
@@ -110,7 +110,7 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
   const currentGear = getGearResourceNames(curr.run_of_show_data);
   const conflicts: EventConflict[] = [];
 
-  for (const row of overlapping as { id: string; name: string; run_of_show_data: RunOfShowRow | null }[]) {
+  for (const row of overlapping as { id: string; title: string; run_of_show_data: RunOfShowRow | null }[]) {
     const otherCrew = getCrewRoleNames(row.run_of_show_data);
     const otherGear = getGearResourceNames(row.run_of_show_data);
 
@@ -118,7 +118,7 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
     for (const resourceName of crewIntersection) {
       conflicts.push({
         eventId: row.id,
-        eventName: row.name ?? 'Untitled',
+        eventName: row.title ?? 'Untitled',
         resourceType: 'crew',
         resourceName,
       });
@@ -128,7 +128,7 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
     for (const resourceName of gearIntersection) {
       conflicts.push({
         eventId: row.id,
-        eventName: row.name ?? 'Untitled',
+        eventName: row.title ?? 'Untitled',
         resourceType: 'gear',
         resourceName,
       });

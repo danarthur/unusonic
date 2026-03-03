@@ -102,15 +102,41 @@ export async function claimGhostOrganizationBySlug(
     return { ok: false, error: 'You must be signed in to claim an organization.' };
   }
 
-  const { data: org, error: orgError } = await supabase
-    .from('organizations')
-    .select('id, workspace_id')
-    .eq('slug', slug)
-    .eq('is_claimed', false)
+  // Prefer directory.entities; fallback to public.organizations
+  const { data: orgDirEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('legacy_org_id, owner_workspace_id, attributes')
+    .eq('handle', slug)
+    .eq('type', 'company')
     .maybeSingle();
 
-  if (orgError || !org) {
-    return { ok: false, error: 'Organization not found or already claimed.' };
+  let orgId: string;
+  let orgWorkspaceId: string;
+  let orgAttrs: Record<string, unknown> = {};
+
+  if (orgDirEntity?.legacy_org_id) {
+    const attrs = (orgDirEntity.attributes as Record<string, unknown>) ?? {};
+    if (attrs.is_claimed === true) {
+      return { ok: false, error: 'Organization not found or already claimed.' };
+    }
+    orgId = orgDirEntity.legacy_org_id;
+    orgWorkspaceId = orgDirEntity.owner_workspace_id ?? '';
+    orgAttrs = attrs;
+    if (!orgWorkspaceId) return { ok: false, error: 'Organization not found or already claimed.' };
+  } else {
+    // Fallback: org not yet in directory
+    const { data: org, error: orgError } = await supabase
+      .from('organizations')
+      .select('id, workspace_id')
+      .eq('slug', slug)
+      .eq('is_claimed', false)
+      .maybeSingle();
+    if (orgError || !org) {
+      return { ok: false, error: 'Organization not found or already claimed.' };
+    }
+    orgId = org.id;
+    orgWorkspaceId = org.workspace_id;
   }
 
   let entityId: string;
@@ -141,27 +167,27 @@ export async function claimGhostOrganizationBySlug(
       claimed_at: new Date().toISOString(),
       owner_id: entityId,
     })
-    .eq('id', org.id);
+    .eq('id', orgId);
   if (orgUpdateError) {
     return { ok: false, error: orgUpdateError.message ?? 'Failed to claim organization.' };
   }
 
   const { error: affError } = await supabase.from('affiliations').insert({
-    organization_id: org.id,
+    organization_id: orgId,
     entity_id: entityId,
     role_label: 'Owner',
     status: 'active',
     access_level: 'admin',
   });
   if (affError) {
-    await supabase.from('organizations').update({ is_claimed: false, claimed_at: null, owner_id: null }).eq('id', org.id);
+    await supabase.from('organizations').update({ is_claimed: false, claimed_at: null, owner_id: null }).eq('id', orgId);
     return { ok: false, error: affError.message ?? 'Failed to link you to the organization.' };
   }
 
   const { error: memberError } = await supabase.from('org_members').insert({
-    org_id: org.id,
+    org_id: orgId,
     entity_id: entityId,
-    workspace_id: org.workspace_id,
+    workspace_id: orgWorkspaceId,
     profile_id: null,
     first_name: null,
     last_name: null,
@@ -171,23 +197,30 @@ export async function claimGhostOrganizationBySlug(
     default_hourly_rate: 0,
   });
   if (memberError) {
-    await supabase.from('affiliations').delete().eq('entity_id', entityId).eq('organization_id', org.id);
-    await supabase.from('organizations').update({ is_claimed: false, claimed_at: null, owner_id: null }).eq('id', org.id);
+    await supabase.from('affiliations').delete().eq('entity_id', entityId).eq('organization_id', orgId);
+    await supabase.from('organizations').update({ is_claimed: false, claimed_at: null, owner_id: null }).eq('id', orgId);
     return { ok: false, error: memberError.message ?? 'Failed to add you as owner.' };
   }
 
   const { data: existingMember } = await supabase
     .from('workspace_members')
     .select('user_id')
-    .eq('workspace_id', org.workspace_id)
+    .eq('workspace_id', orgWorkspaceId)
     .eq('user_id', user.id)
     .maybeSingle();
   if (!existingMember) {
     await supabase.from('workspace_members').insert({
-      workspace_id: org.workspace_id,
+      workspace_id: orgWorkspaceId,
       user_id: user.id,
       role: 'owner',
     });
+  }
+
+  // Non-fatal: sync claim status to directory.entities (only if org was found in directory)
+  if (orgDirEntity?.legacy_org_id) {
+    await supabase.schema('directory').from('entities')
+      .update({ attributes: { ...orgAttrs, is_claimed: true } })
+      .eq('legacy_org_id', orgId);
   }
 
   // Mark onboarding complete so user isn't redirected back to /onboarding
@@ -315,6 +348,22 @@ export async function createGhostOrganization(
     return { ok: false, error: orgError.message ?? 'Failed to create organization.' };
   }
 
+  // Non-fatal: mirror ghost org to directory.entities
+  await supabase.schema('directory').from('entities').insert({
+    legacy_org_id: orgId,
+    display_name: name,
+    handle: slug || null,
+    type: 'company',
+    owner_workspace_id: workspace_id,
+    claimed_by_user_id: null,
+    attributes: {
+      is_ghost: true,
+      is_claimed: false,
+      created_by_org_id: resolvedCreatorOrgId,
+      slug: slug || null,
+    },
+  });
+
   // 4) Create ghost entity for the contact
   const { data: ghostEntity, error: ghostError } = await supabase
     .from('entities')
@@ -328,6 +377,16 @@ export async function createGhostOrganization(
     await supabase.from('organizations').delete().eq('id', orgId);
     return { ok: false, error: ghostError?.message ?? 'Failed to create contact entity.' };
   }
+
+  // Non-fatal: mirror ghost contact entity to directory.entities
+  await supabase.schema('directory').from('entities').insert({
+    legacy_entity_id: ghostEntity.id,
+    display_name: contact_email,
+    type: 'person',
+    claimed_by_user_id: null,
+    owner_workspace_id: workspace_id,
+    attributes: { is_ghost: true },
+  });
 
   // 5) Link contact to org via affiliation
   const { error: affError } = await supabase.from('affiliations').insert({
@@ -426,6 +485,18 @@ export async function claimOrganization(
     return { ok: false, error: orgUpdateError.message ?? 'Failed to claim organization.' };
   }
 
+  // Non-fatal: sync claim status to directory.entities org
+  {
+    const { data: orgDir } = await supabase.schema('directory').from('entities')
+      .select('attributes').eq('legacy_org_id', invitation.organization_id).maybeSingle();
+    if (orgDir) {
+      const existingAttrs = (orgDir.attributes as Record<string, unknown>) ?? {};
+      await supabase.schema('directory').from('entities')
+        .update({ attributes: { ...existingAttrs, is_claimed: true } })
+        .eq('legacy_org_id', invitation.organization_id);
+    }
+  }
+
   // Update entity: no longer ghost, link to auth user
   const { error: entityUpdateError } = await supabase
     .from('entities')
@@ -434,6 +505,11 @@ export async function claimOrganization(
   if (entityUpdateError) {
     return { ok: false, error: entityUpdateError.message ?? 'Failed to link your account.' };
   }
+
+  // Non-fatal: set claimed_by_user_id on directory.entities person entity
+  await supabase.schema('directory').from('entities')
+    .update({ claimed_by_user_id: user.id })
+    .eq('legacy_entity_id', entityId);
 
   // Grant admin access to the claimer
   const { error: affUpdateError } = await supabase
@@ -550,6 +626,22 @@ export async function createGenesisOrganization(
     }
     return { ok: false, error: orgError.message ?? 'Failed to create organization.' };
   }
+
+  // Non-fatal: mirror genesis org to directory.entities
+  await supabase.schema('directory').from('entities').insert({
+    legacy_org_id: orgId,
+    display_name: name,
+    handle: finalSlug || null,
+    type: 'company',
+    owner_workspace_id: workspaceId,
+    attributes: {
+      is_ghost: false,
+      is_claimed: true,
+      logo_url: logo_url && logo_url.startsWith('http') ? logo_url : null,
+      brand_color: brand_color || null,
+      tier: tierValue,
+    },
+  });
 
   const { error: affError } = await supabase.from('affiliations').insert({
     organization_id: orgId,

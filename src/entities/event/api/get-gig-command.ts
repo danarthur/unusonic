@@ -28,8 +28,9 @@ export async function getGigCommand(eventId: string): Promise<GigCommandDTO | nu
   if (authError || !user) return null;
 
   const { data: row, error } = await supabase
+    .schema('ops')
     .from('events')
-    .select('id, title, lifecycle_status, starts_at, location_name, workspace_id, organizations:client_id(name)')
+    .select('id, title, lifecycle_status, starts_at, location_name, workspace_id, client_entity_id')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -37,7 +38,18 @@ export async function getGigCommand(eventId: string): Promise<GigCommandDTO | nu
 
   const r = row as Record<string, unknown>;
   const eventDate = r.starts_at ? String((r.starts_at as string).slice(0, 10)) : null;
-  const clientName = (r.organizations as { name?: string } | null)?.name ?? null;
+
+  let clientName: string | null = null;
+  const clientEntityId = r.client_entity_id as string | null;
+  if (clientEntityId) {
+    const { data: dirEnt } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('id', clientEntityId)
+      .maybeSingle();
+    clientName = dirEnt?.display_name ?? null;
+  }
 
   return {
     id: r.id as string,

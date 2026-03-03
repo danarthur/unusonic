@@ -37,5 +37,42 @@ export async function updateOrg(input: UpdateOrgInput): Promise<UpdateOrgResult>
     .eq('id', org_id);
 
   if (error) return { ok: false, error: error.message };
+
+  // Dual-write: sync to directory.entities (new schema)
+  // Fetch the updated row so we can rebuild the full attributes object.
+  const { data: fresh } = await supabase
+    .from('organizations')
+    .select('name, slug, logo_url, description, brand_color, website, tier, address, social_links, support_email, default_currency, is_ghost, is_claimed, operational_settings, category')
+    .eq('id', org_id)
+    .maybeSingle();
+
+  if (fresh) {
+    const f = fresh as Record<string, unknown>;
+    await supabase
+      .schema('directory')
+      .from('entities')
+      .update({
+        display_name: f.name as string,
+        handle: (f.slug as string | null) ?? null,
+        avatar_url: (f.logo_url as string | null) ?? null,
+        attributes: {
+          description: f.description ?? null,
+          website: f.website ?? null,
+          brand_color: f.brand_color ?? null,
+          tier: f.tier ?? null,
+          address: f.address ?? null,
+          social_links: f.social_links ?? null,
+          support_email: f.support_email ?? null,
+          default_currency: f.default_currency ?? null,
+          is_ghost: f.is_ghost ?? false,
+          is_claimed: f.is_claimed ?? true,
+          operational_settings: f.operational_settings ?? null,
+          category: f.category ?? null,
+        },
+      })
+      .eq('legacy_org_id', org_id);
+    // Non-fatal: if directory.entities sync fails, public.organizations is still updated.
+  }
+
   return { ok: true };
 }

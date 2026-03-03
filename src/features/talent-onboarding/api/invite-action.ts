@@ -179,6 +179,20 @@ export async function inviteTalent(
       }
     }
 
+    // Non-fatal cortex ROSTER_MEMBER edge mirror (errors silently ignored)
+    const [personDir, orgDir] = await Promise.all([
+      supabase.schema('directory').from('entities').select('id').eq('legacy_entity_id', inviteeEntityId).maybeSingle(),
+      supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', orgId).maybeSingle(),
+    ]);
+    if (personDir.data?.id && orgDir.data?.id) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: personDir.data.id,
+        p_target_entity_id: orgDir.data.id,
+        p_type: 'ROSTER_MEMBER',
+        p_context_data: { first_name: first_name ?? null, last_name: last_name ?? null, role, job_title: job_title ?? null, employment_status, org_member_id: orgMember.id },
+      });
+    }
+
     const statusLabel =
       employment_status === 'external_contractor' ? 'Contractor' : 'Employee';
     const skillsLabel =
@@ -299,6 +313,33 @@ export async function inviteTalent(
         ok: false,
         error: skillsError?.message ?? 'Failed to add skills; member was not added.',
       };
+    }
+  }
+
+  // Non-fatal: sync ghost person to directory.entities + create cortex ROSTER_MEMBER edge
+  const { data: orgDirGhost } = await supabase
+    .schema('directory').from('entities').select('id, owner_workspace_id').eq('legacy_org_id', orgId).maybeSingle();
+  if (orgDirGhost?.id) {
+    let dirGhostPersonId: string | null = null;
+    const { data: existingDirGhost } = await supabase
+      .schema('directory').from('entities').select('id').eq('legacy_entity_id', inviteeEntityId).maybeSingle();
+    if (existingDirGhost?.id) {
+      dirGhostPersonId = existingDirGhost.id;
+    } else if (!existingGhostEntity) {
+      // Only mirror for newly created ghost entities (avoid overwriting existing directory records)
+      const { data: newDirGhost } = await supabase
+        .schema('directory').from('entities')
+        .insert({ legacy_entity_id: inviteeEntityId, display_name: [first_name, last_name].filter(Boolean).join(' ').trim() || emailTrim, type: 'person', owner_workspace_id: orgDirGhost.owner_workspace_id ?? null, claimed_by_user_id: null, attributes: { is_ghost: true, email: emailTrim } })
+        .select('id').maybeSingle();
+      dirGhostPersonId = newDirGhost?.id ?? null;
+    }
+    if (dirGhostPersonId) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: dirGhostPersonId,
+        p_target_entity_id: orgDirGhost.id,
+        p_type: 'ROSTER_MEMBER',
+        p_context_data: { first_name: first_name ?? null, last_name: last_name ?? null, role, job_title: job_title ?? null, employment_status, org_member_id: orgMember.id },
+      });
     }
   }
 
