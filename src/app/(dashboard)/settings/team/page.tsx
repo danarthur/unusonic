@@ -1,6 +1,6 @@
 /**
  * Team Roster – Forge the Roster (Genesis Step 2).
- * Personnel cards: Captain, Ghost slots, batch Deploy Signals.
+ * Personnel cards: Captain, Ghost slots, batch Send Signals.
  */
 
 import { redirect } from 'next/navigation';

@@ -29,7 +29,7 @@ import { RoleSelect } from '@/features/team-invite/ui/RoleSelect';
 import type { SignalRoleId } from '@/features/team-invite/model/role-presets';
 import { WorkspaceRoleSelect } from '@/features/role-builder';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
-import { getWorkspaceMemberByOrgMemberId } from '@/app/actions/workspace';
+import { getWorkspaceMemberByOrgMemberId } from '../api/member-actions';
 
 const PRESET_SKILL_TAGS = [
   'Audio A1',

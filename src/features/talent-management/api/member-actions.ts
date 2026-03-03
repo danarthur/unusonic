@@ -154,3 +154,40 @@ export async function removeSkillFromMember(input: RemoveSkillInput): Promise<Me
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+/**
+ * Resolve an org member (roster person) to a workspace member so we can show/edit workspace role.
+ * Used by MemberDetailSheet: if this person is in the workspace, show WorkspaceRoleSelect.
+ */
+export async function getWorkspaceMemberByOrgMemberId(
+  orgMemberId: string,
+  workspaceId: string
+): Promise<{ workspaceMemberId: string; roleId: string | null } | null> {
+  const supabase = await createClient();
+  const { data: orgMember } = await supabase
+    .from('org_members')
+    .select('profile_id, entity_id')
+    .eq('id', orgMemberId)
+    .single();
+  if (!orgMember) return null;
+
+  let userId: string | null = orgMember.profile_id ?? null;
+  if (!userId && orgMember.entity_id) {
+    const [publicEnt, dirEnt] = await Promise.all([
+      supabase.from('entities').select('auth_id').eq('id', orgMember.entity_id).maybeSingle(),
+      supabase.schema('directory').from('entities').select('claimed_by_user_id').eq('id', orgMember.entity_id).maybeSingle(),
+    ]);
+    userId = publicEnt.data?.auth_id ?? dirEnt.data?.claimed_by_user_id ?? null;
+  }
+  if (!userId) return null;
+
+  const { data: wm } = await supabase
+    .from('workspace_members')
+    .select('id, role_id')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!wm) return null;
+
+  return { workspaceMemberId: wm.id, roleId: wm.role_id ?? null };
+}

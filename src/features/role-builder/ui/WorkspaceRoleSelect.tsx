@@ -10,8 +10,7 @@ import {
 } from '@/shared/ui/select';
 import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
-import { getWorkspaceRolesForBuilder } from '../api/actions';
-import { updateMemberRole } from '@/app/actions/workspace';
+import { getWorkspaceRolesForBuilder, updateMemberRole } from '../api/actions';
 
 export interface WorkspaceRoleSelectProps {
   workspaceId: string;

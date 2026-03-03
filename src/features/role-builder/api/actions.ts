@@ -202,6 +202,97 @@ export async function updateCustomRole(
 }
 
 /**
+ * Updates a member's workspace role (role_id). Requires manage_team or owner/admin.
+ * Cannot change the owner's role. roleId must be a system role or a custom role for this workspace.
+ */
+export async function updateMemberRole(
+  workspaceId: string,
+  memberId: string,
+  roleId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const { data: currentMember } = await supabase
+    .from('workspace_members')
+    .select('role, permissions')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!currentMember) {
+    return { success: false, error: 'Not a member of this workspace' };
+  }
+
+  const canManage =
+    currentMember.role === 'owner' ||
+    currentMember.role === 'admin' ||
+    (currentMember.permissions as { manage_team?: boolean } | null)?.manage_team;
+
+  if (!canManage) {
+    return { success: false, error: 'Insufficient permissions' };
+  }
+
+  const { data: targetMember } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('id', memberId)
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  if (!targetMember) {
+    return { success: false, error: 'Member not found' };
+  }
+
+  if (targetMember.role === 'owner') {
+    const { count, error: countErr } = await supabase
+      .from('workspace_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('role', 'owner');
+    if (countErr || (count ?? 0) <= 1) {
+      return { success: false, error: 'Cannot remove the last Owner. Assign another member as Owner first.' };
+    }
+  }
+
+  const { data: roleRow } = await supabase
+    .schema('ops')
+    .from('workspace_roles')
+    .select('id, slug')
+    .eq('id', roleId)
+    .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+    .single();
+
+  if (!roleRow) {
+    return { success: false, error: 'Invalid role' };
+  }
+
+  const systemSlugToLegacy: Record<string, 'owner' | 'admin' | 'member' | 'viewer'> = {
+    owner: 'owner',
+    admin: 'admin',
+    member: 'member',
+    observer: 'viewer',
+  };
+  const legacyRole = systemSlugToLegacy[roleRow.slug] ?? 'member';
+  const { error } = await supabase
+    .from('workspace_members')
+    .update({ role_id: roleId, role: legacyRole })
+    .eq('id', memberId)
+    .eq('workspace_id', workspaceId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/settings');
+  return { success: true };
+}
+
+/**
  * Deletes a custom role. Fails with ROLE_IN_USE if any workspace_members have this role_id
  * (caller must reassign those members first).
  * Rejected if workspace subscription_tier is not venue_os or autonomous.

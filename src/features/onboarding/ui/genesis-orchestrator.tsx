@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LivingLogo, type LivingLogoStatus } from '@/shared/ui/branding/living-logo';
-import { IonInput } from '@/app/(dashboard)/(features)/brain/components/IonInput';
 import { OnboardingChatInput } from './onboarding-chat-input';
 import { GhostClaimCard } from './ghost-claim-card';
 import { GenesisCreateCard } from './genesis-create-card';
@@ -104,25 +103,13 @@ export function GenesisOrchestrator({
             </h1>
           )}
 
-          {isEmbedded ? (
-              <OnboardingChatInput
-                value={name}
-                onChange={handleInput}
-                onSubmit={handleSubmit}
-                placeholder="Company or Team Name"
-                isLoading={logoStatus === 'thinking'}
-              />
-            ) : (
-              <IonInput
-                value={name}
-                onChange={handleInput}
-                onSubmit={handleSubmit}
-                isLoading={logoStatus === 'thinking'}
-                placeholder="Company or Team Name"
-                showAttachment={false}
-                showVoice={false}
-              />
-            )}
+          <OnboardingChatInput
+              value={name}
+              onChange={handleInput}
+              onSubmit={handleSubmit}
+              placeholder="Company or Team Name"
+              isLoading={logoStatus === 'thinking'}
+            />
 
             {/* Handle feedback (the tech layer) */}
             <div className="mt-6 min-h-[2rem]">
