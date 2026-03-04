@@ -198,15 +198,15 @@ export async function removeSkillFromMember(input: RemoveSkillInput): Promise<Me
     .single();
   if (!skill) return { ok: false, error: 'Skill not found.' };
 
-  // Permission check: look up org via legacy org_members (still exists; org_member_id is legacy UUID)
-  const { data: om } = await supabase
-    .from('org_members')
-    .select('org_id')
+  // Permission check: look up org via cortex relationship (org_member_id is cortex rel id)
+  const { data: skillRel } = await supabase
+    .schema('cortex').from('relationships')
+    .select('target_entity_id')
     .eq('id', skill.org_member_id)
     .maybeSingle();
-  if (!om) return { ok: false, error: 'Member not found.' };
+  if (!skillRel) return { ok: false, error: 'Member not found.' };
 
-  const err = await assertCanManageOrgMember(supabase, om.org_id);
+  const err = await assertCanManageOrgMember(supabase, skillRel.target_entity_id);
   if (err) return err;
 
   const { error } = await supabase
@@ -243,19 +243,6 @@ export async function getWorkspaceMemberByOrgMemberId(
       .schema('directory').from('entities')
       .select('claimed_by_user_id').eq('id', rel.source_entity_id).maybeSingle();
     userId = personEnt?.claimed_by_user_id ?? null;
-  } else {
-    // Legacy fallback for callers passing old org_members.id
-    const { data: orgMember } = await supabase
-      .from('org_members').select('profile_id, entity_id').eq('id', orgMemberId).single();
-    if (!orgMember) return null;
-
-    userId = orgMember.profile_id ?? null;
-    if (!userId && orgMember.entity_id) {
-      const { data: dirEnt } = await supabase
-        .schema('directory').from('entities')
-        .select('claimed_by_user_id').eq('id', orgMember.entity_id).maybeSingle();
-      userId = dirEnt?.claimed_by_user_id ?? null;
-    }
   }
 
   if (!userId) return null;

@@ -491,41 +491,47 @@ export async function offboardTeamMember(
 
   // Step 3: Roster management (only for full_offboard).
   if (intent === 'full_offboard') {
-    // Resolve user_id → entity_id (public.entities or directory.entities).
-    let entityId: string | null = null;
-    const { data: publicEnt } = await supabase
+    // Resolve user_id → directory.entities person entity.
+    const { data: dirEnt } = await supabase
+      .schema('directory')
       .from('entities')
       .select('id')
-      .eq('auth_id', targetUserId)
+      .eq('claimed_by_user_id', targetUserId)
       .maybeSingle();
-    if (publicEnt?.id) {
-      entityId = publicEnt.id;
-    }
-    if (!entityId) {
-      const { data: dirEnt } = await supabase
+
+    if (dirEnt?.id) {
+      // Find org entities owned by this workspace
+      const { data: orgDirEnts } = await supabase
         .schema('directory')
         .from('entities')
         .select('id')
-        .eq('claimed_by_user_id', targetUserId)
-        .maybeSingle();
-      if (dirEnt?.id) entityId = dirEnt.id;
-    }
+        .eq('owner_workspace_id', workspaceId)
+        .eq('type', 'company');
 
-    if (entityId) {
-      const { data: orgs } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('workspace_id', workspaceId);
-      const orgIds = (orgs ?? []).map((o) => o.id);
-      if (orgIds.length > 0) {
-        await supabase
-          .from('org_members')
-          .delete()
-          .in('org_id', orgIds)
-          .eq('entity_id', entityId);
+      const orgEntityIds = (orgDirEnts ?? []).map((e) => e.id);
+
+      // Soft-delete ROSTER_MEMBER edges from person to workspace orgs
+      for (const orgEntityId of orgEntityIds) {
+        const { data: relRow } = await supabase
+          .schema('cortex')
+          .from('relationships')
+          .select('id, context_data')
+          .eq('source_entity_id', dirEnt.id)
+          .eq('target_entity_id', orgEntityId)
+          .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+          .maybeSingle();
+        if (relRow) {
+          const ctx = (relRow.context_data as Record<string, unknown>) ?? {};
+          await supabase.rpc('upsert_relationship', {
+            p_source_entity_id: dirEnt.id,
+            p_target_entity_id: orgEntityId,
+            p_type: 'ROSTER_MEMBER',
+            p_context_data: { ...ctx, deleted_at: new Date().toISOString() },
+          });
+        }
       }
     }
-    // We do NOT delete public.entities, directory.entities, or deal_stakeholders — history is preserved.
+    // directory.entities and deal_stakeholders are preserved — history is intact.
   }
 
   revalidatePath('/settings');
@@ -641,14 +647,8 @@ export async function inviteTeamMember(
   }
 
   const orgMemberId = result.id;
-
-  const { data: addedMember } = await supabase
-    .from('org_members')
-    .select('entity_id')
-    .eq('id', orgMemberId)
-    .single();
-
-  const entityIdForRollback = addedMember?.entity_id ?? null;
+  // entity_id is returned by add_ghost_member RPC (directory.entities.id of the ghost person)
+  const entityIdForRollback = (result as { ok?: boolean; id?: string; entity_id?: string; error?: string } | null)?.entity_id ?? null;
 
   if (!grant_workspace_access) {
     revalidatePath('/settings');
@@ -715,23 +715,16 @@ export async function inviteTeamMember(
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function rollbackRosterStep(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  orgMemberId: string,
-  entityId: string | null
+  _supabase: Awaited<ReturnType<typeof createClient>>,
+  _orgMemberId: string,
+  _entityId: string | null
 ): Promise<void> {
-  await supabase.from('org_members').delete().eq('id', orgMemberId);
-  if (entityId) {
-    const { data: other } = await supabase
-      .from('org_members')
-      .select('id')
-      .eq('entity_id', entityId)
-      .limit(1)
-      .maybeSingle();
-    if (!other) {
-      await supabase.from('entities').delete().eq('id', entityId);
-    }
-  }
+  // Cortex.relationships entries cannot be hard-deleted without a dedicated RPC.
+  // The ghost person remains on the roster with no workspace access.
+  // An admin can remove them via the offboard flow if needed.
+  console.warn('[inviteTeamMember] Rollback: ghost roster entry left in cortex (no workspace access).');
 }
 
 // ============================================================================

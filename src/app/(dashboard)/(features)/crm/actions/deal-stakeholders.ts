@@ -85,19 +85,6 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
         address: (attrs.address as Record<string, string> | null) ?? null,
       });
     }
-    // Fallback: public.organizations for any org not in directory
-    const missingOrgIds = orgIds.filter((id) => !orgMap.has(id));
-    if (missingOrgIds.length > 0) {
-      const { data: legacyOrgs } = await supabase
-        .from('organizations').select('id, name, logo_url, support_email, address')
-        .in('id', missingOrgIds).eq('workspace_id', workspaceId);
-      for (const o of legacyOrgs ?? []) {
-        const lo = o as { id: string; name?: string; logo_url?: string | null; support_email?: string | null; address?: Record<string, string> | null };
-        if (!orgMap.has(lo.id)) {
-          orgMap.set(lo.id, { dirId: '', name: lo.name ?? '', logo_url: lo.logo_url ?? null, email: lo.support_email ?? null, address: lo.address ?? null });
-        }
-      }
-    }
 
     // Prefer directory.entities for person lookups
     const { data: dirPersonEntities } = entityIds.length > 0
@@ -112,15 +99,6 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
       const attrs = (de.attributes as Record<string, unknown>) ?? {};
       const email = (attrs.email as string | null) ?? null;
       entityMap.set(de.legacy_entity_id, { dirId: de.id, name: email ?? de.display_name ?? '', email });
-    }
-    // Fallback: public.entities for persons not in directory
-    const missingEntityIds = entityIds.filter((id) => !entityMap.has(id));
-    if (missingEntityIds.length > 0) {
-      const { data: legacyEnts } = await supabase.from('entities').select('id, email').in('id', missingEntityIds);
-      for (const e of legacyEnts ?? []) {
-        const le = e as { id: string; email?: string | null };
-        if (!entityMap.has(le.id)) entityMap.set(le.id, { dirId: '', name: le.email ?? '', email: le.email ?? null });
-      }
     }
 
     // Contact names: cortex ROSTER_MEMBER preferred, fallback to org_members
@@ -142,20 +120,6 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
         const legacyOrgId = dirToLegacyOrg.get(edge.target_entity_id);
         const legacyPersonId = dirToLegacyPerson.get(edge.source_entity_id);
         if (legacyOrgId && legacyPersonId) contactDisplayByKey.set(`${legacyOrgId}|${legacyPersonId}`, display);
-      }
-    }
-    // Fallback: org_members for pairs not resolved via cortex
-    const missingPairs = dualNodePairs.filter((p) => !contactDisplayByKey.has(`${p.org_id}|${p.entity_id}`));
-    if (missingPairs.length > 0) {
-      const { data: memberRows } = await supabase.from('org_members')
-        .select('org_id, entity_id, first_name, last_name')
-        .in('org_id', [...new Set(missingPairs.map((p) => p.org_id))])
-        .in('entity_id', [...new Set(missingPairs.map((p) => p.entity_id))]);
-      for (const m of (memberRows ?? []) as { org_id: string; entity_id: string; first_name: string | null; last_name: string | null }[]) {
-        const key = `${m.org_id}|${m.entity_id}`;
-        if (!contactDisplayByKey.has(key)) {
-          contactDisplayByKey.set(key, [m.first_name, m.last_name].filter(Boolean).join(' ').trim());
-        }
       }
     }
 
@@ -351,12 +315,6 @@ export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRost
         .map((de) => de.legacy_entity_id!);
 
       const emailByLegacyId = new Map<string, string | null>();
-      if (legacyIdsNeedingEmail.length > 0) {
-        const { data: legacyEnts } = await supabase.from('entities').select('id, email').in('id', legacyIdsNeedingEmail);
-        for (const le of legacyEnts ?? []) {
-          emailByLegacyId.set(le.id, (le as { email?: string | null }).email ?? null);
-        }
-      }
 
       return (dirPeople ?? []).map((de) => {
         const attrs = (de.attributes as Record<string, unknown>) ?? {};
@@ -370,55 +328,7 @@ export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRost
       });
     }
 
-    // Legacy fallback: affiliations + org_members + entities
-    const [affsRes, membersRes] = await Promise.all([
-      supabase.from('affiliations').select('entity_id').eq('organization_id', orgId).eq('status', 'active').limit(1000),
-      supabase.from('org_members').select('id, entity_id, first_name, last_name').eq('org_id', orgId).limit(1000),
-    ]);
-
-    if (affsRes.error) return [];
-    if (membersRes.error) return [];
-
-    const affEntityIds = new Set((affsRes.data ?? []).map((a) => (a as { entity_id: string }).entity_id).filter(Boolean));
-    const memberRows = (membersRes.data ?? []) as { id: string; entity_id: string | null; first_name: string | null; last_name: string | null }[];
-    for (const m of memberRows) {
-      if (m.entity_id) affEntityIds.add(m.entity_id);
-    }
-    const entityIds = [...affEntityIds];
-
-    if (entityIds.length === 0) return [];
-
-    // Prefer directory.entities for email lookups; fallback to public.entities
-    const { data: dirEntityEmails } = await supabase.schema('directory').from('entities')
-      .select('legacy_entity_id, attributes').in('legacy_entity_id', entityIds);
-    const entityMap = new Map<string, { email: string | null }>();
-    for (const de of dirEntityEmails ?? []) {
-      if (!de.legacy_entity_id) continue;
-      const attrs = (de.attributes as Record<string, unknown>) ?? {};
-      entityMap.set(de.legacy_entity_id, { email: (attrs.email as string | null) ?? null });
-    }
-    const missingIds = entityIds.filter((id) => !entityMap.has(id));
-    if (missingIds.length > 0) {
-      const { data: legacyEnts } = await supabase.from('entities').select('id, email').in('id', missingIds);
-      for (const e of legacyEnts ?? []) {
-        const le = e as { id: string; email?: string | null };
-        if (!entityMap.has(le.id)) entityMap.set(le.id, { email: le.email ?? null });
-      }
-    }
-
-    const memberByEntity = new Map(
-      memberRows.filter((m) => m.entity_id != null)
-        .map((m) => [m.entity_id!, { id: m.id, first_name: m.first_name, last_name: m.last_name }])
-    );
-
-    return entityIds.map((entity_id) => {
-      const ent = entityMap.get(entity_id);
-      const member = memberByEntity.get(entity_id);
-      const display =
-        (member && [member.first_name, member.last_name].filter(Boolean).join(' ').trim()) ||
-        ent?.email || 'Unknown';
-      return { id: member?.id ?? entity_id, entity_id, display_name: display, email: ent?.email ?? null };
-    });
+    return [];
   } catch {
     return [];
   }
@@ -444,18 +354,13 @@ export async function createContactForOrg(
   if (!trimmed.includes('@')) return { success: false, error: 'Valid email required.' };
 
   const supabase = await createClient();
-  // Prefer directory.entities for org validation; fallback to public.organizations
   const { data: orgDirCheck } = await supabase
     .schema('directory').from('entities')
     .select('legacy_org_id')
-    .eq('legacy_org_id', orgId)
+    .or(`legacy_org_id.eq.${orgId},id.eq.${orgId}`)
     .eq('owner_workspace_id', workspaceId)
     .maybeSingle();
-  if (!orgDirCheck) {
-    const { data: legacyOrgCheck } = await supabase
-      .from('organizations').select('id').eq('id', orgId).eq('workspace_id', workspaceId).maybeSingle();
-    if (!legacyOrgCheck) return { success: false, error: 'Organization not found.' };
-  }
+  if (!orgDirCheck) return { success: false, error: 'Organization not found.' };
 
   const { data: rpcResult, error: rpcErr } = await supabase.rpc('add_ghost_member', {
     p_org_id: orgId,

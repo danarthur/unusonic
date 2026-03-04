@@ -96,30 +96,12 @@ export async function getDealClientContext(
         website: (attrs.website as string | null) ?? null,
         address: (attrs.address as DealClientContext['organization']['address']) ?? null,
       };
-    } else {
-      const { data: legacyOrg } = await supabase
-        .from('organizations').select('name, category, support_email, website, address')
-        .eq('id', orgId).eq('workspace_id', workspaceId).maybeSingle();
-      if (legacyOrg) {
-        const lo = legacyOrg as Record<string, unknown>;
-        orgDisplayData = {
-          name: (lo.name as string) ?? '',
-          category: (lo.category as string | null) ?? null,
-          support_email: (lo.support_email as string | null) ?? null,
-          website: (lo.website as string | null) ?? null,
-          address: (lo.address as DealClientContext['organization']['address']) ?? null,
-        };
-      }
     }
 
     let personEmail: string | null = null;
     if (personDirRes.data) {
       const attrs = (personDirRes.data.attributes as Record<string, unknown>) ?? {};
       personEmail = (attrs.email as string | null) ?? null;
-    } else {
-      const { data: legacyEnt } = await supabase
-        .from('entities').select('email').eq('id', entityIdFromStakeholder).maybeSingle();
-      personEmail = (legacyEnt as { email?: string | null } | null)?.email ?? null;
     }
 
     // Contact name: cortex ROSTER_MEMBER edge
@@ -173,10 +155,6 @@ export async function getDealClientContext(
     if (personOnlyDir) {
       const attrs = (personOnlyDir.attributes as Record<string, unknown>) ?? {};
       personOnlyEmail = (attrs.email as string | null) ?? personOnlyDir.display_name ?? null;
-    } else {
-      const { data: legacyEnt } = await supabase
-        .from('entities').select('email').eq('id', entityIdFromStakeholder).maybeSingle();
-      personOnlyEmail = (legacyEnt as { email?: string | null } | null)?.email ?? null;
     }
     if (personOnlyEmail !== null || personOnlyDir) {
       return {
@@ -224,19 +202,6 @@ export async function getDealClientContext(
     mainOrgWebsite = (attrs.website as string | null) ?? null;
     mainOrgAddress = (attrs.address as DealClientContext['organization']['address']) ?? null;
     foundOrg = true;
-  } else {
-    const { data: legacyOrg } = await supabase
-      .from('organizations').select('name, category, support_email, website, address')
-      .eq('id', orgId).eq('workspace_id', workspaceId).maybeSingle();
-    if (legacyOrg) {
-      const lo = legacyOrg as Record<string, unknown>;
-      mainOrgName = (lo.name as string) ?? '';
-      mainOrgCategory = (lo.category as string | null) ?? null;
-      mainOrgSupportEmail = (lo.support_email as string | null) ?? null;
-      mainOrgWebsite = (lo.website as string | null) ?? null;
-      mainOrgAddress = (lo.address as DealClientContext['organization']['address']) ?? null;
-      foundOrg = true;
-    }
   }
 
   if (!foundOrg) return null;
@@ -258,20 +223,6 @@ export async function getDealClientContext(
         email: (attrs.email as string | null) ?? null,
         phone: (attrs.phone as string | null) ?? null,
       };
-    } else {
-      const { data: legacyContact } = await supabase
-        .from('contacts').select('id, first_name, last_name, email, phone')
-        .eq('id', mainContactId).eq('workspace_id', workspaceId).maybeSingle();
-      if (legacyContact) {
-        const lc = legacyContact as Record<string, unknown>;
-        contactData = {
-          id: lc.id as string,
-          first_name: (lc.first_name as string) ?? '',
-          last_name: (lc.last_name as string) ?? '',
-          email: (lc.email as string | null) ?? null,
-          phone: (lc.phone as string | null) ?? null,
-        };
-      }
     }
   }
 

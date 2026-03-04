@@ -24,9 +24,25 @@ export interface TalentSkillRow {
 export type TalentSkillInsert = Partial<TalentSkillRow> & Pick<TalentSkillRow, 'org_member_id' | 'skill_tag'>;
 export type TalentSkillUpdate = Partial<Omit<TalentSkillRow, 'id'>>;
 
-export type OrgMemberRow = Database['public']['Tables']['org_members']['Row'];
-export type OrgMemberInsert = Database['public']['Tables']['org_members']['Insert'];
-export type OrgMemberUpdate = Database['public']['Tables']['org_members']['Update'];
+// Legacy row shapes (org_members table dropped in Session 10; kept for backward compat)
+export interface OrgMemberRow {
+  id: string;
+  org_id: string;
+  profile_id: string | null;
+  entity_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  job_title: string | null;
+  employment_status: EmploymentStatus;
+  role: OrgMemberRole;
+  default_hourly_rate: number;
+  avatar_url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+export type OrgMemberInsert = Partial<OrgMemberRow> & { org_id: string };
+export type OrgMemberUpdate = Partial<OrgMemberRow>;
 
 /** Skill node for display (e.g. badge under member name). */
 export interface TalentSkillDTO {

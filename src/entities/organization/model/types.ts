@@ -5,13 +5,45 @@
 
 import type { Database } from '@/types/supabase';
 
-export type OrgRow = Database['public']['Tables']['organizations']['Row'];
-export type OrgMemberRow = Database['public']['Tables']['org_members']['Row'];
-export type OrgMemberInsert = Database['public']['Tables']['org_members']['Insert'];
-export type OrgMemberUpdate = Database['public']['Tables']['org_members']['Update'];
-
 export type EmploymentStatus = Database['public']['Enums']['employment_status'];
 export type OrgMemberRole = Database['public']['Enums']['org_member_role'];
+
+// Legacy row shapes (organizations + org_members tables dropped in Session 10; kept for backward compat)
+export interface OrgRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  slug: string | null;
+  is_claimed: boolean;
+  is_ghost: boolean;
+  logo_url: string | null;
+  brand_color: string | null;
+  website: string | null;
+  description: string | null;
+  support_email: string | null;
+  default_currency: string | null;
+  category: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+export interface OrgMemberRow {
+  id: string;
+  org_id: string;
+  profile_id: string | null;
+  entity_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  job_title: string | null;
+  employment_status: EmploymentStatus;
+  role: OrgMemberRole;
+  default_hourly_rate: number;
+  avatar_url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+export type OrgMemberInsert = Partial<OrgMemberRow> & { org_id: string };
+export type OrgMemberUpdate = Partial<OrgMemberRow>;
 
 /** Address for Digital Twin (map logic later). City/State required for map pins. */
 export interface OrgAddress {
@@ -35,7 +67,7 @@ export interface OrgOperationalSettings {
   timezone?: string;
 }
 
-/** Full organization profile for Command Center (includes new columns from migration). */
+/** Full organization profile for Event Studio (includes new columns from migration). */
 export interface OrgDetails {
   id: string;
   name: string;

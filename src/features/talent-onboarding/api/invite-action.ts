@@ -2,7 +2,6 @@
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
-import { getCurrentEntityId } from '@/features/network/api/actions';
 import { inviteTalentSchema } from '../model/schema';
 import type { InviteTalentInput } from '../model/schema';
 
@@ -24,8 +23,10 @@ export async function checkEmailExists(email: string): Promise<boolean> {
 
 /**
  * Create Talent (Prism Injector): Link existing user OR create Ghost Member.
- * Path 1 (User exists): Entity + Affiliation + OrgMember (profile_id + entity_id) + Skills.
- * Path 2 (Ghost): Entity (is_ghost) + Affiliation + OrgMember (entity_id only) + Skills.
+ * Session 10: directory.entities + cortex.relationships only. No legacy writes.
+ *
+ * Path 1 (User exists): directory person entity + ROSTER_MEMBER edge + Skills.
+ * Path 2 (Ghost): ghost directory person entity + ROSTER_MEMBER edge + Skills.
  */
 export async function inviteTalent(
   orgId: string,
@@ -49,7 +50,7 @@ export async function inviteTalent(
     return { ok: false, error: 'You must be signed in to add talent.' };
   }
 
-  // Session 9: membership check via directory.entities + cortex.relationships
+  // Membership check via directory.entities + cortex.relationships
   const { data: myDirEnt } = await supabase
     .schema('directory').from('entities')
     .select('id').eq('claimed_by_user_id', user.id).maybeSingle();
@@ -59,20 +60,19 @@ export async function inviteTalent(
 
   const { data: orgDirEnt } = await supabase
     .schema('directory').from('entities')
-    .select('id').eq('legacy_org_id', orgId).maybeSingle();
+    .select('id, owner_workspace_id').eq('legacy_org_id', orgId).maybeSingle();
+  if (!orgDirEnt) {
+    return { ok: false, error: 'Organization not found.' };
+  }
 
-  const { data: membershipRel } = orgDirEnt ? await supabase
+  const { data: membershipRel } = await supabase
     .schema('cortex').from('relationships')
     .select('id').eq('source_entity_id', myDirEnt.id).eq('target_entity_id', orgDirEnt.id)
-    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).maybeSingle()
-    : { data: null };
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']).maybeSingle();
 
   if (!membershipRel) {
     return { ok: false, error: 'You do not have permission to add members to this organization.' };
   }
-
-  // Keep myEntityId compatible for legacy writes below (resolve from directory.legacy_entity_id)
-  const myEntityId = myDirEnt.id;
 
   const emailTrim = email.trim();
   const { data: profile } = await supabase
@@ -81,282 +81,150 @@ export async function inviteTalent(
     .ilike('email', emailTrim)
     .maybeSingle();
 
-  let inviteeEntityId: string;
-
   if (profile) {
     // ——— Path 1: User exists (claimed or will be) ———
     const profileId = profile.id;
     const profileEmail = profile.email ?? emailTrim;
 
-    const { data: existingByProfile } = await supabase
-      .from('org_members')
-      .select('id')
-      .eq('profile_id', profileId)
-      .eq('org_id', orgId)
-      .maybeSingle();
-    if (existingByProfile) {
-      return { ok: false, error: 'This person is already a member of this organization.' };
-    }
+    // Find or create directory person entity
+    let { data: inviteeDirEnt } = await supabase
+      .schema('directory').from('entities')
+      .select('id').eq('claimed_by_user_id', profileId).maybeSingle();
 
-    let { data: inviteeEntity } = await supabase
-      .from('entities')
-      .select('id')
-      .eq('auth_id', profileId)
-      .maybeSingle();
-
-    if (!inviteeEntity) {
-      const { data: newEntity, error: entityError } = await supabase
-        .from('entities')
+    if (!inviteeDirEnt) {
+      const { data: newDirEnt, error: newEntErr } = await supabase
+        .schema('directory').from('entities')
         .insert({
-          email: profileEmail,
-          is_ghost: false,
-          auth_id: profileId,
+          display_name: [first_name, last_name].filter(Boolean).join(' ').trim() || profileEmail,
+          type: 'person',
+          claimed_by_user_id: profileId,
+          owner_workspace_id: orgDirEnt.owner_workspace_id ?? null,
+          attributes: { email: profileEmail, is_ghost: false, first_name: first_name ?? null, last_name: last_name ?? null },
         })
         .select('id')
         .single();
-      if (entityError || !newEntity) {
-        return {
-          ok: false,
-          error: entityError?.message ?? 'Failed to create profile record.',
-        };
+      if (newEntErr || !newDirEnt) {
+        return { ok: false, error: newEntErr?.message ?? 'Failed to create profile record.' };
       }
-      inviteeEntity = newEntity;
-    }
-    inviteeEntityId = inviteeEntity.id;
-
-    const { data: existingAff } = await supabase
-      .from('affiliations')
-      .select('id')
-      .eq('entity_id', inviteeEntityId)
-      .eq('organization_id', orgId)
-      .maybeSingle();
-
-    if (!existingAff) {
-      const affAccessLevel = role === 'admin' ? 'admin' : 'member';
-      const { error: affError } = await supabase.from('affiliations').insert({
-        entity_id: inviteeEntityId,
-        organization_id: orgId,
-        access_level: affAccessLevel,
-        role_label: job_title?.trim() || null,
-        status: 'active',
-      });
-      if (affError) {
-        return {
-          ok: false,
-          error: affError?.message ?? 'Failed to link profile to organization.',
-        };
-      }
+      inviteeDirEnt = newDirEnt;
     }
 
-    const { data: orgMember, error: memberError } = await supabase
-      .from('org_members')
-      .insert({
-        profile_id: profileId,
-        entity_id: inviteeEntityId,
-        org_id: orgId,
+    // Dup check via cortex
+    const { data: existingRel } = await supabase
+      .schema('cortex').from('relationships')
+      .select('id').eq('source_entity_id', inviteeDirEnt.id).eq('target_entity_id', orgDirEnt.id)
+      .eq('relationship_type', 'ROSTER_MEMBER').maybeSingle();
+    if (existingRel) {
+      return { ok: false, error: 'This person is already a member of this organization.' };
+    }
+
+    // Create ROSTER_MEMBER edge
+    const { data: newRel, error: relErr } = await supabase.rpc('upsert_relationship', {
+      p_source_entity_id: inviteeDirEnt.id,
+      p_target_entity_id: orgDirEnt.id,
+      p_type: 'ROSTER_MEMBER',
+      p_context_data: {
         first_name: first_name ?? null,
         last_name: last_name ?? null,
-        phone: phone ?? null,
+        role,
         job_title: job_title ?? null,
         employment_status,
-        role,
-        default_hourly_rate: 0,
-      })
-      .select('id')
-      .single();
-
-    if (memberError || !orgMember) {
-      return {
-        ok: false,
-        error: memberError?.message ?? 'Failed to add member to organization.',
-      };
+        phone: phone ?? null,
+      },
+    });
+    if (relErr || !newRel) {
+      return { ok: false, error: relErr?.message ?? 'Failed to add member to organization.' };
     }
+
+    const relId = newRel as string;
 
     if (skill_tags.length > 0) {
       const skillRows = skill_tags.map((skill_tag) => ({
-        org_member_id: orgMember.id,
+        org_member_id: relId,
         skill_tag: skill_tag.trim(),
       }));
       const { error: skillsError } = await supabase.from('talent_skills').insert(skillRows);
       if (skillsError) {
-        await supabase.from('org_members').delete().eq('id', orgMember.id);
-        return {
-          ok: false,
-          error: skillsError?.message ?? 'Failed to add skills; member was not added.',
-        };
+        return { ok: false, error: skillsError.message ?? 'Failed to add skills; member was not added.' };
       }
     }
 
-    // Non-fatal cortex ROSTER_MEMBER edge mirror (errors silently ignored)
-    const [personDir, orgDir] = await Promise.all([
-      supabase.schema('directory').from('entities').select('id').eq('legacy_entity_id', inviteeEntityId).maybeSingle(),
-      supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', orgId).maybeSingle(),
-    ]);
-    if (personDir.data?.id && orgDir.data?.id) {
-      await supabase.rpc('upsert_relationship', {
-        p_source_entity_id: personDir.data.id,
-        p_target_entity_id: orgDir.data.id,
-        p_type: 'ROSTER_MEMBER',
-        p_context_data: { first_name: first_name ?? null, last_name: last_name ?? null, role, job_title: job_title ?? null, employment_status, org_member_id: orgMember.id },
-      });
-    }
-
-    const statusLabel =
-      employment_status === 'external_contractor' ? 'Contractor' : 'Employee';
-    const skillsLabel =
-      skill_tags.length > 0
-        ? ` with ${skill_tags.length} skill${skill_tags.length === 1 ? '' : 's'}`
-        : '';
-    return {
-      ok: true,
-      message: `${emailTrim} added as ${statusLabel}${skillsLabel}.`,
-    };
+    const statusLabel = employment_status === 'external_contractor' ? 'Contractor' : 'Employee';
+    const skillsLabel = skill_tags.length > 0
+      ? ` with ${skill_tags.length} skill${skill_tags.length === 1 ? '' : 's'}`
+      : '';
+    return { ok: true, message: `${emailTrim} added as ${statusLabel}${skillsLabel}.` };
   }
 
-  // ——— Path 2: Ghost (Day One) ———
-  const { data: existingGhostEntity } = await supabase
-    .from('entities')
-    .select('id')
-    .eq('email', emailTrim)
-    .eq('is_ghost', true)
-    .maybeSingle();
+  // ——— Path 2: Ghost (no account yet) ———
 
-  if (existingGhostEntity) {
-    const { data: existingGhostMember } = await supabase
-      .from('org_members')
-      .select('id')
-      .eq('entity_id', existingGhostEntity.id)
-      .eq('org_id', orgId)
-      .maybeSingle();
-    if (existingGhostMember) {
-      return { ok: false, error: 'This person is already in this organization.' };
-    }
-    inviteeEntityId = existingGhostEntity.id;
-  } else {
-    const { data: newGhost, error: ghostEntityError } = await supabase
-      .from('entities')
+  // Find or create ghost person in directory.entities (match by email in attributes)
+  let { data: ghostDirEnt } = await supabase
+    .schema('directory').from('entities')
+    .select('id').ilike('attributes->>email', emailTrim).eq('type', 'person').is('claimed_by_user_id', null).maybeSingle();
+
+  if (!ghostDirEnt) {
+    const { data: newGhostEnt, error: ghostEntErr } = await supabase
+      .schema('directory').from('entities')
       .insert({
-        email: emailTrim,
-        is_ghost: true,
-        auth_id: null,
+        display_name: [first_name, last_name].filter(Boolean).join(' ').trim() || emailTrim,
+        type: 'person',
+        claimed_by_user_id: null,
+        owner_workspace_id: orgDirEnt.owner_workspace_id ?? null,
+        attributes: { is_ghost: true, email: emailTrim, first_name: first_name ?? null, last_name: last_name ?? null },
       })
       .select('id')
       .single();
-    if (ghostEntityError || !newGhost) {
-      return {
-        ok: false,
-        error: ghostEntityError?.message ?? 'Failed to create profile.',
-      };
+    if (ghostEntErr || !newGhostEnt) {
+      return { ok: false, error: ghostEntErr?.message ?? 'Failed to create profile.' };
     }
-    inviteeEntityId = newGhost.id;
+    ghostDirEnt = newGhostEnt;
   }
 
-  const { data: existingAff } = await supabase
-    .from('affiliations')
-    .select('id')
-    .eq('entity_id', inviteeEntityId)
-    .eq('organization_id', orgId)
-    .maybeSingle();
-
-  if (!existingAff) {
-    const { error: affError } = await supabase.from('affiliations').insert({
-      entity_id: inviteeEntityId,
-      organization_id: orgId,
-      access_level: role === 'admin' ? 'admin' : 'member',
-      role_label: job_title?.trim() || null,
-      status: 'active',
-    });
-    if (affError) {
-      if (!existingGhostEntity) {
-        await supabase.from('entities').delete().eq('id', inviteeEntityId);
-      }
-      return {
-        ok: false,
-        error: affError?.message ?? 'Failed to link profile to organization.',
-      };
-    }
+  // Dup check via cortex
+  const { data: existingGhostRel } = await supabase
+    .schema('cortex').from('relationships')
+    .select('id').eq('source_entity_id', ghostDirEnt.id).eq('target_entity_id', orgDirEnt.id)
+    .eq('relationship_type', 'ROSTER_MEMBER').maybeSingle();
+  if (existingGhostRel) {
+    return { ok: false, error: 'This person is already in this organization.' };
   }
 
-  const { data: orgMember, error: memberError } = await supabase
-    .from('org_members')
-    .insert({
-      entity_id: inviteeEntityId,
-      profile_id: null,
-      org_id: orgId,
+  // Create ROSTER_MEMBER edge
+  const { data: newGhostRel, error: ghostRelErr } = await supabase.rpc('upsert_relationship', {
+    p_source_entity_id: ghostDirEnt.id,
+    p_target_entity_id: orgDirEnt.id,
+    p_type: 'ROSTER_MEMBER',
+    p_context_data: {
       first_name: first_name ?? null,
       last_name: last_name ?? null,
-      phone: phone ?? null,
+      role,
       job_title: job_title ?? null,
       employment_status,
-      role,
-      default_hourly_rate: 0,
-    })
-    .select('id')
-    .single();
-
-  if (memberError || !orgMember) {
-    await supabase.from('affiliations').delete().eq('entity_id', inviteeEntityId).eq('organization_id', orgId);
-    if (!existingGhostEntity) {
-      await supabase.from('entities').delete().eq('id', inviteeEntityId);
-    }
-    return {
-      ok: false,
-      error: memberError?.message ?? 'Failed to add member to organization.',
-    };
+      phone: phone ?? null,
+    },
+  });
+  if (ghostRelErr || !newGhostRel) {
+    return { ok: false, error: ghostRelErr?.message ?? 'Failed to add member to organization.' };
   }
+
+  const ghostRelId = newGhostRel as string;
 
   if (skill_tags.length > 0) {
     const skillRows = skill_tags.map((skill_tag) => ({
-      org_member_id: orgMember.id,
+      org_member_id: ghostRelId,
       skill_tag: skill_tag.trim(),
     }));
     const { error: skillsError } = await supabase.from('talent_skills').insert(skillRows);
     if (skillsError) {
-      await supabase.from('org_members').delete().eq('id', orgMember.id);
-      await supabase.from('affiliations').delete().eq('entity_id', inviteeEntityId).eq('organization_id', orgId);
-      if (!existingGhostEntity) {
-        await supabase.from('entities').delete().eq('id', inviteeEntityId);
-      }
-      return {
-        ok: false,
-        error: skillsError?.message ?? 'Failed to add skills; member was not added.',
-      };
+      return { ok: false, error: skillsError.message ?? 'Failed to add skills; member was not added.' };
     }
   }
 
-  // Non-fatal: sync ghost person to directory.entities + create cortex ROSTER_MEMBER edge
-  const { data: orgDirGhost } = await supabase
-    .schema('directory').from('entities').select('id, owner_workspace_id').eq('legacy_org_id', orgId).maybeSingle();
-  if (orgDirGhost?.id) {
-    let dirGhostPersonId: string | null = null;
-    const { data: existingDirGhost } = await supabase
-      .schema('directory').from('entities').select('id').eq('legacy_entity_id', inviteeEntityId).maybeSingle();
-    if (existingDirGhost?.id) {
-      dirGhostPersonId = existingDirGhost.id;
-    } else if (!existingGhostEntity) {
-      // Only mirror for newly created ghost entities (avoid overwriting existing directory records)
-      const { data: newDirGhost } = await supabase
-        .schema('directory').from('entities')
-        .insert({ legacy_entity_id: inviteeEntityId, display_name: [first_name, last_name].filter(Boolean).join(' ').trim() || emailTrim, type: 'person', owner_workspace_id: orgDirGhost.owner_workspace_id ?? null, claimed_by_user_id: null, attributes: { is_ghost: true, email: emailTrim } })
-        .select('id').maybeSingle();
-      dirGhostPersonId = newDirGhost?.id ?? null;
-    }
-    if (dirGhostPersonId) {
-      await supabase.rpc('upsert_relationship', {
-        p_source_entity_id: dirGhostPersonId,
-        p_target_entity_id: orgDirGhost.id,
-        p_type: 'ROSTER_MEMBER',
-        p_context_data: { first_name: first_name ?? null, last_name: last_name ?? null, role, job_title: job_title ?? null, employment_status, org_member_id: orgMember.id },
-      });
-    }
-  }
-
-  const statusLabel =
-    employment_status === 'external_contractor' ? 'Contractor' : 'Employee';
-  const skillsLabel =
-    skill_tags.length > 0
-      ? ` with ${skill_tags.length} skill${skill_tags.length === 1 ? '' : 's'}`
-      : '';
+  const statusLabel = employment_status === 'external_contractor' ? 'Contractor' : 'Employee';
+  const skillsLabel = skill_tags.length > 0
+    ? ` with ${skill_tags.length} skill${skill_tags.length === 1 ? '' : 's'}`
+    : '';
   return {
     ok: true,
     message: `${first_name ?? ''} ${last_name ?? ''} (Ghost) added as ${statusLabel}${skillsLabel}.`.trim() || `${emailTrim} added as ${statusLabel}${skillsLabel}.`,

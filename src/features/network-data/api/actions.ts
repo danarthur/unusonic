@@ -15,7 +15,7 @@ import { createGhostOrg } from '@/entities/organization';
 
 const ROLE_ORDER: Record<string, number> = { owner: 0, admin: 1, member: 2, restricted: 3 };
 
-/** HQ org resolution: must match features/network/api/actions (org_members, not affiliations). */
+/** HQ org resolution: uses cortex.relationships ROSTER_MEMBER/MEMBER edges. */
 const ORG_ROLE_PRIORITY: Record<string, number> = {
   owner: 0,
   admin: 1,
@@ -24,7 +24,7 @@ const ORG_ROLE_PRIORITY: Record<string, number> = {
   restricted: 4,
 };
 
-/** Maps public.org_relationships.type to cortex relationship_type. */
+/** Maps relationship type string to cortex relationship_type. */
 function orgTypeToCortex(type: string): string {
   switch (type) {
     case 'vendor':         return 'VENDOR';
@@ -33,49 +33,6 @@ function orgTypeToCortex(type: string): string {
     case 'client':         return 'CLIENT';
     case 'partner':        return 'PARTNER';
     default:               return type.toUpperCase();
-  }
-}
-
-/**
- * Dual-write helper: syncs a single org_relationship row to cortex.relationships.
- * Fetches the current state of the row, looks up directory entities, calls upsert_relationship RPC.
- * Non-fatal — cortex sync failure does not block the primary write.
- */
-async function syncOrgRelToCortex(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  relationshipId: string
-): Promise<void> {
-  try {
-    const { data: rel } = await supabase
-      .from('org_relationships')
-      .select('source_org_id, target_org_id, type, tier, notes, tags, lifecycle_status, blacklist_reason, deleted_at')
-      .eq('id', relationshipId)
-      .maybeSingle();
-    if (!rel) return;
-
-    const [sourceRes, targetRes] = await Promise.all([
-      supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', rel.source_org_id).maybeSingle(),
-      supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', rel.target_org_id).maybeSingle(),
-    ]);
-    if (!sourceRes.data?.id || !targetRes.data?.id) return;
-
-    const row = rel as Record<string, unknown>;
-    await supabase.rpc('upsert_relationship', {
-      p_source_entity_id: sourceRes.data.id,
-      p_target_entity_id: targetRes.data.id,
-      p_type: orgTypeToCortex(String(row.type)),
-      p_context_data: {
-        tier:                      row.tier,
-        notes:                     row.notes,
-        tags:                      row.tags,
-        lifecycle_status:          row.lifecycle_status,
-        blacklist_reason:          row.blacklist_reason,
-        deleted_at:                row.deleted_at,
-        legacy_org_relationship_id: relationshipId,
-      },
-    });
-  } catch {
-    // Non-fatal: cortex sync is best-effort during the dual-write transition phase.
   }
 }
 
@@ -266,21 +223,11 @@ export async function pinToInnerCircle(
     return { ok: true };
   }
 
-  // Legacy fallback: org_relationships
-  const { error } = await supabase
-    .from('org_relationships')
-    .update({ tier: 'preferred' })
-    .eq('id', relationshipId)
-    .eq('source_org_id', orgId);
-  if (error) return { ok: false, error: error.message };
-  await syncOrgRelToCortex(supabase, relationshipId);
-  revalidatePath('/network');
-  return { ok: true };
+  return { ok: false, error: 'Relationship not found.' };
 }
 
 /**
  * Unpin (Anti-Gravity): Downgrade a relationship from 'preferred' (Inner Circle) to 'standard' (Outer Orbit).
- * Session 9: handles cortex relationship IDs with legacy org_relationships fallback.
  */
 export async function unpinFromInnerCircle(
   relationshipId: string
@@ -308,16 +255,7 @@ export async function unpinFromInnerCircle(
     return { ok: true };
   }
 
-  // Legacy fallback: org_relationships
-  const { error } = await supabase
-    .from('org_relationships')
-    .update({ tier: 'standard' })
-    .eq('id', relationshipId)
-    .eq('source_org_id', orgId);
-  if (error) return { ok: false, error: error.message };
-  await syncOrgRelToCortex(supabase, relationshipId);
-  revalidatePath('/network');
-  return { ok: true };
+  return { ok: false, error: 'Relationship not found.' };
 }
 
 /**
@@ -639,40 +577,6 @@ export async function searchNetworkOrgs(
       });
     }
     connectionIds = connectionResults.map((r) => r.id);
-  } else {
-    // LEGACY FALLBACK: org_relationships + organizations
-    if (!workspaceId) {
-      const { data: sourceOrg } = await supabase
-        .from('organizations')
-        .select('workspace_id')
-        .eq('id', sourceOrgId)
-        .single();
-      workspaceId = sourceOrg?.workspace_id ?? null;
-    }
-    if (workspaceId) {
-      const { data: rels } = await supabase
-        .from('org_relationships')
-        .select('target_org_id')
-        .eq('source_org_id', sourceOrgId)
-        .is('deleted_at', null);
-      const myTargetIds = (rels ?? []).map((r) => r.target_org_id).filter(Boolean);
-      if (myTargetIds.length > 0) {
-        const { data: connectionOrgs } = await supabase
-          .from('organizations')
-          .select('id, name, logo_url, is_ghost')
-          .in('id', myTargetIds)
-          .ilike('name', `%${q}%`)
-          .limit(10);
-        connectionResults = (connectionOrgs ?? []).map((r) => ({
-          id: r.id,
-          name: r.name,
-          logo_url: (r as { logo_url?: string | null }).logo_url ?? null,
-          is_ghost: (r as { is_ghost?: boolean }).is_ghost ?? false,
-          _source: 'connection' as const,
-        }));
-      }
-      connectionIds = connectionResults.map((r) => r.id);
-    }
   }
 
   if (!workspaceId) return connectionResults;
@@ -709,24 +613,6 @@ export async function searchNetworkOrgs(
         _source: 'global' as const,
       };
     });
-  } else {
-    // Fallback: organizations table
-    const { data: globalRows } = await supabase
-      .from('organizations')
-      .select('id, name, logo_url, is_ghost')
-      .eq('workspace_id', workspaceId)
-      .eq('is_ghost', false)
-      .neq('id', sourceOrgId)
-      .ilike('name', `%${q}%`)
-      .limit(15);
-    const globalFiltered = (globalRows ?? []).filter((r) => !excludeSet.has(r.id)).slice(0, 10);
-    globalResults = globalFiltered.map((r) => ({
-      id: r.id,
-      name: r.name,
-      logo_url: (r as { logo_url?: string | null }).logo_url ?? null,
-      is_ghost: (r as { is_ghost?: boolean }).is_ghost ?? false,
-      _source: 'global' as const,
-    }));
   }
 
   return [...connectionResults, ...globalResults];
@@ -861,51 +747,7 @@ export async function getNetworkNodeDetails(
       };
     }
 
-    // Legacy fallback
-    const { data: member, error: memberError } = await supabase
-      .from('org_members')
-      .select('id, entity_id, job_title, first_name, last_name, role')
-      .eq('id', nodeId)
-      .eq('org_id', sourceOrgId)
-      .maybeSingle();
-    if (memberError || !member?.entity_id) return null;
-
-    const { data: avatarRow } = await supabase
-      .from('org_members')
-      .select('avatar_url')
-      .eq('id', nodeId)
-      .eq('org_id', sourceOrgId)
-      .maybeSingle();
-    const legacyAvatarUrl = (avatarRow as { avatar_url?: string | null } | null)?.avatar_url ?? null;
-
-    const { data: entity } = await supabase
-      .from('entities')
-      .select('id, email')
-      .eq('id', member.entity_id)
-      .single();
-    const legacyName =
-      [member.first_name, member.last_name].filter(Boolean).join(' ') || entity?.email || 'Unknown';
-    const legacyRole = member.role as 'owner' | 'admin' | 'member' | 'restricted' | null;
-
-    return {
-      id: member.id,
-      kind: 'internal_employee',
-      identity: {
-        name: legacyName,
-        avatarUrl: legacyAvatarUrl,
-        label: member.job_title || member.role || 'Member',
-        email: entity?.email,
-      },
-      direction: null,
-      balance: { inbound: 0, outbound: 0 },
-      active_events: [],
-      notes: null,
-      relationshipId: null,
-      isGhost: false,
-      targetOrgId: null,
-      memberRole: legacyRole ?? null,
-      canAssignElevatedRole: false,
-    };
+    return null;
   }
 
   // external_partner — cortex-first
@@ -927,7 +769,9 @@ export async function getNetworkNodeDetails(
   let relType: string;
   let orgEntity: { id: string; display_name: string; handle: string | null; avatar_url: string | null; attributes: unknown } | null = null;
 
-  if (cortexExtRel) {
+  if (!cortexExtRel) return null;
+
+  {
     const ctx = (cortexExtRel.context_data as Record<string, unknown>) ?? {};
     if (ctx.deleted_at) return null;
     relId = cortexExtRel.id;
@@ -937,7 +781,6 @@ export async function getNetworkNodeDetails(
     relTags = (ctx.tags as string[] | null) ?? null;
     relLifecycleStatus = (ctx.lifecycle_status as NodeDetail['lifecycleStatus']) ?? null;
     relBlacklistReason = (ctx.blacklist_reason as string | null) ?? null;
-    // Map cortex type back to display label
     relType = cortexExtRel.relationship_type
       .toLowerCase()
       .replace('venue_partner', 'venue')
@@ -950,34 +793,6 @@ export async function getNetworkNodeDetails(
     if (!orgEnt) return null;
     orgEntity = orgEnt;
     targetOrgIdLegacy = orgEnt.legacy_org_id ?? orgEnt.id;
-  } else {
-    // Legacy fallback: org_relationships
-    const { data: rel, error: relError } = await supabase
-      .from('org_relationships')
-      .select('id, target_org_id, type, notes, tier, tags, lifecycle_status, blacklist_reason, deleted_at')
-      .eq('id', nodeId)
-      .eq('source_org_id', sourceOrgId)
-      .maybeSingle();
-    if (relError || !rel) return null;
-    const relWithDeleted = rel as { deleted_at?: string | null };
-    if (relWithDeleted.deleted_at) return null;
-
-    const relRow = rel as { lifecycle_status?: string | null; blacklist_reason?: string | null; tier?: string | null; tags?: string[] | null };
-    relId = rel.id;
-    relNotes = rel.notes ?? null;
-    relTier = relRow.tier ?? null;
-    relTags = relRow.tags ?? null;
-    relLifecycleStatus = relRow.lifecycle_status as NodeDetail['lifecycleStatus'];
-    relBlacklistReason = relRow.blacklist_reason ?? null;
-    relType = String(rel.type);
-    targetOrgIdLegacy = rel.target_org_id;
-
-    const { data: orgEnt } = await supabase
-      .schema('directory').from('entities')
-      .select('id, display_name, handle, avatar_url, attributes, legacy_org_id')
-      .eq('legacy_org_id', rel.target_org_id).maybeSingle();
-    orgEntity = orgEnt ?? null;
-    targetEntityIdForCrew = orgEnt?.id ?? null;
   }
 
   const orgAttrs = (orgEntity?.attributes as Record<string, unknown>) ?? {};
@@ -1038,54 +853,6 @@ export async function getNetworkNodeDetails(
           phone: (attrs.phone as string | null) ?? null,
         };
       });
-    } else if (targetOrgIdLegacy) {
-      // Legacy crew fallback: org_members + affiliations + entities
-      const [membersRes, affsRes] = await Promise.all([
-        sys
-          .from('org_members')
-          .select('id, entity_id, first_name, last_name, role, job_title, avatar_url, phone')
-          .eq('org_id', targetOrgIdLegacy)
-          .limit(500),
-        sys
-          .from('affiliations')
-          .select('entity_id')
-          .eq('organization_id', targetOrgIdLegacy)
-          .eq('status', 'active')
-          .limit(500),
-      ]);
-      const members = membersRes.data ?? [];
-      const affEntityIds = new Set(
-        (affsRes.data ?? []).map((a) => (a as { entity_id: string }).entity_id).filter(Boolean)
-      );
-      members.forEach((m) => { if (m.entity_id) affEntityIds.add(m.entity_id); });
-      const entityIds = [...affEntityIds];
-      if (entityIds.length > 0) {
-        const { data: entities } = await sys.from('entities').select('id, email').in('id', entityIds);
-        const entityMap = new Map((entities ?? []).map((e) => [e.id, e]));
-        const memberByEntity = new Map(
-          (members as { entity_id: string | null; id: string; first_name: string | null; last_name: string | null; role?: string | null; job_title?: string | null; avatar_url?: string | null; phone?: string | null }[])
-            .filter((m) => m.entity_id != null)
-            .map((m) => [m.entity_id!, {
-              id: m.id, first_name: m.first_name, last_name: m.last_name,
-              role: m.role ?? null, job_title: m.job_title ?? null,
-              avatar_url: m.avatar_url ?? null, phone: m.phone ?? null,
-            }])
-        );
-        crew = entityIds.map((entity_id) => {
-          const m = memberByEntity.get(entity_id);
-          const e = entityMap.get(entity_id);
-          const rawName = (m && [m.first_name, m.last_name].filter(Boolean).join(' ').trim()) || e?.email || null;
-          return {
-            id: m?.id ?? entity_id,
-            name: rawName?.trim() || 'Contact',
-            email: e?.email ?? null,
-            role: m?.role ?? null,
-            jobTitle: m?.job_title ?? null,
-            avatarUrl: m?.avatar_url ?? null,
-            phone: m?.phone ?? null,
-          };
-        });
-      }
     }
   }
 
@@ -1151,16 +918,7 @@ export async function updateRelationshipNotes(
     return { ok: true };
   }
 
-  // Legacy fallback
-  const { error } = await supabase
-    .from('org_relationships')
-    .update({ notes: notes ?? null })
-    .eq('id', relationshipId)
-    .eq('source_org_id', orgId);
-  if (error) return { ok: false, error: error.message };
-  await syncOrgRelToCortex(supabase, relationshipId);
-  revalidatePath('/network');
-  return { ok: true };
+  return { ok: false, error: 'Relationship not found.' };
 }
 
 export type RelationshipType = 'vendor' | 'venue' | 'client_company' | 'partner';
@@ -1212,25 +970,7 @@ export async function updateRelationshipMeta(
     return { ok: true };
   }
 
-  // Legacy fallback
-  const toUpdate: Record<string, unknown> = {};
-  if (payload.type !== undefined) toUpdate.type = payload.type;
-  if (payload.tier !== undefined) toUpdate.tier = payload.tier ?? 'standard';
-  if (payload.tags !== undefined) toUpdate.tags = payload.tags ?? null;
-  if (payload.lifecycleStatus !== undefined) toUpdate.lifecycle_status = payload.lifecycleStatus;
-  if (payload.blacklistReason !== undefined) toUpdate.blacklist_reason = payload.blacklistReason;
-
-  if (Object.keys(toUpdate).length === 0) return { ok: true };
-
-  const { error } = await supabase
-    .from('org_relationships')
-    .update(toUpdate)
-    .eq('id', relationshipId)
-    .eq('source_org_id', sourceOrgId);
-  if (error) return { ok: false, error: error.message };
-  await syncOrgRelToCortex(supabase, relationshipId);
-  revalidatePath('/network');
-  return { ok: true };
+  return { ok: false, error: 'Relationship not found.' };
 }
 
 const DELETED_RETENTION_DAYS = 30;
@@ -1267,17 +1007,7 @@ export async function softDeleteGhostRelationship(
     return { ok: true };
   }
 
-  // Legacy fallback
-  const { error } = await supabase
-    .from('org_relationships')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', relationshipId)
-    .eq('source_org_id', sourceOrgId);
-
-  if (error) return { ok: false, error: error.message };
-  await syncOrgRelToCortex(supabase, relationshipId);
-  revalidatePath('/network');
-  return { ok: true };
+  return { ok: false, error: 'Relationship not found.' };
 }
 
 /**
@@ -1313,17 +1043,7 @@ export async function restoreGhostRelationship(
     return { ok: true };
   }
 
-  // Legacy fallback
-  const { error } = await supabase
-    .from('org_relationships')
-    .update({ deleted_at: null })
-    .eq('id', relationshipId)
-    .eq('source_org_id', sourceOrgId);
-
-  if (error) return { ok: false, error: error.message };
-  await syncOrgRelToCortex(supabase, relationshipId);
-  revalidatePath('/network');
-  return { ok: true };
+  return { ok: false, error: 'Relationship not found.' };
 }
 
 export type DeletedRelationship = {
@@ -1388,34 +1108,7 @@ export async function getDeletedRelationships(sourceOrgId: string): Promise<Dele
     }
   }
 
-  // Legacy fallback: org_relationships
-  const { data: rels } = await supabase
-    .from('org_relationships')
-    .select('id, target_org_id, deleted_at')
-    .eq('source_org_id', sourceOrgId)
-    .not('deleted_at', 'is', null)
-    .gte('deleted_at', cutoffIso);
-
-  if (!rels?.length) return [];
-  const targetIds = [...new Set(rels.map((r) => r.target_org_id))];
-  const { data: orgEntities } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('display_name, legacy_org_id')
-    .in('legacy_org_id', targetIds);
-  const nameByOrg = new Map(
-    (orgEntities ?? [])
-      .filter((e) => e.legacy_org_id)
-      .map((e) => [e.legacy_org_id!, e.display_name ?? 'Unknown'])
-  );
-
-  return rels.map((r) => ({
-    id: r.id,
-    targetOrgId: r.target_org_id,
-    targetName: nameByOrg.get(r.target_org_id) ?? 'Unknown',
-    deletedAt: (r as { deleted_at: string }).deleted_at,
-    canRestore: true,
-  }));
+  return [];
 }
 
 /**

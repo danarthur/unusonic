@@ -264,9 +264,10 @@ export async function getInvitationForClaim(
   if (new Date((inv as { expires_at: string }).expires_at) <= new Date()) return { ok: false, error: 'This link has expired.' };
 
   const targetOrgId = invRow.target_org_id ?? invRow.organization_id;
+  // Support both old (legacy_org_id) and new (directory entity id) org identifiers
   const [originRes, targetRes] = await Promise.all([
-    supabase.schema('directory').from('entities').select('display_name').eq('legacy_org_id', invRow.created_by_org_id).maybeSingle(),
-    supabase.schema('directory').from('entities').select('display_name, avatar_url').eq('legacy_org_id', targetOrgId).maybeSingle(),
+    supabase.schema('directory').from('entities').select('display_name').or(`legacy_org_id.eq.${invRow.created_by_org_id},id.eq.${invRow.created_by_org_id}`).eq('type', 'company').maybeSingle(),
+    supabase.schema('directory').from('entities').select('display_name, avatar_url').or(`legacy_org_id.eq.${targetOrgId},id.eq.${targetOrgId}`).eq('type', 'company').maybeSingle(),
   ]);
   const originName = originRes.data?.display_name ?? 'A partner';
   const targetName = targetRes.data?.display_name ?? (inv as { email: string }).email.split('@')[0] ?? 'Your organization';
@@ -289,6 +290,7 @@ export async function getInvitationForClaim(
 
 /**
  * After the user has signed up (auth exists), complete the claim: create sovereign org and run the Magnet.
+ * Session 10: directory.entities + cortex.relationships only. No legacy writes.
  * Call this from the claim page after client-side signUp succeeds.
  */
 export async function finishPartnerClaim(
@@ -320,162 +322,164 @@ export async function finishPartnerClaim(
   const payload = (inv.payload as { redirectTo?: string } | null) ?? null;
   const redirectTo = payload?.redirectTo ?? '/network';
 
-  let entityId: string;
-  const { data: existingEntity } = await supabase
-    .from('entities')
-    .select('id')
-    .ilike('email', user.email)
+  const ghostOrgId = (inv as { target_org_id?: string | null; organization_id: string }).target_org_id ?? inv.organization_id;
+  const invRow = inv as { created_by_org_id: string };
+
+  // Resolve ghost org entity in directory (id or legacy_org_id)
+  const { data: ghostOrgEnt } = await supabase
+    .schema('directory').from('entities')
+    .select('id, owner_workspace_id, attributes')
+    .or(`id.eq.${ghostOrgId},legacy_org_id.eq.${ghostOrgId}`)
+    .eq('type', 'company')
     .maybeSingle();
 
-  if (existingEntity) {
-    await supabase.from('entities').update({ is_ghost: false, auth_id: user.id }).eq('id', existingEntity.id);
-    entityId = existingEntity.id;
+  const workspaceId: string | undefined = ghostOrgEnt?.owner_workspace_id ?? undefined;
+  if (!workspaceId) return { ok: false, error: 'Workspace not found.' };
+
+  // Get or create person entity in directory.entities
+  const { data: existingPersonEnt } = await supabase
+    .schema('directory').from('entities')
+    .select('id').eq('claimed_by_user_id', user.id).maybeSingle();
+
+  let personDirId: string;
+  if (existingPersonEnt) {
+    personDirId = existingPersonEnt.id;
+    // Ensure workspace ownership
+    await supabase.schema('directory').from('entities')
+      .update({ owner_workspace_id: workspaceId })
+      .eq('id', personDirId);
   } else {
-    const { data: newEntity, error: entityError } = await supabase
-      .from('entities')
-      .insert({ email: user.email, is_ghost: false, auth_id: user.id })
-      .select('id')
-      .single();
-    if (entityError || !newEntity) return { ok: false, error: 'Failed to create profile.' };
-    entityId = newEntity.id;
+    // Check for ghost entity by email
+    const { data: ghostPersonEnt } = await supabase
+      .schema('directory').from('entities')
+      .select('id').ilike('attributes->>email', user.email).eq('type', 'person').is('claimed_by_user_id', null).maybeSingle();
+    if (ghostPersonEnt) {
+      await supabase.schema('directory').from('entities')
+        .update({ claimed_by_user_id: user.id, owner_workspace_id: workspaceId })
+        .eq('id', ghostPersonEnt.id);
+      personDirId = ghostPersonEnt.id;
+    } else {
+      const { data: newPersonEnt, error: personErr } = await supabase
+        .schema('directory').from('entities')
+        .insert({
+          display_name: user.email,
+          type: 'person',
+          claimed_by_user_id: user.id,
+          owner_workspace_id: workspaceId,
+          attributes: { email: user.email, is_ghost: false },
+        }).select('id').single();
+      if (personErr || !newPersonEnt) return { ok: false, error: 'Failed to create profile.' };
+      personDirId = newPersonEnt.id;
+    }
   }
 
   const orgName = name?.trim() || inv.email.split('@')[0] || 'My Organization';
   const orgSlug = (slug?.trim() || orgName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')).slice(0, 64) || 'org';
-  const ghostOrgId = inv.target_org_id ?? inv.organization_id;
-  const { data: ghostOrgEntity } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('owner_workspace_id')
-    .eq('legacy_org_id', ghostOrgId)
-    .maybeSingle();
-  let workspaceId: string | undefined = ghostOrgEntity?.owner_workspace_id ?? undefined;
-  if (!workspaceId) {
-    // Fallback: ghost org not yet in directory
-    const { data: ghostOrg } = await supabase
-      .from('organizations')
-      .select('workspace_id')
-      .eq('id', ghostOrgId)
-      .single();
-    workspaceId = ghostOrg?.workspace_id;
-  }
-  if (!workspaceId) return { ok: false, error: 'Workspace not found.' };
 
-  const { data: sovereignOrg, error: orgError } = await supabase
-    .from('organizations')
+  // Create sovereign org in directory.entities
+  const { data: sovereignOrgEnt, error: orgError } = await supabase
+    .schema('directory').from('entities')
     .insert({
-      name: orgName,
-      slug: orgSlug,
-      is_claimed: true,
-      claimed_at: new Date().toISOString(),
-      owner_id: entityId,
-      workspace_id: workspaceId,
-    })
-    .select('id')
-    .single();
+      display_name: orgName,
+      handle: orgSlug,
+      type: 'company',
+      owner_workspace_id: workspaceId,
+      attributes: { is_claimed: true, is_ghost: false },
+    }).select('id').single();
 
-  if (orgError || !sovereignOrg) return { ok: false, error: 'Failed to create organization.' };
+  if (orgError || !sovereignOrgEnt) return { ok: false, error: 'Failed to create organization.' };
 
-  // Non-fatal: mirror sovereign org to directory.entities
-  await supabase.schema('directory').from('entities').insert({
-    legacy_org_id: sovereignOrg.id,
-    display_name: orgName,
-    handle: orgSlug,
-    type: 'company',
-    owner_workspace_id: workspaceId,
-    attributes: { is_claimed: true, is_ghost: false },
+  // Create ROSTER_MEMBER edge: person → sovereign org
+  const { error: relErr } = await supabase.rpc('upsert_relationship', {
+    p_source_entity_id: personDirId,
+    p_target_entity_id: sovereignOrgEnt.id,
+    p_type: 'ROSTER_MEMBER',
+    p_context_data: { role: 'owner', employment_status: 'internal_employee' },
   });
-  // Non-fatal: sync claimed person entity to directory (set claimed_by_user_id)
-  await supabase.schema('directory').from('entities')
-    .update({ claimed_by_user_id: user.id, owner_workspace_id: workspaceId })
-    .eq('legacy_entity_id', entityId);
+  if (relErr) {
+    await supabase.schema('directory').from('entities').delete().eq('id', sovereignOrgEnt.id);
+    return { ok: false, error: 'Failed to create owner relationship.' };
+  }
 
-  await supabase.from('affiliations').insert({
-    entity_id: entityId,
-    organization_id: sovereignOrg.id,
-    access_level: 'admin',
-    status: 'active',
-  });
+  // Magnet: find all ghost orgs this person entity is MEMBER of via cortex
+  const { data: personMemberRels } = await supabase
+    .schema('cortex').from('relationships')
+    .select('target_entity_id')
+    .eq('source_entity_id', personDirId)
+    .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']);
 
-  // Magnet: invitation's ghost + any other ghost orgs this entity is affiliated with
-  const inviteGhostId = ghostOrgId;
-  const { data: ghostAffs } = await supabase
-    .from('affiliations')
-    .select('organization_id')
-    .eq('entity_id', entityId);
-  const ghostOrgIds = [
-    inviteGhostId,
-    ...(ghostAffs ?? []).map((a) => a.organization_id),
-  ].filter(Boolean) as string[];
-  const uniqueGhostIds = [...new Set(ghostOrgIds)];
+  const ghostOrgEntityIds = [...new Set([
+    ...(ghostOrgEnt ? [ghostOrgEnt.id] : []),
+    ...(personMemberRels ?? []).map((r) => r.target_entity_id),
+  ])];
 
-  const { data: ghostOrgEntities } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('legacy_org_id, attributes')
-    .in('legacy_org_id', uniqueGhostIds)
-    .eq('type', 'company');
-  const ghostOrgs = (ghostOrgEntities ?? [])
-    .filter((e) => {
+  if (ghostOrgEntityIds.length > 0) {
+    const { data: ghostOrgEntities } = await supabase
+      .schema('directory').from('entities')
+      .select('id, legacy_org_id, attributes')
+      .in('id', ghostOrgEntityIds)
+      .eq('type', 'company');
+
+    const unclaimed = (ghostOrgEntities ?? []).filter((e) => {
       const attrs = (e.attributes as Record<string, unknown>) ?? {};
-      return attrs.is_claimed !== true && e.legacy_org_id;
-    })
-    .map((e) => {
-      const attrs = (e.attributes as Record<string, unknown>) ?? {};
-      return {
-        id: e.legacy_org_id!,
-        created_by_org_id: (attrs.created_by_org_id as string | null) ?? null,
-      };
+      return attrs.is_claimed !== true;
     });
 
-  for (const ghost of ghostOrgs) {
-    const plannerOrgId = ghost.created_by_org_id;
-    if (!plannerOrgId || plannerOrgId === sovereignOrg.id) continue;
+    for (const ghost of unclaimed) {
+      const ghostAttrs = (ghost.attributes as Record<string, unknown>) ?? {};
+      const plannerOrgId = ghostAttrs.created_by_org_id as string | null;
+      if (!plannerOrgId) continue;
 
-    const { data: rel } = await supabase
-      .from('org_relationships')
-      .select('id, notes')
-      .eq('source_org_id', plannerOrgId)
-      .eq('target_org_id', ghost.id)
-      .maybeSingle();
+      // Find planner entity in directory
+      const { data: plannerEnt } = await supabase
+        .schema('directory').from('entities')
+        .select('id, legacy_org_id')
+        .or(`legacy_org_id.eq.${plannerOrgId},id.eq.${plannerOrgId}`)
+        .eq('type', 'company')
+        .maybeSingle();
 
-    const { data: plannerEntity } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('owner_workspace_id')
-      .eq('legacy_org_id', plannerOrgId)
-      .maybeSingle();
+      if (!plannerEnt?.id) continue;
 
-    if (plannerEntity?.owner_workspace_id) {
-      await supabase.from('org_relationships').upsert(
-        {
-          source_org_id: plannerOrgId,
-          target_org_id: sovereignOrg.id,
-          type: 'partner',
-          tier: 'preferred',
-          notes: rel?.notes ?? null,
-          workspace_id: plannerEntity.owner_workspace_id,
-        },
-        { onConflict: 'source_org_id,target_org_id' }
-      );
+      // Find existing PARTNER edge from planner to ghost (for notes)
+      const { data: existingEdge } = await supabase
+        .schema('cortex').from('relationships')
+        .select('context_data')
+        .eq('source_entity_id', plannerEnt.id)
+        .eq('target_entity_id', ghost.id)
+        .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER'])
+        .maybeSingle();
+
+      const existingCtx = (existingEdge?.context_data as Record<string, unknown>) ?? {};
+
+      // Upsert PARTNER edge from planner to sovereign org
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: plannerEnt.id,
+        p_target_entity_id: sovereignOrgEnt.id,
+        p_type: 'PARTNER',
+        p_context_data: { tier: 'preferred', lifecycle_status: 'active', notes: existingCtx.notes ?? null },
+      });
+
+      // Migrate private data (keyed by legacy_org_id for backward compat)
+      const plannerLegacyId = plannerEnt.legacy_org_id ?? plannerEnt.id;
+      const ghostLegacyId = ghost.legacy_org_id ?? ghost.id;
+      const sovereignLegacyId = ghostLegacyId; // preserve subject key for now
+
+      const { data: privateRow } = await supabase
+        .from('org_private_data')
+        .select('private_notes, internal_rating')
+        .eq('owner_org_id', plannerLegacyId)
+        .eq('subject_org_id', ghostLegacyId)
+        .maybeSingle();
+
+      if (privateRow) {
+        await supabase.from('org_private_data').upsert({
+          owner_org_id: plannerLegacyId,
+          subject_org_id: sovereignLegacyId,
+          private_notes: privateRow.private_notes,
+          internal_rating: privateRow.internal_rating,
+        }, { onConflict: 'subject_org_id,owner_org_id' });
+      }
     }
-
-    const { data: privateRow } = await supabase
-      .from('org_private_data')
-      .select('private_notes, internal_rating')
-      .eq('owner_org_id', plannerOrgId)
-      .eq('subject_org_id', ghost.id)
-      .maybeSingle();
-
-    if (privateRow) {
-      await supabase.from('org_private_data').upsert({
-        owner_org_id: plannerOrgId,
-        subject_org_id: sovereignOrg.id,
-        private_notes: privateRow.private_notes,
-        internal_rating: privateRow.internal_rating,
-      }, { onConflict: 'subject_org_id,owner_org_id' });
-    }
-
   }
 
   await supabase.from('invitations').update({ status: 'accepted' }).eq('id', inv.id);

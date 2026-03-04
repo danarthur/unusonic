@@ -45,40 +45,6 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   let eventRow: { id: string; title?: string | null; starts_at?: string | null; organizations?: { name?: string } | null } | null = null;
   let clientName: string | null = null;
 
-  // Bill-To from deal_stakeholders (Stakeholder Map) for PDF / client name
-  try {
-    const { data: billToRow } = await supabase
-      .from('deal_stakeholders')
-      .select('organization_id, entity_id')
-      .eq('deal_id', dealId)
-      .eq('role', 'bill_to')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const billTo = billToRow as { organization_id?: string | null; entity_id?: string | null } | null;
-    if (billTo?.organization_id) {
-      const { data: orgEntity } = await supabase
-        .schema('directory')
-        .from('entities')
-        .select('display_name')
-        .eq('legacy_org_id', billTo.organization_id)
-        .maybeSingle();
-      if (orgEntity) clientName = orgEntity.display_name ?? null;
-    } else if (billTo?.entity_id) {
-      const { data: personEntity } = await supabase
-        .schema('directory')
-        .from('entities')
-        .select('attributes')
-        .eq('legacy_entity_id', billTo.entity_id)
-        .maybeSingle();
-      if (personEntity) {
-        const attrs = (personEntity.attributes as Record<string, unknown>) ?? {};
-        clientName = (attrs.email as string | null) ?? null;
-      }
-    }
-  } catch {
-    // deal_stakeholders may not exist; clientName stays null
-  }
   if (!clientName && deal.organization_id) {
     const { data: orgEntity } = await supabase
       .schema('directory')

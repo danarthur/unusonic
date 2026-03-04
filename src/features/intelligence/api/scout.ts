@@ -913,12 +913,19 @@ export async function scoutEntity(
   let existingTags: string[] = [];
   try {
     const supabase = await createClient();
-    const { data } = await supabase
-      .from('org_relationships')
-      .select('tags')
-      .eq('source_org_id', currentOrgId)
-      .not('tags', 'is', null);
-    existingTags = [...new Set((data ?? []).flatMap((r) => (r.tags as string[]) ?? []))];
+    const { data: srcEnt } = await supabase
+      .schema('directory').from('entities')
+      .select('id').eq('legacy_org_id', currentOrgId).maybeSingle();
+    if (srcEnt?.id) {
+      const { data } = await supabase
+        .schema('cortex').from('relationships')
+        .select('context_data')
+        .eq('source_entity_id', srcEnt.id)
+        .in('relationship_type', ['VENDOR', 'VENUE_PARTNER', 'CLIENT', 'PARTNER']);
+      existingTags = [...new Set(
+        (data ?? []).flatMap((r) => ((r.context_data as Record<string, unknown>)?.tags as string[]) ?? [])
+      )];
+    }
   } catch {
     /* ignore */
   }

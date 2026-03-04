@@ -315,18 +315,18 @@ export async function canAccessDealFinancials(
   const hasGlobal = await hasCapability(user.id, workspaceId, 'finance:view');
   if (hasGlobal) return true;
 
-  const { data: entity } = await supabase
-    .from('entities')
+  const { data: dirEnt } = await supabase
+    .schema('directory').from('entities')
     .select('id')
-    .eq('auth_id', user.id)
+    .eq('claimed_by_user_id', user.id)
     .maybeSingle();
-  if (!entity?.id) return false;
+  if (!dirEnt?.id) return false;
 
   const { data: stake, error } = await supabase
     .from('deal_stakeholders')
     .select('id')
     .eq('deal_id', dealId)
-    .eq('entity_id', entity.id)
+    .eq('entity_id', dirEnt.id)
     .limit(1)
     .maybeSingle();
 
@@ -348,18 +348,18 @@ export async function canAccessDealProposals(
   const hasGlobal = await hasCapability(user.id, workspaceId, 'proposals:view');
   if (hasGlobal) return true;
 
-  const { data: entity } = await supabase
-    .from('entities')
+  const { data: dirEnt } = await supabase
+    .schema('directory').from('entities')
     .select('id')
-    .eq('auth_id', user.id)
+    .eq('claimed_by_user_id', user.id)
     .maybeSingle();
-  if (!entity?.id) return false;
+  if (!dirEnt?.id) return false;
 
   const { data: stake, error } = await supabase
     .from('deal_stakeholders')
     .select('id')
     .eq('deal_id', dealId)
-    .eq('entity_id', entity.id)
+    .eq('entity_id', dirEnt.id)
     .limit(1)
     .maybeSingle();
 

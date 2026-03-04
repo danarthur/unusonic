@@ -515,51 +515,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      affiliations: {
-        Row: {
-          access_level: Database["public"]["Enums"]["affiliation_access_level"]
-          created_at: string
-          entity_id: string
-          organization_id: string
-          role_label: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          access_level?: Database["public"]["Enums"]["affiliation_access_level"]
-          created_at?: string
-          entity_id: string
-          organization_id: string
-          role_label?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          access_level?: Database["public"]["Enums"]["affiliation_access_level"]
-          created_at?: string
-          entity_id?: string
-          organization_id?: string
-          role_label?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "affiliations_entity_id_fkey"
-            columns: ["entity_id"]
-            isOneToOne: false
-            referencedRelation: "entities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "affiliations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       agent_configs: {
         Row: {
           agent_mode: string | null
@@ -740,31 +695,37 @@ export type Database = {
       }
       deal_stakeholders: {
         Row: {
-          created_at: string
+          created_at: string | null
           deal_id: string
           entity_id: string | null
           id: string
           is_primary: boolean
           organization_id: string | null
-          role: Database["public"]["Enums"]["deal_stakeholder_role"]
+          role: string
+          updated_at: string | null
+          workspace_id: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           deal_id: string
           entity_id?: string | null
           id?: string
           is_primary?: boolean
           organization_id?: string | null
-          role?: Database["public"]["Enums"]["deal_stakeholder_role"]
+          role?: string
+          updated_at?: string | null
+          workspace_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           deal_id?: string
           entity_id?: string | null
           id?: string
           is_primary?: boolean
           organization_id?: string | null
-          role?: Database["public"]["Enums"]["deal_stakeholder_role"]
+          role?: string
+          updated_at?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -772,13 +733,6 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "deal_stakeholders_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -842,33 +796,6 @@ export type Database = {
           },
         ]
       }
-      entities: {
-        Row: {
-          auth_id: string | null
-          created_at: string
-          email: string
-          id: string
-          is_ghost: boolean
-          updated_at: string
-        }
-        Insert: {
-          auth_id?: string | null
-          created_at?: string
-          email?: string
-          id?: string
-          is_ghost?: boolean
-          updated_at?: string
-        }
-        Update: {
-          auth_id?: string | null
-          created_at?: string
-          email?: string
-          id?: string
-          is_ghost?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
       guardians: {
         Row: {
           created_at: string | null
@@ -892,149 +819,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["guardian_status"] | null
         }
         Relationships: []
-      }
-      org_members: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          default_hourly_rate: number
-          employment_status: Database["public"]["Enums"]["employment_status"]
-          entity_id: string | null
-          first_name: string | null
-          id: string
-          job_title: string | null
-          last_name: string | null
-          org_id: string
-          phone: string | null
-          profile_id: string | null
-          role: Database["public"]["Enums"]["org_member_role"]
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          default_hourly_rate?: number
-          employment_status?: Database["public"]["Enums"]["employment_status"]
-          entity_id?: string | null
-          first_name?: string | null
-          id?: string
-          job_title?: string | null
-          last_name?: string | null
-          org_id: string
-          phone?: string | null
-          profile_id?: string | null
-          role?: Database["public"]["Enums"]["org_member_role"]
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          default_hourly_rate?: number
-          employment_status?: Database["public"]["Enums"]["employment_status"]
-          entity_id?: string | null
-          first_name?: string | null
-          id?: string
-          job_title?: string | null
-          last_name?: string | null
-          org_id?: string
-          phone?: string | null
-          profile_id?: string | null
-          role?: Database["public"]["Enums"]["org_member_role"]
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "org_members_entity_id_fkey"
-            columns: ["entity_id"]
-            isOneToOne: false
-            referencedRelation: "entities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_members_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_members_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      org_relationships: {
-        Row: {
-          blacklist_reason: string | null
-          created_at: string
-          deleted_at: string | null
-          id: string
-          lifecycle_status: string | null
-          notes: string | null
-          source_org_id: string
-          tags: string[] | null
-          target_org_id: string
-          tier: Database["public"]["Enums"]["org_relationship_tier"]
-          type: Database["public"]["Enums"]["relationship_type"]
-          workspace_id: string
-        }
-        Insert: {
-          blacklist_reason?: string | null
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          lifecycle_status?: string | null
-          notes?: string | null
-          source_org_id: string
-          tags?: string[] | null
-          target_org_id: string
-          tier?: Database["public"]["Enums"]["org_relationship_tier"]
-          type?: Database["public"]["Enums"]["relationship_type"]
-          workspace_id: string
-        }
-        Update: {
-          blacklist_reason?: string | null
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          lifecycle_status?: string | null
-          notes?: string | null
-          source_org_id?: string
-          tags?: string[] | null
-          target_org_id?: string
-          tier?: Database["public"]["Enums"]["org_relationship_tier"]
-          type?: Database["public"]["Enums"]["relationship_type"]
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "org_relationships_source_org_id_fkey"
-            columns: ["source_org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_relationships_target_org_id_fkey"
-            columns: ["target_org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_relationships_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       organization_members: {
         Row: {
@@ -1061,116 +845,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "commercial_organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organizations: {
-        Row: {
-          address: Json | null
-          brand_color: string | null
-          category: Database["public"]["Enums"]["org_category"] | null
-          claimed_at: string | null
-          created_at: string | null
-          created_by_org_id: string | null
-          default_currency: string | null
-          default_venue_id: string | null
-          description: string | null
-          id: string
-          is_claimed: boolean
-          is_ghost: boolean | null
-          logo_url: string | null
-          name: string
-          operational_settings: Json | null
-          owner_id: string | null
-          parent_org_id: string | null
-          slug: string | null
-          social_links: Json | null
-          support_email: string | null
-          tier: string | null
-          updated_at: string | null
-          website: string | null
-          workspace_id: string
-        }
-        Insert: {
-          address?: Json | null
-          brand_color?: string | null
-          category?: Database["public"]["Enums"]["org_category"] | null
-          claimed_at?: string | null
-          created_at?: string | null
-          created_by_org_id?: string | null
-          default_currency?: string | null
-          default_venue_id?: string | null
-          description?: string | null
-          id?: string
-          is_claimed?: boolean
-          is_ghost?: boolean | null
-          logo_url?: string | null
-          name: string
-          operational_settings?: Json | null
-          owner_id?: string | null
-          parent_org_id?: string | null
-          slug?: string | null
-          social_links?: Json | null
-          support_email?: string | null
-          tier?: string | null
-          updated_at?: string | null
-          website?: string | null
-          workspace_id: string
-        }
-        Update: {
-          address?: Json | null
-          brand_color?: string | null
-          category?: Database["public"]["Enums"]["org_category"] | null
-          claimed_at?: string | null
-          created_at?: string | null
-          created_by_org_id?: string | null
-          default_currency?: string | null
-          default_venue_id?: string | null
-          description?: string | null
-          id?: string
-          is_claimed?: boolean
-          is_ghost?: boolean | null
-          logo_url?: string | null
-          name?: string
-          operational_settings?: Json | null
-          owner_id?: string | null
-          parent_org_id?: string | null
-          slug?: string | null
-          social_links?: Json | null
-          support_email?: string | null
-          tier?: string | null
-          updated_at?: string | null
-          website?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organizations_created_by_org_id_fkey"
-            columns: ["created_by_org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organizations_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "entities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organizations_parent_org_id_fkey"
-            columns: ["parent_org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organizations_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -2158,16 +1832,9 @@ export const Constants = {
   },
 } as const
 
-// ---------------------------------------------------------------------------
-// Convenience type aliases — manually maintained, re-add after each db:types run
-// ---------------------------------------------------------------------------
-/** Enum for cue type (stage, audio, lighting, video, logistics) */
-export type CueType = Enums<"cue_type">
-/** Row type for proposals table */
-export type Proposal = Tables<"proposals">
-/** Row type for proposal_items table */
-export type ProposalItem = Tables<"proposal_items">
-/** Row type for packages table */
-export type Package = Tables<"packages">
-/** Enum for payment method */
-export type PaymentMethod = Enums<"payment_method">
+// Convenience aliases
+export type CueType = Database['public']['Enums']['cue_type']
+export type Proposal = Database['public']['Tables']['proposals']['Row']
+export type ProposalItem = Database['public']['Tables']['proposal_items']['Row']
+export type Package = Database['public']['Tables']['packages']['Row']
+export type PaymentMethod = Database['public']['Enums']['payment_method']
