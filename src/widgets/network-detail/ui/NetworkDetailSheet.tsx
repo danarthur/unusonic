@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileEdit, Globe } from 'lucide-react';
+import { X, FileEdit, Globe, Pencil } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { IdentityHeader } from './IdentityHeader';
 import { TradeLedger } from './TradeLedger';
@@ -11,17 +11,25 @@ import { PrivateNotes } from './PrivateNotes';
 import { NodeCrewList } from './NodeCrewList';
 import { RoleSelect } from '@/features/team-invite/ui/RoleSelect';
 import type { SignalRoleId } from '@/features/team-invite/model/role-presets';
-import { updateOrgMemberRole } from '@/features/network-data';
+import {
+  updateOrgMemberRole,
+  removeRosterMember,
+  archiveRosterMember,
+  setDoNotRebook,
+  updateRosterMemberField,
+} from '@/features/network-data';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 
 type TabId = 'transmission' | 'crew' | 'ledger';
 
 interface NetworkDetailSheetProps {
   details: NodeDetail;
-  /** Called when user closes; defaults to router.push('/network') if omitted. */
+  /** Called when user closes; defaults to router.push(returnPath ?? '/network') if omitted. */
   onClose?: () => void;
   /** Current org id (for Summon partner). */
   sourceOrgId: string;
+  /** Where to navigate on close and after editing. Defaults to '/network'. */
+  returnPath?: string;
 }
 
 const ALL_TABS: { id: TabId; label: string }[] = [
@@ -79,6 +87,351 @@ function InternalMemberRoleCard({
   );
 }
 
+// ─── Inline edit field ────────────────────────────────────────────────────────
+
+function InlineEditField({
+  label,
+  value,
+  onSave,
+}: {
+  label: string;
+  value: string;
+  onSave: (v: string) => Promise<string | null>;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [local, setLocal] = React.useState(value);
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+  // Guard: when true the next blur event is from an Escape dismissal — skip save
+  const cancellingRef = React.useRef(false);
+
+  // Sync local state when parent value changes (e.g. after router.refresh)
+  React.useEffect(() => {
+    if (!editing) setLocal(value);
+  }, [value, editing]);
+
+  const save = React.useCallback(async () => {
+    if (cancellingRef.current) return;
+    if (local === value) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    const err = await onSave(local);
+    setSaving(false);
+    if (err) {
+      setSaveError(err);
+    } else {
+      setEditing(false);
+    }
+  }, [local, value, onSave]);
+
+  if (editing) {
+    return (
+      <div>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+          {label}
+        </p>
+        <input
+          autoFocus
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') { cancellingRef.current = true; setSaveError(null); setEditing(false); setTimeout(() => { cancellingRef.current = false; }, 0); }
+          }}
+          disabled={saving}
+          className="w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-2 py-1 text-sm text-[var(--color-ink)] outline-none focus:border-[var(--color-silk)]/50 disabled:opacity-50"
+        />
+        {saveError && (
+          <p className="mt-1 text-xs text-[var(--color-signal-error)]">{saveError}</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+        {label}
+      </p>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="group flex w-full items-center gap-2 text-left"
+      >
+        <span className="text-sm text-[var(--color-ink)]">
+          {value || <span className="text-[var(--color-ink-muted)]">—</span>}
+        </span>
+        <Pencil className="size-3 opacity-0 transition-opacity group-hover:opacity-50 text-[var(--color-ink-muted)]" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Internal member fields card ──────────────────────────────────────────────
+
+function InternalMemberFieldsCard({
+  details,
+  sourceOrgId,
+  onSaved,
+}: {
+  details: NodeDetail;
+  sourceOrgId: string;
+  onSaved: () => void;
+}) {
+  const makeFieldSaver = (field: 'phone' | 'market' | 'job_title') =>
+    async (value: string): Promise<string | null> => {
+      const result = await updateRosterMemberField(details.id, sourceOrgId, field, value);
+      if (!result.ok) return result.error;
+      onSaved();
+      return null;
+    };
+
+  const phone = details.phone ?? '';
+  const market = details.market ?? '';
+  const jobTitle = (details.identity.label !== details.memberRole && details.identity.label !== 'Member')
+    ? details.identity.label
+    : '';
+
+  return (
+    <div className="liquid-card rounded-2xl p-4 md:col-span-2 space-y-4">
+      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)]">
+        Profile
+      </h3>
+      <InlineEditField label="Job title" value={jobTitle} onSave={makeFieldSaver('job_title')} />
+      <InlineEditField label="Phone" value={phone} onSave={makeFieldSaver('phone')} />
+      <InlineEditField label="Market" value={market} onSave={makeFieldSaver('market')} />
+    </div>
+  );
+}
+
+// ─── Roster status actions card ───────────────────────────────────────────────
+
+function RosterStatusCard({
+  details,
+  sourceOrgId,
+  onRemoved,
+  onSaved,
+}: {
+  details: NodeDetail;
+  sourceOrgId: string;
+  onRemoved: () => void;
+  onSaved: () => void;
+}) {
+  const router = useRouter();
+  const doNotRebook = details.doNotRebook ?? false;
+  const isArchived = details.archived ?? false;
+
+  // Archive confirm state
+  const [archiveConfirm, setArchiveConfirm] = React.useState(false);
+  const [archiving, setArchiving] = React.useState(false);
+  const [archiveError, setArchiveError] = React.useState<string | null>(null);
+
+  // Remove confirm state
+  const [removeConfirm, setRemoveConfirm] = React.useState(false);
+  const [removing, setRemoving] = React.useState(false);
+  const [removeError, setRemoveError] = React.useState<string | null>(null);
+  const [forceCount, setForceCount] = React.useState<number | null>(null);
+
+  // DNR state
+  const [dnrSaving, setDnrSaving] = React.useState(false);
+  const [dnrError, setDnrError] = React.useState<string | null>(null);
+
+  const handleDnrToggle = async () => {
+    setDnrSaving(true);
+    setDnrError(null);
+    const result = await setDoNotRebook(details.id, sourceOrgId, !doNotRebook);
+    setDnrSaving(false);
+    if (result.ok) {
+      onSaved();
+      router.refresh();
+    } else {
+      setDnrError(result.error);
+    }
+  };
+
+  const handleArchive = async () => {
+    setArchiving(true);
+    setArchiveError(null);
+    const result = await archiveRosterMember(details.id, sourceOrgId, !isArchived);
+    setArchiving(false);
+    if (result.ok) {
+      setArchiveConfirm(false);
+      onSaved();
+      router.refresh();
+    } else {
+      setArchiveError(result.error);
+    }
+  };
+
+  const handleRemove = async (force?: boolean) => {
+    setRemoving(true);
+    setRemoveError(null);
+    const result = await removeRosterMember(details.id, sourceOrgId, force);
+    setRemoving(false);
+    if (result.ok) {
+      onRemoved();
+    } else if ('requiresForce' in result && result.requiresForce) {
+      setForceCount(result.assignmentCount ?? null);
+    } else {
+      setRemoveError(result.error);
+    }
+  };
+
+  return (
+    <div className="liquid-card rounded-2xl p-4 md:col-span-3 space-y-3">
+      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)]">
+        Roster actions
+      </h3>
+
+      {/* Do-not-rebook */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1">
+            <p className="text-sm text-[var(--color-ink)]">Do not rebook</p>
+            <p className="text-xs text-[var(--color-ink-muted)]">
+              Flags this person in scheduling suggestions.
+            </p>
+          </div>
+          {doNotRebook ? (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[oklch(0.75_0.15_60)]/15 px-2.5 py-1 text-xs font-medium text-[oklch(0.75_0.15_60)]">
+                Flagged
+              </span>
+              <button
+                type="button"
+                onClick={handleDnrToggle}
+                disabled={dnrSaving}
+                className="rounded-lg px-2.5 py-1 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors disabled:opacity-50"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleDnrToggle}
+              disabled={dnrSaving}
+              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors disabled:opacity-50"
+            >
+              Flag do not rebook
+            </button>
+          )}
+        </div>
+        {doNotRebook && details.lastModifiedByName && (
+          <p className="text-xs text-[var(--color-ink-muted)]/70">
+            Set by {details.lastModifiedByName}
+            {details.lastModifiedAt ? ` · ${new Date(details.lastModifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+          </p>
+        )}
+        {dnrError && <p className="text-xs text-[var(--color-signal-error)]">{dnrError}</p>}
+      </div>
+
+      {/* Archive / Unarchive */}
+      <div className="space-y-1 pt-1 border-t border-[var(--color-mercury)]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1">
+            <p className="text-sm text-[var(--color-ink)]">
+              {isArchived ? 'Archived' : 'Archive'}
+            </p>
+            <p className="text-xs text-[var(--color-ink-muted)]">
+              {isArchived
+                ? 'Member is on record but excluded from active scheduling.'
+                : 'Keeps the member on record but removes from active scheduling.'}
+            </p>
+          </div>
+          {isArchived ? (
+            <button
+              type="button"
+              onClick={() => handleArchive()}
+              disabled={archiving}
+              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors disabled:opacity-50"
+            >
+              {archiving ? 'Restoring…' : 'Unarchive'}
+            </button>
+          ) : archiveConfirm ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleArchive}
+                disabled={archiving}
+                className="rounded-lg bg-[oklch(0.75_0.15_60)]/15 px-3 py-1.5 text-xs font-medium text-[oklch(0.75_0.15_60)] hover:bg-[oklch(0.75_0.15_60)]/25 transition-colors disabled:opacity-50"
+              >
+                {archiving ? 'Archiving…' : 'Confirm archive?'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setArchiveConfirm(false)}
+                className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setArchiveConfirm(true)}
+              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors"
+            >
+              Archive
+            </button>
+          )}
+        </div>
+        {archiveError && <p className="text-xs text-[var(--color-signal-error)]">{archiveError}</p>}
+      </div>
+
+      {/* Remove from roster */}
+      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--color-mercury)]">
+        <div className="flex-1">
+          <p className="text-sm text-[var(--color-ink)]">Remove from roster</p>
+          <p className="text-xs text-[var(--color-ink-muted)]">
+            Permanently removes this member. Cannot be undone.
+          </p>
+        </div>
+        {removeConfirm ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleRemove(forceCount !== null ? true : false)}
+              disabled={removing}
+              className="rounded-lg bg-[var(--color-signal-error)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-signal-error)] hover:bg-[var(--color-signal-error)]/25 transition-colors disabled:opacity-50"
+            >
+              {removing
+                ? 'Removing…'
+                : forceCount !== null
+                ? `${forceCount} assignment(s) — remove anyway?`
+                : 'Confirm remove?'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setRemoveConfirm(false); setForceCount(null); }}
+              className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setRemoveConfirm(true);
+              setForceCount(null);
+              setRemoveError(null);
+            }}
+            className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[var(--color-signal-error)]/50 hover:text-[var(--color-signal-error)] transition-colors"
+          >
+            Remove from roster
+          </button>
+        )}
+      </div>
+      {removeError && <p className="text-xs text-[var(--color-signal-error)]">{removeError}</p>}
+    </div>
+  );
+}
+
 /** Crew tab only for organizations (vendor, venue, client). Hide for individuals (coordinator or uncategorized, e.g. groom). */
 function getTabsForDetail(details: NodeDetail): { id: TabId; label: string }[] {
   const isPartner = details.kind === 'external_partner';
@@ -87,14 +440,17 @@ function getTabsForDetail(details: NodeDetail): { id: TabId; label: string }[] {
   return showCrew ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'crew');
 }
 
-export function NetworkDetailSheet({ details, onClose, sourceOrgId }: NetworkDetailSheetProps) {
+export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }: NetworkDetailSheetProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<TabId>('transmission');
 
   const handleClose = React.useCallback(() => {
-    onClose?.();
-    router.push('/network');
-  }, [onClose, router]);
+    if (onClose) {
+      onClose();
+    } else {
+      router.push(returnPath ?? '/network');
+    }
+  }, [onClose, returnPath, router]);
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -186,7 +542,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId }: NetworkDet
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => router.push(`/network/entity/${details.id}`)}
+                  onClick={() => router.push(`/network/entity/${details.id}?kind=external_partner${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
                   className="h-8 gap-1.5 px-2 text-[var(--color-silk)] hover:bg-[var(--color-silk)]/10"
                 >
                   <FileEdit className="size-4" />
@@ -280,6 +636,23 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId }: NetworkDet
                     <InternalMemberRoleCard
                       details={details}
                       sourceOrgId={sourceOrgId}
+                      onSaved={handleRefresh}
+                    />
+                  )}
+                  {/* Inline profile fields — internal_employee only */}
+                  {!isPartner && (
+                    <InternalMemberFieldsCard
+                      details={details}
+                      sourceOrgId={sourceOrgId}
+                      onSaved={handleRefresh}
+                    />
+                  )}
+                  {/* Roster status actions — internal_employee + owner/admin only */}
+                  {!isPartner && details.canAssignElevatedRole && (
+                    <RosterStatusCard
+                      details={details}
+                      sourceOrgId={sourceOrgId}
+                      onRemoved={handleClose}
                       onSaved={handleRefresh}
                     />
                   )}

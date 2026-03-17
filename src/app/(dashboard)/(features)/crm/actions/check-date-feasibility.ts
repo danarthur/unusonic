@@ -15,7 +15,7 @@ export type CheckDateFeasibilityResult = {
 const BADGE_MESSAGES: Record<FeasibilityStatus, string> = {
   clear: 'Prime Availability. Top 3 Leads Available.',
   caution: 'Date Congested. 2+ Inquiries Pending. Staffing Tight.',
-  critical: 'Venue Blackout / Exclusive Buyout in place.',
+  critical: 'Date Fully Booked. No Capacity Available.',
 };
 
 /**
@@ -48,23 +48,26 @@ export async function checkDateFeasibility(
       };
     }
 
-    const dayStart = `${dateStr}T00:00:00.000Z`;
-    const dayEnd = `${dateStr}T23:59:59.999Z`;
+    const baseStart = new Date(`${dateStr}T00:00:00.000Z`);
+    const baseEnd = new Date(`${dateStr}T23:59:59.999Z`);
+    const dayStart = new Date(baseStart.getTime() - 12 * 60 * 60 * 1000).toISOString();
+    const dayEnd = new Date(baseEnd.getTime() + 12 * 60 * 60 * 1000).toISOString();
 
     const supabase = await createClient();
 
     const [eventsRes, dealsRes] = await Promise.all([
       supabase
-        .schema('ops')
-        .from('events')
-        .select('id, project:projects!inner(workspace_id)', { count: 'exact', head: true })
-        .eq('projects.workspace_id', workspaceId)
-        .lte('starts_at', dayEnd)
-        .gte('ends_at', dayStart),
+            .schema('ops')
+            .from('events')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', workspaceId)
+            .lte('starts_at', dayEnd)
+            .gte('ends_at', dayStart),
       supabase
         .from('deals')
         .select('*', { count: 'exact', head: true })
         .eq('workspace_id', workspaceId)
+        .is('archived_at', null)
         .eq('proposed_date', dateStr)
         .in('status', ['inquiry', 'proposal']),
     ]);
@@ -73,15 +76,22 @@ export async function checkDateFeasibility(
     const dealsCount = dealsRes.count ?? 0;
 
     let status: FeasibilityStatus = 'clear';
-    if (confirmedCount > 0) {
-      status = 'critical';
+    let message = BADGE_MESSAGES.clear;
+
+    if (confirmedCount > 0 && dealsCount > 0) {
+      status = 'caution';
+      message = `${confirmedCount} event${confirmedCount > 1 ? 's' : ''} booked · ${dealsCount} inquiri${dealsCount > 1 ? 'es' : 'y'} pending.`;
+    } else if (confirmedCount > 0) {
+      status = 'caution';
+      message = `${confirmedCount} event${confirmedCount > 1 ? 's' : ''} already booked on this date.`;
     } else if (dealsCount > 2) {
       status = 'caution';
+      message = `Date congested — ${dealsCount} inquiries pending.`;
     }
 
     return {
       status,
-      message: BADGE_MESSAGES[status],
+      message,
       confirmedCount,
       dealsCount,
     };

@@ -45,14 +45,27 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   let eventRow: { id: string; title?: string | null; starts_at?: string | null; organizations?: { name?: string } | null } | null = null;
   let clientName: string | null = null;
 
-  if (!clientName && deal.organization_id) {
-    const { data: orgEntity } = await supabase
+  if (deal.organization_id) {
+    const { data: orgEntityByLegacy } = await supabase
       .schema('directory')
       .from('entities')
       .select('display_name')
       .eq('legacy_org_id', deal.organization_id)
+      .eq('owner_workspace_id', workspaceId)
       .maybeSingle();
-    if (orgEntity) clientName = orgEntity.display_name ?? null;
+    if (orgEntityByLegacy) {
+      clientName = orgEntityByLegacy.display_name ?? null;
+    } else {
+      // Fallback: new ghost entities (created by createDeal) have no legacy_org_id — look up by direct UUID
+      const { data: orgEntityDirect } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('display_name')
+        .eq('id', deal.organization_id)
+        .eq('owner_workspace_id', workspaceId)
+        .maybeSingle();
+      if (orgEntityDirect) clientName = orgEntityDirect.display_name ?? null;
+    }
   }
 
   if (deal.event_id) {
@@ -133,5 +146,6 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
       : { id: workspaceId ?? '', name: 'Signal', logoUrl: null },
     items: itemsWithImages,
     total,
+    embedSrc: null,
   };
 }

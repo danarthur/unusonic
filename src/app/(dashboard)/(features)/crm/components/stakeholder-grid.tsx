@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Plus, Building2, ChevronRight, X, User } from 'lucide-react';
+import { Plus, Building2, ChevronRight, X, User, Pencil, Loader2 } from 'lucide-react';
 import { OmniSearch } from '@/widgets/network-stream';
-import type { NetworkSearchOrg } from '@/features/network-data';
+import { NetworkDetailSheet } from '@/widgets/network-detail';
+import type { NetworkSearchOrg, NodeDetail } from '@/features/network-data';
+import { getNodeForSheet, getCoupleEntityForEdit, type CoupleEntityForEdit } from '../actions/get-node-for-sheet';
 import {
   addDealStakeholder,
   removeDealStakeholder,
@@ -21,6 +23,7 @@ import type { DealClientContext } from '../actions/get-deal-client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
+import { CoupleEditSheet } from './couple-edit-sheet';
 import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
@@ -74,6 +77,43 @@ export function StakeholderGrid({
   const billTo = stakeholders.find((s) => s.role === 'bill_to') ?? null;
   const others = stakeholders.filter((s) => s.role !== 'bill_to');
   const hasLegacyClient = !billTo && client?.organization;
+
+  // NetworkDetailSheet state (for cortex-linked entities)
+  const [sheetDetails, setSheetDetails] = useState<NodeDetail | null>(null);
+  const [loadingRelId, setLoadingRelId] = useState<string | null>(null);
+
+  const handleEditClick = async (relationshipId: string) => {
+    setLoadingRelId(relationshipId);
+    const details = await getNodeForSheet(relationshipId);
+    setLoadingRelId(null);
+    if (details) setSheetDetails(details);
+  };
+
+  // CoupleEditSheet state
+  const [coupleEdit, setCoupleEdit] = useState<{
+    open: boolean;
+    entityId: string;
+    initialValues: CoupleEntityForEdit;
+  } | null>(null);
+  const [loadingCoupleId, setLoadingCoupleId] = useState<string | null>(null);
+
+  const handleCoupleEditClick = async (entityId: string) => {
+    setLoadingCoupleId(entityId);
+    const coupleData = await getCoupleEntityForEdit(entityId);
+    setLoadingCoupleId(null);
+    if (coupleData) {
+      setCoupleEdit({ open: true, entityId, initialValues: coupleData });
+    } else {
+      toast.error('Could not load couple details.');
+    }
+  };
+
+  // Return path for the "Edit full page" button inside the sheet
+  const selectedId = searchParams.get('selected');
+  const streamMode = searchParams.get('stream') ?? 'inquiry';
+  const crmReturnPath = selectedId
+    ? `/crm?selected=${selectedId}&stream=${streamMode}`
+    : '/crm';
 
   const handleAddConnection = () => {
     if (sourceOrgId) {
@@ -175,6 +215,47 @@ export function StakeholderGrid({
     compact ? 'liquid-card p-3' : 'liquid-card p-4'
   );
 
+  /** Render edit button for a stakeholder — handles cortex-linked orgs and couple entities */
+  const renderEditButton = (s: DealStakeholderDisplay) => {
+    const entityId = s.organization_id;
+    const isCouple = s.entity_type === 'couple';
+    const isLoadingThis = loadingRelId === s.relationship_id || loadingCoupleId === entityId;
+
+    if (isCouple && entityId) {
+      return (
+        <button
+          type="button"
+          disabled={isLoadingThis}
+          onClick={() => handleCoupleEditClick(entityId)}
+          className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors disabled:opacity-50"
+          aria-label={`Edit ${s.contact_name ?? s.name}`}
+        >
+          {isLoadingThis
+            ? <Loader2 className="size-4 animate-spin" />
+            : <Pencil className="size-4" />}
+        </button>
+      );
+    }
+
+    if (s.relationship_id) {
+      return (
+        <button
+          type="button"
+          disabled={!!loadingRelId}
+          onClick={() => handleEditClick(s.relationship_id!)}
+          className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors disabled:opacity-50"
+          aria-label={`Edit ${s.contact_name ?? s.name}`}
+        >
+          {loadingRelId === s.relationship_id
+            ? <Loader2 className="size-4 animate-spin" />
+            : <Pencil className="size-4" />}
+        </button>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-1">
@@ -208,14 +289,17 @@ export function StakeholderGrid({
                   <p className="text-xs text-ink-muted truncate mt-0.5">{billTo.email}</p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => handleRemove(billTo.id)}
-                className="shrink-0 p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
-                aria-label="Remove"
-              >
-                <X className="size-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {renderEditButton(billTo)}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(billTo.id)}
+                  className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
+                  aria-label="Remove"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
             </div>
           ) : hasLegacyClient && client ? (
             client.relationshipId ? (
@@ -262,7 +346,7 @@ export function StakeholderGrid({
         </motion.div>
       )}
 
-      {/* Partners / Planner / Venue / Vendor — dual-node: contact name prominent, org + logo subtitle */}
+      {/* Partners / Planner / Venue / Vendor */}
       {others.length > 0 && (
         <div className="space-y-2">
           <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted/80">
@@ -300,14 +384,17 @@ export function StakeholderGrid({
                     {getStakeholderRoleLabel(s.role)}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemove(s.id)}
-                  className="shrink-0 p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
-                  aria-label="Remove"
-                >
-                  <X className="size-4" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {renderEditButton(s)}
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(s.id)}
+                    className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
+                    aria-label="Remove"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -473,6 +560,32 @@ export function StakeholderGrid({
           </SheetBody>
         </SheetContent>
       </Sheet>
+
+      {/* NetworkDetailSheet for cortex-linked entities */}
+      {sheetDetails && sourceOrgId && (
+        <NetworkDetailSheet
+          details={sheetDetails}
+          sourceOrgId={sourceOrgId}
+          onClose={() => setSheetDetails(null)}
+        />
+      )}
+
+      {/* CoupleEditSheet */}
+      {coupleEdit && (
+        <CoupleEditSheet
+          open={coupleEdit.open}
+          onOpenChange={(open) => {
+            if (!open) setCoupleEdit(null);
+            else setCoupleEdit((prev) => prev ? { ...prev, open: true } : null);
+          }}
+          entityId={coupleEdit.entityId}
+          initialValues={coupleEdit.initialValues}
+          onSaved={() => {
+            onStakeholdersChange();
+            router.refresh();
+          }}
+        />
+      )}
 
       <Sheet open={roleSheetOpen} onOpenChange={setRoleSheetOpen}>
         <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">

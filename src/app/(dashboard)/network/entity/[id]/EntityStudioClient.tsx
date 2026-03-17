@@ -15,6 +15,9 @@ import {
   ChevronDown,
   RotateCcw,
   Trash2,
+  Calendar,
+  Briefcase,
+  Receipt,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -31,6 +34,15 @@ import { ColorTuner } from '@/features/org-identity';
 import { SignalScoutInput } from '@/widgets/network-detail/ui/SignalScoutInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
+import {
+  getEntityDeals,
+  getEntityFinancialSummary,
+  updateVenueTechnicalSpecs,
+  type EntityDeal,
+  type EntityInvoiceSummary,
+  type VenueTechSpecs,
+} from '@/features/network-data/api/entity-context-actions';
+import { getEntityCrewSchedule, getEntityCrewHistory, type CrewScheduleEntry } from '@/features/ops/actions/get-entity-crew-schedule';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
@@ -79,12 +91,311 @@ function AccordionSection({
   );
 }
 
+// ─── Context panels (assignments, deals, finance) ─────────────────────────────
+
+function AssignmentRow({ entry, muted = false }: { entry: CrewScheduleEntry; muted?: boolean }) {
+  return (
+    <li className="flex items-start gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5">
+      <div className="min-w-0 flex-1">
+        <p className={cn('text-sm font-medium truncate', muted ? 'text-[var(--color-ink-muted)]' : 'text-[var(--color-ink)]')}>
+          {entry.event_title ?? 'Untitled event'}
+        </p>
+        <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
+          {entry.role}
+          {entry.starts_at ? ` · ${new Date(entry.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+          {entry.venue_name ? ` · ${entry.venue_name}` : ''}
+        </p>
+      </div>
+      <span className={cn(
+        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+        muted
+          ? 'bg-white/5 text-[var(--color-ink-muted)]/60'
+          : entry.status === 'confirmed'
+            ? 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]'
+            : entry.status === 'dispatched'
+              ? 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]'
+              : 'bg-white/10 text-[var(--color-ink-muted)]',
+      )}>
+        {entry.status}
+      </span>
+    </li>
+  );
+}
+
+function AssignmentsPanel({ entityId }: { entityId: string }) {
+  const [upcoming, setUpcoming] = React.useState<CrewScheduleEntry[] | null>(null);
+  const [history, setHistory] = React.useState<CrewScheduleEntry[] | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [showPast, setShowPast] = React.useState(false);
+
+  React.useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      getEntityCrewSchedule(entityId),
+      getEntityCrewHistory(entityId),
+    ]).then(([upcomingData, historyData]) => {
+      setUpcoming(upcomingData);
+      setHistory(historyData);
+      setLoading(false);
+    });
+  }, [entityId]);
+
+  if (loading) return (
+    <AccordionSection label="Assignments" icon={Calendar}>
+      <div className="space-y-2">
+        <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
+        <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
+      </div>
+    </AccordionSection>
+  );
+  if ((!upcoming || upcoming.length === 0) && (!history || history.length === 0)) return null;
+
+  return (
+    <AccordionSection label="Assignments" icon={Calendar}>
+      <div className="space-y-4">
+        {upcoming && upcoming.length > 0 && (
+          <div>
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+              Upcoming
+            </p>
+            <ul className="space-y-2">
+              {upcoming.map((entry) => (
+                <AssignmentRow key={entry.assignment_id} entry={entry} />
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {history && history.length > 0 && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowPast((p) => !p)}
+              className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
+            >
+              <ChevronDown className={cn('size-3 transition-transform', showPast && 'rotate-180')} />
+              {showPast ? 'Hide history' : `Show history (${history.length})`}
+            </button>
+            {showPast && (
+              <ul className="space-y-2">
+                {history.map((entry) => (
+                  <AssignmentRow key={entry.assignment_id} entry={entry} muted />
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    </AccordionSection>
+  );
+}
+
+function DealsPanel({ entityId }: { entityId: string }) {
+  const [data, setData] = React.useState<EntityDeal[] | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    setLoading(true);
+    getEntityDeals(entityId).then((d) => { setData(d); setLoading(false); });
+  }, [entityId]);
+
+  if (loading) return (
+    <AccordionSection label="Related deals" icon={Briefcase}>
+      <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
+    </AccordionSection>
+  );
+  if (!data || data.length === 0) return null;
+
+  return (
+    <AccordionSection label="Related deals" icon={Briefcase}>
+      <ul className="space-y-2">
+        {data.map((deal) => (
+          <li key={deal.id} className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-[var(--color-ink)] capitalize">
+                {deal.event_archetype?.replace(/_/g, ' ') ?? 'Deal'}
+              </p>
+              <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
+                {new Date(deal.proposed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {deal.budget_estimated ? ` · $${deal.budget_estimated.toLocaleString()}` : ''}
+              </p>
+            </div>
+            <span className={cn(
+              'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+              deal.status === 'confirmed' && 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]',
+              deal.status === 'signed' && 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]',
+              deal.status === 'prospect' && 'bg-white/10 text-[var(--color-ink-muted)]',
+              !['confirmed','signed','prospect'].includes(deal.status) && 'bg-white/10 text-[var(--color-ink-muted)]',
+            )}>
+              {deal.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </AccordionSection>
+  );
+}
+
+function FinancePanel({ entityId }: { entityId: string }) {
+  const [data, setData] = React.useState<EntityInvoiceSummary[] | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    setLoading(true);
+    getEntityFinancialSummary(entityId).then((d) => { setData(d); setLoading(false); });
+  }, [entityId]);
+
+  if (loading) return (
+    <AccordionSection label="Financial obligations" icon={Receipt}>
+      <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
+    </AccordionSection>
+  );
+  if (!data || data.length === 0) return null;
+
+  const totalOutstanding = data
+    .filter((inv) => inv.status !== 'paid' && inv.status !== 'void')
+    .reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
+
+  return (
+    <AccordionSection label="Financial obligations" icon={Receipt}>
+      {totalOutstanding > 0 && (
+        <div className="rounded-lg bg-[oklch(0.75_0.15_60)]/10 border border-[oklch(0.75_0.15_60)]/20 px-3 py-2 mb-3">
+          <p className="text-xs text-[var(--color-ink-muted)]">Outstanding</p>
+          <p className="text-lg font-semibold text-[oklch(0.75_0.15_60)]">
+            ${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        </div>
+      )}
+      <ul className="space-y-2">
+        {data.map((inv) => (
+          <li key={inv.id} className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-[var(--color-ink)]">
+                ${(inv.total_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              {inv.due_date && (
+                <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
+                  Due {new Date(inv.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              )}
+            </div>
+            <span className={cn(
+              'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+              inv.status === 'paid' && 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]',
+              inv.status === 'overdue' && 'bg-[var(--color-signal-error)]/15 text-[var(--color-signal-error)]',
+              inv.status === 'sent' && 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]',
+              !['paid','overdue','sent'].includes(inv.status ?? '') && 'bg-white/10 text-[var(--color-ink-muted)]',
+            )}>
+              {inv.status ?? 'draft'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </AccordionSection>
+  );
+}
+
+// ─── Venue technical specs card ───────────────────────────────────────────────
+
+function VenueTechSpecsCard({
+  entityId,
+  initialSpecs,
+}: {
+  entityId: string;
+  initialSpecs: NonNullable<import('@/features/network-data').NodeDetail['orgVenueSpecs']>;
+}) {
+  const [capacity, setCapacity] = React.useState<string>(
+    initialSpecs.capacity != null ? String(initialSpecs.capacity) : ''
+  );
+  const [loadInNotes, setLoadInNotes] = React.useState(initialSpecs.load_in_notes ?? '');
+  const [powerNotes, setPowerNotes] = React.useState(initialSpecs.power_notes ?? '');
+  const [stageNotes, setStageNotes] = React.useState(initialSpecs.stage_notes ?? '');
+  const [saving, startSave] = React.useTransition();
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+
+  function handleSave() {
+    setSaveError(null);
+    startSave(async () => {
+      const specs: VenueTechSpecs = {
+        capacity: capacity !== '' ? Math.max(0, parseInt(capacity, 10)) || null : null,
+        load_in_notes: loadInNotes || null,
+        power_notes: powerNotes || null,
+        stage_notes: stageNotes || null,
+      };
+      const result = await updateVenueTechnicalSpecs(entityId, specs);
+      if (!result.ok) setSaveError(result.error);
+    });
+  }
+
+  return (
+    <div className="rounded-2xl bg-[var(--color-surface-100)] p-5">
+      <h3 className="mb-4 text-sm font-medium text-[var(--color-ink-muted)]">Technical Specs</h3>
+      <div className="space-y-3">
+        <div>
+          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Capacity</label>
+          <input
+            type="number"
+            value={capacity}
+            onChange={(e) => setCapacity(e.target.value)}
+            className="w-full rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            placeholder="e.g. 500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Load-in notes</label>
+          <textarea
+            value={loadInNotes}
+            onChange={(e) => setLoadInNotes(e.target.value)}
+            rows={3}
+            className="w-full resize-none rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            placeholder="Dock access, elevator, stairs..."
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Power notes</label>
+          <input
+            type="text"
+            value={powerNotes}
+            onChange={(e) => setPowerNotes(e.target.value)}
+            className="w-full rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            placeholder="200A 3-phase, 4× 20A circuits..."
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Stage dimensions</label>
+          <input
+            type="text"
+            value={stageNotes}
+            onChange={(e) => setStageNotes(e.target.value)}
+            className="w-full rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            placeholder="40ft W × 30ft D × 20ft H"
+          />
+        </div>
+      </div>
+      {saveError && (
+        <p className="mt-2 text-xs text-[var(--color-signal-error)]">{saveError}</p>
+      )}
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saving}
+        className="mt-4 w-full rounded-xl bg-[var(--color-silk)]/10 py-2 text-sm font-medium text-[var(--color-silk)] transition-opacity hover:opacity-80 disabled:opacity-40"
+      >
+        {saving ? 'Saving…' : 'Save specs'}
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface EntityStudioClientProps {
   details: NodeDetail;
   sourceOrgId: string;
+  returnPath?: string;
 }
 
-export function EntityStudioClient({ details, sourceOrgId }: EntityStudioClientProps) {
+export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network' }: EntityStudioClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [hasChanges, setHasChanges] = React.useState(false);
@@ -149,7 +460,7 @@ export function EntityStudioClient({ details, sourceOrgId }: EntityStudioClientP
       setDeleteConfirmOpen(false);
       if (result.ok) {
         toast.success('Connection deleted. You can restore it within 30 days from the Network page.');
-        router.push('/network');
+        router.push(returnPath);
         router.refresh();
       } else {
         toast.error(result.error);
@@ -276,7 +587,10 @@ export function EntityStudioClient({ details, sourceOrgId }: EntityStudioClientP
   );
 
   const handleSave = () => {
-    if (!ghostOrgId) return;
+    if (!ghostOrgId) {
+      toast.error('This profile is managed by its owner and cannot be edited here.');
+      return;
+    }
     startTransition(async () => {
       const formData = new FormData();
       formData.set('name', name);
@@ -314,7 +628,7 @@ export function EntityStudioClient({ details, sourceOrgId }: EntityStudioClientP
       } else {
         toast.success('Saved');
         setHasChanges(false);
-        router.push(`/network?nodeId=${details.id}&kind=external_partner`);
+        router.push(returnPath);
         router.refresh();
       }
     });
@@ -333,7 +647,7 @@ export function EntityStudioClient({ details, sourceOrgId }: EntityStudioClientP
     <div className="min-h-screen bg-[var(--color-obsidian)] pb-32">
       <header className="sticky top-0 z-20 bg-[var(--color-obsidian)]/80 backdrop-blur-xl border-b border-[var(--color-mercury)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/network')} aria-label="Back">
+          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
             <ArrowLeft className="size-5" />
           </Button>
           <div>
@@ -655,6 +969,23 @@ export function EntityStudioClient({ details, sourceOrgId }: EntityStudioClientP
               onRefresh={() => router.refresh()}
             />
           </AccordionSection>
+
+          {/* Cross-module context panels — use subjectEntityId (directory.entities.id),
+              NOT details.id which is the cortex relationship edge ID */}
+          {details.subjectEntityId && (
+            <>
+              <AssignmentsPanel entityId={details.subjectEntityId} />
+              <DealsPanel entityId={details.subjectEntityId} />
+              <FinancePanel entityId={details.subjectEntityId} />
+            </>
+          )}
+
+          {details.entityDirectoryType === 'venue' && details.subjectEntityId && details.orgVenueSpecs && (
+            <VenueTechSpecsCard
+              entityId={details.subjectEntityId}
+              initialSpecs={details.orgVenueSpecs}
+            />
+          )}
         </div>
       </div>
 

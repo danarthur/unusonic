@@ -6,11 +6,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
 import { Command } from 'cmdk';
-import { Building2, User, MapPin, Plus, ChevronRight, ChevronDown } from 'lucide-react';
+import { Building2, User, MapPin, Plus, ChevronRight, ChevronDown, Heart } from 'lucide-react';
 import { createDeal, type CreateDealInput } from '../actions/deal-actions';
 import { checkDateFeasibility, type FeasibilityStatus, type CheckDateFeasibilityResult } from '../actions/check-date-feasibility';
 import { searchOmni, getVenueSuggestions, type OmniResult, type VenueSuggestion } from '../actions/lookup';
 import { CalendarPanel, parseLocalDateString } from './ceramic-date-picker';
+import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { cn } from '@/shared/lib/utils';
 import { SIGNAL_PHYSICS, M3_SHARED_AXIS_Y_VARIANTS } from '@/shared/lib/motion-constants';
 import { format } from 'date-fns';
@@ -104,13 +105,16 @@ function TimeInput({
   );
 }
 
+type ClientType = 'company' | 'individual' | 'couple';
+
 interface CreateGigModalProps {
   open: boolean;
   onClose: () => void;
   addOptimisticGig: (update: OptimisticUpdate) => void;
+  onRefetchList?: () => Promise<void>;
 }
 
-export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigModalProps) {
+export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList }: CreateGigModalProps) {
   const router = useRouter();
   const { hasWorkspace } = useWorkspace();
   const [isPending, startTransition] = useTransition();
@@ -129,6 +133,35 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
   const [error, setError] = useState<string | null>(null);
   const budgetEstimatedDisplay = budgetEstimated === undefined ? '' : String(budgetEstimated);
 
+  // Client type selection
+  const [clientType, setClientType] = useState<ClientType>('company');
+
+  // Individual client form
+  const [individualForm, setIndividualForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
+
+  // Couple client form
+  const [coupleForm, setCoupleForm] = useState({
+    partnerAFirst: '', partnerALast: '', partnerAEmail: '',
+    partnerBFirst: '', partnerBLast: '', partnerBEmail: '',
+  });
+  const [coupleDisplayName, setCoupleDisplayName] = useState('');
+  const [displayNameMode, setDisplayNameMode] = useState<'auto' | 'manual'>('auto');
+
+  // Auto-generate couple display name
+  useEffect(() => {
+    if (displayNameMode !== 'auto') return;
+    const { partnerAFirst, partnerALast, partnerBFirst, partnerBLast } = coupleForm;
+    if (!partnerAFirst && !partnerBFirst) { setCoupleDisplayName(''); return; }
+    const sameLast = partnerALast && partnerBLast && partnerALast.trim().toLowerCase() === partnerBLast.trim().toLowerCase();
+    if (sameLast) {
+      setCoupleDisplayName(`${partnerAFirst} & ${partnerBFirst} ${partnerALast}`.trim());
+    } else {
+      const a = [partnerAFirst, partnerALast].filter(Boolean).join(' ');
+      const b = [partnerBFirst, partnerBLast].filter(Boolean).join(' ');
+      setCoupleDisplayName([a, b].filter(Boolean).join(' & '));
+    }
+  }, [coupleForm, displayNameMode]);
+
   // Clear error when modal opens or stage changes so stale submit errors don't linger
   useEffect(() => {
     if (open) setError(null);
@@ -138,7 +171,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
     setStage(next);
   };
 
-  // Client OmniBox state
+  // Client OmniBox state (company mode only)
   const [clientOpen, setClientOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState('');
   const [clientResults, setClientResults] = useState<OmniResult[]>([]);
@@ -223,7 +256,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
     return () => clearTimeout(t);
   }, [venueQuery, orgId, runVenueSearch]);
 
-  // Feasibility check when date and archetype are set (read-only; badge on blur / after select)
+  // Feasibility check when date and archetype are set
   useEffect(() => {
     if (!eventDate || !eventArchetype || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
       setFeasibility(null);
@@ -245,7 +278,14 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
     };
   }, [eventDate, eventArchetype]);
 
-  const clientName = selectedClient?.name ?? '';
+  // Compute optimistic client name based on type
+  const getOptimisticClientName = (): string => {
+    if (clientType === 'couple') return coupleDisplayName || 'Couple';
+    if (clientType === 'individual') return [individualForm.firstName, individualForm.lastName].filter(Boolean).join(' ') || '';
+    return selectedClient?.name ?? '';
+  };
+
+  const clientName = getOptimisticClientName();
   const locationStr = selectedVenue
     ? [selectedVenue.name, selectedVenue.address].filter(Boolean).join(', ')
     : venueQuery || '';
@@ -275,20 +315,67 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
 
     startTransition(async () => {
       addOptimisticGig({ type: 'add', gig: optimisticGig });
-      const result = await createDeal({
-        proposedDate: eventDate,
-        eventArchetype: (eventArchetype ?? undefined) as CreateDealInput['eventArchetype'],
-        title: title.trim() || undefined,
-        organizationId: selectedClient?.type === 'org' ? selectedClient.id : selectedClient?.organizationId ?? undefined,
-        mainContactId: selectedClient?.type === 'contact' ? selectedClient.id : undefined,
-        status: 'inquiry',
-        budgetEstimated: budgetEstimated ?? undefined,
-        notes: notesTrimmed || undefined,
-        venueId: (selectedVenue?.id && selectedVenue.id.length > 0) ? selectedVenue.id : undefined,
-      });
+
+      let dealInput: CreateDealInput;
+
+      if (clientType === 'individual') {
+        dealInput = {
+          proposedDate: eventDate,
+          eventArchetype: (eventArchetype ?? undefined) as CreateDealInput['eventArchetype'],
+          title: title.trim() || undefined,
+          clientType: 'individual',
+          clientFirstName: individualForm.firstName.trim() || undefined,
+          clientLastName: individualForm.lastName.trim() || undefined,
+          clientEmail: individualForm.email.trim() || undefined,
+          clientPhone: individualForm.phone.trim() || undefined,
+          status: 'inquiry',
+          budgetEstimated: budgetEstimated ?? undefined,
+          notes: notesTrimmed || undefined,
+          venueId: (selectedVenue?.id && selectedVenue.id.length > 0) ? selectedVenue.id : undefined,
+          venueName: (!selectedVenue?.id && selectedVenue?.name) ? selectedVenue.name : undefined,
+        };
+      } else if (clientType === 'couple') {
+        dealInput = {
+          proposedDate: eventDate,
+          eventArchetype: (eventArchetype ?? undefined) as CreateDealInput['eventArchetype'],
+          title: title.trim() || undefined,
+          clientType: 'couple',
+          clientFirstName: coupleForm.partnerAFirst.trim() || undefined,
+          clientLastName: coupleForm.partnerALast.trim() || undefined,
+          clientEmail: coupleForm.partnerAEmail.trim() || undefined,
+          partnerBFirstName: coupleForm.partnerBFirst.trim() || undefined,
+          partnerBLastName: coupleForm.partnerBLast.trim() || undefined,
+          partnerBEmail: coupleForm.partnerBEmail.trim() || undefined,
+          clientName: coupleDisplayName.trim() || undefined,
+          status: 'inquiry',
+          budgetEstimated: budgetEstimated ?? undefined,
+          notes: notesTrimmed || undefined,
+          venueId: (selectedVenue?.id && selectedVenue.id.length > 0) ? selectedVenue.id : undefined,
+          venueName: (!selectedVenue?.id && selectedVenue?.name) ? selectedVenue.name : undefined,
+        };
+      } else {
+        // Company (default)
+        dealInput = {
+          proposedDate: eventDate,
+          eventArchetype: (eventArchetype ?? undefined) as CreateDealInput['eventArchetype'],
+          title: title.trim() || undefined,
+          clientType: 'company',
+          organizationId: selectedClient?.type === 'org' && selectedClient.id ? selectedClient.id : selectedClient?.organizationId ?? undefined,
+          clientName: (!selectedClient?.id && selectedClient?.name) ? selectedClient.name : undefined,
+          mainContactId: selectedClient?.type === 'contact' ? selectedClient.id : undefined,
+          status: 'inquiry',
+          budgetEstimated: budgetEstimated ?? undefined,
+          notes: notesTrimmed || undefined,
+          venueId: (selectedVenue?.id && selectedVenue.id.length > 0) ? selectedVenue.id : undefined,
+          venueName: (!selectedVenue?.id && selectedVenue?.name) ? selectedVenue.name : undefined,
+        };
+      }
+
+      const result = await createDeal(dealInput);
 
       if (result.success) {
         addOptimisticGig({ type: 'replaceId', tempId, realId: result.dealId });
+        await onRefetchList?.();
         router.refresh();
         onClose();
         resetForm();
@@ -317,7 +404,29 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
     setVenueQuery('');
     setNotes('');
     setBudgetEstimated(undefined);
+    setClientType('company');
+    setIndividualForm({ firstName: '', lastName: '', email: '', phone: '' });
+    setCoupleForm({ partnerAFirst: '', partnerALast: '', partnerAEmail: '', partnerBFirst: '', partnerBLast: '', partnerBEmail: '' });
+    setCoupleDisplayName('');
+    setDisplayNameMode('auto');
   }
+
+  const handleClientTypeChange = (type: ClientType) => {
+    setClientType(type);
+    setSelectedClient(null);
+    setClientQuery('');
+    setClientResults([]);
+    if (type !== 'individual') setIndividualForm({ firstName: '', lastName: '', email: '', phone: '' });
+    if (type !== 'couple') {
+      setCoupleForm({ partnerAFirst: '', partnerALast: '', partnerAEmail: '', partnerBFirst: '', partnerBLast: '', partnerBEmail: '' });
+      setCoupleDisplayName('');
+      setDisplayNameMode('auto');
+    }
+  };
+
+  const pillBase = 'flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]';
+  const pillActive = 'bg-[var(--glass-bg-hover)] text-ink border border-[var(--glass-border)]';
+  const pillInactive = 'text-ink-muted hover:text-ink hover:bg-white/5 border border-transparent';
 
   return (
     <AnimatePresence>
@@ -337,7 +446,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
           />
           <motion.div
             ref={modalContentRef}
-            className="relative z-10 my-auto w-full max-w-2xl min-w-0 max-h-[min(90vh,40rem)]"
+            className="relative z-10 my-auto w-full max-w-2xl min-w-0 max-h-[min(90vh,48rem)]"
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
@@ -352,7 +461,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
           </h2>
           <p className="text-sm text-ink-muted break-words">
             {stage === 1
-              ? 'Check availability for your date and event type. We’ll show you demand at a glance.'
+              ? "Check availability for your date and event type. We'll show you demand at a glance."
               : 'Add client and details. This creates a deal in your pipeline (no event yet).'}
           </p>
         </div>
@@ -370,7 +479,6 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
                 transition={SIGNAL_PHYSICS}
                 className="space-y-4 min-w-0"
               >
-                {/* Shared glass field style for date + archetype (design system) */}
                 <div ref={dateBlockRef} className="space-y-4 min-w-0">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -456,7 +564,6 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
                     )}
                   </AnimatePresence>
                 </div>
-                {/* Feasibility badge: appears when date + archetype set */}
                 {eventDate && eventArchetype && (
                   <div className="flex items-center gap-2 min-w-0">
                     {feasibilityLoading ? (
@@ -469,7 +576,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
               </motion.div>
             )}
 
-            {/* Stage 2: Title, Client, Venue, Times, Budget, Notes */}
+            {/* Stage 2: Title, Client, Venue, Budget, Notes */}
             {stage === 2 && (
               <motion.div
                 key="stage2"
@@ -494,69 +601,241 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
                 />
               </div>
 
+              {/* Client section */}
               <div>
                 <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5">
                   Client
                 </label>
-                <Command
-                  className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] overflow-hidden min-w-0"
-                  loop
-                >
-                  <Command.Input
-                    value={selectedClient ? selectedClient.name : clientQuery}
-                    onValueChange={(v) => {
-                      setSelectedClient(null);
-                      setClientQuery(v);
-                    }}
-                    onFocus={() => setClientOpen(true)}
-                    onBlur={() => setTimeout(() => setClientOpen(false), 180)}
-                    placeholder="Search org or contact…"
-                    className="w-full min-w-0 border-0 bg-transparent px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-0 truncate"
-                  />
-                  {(clientOpen && clientResults.length > 0) && (
-                  <Command.List className="h-fit max-h-[200px] overflow-y-auto overflow-x-hidden border-t border-[var(--glass-border)]">
-                    <>
-                        {clientResults.map((r) => (
-                          <Command.Item
-                            key={`${r.type}-${r.id}`}
-                            value={`${r.type}-${r.id}-${r.type === 'org' ? r.name : `${r.first_name} ${r.last_name}`}`}
-                            onSelect={() => {
-                              if (r.type === 'org') {
-                                setSelectedClient({ type: 'org', id: r.id, name: r.name });
-                              } else {
-                                setSelectedClient({
-                                  type: 'contact',
-                                  id: r.id,
-                                  name: `${r.first_name} ${r.last_name}`,
-                                  organizationId: r.organization_id,
-                                });
-                              }
-                              setClientQuery('');
-                              setClientResults([]);
-                            }}
-                            className="flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer hover:bg-[var(--glass-bg-hover)] data-[selected=true]:bg-[var(--glass-bg-hover)] min-w-0"
+
+                {/* Client type toggle — only show when no existing client is selected (company mode) */}
+                {(clientType !== 'company' || !selectedClient) && (
+                  <div className="flex gap-1 p-1 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => handleClientTypeChange('company')}
+                      className={cn(pillBase, clientType === 'company' ? pillActive : pillInactive)}
+                    >
+                      <Building2 className="inline-block size-3 mr-1" />
+                      Company
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleClientTypeChange('individual')}
+                      className={cn(pillBase, clientType === 'individual' ? pillActive : pillInactive)}
+                    >
+                      <User className="inline-block size-3 mr-1" />
+                      Individual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleClientTypeChange('couple')}
+                      className={cn(pillBase, clientType === 'couple' ? pillActive : pillInactive)}
+                    >
+                      <Heart className="inline-block size-3 mr-1" />
+                      Couple
+                    </button>
+                  </div>
+                )}
+
+                {clientType === 'company' && (
+                  <Command
+                    className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] overflow-hidden min-w-0"
+                    loop
+                  >
+                    <Command.Input
+                      value={selectedClient ? selectedClient.name : clientQuery}
+                      onValueChange={(v) => {
+                        setSelectedClient(null);
+                        setClientQuery(v);
+                      }}
+                      onFocus={() => setClientOpen(true)}
+                      onBlur={() => setTimeout(() => setClientOpen(false), 180)}
+                      placeholder="Search org or contact…"
+                      className="w-full min-w-0 border-0 bg-transparent px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-0 truncate"
+                    />
+                    {clientOpen && (clientResults.length > 0 || (clientQuery.length >= 2 && !clientLoading)) && (
+                    <Command.List className="h-fit max-h-[200px] overflow-y-auto overflow-x-hidden border-t border-[var(--glass-border)]">
+                      <>
+                          {clientResults.map((r) => (
+                            <Command.Item
+                              key={`${r.type}-${r.id}`}
+                              value={`${r.type}-${r.id}-${r.type === 'org' ? r.name : `${r.first_name} ${r.last_name}`}`}
+                              onSelect={() => {
+                                if (r.type === 'org') {
+                                  setSelectedClient({ type: 'org', id: r.id, name: r.name });
+                                } else {
+                                  setSelectedClient({
+                                    type: 'contact',
+                                    id: r.id,
+                                    name: `${r.first_name} ${r.last_name}`,
+                                    organizationId: r.organization_id,
+                                  });
+                                }
+                                setClientQuery('');
+                                setClientResults([]);
+                              }}
+                              className="flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer hover:bg-[var(--glass-bg-hover)] data-[selected=true]:bg-[var(--glass-bg-hover)] min-w-0"
+                            >
+                              {r.type === 'org' ? (
+                                <Building2 size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} />
+                              ) : (
+                                <User size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} />
+                              )}
+                              <span className="text-ink truncate min-w-0">
+                                {r.type === 'org' ? r.name : `${r.first_name} ${r.last_name}`}
+                              </span>
+                              {r.type === 'contact' && r.email && (
+                                <span className="text-ink-muted text-xs truncate shrink-0 max-w-[120px]">{r.email}</span>
+                              )}
+                            </Command.Item>
+                          ))}
+                          {clientQuery.length >= 2 && clientResults.length === 0 && !clientLoading && (
+                            <Command.Item
+                              value={`create-${clientQuery}`}
+                              onSelect={() => {
+                                setSelectedClient({ type: 'org', id: '', name: clientQuery.trim() });
+                                setClientQuery('');
+                                setClientResults([]);
+                              }}
+                              className="flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer text-accent-sage hover:bg-[var(--glass-bg-hover)] data-[selected=true]:bg-[var(--glass-bg-hover)] min-w-0"
+                            >
+                              <Plus size={16} className="shrink-0" strokeWidth={1.5} />
+                              <span className="truncate min-w-0">Add &quot;{clientQuery.trim()}&quot; as client</span>
+                            </Command.Item>
+                          )}
+                      </>
+                    </Command.List>
+                    )}
+                  </Command>
+                )}
+
+                {clientType === 'individual' && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <FloatingLabelInput
+                        label="First name"
+                        value={individualForm.firstName}
+                        onChange={(e) => setIndividualForm((p) => ({ ...p, firstName: e.target.value }))}
+                        className="bg-white/5 border-[var(--color-mercury)]"
+                      />
+                      <FloatingLabelInput
+                        label="Last name"
+                        value={individualForm.lastName}
+                        onChange={(e) => setIndividualForm((p) => ({ ...p, lastName: e.target.value }))}
+                        className="bg-white/5 border-[var(--color-mercury)]"
+                      />
+                    </div>
+                    <FloatingLabelInput
+                      label="Email (optional)"
+                      type="email"
+                      value={individualForm.email}
+                      onChange={(e) => setIndividualForm((p) => ({ ...p, email: e.target.value }))}
+                      className="bg-white/5 border-[var(--color-mercury)]"
+                    />
+                    <FloatingLabelInput
+                      label="Phone (optional)"
+                      type="tel"
+                      value={individualForm.phone}
+                      onChange={(e) => setIndividualForm((p) => ({ ...p, phone: e.target.value }))}
+                      className="bg-white/5 border-[var(--color-mercury)]"
+                    />
+                  </div>
+                )}
+
+                {clientType === 'couple' && (
+                  <div className="space-y-4">
+                    {/* Partner A */}
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-2">Partner A</p>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <FloatingLabelInput
+                            label="First name"
+                            value={coupleForm.partnerAFirst}
+                            onChange={(e) => setCoupleForm((p) => ({ ...p, partnerAFirst: e.target.value }))}
+                            className="bg-white/5 border-[var(--color-mercury)]"
+                          />
+                          <FloatingLabelInput
+                            label="Last name"
+                            value={coupleForm.partnerALast}
+                            onChange={(e) => setCoupleForm((p) => ({ ...p, partnerALast: e.target.value }))}
+                            className="bg-white/5 border-[var(--color-mercury)]"
+                          />
+                        </div>
+                        <FloatingLabelInput
+                          label="Email (optional)"
+                          type="email"
+                          value={coupleForm.partnerAEmail}
+                          onChange={(e) => setCoupleForm((p) => ({ ...p, partnerAEmail: e.target.value }))}
+                          className="bg-white/5 border-[var(--color-mercury)]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Partner B */}
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-2">Partner B</p>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <FloatingLabelInput
+                            label="First name"
+                            value={coupleForm.partnerBFirst}
+                            onChange={(e) => setCoupleForm((p) => ({ ...p, partnerBFirst: e.target.value }))}
+                            className="bg-white/5 border-[var(--color-mercury)]"
+                          />
+                          <FloatingLabelInput
+                            label="Last name"
+                            value={coupleForm.partnerBLast}
+                            onChange={(e) => setCoupleForm((p) => ({ ...p, partnerBLast: e.target.value }))}
+                            className="bg-white/5 border-[var(--color-mercury)]"
+                          />
+                        </div>
+                        <FloatingLabelInput
+                          label="Email (optional)"
+                          type="email"
+                          value={coupleForm.partnerBEmail}
+                          onChange={(e) => setCoupleForm((p) => ({ ...p, partnerBEmail: e.target.value }))}
+                          className="bg-white/5 border-[var(--color-mercury)]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Display name (auto/manual) */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted">Display name</p>
+                        {displayNameMode === 'auto' && (
+                          <span className="rounded-full border border-[var(--glass-border)] bg-white/5 px-2 py-0.5 text-[10px] text-ink-muted">
+                            auto
+                          </span>
+                        )}
+                        {displayNameMode === 'manual' && (
+                          <button
+                            type="button"
+                            onClick={() => setDisplayNameMode('auto')}
+                            className="rounded-full border border-[var(--glass-border)] bg-white/5 px-2 py-0.5 text-[10px] text-ink-muted hover:text-ink transition-colors"
                           >
-                            {r.type === 'org' ? (
-                              <Building2 size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} />
-                            ) : (
-                              <User size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} />
-                            )}
-                            <span className="text-ink truncate min-w-0">
-                              {r.type === 'org' ? r.name : `${r.first_name} ${r.last_name}`}
-                            </span>
-                            {r.type === 'contact' && r.email && (
-                              <span className="text-ink-muted text-xs truncate shrink-0 max-w-[120px]">{r.email}</span>
-                            )}
-                          </Command.Item>
-                        ))}
-                    </>
-                  </Command.List>
-                  )}
-                </Command>
+                            reset to auto
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={coupleDisplayName}
+                        onChange={(e) => {
+                          setCoupleDisplayName(e.target.value);
+                          setDisplayNameMode('manual');
+                        }}
+                        placeholder="e.g. Emma & James Johnson"
+                        className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Venue Selector - plain input + dropdown only when results exist */}
+            {/* Venue Selector */}
             <div className="min-w-0 relative">
               <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5">
                 Venue
@@ -573,7 +852,6 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
                 placeholder="Search venue or type to create…"
                 className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] truncate"
               />
-              {/* Only render dropdown when user has typed AND we have results */}
               {venueOpen && venueQuery.length >= 1 && venueResults.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[180px] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] shadow-[var(--glass-shadow)]">
                   {venueResults.map((r, i) =>
@@ -675,15 +953,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
                 >
                   Cancel
                 </button>
-                {feasibility?.status === 'critical' ? (
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl border border-[var(--color-signal-warning)] py-2.5 text-sm font-medium text-[var(--color-signal-warning)] transition-colors hover:bg-[var(--color-surface-warning)]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                  >
-                    Join Waitlist
-                  </button>
-                ) : (
-                  <button
+                <button
                     type="button"
                     disabled={!hasWorkspace || !eventDate || !eventArchetype || feasibilityLoading}
                     onClick={(e) => {
@@ -695,7 +965,6 @@ export function CreateGigModal({ open, onClose, addOptimisticGig }: CreateGigMod
                   >
                     Next <ChevronRight size={16} />
                   </button>
-                )}
               </>
             ) : (
               <>

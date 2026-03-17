@@ -14,6 +14,7 @@ export type CRMQueueItem = {
   location: string | null;
   client_name: string | null;
   source: 'deal' | 'event';
+  lifecycle_status?: string | null;
 };
 
 const STREAM_MODES = ['inquiry', 'active', 'past'] as const;
@@ -48,47 +49,58 @@ export default async function CRMPage({
     workspaceId
       ? supabase
           .from('deals')
-          .select('id, title, status, proposed_date')
+          .select('id, title, status, proposed_date, organization_id, venue_id')
           .eq('workspace_id', workspaceId)
+          .is('archived_at', null)
           .order('proposed_date', { ascending: true })
       : { data: [] as Record<string, unknown>[] },
     workspaceId
-      ? (async () => {
-          const { data: projects } = await supabase
-            .schema('ops')
-            .from('projects')
-            .select('id')
-            .eq('workspace_id', workspaceId);
-          const projectIds = (projects ?? []).map((p: { id: string }) => p.id);
-          if (projectIds.length === 0) return { data: [] as Record<string, unknown>[] };
-          return supabase
-            .schema('ops')
-            .from('events')
-            .select('id, name, start_at')
-            .in('project_id', projectIds)
-            .order('start_at', { ascending: true });
-        })()
+      ? supabase
+          .schema('ops')
+          .from('events')
+          .select('id, title, starts_at, lifecycle_status')
+          .eq('workspace_id', workspaceId)
+          .order('starts_at', { ascending: true })
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     ]);
+
+    // Resolve client + venue display names from directory.entities in one extra query
+    const entityIds = new Set<string>();
+    for (const d of (dealsRes.data ?? [])) {
+      if (d.organization_id) entityIds.add(d.organization_id as string);
+      if (d.venue_id) entityIds.add(d.venue_id as string);
+    }
+    let entityNameMap = new Map<string, string>();
+    if (entityIds.size > 0) {
+      const { data: entities } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('id, display_name')
+        .in('id', [...entityIds]);
+      entityNameMap = new Map(
+        (entities ?? []).map((e) => [e.id as string, (e.display_name as string) ?? ''])
+      );
+    }
 
     const dealGigs: StreamCardItem[] = (dealsRes.data ?? []).map((d: Record<string, unknown>) => ({
     id: d.id as string,
     title: (d.title as string) ?? null,
     status: (d.status as string) ?? null,
     event_date: d.proposed_date ? String(d.proposed_date) : null,
-    location: null,
-    client_name: null,
+    location: d.venue_id ? (entityNameMap.get(d.venue_id as string) ?? null) : null,
+    client_name: d.organization_id ? (entityNameMap.get(d.organization_id as string) ?? null) : null,
     source: 'deal' as const,
   }));
 
     const eventGigs: StreamCardItem[] = (eventsRes.data ?? []).map((e: Record<string, unknown>) => ({
       id: e.id as string,
-      title: (e.name as string) ?? null,
+      title: (e.title as string) ?? null,
       status: null,
-      event_date: e.start_at ? String((e.start_at as string).slice(0, 10)) : null,
+      event_date: e.starts_at ? String((e.starts_at as string).slice(0, 10)) : null,
       location: null,
       client_name: null,
       source: 'event' as const,
+      lifecycle_status: (e.lifecycle_status as string) ?? null,
     }));
 
     gigs = [...dealGigs, ...eventGigs].sort((a, b) => {
@@ -121,6 +133,7 @@ export default async function CRMPage({
           nodeId={nodeId}
           kind={kind}
           sourceOrgId={currentOrgId}
+          returnPath={`/crm${selectedId ? `?selected=${selectedId}&stream=${streamMode}` : ''}`}
         />
       )}
     </>

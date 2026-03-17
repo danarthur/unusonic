@@ -5,6 +5,7 @@ interface NetworkDetailSheetAsyncProps {
   nodeId: string;
   kind: 'internal_employee' | 'external_partner';
   sourceOrgId: string;
+  returnPath?: string;
 }
 
 /** Async server component: fetches details and renders the sheet. Used with Suspense. */
@@ -12,8 +13,9 @@ export async function NetworkDetailSheetAsync({
   nodeId,
   kind,
   sourceOrgId,
+  returnPath,
 }: NetworkDetailSheetAsyncProps) {
   const details = await getNetworkNodeDetails(nodeId, kind, sourceOrgId);
   if (!details) return null;
-  return <NetworkDetailSheet details={details} sourceOrgId={sourceOrgId} />;
+  return <NetworkDetailSheet details={details} sourceOrgId={sourceOrgId} returnPath={returnPath} />;
 }

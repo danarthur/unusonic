@@ -29,6 +29,10 @@ export type DealStakeholderDisplay = {
   logo_url: string | null;
   /** Org address for contracts/invoices. */
   address: { street?: string; city?: string; state?: string; postal_code?: string; country?: string } | null;
+  /** Cortex relationship ID (workspace → org entity). Used to open NetworkDetailSheet inline. */
+  relationship_id: string | null;
+  /** directory.entities.type — 'person', 'company', 'couple', 'venue', etc. */
+  entity_type: string | null;
 };
 
 /** Person at an org (for Point of Contact step). */
@@ -51,7 +55,7 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
   try {
     const supabase = await createClient();
     const { data: rows, error } = await supabase
-      .from('deal_stakeholders')
+      .schema('ops').from('deal_stakeholders')
       .select('id, deal_id, role, is_primary, organization_id, entity_id')
       .eq('deal_id', dealId)
       .order('is_primary', { ascending: false })
@@ -62,20 +66,18 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
     const orgIds = [...new Set((rows as { organization_id?: string | null }[]).map((r) => r.organization_id).filter(Boolean))] as string[];
     const entityIds = [...new Set((rows as { entity_id?: string | null }[]).map((r) => r.entity_id).filter(Boolean))] as string[];
 
-    const dualNodePairs = (rows as { organization_id?: string | null; entity_id?: string | null }[])
-      .filter((r) => r.organization_id && r.entity_id)
-      .map((r) => ({ org_id: r.organization_id!, entity_id: r.entity_id! }));
-
-    // Prefer directory.entities for org lookups
+    // Prefer directory.entities for org lookups — first try legacy_org_id, then direct id
     const { data: dirOrgEntities } = orgIds.length > 0
       ? await supabase.schema('directory').from('entities')
-          .select('id, display_name, avatar_url, attributes, legacy_org_id')
+          .select('id, display_name, avatar_url, attributes, legacy_org_id, type')
           .in('legacy_org_id', orgIds)
       : { data: [] };
 
-    const orgMap = new Map<string, { dirId: string; name: string; logo_url: string | null; email: string | null; address: Record<string, string> | null }>();
+    const orgMap = new Map<string, { dirId: string; name: string; logo_url: string | null; email: string | null; address: Record<string, string> | null; entity_type: string | null }>();
+    const foundByLegacyId = new Set<string>();
     for (const de of dirOrgEntities ?? []) {
       if (!de.legacy_org_id) continue;
+      foundByLegacyId.add(de.legacy_org_id);
       const attrs = (de.attributes as Record<string, unknown>) ?? {};
       orgMap.set(de.legacy_org_id, {
         dirId: de.id,
@@ -83,25 +85,72 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
         logo_url: de.avatar_url ?? (attrs.logo_url as string | null) ?? null,
         email: (attrs.support_email as string | null) ?? null,
         address: (attrs.address as Record<string, string> | null) ?? null,
+        entity_type: (de as { type?: string | null }).type ?? null,
       });
     }
 
-    // Prefer directory.entities for person lookups
+    // Fallback: new directory entities (created by createDeal) have no legacy_org_id —
+    // look them up by their UUID id directly
+    const unfoundOrgIds = orgIds.filter((id) => !foundByLegacyId.has(id));
+    if (unfoundOrgIds.length > 0) {
+      const { data: dirEntitiesDirect } = await supabase.schema('directory').from('entities')
+        .select('id, display_name, avatar_url, attributes, type')
+        .in('id', unfoundOrgIds);
+      for (const de of dirEntitiesDirect ?? []) {
+        const attrs = (de.attributes as Record<string, unknown>) ?? {};
+        orgMap.set(de.id, {
+          dirId: de.id,
+          name: de.display_name ?? '',
+          logo_url: de.avatar_url ?? (attrs.logo_url as string | null) ?? null,
+          email: (attrs.support_email as string | null) ?? null,
+          address: (attrs.address as Record<string, string> | null) ?? null,
+          entity_type: (de as { type?: string | null }).type ?? null,
+        });
+      }
+    }
+
+    // Prefer directory.entities for person lookups — first by legacy_entity_id
     const { data: dirPersonEntities } = entityIds.length > 0
       ? await supabase.schema('directory').from('entities')
-          .select('id, display_name, attributes, legacy_entity_id')
+          .select('id, display_name, attributes, legacy_entity_id, type')
           .in('legacy_entity_id', entityIds)
       : { data: [] };
 
-    const entityMap = new Map<string, { dirId: string; name: string; email: string | null }>();
+    const entityMap = new Map<string, { dirId: string; name: string; email: string | null; entity_type: string | null }>();
+    const foundPersonByLegacyId = new Set<string>();
     for (const de of dirPersonEntities ?? []) {
       if (!de.legacy_entity_id) continue;
+      foundPersonByLegacyId.add(de.legacy_entity_id);
       const attrs = (de.attributes as Record<string, unknown>) ?? {};
       const email = (attrs.email as string | null) ?? null;
-      entityMap.set(de.legacy_entity_id, { dirId: de.id, name: email ?? de.display_name ?? '', email });
+      // Fix: use display_name as primary name, not email
+      entityMap.set(de.legacy_entity_id, {
+        dirId: de.id,
+        name: de.display_name ?? email ?? '',
+        email,
+        entity_type: (de as { type?: string | null }).type ?? null,
+      });
     }
 
-    // Contact names: cortex ROSTER_MEMBER preferred, fallback to org_members
+    // Fallback: new individual client ghost persons have no legacy_entity_id — look up by direct UUID
+    const unfoundEntityIds = entityIds.filter((id) => !foundPersonByLegacyId.has(id));
+    if (unfoundEntityIds.length > 0) {
+      const { data: dirPersonsDirect } = await supabase.schema('directory').from('entities')
+        .select('id, display_name, attributes, type')
+        .in('id', unfoundEntityIds);
+      for (const de of dirPersonsDirect ?? []) {
+        const attrs = (de.attributes as Record<string, unknown>) ?? {};
+        const email = (attrs.email as string | null) ?? null;
+        entityMap.set(de.id, {
+          dirId: de.id,
+          name: de.display_name ?? email ?? '',
+          email,
+          entity_type: (de as { type?: string | null }).type ?? null,
+        });
+      }
+    }
+
+    // Contact names: cortex ROSTER_MEMBER preferred
     const contactDisplayByKey = new Map<string, string>();
     const dirPersonIds = [...new Set([...entityMap.values()].filter((v) => v.dirId).map((v) => v.dirId))];
     const dirOrgIds = [...new Set([...orgMap.values()].filter((v) => v.dirId).map((v) => v.dirId))];
@@ -123,10 +172,35 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
       }
     }
 
+    // Resolve cortex relationship IDs (workspace → stakeholder org) for inline edit buttons
+    const dirIdToRelId = new Map<string, string>();
+    const allDirOrgIds = [...new Set([...orgMap.values()].map((v) => v.dirId))];
+    if (allDirOrgIds.length > 0) {
+      const { data: wsOrg } = await supabase
+        .schema('directory').from('entities')
+        .select('id')
+        .eq('owner_workspace_id', workspaceId)
+        .eq('type', 'company')
+        .neq('attributes->>is_ghost', 'true')
+        .maybeSingle();
+      if (wsOrg?.id) {
+        const { data: cortexRels } = await supabase
+          .schema('cortex').from('relationships')
+          .select('id, target_entity_id')
+          .eq('source_entity_id', wsOrg.id)
+          .in('target_entity_id', allDirOrgIds)
+          .in('relationship_type', ['CLIENT', 'VENDOR', 'VENUE_PARTNER', 'PARTNER']);
+        for (const rel of cortexRels ?? []) {
+          dirIdToRelId.set(rel.target_entity_id, rel.id);
+        }
+      }
+    }
+
     return rows.map((r) => {
       const row = r as { id: string; deal_id: string; role: string; is_primary: boolean; organization_id?: string | null; entity_id?: string | null };
       const org = row.organization_id ? orgMap.get(row.organization_id) : null;
       const ent = row.entity_id ? entityMap.get(row.entity_id) : null;
+      const relId = org?.dirId ? (dirIdToRelId.get(org.dirId) ?? null) : null;
 
       if (row.organization_id && row.entity_id) {
         // Dual-node: org + contact (e.g. Pure Lavish + person from their crew)
@@ -149,6 +223,8 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
           organization_name: orgName,
           logo_url: org?.logo_url ?? null,
           address: org?.address && typeof org.address === 'object' ? org.address : null,
+          relationship_id: relId,
+          entity_type: org?.entity_type ?? null,
         };
       }
       if (row.organization_id) {
@@ -167,9 +243,11 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
           organization_name: org?.name ?? null,
           logo_url: org?.logo_url ?? null,
           address: org?.address && typeof org.address === 'object' ? org.address : null,
+          relationship_id: relId,
+          entity_type: org?.entity_type ?? null,
         };
       }
-      const entOnly = entityMap.get(row.entity_id!);
+      const entOnly = row.entity_id ? entityMap.get(row.entity_id) : null;
       return {
         id: row.id,
         deal_id: row.deal_id,
@@ -185,6 +263,8 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
         organization_name: null,
         logo_url: null,
         address: null,
+        relationship_id: null,
+        entity_type: entOnly?.entity_type ?? null,
       };
     });
   } catch {
@@ -214,12 +294,6 @@ export async function addDealStakeholder(
   if (!hasOrg && !hasEntity) {
     return { success: false, error: 'Provide organizationId or entityId (or both for dual-node).' };
   }
-  if (hasEntity && !hasOrg) {
-    // Person-only (e.g. Bride): entity_id set, organization_id null
-  }
-  if (hasOrg && hasEntity) {
-    // Dual-node: org + contact
-  }
 
   const supabase = await createClient();
   const { data: deal } = await supabase
@@ -231,7 +305,7 @@ export async function addDealStakeholder(
   if (!deal) return { success: false, error: 'Deal not found.' };
 
   const { data: inserted, error } = await supabase
-    .from('deal_stakeholders')
+    .schema('ops').from('deal_stakeholders')
     .insert({
       deal_id: dealId,
       organization_id: organizationId ?? null,
@@ -256,8 +330,18 @@ export async function removeDealStakeholder(dealId: string, stakeholderId: strin
   if (!workspaceId) return { success: false, error: 'No workspace.' };
 
   const supabase = await createClient();
+
+  // Verify deal belongs to the caller's workspace before deleting any stakeholder row
+  const { data: deal } = await supabase
+    .from('deals')
+    .select('id')
+    .eq('id', dealId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (!deal) return { success: false, error: 'Deal not found.' };
+
   const { error } = await supabase
-    .from('deal_stakeholders')
+    .schema('ops').from('deal_stakeholders')
     .delete()
     .eq('id', stakeholderId)
     .eq('deal_id', dealId);
@@ -268,9 +352,6 @@ export async function removeDealStakeholder(dealId: string, stakeholderId: strin
 
 /**
  * List people connected to an organization (for Point of Contact step).
- * Uses the same source as the Network page: affiliations (organization_id + entity_id).
- * Also includes org_members for this org so we show everyone—both people stored via
- * the Networking page (affiliations) and people added via "Add New Contact" (org_members).
  */
 export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRosterContact[]> {
   const workspaceId = await getActiveWorkspaceId();
@@ -279,12 +360,11 @@ export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRost
   try {
     const supabase = await createClient();
 
-    // Prefer cortex.relationships for affiliates + roster; fallback to affiliations + org_members
     const { data: orgDirEnt } = await supabase
-      .schema('directory').from('entities').select('id').eq('legacy_org_id', orgId).maybeSingle();
+      .schema('directory').from('entities').select('id')
+      .eq('legacy_org_id', orgId).eq('owner_workspace_id', workspaceId).maybeSingle();
 
     if (orgDirEnt?.id) {
-      // Cortex path: MEMBER and ROSTER_MEMBER edges point to this org
       const { data: cortexEdges } = await supabase.schema('cortex').from('relationships')
         .select('source_entity_id, relationship_type, context_data')
         .eq('target_entity_id', orgDirEnt.id)
@@ -298,21 +378,12 @@ export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRost
         .select('id, display_name, attributes, legacy_entity_id')
         .in('id', dirEntityIds);
 
-      // Build roster context (first_name/last_name) from ROSTER_MEMBER edges
       const rosterCtxByDirId = new Map<string, Record<string, unknown>>();
       for (const edge of cortexEdges ?? []) {
         if (edge.relationship_type === 'ROSTER_MEMBER') {
           rosterCtxByDirId.set(edge.source_entity_id, (edge.context_data as Record<string, unknown>) ?? {});
         }
       }
-
-      // Collect legacy entity IDs for email fallback lookup
-      const legacyIdsNeedingEmail = (dirPeople ?? [])
-        .filter((de) => {
-          const attrs = (de.attributes as Record<string, unknown>) ?? {};
-          return !(attrs.email as string | null) && de.legacy_entity_id;
-        })
-        .map((de) => de.legacy_entity_id!);
 
       const emailByLegacyId = new Map<string, string | null>();
 
@@ -340,7 +411,6 @@ export type CreateContactForOrgResult =
 
 /**
  * Add a new person to an organization (Point of Contact flow).
- * Creates entity + org_member via add_ghost_member RPC so they appear in roster.
  */
 export async function createContactForOrg(
   orgId: string,
@@ -379,13 +449,11 @@ export async function createContactForOrg(
     return { success: false, error: msg };
   }
 
-  // Migrated RPC returns { ok, id (cortex rel id), entity_id (directory entity id), ... }
   const result = rpcResult as { ok?: boolean; id?: string; entity_id?: string; error?: string } | null;
   if (!result?.ok) {
     return { success: false, error: result?.error ?? 'Failed to add contact.' };
   }
 
-  // entity_id from RPC is the directory.entities.id (deal_stakeholders.entity_id FK dropped — soft ref)
   const entityId = result.entity_id ?? null;
   if (!entityId) return { success: false, error: 'Contact was created but could not be linked.' };
 

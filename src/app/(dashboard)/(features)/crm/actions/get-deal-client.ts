@@ -55,7 +55,7 @@ export async function getDealClientContext(
   let entityIdFromStakeholder: string | null = null;
   try {
     const { data: billToRow } = await supabase
-      .from('deal_stakeholders')
+      .schema('ops').from('deal_stakeholders')
       .select('organization_id, entity_id')
       .eq('deal_id', dealId)
       .eq('role', 'bill_to')
@@ -143,10 +143,8 @@ export async function getDealClientContext(
     }
   }
 
-  // If bill_to is an entity only (person, e.g. Bride), build minimal context from entity
+  // If bill_to is an entity only (person, e.g. Bride or individual client), build minimal context from entity
   if (entityIdFromStakeholder && !orgId) {
-    // Prefer directory.entities; fallback to public.entities
-    let personOnlyEmail: string | null = null;
     const { data: personOnlyDir } = await supabase
       .schema('directory').from('entities')
       .select('display_name, attributes')
@@ -154,13 +152,13 @@ export async function getDealClientContext(
       .maybeSingle();
     if (personOnlyDir) {
       const attrs = (personOnlyDir.attributes as Record<string, unknown>) ?? {};
-      personOnlyEmail = (attrs.email as string | null) ?? personOnlyDir.display_name ?? null;
-    }
-    if (personOnlyEmail !== null || personOnlyDir) {
+      const personOnlyEmail = (attrs.email as string | null) ?? null;
+      // Use display_name as primary name — never use email as the name
+      const personName = personOnlyDir.display_name ?? personOnlyEmail ?? 'Unknown';
       return {
         organization: {
           id: entityIdFromStakeholder,
-          name: personOnlyEmail ?? 'Unknown',
+          name: personName,
           category: null,
           support_email: personOnlyEmail ?? null,
           website: null,
@@ -177,15 +175,24 @@ export async function getDealClientContext(
   if (!orgId) return null;
 
   // Prefer directory.entities for org; parallel with count + notes
-  const [orgDirMainRes, countRes, notesRes] = await Promise.all([
+  const [orgDirMainRes, countRes] = await Promise.all([
     supabase.schema('directory').from('entities')
       .select('id, display_name, attributes')
       .eq('legacy_org_id', orgId)
       .maybeSingle(),
     supabase.from('deals').select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId).eq('workspace_id', workspaceId),
-    supabase.from('org_private_data').select('private_notes').eq('subject_org_id', orgId).maybeSingle(),
   ]);
+
+  // Resolve org entity — first by legacy_org_id, then by direct UUID (new ghost entities have no legacy_org_id)
+  let resolvedOrgDirData: { id: string; display_name: string | null; attributes: unknown } | null = orgDirMainRes.data ?? null;
+  if (!resolvedOrgDirData) {
+    const { data: directEnt } = await supabase.schema('directory').from('entities')
+      .select('id, display_name, attributes')
+      .eq('id', orgId)
+      .maybeSingle();
+    resolvedOrgDirData = directEnt ?? null;
+  }
 
   let mainOrgName = '';
   let mainOrgCategory: string | null = null;
@@ -194,9 +201,9 @@ export async function getDealClientContext(
   let mainOrgAddress: DealClientContext['organization']['address'] = null;
   let foundOrg = false;
 
-  if (orgDirMainRes.data) {
-    const attrs = (orgDirMainRes.data.attributes as Record<string, unknown>) ?? {};
-    mainOrgName = orgDirMainRes.data.display_name ?? '';
+  if (resolvedOrgDirData) {
+    const attrs = (resolvedOrgDirData.attributes as Record<string, unknown>) ?? {};
+    mainOrgName = resolvedOrgDirData.display_name ?? '';
     mainOrgCategory = (attrs.category as string | null) ?? null;
     mainOrgSupportEmail = (attrs.support_email as string | null) ?? null;
     mainOrgWebsite = (attrs.website as string | null) ?? null;
@@ -231,11 +238,11 @@ export async function getDealClientContext(
   if (sourceOrgId) {
     const { data: srcDirEnt } = await supabase
       .schema('directory').from('entities').select('id').eq('legacy_org_id', sourceOrgId).maybeSingle();
-    if (srcDirEnt?.id && orgDirMainRes.data?.id) {
+    if (srcDirEnt?.id && resolvedOrgDirData?.id) {
       const { data: cortexRel } = await supabase.schema('cortex').from('relationships')
         .select('id')
         .eq('source_entity_id', srcDirEnt.id)
-        .eq('target_entity_id', orgDirMainRes.data.id)
+        .eq('target_entity_id', resolvedOrgDirData.id)
         .in('relationship_type', ['VENDOR', 'PARTNER', 'CLIENT', 'VENUE_PARTNER'])
         .maybeSingle();
       relId = (cortexRel as { id?: string } | null)?.id ?? null;
