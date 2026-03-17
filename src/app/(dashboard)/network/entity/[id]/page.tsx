@@ -9,6 +9,7 @@ import { ArrowLeft } from 'lucide-react';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { getNetworkNodeDetails } from '@/features/network-data';
 import { createClient } from '@/shared/api/supabase/server';
+import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { EntityStudioClient } from './EntityStudioClient';
 
 type PageProps = {
@@ -24,12 +25,15 @@ export default async function EntityStudioPage({ params, searchParams }: PagePro
   if (!sourceOrgId) redirect('/network');
 
   // Guard: couple entities are edited via the deal Stakeholders panel, not here.
+  // Workspace-scoped to prevent cross-workspace type disclosure.
   const supabase = await createClient();
+  const workspaceId = await getActiveWorkspaceId();
   const { data: entityRow } = await supabase
     .schema('directory')
     .from('entities')
     .select('type')
     .eq('id', id)
+    .eq('owner_workspace_id', workspaceId ?? '')
     .maybeSingle();
 
   if (entityRow?.type === 'couple') {

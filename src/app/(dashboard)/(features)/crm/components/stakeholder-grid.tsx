@@ -8,7 +8,7 @@ import { Plus, Building2, ChevronRight, X, User, Pencil, Loader2 } from 'lucide-
 import { OmniSearch } from '@/widgets/network-stream';
 import { NetworkDetailSheet } from '@/widgets/network-detail';
 import type { NetworkSearchOrg, NodeDetail } from '@/features/network-data';
-import { getNodeForSheet, getCoupleEntityForEdit, type CoupleEntityForEdit } from '../actions/get-node-for-sheet';
+import { getNodeForSheet, getCoupleEntityForEdit, getIndividualEntityForEdit, type CoupleEntityForEdit, type IndividualEntityForEdit } from '../actions/get-node-for-sheet';
 import {
   addDealStakeholder,
   removeDealStakeholder,
@@ -24,6 +24,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } f
 import { Button } from '@/shared/ui/button';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { CoupleEditSheet } from './couple-edit-sheet';
+import { IndividualEditSheet } from './individual-edit-sheet';
 import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
@@ -105,6 +106,25 @@ export function StakeholderGrid({
       setCoupleEdit({ open: true, entityId, initialValues: coupleData });
     } else {
       toast.error('Could not load couple details.');
+    }
+  };
+
+  // IndividualEditSheet state
+  const [individualEdit, setIndividualEdit] = useState<{
+    open: boolean;
+    entityId: string;
+    initialValues: IndividualEntityForEdit;
+  } | null>(null);
+  const [loadingIndividualId, setLoadingIndividualId] = useState<string | null>(null);
+
+  const handleIndividualEditClick = async (entityId: string) => {
+    setLoadingIndividualId(entityId);
+    const data = await getIndividualEntityForEdit(entityId);
+    setLoadingIndividualId(null);
+    if (data) {
+      setIndividualEdit({ open: true, entityId, initialValues: data });
+    } else {
+      toast.error('Could not load client details.');
     }
   };
 
@@ -215,11 +235,16 @@ export function StakeholderGrid({
     compact ? 'liquid-card p-3' : 'liquid-card p-4'
   );
 
-  /** Render edit button for a stakeholder — handles cortex-linked orgs and couple entities */
+  /** Render edit button for a stakeholder — handles cortex-linked orgs, individual, and couple entities */
   const renderEditButton = (s: DealStakeholderDisplay) => {
+    // organization_id holds the entity UUID for individual/couple ghost entities too
     const entityId = s.organization_id;
     const isCouple = s.entity_type === 'couple';
-    const isLoadingThis = loadingRelId === s.relationship_id || loadingCoupleId === entityId;
+    const isIndividual = s.entity_type === 'person';
+    const isLoadingThis =
+      loadingRelId === s.relationship_id ||
+      loadingCoupleId === entityId ||
+      loadingIndividualId === entityId;
 
     if (isCouple && entityId) {
       return (
@@ -229,6 +254,22 @@ export function StakeholderGrid({
           onClick={() => handleCoupleEditClick(entityId)}
           className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors disabled:opacity-50"
           aria-label={`Edit ${s.contact_name ?? s.name}`}
+        >
+          {isLoadingThis
+            ? <Loader2 className="size-4 animate-spin" />
+            : <Pencil className="size-4" />}
+        </button>
+      );
+    }
+
+    if (isIndividual && entityId) {
+      return (
+        <button
+          type="button"
+          disabled={isLoadingThis}
+          onClick={() => handleIndividualEditClick(entityId)}
+          className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors disabled:opacity-50"
+          aria-label={`Edit ${s.name}`}
         >
           {isLoadingThis
             ? <Loader2 className="size-4 animate-spin" />
@@ -580,6 +621,23 @@ export function StakeholderGrid({
           }}
           entityId={coupleEdit.entityId}
           initialValues={coupleEdit.initialValues}
+          onSaved={() => {
+            onStakeholdersChange();
+            router.refresh();
+          }}
+        />
+      )}
+
+      {/* IndividualEditSheet */}
+      {individualEdit && (
+        <IndividualEditSheet
+          open={individualEdit.open}
+          onOpenChange={(open) => {
+            if (!open) setIndividualEdit(null);
+            else setIndividualEdit((prev) => prev ? { ...prev, open: true } : null);
+          }}
+          entityId={individualEdit.entityId}
+          initialValues={individualEdit.initialValues}
           onSaved={() => {
             onStakeholdersChange();
             router.refresh();

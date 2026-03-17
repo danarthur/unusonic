@@ -128,10 +128,15 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
     packageImageUrl: item.package_id ? packageImages[item.package_id] ?? null : null,
   }));
 
-  const total = itemsWithImages.reduce(
-    (sum, row) => sum + (row.quantity ?? 1) * parseFloat(String(row.unit_price ?? 0)),
-    0
-  );
+  const total = itemsWithImages.reduce((sum, row) => {
+    // Exclude internal-only rows (cost breakdowns, margin items not intended for client view)
+    if ((row as { is_client_visible?: boolean | null }).is_client_visible === false) return sum;
+    // Use override_price when set (proposal-level price lock), else unit_price from catalog
+    const price = parseFloat(String((row as { override_price?: number | null }).override_price ?? row.unit_price ?? 0));
+    // unit_multiplier handles per-day / per-head rate multipliers
+    const multiplier = Number((row as { unit_multiplier?: number | null }).unit_multiplier ?? 1) || 1;
+    return sum + (row.quantity ?? 1) * multiplier * price;
+  }, 0);
 
   return {
     proposal,

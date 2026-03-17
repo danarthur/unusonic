@@ -129,7 +129,7 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
             p_context_data: { tier: 'preferred', deleted_at: null, lifecycle_status: 'active' },
           });
         }
-      } else if (clientType === 'couple' && (clientFirstName?.trim() || clientName?.trim())) {
+      } else if (clientType === 'couple') {
         // Auto-generate display name from partners
         const partnerAFirst = clientFirstName?.trim() ?? '';
         const partnerALast = clientLastName?.trim() ?? '';
