@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Plus, Building2, ChevronRight, X, User, Pencil, Loader2 } from 'lucide-react';
+import { Plus, Building2, ChevronRight, X, User, Pencil, Loader2, RefreshCw } from 'lucide-react';
 import { OmniSearch } from '@/widgets/network-stream';
 import { NetworkDetailSheet } from '@/widgets/network-detail';
 import type { NetworkSearchOrg, NodeDetail } from '@/features/network-data';
@@ -25,6 +25,7 @@ import { Button } from '@/shared/ui/button';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { CoupleEditSheet } from './couple-edit-sheet';
 import { IndividualEditSheet } from './individual-edit-sheet';
+import { reclassifyClientEntity, type ClientEntityType } from '../actions/reclassify-client-entity';
 import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
@@ -125,6 +126,24 @@ export function StakeholderGrid({
       setIndividualEdit({ open: true, entityId, initialValues: data });
     } else {
       toast.error('Could not load client details.');
+    }
+  };
+
+  // Reclassify client type
+  const [reclassifyingId, setReclassifyingId] = useState<string | null>(null);
+  const [reclassifySheet, setReclassifySheet] = useState<{ entityId: string; currentType: string } | null>(null);
+
+  const handleReclassify = async (entityId: string, newType: ClientEntityType) => {
+    setReclassifyingId(entityId);
+    const result = await reclassifyClientEntity(entityId, newType);
+    setReclassifyingId(null);
+    if (result.success) {
+      setReclassifySheet(null);
+      toast.success(`Client type changed to ${newType}.`);
+      onStakeholdersChange();
+      router.refresh();
+    } else {
+      toast.error(result.error);
     }
   };
 
@@ -332,6 +351,18 @@ export function StakeholderGrid({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {renderEditButton(billTo)}
+                {/* Reclassify — only shown on ghost client entities */}
+                {billTo.organization_id && (
+                  <button
+                    type="button"
+                    title="Change client type"
+                    onClick={() => setReclassifySheet({ entityId: billTo.organization_id!, currentType: billTo.entity_type ?? 'company' })}
+                    className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors"
+                    aria-label="Change client type"
+                  >
+                    <RefreshCw className="size-4" />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleRemove(billTo.id)}
@@ -644,6 +675,48 @@ export function StakeholderGrid({
           }}
         />
       )}
+
+      {/* Reclassify client type sheet */}
+      <Sheet open={!!reclassifySheet} onOpenChange={(open) => { if (!open) setReclassifySheet(null); }}>
+        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
+          <SheetHeader className="border-b border-white/10 px-6 py-5">
+            <SheetTitle className="text-ceramic font-medium tracking-tight">Change client type</SheetTitle>
+            <SheetClose />
+          </SheetHeader>
+          <SheetBody className="flex flex-col gap-3 px-6 py-5">
+            <p className="text-sm text-ink-muted mb-2">
+              Choose the type that best describes this client. Their name, deals, and proposals are unchanged.
+            </p>
+            {(['company', 'person', 'couple'] as ClientEntityType[]).map((t) => {
+              const isCurrent = reclassifySheet?.currentType === t;
+              const isLoading = reclassifyingId === reclassifySheet?.entityId;
+              const labels: Record<ClientEntityType, string> = {
+                company: 'Company / Organisation',
+                person: 'Individual',
+                couple: 'Couple / Duo',
+              };
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  disabled={isCurrent || isLoading}
+                  onClick={() => reclassifySheet && handleReclassify(reclassifySheet.entityId, t)}
+                  className={cn(
+                    'w-full rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors',
+                    isCurrent
+                      ? 'border-[var(--color-ceramic)] bg-white/10 text-ceramic cursor-default'
+                      : 'border-white/10 bg-white/5 text-ink-muted hover:bg-white/10 hover:text-ceramic'
+                  )}
+                >
+                  {isLoading && !isCurrent ? <Loader2 className="size-4 animate-spin inline mr-2" /> : null}
+                  {labels[t]}
+                  {isCurrent && <span className="ml-2 text-xs text-ink-muted">(current)</span>}
+                </button>
+              );
+            })}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={roleSheetOpen} onOpenChange={setRoleSheetOpen}>
         <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
