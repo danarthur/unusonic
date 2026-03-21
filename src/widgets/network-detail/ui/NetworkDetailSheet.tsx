@@ -143,7 +143,7 @@ function InlineEditField({
             if (e.key === 'Escape') { cancellingRef.current = true; setSaveError(null); setEditing(false); setTimeout(() => { cancellingRef.current = false; }, 0); }
           }}
           disabled={saving}
-          className="w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-2 py-1 text-sm text-[var(--color-ink)] outline-none focus:border-[var(--color-silk)]/50 disabled:opacity-50"
+          className="w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-2 py-1 text-sm text-[var(--color-ink)] outline-none focus:border-[var(--color-silk)]/50 disabled:opacity-50"
         />
         {saveError && (
           <p className="mt-1 text-xs text-[var(--color-signal-error)]">{saveError}</p>
@@ -305,7 +305,7 @@ function RosterStatusCard({
                 type="button"
                 onClick={handleDnrToggle}
                 disabled={dnrSaving}
-                className="rounded-lg px-2.5 py-1 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors disabled:opacity-50"
+                className="rounded-lg px-2.5 py-1 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
               >
                 Clear
               </button>
@@ -348,7 +348,7 @@ function RosterStatusCard({
               type="button"
               onClick={() => handleArchive()}
               disabled={archiving}
-              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors disabled:opacity-50"
+              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
             >
               {archiving ? 'Restoring…' : 'Unarchive'}
             </button>
@@ -365,7 +365,7 @@ function RosterStatusCard({
               <button
                 type="button"
                 onClick={() => setArchiveConfirm(false)}
-                className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors"
+                className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors"
               >
                 Cancel
               </button>
@@ -408,7 +408,7 @@ function RosterStatusCard({
             <button
               type="button"
               onClick={() => { setRemoveConfirm(false); setForceCount(null); }}
-              className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-white/5 transition-colors"
+              className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors"
             >
               Cancel
             </button>
@@ -432,11 +432,12 @@ function RosterStatusCard({
   );
 }
 
-/** Crew tab only for organizations (vendor, venue, client). Hide for individuals (coordinator or uncategorized, e.g. groom). */
+/** Crew tab only for org/venue entities (not person/couple). */
 function getTabsForDetail(details: NodeDetail): { id: TabId; label: string }[] {
   const isPartner = details.kind === 'external_partner';
-  const category = (details as { orgCategory?: string | null }).orgCategory;
-  const showCrew = isPartner && (category === 'vendor' || category === 'venue' || category === 'client');
+  const showCrew = isPartner
+    && details.entityDirectoryType !== 'person'
+    && details.entityDirectoryType !== 'couple';
   return showCrew ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'crew');
 }
 
@@ -470,7 +471,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
     const tabList = getTabsForDetail(details);
     const ids = tabList.map((t) => t.id);
     if (!ids.includes(activeTab)) setActiveTab(ids[0] ?? 'transmission');
-  }, [details.id, details.kind, (details as { orgCategory?: string | null }).orgCategory, activeTab]);
+  }, [details.id, details.kind, details.entityDirectoryType, activeTab]);
 
   const handleRefresh = React.useCallback(() => {
     router.refresh();
@@ -514,7 +515,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
       >
         <motion.div
           role="presentation"
-          className="absolute inset-0 bg-[var(--color-obsidian)]/50 backdrop-blur-sm"
+          className="absolute inset-0 bg-[oklch(0.12_0_0/0.5)] backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -574,25 +575,29 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
             {/* Tab strip with sliding indicator */}
             <div className="shrink-0 border-b border-[var(--color-mercury)] px-4 md:px-5">
               <div className="relative flex h-12" role="tablist">
-                {getTabsForDetail(details).map(({ id, label }) => (
-                  <div key={id} className="relative flex flex-1 items-center justify-center">
+                {getTabsForDetail(details).map((tab) => {
+                  const displayLabel = tab.id === 'crew' && details.entityDirectoryType === 'venue'
+                    ? 'House contacts'
+                    : tab.label;
+                  return (
+                  <div key={tab.id} className="relative flex flex-1 items-center justify-center">
                     <button
                       type="button"
                       role="tab"
-                      aria-selected={activeTab === id}
-                      aria-controls={`panel-${id}`}
-                      id={`tab-${id}`}
-                      onClick={() => setActiveTab(id)}
+                      aria-selected={activeTab === tab.id}
+                      aria-controls={`panel-${tab.id}`}
+                      id={`tab-${tab.id}`}
+                      onClick={() => setActiveTab(tab.id)}
                       className={`
                         text-xs font-medium uppercase tracking-widest
                         transition-colors text-[var(--color-ink-muted)]
                         hover:text-[var(--color-ink)]
-                        ${activeTab === id ? 'text-[var(--color-ink)]' : ''}
+                        ${activeTab === tab.id ? 'text-[var(--color-ink)]' : ''}
                       `}
                     >
-                      {label}
+                      {displayLabel}
                     </button>
-                    {activeTab === id && (
+                    {activeTab === tab.id && (
                       <motion.div
                         layoutId="network-detail-tab-indicator"
                         className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-silk)]"
@@ -601,7 +606,8 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       />
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -656,8 +662,45 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       onSaved={handleRefresh}
                     />
                   )}
-                  {/* Website — col-span-2 when partner */}
-                  {isPartner && details.orgWebsite && (
+                  {/* Contact info — person/couple entities */}
+                  {isPartner && (details.entityDirectoryType === 'person' || details.entityDirectoryType === 'couple') && (details.personEmail || details.personPhone || details.couplePartnerBEmail) && (
+                    <div className="liquid-card rounded-2xl p-4 md:col-span-2">
+                      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)] mb-3">
+                        Contact
+                      </h3>
+                      {details.entityDirectoryType === 'couple' ? (
+                        <div className="space-y-2">
+                          {details.personEmail && (
+                            <div>
+                              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] mb-0.5">{details.couplePartnerAName ?? 'Partner A'}</p>
+                              <p className="text-sm text-[var(--color-ink)]">{details.personEmail}</p>
+                            </div>
+                          )}
+                          {details.couplePartnerBEmail && (
+                            <div>
+                              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] mb-0.5">{details.couplePartnerBName ?? 'Partner B'}</p>
+                              <p className="text-sm text-[var(--color-ink)]">{details.couplePartnerBEmail}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {details.personEmail && (
+                            <p className="text-sm text-[var(--color-ink)]">{details.personEmail}</p>
+                          )}
+                          {details.personPhone && (
+                            <a href={`tel:${details.personPhone}`}
+                              className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
+                              onClick={(e) => e.stopPropagation()}>
+                              {details.personPhone}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Website — org/venue entities only (not person/couple) */}
+                  {isPartner && details.orgWebsite && details.entityDirectoryType !== 'person' && details.entityDirectoryType !== 'couple' && (
                     <div className="liquid-card rounded-2xl p-4 md:col-span-2">
                       <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)] mb-2">
                         Website
@@ -672,6 +715,71 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       </a>
                     </div>
                   )}
+                  {/* Venue specs — venue entities only */}
+                  {isPartner && details.entityDirectoryType === 'venue' && details.orgVenueSpecs && (() => {
+                    const specs = details.orgVenueSpecs!;
+                    const hasAny = specs.capacity || specs.load_in_notes || specs.power_notes || specs.stage_notes;
+                    if (!hasAny) return null;
+                    return (
+                      <div className="liquid-card rounded-2xl p-4 space-y-3 md:col-span-2">
+                        <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Venue specs</h3>
+                        <dl className="space-y-2">
+                          {specs.capacity && (
+                            <div className="flex items-center justify-between text-sm">
+                              <dt className="text-[var(--color-ink-muted)]">Capacity</dt>
+                              <dd className="font-mono text-[var(--color-ink)]">{specs.capacity.toLocaleString()}</dd>
+                            </div>
+                          )}
+                          {specs.load_in_notes && (
+                            <div className="space-y-0.5">
+                              <dt className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Load-in</dt>
+                              <dd className="text-sm text-[var(--color-ink)]">{specs.load_in_notes}</dd>
+                            </div>
+                          )}
+                          {specs.power_notes && (
+                            <div className="space-y-0.5">
+                              <dt className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Power</dt>
+                              <dd className="text-sm text-[var(--color-ink)]">{specs.power_notes}</dd>
+                            </div>
+                          )}
+                          {specs.stage_notes && (
+                            <div className="space-y-0.5">
+                              <dt className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Stage</dt>
+                              <dd className="text-sm text-[var(--color-ink)]">{specs.stage_notes}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </div>
+                    );
+                  })()}
+                  {/* Address/contact — company/venue entities only */}
+                  {isPartner
+                    && details.entityDirectoryType !== 'person'
+                    && details.entityDirectoryType !== 'couple'
+                    && (details.orgAddress || details.orgSupportEmail)
+                    && (() => {
+                      const addr = details.orgAddress as { street?: string; city?: string; state?: string; postal_code?: string } | null;
+                      return (
+                        <div className="liquid-card rounded-2xl p-4 space-y-3 md:col-span-2">
+                          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Contact</h3>
+                          {details.orgSupportEmail && (
+                            <a href={`mailto:${details.orgSupportEmail}`}
+                              className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
+                              onClick={(e) => e.stopPropagation()}>
+                              {details.orgSupportEmail}
+                            </a>
+                          )}
+                          {addr && (addr.street || addr.city) && (
+                            <address className="not-italic space-y-0.5 text-sm text-[var(--color-ink-muted)]">
+                              {addr.street && <p>{addr.street}</p>}
+                              {(addr.city || addr.state) && <p>{[addr.city, addr.state].filter(Boolean).join(', ')}</p>}
+                              {addr.postal_code && <p>{addr.postal_code}</p>}
+                            </address>
+                          )}
+                        </div>
+                      );
+                    })()
+                  }
                   {/* Events — col-span-1 */}
                   {details.active_events.length > 0 && (
                     <div className="liquid-card rounded-2xl p-4 md:col-span-1">
@@ -679,8 +787,8 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                         Events
                       </h3>
                       <ul className="space-y-1 text-sm text-[var(--color-ink)]">
-                        {details.active_events.map((name) => (
-                          <li key={name}>{name}</li>
+                        {details.active_events.map((name, i) => (
+                          <li key={`${name}-${i}`}>{name}</li>
                         ))}
                       </ul>
                     </div>

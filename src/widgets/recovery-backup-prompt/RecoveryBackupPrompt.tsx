@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Shield, X } from 'lucide-react';
 import { getRecoveryStatus } from '@/features/sovereign-recovery/api/get-recovery-status';
 
-const DISMISS_KEY = 'signal_recovery_prompt_dismissed_until';
+const DISMISS_KEY = 'unusonic_recovery_prompt_dismissed_until';
 const DISMISS_DAYS = 7;
 const MIN_ACCOUNT_AGE_DAYS = 7;
 

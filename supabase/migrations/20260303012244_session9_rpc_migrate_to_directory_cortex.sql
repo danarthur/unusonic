@@ -1,0 +1,10 @@
+-- =============================================================================
+-- Session 9: Migrate RPCs to directory + cortex primary paths
+--
+-- APPLIED: 2026-03-03 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Updated all database RPCs (create_draft_invoice_from_proposal, deal-related
+-- functions, search RPCs) to query directory.entities and cortex.relationships
+-- as the primary source, removing all fallback branches that queried
+-- public.organizations, public.entities, public.affiliations, public.org_members.
+-- =============================================================================

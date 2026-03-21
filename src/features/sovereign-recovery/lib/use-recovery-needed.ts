@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getRecoveryStatus } from '../api/get-recovery-status';
 
-export const RECOVERY_DISMISS_KEY = 'signal_recovery_prompt_dismissed_until';
+export const RECOVERY_DISMISS_KEY = 'unusonic_recovery_prompt_dismissed_until';
 export const RECOVERY_DISMISS_DAYS = 7;
 export const RECOVERY_MIN_ACCOUNT_AGE_DAYS = 7;
 

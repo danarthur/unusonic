@@ -1,0 +1,37 @@
+-- =============================================================================
+-- Session 10: Drop all legacy public schema tables that have been fully
+-- migrated to directory + cortex schemas.
+--
+-- APPLIED: 2026-03-04 via Supabase MCP (not supabase db push).
+-- This file is documentation — do NOT run again.
+--
+-- Tables dropped (in FK-safe order):
+--   1. public.affiliations       → migrated to cortex.relationships (MEMBER edges)
+--   2. public.org_members        → migrated to cortex.relationships (ROSTER_MEMBER edges)
+--   3. public.org_relationships  → migrated to cortex.relationships (VENDOR/CLIENT/PARTNER/VENUE_PARTNER edges)
+--   4. public.entities           → migrated to directory.entities (people, ghost profiles)
+--   5. public.organizations      → migrated to directory.entities (companies, venues)
+--
+-- What is NOT dropped (still active):
+--   - public.deal_stakeholders   → restored without legacy FKs (see session10_restore_deal_stakeholders)
+--   - All other public tables: deals, proposals, packages, workspace_members, workspaces, profiles, etc.
+--
+-- After this migration the codebase is directory + cortex only.
+-- DO NOT create new queries against the dropped tables.
+-- DO NOT create migrations that reference public.organizations, public.org_members,
+-- public.affiliations, public.org_relationships, or public.entities.
+-- =============================================================================
+
+-- Dropped in session 10 (applied directly):
+-- DROP TABLE public.affiliations;
+-- DROP TABLE public.org_members;
+-- DROP TABLE public.org_relationships;
+-- DROP TABLE public.entities;
+-- DROP TABLE public.organizations;
+
+-- Enums that were dropped along with their tables:
+-- DROP TYPE public.affiliation_access_level;
+-- DROP TYPE public.employment_status;
+-- DROP TYPE public.org_member_role;
+-- DROP TYPE public.relationship_type;
+-- DROP TYPE public.org_relationship_tier;

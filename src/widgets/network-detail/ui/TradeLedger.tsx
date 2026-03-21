@@ -18,7 +18,7 @@ export function TradeLedger({ details }: TradeLedgerProps) {
       <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)]">
         Ledger
       </h3>
-      <div className="rounded-xl border border-[var(--color-mercury)] bg-white/5 p-4">
+      <div className="liquid-card rounded-2xl p-4">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-[var(--color-signal-success)]">In</span>
           <span className="font-mono text-[var(--color-ink)]">
@@ -31,7 +31,7 @@ export function TradeLedger({ details }: TradeLedgerProps) {
             ${outbound.toLocaleString()}
           </span>
         </div>
-        <div className="h-2 flex rounded-full overflow-hidden bg-ink/10">
+        <div className="h-2 flex rounded-full overflow-hidden bg-[var(--color-ink)]/10">
           <div
             className="bg-[var(--color-signal-success)]/70 transition-all duration-300"
             style={{ width: `${inboundPct}%` }}

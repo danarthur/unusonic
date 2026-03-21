@@ -2,11 +2,15 @@
 
 import { motion } from 'framer-motion';
 
+interface MembraneProps {
+  label?: string;
+}
+
 /**
- * Visual divider between Zone A (Core) and Zone B (Inner Circle).
+ * Visual divider between network zones.
  * Glowing gradient line with centered pill label.
  */
-export function TheMembrane() {
+export function TheMembrane({ label = 'Network' }: MembraneProps) {
   return (
     <motion.div
       className="flex flex-col items-center gap-3 py-2"
@@ -25,8 +29,8 @@ export function TheMembrane() {
           boxShadow: '0 0 12px oklch(0.70 0.15 250 / 0.3)',
         }}
       />
-      <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-[var(--color-ink-muted)] backdrop-blur-sm">
-        Extended Team & Talent
+      <span className="rounded-full border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] px-4 py-1.5 text-xs font-medium tracking-wide text-[var(--color-ink-muted)] backdrop-blur-sm">
+        {label}
       </span>
     </motion.div>
   );

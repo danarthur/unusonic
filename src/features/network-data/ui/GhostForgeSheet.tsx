@@ -3,8 +3,8 @@
 import * as React from 'react';
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { Building2, User, Globe, Mail } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Building2, User, Globe, Mail, Phone, MapPin } from 'lucide-react';
 
 const formStagger = { type: 'spring' as const, stiffness: 300, damping: 30 };
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
@@ -26,9 +26,32 @@ export interface GhostForgeSheetProps {
   onOpenChange: (open: boolean) => void;
   initialName: string;
   sourceOrgId: string;
-  /** ION scout input (injected from widget layer to respect FSD). Required when using scout mode. */
+  /** Aion scout input (injected from widget layer to respect FSD). Required when using scout mode. */
   ScoutInputComponent: React.ComponentType<ScoutInputProps>;
 }
+
+type RelType = 'vendor' | 'client' | 'venue' | 'partner';
+
+const REL_TYPE_OPTIONS: { value: RelType; label: string }[] = [
+  { value: 'vendor', label: 'Vendor' },
+  { value: 'client', label: 'Client' },
+  { value: 'venue', label: 'Venue' },
+  { value: 'partner', label: 'Partner' },
+];
+
+const PAYMENT_TERMS_OPTIONS = [
+  { value: '', label: '—' },
+  { value: 'Net 15', label: 'Net 15' },
+  { value: 'Net 30', label: 'Net 30' },
+  { value: '50% deposit', label: '50% deposit' },
+  { value: 'Immediate', label: 'Immediate' },
+];
+
+const inputCls =
+  'h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-silk)]/50';
+const labelCls = 'text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]';
+const selectCls =
+  'h-11 w-full rounded-xl border border-[var(--color-mercury)] bg-white/5 px-3 text-sm text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-silk)]/50 appearance-none';
 
 /**
  * Ghost Forge – slide-over to capture new connection: org or person + primary contact.
@@ -44,9 +67,28 @@ export function GhostForgeSheet({
   const router = useRouter();
   const [type, setType] = React.useState<'organization' | 'person'>('organization');
   const [name, setName] = React.useState(initialName);
-  const [contactName, setContactName] = React.useState('');
+
+  // Shared
   const [email, setEmail] = React.useState('');
+
+  // Organization fields
   const [website, setWebsite] = React.useState('');
+  const [contactName, setContactName] = React.useState('');
+  const [relType, setRelType] = React.useState<RelType>('vendor');
+  const [w9Status, setW9Status] = React.useState(false);
+  const [coiExpiry, setCoiExpiry] = React.useState('');
+  const [paymentTerms, setPaymentTerms] = React.useState('');
+
+  // Venue-specific (subset of organization)
+  const [dockAddress, setDockAddress] = React.useState('');
+  const [venuePmName, setVenuePmName] = React.useState('');
+  const [venuePmPhone, setVenuePmPhone] = React.useState('');
+
+  // Person fields
+  const [phone, setPhone] = React.useState('');
+  const [market, setMarket] = React.useState('');
+  const [unionStatus, setUnionStatus] = React.useState('');
+
   const [scoutUrl, setScoutUrl] = React.useState('');
   const [mode, setMode] = React.useState<'scout' | 'manual'>('scout');
   const [isPending, startTransition] = useTransition();
@@ -55,9 +97,19 @@ export function GhostForgeSheet({
   React.useEffect(() => {
     if (isOpen) {
       setName(initialName);
-      setContactName('');
       setEmail('');
       setWebsite('');
+      setContactName('');
+      setRelType('vendor');
+      setW9Status(false);
+      setCoiExpiry('');
+      setPaymentTerms('');
+      setDockAddress('');
+      setVenuePmName('');
+      setVenuePmPhone('');
+      setPhone('');
+      setMarket('');
+      setUnionStatus('');
       setScoutUrl('');
     }
   }, [isOpen, initialName]);
@@ -79,14 +131,37 @@ export function GhostForgeSheet({
     [sourceOrgId, onOpenChange, router]
   );
 
+  const isSubmitDisabled =
+    isPending ||
+    (type === 'person'
+      ? !name.trim() && !phone.trim()
+      : !name.trim());
+
   const handleSubmit = () => {
     startTransition(async () => {
       const result = await createGhostWithContact(sourceOrgId, {
         type,
         name,
+        // Person fields
+        phone: type === 'person' ? phone.trim() || undefined : undefined,
+        market: type === 'person' ? market.trim() || undefined : undefined,
+        unionStatus: type === 'person' ? unionStatus.trim() || undefined : undefined,
+        // Organization fields
         contactName: type === 'organization' ? contactName : undefined,
+        website: type === 'organization' ? website.trim() || undefined : undefined,
+        relationshipType: type === 'organization' ? relType : undefined,
+        w9Status: type === 'organization' ? w9Status : undefined,
+        coiExpiry: type === 'organization' ? coiExpiry.trim() || undefined : undefined,
+        paymentTerms: type === 'organization' ? paymentTerms || undefined : undefined,
+        // Venue-specific
+        dockAddress:
+          type === 'organization' && relType === 'venue' ? dockAddress.trim() || undefined : undefined,
+        venuePmName:
+          type === 'organization' && relType === 'venue' ? venuePmName.trim() || undefined : undefined,
+        venuePmPhone:
+          type === 'organization' && relType === 'venue' ? venuePmPhone.trim() || undefined : undefined,
+        // Shared
         email: email.trim() || undefined,
-        website: website.trim() || undefined,
       });
 
       if (!result.success) {
@@ -107,13 +182,11 @@ export function GhostForgeSheet({
       >
         <SheetHeader className="flex-col items-stretch gap-2 border-b border-[var(--color-mercury)] px-6 py-6">
           <div className="flex items-center justify-between gap-4">
-            <SheetTitle className="text-xl font-light tracking-tight text-[var(--color-ink)]">
-              Add connection
-            </SheetTitle>
+            <SheetTitle>Add connection</SheetTitle>
             <SheetClose />
           </div>
           <p className="text-sm text-[var(--color-ink-muted)]">
-            Ask ION to scout a website for details, or add them manually.
+            Ask Aion to scout a website for details, or add them manually.
           </p>
 
           <div className="mt-4 flex gap-1 rounded-lg border border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 p-1">
@@ -127,7 +200,7 @@ export function GhostForgeSheet({
                   : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
               )}
             >
-              ION
+              Aion
             </button>
             <button
               type="button"
@@ -154,10 +227,10 @@ export function GhostForgeSheet({
             >
               <div>
                 <h3 className="text-sm font-medium text-[var(--color-ink)] tracking-tight">
-                  Ask ION to scout
+                  Ask Aion to scout
                 </h3>
                 <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
-                  Paste a company website — ION will pull the name, logo, and team so you don&apos;t have to type it.
+                  Paste a company website — Aion will pull the name, logo, and team so you don&apos;t have to type it.
                 </p>
               </div>
               <ScoutInputComponent
@@ -175,6 +248,7 @@ export function GhostForgeSheet({
 
           {mode === 'manual' && (
             <>
+              {/* Type toggle */}
               <div className="flex gap-1 rounded-lg border border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 p-1">
                 <button
                   type="button"
@@ -204,71 +278,289 @@ export function GhostForgeSheet({
                 </button>
               </div>
 
-          <motion.div
-            className="space-y-2"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...formStagger, delay: 0.05 }}
-          >
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
-              {type === 'organization' ? 'Name' : 'Name'}
-            </label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={type === 'organization' ? 'Acme Corp' : 'Jane Doe'}
-              className="h-12 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-silk)]/50"
-            />
-          </motion.div>
+              {/* ── PERSON FORM ─────────────────────────────────────── */}
+              {type === 'person' && (
+                <>
+                  {/* Name */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.05 }}
+                  >
+                    <label className={labelCls}>Name</label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Jane Doe"
+                      className={cn('h-12 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-silk)]/50')}
+                    />
+                  </motion.div>
 
-          <motion.div
-            className="space-y-2"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...formStagger, delay: 0.08 }}
-          >
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
-              Website
-            </label>
-              <div className="relative">
-                <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
-                <Input
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="example.com"
-                  className="h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 pl-10 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
-                />
-              </div>
-          </motion.div>
+                  {/* Phone — most time-critical field for crew */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.08 }}
+                  >
+                    <label className={labelCls}>Phone</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+1 (555) 000-0000"
+                        className={cn(inputCls, 'pl-10')}
+                      />
+                    </div>
+                  </motion.div>
 
-          <motion.div
-            className="space-y-3 border-t border-[var(--color-mercury)] pt-4"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...formStagger, delay: 0.1 }}
-          >
-            <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] block mb-2">
-              {type === 'organization' ? 'Primary contact' : 'Email'}
-            </span>
-            {type === 'organization' && (
-              <Input
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-                placeholder="Contact name"
-                className="h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
-              />
-            )}
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@example.com"
-                className="h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 pl-10 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
-              />
-            </div>
-          </motion.div>
+                  {/* Email */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.1 }}
+                  >
+                    <label className={labelCls}>Email <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        className={cn(inputCls, 'pl-10')}
+                      />
+                    </div>
+                  </motion.div>
+
+                  {/* Market */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.12 }}
+                  >
+                    <label className={labelCls}>Market <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Input
+                        value={market}
+                        onChange={(e) => setMarket(e.target.value)}
+                        placeholder="Home market"
+                        className={cn(inputCls, 'pl-10')}
+                      />
+                    </div>
+                  </motion.div>
+
+                  {/* Union status */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.14 }}
+                  >
+                    <label className={labelCls}>Union status <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <Input
+                      value={unionStatus}
+                      onChange={(e) => setUnionStatus(e.target.value)}
+                      placeholder="e.g. IATSE Local 33 or Non-union"
+                      className={inputCls}
+                    />
+                  </motion.div>
+                </>
+              )}
+
+              {/* ── ORGANIZATION FORM ────────────────────────────────── */}
+              {type === 'organization' && (
+                <>
+                  {/* Name */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.05 }}
+                  >
+                    <label className={labelCls}>Name</label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Acme Corp"
+                      className="h-12 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-silk)]/50"
+                    />
+                  </motion.div>
+
+                  {/* Relationship type — required */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.08 }}
+                  >
+                    <label className={labelCls}>Relationship type</label>
+                    <select
+                      value={relType}
+                      onChange={(e) => setRelType(e.target.value as RelType)}
+                      className={selectCls}
+                    >
+                      {REL_TYPE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </motion.div>
+
+                  {/* Website */}
+                  <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.1 }}
+                  >
+                    <label className={labelCls}>Website <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Input
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
+                        placeholder="example.com"
+                        className={cn(inputCls, 'pl-10')}
+                      />
+                    </div>
+                  </motion.div>
+
+                  {/* Primary contact */}
+                  <motion.div
+                    className="space-y-3 border-t border-[var(--color-mercury)] pt-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.12 }}
+                  >
+                    <span className={cn(labelCls, 'block mb-2')}>Primary contact <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></span>
+                    <Input
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      placeholder="Contact name"
+                      className={inputCls}
+                    />
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        className={cn(inputCls, 'pl-10')}
+                      />
+                    </div>
+                  </motion.div>
+
+                  {/* Compliance fields */}
+                  <motion.div
+                    className="space-y-3 border-t border-[var(--color-mercury)] pt-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...formStagger, delay: 0.14 }}
+                  >
+                    <span className={cn(labelCls, 'block mb-2')}>Compliance</span>
+
+                    {/* W-9 checkbox */}
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={w9Status}
+                        onChange={(e) => setW9Status(e.target.checked)}
+                        className="h-4 w-4 rounded border-[var(--color-mercury)] bg-white/5 accent-[var(--color-silk)]"
+                      />
+                      <span className="text-sm text-[var(--color-ink-muted)]">W-9 on file</span>
+                    </label>
+
+                    {/* COI expiry */}
+                    <div className="space-y-1.5">
+                      <label className={labelCls}>COI expires <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                      <input
+                        type="date"
+                        value={coiExpiry}
+                        onChange={(e) => setCoiExpiry(e.target.value)}
+                        className={cn(selectCls, 'text-sm')}
+                      />
+                    </div>
+
+                    {/* Payment terms */}
+                    <div className="space-y-1.5">
+                      <label className={labelCls}>Payment terms <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                      <select
+                        value={paymentTerms}
+                        onChange={(e) => setPaymentTerms(e.target.value)}
+                        className={selectCls}
+                      >
+                        {PAYMENT_TERMS_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </motion.div>
+
+                  {/* Venue-specific fields — shown only when relType === 'venue' */}
+                  <AnimatePresence>
+                    {relType === 'venue' && (
+                      <motion.div
+                        key="venue-fields"
+                        className="space-y-3 border-t border-[var(--color-mercury)] pt-4"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={formStagger}
+                      >
+                        <span className={cn(labelCls, 'block mb-2')}>Venue ops</span>
+
+                        {/* Dock address */}
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>Dock address <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                          <Input
+                            value={dockAddress}
+                            onChange={(e) => setDockAddress(e.target.value)}
+                            placeholder="Truck entrance / loading dock address"
+                            className={inputCls}
+                          />
+                        </div>
+
+                        {/* House PM name */}
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>House PM name <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                          <Input
+                            value={venuePmName}
+                            onChange={(e) => setVenuePmName(e.target.value)}
+                            placeholder="House production manager"
+                            className={inputCls}
+                          />
+                        </div>
+
+                        {/* House PM phone */}
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>House PM phone <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                            <Input
+                              type="tel"
+                              value={venuePmPhone}
+                              onChange={(e) => setVenuePmPhone(e.target.value)}
+                              placeholder="Direct cell"
+                              className={cn(inputCls, 'pl-10')}
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
             </>
           )}
         </SheetBody>
@@ -278,7 +570,7 @@ export function GhostForgeSheet({
             <Button
               className="h-12 w-full rounded-xl bg-[var(--color-silk)]/20 text-[var(--color-silk)] hover:bg-[var(--color-silk)]/30"
               onClick={handleSubmit}
-              disabled={!name.trim() || isPending}
+              disabled={isSubmitDisabled}
             >
               {isPending ? 'Adding…' : 'Add & open'}
             </Button>

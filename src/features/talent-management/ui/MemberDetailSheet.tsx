@@ -200,7 +200,7 @@ export function MemberDetailSheet({
                   <User className="size-5 text-[var(--color-ink-muted)]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <SheetTitle className="truncate text-[var(--color-ink)] tracking-tight">
+                  <SheetTitle className="truncate">
                     {displayName(member)}
                   </SheetTitle>
                   <Badge

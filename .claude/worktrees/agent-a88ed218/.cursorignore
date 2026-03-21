@@ -1,0 +1,10 @@
+# .cursorignore
+# Ignore build outputs and dependencies so AI focuses on SOURCE code.
+.next/
+node_modules/
+dist/
+build/
+.git/
+package-lock.json
+yarn.lock
+supa_audit/

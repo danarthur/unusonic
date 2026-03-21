@@ -5,7 +5,7 @@ import { Sparkles } from 'lucide-react';
 import { useSession } from '@/shared/ui/providers/SessionContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
-import { IonInput } from '@/app/(dashboard)/(features)/brain/components/IonInput';
+import { AionInput } from '@/app/(dashboard)/(features)/brain/components/AionInput';
 
 interface ChatInterfaceProps {
   viewState?: 'overview' | 'chat';
@@ -34,7 +34,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState }) => {
               className="flex flex-col items-center justify-center h-full opacity-30 select-none"
             >
               <Sparkles size={28} className="mb-4 text-ink" />
-              <p className="font-serif text-2xl text-ink">ION is listening.</p>
+              <p className="font-serif text-2xl text-ink">Aion is listening.</p>
             </motion.div>
           )}
 
@@ -83,7 +83,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState }) => {
       {viewState !== 'overview' && (
         <div className="absolute bottom-0 left-0 right-0 pb-6 z-40">
           <div className="max-w-2xl mx-auto">
-            <IonInput
+            <AionInput
               input={input}
               setInput={setInput}
               handleInputChange={handleInputChange}

@@ -1,0 +1,1 @@
+export { GET } from '@/app/(dashboard)/(features)/finance/api/route';

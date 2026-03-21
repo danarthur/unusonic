@@ -44,6 +44,10 @@ export const PERSON_ATTR = {
 } as const;
 
 // ─── Company (ghost org) entity keys ──────────────────────────────────────
+// NOTE — Scout-written fields that are NOT in entity attributes:
+//   logoUrl   → written to directory.entities.avatar_url column directly (not attributes)
+//   entityType → stored as operational_settings.entity_type (sub-key of COMPANY_ATTR.operational_settings)
+// These do not need separate top-level keys here.
 export const COMPANY_ATTR = {
   /** Ghost org flag — true until claimed */
   is_ghost: 'is_ghost',
@@ -95,6 +99,30 @@ export const VENUE_ATTR = {
    */
   venue_ops: 'venue_ops',
 
+  // ── Address fields (top-level) ──────────────────────────────────────────
+  // These are read by crm/actions/lookup.ts and crm/actions/update-event-venue.ts.
+  // Stored at top-level (not inside venue_ops) so patch_entity_attributes can merge
+  // them without clobbering the venue_ops sub-object.
+
+  /**
+   * Full address object — { street, city, state, postal_code, country }.
+   * Prefer this over individual fields when writing a complete address in one patch.
+   */
+  address: 'address',
+  /**
+   * Pre-formatted single-line address string (e.g. "123 Main St, Nashville, TN 37201").
+   * Written by Google Places autocomplete and update-event-venue.ts.
+   */
+  formatted_address: 'formatted_address',
+  /** Street address line */
+  street: 'street',
+  /** City */
+  city: 'city',
+  /** State / province abbreviation (e.g. "TN", "CA") */
+  state: 'state',
+  /** Postal / ZIP code */
+  postal_code: 'postal_code',
+
   // ── Free-text note fields (top-level) — written by Entity Studio VenueTechSpecsCard ──
   // Distinct from the structured VENUE_OPS fields (time windows, numeric dimensions).
   // Top-level storage is intentional: patch_entity_attributes uses shallow || merge,
@@ -109,6 +137,8 @@ export const VENUE_ATTR = {
    * Distinct from the structured VENUE_OPS.stage_width / stage_depth / trim_height fields.
    */
   stage_notes: 'stage_notes',
+  /** Public website URL for the venue. */
+  website: 'website',
 } as const;
 
 // ─── Venue ops sub-object keys (attributes.venue_ops.*) ───────────────────
@@ -196,6 +226,11 @@ export const INDIVIDUAL_ATTR = {
  * and PARTNER cortex edges. For now, all data lives in this JSONB.
  */
 export const COUPLE_ATTR = {
+  /**
+   * TypeScript alias → JSONB key: `partner_a_first` → `'partner_a_first_name'`.
+   * The TS property is a shorthand for readability; the actual JSONB key is the full name.
+   * Always use `COUPLE_ATTR.partner_a_first` in code — never the string `'partner_a_first'`.
+   */
   partner_a_first: 'partner_a_first_name',
   partner_a_last: 'partner_a_last_name',
   partner_a_email: 'partner_a_email',

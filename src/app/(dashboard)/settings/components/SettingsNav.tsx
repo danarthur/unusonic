@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Settings, Users, Shield, User, Lock } from 'lucide-react';
+import { Settings, Users, Shield, User, Lock, Mail } from 'lucide-react';
 
 const ITEMS: { href: string; label: string; icon: typeof Settings }[] = [
   { href: '/settings', label: 'Overview', icon: Settings },
@@ -10,6 +10,7 @@ const ITEMS: { href: string; label: string; icon: typeof Settings }[] = [
   { href: '/settings/roles', label: 'Roles', icon: Shield },
   { href: '/settings/security', label: 'Security', icon: Lock },
   { href: '/settings/identity', label: 'Identity', icon: User },
+  { href: '/settings/email', label: 'Email', icon: Mail },
 ];
 
 export function SettingsNav() {

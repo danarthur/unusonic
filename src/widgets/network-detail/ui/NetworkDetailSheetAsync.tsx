@@ -3,7 +3,7 @@ import { NetworkDetailSheet } from './NetworkDetailSheet';
 
 interface NetworkDetailSheetAsyncProps {
   nodeId: string;
-  kind: 'internal_employee' | 'external_partner';
+  kind: 'internal_employee' | 'extended_team' | 'external_partner';
   sourceOrgId: string;
   returnPath?: string;
 }

@@ -9,7 +9,9 @@ import { RunOfShow } from '@/widgets/run-of-show';
 import { CueInspector } from '@/app/(dashboard)/(features)/crm/components/CueInspector';
 import type { Cue } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
 import { deleteCue, duplicateCue, updateCue, createCue, fetchCues } from '@/app/(dashboard)/(features)/crm/actions/ros';
+import { getEventCrew } from '@/app/(dashboard)/(features)/crm/actions/get-event-crew';
 import type { EventSummary } from '@/entities/event';
+import type { AssignedCrewEntry } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
 import { format as formatDate } from 'date-fns';
 
 type RunOfShowClientProps = {
@@ -20,6 +22,7 @@ type RunOfShowClientProps = {
 export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps) {
   const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
   const [cues, setCues] = useState<Cue[]>([]);
+  const [eventCrew, setEventCrew] = useState<AssignedCrewEntry[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -28,6 +31,17 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
     mq.addEventListener('change', fn);
     return () => mq.removeEventListener('change', fn);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    getEventCrew(eventId).then((crew) => {
+      if (!active) return;
+      setEventCrew(crew);
+    });
+    return () => {
+      active = false;
+    };
+  }, [eventId]);
 
   const displayDate = initialEvent.starts_at
     ? formatDate(new Date(initialEvent.starts_at), 'MMM d, yyyy')
@@ -246,6 +260,7 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
             onSave={handleSave}
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
+            eventCrew={eventCrew}
           />
         </aside>
 
@@ -268,6 +283,7 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
                 onSave={handleSave}
                 onDelete={handleDelete}
                 onDuplicate={handleDuplicate}
+                eventCrew={eventCrew}
               />
             </SheetBody>
           </SheetContent>

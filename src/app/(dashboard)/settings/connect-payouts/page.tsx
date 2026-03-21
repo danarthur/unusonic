@@ -11,7 +11,7 @@ import { Zap, ArrowLeft } from 'lucide-react';
 import { TRANSACTION_FEE_BASIS } from '@/entities/billing/utils/calc';
 
 export const metadata = {
-  title: 'Connect Payouts | Signal',
+  title: 'Connect Payouts | Unusonic',
   description: 'Enable SignalPay to unlock Autonomous AI Agents',
 };
 

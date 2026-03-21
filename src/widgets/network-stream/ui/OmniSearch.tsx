@@ -382,7 +382,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                 </span>
               </div>
               <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]/80">
-                Signal
+                Unusonic
               </span>
             </div>
               </Command>

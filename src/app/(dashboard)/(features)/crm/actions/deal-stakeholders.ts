@@ -1,4 +1,5 @@
 'use server';
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
@@ -83,7 +84,7 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
         dirId: de.id,
         name: de.display_name ?? '',
         logo_url: de.avatar_url ?? (attrs.logo_url as string | null) ?? null,
-        email: (attrs.support_email as string | null) ?? null,
+        email: (attrs.support_email as string | null) ?? (attrs.email as string | null) ?? (attrs.partner_a_email as string | null) ?? null,
         address: (attrs.address as Record<string, string> | null) ?? null,
         entity_type: (de as { type?: string | null }).type ?? null,
       });
@@ -102,7 +103,7 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
           dirId: de.id,
           name: de.display_name ?? '',
           logo_url: de.avatar_url ?? (attrs.logo_url as string | null) ?? null,
-          email: (attrs.support_email as string | null) ?? null,
+          email: (attrs.support_email as string | null) ?? (attrs.email as string | null) ?? (attrs.partner_a_email as string | null) ?? null,
           address: (attrs.address as Record<string, string> | null) ?? null,
           entity_type: (de as { type?: string | null }).type ?? null,
         });

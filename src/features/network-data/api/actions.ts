@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 /**
  * Network Orbit – Server Actions: getNetworkStream, pinToInnerCircle, summonPartner.
  * @module features/network-data/api/actions
@@ -12,6 +13,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import type { NetworkNode } from '@/entities/network';
 import { createGhostOrg } from '@/entities/organization';
+import { PERSON_ATTR, COMPANY_ATTR, VENUE_ATTR, VENUE_OPS, COUPLE_ATTR, INDIVIDUAL_ATTR } from '../model/attribute-keys';
 
 const ROLE_ORDER: Record<string, number> = { owner: 0, admin: 1, member: 2, restricted: 3 };
 
@@ -101,11 +103,11 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   // Fetch all ROSTER_MEMBER edges (team) and preferred partner edges (inner circle) in parallel
   const [rosterRes, partnerRes] = await Promise.all([
     supabase.schema('cortex').from('relationships')
-      .select('id, source_entity_id, context_data')
+      .select('id, source_entity_id, context_data, created_at')
       .eq('target_entity_id', orgDirEnt.id)
       .eq('relationship_type', 'ROSTER_MEMBER'),
     supabase.schema('cortex').from('relationships')
-      .select('id, target_entity_id, relationship_type, context_data')
+      .select('id, target_entity_id, relationship_type, context_data, created_at')
       .eq('source_entity_id', orgDirEnt.id)
       .in('relationship_type', ['PARTNER', 'VENDOR', 'CLIENT', 'VENUE_PARTNER']),
   ]);
@@ -116,52 +118,95 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const ctx = (r.context_data as Record<string, unknown>) ?? {};
     return ctx.tier === 'preferred' && !ctx.deleted_at;
   });
+  const outerOrbitEdges = allPartnerEdges.filter((r) => {
+    const ctx = (r.context_data as Record<string, unknown>) ?? {};
+    return ctx.tier !== 'preferred' && !ctx.deleted_at;
+  });
 
-  // Fetch person entities and partner org entities
+  // Fetch person entities and partner org entities (inner circle + outer orbit combined)
   const personEntityIds = [...new Set(rosterEdges.map((e) => e.source_entity_id))];
-  const partnerEntityIds = [...new Set(innerCircleEdges.map((e) => e.target_entity_id))];
+  const innerCircleEntityIds = [...new Set(innerCircleEdges.map((e) => e.target_entity_id))];
+  const outerOrbitEntityIds = [...new Set(outerOrbitEdges.map((e) => e.target_entity_id))];
+  const allPartnerEntityIds = [...new Set([...innerCircleEntityIds, ...outerOrbitEntityIds])];
 
-  const [personEntRes, partnerEntRes] = await Promise.all([
+  const [personEntRes, partnerEntRes, invoicesRes] = await Promise.all([
     personEntityIds.length > 0
       ? supabase.schema('directory').from('entities')
-          .select('id, display_name, avatar_url, attributes')
+          .select('id, display_name, avatar_url, type, attributes')
           .in('id', personEntityIds)
-      : { data: [] as { id: string; display_name: string; avatar_url: string | null; attributes: unknown }[] },
-    partnerEntityIds.length > 0
+      : { data: [] as { id: string; display_name: string; avatar_url: string | null; type: string | null; attributes: unknown }[] },
+    allPartnerEntityIds.length > 0
       ? supabase.schema('directory').from('entities')
-          .select('id, display_name, avatar_url, legacy_org_id')
-          .in('id', partnerEntityIds)
-      : { data: [] as { id: string; display_name: string; avatar_url: string | null; legacy_org_id: string | null }[] },
+          .select('id, display_name, avatar_url, legacy_org_id, type, attributes')
+          .in('id', allPartnerEntityIds)
+      : { data: [] as { id: string; display_name: string; avatar_url: string | null; legacy_org_id: string | null; type: string | null; attributes: unknown }[] },
+    // Batch outstanding balance — single query for all partners (inner + outer)
+    allPartnerEntityIds.length > 0
+      ? supabase.schema('finance').from('invoices')
+          .select('bill_to_entity_id, total_amount')
+          .in('bill_to_entity_id', allPartnerEntityIds)
+          .not('status', 'in', '(paid,void)')
+      : { data: [] as { bill_to_entity_id: string; total_amount: number }[] },
   ]);
 
-  const personMap = new Map((personEntRes.data ?? []).map((p) => [p.id, p]));
-  const partnerMap = new Map((partnerEntRes.data ?? []).map((p) => [p.id, p]));
+  // Aggregate outstanding balance per entity in JS
+  const balanceMap = new Map<string, number>();
+  for (const inv of (invoicesRes.data ?? [])) {
+    balanceMap.set(inv.bill_to_entity_id, (balanceMap.get(inv.bill_to_entity_id) ?? 0) + (inv.total_amount ?? 0));
+  }
 
-  const coreNodes: NetworkNode[] = rosterEdges.map((edge): NetworkNode => {
+  const personMap = new Map((personEntRes.data ?? []).map((p) => [p.id, p]));
+  const partnerEntMap = new Map((partnerEntRes.data ?? []).map((p) => [p.id, p]));
+  /** @deprecated use partnerEntMap — kept for backward compat within this function */
+  const partnerMap = partnerEntMap;
+
+  function buildRosterNode(edge: (typeof rosterEdges)[number], isExternal: boolean): NetworkNode {
     const ctx = (edge.context_data as Record<string, unknown>) ?? {};
     const person = personMap.get(edge.source_entity_id);
     const attrs = (person?.attributes as Record<string, unknown>) ?? {};
-    const email = (attrs.email as string | null) ?? null;
+    const email = (attrs[PERSON_ATTR.email] as string | null) ?? null;
     const name =
       [(ctx.first_name as string) ?? '', (ctx.last_name as string) ?? ''].filter(Boolean).join(' ') ||
       person?.display_name || email || 'Unknown';
     const avatarUrl = person?.avatar_url ?? null;
     const role = (ctx.role as string) ?? 'member';
     const jobTitle = (ctx.job_title as string | null) ?? null;
+    const entityType = (person?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     return {
       id: edge.id,
       entityId: edge.source_entity_id,
-      kind: 'internal_employee',
+      kind: isExternal ? 'extended_team' : 'internal_employee',
       gravity: 'core',
-      identity: { name, avatarUrl, label: jobTitle || role || 'Member' },
-      meta: { email: email ?? undefined, tags: [] },
+      identity: { name, avatarUrl, label: jobTitle || role || 'Member', entityType },
+      meta: {
+        email: email ?? undefined,
+        tags: [],
+        connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
+        doNotRebook: (ctx.do_not_rebook as boolean) ?? false,
+        archived: (ctx.archived as boolean) ?? false,
+      },
     };
-  }).sort((a, b) => {
-    const orderA = ROLE_ORDER[a.identity.label] ?? 99;
-    const orderB = ROLE_ORDER[b.identity.label] ?? 99;
-    if (orderA !== orderB) return orderA - orderB;
-    return a.identity.name.localeCompare(b.identity.name);
-  });
+  }
+
+  const sortRosterNodes = (nodes: NetworkNode[]) =>
+    [...nodes].sort((a, b) => {
+      const orderA = ROLE_ORDER[a.identity.label] ?? 99;
+      const orderB = ROLE_ORDER[b.identity.label] ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.identity.name.localeCompare(b.identity.name);
+    });
+
+  const coreNodes: NetworkNode[] = sortRosterNodes(
+    rosterEdges
+      .filter((e) => (e.context_data as Record<string, unknown>)?.employment_status !== 'external_contractor')
+      .map((e) => buildRosterNode(e, false))
+  );
+
+  const extendedTeamNodes: NetworkNode[] = sortRosterNodes(
+    rosterEdges
+      .filter((e) => (e.context_data as Record<string, unknown>)?.employment_status === 'external_contractor')
+      .map((e) => buildRosterNode(e, true))
+  );
 
   function cortexTypeToLabel(type: string): string {
     switch (type) {
@@ -175,22 +220,77 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const innerCircleNodes: NetworkNode[] = innerCircleEdges.map((edge): NetworkNode => {
     const partner = partnerMap.get(edge.target_entity_id);
     const ctx = (edge.context_data as Record<string, unknown>) ?? {};
-    const legacyOrgId = (partner?.legacy_org_id as string | null) ?? edge.target_entity_id;
+    const balance = balanceMap.get(edge.target_entity_id) ?? 0;
+    const entityType = (partner?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
+    const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
+    // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
+    // preserved email key from a prior person → couple reclassification.
+    const email =
+      entityType === 'couple'
+        ? ((attrs[COUPLE_ATTR.partner_a_email] as string) ?? undefined)
+        : entityType === 'person'
+          ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
+          : undefined;
     return {
       id: edge.id,
-      entityId: legacyOrgId,
+      entityId: edge.target_entity_id,
       kind: 'external_partner',
       gravity: 'inner_circle',
       identity: {
         name: partner?.display_name ?? 'Unknown',
         avatarUrl: null,
         label: cortexTypeToLabel(edge.relationship_type),
+        entityType,
       },
-      meta: { tags: (ctx.tags as string[] | null) ?? [] },
+      meta: {
+        email,
+        tags: (ctx.industry_tags as string[] | null) ?? [],
+        ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
+      },
     };
   }).sort((a, b) => a.identity.name.localeCompare(b.identity.name));
 
-  return [...coreNodes, ...innerCircleNodes];
+  const outerOrbitNodes: NetworkNode[] = outerOrbitEdges.map((rel): NetworkNode => {
+    const ctx = (rel.context_data as Record<string, unknown>) ?? {};
+    const partnerEnt = partnerEntMap.get(rel.target_entity_id);
+    const balance = balanceMap.get(rel.target_entity_id) ?? 0;
+
+    // Use the edge column as the canonical type source — context_data.relationship_type
+    // is not a defined cortex field and should not influence labels.
+    const typeLabel = cortexTypeToLabel(rel.relationship_type);
+    const entityType = (partnerEnt?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
+    const attrs = (partnerEnt?.attributes as Record<string, unknown>) ?? {};
+    // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
+    // preserved email key from a prior person → couple reclassification.
+    const email =
+      entityType === 'couple'
+        ? ((attrs[COUPLE_ATTR.partner_a_email] as string) ?? undefined)
+        : entityType === 'person'
+          ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
+          : undefined;
+
+    return {
+      id: rel.id,
+      entityId: rel.target_entity_id,
+      kind: 'external_partner' as const,
+      gravity: 'outer_orbit' as const,
+      identity: {
+        name: partnerEnt?.display_name ?? 'Unknown',
+        label: typeLabel,
+        avatarUrl: partnerEnt?.avatar_url ?? null,
+        entityType,
+      },
+      meta: {
+        email,
+        tags: Array.isArray(ctx.industry_tags) ? (ctx.industry_tags as string[]) : [],
+        ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        connectedSince: (rel as { created_at?: string }).created_at ?? undefined,
+      },
+    };
+  }).sort((a, b) => a.identity.name.localeCompare(b.identity.name));
+
+  return [...coreNodes, ...extendedTeamNodes, ...innerCircleNodes, ...outerOrbitNodes];
 }
 
 /**
@@ -348,6 +448,19 @@ export type CreateGhostWithContactPayload = {
   contactName?: string;
   email?: string;
   website?: string;
+  // Person-specific
+  phone?: string;
+  market?: string;
+  unionStatus?: string;
+  // Organization-specific
+  relationshipType?: 'vendor' | 'client' | 'venue' | 'partner';
+  w9Status?: boolean;
+  coiExpiry?: string;
+  paymentTerms?: string;
+  // Venue-specific (subset of organization)
+  dockAddress?: string;
+  venuePmName?: string;
+  venuePmPhone?: string;
 };
 
 /**
@@ -388,18 +501,51 @@ export async function createGhostWithContact(
   });
   if (!ghost.ok) return { success: false, error: ghost.error };
 
+  // ── Attribute patch: website + professional fields ─────────────────────
+  // ghost.id is directory.entities.id (Session 9: createGhostOrg writes only to directory)
   const websiteTrim = payload.website?.trim();
-  if (websiteTrim) {
-    // ghost.id is directory.entities.id (Session 9: createGhostOrg writes only to directory)
+
+  // Collect all top-level attribute fields to patch in a single write
+  const attrPatch: Record<string, unknown> = {};
+
+  if (websiteTrim) attrPatch[COMPANY_ATTR.website] = websiteTrim;
+
+  if (payload.type === 'person') {
+    if (payload.phone) attrPatch[PERSON_ATTR.phone] = payload.phone;
+    if (payload.market) attrPatch[PERSON_ATTR.market] = payload.market;
+    if (payload.unionStatus) attrPatch[PERSON_ATTR.union_status] = payload.unionStatus;
+  }
+
+  if (payload.type === 'organization') {
+    if (payload.w9Status !== undefined) attrPatch[COMPANY_ATTR.w9_status] = payload.w9Status;
+    if (payload.coiExpiry) attrPatch[COMPANY_ATTR.coi_expiry] = payload.coiExpiry;
+    if (payload.paymentTerms) attrPatch[COMPANY_ATTR.payment_terms] = payload.paymentTerms;
+
+    // Venue ops fields go under attributes.venue_ops sub-object — never top-level
+    const venueOpsPatch: Record<string, unknown> = {};
+    if (payload.dockAddress) venueOpsPatch[VENUE_OPS.dock_address] = payload.dockAddress;
+    if (payload.venuePmName) venueOpsPatch[VENUE_OPS.venue_contact_name] = payload.venuePmName;
+    if (payload.venuePmPhone) venueOpsPatch[VENUE_OPS.venue_contact_phone] = payload.venuePmPhone;
+
+    if (Object.keys(venueOpsPatch).length > 0) {
+      // Read existing venue_ops first to avoid overwriting sibling keys
+      const { data: ghostDirForVenue } = await supabase
+        .schema('directory').from('entities')
+        .select('attributes').eq('id', ghost.id).maybeSingle();
+      const existingForVenue = (ghostDirForVenue?.attributes as Record<string, unknown>) ?? {};
+      const existingVenueOps = (existingForVenue[VENUE_ATTR.venue_ops] as Record<string, unknown>) ?? {};
+      attrPatch[VENUE_ATTR.venue_ops] = { ...existingVenueOps, ...venueOpsPatch };
+    }
+  }
+
+  if (Object.keys(attrPatch).length > 0) {
     const { data: ghostDirEnt } = await supabase
       .schema('directory').from('entities')
       .select('attributes').eq('id', ghost.id).maybeSingle();
-    if (ghostDirEnt) {
-      const existingAttrs = (ghostDirEnt.attributes as Record<string, unknown>) ?? {};
-      await supabase.schema('directory').from('entities')
-        .update({ attributes: { ...existingAttrs, website: websiteTrim } })
-        .eq('id', ghost.id);
-    }
+    const existingAttrs = (ghostDirEnt?.attributes as Record<string, unknown>) ?? {};
+    await supabase.schema('directory').from('entities')
+      .update({ attributes: { ...existingAttrs, ...attrPatch } })
+      .eq('id', ghost.id);
   }
 
   let mainContactId: string | null = null;
@@ -423,7 +569,11 @@ export async function createGhostWithContact(
     if (rpcData && typeof rpcData === 'string') mainContactId = rpcData;
   }
 
-  const result = await summonPartner(sourceOrgId, ghost.id, 'partner');
+  const cortexType: 'vendor' | 'venue' | 'client' | 'partner' =
+    payload.type === 'organization' && payload.relationshipType
+      ? payload.relationshipType
+      : 'partner';
+  const result = await summonPartner(sourceOrgId, ghost.id, cortexType);
   if (!result.ok) return { success: false, error: result.error };
   return {
     success: true,
@@ -466,7 +616,7 @@ export async function createConnectionFromScout(
   const workspaceId = srcEntity?.owner_workspace_id ?? null;
   if (!workspaceId) return { success: false, error: 'Organization not found.' };
 
-  const name = (data.name ?? data.website ?? 'From ION').trim() || 'From ION';
+  const name = (data.name ?? data.website ?? 'From Aion').trim() || 'From Aion';
   const ghost = await createGhostOrg({
     workspace_id: workspaceId,
     name,
@@ -634,7 +784,7 @@ export type NodeDetailCrewMember = {
 
 export type NodeDetail = {
   id: string;
-  kind: 'internal_employee' | 'external_partner';
+  kind: 'internal_employee' | 'extended_team' | 'external_partner';
   identity: {
     name: string;
     avatarUrl: string | null;
@@ -643,6 +793,13 @@ export type NodeDetail = {
   };
   /** Relationship direction for partners: vendor (money out), client (money in), partner (both). */
   direction: 'vendor' | 'client' | 'partner' | null;
+  /**
+   * Raw relationship type string as returned by the server before collapsing to direction.
+   * Values: 'vendor' | 'venue' | 'client' | 'client_company' | 'partner'.
+   * Use this (not `direction`) when initialising edit-form state so venue relationships
+   * don't get silently reclassified to vendor on save.
+   */
+  relationshipTypeRaw?: string | null;
   balance: { inbound: number; outbound: number };
   active_events: string[];
   /** Only for external_partner: org_relationships.notes. */
@@ -675,6 +832,45 @@ export type NodeDetail = {
   memberRole?: 'owner' | 'admin' | 'member' | 'restricted' | null;
   /** For internal_employee: whether current user can assign admin/manager (owner or admin). */
   canAssignElevatedRole?: boolean;
+  /** For internal_employee: do-not-rebook flag from ROSTER_MEMBER edge context_data. */
+  doNotRebook?: boolean;
+  /** For internal_employee: archived flag from ROSTER_MEMBER edge context_data. */
+  archived?: boolean;
+  /** For internal_employee: phone from directory.entities.attributes. */
+  phone?: string | null;
+  /** For internal_employee: market from directory.entities.attributes. */
+  market?: string | null;
+  /**
+   * Audit trail for the ROSTER_MEMBER edge — set by the Postgres trigger whenever
+   * context_data changes. Surfaces on hover in the detail sheet.
+   */
+  lastModifiedAt?: string | null;
+  lastModifiedByName?: string | null;
+  /**
+   * The `directory.entities.id` of the subject being viewed (person or org).
+   * Distinct from `id` which is the cortex relationship edge ID.
+   * Use this for context panel queries (crew schedule, deals, finance).
+   */
+  subjectEntityId?: string | null;
+  /** The `directory.entities.type` value ('person', 'company', 'venue', etc.) */
+  entityDirectoryType?: string | null;
+  /** For external_partner person entities: email from INDIVIDUAL_ATTR */
+  personEmail?: string | null;
+  /** For external_partner person entities: phone from INDIVIDUAL_ATTR */
+  personPhone?: string | null;
+  /** For external_partner couple entities: partner B email */
+  couplePartnerBEmail?: string | null;
+  /** For external_partner couple entities: partner A full name */
+  couplePartnerAName?: string | null;
+  /** For external_partner couple entities: partner B full name */
+  couplePartnerBName?: string | null;
+  /** Venue-specific technical spec fields, from directory.entities.attributes */
+  orgVenueSpecs?: {
+    capacity?: number | null;
+    load_in_notes?: string | null;
+    power_notes?: string | null;
+    stage_notes?: string | null;
+  } | null;
 };
 
 /**
@@ -684,7 +880,7 @@ export type NodeDetail = {
  */
 export async function getNetworkNodeDetails(
   nodeId: string,
-  kind: 'internal_employee' | 'external_partner',
+  kind: 'internal_employee' | 'extended_team' | 'external_partner',
   sourceOrgId: string
 ): Promise<NodeDetail | null> {
   unstable_noStore();
@@ -692,7 +888,7 @@ export async function getNetworkNodeDetails(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId || orgId !== sourceOrgId) return null;
 
-  if (kind === 'internal_employee') {
+  if (kind === 'internal_employee' || kind === 'extended_team') {
     // Cortex-first: nodeId is cortex.relationships.id (ROSTER_MEMBER edge)
     const { data: cortexRel } = await supabase
       .schema('cortex').from('relationships')
@@ -706,7 +902,7 @@ export async function getNetworkNodeDetails(
         .select('id, display_name, avatar_url, attributes')
         .eq('id', cortexRel.source_entity_id).maybeSingle();
       const attrs = (personEnt?.attributes as Record<string, unknown>) ?? {};
-      const email = (attrs.email as string | null) ?? null;
+      const email = (attrs[PERSON_ATTR.email] as string | null) ?? null;
       const firstName = (ctx.first_name as string | null) ?? null;
       const lastName = (ctx.last_name as string | null) ?? null;
       const name = [firstName, lastName].filter(Boolean).join(' ') || personEnt?.display_name || email || 'Unknown';
@@ -726,9 +922,13 @@ export async function getNetworkNodeDetails(
         canAssignElevatedRole = callerRole === 'owner' || callerRole === 'admin';
       }
 
+      const employmentStatus = (ctx.employment_status as string | null) ?? null;
+      const resolvedKind: NodeDetail['kind'] =
+        employmentStatus === 'external_contractor' ? 'extended_team' : 'internal_employee';
+
       return {
         id: cortexRel.id,
-        kind: 'internal_employee',
+        kind: resolvedKind,
         identity: {
           name,
           avatarUrl: personEnt?.avatar_url ?? null,
@@ -744,6 +944,13 @@ export async function getNetworkNodeDetails(
         targetOrgId: null,
         memberRole: role ?? null,
         canAssignElevatedRole,
+        doNotRebook: (ctx.do_not_rebook as boolean) ?? false,
+        archived: (ctx.archived as boolean) ?? false,
+        phone: (attrs[PERSON_ATTR.phone] as string | null) ?? null,
+        market: (attrs[PERSON_ATTR.market] as string | null) ?? null,
+        lastModifiedAt: (ctx.last_modified_at as string | null) ?? null,
+        lastModifiedByName: (ctx.last_modified_by_name as string | null) ?? null,
+        subjectEntityId: cortexRel.source_entity_id,
       };
     }
 
@@ -767,7 +974,7 @@ export async function getNetworkNodeDetails(
   let relLifecycleStatus: NodeDetail['lifecycleStatus'];
   let relBlacklistReason: string | null;
   let relType: string;
-  let orgEntity: { id: string; display_name: string; handle: string | null; avatar_url: string | null; attributes: unknown } | null = null;
+  let orgEntity: { id: string; display_name: string; handle: string | null; avatar_url: string | null; attributes: unknown; type?: string | null } | null = null;
 
   if (!cortexExtRel) return null;
 
@@ -778,7 +985,7 @@ export async function getNetworkNodeDetails(
     targetEntityIdForCrew = cortexExtRel.target_entity_id;
     relNotes = (ctx.notes as string | null) ?? null;
     relTier = (ctx.tier as string | null) ?? null;
-    relTags = (ctx.tags as string[] | null) ?? null;
+    relTags = (ctx.industry_tags as string[] | null) ?? null;
     relLifecycleStatus = (ctx.lifecycle_status as NodeDetail['lifecycleStatus']) ?? null;
     relBlacklistReason = (ctx.blacklist_reason as string | null) ?? null;
     relType = cortexExtRel.relationship_type
@@ -788,7 +995,7 @@ export async function getNetworkNodeDetails(
 
     const { data: orgEnt } = await supabase
       .schema('directory').from('entities')
-      .select('id, display_name, handle, avatar_url, attributes, legacy_org_id')
+      .select('id, display_name, handle, avatar_url, attributes, legacy_org_id, type')
       .eq('id', cortexExtRel.target_entity_id).maybeSingle();
     if (!orgEnt) return null;
     orgEntity = orgEnt;
@@ -796,13 +1003,32 @@ export async function getNetworkNodeDetails(
   }
 
   const orgAttrs = (orgEntity?.attributes as Record<string, unknown>) ?? {};
-  const isGhost = (orgAttrs.is_ghost as boolean) ?? false;
+  const isGhost = (orgAttrs[COMPANY_ATTR.is_ghost] as boolean) ?? false;
+
+  // Person/couple contact extraction — INDIVIDUAL_ATTR/COUPLE_ATTR keys
+  const _entityDirType = (orgEntity as { type?: string | null }).type ?? null;
+  const personEmail: string | null =
+    _entityDirType === 'person' ? ((orgAttrs[INDIVIDUAL_ATTR.email] as string) ?? null)
+    : _entityDirType === 'couple' ? ((orgAttrs[COUPLE_ATTR.partner_a_email] as string) ?? null)
+    : null;
+  const personPhone: string | null =
+    _entityDirType === 'person' ? ((orgAttrs[INDIVIDUAL_ATTR.phone] as string) ?? null) : null;
+  const couplePartnerBEmail: string | null =
+    _entityDirType === 'couple' ? ((orgAttrs[COUPLE_ATTR.partner_b_email] as string) ?? null) : null;
+  const couplePartnerAName: string | null =
+    _entityDirType === 'couple'
+      ? ([orgAttrs[COUPLE_ATTR.partner_a_first] as string | null, orgAttrs[COUPLE_ATTR.partner_a_last] as string | null].filter(Boolean).join(' ') || null)
+      : null;
+  const couplePartnerBName: string | null =
+    _entityDirType === 'couple'
+      ? ([orgAttrs[COUPLE_ATTR.partner_b_first] as string | null, orgAttrs[COUPLE_ATTR.partner_b_last] as string | null].filter(Boolean).join(' ') || null)
+      : null;
   const typeLabel =
     relType === 'vendor'
       ? 'Vendor'
       : relType === 'venue'
         ? 'Venue'
-        : relType === 'client' || relType === 'client_company' || relType === 'client'
+        : relType === 'client' || relType === 'client_company'
           ? 'Client'
           : 'Partner';
   const direction: NodeDetail['direction'] =
@@ -810,7 +1036,9 @@ export async function getNetworkNodeDetails(
       ? 'vendor'
       : relType === 'client' || relType === 'client_company'
         ? 'client'
-        : 'partner';
+        : relType === 'venue' || relType === 'venue partner'
+          ? 'vendor'
+          : 'partner';
 
   // Crew: cortex-first (ROSTER_MEMBER edges on target org)
   let crew: NodeDetail['crew'] = [];
@@ -841,20 +1069,45 @@ export async function getNetworkNodeDetails(
         const name =
           [firstName, lastName].filter(Boolean).join(' ') ||
           personEnt?.display_name ||
-          (attrs.email as string | null) ||
+          (attrs[PERSON_ATTR.email] as string | null) ||
           'Contact';
         return {
           id: r.id,
           name,
-          email: (attrs.email as string | null) ?? null,
+          email: (attrs[PERSON_ATTR.email] as string | null) ?? null,
           role: (ctx.role as string | null) ?? null,
           jobTitle: (ctx.job_title as string | null) ?? null,
           avatarUrl: personEnt?.avatar_url ?? null,
-          phone: (attrs.phone as string | null) ?? null,
+          phone: (attrs[PERSON_ATTR.phone] as string | null) ?? null,
         };
       });
     }
   }
+
+  // Active events where this entity is the client
+  const { data: eventsData } = await supabase
+    .schema('ops').from('events')
+    .select('title')
+    .eq('client_entity_id', cortexExtRel.target_entity_id)
+    .limit(5);
+  const active_events = (eventsData ?? []).map((e) => e.title ?? '').filter(Boolean);
+
+  // Balance: inbound (invoices billed to this entity) + outbound (expenses paid to this entity)
+  const targetEntityId = cortexExtRel.target_entity_id;
+  const [invoicesResult, expensesResult] = await Promise.all([
+    supabase.schema('finance').from('invoices')
+      .select('total_amount, status')
+      .eq('bill_to_entity_id', targetEntityId),
+    supabase.schema('ops').from('event_expenses')
+      .select('amount')
+      .eq('vendor_entity_id', targetEntityId),
+  ]);
+  const inbound = (invoicesResult.data ?? [])
+    .filter((inv) => inv.status !== 'void')
+    .reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
+  const outbound = (expensesResult.data ?? [])
+    .reduce((sum, exp) => sum + ((exp.amount as number) ?? 0), 0);
+  const balance = { inbound, outbound };
 
   return {
     id: relId,
@@ -865,26 +1118,43 @@ export async function getNetworkNodeDetails(
       label: typeLabel,
     },
     direction,
-    balance: { inbound: 0, outbound: 0 },
-    active_events: [],
+    relationshipTypeRaw: relType,
+    balance,
+    active_events,
     notes: relNotes,
     relationshipId: relId,
     isGhost,
     targetOrgId: targetOrgIdLegacy,
     orgSlug: orgEntity?.handle ?? null,
     orgLogoUrl: orgEntity?.avatar_url ?? null,
-    orgBrandColor: (orgAttrs.brand_color as string | null) ?? null,
-    orgWebsite: (orgAttrs.website as string | null) ?? null,
+    orgBrandColor: (orgAttrs[COMPANY_ATTR.brand_color] as string | null) ?? null,
+    orgWebsite: (orgAttrs[COMPANY_ATTR.website] as string | null) ?? null,
     crew,
-    orgSupportEmail: (orgAttrs.support_email as string | null) ?? null,
-    orgAddress: (orgAttrs.address as NodeDetail['orgAddress']) ?? null,
-    orgDefaultCurrency: (orgAttrs.default_currency as string | null) ?? null,
-    orgCategory: (orgAttrs.category as string | null) ?? null,
-    orgOperationalSettings: (orgAttrs.operational_settings as Record<string, unknown> | null) ?? null,
+    orgSupportEmail: (orgAttrs[COMPANY_ATTR.support_email] as string | null) ?? null,
+    orgAddress: (orgAttrs[COMPANY_ATTR.address] as NodeDetail['orgAddress']) ?? null,
+    orgDefaultCurrency: (orgAttrs[COMPANY_ATTR.default_currency] as string | null) ?? null,
+    orgCategory: (orgAttrs[COMPANY_ATTR.category] as string | null) ?? null,
+    orgOperationalSettings: (orgAttrs[COMPANY_ATTR.operational_settings] as Record<string, unknown> | null) ?? null,
     relationshipTier: relTier,
     relationshipTags: relTags,
     lifecycleStatus: relLifecycleStatus ?? null,
     blacklistReason: relBlacklistReason,
+    subjectEntityId: cortexExtRel.target_entity_id,
+    entityDirectoryType: _entityDirType,
+    personEmail,
+    personPhone,
+    couplePartnerBEmail,
+    couplePartnerAName,
+    couplePartnerBName,
+    orgVenueSpecs: orgEntity ? (() => {
+      const vAttrs = (orgEntity!.attributes as Record<string, unknown> | null) ?? {};
+      return {
+        capacity: typeof vAttrs[VENUE_ATTR.capacity] === 'number' ? vAttrs[VENUE_ATTR.capacity] as number : null,
+        load_in_notes: typeof vAttrs[VENUE_ATTR.load_in_notes] === 'string' ? vAttrs[VENUE_ATTR.load_in_notes] as string : null,
+        power_notes: typeof vAttrs[VENUE_ATTR.power_notes] === 'string' ? vAttrs[VENUE_ATTR.power_notes] as string : null,
+        stage_notes: typeof vAttrs[VENUE_ATTR.stage_notes] === 'string' ? vAttrs[VENUE_ATTR.stage_notes] as string : null,
+      };
+    })() : null,
   };
 }
 

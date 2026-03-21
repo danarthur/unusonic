@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 import { RecoverRequestForm } from './RecoverRequestForm';
 
 export const metadata = {
-  title: 'Recover access | Signal',
+  title: 'Recover access | Unusonic',
   description: 'Start account recovery with your Safety Net guardians',
 };
 

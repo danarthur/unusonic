@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Plus, Search } from 'lucide-react';
 import { StreamCard, type StreamCardItem } from './stream-card';
 import { CreateGigModal } from './create-gig-modal';
 import type { OptimisticUpdate } from './crm-production-queue';
-import { SIGNAL_PHYSICS, FLUID_SPRING, PILL_SLIDE_SPRING, M3_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS, FLUID_SPRING, PILL_SLIDE_SPRING, M3_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 export type StreamMode = 'inquiry' | 'active' | 'past';
@@ -20,24 +20,39 @@ const STREAM_TABS = [
 function filterByMode(items: StreamCardItem[], mode: StreamMode): StreamCardItem[] {
   const today = new Date().toISOString().slice(0, 10);
   if (mode === 'inquiry') {
+    // Only pre-sale deals that haven't passed their date yet (or have no date)
     return items.filter(
       (i) =>
         i.source === 'deal' &&
-        (i.status === 'inquiry' || i.status === 'proposal')
+        (i.status === 'inquiry' || i.status === 'proposal') &&
+        (i.event_date == null || i.event_date >= today)
     );
   }
   if (mode === 'active') {
     return items.filter(
       (i) =>
-        i.source === 'event' ||
-        (i.source === 'deal' && i.status === 'contract_sent')
+        (i.source === 'event' &&
+          i.lifecycle_status !== 'cancelled' &&
+          (i.event_date ?? '') >= today) ||
+        (i.source === 'deal' && (i.status === 'contract_sent' || i.status === 'contract_signed'))
     );
   }
   if (mode === 'past') {
     return items.filter(
       (i) =>
+        // Won or lost deals
         (i.source === 'deal' && (i.status === 'won' || i.status === 'lost')) ||
-        (i.source === 'event' && (i.event_date ?? '') < today)
+        // Past-dated deals that never converted (any pre-handover status)
+        (i.source === 'deal' &&
+          (i.status === 'inquiry' || i.status === 'proposal' || i.status === 'contract_sent' || i.status === 'contract_signed') &&
+          i.event_date != null &&
+          i.event_date < today) ||
+        // Cancelled events (regardless of date)
+        (i.source === 'event' && i.lifecycle_status === 'cancelled') ||
+        // Past-dated events
+        (i.source === 'event' &&
+          i.lifecycle_status !== 'cancelled' &&
+          (i.event_date ?? '') < today)
     );
   }
   return items;
@@ -48,6 +63,7 @@ export function Stream({
   selectedId,
   onSelect,
   addOptimisticGig,
+  onRefetchList,
   mode,
   onModeChange,
   className,
@@ -56,11 +72,13 @@ export function Stream({
   selectedId: string | null;
   onSelect: (id: string) => void;
   addOptimisticGig: (update: OptimisticUpdate) => void;
+  onRefetchList?: () => Promise<void>;
   mode: StreamMode;
   onModeChange: (mode: StreamMode) => void;
   className?: string;
 }) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const today = new Date().toISOString().slice(0, 10);
   const tagged: StreamCardItem[] = items.map((i) => {
@@ -73,7 +91,18 @@ export function Stream({
     return { ...i, mode: tag };
   });
 
-  const filtered = filterByMode(tagged, mode);
+  const modeFiltered = filterByMode(tagged, mode);
+
+  // Fix 3: apply search filter — case-insensitive substring match on title, client_name, location
+  const q = searchQuery.trim().toLowerCase();
+  const filtered = q
+    ? modeFiltered.filter(
+        (i) =>
+          (i.title ?? '').toLowerCase().includes(q) ||
+          (i.client_name ?? '').toLowerCase().includes(q) ||
+          (i.location ?? '').toLowerCase().includes(q)
+      )
+    : modeFiltered;
 
   return (
     <div className={cn('flex flex-col h-full min-h-0', className)}>
@@ -128,7 +157,7 @@ export function Stream({
               type="button"
               role="tab"
               aria-selected={mode === tab.value}
-              onClick={() => onModeChange(tab.value)}
+              onClick={() => { onModeChange(tab.value); setSearchQuery(''); }}
               whileTap={{ scale: 0.98 }}
               transition={FLUID_SPRING}
               className={cn(
@@ -144,6 +173,26 @@ export function Stream({
         </div>
       </header>
 
+      {/* Fix 3: Search input — only shown when there are items or a query is active */}
+      {(modeFiltered.length > 0 || searchQuery.length > 0) && (
+        <div className="shrink-0 px-4 pb-3 border-b border-white/10">
+          <div className="relative flex items-center">
+            <Search
+              size={14}
+              className="absolute left-3 text-ink-muted pointer-events-none shrink-0"
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search productions…"
+              className="w-full pl-8 pr-3 py-2 rounded-xl text-sm text-ceramic placeholder:text-ink-muted bg-[oklch(0.18_0_0)] border border-white/10 focus:outline-none focus:ring-1 focus:ring-white/20"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <motion.ul
           key={`stream-list-${mode}`}
@@ -155,25 +204,34 @@ export function Stream({
             hidden: {},
           }}
         >
-          <AnimatePresence mode="popLayout">
-            {filtered.map((item) => (
-              <motion.li
-                key={item.id}
-                layout
-                variants={{
-                  visible: { opacity: 1, y: 0 },
-                  hidden: { opacity: 0, y: 8 },
-                }}
-                transition={SIGNAL_PHYSICS}
-              >
-                <StreamCard
-                  item={item}
-                  selected={selectedId === item.id}
-                  onClick={() => onSelect(item.id)}
-                />
-              </motion.li>
-            ))}
-          </AnimatePresence>
+          {filtered.map((item) => (
+            <motion.li
+              key={item.id}
+              layout
+              variants={{
+                visible: { opacity: 1, y: 0 },
+                hidden: { opacity: 0, y: 8 },
+              }}
+              transition={UNUSONIC_PHYSICS}
+            >
+              <StreamCard
+                item={item}
+                selected={selectedId === item.id}
+                onClick={() => onSelect(item.id)}
+              />
+            </motion.li>
+          ))}
+
+          {/* P1.4: empty state */}
+          {filtered.length === 0 && (
+            <motion.li
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center text-sm text-ink-muted py-12 list-none"
+            >
+              {searchQuery ? 'No results for that search.' : 'Nothing here yet.'}
+            </motion.li>
+          )}
         </motion.ul>
       </div>
 
@@ -181,6 +239,7 @@ export function Stream({
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         addOptimisticGig={addOptimisticGig}
+        onRefetchList={onRefetchList}
       />
     </div>
   );

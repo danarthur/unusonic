@@ -1,0 +1,1 @@
+Run a full codebase audit using the codebase-auditor agent. Check all 9 rule categories (legacy table usage, new public tables, FSD boundaries, system.ts in client components, forbidden copy/voice, async params, raw hex colors, bg-white/bg-black, StreamingTextResponse) and write the results to docs/audits/audit-YYYY-MM-DD.md.

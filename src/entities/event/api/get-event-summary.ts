@@ -7,6 +7,28 @@ import 'server-only';
 
 import { createClient } from '@/shared/api/supabase/server';
 
+/** Named call time slot stored in run_of_show_data.call_time_slots[]. */
+export type CallTimeSlot = {
+  id: string;
+  label: string;
+  time: string; // "HH:MM" 24h local time
+};
+
+/** Transport vehicle mode. */
+export type TransportMode = 'personal_vehicle' | 'company_van' | 'rental_truck';
+
+/** Transport status — varies by mode; see VAN_STATUS_FLOW / RENTAL_STATUS_FLOW in plan-vitals-row. */
+export type TransportStatus =
+  | 'pending'
+  | 'loading'
+  | 'dispatched'
+  | 'on_site'
+  | 'returning'
+  | 'complete'
+  | 'pending_rental'
+  | 'truck_picked_up'
+  | 'truck_returned';
+
 /** run_of_show_data from ops.events (JSONB). Used by Plan lens flight checks and conflict detection. */
 export type RunOfShowData = {
   crew_roles?: string[] | null;
@@ -17,9 +39,13 @@ export type RunOfShowData = {
     assignee_name?: string | null;
   }[] | null;
   gear_requirements?: string | null;
-  gear_items?: { id: string; name: string; status: 'pending' | 'pulled' | 'loaded' }[] | null;
+  gear_items?: { id: string; name: string; quantity?: number; status: 'pending' | 'pulled' | 'loaded'; catalog_package_id?: string | null; is_sub_rental?: boolean | null }[] | null;
   venue_restrictions?: string | null;
-  logistics?: { venue_access_confirmed?: boolean; truck_loaded?: boolean; crew_confirmed?: boolean } | null;
+  logistics?: { venue_access_confirmed?: boolean; truck_loaded?: boolean; crew_confirmed?: boolean; transport_mode?: TransportMode | null; transport_status?: TransportStatus | null } | null;
+  call_time_slots?: CallTimeSlot[] | null;
+  call_time_override?: string | null;
+  transport_mode?: TransportMode | null;
+  transport_status?: TransportStatus | null;
   [key: string]: unknown;
 };
 
@@ -30,6 +56,7 @@ export type EventSummary = {
   ends_at: string | null;
   location_name: string | null;
   location_address: string | null;
+  venue_entity_id: string | null;
   run_of_show_data: RunOfShowData | null;
 };
 
@@ -54,7 +81,7 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     const res = await supabase
       .schema('ops')
       .from('events')
-      .select('name, start_at, end_at, run_of_show_data, project:projects!inner(workspace_id)')
+      .select('title, starts_at, ends_at, location_name, location_address, venue_entity_id, run_of_show_data, client_entity_id, project:projects!inner(workspace_id)')
       .eq('id', eventId)
       .eq('projects.workspace_id', workspaceId)
       .maybeSingle();
@@ -71,13 +98,28 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
   if (!row) return null;
 
   const r = row;
+
+  // Resolve client name from directory.entities if client_entity_id is set
+  let clientName: string | null = null;
+  const clientEntityId = r.client_entity_id as string | null;
+  if (clientEntityId) {
+    const { data: dirEnt } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('id', clientEntityId)
+      .maybeSingle();
+    clientName = dirEnt?.display_name ?? null;
+  }
+
   return {
-    title: (r.name as string) ?? null,
-    client_name: null,
-    starts_at: (r.start_at as string) ?? '',
-    ends_at: (r.end_at as string) ?? null,
-    location_name: null,
-    location_address: null,
+    title: (r.title as string) ?? null,
+    client_name: clientName,
+    starts_at: (r.starts_at as string) ?? '',
+    ends_at: (r.ends_at as string) ?? null,
+    location_name: (r.location_name as string) ?? null,
+    location_address: (r.location_address as string) ?? null,
+    venue_entity_id: (r.venue_entity_id as string) ?? null,
     run_of_show_data: (r.run_of_show_data as RunOfShowData) ?? null,
   };
 }

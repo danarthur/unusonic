@@ -1,0 +1,13 @@
+-- =============================================================================
+-- Session 10: Restore deal_stakeholders after legacy FK removal
+--
+-- APPLIED: 2026-03-04 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Context: public.deal_stakeholders originally had hard FKs to public.organizations
+-- and public.entities (both dropped in session10_drop_legacy_tables). This migration
+-- restored the table with soft references only — organization_id and entity_id are
+-- plain uuid columns resolved at the app layer via directory.entities.
+--
+-- Note: ops.deal_stakeholders was also created (20260307014128_move_deal_stakeholders_to_ops).
+-- The canonical table is now ops.deal_stakeholders.
+-- =============================================================================

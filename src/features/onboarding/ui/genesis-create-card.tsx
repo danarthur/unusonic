@@ -37,7 +37,7 @@ interface GenesisCreateCardProps {
   slug: string;
   /** When set, uses initializeOrganization (first-time onboarding) instead of createGenesisOrganization */
   onboardingContext?: OnboardingGenesisContext;
-  /** Pre-fill from ION website scout (onboarding) */
+  /** Pre-fill from Aion website scout (onboarding) */
   prefill?: GenesisPrefill;
 }
 

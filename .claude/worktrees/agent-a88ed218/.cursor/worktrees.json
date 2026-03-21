@@ -1,0 +1,16 @@
+{
+  "setup-worktree-unix": [
+    "echo '🚀 Initializing DanielOS Sandbox...'",
+    "npm ci",
+    "cp \"$ROOT_WORKTREE_PATH/.env.local\" .env.local",
+    "echo '✅ Dependencies installed & Environment synced.'"
+  ],
+  "setup-worktree-windows": [
+    "npm ci",
+    "copy \"%ROOT_WORKTREE_PATH%\\.env.local\" .env.local"
+  ],
+  "setup-worktree": [
+    "npm ci",
+    "cp \"$ROOT_WORKTREE_PATH/.env.local\" .env.local"
+  ]
+}

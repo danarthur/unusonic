@@ -6,7 +6,7 @@
  */
 
 /** Heavy ceramic spring: density, critically damped stop, no oscillation. */
-export const SIGNAL_PHYSICS = {
+export const UNUSONIC_PHYSICS = {
   type: 'spring' as const,
   stiffness: 280,
   damping: 36,
@@ -113,7 +113,7 @@ export const GPU_STABILIZE = {
 } as const;
 
 /**
- * Approximate settling time (ms) for SIGNAL_PHYSICS spring.
+ * Approximate settling time (ms) for UNUSONIC_PHYSICS spring.
  * Used to derive logo "thinking" trigger delay so state switch hides in movement blur.
  */
 export const SIGNAL_SPRING_DURATION_MS = 320;

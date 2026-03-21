@@ -1,15 +1,15 @@
 /**
  * Entity Studio — Full-page editor for ghost partner profiles.
  * Replaces the inline Dossier modal with a sovereign editing environment.
+ * Supports company, person (individual), and couple entity types.
  */
 
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { getNetworkNodeDetails } from '@/features/network-data';
 import { createClient } from '@/shared/api/supabase/server';
-import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import type { IndividualAttrs, CoupleAttrs } from '@/shared/lib/entity-attrs';
 import { EntityStudioClient } from './EntityStudioClient';
 
 type PageProps = {
@@ -24,46 +24,41 @@ export default async function EntityStudioPage({ params, searchParams }: PagePro
   const sourceOrgId = await getCurrentOrgId();
   if (!sourceOrgId) redirect('/network');
 
-  // Guard: couple entities are edited via the deal Stakeholders panel, not here.
-  // Workspace-scoped to prevent cross-workspace type disclosure.
-  const supabase = await createClient();
-  const workspaceId = await getActiveWorkspaceId();
-  const { data: entityRow } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('type')
-    .eq('id', id)
-    .eq('owner_workspace_id', workspaceId ?? '')
-    .maybeSingle();
-
-  if (entityRow?.type === 'couple') {
-    const backHref = returnPath ?? '/crm';
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-obsidian px-6 text-center">
-        <p className="max-w-sm text-sm text-mercury/70 leading-relaxed">
-          Couple profile editor — full editing is available from the deal&apos;s Stakeholders panel.
-          Navigate to the deal to edit this couple&apos;s details.
-        </p>
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-mercury transition-colors hover:bg-white/10"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Link>
-      </div>
-    );
-  }
-
   const details = await getNetworkNodeDetails(id, 'external_partner', sourceOrgId);
   if (!details || details.kind !== 'external_partner' || !details.isGhost) {
     redirect('/network');
+  }
+
+  // For person/couple entities, fetch initial attribute values for the typed form.
+  const dirType = details.entityDirectoryType;
+  let initialPersonAttrs: IndividualAttrs | null = null;
+  let initialCoupleAttrs: CoupleAttrs | null = null;
+
+  if ((dirType === 'person' || dirType === 'couple') && details.subjectEntityId) {
+    const supabase = await createClient();
+    const { data: entRow } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('attributes')
+      .eq('id', details.subjectEntityId)
+      .maybeSingle();
+
+    if (entRow) {
+      if (dirType === 'person') {
+        initialPersonAttrs = readEntityAttrs(entRow.attributes, 'individual');
+      } else {
+        initialCoupleAttrs = readEntityAttrs(entRow.attributes, 'couple');
+      }
+    }
   }
 
   return (
     <EntityStudioClient
       details={details}
       sourceOrgId={sourceOrgId}
+      returnPath={returnPath}
+      initialPersonAttrs={initialPersonAttrs}
+      initialCoupleAttrs={initialCoupleAttrs}
     />
   );
 }

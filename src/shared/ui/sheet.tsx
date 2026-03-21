@@ -154,9 +154,17 @@ function SheetHeader({ children, className }: { children: React.ReactNode; class
 
 function SheetTitle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <h2 className={cn('text-lg font-medium tracking-tight text-[var(--color-ink)]', className)}>
+    <h2 className={cn('text-lg font-medium tracking-tight text-ceramic', className)}>
       {children}
     </h2>
+  );
+}
+
+function SheetFooter({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn('shrink-0 border-t border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 px-6 py-5', className)}>
+      {children}
+    </div>
   );
 }
 
@@ -191,4 +199,5 @@ export {
   SheetTitle,
   SheetClose,
   SheetBody,
+  SheetFooter,
 };

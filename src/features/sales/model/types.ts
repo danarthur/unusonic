@@ -4,6 +4,7 @@
  */
 
 import type { Proposal, ProposalItem } from '@/types/supabase';
+import type { RequiredRole } from '@/features/sales/api/package-types';
 
 // =============================================================================
 // Deal Room DTO
@@ -112,6 +113,14 @@ export interface ProposalBuilderLineItem {
   overridePrice?: number | null;
   /** Actual cost for this event; used for margin calc. */
   actualCost?: number | null;
+  /** Catalog floor price locked at proposal-add time (from definition_snapshot.price_meta.floor_price). */
+  floorPrice?: number | null;
+  /** Taxability locked at proposal-add time (from definition_snapshot.tax_meta.is_taxable). */
+  isTaxable?: boolean | null;
+  /** Internal-only notes for this line item (not shown to client). */
+  internalNotes?: string | null;
+  /** Required crew roles locked at proposal-add time (from definition_snapshot.crew_meta.required_roles). */
+  requiredRoles?: RequiredRole[] | null;
 }
 
 /** Hardcoded suggestion: when user adds this package name, suggest the other. */

@@ -1,6 +1,6 @@
 /**
- * Onboarding Wizard – ION conversation flow
- * Profile → Website (ION lookup) → Genesis: feels like chatting with ION
+ * Onboarding Wizard – Aion conversation flow
+ * Profile → Website (Aion lookup) → Genesis: feels like chatting with Aion
  * @module app/(auth)/onboarding/components/onboarding-wizard
  */
 
@@ -15,7 +15,7 @@ import {
   uploadAvatar,
 } from '@/features/identity-hydration';
 import { GenesisOrchestrator } from '@/features/onboarding';
-import { IonOnboardingShell } from '@/features/onboarding/ui/ion-onboarding-shell';
+import { AionOnboardingShell } from '@/features/onboarding/ui/aion-onboarding-shell';
 import { OnboardingChatInput } from '@/features/onboarding/ui/onboarding-chat-input';
 import { WebsiteStep } from '@/features/onboarding/ui/website-step';
 import type { ScoutOnboardingPayload } from '@/features/onboarding/ui/website-step';
@@ -118,7 +118,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
   const onBack = currentStep > minStep ? handleBack : undefined;
 
   return (
-    <IonOnboardingShell
+    <AionOnboardingShell
       prompt={
         currentStep === 0
           ? 'What should we call you?'
@@ -238,6 +238,6 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
           </motion.div>
         )}
       </AnimatePresence>
-    </IonOnboardingShell>
+    </AionOnboardingShell>
   );
 }

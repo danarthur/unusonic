@@ -58,7 +58,7 @@ export function ScoutFindingsDialog({
       <>
         <motion.div
           role="presentation"
-          className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] bg-[oklch(0.12_0_0/0.5)] backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -79,7 +79,7 @@ export function ScoutFindingsDialog({
         >
           <div className="shrink-0 px-5 pt-5 pb-3">
             <h2 id="ion-findings-title" className="text-sm font-semibold uppercase tracking-widest text-[var(--color-silk)]">
-              ION findings
+              Aion findings
             </h2>
           </div>
 
@@ -91,7 +91,7 @@ export function ScoutFindingsDialog({
                     <div
                       className="size-14 shrink-0 rounded-xl overflow-hidden border border-[var(--color-mercury)] flex items-center justify-center"
                       style={{
-                        background: 'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(248,250,252,0.7) 0%, rgba(226,232,240,0.4) 50%, transparent 100%)',
+                        background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.98 0 0 / 0.7) 0%, oklch(0.90 0 0 / 0.4) 50%, transparent 100%)',
                       }}
                     >
                       <img src={findings.logoUrl} alt="" className="size-full object-contain p-1.5" />
@@ -114,35 +114,35 @@ export function ScoutFindingsDialog({
 
                 <div className="space-y-3 text-sm">
                   {findings.website && (
-                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2">
+                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
                       <Globe className="size-4 shrink-0 text-[var(--color-ink-muted)]" />
                       <span className="truncate font-mono text-xs text-[var(--color-ink)]">{findings.website}</span>
                     </div>
                   )}
                   {findings.supportEmail && (
-                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2">
+                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
                       <Mail className="size-4 shrink-0 text-[var(--color-ink-muted)]" />
                       <span className="truncate font-mono text-xs text-[var(--color-ink)]">{findings.supportEmail}</span>
                     </div>
                   )}
                   {findings.phone && (
-                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2">
+                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
                       <Phone className="size-4 shrink-0 text-[var(--color-ink-muted)]" />
                       <span className="truncate text-xs text-[var(--color-ink)]">{findings.phone}</span>
                     </div>
                   )}
                   {findings.address && formatAddress(findings.address) && (
-                    <div className="flex items-start gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2">
+                    <div className="flex items-start gap-3 min-h-[36px] rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
                       <MapPin className="size-4 shrink-0 mt-0.5 text-[var(--color-ink-muted)]" />
                       <span className="text-xs leading-relaxed text-[var(--color-ink-muted)]">{formatAddress(findings.address)}</span>
                     </div>
                   )}
                   {findings.tags && findings.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2 min-h-[36px]">
+                    <div className="flex flex-wrap gap-2 rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-3 py-2 min-h-[36px]">
                       {findings.tags.map((t) => (
                         <span
                           key={t}
-                          className="inline-flex rounded-md border border-[var(--color-mercury)] bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                          className="inline-flex rounded-md border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
                         >
                           {t}
                         </span>
@@ -159,12 +159,12 @@ export function ScoutFindingsDialog({
                       </span>
                     </div>
                     {findings.roster && findings.roster.length > 0 ? (
-                      <div className="rounded-lg border border-[var(--color-mercury)] bg-white/5 max-h-[200px] overflow-y-auto">
+                      <div className="rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] max-h-[200px] overflow-y-auto">
                         <ul className="grid grid-cols-2 gap-2 p-2">
                           {findings.roster.map((m, i) => (
                             <li
                               key={i}
-                              className="flex items-center gap-2 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-2 py-1.5 min-w-0"
+                              className="flex items-center gap-2 rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-2 py-1.5 min-w-0"
                             >
                               {m.avatarUrl ? (
                                 <img
@@ -173,7 +173,7 @@ export function ScoutFindingsDialog({
                                   className="size-8 rounded-full object-cover border border-[var(--color-mercury)]"
                                 />
                               ) : (
-                                <div className="size-8 rounded-full bg-[var(--color-mercury)]/30 flex items-center justify-center text-[10px] font-medium text-[var(--color-ink-muted)]">
+                                <div className="size-8 rounded-full bg-[oklch(1_0_0/0.08)] flex items-center justify-center text-[10px] font-medium text-[var(--color-ink-muted)]">
                                   {(m.firstName?.[0] ?? '?') + (m.lastName?.[0] ?? '')}
                                 </div>
                               )}
@@ -210,7 +210,7 @@ export function ScoutFindingsDialog({
                 variant="outline"
                 size="sm"
                 onClick={handleDiscard}
-                className="flex-1 gap-2 border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:bg-white/5"
+                className="flex-1 gap-2 border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)]"
               >
                 <X className="size-4" />
                 Discard

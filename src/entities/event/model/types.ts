@@ -48,6 +48,7 @@ export interface EventCommandRow {
   ends_at: string;
   dates_load_in: string | null;
   dates_load_out: string | null;
+  venue_entity_id: string | null;
   venue_name: string | null;
   venue_address: string | null;
   venue_google_maps_id: string | null;

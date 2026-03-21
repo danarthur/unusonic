@@ -317,7 +317,7 @@
 
   /* Spotlight / Cove Light — single light source from top, no colored orbs.
      Use for auth pages, landing. Industrial Luxury: instrument, not lava lamp. */
-  .bg-signal-void {
+  .bg-unusonic-void {
     background-color: var(--color-obsidian);
     background-image: radial-gradient(
       circle at 50% 0%,

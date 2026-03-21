@@ -136,9 +136,7 @@ export function InviteTalentDialog({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex max-w-md flex-col">
         <SheetHeader>
-          <SheetTitle className="text-[var(--color-ink)] tracking-tight">
-            Create talent
-          </SheetTitle>
+          <SheetTitle>Create talent</SheetTitle>
           <SheetClose />
         </SheetHeader>
         <SheetBody className="flex flex-col gap-6">

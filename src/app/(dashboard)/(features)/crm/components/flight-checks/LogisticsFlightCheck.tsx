@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, Truck, MapPin, Users } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { updateFlightCheckStatus } from '../../actions/update-flight-check-status';
 import { normalizeLogistics } from './types';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
@@ -36,7 +36,7 @@ export function LogisticsFlightCheck({
   const toggle = async (key: keyof typeof state) => {
     const next = { ...state, [key]: !state[key] };
     setUpdating(key);
-    const result = await updateFlightCheckStatus(eventId, { logistics: next });
+    const result = await updateFlightCheckStatus(eventId, { logistics: next as import('@/entities/event/api/get-event-summary').RunOfShowData['logistics'] });
     setUpdating(null);
     if (result.success) onUpdated?.();
   };
@@ -58,7 +58,7 @@ export function LogisticsFlightCheck({
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
-          transition={SIGNAL_PHYSICS}
+          transition={UNUSONIC_PHYSICS}
           className="mt-4 space-y-3"
         >
           {LOGISTICS_ITEMS.map(({ key, label, icon: Icon }) => (
@@ -78,7 +78,7 @@ export function LogisticsFlightCheck({
                 disabled={updating === key}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className={`
                   shrink-0 relative w-11 h-6 rounded-full border transition-colors
                   focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]
@@ -88,7 +88,7 @@ export function LogisticsFlightCheck({
               >
                 <motion.span
                   layout
-                  transition={SIGNAL_PHYSICS}
+                  transition={UNUSONIC_PHYSICS}
                   className="absolute top-1 left-1 w-4 h-4 rounded-full bg-ceramic shadow-sm"
                   animate={{ x: state[key] ? 20 : 0 }}
                 />

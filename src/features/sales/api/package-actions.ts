@@ -8,6 +8,8 @@
 import { createClient } from '@/shared/api/supabase/server';
 import type { Package } from '@/types/supabase';
 
+export type { Package };
+
 /** Tag shape when hydrated on a package (from workspace_tags via package_tags). */
 export interface PackageTag {
   id: string;
@@ -95,6 +97,8 @@ export interface CreatePackageInput {
   definition?: PackageDefinition | null;
   /** Tag IDs (workspace_tags.id). Linked via package_tags. */
   tagIds?: string[] | null;
+  /** Whether this item is subject to sales tax. Defaults true for rental/retail_sale; false for service/talent/fee. */
+  is_taxable?: boolean;
 }
 
 export interface UpdatePackageInput {
@@ -116,6 +120,8 @@ export interface UpdatePackageInput {
   definition?: PackageDefinition | null;
   /** Tag IDs (workspace_tags.id). Replaces package_tags for this package. */
   tagIds?: string[] | null;
+  /** Whether this item is subject to sales tax. */
+  is_taxable?: boolean;
 }
 
 export interface CreatePackageResult {
@@ -236,6 +242,7 @@ export async function createPackage(
       replacement_cost: replacementCost,
       buffer_days: bufferDays,
       is_active: true,
+      is_taxable: input.is_taxable ?? true,
       definition: input.definition ?? null,
     })
     .select()
@@ -294,6 +301,7 @@ export async function updatePackage(
     updates.buffer_days = v;
   }
   if (input.definition !== undefined) updates.definition = input.definition;
+  if (input.is_taxable !== undefined) updates.is_taxable = input.is_taxable;
   if (input.tagIds !== undefined) {
     await supabase.from('package_tags').delete().eq('package_id', packageId);
     const ids = (input.tagIds ?? []).filter(Boolean);

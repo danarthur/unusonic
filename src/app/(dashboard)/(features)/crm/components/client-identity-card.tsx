@@ -12,11 +12,12 @@ import {
   SheetBody,
 } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { updateClientAddress } from '../actions/update-client-address';
 import { updatePrivateNotes } from '@/features/network/api/actions';
+import { toast } from 'sonner';
 
 type ClientSummaryCardProps = {
   client: DealClientContext | null;
@@ -75,7 +76,7 @@ export function ClientSummaryCard({ client, compact }: ClientSummaryCardProps) {
         onClick={() => setDrawerOpen(true)}
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
         className={cn(
           'w-full text-left rounded-2xl border border-white/10 backdrop-blur-xl overflow-hidden',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',
@@ -170,7 +171,9 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
 
   const handleSaveNotes = () => {
     startNotesSave(async () => {
-      await updatePrivateNotes(organization.id, notesDraft.trim() || null, null);
+      const result = await updatePrivateNotes(organization.id, notesDraft.trim() || null, null);
+      if (!result.ok) toast.error('Failed to save notes.');
+      else toast.success('Notes saved.');
     });
   };
 
@@ -178,7 +181,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col w-full max-w-md">
         <SheetHeader className="border-b border-white/10 px-6 py-5">
-          <SheetTitle className="text-ceramic font-medium tracking-tight">
+          <SheetTitle>
             Client
           </SheetTitle>
           <SheetClose className="text-ink-muted hover:text-ceramic" />
@@ -241,7 +244,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
               onChange={(e) => setAddressDraft(e.target.value)}
               onBlur={handleSaveAddress}
               rows={3}
-              className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-ceramic placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="w-full rounded-xl border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5 text-sm text-ceramic placeholder:text-ink-muted/60 focus:outline-none focus:border-[var(--color-silk)]/60"
               placeholder="Street, City, State, Postal code, Country"
             />
             {savingAddress && (
@@ -270,7 +273,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
               onChange={(e) => setNotesDraft(e.target.value)}
               onBlur={handleSaveNotes}
               rows={4}
-              className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-ceramic placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="w-full rounded-xl border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5 text-sm text-ceramic placeholder:text-ink-muted/60 focus:outline-none focus:border-[var(--color-silk)]/60"
               placeholder="e.g. Prefers texts over calls. Always wants premium lighting."
             />
             {savingNotes && (

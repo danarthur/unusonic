@@ -1,7 +1,9 @@
 'use server';
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
+import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { OrgConnectionItem, RelationshipType } from '../model/types';
 
 /** Maps cortex relationship_type back to the legacy RelationshipType enum. */
@@ -15,20 +17,20 @@ function cortexTypeToRelType(cortexType: string): RelationshipType {
   }
 }
 
-/**
- * List org_relationships for a source org (my Rolodex).
- * Prefers cortex.relationships (new schema); falls back to org_relationships.
- * RLS: only source_org members can see.
- */
+/** List cortex relationships for a source org (my Rolodex). */
 export async function listOrgRelationships(sourceOrgId: string): Promise<OrgConnectionItem[]> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return [];
+
   const supabase = await createClient();
 
-  // Prefer cortex.relationships (new schema)
+  // Resolve source entity — workspace-scoped; accepts direct entity UUID or legacy_org_id
   const { data: sourceEntity } = await supabase
     .schema('directory')
     .from('entities')
     .select('id')
-    .eq('legacy_org_id', sourceOrgId)
+    .or(`id.eq.${sourceOrgId},legacy_org_id.eq.${sourceOrgId}`)
+    .eq('owner_workspace_id', workspaceId)
     .maybeSingle();
 
   if (sourceEntity) {
@@ -76,39 +78,5 @@ export async function listOrgRelationships(sourceOrgId: string): Promise<OrgConn
     }
   }
 
-  // Fallback: org_relationships (legacy — active until Session 9 cutover)
-  const { data: rels, error: relError } = await supabase
-    .from('org_relationships')
-    .select('id, source_org_id, target_org_id, type, notes, created_at')
-    .eq('source_org_id', sourceOrgId)
-    .order('created_at', { ascending: false });
-
-  if (relError || !rels?.length) return [];
-
-  const targetIds = [...new Set(rels.map((r) => r.target_org_id))];
-  const { data: orgs } = await supabase
-    .from('organizations')
-    .select('id, name, is_ghost, address')
-    .in('id', targetIds);
-
-  const orgMap = new Map((orgs ?? []).map((o) => [o.id, o]));
-  return rels.map((r) => {
-    const target = orgMap.get(r.target_org_id);
-    return {
-      id: r.id,
-      source_org_id: r.source_org_id,
-      target_org_id: r.target_org_id,
-      type: r.type as RelationshipType,
-      notes: r.notes,
-      created_at: r.created_at,
-      target_org: target
-        ? {
-            id: target.id,
-            name: target.name,
-            is_ghost: (target as { is_ghost?: boolean }).is_ghost ?? false,
-            address: (target.address as { city?: string; state?: string } | null) ?? null,
-          }
-        : { id: r.target_org_id, name: 'Unknown', is_ghost: false, address: null },
-    };
-  });
+  return [];
 }

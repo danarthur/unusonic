@@ -9,7 +9,7 @@ import { getOrgDetails } from '@/features/org-management/api';
 import { IdentityArchitect } from '@/features/org-identity';
 
 export const metadata = {
-  title: 'Establish Identity | Settings | Signal',
+  title: 'Establish Identity | Settings | Unusonic',
   description: 'Craft the artifact that other companies see when they connect with you.',
 };
 

@@ -26,7 +26,7 @@ import {
 } from '@/features/sales/api/workspace-tag-actions';
 import { SmartTagInput } from '@/shared/ui/smart-tag-input';
 import { CurrencyInput } from '@/shared/ui/currency-input';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import {
   Dialog,
   DialogContent,
@@ -99,6 +99,7 @@ export default function CatalogPage() {
   const [isSubRental, setIsSubRental] = useState(false);
   const [replacementCost, setReplacementCost] = useState('');
   const [bufferDays, setBufferDays] = useState('');
+  const [isTaxable, setIsTaxable] = useState(true);
 
   const allTags = useMemo(() => {
     const seen = new Map<string, WorkspaceTag>();
@@ -158,6 +159,12 @@ export default function CatalogPage() {
     }
   }, [activeCategoryTab]);
 
+  // Auto-set taxable default when category changes during create (not edit)
+  useEffect(() => {
+    if (!modalOpen || editingId) return;
+    setIsTaxable(category !== 'service' && category !== 'fee');
+  }, [category, modalOpen, editingId]);
+
   const openCreate = () => {
     setEditingId(null);
     setName('');
@@ -171,6 +178,7 @@ export default function CatalogPage() {
     setIsSubRental(false);
     setReplacementCost('');
     setBufferDays('');
+    setIsTaxable(true);
     setFormError(null);
     setModalOpen(true);
   };
@@ -186,6 +194,7 @@ export default function CatalogPage() {
     setSelectedTags(
       (pkg.tags ?? []).map((t) => ({ ...t, workspace_id: pkg.workspace_id }))
     );
+    setIsTaxable((pkg as typeof pkg & { is_taxable?: boolean | null }).is_taxable !== false);
     const row = pkg as PackageWithTags & { stock_quantity?: number; is_sub_rental?: boolean; replacement_cost?: number | null; buffer_days?: number };
     if ((pkg.category as string) === 'rental') {
       setStockQuantity(row.stock_quantity != null ? String(row.stock_quantity) : '');
@@ -251,6 +260,7 @@ export default function CatalogPage() {
         price: priceNum,
         floor_price: floorPriceValue,
         target_cost: targetCostValue,
+        is_taxable: isTaxable,
         tagIds: tagIds.length ? tagIds : null,
         ...(category === 'rental'
           ? {
@@ -274,6 +284,7 @@ export default function CatalogPage() {
         price: priceNum,
         floor_price: floorPriceValue,
         target_cost: targetCostValue,
+        is_taxable: isTaxable,
         tagIds: tagIds.length ? tagIds : null,
         ...rentalPayload,
       });
@@ -347,18 +358,18 @@ export default function CatalogPage() {
             onClick={() => { setIonError(null); setIonModalOpen(true); }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-neon/40 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <LivingLogo size="sm" status="idle" />
-            Ask ION
+            Ask Aion
           </motion.button>
           <motion.button
             type="button"
             onClick={openCreate}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[var(--glass-border)] text-ceramic font-medium text-sm hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <Plus size={18} aria-hidden />
@@ -370,12 +381,12 @@ export default function CatalogPage() {
       <Dialog open={ionModalOpen} onOpenChange={setIonModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Ask ION</DialogTitle>
+            <DialogTitle>Ask Aion</DialogTitle>
             <DialogClose className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5" />
           </DialogHeader>
           <div className="px-6 pb-6 flex flex-col gap-4">
             <p className="text-sm text-ink-muted">
-              Describe the package you want. ION will create it and open the builder so you can tweak it.
+              Describe the package you want. Aion will create it and open the builder so you can tweak it.
             </p>
             <textarea
               value={ionPrompt}
@@ -393,10 +404,10 @@ export default function CatalogPage() {
               disabled={ionLoading || !ionPrompt.trim()}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className="w-full py-2.5 rounded-xl border border-neon/50 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20 disabled:opacity-50"
             >
-              {ionLoading ? 'Creating…' : 'Create with ION'}
+              {ionLoading ? 'Creating…' : 'Create with Aion'}
             </motion.button>
           </div>
         </DialogContent>
@@ -418,7 +429,7 @@ export default function CatalogPage() {
               onClick={openCreate}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[var(--glass-border)] text-ceramic font-medium text-sm hover:bg-[var(--glass-bg-hover)]"
             >
               <Plus size={18} /> New Item
@@ -427,17 +438,17 @@ export default function CatalogPage() {
           <LiquidPanel className="p-8 rounded-[28px] border border-neon/30 bg-neon/5 flex flex-col">
             <div className="flex items-center gap-3 mb-3">
               <LivingLogo size="md" status="idle" className="shrink-0" />
-              <h3 className="text-lg font-medium text-ceramic tracking-tight">Ask ION</h3>
+              <h3 className="text-lg font-medium text-ceramic tracking-tight">Ask Aion</h3>
             </div>
             <p className="text-sm text-ink-muted mb-4 flex-1">
-              Describe the package you want in plain language. ION will create it from your catalog and open the builder.
+              Describe the package you want in plain language. Aion will create it from your catalog and open the builder.
             </p>
             <motion.button
               type="button"
               onClick={() => { setIonError(null); setIonModalOpen(true); }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-neon/50 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20"
             >
               <LivingLogo size="sm" status="idle" /> Describe & create
@@ -521,7 +532,7 @@ export default function CatalogPage() {
                 onClick={() => setViewMode('grid')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className={cn(
                   'p-2.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
                   viewMode === 'grid'
@@ -538,7 +549,7 @@ export default function CatalogPage() {
                 onClick={() => setViewMode('table')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className={cn(
                   'p-2.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
                   viewMode === 'table'
@@ -576,7 +587,7 @@ export default function CatalogPage() {
                       animate={{ opacity: 1, y: 0 }}
                       whileHover={{ scale: 1.02, filter: 'brightness(1.1)' }}
                       whileTap={{ scale: 0.98 }}
-                      transition={SIGNAL_PHYSICS}
+                      transition={UNUSONIC_PHYSICS}
                       className={cn(
                         'liquid-card p-6 rounded-[28px] flex flex-col gap-4',
                         !pkg.is_active && 'opacity-70 border-dashed'
@@ -651,7 +662,7 @@ export default function CatalogPage() {
                           onClick={() => handleArchive(pkg)}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          transition={SIGNAL_PHYSICS}
+                          transition={UNUSONIC_PHYSICS}
                           className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                           aria-label={pkg.is_active ? 'Archive' : 'Restore'}
                         >
@@ -714,7 +725,7 @@ export default function CatalogPage() {
                         layout
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={SIGNAL_PHYSICS}
+                        transition={UNUSONIC_PHYSICS}
                         className={cn(
                           'border-b border-[var(--glass-border)] last:border-b-0 hover:bg-white/[0.02]',
                           !pkg.is_active && 'opacity-70'
@@ -779,7 +790,7 @@ export default function CatalogPage() {
                               onClick={() => handleArchive(pkg)}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
-                              transition={SIGNAL_PHYSICS}
+                              transition={UNUSONIC_PHYSICS}
                               className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                               aria-label={pkg.is_active ? 'Archive' : 'Restore'}
                             >
@@ -1177,6 +1188,23 @@ export default function CatalogPage() {
                     <p className="text-xs text-ink-muted mt-1">Days needed for cleaning/prep before it can be rented again.</p>
                   </div>
                 </div>
+              </div>
+            )}
+            {category !== 'package' && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-4 py-3 bg-white/[0.02]">
+                <div>
+                  <p className="text-sm font-medium text-ceramic">Taxable</p>
+                  <p className="text-xs text-ink-muted mt-0.5">Include sales tax on this item when added to a proposal.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isTaxable}
+                    onChange={(e) => setIsTaxable(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:bg-[var(--color-neon)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-obsidian after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
+                </label>
               </div>
             )}
             <div className="flex gap-3 pt-2">

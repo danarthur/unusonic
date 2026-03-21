@@ -1,5 +1,5 @@
 /**
- * ION – AI package definition generator (Guarded Garden + RAG).
+ * Aion – AI package definition generator (Guarded Garden + RAG).
  * Server actions only; schema and types live in package-generator-schema.ts.
  * @module features/ai/tools/package-generator
  */
@@ -19,7 +19,7 @@ import {
   type CreatePackageWithIONResult,
 } from '@/features/ai/tools/package-generator-schema';
 
-const ION_SYSTEM = `You are ION, an AI that builds package definitions for an event-production catalog. You output strict JSON matching the given schema.
+const ION_SYSTEM = `You are Aion, an AI that builds package definitions for an event-production catalog. You output strict JSON matching the given schema.
 
 Block types you can use (catalog only — no signatures; those belong on the deal/proposal):
 - header_hero: Package image and title. content: { image?: string, title?: string }
@@ -33,7 +33,7 @@ Rules:
 4. Keep blocks ordered logically (package image → description/terms → line item groups).
 5. staffing: set only if the package is a service that requires a role (e.g. DJ, Photographer). Otherwise omit or null.`;
 
-/** Fetch workspace catalog for ION to use real IDs in line_item_group items. */
+/** Fetch workspace catalog for Aion to use real IDs in line_item_group items. */
 export async function getCatalogForION(
   workspaceId: string
 ): Promise<GetCatalogForIONResult> {
@@ -86,12 +86,12 @@ export async function generatePackageDefinition(
 
     return { definition: object as PackageDefinitionGenerated };
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'ION could not generate the package.';
+    const message = err instanceof Error ? err.message : 'Aion could not generate the package.';
     return { definition: null, error: message };
   }
 }
 
-// —— Catalog page: create new package from ION (name + price + definition) ——
+// —— Catalog page: create new package from Aion (name + price + definition) ——
 
 const ionFullPackageSchema = z.object({
   suggestedName: z.string().describe('Short package name for the catalog, e.g. "Luxury Wedding Package"'),
@@ -153,7 +153,7 @@ export async function createPackageWithION(
     }
     return { packageId: created.package.id };
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'ION could not create the package.';
+    const message = err instanceof Error ? err.message : 'Aion could not create the package.';
     return { packageId: null, error: message };
   }
 }

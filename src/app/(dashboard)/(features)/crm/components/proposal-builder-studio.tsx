@@ -12,7 +12,7 @@ import { getPackages, getProposalForDeal, addPackageToProposal, revertProposalTo
 import type { DealDetail } from '../actions/get-deal';
 import type { ProposalWithItems } from '@/features/sales/model/types';
 import type { Package as PackageType } from '@/types/supabase';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const CATALOG_DROPPABLE = 'catalog';
@@ -168,7 +168,7 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 bg-[var(--color-neon-amber)]/5 text-ink-muted text-sm"
           >
             <div className="flex items-center gap-3">

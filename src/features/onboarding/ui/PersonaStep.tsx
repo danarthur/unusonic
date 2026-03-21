@@ -1,5 +1,5 @@
 /**
- * PersonaStep – ION quick-reply suggestions
+ * PersonaStep – Aion quick-reply suggestions
  * Compact glass cards that feel like chat options.
  * @module features/onboarding/ui/PersonaStep
  */

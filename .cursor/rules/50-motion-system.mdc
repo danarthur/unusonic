@@ -39,9 +39,9 @@ export const SIGNAL_PHYSICS = {
 
 ## 2. MATERIAL DESIGN 3 (M3) TRANSITION PATTERNS
 
-M3 defines [four primary transition patterns](https://m3.material.io/styles/motion/transitions/transition-patterns) for navigation and choreography. Map Signal flows to these so motion stays consistent and predictable.
+M3 defines [four primary transition patterns](https://m3.material.io/styles/motion/transitions/transition-patterns) for navigation and choreography. Map Unusonic flows to these so motion stays consistent and predictable.
 
-| Pattern | When to use | Signal mapping |
+| Pattern | When to use | Unusonic mapping |
 | --- | --- | --- |
 | **Container transform** | One container morphs into another; shared focus. | **Sign In → Create Account:** card exits, full-bleed shell appears; shared logo via `layoutId`. |
 | **Shared axis** | Same content moves along X, Y, or Z (e.g. list → detail). | Stepper flows (name → email → password); horizontal or vertical shared axis. |

@@ -1,0 +1,28 @@
+---
+description: Supabase schema standards, RLS security policies, and SQL migration rules.
+globs: ["supabase/**/*", "**/*.sql", "src/shared/api/supabase/**/*", "src/types/supabase.ts"]
+---
+# 🛡️ SUPABASE INTEGRITY PROTOCOL
+
+## 1. SCHEMA MIRRORING
+**Before suggesting any database change:**
+1. You MUST read `src/types/supabase.ts` or `supabase/migrations` to understand the current state.
+2. **Constraint:** Do NOT suggest creating a table that already exists.
+3. **Constraint:** Do NOT use `public` schema for internal logic if `app` schema exists.
+
+## 2. RLS & MULTI-TENANCY
+**Every table MUST have:**
+- A `workspace_id` column (UUID).
+- RLS enabled (`alter table x enable row level security;`).
+- A policy ensuring tenant isolation.
+
+## 3. MIGRATION WORKFLOW
+1. **Analyze:** Check for existing data structures.
+2. **Propose:** Write the SQL migration first (in a code block).
+3. **Verify:** Explain how the RLS policy protects data.
+4. **Execute:** Only after user approval, generate types (`npm run db:gen-types`).
+
+## 4. CLIENT RULES
+- **Server:** Use `@/shared/api/supabase/server`.
+- **Browser:** Use `@/shared/api/supabase/client`.
+- **Forbidden:** Never use `service_role` key in client components.

@@ -8,16 +8,16 @@ export const PYTHON_BACKEND_URL =
 
 // Site Information
 export const SITE_CONFIG = {
-  title: 'Signal',
+  title: 'Unusonic',
   description: 'The Event Operating System',
-  owner: 'ION',
-  contactEmail: 'hello@runsignal.live',
-  socialX: 'https://x.com/runsignal_live',
+  owner: 'Aion',
+  contactEmail: 'hello@unusonic.com',
+  socialX: 'https://x.com/unusonic',
 } as const;
 
 // API Routes
 export const API_ROUTES = {
-  ion: '/api/ion',
+  aion: '/api/aion',
   capture: '/api/capture',
 } as const;
 
@@ -25,6 +25,6 @@ export const API_ROUTES = {
 /** Inactivity logout after this many ms when device is not trusted. */
 export const INACTIVITY_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes
 /** Cookie name for "trust this device" (keep me signed in). */
-export const TRUSTED_DEVICE_COOKIE_NAME = 'signal_trusted_device';
+export const TRUSTED_DEVICE_COOKIE_NAME = 'unusonic_trusted_device';
 /** Max age for trusted-device cookie (1 year). */
 export const TRUSTED_DEVICE_COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;

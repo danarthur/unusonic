@@ -31,4 +31,6 @@ export interface PublicProposalDTO {
   workspace: PublicProposalWorkspace;
   items: PublicProposalItem[];
   total: number;
+  /** DocuSeal embed URL for in-page e-signature. Null when status is accepted or DocuSeal is not configured. */
+  embedSrc: string | null;
 }

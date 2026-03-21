@@ -7,7 +7,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
-import type { PaymentMethod } from '@/types/supabase';
+type PaymentMethod = 'credit_card' | 'wire' | 'check' | 'cash' | 'stripe';
 
 // =============================================================================
 // Generate invoice from proposal
@@ -72,7 +72,7 @@ export async function recordManualPayment(
     .from('payments')
     .insert({
       invoice_id: invoiceId,
-      amount: String(amount),
+      amount: Number(amount),
       method,
       status: 'succeeded',
       reference_id: reference ?? null,

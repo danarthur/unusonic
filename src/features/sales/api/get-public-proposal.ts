@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 /**
  * Sales feature – Fetch public proposal by token (client portal)
  * Uses service-role client to bypass RLS; only returns data for matching public_token.

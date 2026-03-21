@@ -2,6 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import type { Json } from '@/types/supabase';
 
 export type DealDetail = {
   id: string;
@@ -16,6 +17,7 @@ export type DealDetail = {
   organization_id: string | null;
   main_contact_id: string | null;
   venue_id: string | null;
+  preferred_crew: Json | null;
 };
 
 export async function getDeal(dealId: string): Promise<DealDetail | null> {
@@ -25,7 +27,7 @@ export async function getDeal(dealId: string): Promise<DealDetail | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('deals')
-    .select('id, workspace_id, title, status, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id')
+    .select('id, workspace_id, title, status, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, preferred_crew')
     .eq('id', dealId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -45,6 +47,7 @@ export async function getDeal(dealId: string): Promise<DealDetail | null> {
     organization_id: (r.organization_id as string) ?? null,
     main_contact_id: (r.main_contact_id as string) ?? null,
     venue_id: (r.venue_id as string) ?? null,
+    preferred_crew: (r.preferred_crew as Json) ?? null,
   };
 }
 
@@ -56,7 +59,7 @@ export async function getDealByEventId(eventId: string): Promise<DealDetail | nu
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('deals')
-    .select('id, workspace_id, title, status, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id')
+    .select('id, workspace_id, title, status, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, preferred_crew')
     .eq('event_id', eventId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -76,5 +79,6 @@ export async function getDealByEventId(eventId: string): Promise<DealDetail | nu
     organization_id: (r.organization_id as string) ?? null,
     main_contact_id: (r.main_contact_id as string) ?? null,
     venue_id: (r.venue_id as string) ?? null,
+    preferred_crew: (r.preferred_crew as Json) ?? null,
   };
 }

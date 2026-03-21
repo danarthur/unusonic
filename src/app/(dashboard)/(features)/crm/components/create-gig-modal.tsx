@@ -13,7 +13,7 @@ import { searchOmni, getVenueSuggestions, type OmniResult, type VenueSuggestion 
 import { CalendarPanel, parseLocalDateString } from './ceramic-date-picker';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { cn } from '@/shared/lib/utils';
-import { SIGNAL_PHYSICS, M3_SHARED_AXIS_Y_VARIANTS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS, M3_SHARED_AXIS_Y_VARIANTS } from '@/shared/lib/motion-constants';
 import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
 import type { OptimisticUpdate } from './crm-production-queue';
@@ -437,7 +437,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             onMouseDown={onClose}
             onKeyDown={(e) => e.key === 'Escape' && onClose()}
             role="button"
@@ -450,7 +450,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -476,7 +476,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className="space-y-4 min-w-0"
               >
                 <div ref={dateBlockRef} className="space-y-4 min-w-0">
@@ -549,7 +549,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                         initial={M3_SHARED_AXIS_Y_VARIANTS.hidden}
                         animate={M3_SHARED_AXIS_Y_VARIANTS.visible}
                         exit={{ opacity: 0, y: -12 }}
-                        transition={SIGNAL_PHYSICS}
+                        transition={UNUSONIC_PHYSICS}
                         className="w-full min-w-0"
                       >
                         <CalendarPanel
@@ -583,7 +583,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className="space-y-4 min-w-0"
               >
             <div className="space-y-4 min-w-0">

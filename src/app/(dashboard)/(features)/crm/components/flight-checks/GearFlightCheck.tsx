@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { updateFlightCheckStatus } from '../../actions/update-flight-check-status';
 import { normalizeGearItems, type GearItem, type GearStatus } from './types';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
@@ -95,7 +95,7 @@ export function GearFlightCheck({
             layout
             initial={false}
             animate={{ opacity: 1 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0"
           >
             <span className="text-ceramic font-medium tracking-tight text-sm truncate min-w-0">
@@ -107,7 +107,7 @@ export function GearFlightCheck({
               disabled={updating === item.id}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className={`
                 shrink-0 px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight
                 border transition-colors

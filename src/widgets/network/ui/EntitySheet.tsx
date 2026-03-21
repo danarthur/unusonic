@@ -103,7 +103,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
           <>
             <SheetHeader>
               <SheetTitle>
-                {isOrg ? org!.name : entity!.email}
+                {isOrg ? org!.name : (entity!.email || 'Contact')}
               </SheetTitle>
               <SheetClose />
             </SheetHeader>
@@ -138,7 +138,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                   )}
                   {!isOrg && entity && (
                     <>
-                      <p className="text-sm text-[var(--color-ink-muted)]">{entity.email}</p>
+                      {entity.email && <p className="text-sm text-[var(--color-ink-muted)]">{entity.email}</p>}
                       {entity.organization_names?.length ? (
                         <div className="flex flex-wrap gap-1">
                           {entity.organization_names.map((name) => (
@@ -267,7 +267,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                       >
                         <div className="min-w-0 flex-1">
                           <span className="text-sm font-medium text-[var(--color-ink)]">
-                            {person.email}
+                            {person.email || 'Contact'}
                           </span>
                           {rosterPerson.skill_tags?.length ? (
                             <div className="mt-1 flex flex-wrap gap-1">

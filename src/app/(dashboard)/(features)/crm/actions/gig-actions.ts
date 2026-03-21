@@ -1,4 +1,5 @@
 'use server';
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';

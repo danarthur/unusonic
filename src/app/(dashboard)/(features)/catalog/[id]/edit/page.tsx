@@ -23,7 +23,7 @@ import {
 } from '@/features/sales/api/workspace-tag-actions';
 import { SmartTagInput } from '@/shared/ui/smart-tag-input';
 import { CurrencyInput } from '@/shared/ui/currency-input';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const CATEGORIES: { value: PackageCategory; label: string }[] = [
@@ -759,7 +759,7 @@ export default function CatalogEditPage() {
               disabled={saving}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)] font-medium text-sm hover:bg-[var(--color-neon-amber)]/20 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               {saving ? 'Saving…' : 'Save'}

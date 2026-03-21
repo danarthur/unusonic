@@ -1,0 +1,277 @@
+'use client';
+
+import * as React from 'react';
+import { User, Camera, Check, X } from 'lucide-react';
+import { createClient } from '@/shared/api/supabase/client';
+import { cn } from '@/shared/lib/utils';
+import { toast } from 'sonner';
+import { Button } from '@/shared/ui/button';
+
+const BUCKET = 'org-assets';
+const ACCEPT = 'image/png,image/jpeg,image/webp';
+const CROP_SIZE = 240;
+const OUTPUT_SIZE = 256;
+
+export interface AvatarUploadProps {
+  orgId: string;
+  value?: string | null;
+  onChange: (url: string) => void;
+  className?: string;
+}
+
+/**
+ * Circular avatar upload: pick file → adjust position & zoom in circle → upload cropped result.
+ */
+export function AvatarUpload({ orgId, value, onChange, className }: AvatarUploadProps) {
+  const [uploading, setUploading] = React.useState(false);
+  const [pendingFile, setPendingFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+  const [crop, setCrop] = React.useState({ x: 0, y: 0, scale: 1 });
+  const [imageSize, setImageSize] = React.useState({ w: 0, h: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const dragStart = React.useRef({ x: 0, y: 0, cropX: 0, cropY: 0 });
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const imgRef = React.useRef<HTMLImageElement | null>(null);
+
+  const clearPending = React.useCallback(() => {
+    setPendingFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setCrop({ x: 0, y: 0, scale: 1 });
+  }, [previewUrl]);
+
+  const handleFileSelect = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      setPendingFile(file);
+      setCrop({ x: 0, y: 0, scale: 1 });
+    },
+    []
+  );
+
+  const onImageLoad = React.useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    setImageSize({ w, h });
+  }, []);
+
+  const handleCropConfirm = React.useCallback(async () => {
+    const img = imgRef.current;
+    const file = pendingFile;
+    if (!img || !file || !img.complete || imageSize.w === 0) return;
+    const base = CROP_SIZE / Math.min(imageSize.w, imageSize.h);
+
+    setUploading(true);
+    try {
+      const blob = await cropImageToCircle(img, imageSize.w, imageSize.h, crop, base, OUTPUT_SIZE);
+      const supabase = createClient();
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `avatars/${orgId}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, blob, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      onChange(urlData.publicUrl);
+      clearPending();
+    } catch {
+      toast.error('Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }, [pendingFile, orgId, onChange, crop, imageSize.w, imageSize.h, clearPending]);
+
+  const handleCropCancel = React.useCallback(() => {
+    clearPending();
+  }, [clearPending]);
+
+  const handleCropPointerDown = React.useCallback(
+    (e: React.PointerEvent) => {
+      if (!pendingFile) return;
+      e.preventDefault();
+      setIsDragging(true);
+      dragStart.current = { x: e.clientX, y: e.clientY, cropX: crop.x, cropY: crop.y };
+    },
+    [pendingFile, crop.x, crop.y]
+  );
+
+  React.useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: PointerEvent) => {
+      setCrop((prev) => ({
+        ...prev,
+        x: dragStart.current.cropX + (e.clientX - dragStart.current.x),
+        y: dragStart.current.cropY + (e.clientY - dragStart.current.y),
+      }));
+    };
+    const onUp = () => setIsDragging(false);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [isDragging]);
+
+  const canEditCrop = pendingFile && imageSize.w >= CROP_SIZE / 2 && imageSize.h >= CROP_SIZE / 2;
+  const baseScale = imageSize.w && imageSize.h ? CROP_SIZE / Math.min(imageSize.w, imageSize.h) : 1;
+  const displayScale = baseScale * crop.scale;
+
+  return (
+    <div className={cn('flex flex-col items-center gap-3', className)}>
+      {pendingFile && previewUrl ? (
+        <div className="flex flex-col items-center gap-4">
+          <div
+            className="relative rounded-full overflow-hidden border-2 border-[var(--color-mercury)] bg-[var(--color-obsidian)] select-none"
+            style={{ width: CROP_SIZE, height: CROP_SIZE }}
+          >
+            <div
+              className="absolute inset-0 flex items-center justify-center cursor-move touch-none"
+              style={{ clipPath: 'circle(50% at 50% 50%)' }}
+              onPointerDown={handleCropPointerDown}
+            >
+              <img
+                ref={imgRef}
+                src={previewUrl}
+                alt="Crop preview"
+                className="max-w-none pointer-events-none"
+                style={{
+                  width: imageSize.w ? imageSize.w * displayScale : 'auto',
+                  height: imageSize.h ? imageSize.h * displayScale : 'auto',
+                  transform: `translate(${crop.x}px, ${crop.y}px)`,
+                }}
+                onLoad={onImageLoad}
+                draggable={false}
+              />
+            </div>
+          </div>
+          {canEditCrop && (
+            <>
+              <p className="text-xs text-[var(--color-ink-muted)]">Drag to reposition</p>
+              <div className="flex items-center gap-3 w-full max-w-[200px]">
+                <span className="text-xs text-[var(--color-ink-muted)] shrink-0">Zoom</span>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={3}
+                  step={0.05}
+                  value={crop.scale}
+                  onChange={(e) => setCrop((p) => ({ ...p, scale: Number(e.target.value) }))}
+                  className="flex-1 h-2 rounded-full appearance-none bg-white/10 accent-[var(--color-silk)]"
+                />
+              </div>
+            </>
+          )}
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={handleCropCancel} className="gap-1">
+              <X className="size-4" />
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleCropConfirm}
+              disabled={uploading}
+              className="gap-1 bg-[var(--color-silk)]/90 text-[var(--color-canvas)] hover:bg-[var(--color-silk)]"
+            >
+              {uploading ? 'Uploading…' : (
+                <>
+                  <Check className="size-4" />
+                  Apply
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className={cn(
+              'relative size-24 shrink-0 rounded-full border-2 border-[var(--color-mercury)] flex items-center justify-center overflow-hidden',
+              'bg-white/5 hover:border-[var(--color-silk)]/50 hover:bg-white/10 transition-colors cursor-pointer group',
+              uploading && 'opacity-60 pointer-events-none'
+            )}
+          >
+            {value ? (
+              <img src={value} alt="Avatar" className="size-full object-cover" />
+            ) : (
+              <User className="size-10 text-[var(--color-ink-muted)] group-hover:text-[var(--color-silk)] transition-colors" />
+            )}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+              <Camera className="size-6 text-white" />
+            </div>
+            {uploading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                <span className="text-xs text-white">Uploading…</span>
+              </div>
+            )}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPT}
+            className="hidden"
+            onChange={handleFileSelect}
+            disabled={uploading}
+          />
+          <span className="text-xs text-[var(--color-ink-muted)]">Upload photo</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Draw the image cropped to a circle (current crop state) and return as blob.
+ * baseScale = CROP_SIZE / min(imgW, imgH); totalScale = baseScale * crop.scale.
+ */
+async function cropImageToCircle(
+  img: HTMLImageElement,
+  imgW: number,
+  imgH: number,
+  crop: { x: number; y: number; scale: number },
+  baseScale: number,
+  outSize: number
+): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = outSize;
+  canvas.height = outSize;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2d not available');
+
+  const r = outSize / 2;
+  ctx.beginPath();
+  ctx.arc(r, r, r, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+
+  const totalScale = baseScale * crop.scale;
+  const half = CROP_SIZE / 2;
+  const side = CROP_SIZE / totalScale;
+  const cx = imgW / 2 - crop.x / totalScale - half / totalScale;
+  const cy = imgH / 2 - crop.y / totalScale - half / totalScale;
+  const sx = Math.max(0, Math.min(cx, imgW - side));
+  const sy = Math.max(0, Math.min(cy, imgH - side));
+  const sw = Math.min(side, imgW - sx);
+  const sh = Math.min(side, imgH - sy);
+
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outSize, outSize);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))),
+      'image/png',
+      0.92
+    );
+  });
+}

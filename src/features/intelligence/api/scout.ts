@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 /**
  * Signal Scout v3 — Sub-Agent Architecture (One-Way Mirror)
  * Fetches HTML, runs focused sub-agents (Contact, Identity, Classification),

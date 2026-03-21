@@ -1,0 +1,96 @@
+---
+description: Next.js 16 App Router patterns, React 19 Server Actions, FSD architecture, and State Management.
+globs: ["src/app/**/*", "src/features/**/*", "src/widgets/**/*", "src/shared/**/*", "src/types/**/*"]
+---
+# ⚡️ NEXT.JS 16 & REACT 19 CORE STANDARDS
+
+## 1. CRITICAL ASYNC CONSTRAINTS (Next.js 16)
+**Dynamic APIs are now asynchronous. You MUST await them.**
+- **Params:** `const { slug } = await params;`
+- **Search Params:** `const search = await searchParams;`
+- **Headers/Cookies:** `const c = await cookies();`
+- **Constraint:** NEVER access `.params` or `.searchParams` synchronously in a Page or Layout.
+
+## 2. REACT 19 ACTION PATTERNS
+We do not use `useEffect` for form submissions. We use **Server Actions**.
+
+- **Mutations:** Use `useActionState` (formerly `useFormState`) for all form submissions.
+  ```tsx
+  // src/features/login/ui/login-form.tsx
+  'use client';
+  import { useActionState } from 'react';
+  import { loginAction } from '../model/actions';
+
+  export function LoginForm() {
+    const [state, action, isPending] = useActionState(loginAction, null);
+    
+    return (
+      <form action={action}>
+        <input name="email" />
+        <button disabled={isPending}>Log In</button>
+        {state?.error && <p className="text-red-500">{state.error}</p>}
+      </form>
+    );
+  }
+  ```
+
+- **Optimistic UI:** Use `useOptimistic` for instant feedback on lists/cards.
+  ```tsx
+  const [optimisticItems, addOptimisticItem] = useOptimistic(
+    items,
+    (state, newItem) => [...state, { ...newItem, isPending: true }]
+  );
+  ```
+
+## 3. STATE MANAGEMENT PROTOCOL
+**Strict Separation of Concerns:**
+1.  **Server State (Data):** Use **TanStack Query** or direct Server Component fetching.
+    - *Do not put API data into Zustand.*
+2.  **Client State (UI):** Use **Zustand** for global UI state (e.g., Sidebar open/close, Player volume).
+3.  **URL State (Deep Linking):** Use **Nuqs** for search, pagination, and filters.
+    - *Do not use `useState` for things that should survive a refresh.*
+
+- **Nuqs Example:**
+  ```tsx
+  // src/features/search/model.ts
+  import { useQueryState, parseAsString } from 'nuqs';
+
+  export function useSearchFilters() {
+    const [query, setQuery] = useQueryState('q', parseAsString.defaultValue(''));
+    return { query, setQuery };
+  }
+  ```
+
+## 4. FEATURE-SLICED DESIGN (FSD) BOUNDARIES
+**Dependency Rule:** Layers can only import from layers **below** them.
+`App` -> `Widgets` -> `Features` -> `Entities` -> `Shared`
+
+- **App:** Routing & Layouts only. No business logic.
+- **Widgets:** Smart compositions (e.g., `GigKanbanBoard`). Connects data to UI.
+- **Features:** Specific user actions (e.g., `EditGigForm`).
+- **Entities:** Domain business logic (e.g., `GigCard`, `GigType`).
+- **Shared:** Reusable primitives (e.g., `Button`, `SupabaseClient`).
+
+## 5. DATA FETCHING & SECURITY
+- **Server Components:** Fetch data directly via `@/shared/api/supabase/server`.
+- **Client Components:** Fetch via Server Actions or TanStack Query.
+- **Security:** NEVER import `server-only` utils into Client Components.
+
+## 6. AI ENGINEERING (Vercel SDK)
+- **Constraint:** Use `streamText` from `ai` package.
+- **Deprecated:** Do NOT use `StreamingTextResponse` (Legacy).
+- **Pattern:**
+  ```ts
+  // src/app/api/chat/route.ts
+  import { streamText } from 'ai';
+  import { openai } from '@ai-sdk/openai';
+
+  export async function POST(req: Request) {
+    const { messages } = await req.json();
+    const result = streamText({
+      model: openai('gpt-4-turbo'),
+      messages,
+    });
+    return result.toDataStreamResponse();
+  }
+  ```

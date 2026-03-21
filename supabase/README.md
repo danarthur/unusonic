@@ -1,6 +1,6 @@
 # Supabase
 
-This folder holds Supabase config, migrations, edge functions, and backups for Signal Live.
+This folder holds Supabase config, migrations, edge functions, and backups for Unusonic.
 
 ## Layout
 

@@ -10,17 +10,25 @@ export type RelationshipType = 'vendor' | 'venue' | 'client_company' | 'partner'
 export type NetworkNode = {
   id: string;
   entityId: string;
-  kind: 'internal_employee' | 'external_partner';
+  kind: 'internal_employee' | 'extended_team' | 'external_partner';
   gravity: 'core' | 'inner_circle' | 'outer_orbit';
   identity: {
     name: string;
     avatarUrl: string | null;
     label: string;
+    /** Entity type from directory.entities.type — used to pick correct avatar icon */
+    entityType?: 'person' | 'company' | 'venue' | 'couple';
   };
   meta: {
     email?: string;
     phone?: string;
     tags?: string[];
+    doNotRebook?: boolean;
+    archived?: boolean;
+    /** Outstanding invoice balance for external_partner nodes. Only set when > 0. */
+    outstanding_balance?: number;
+    /** ISO date string from cortex.relationships.created_at — when this connection was established. */
+    connectedSince?: string;
   };
 };
 

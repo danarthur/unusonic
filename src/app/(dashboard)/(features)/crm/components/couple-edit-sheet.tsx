@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody, SheetFooter } from '@/shared/ui/sheet';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { Button } from '@/shared/ui/button';
 import { toast } from 'sonner';
@@ -86,37 +86,21 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
-        <SheetHeader className="border-b border-white/10 px-6 py-5">
-          <SheetTitle className="text-ceramic font-medium tracking-tight">Edit couple</SheetTitle>
+      <SheetContent side="center" className="flex flex-col max-w-sm p-0">
+        <SheetHeader>
+          <SheetTitle>Edit couple</SheetTitle>
           <SheetClose />
         </SheetHeader>
-        <SheetBody className="flex flex-col gap-5 px-6 py-5 overflow-y-auto">
+        <SheetBody className="flex flex-col gap-5">
           {/* Partner A */}
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-3">Partner A</p>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <FloatingLabelInput
-                  label="First name"
-                  value={partnerAFirst}
-                  onChange={(e) => setPartnerAFirst(e.target.value)}
-                  className="bg-white/5 border-[var(--color-mercury)]"
-                />
-                <FloatingLabelInput
-                  label="Last name"
-                  value={partnerALast}
-                  onChange={(e) => setPartnerALast(e.target.value)}
-                  className="bg-white/5 border-[var(--color-mercury)]"
-                />
+                <FloatingLabelInput label="First name" value={partnerAFirst} onChange={(e) => setPartnerAFirst(e.target.value)} />
+                <FloatingLabelInput label="Last name" value={partnerALast} onChange={(e) => setPartnerALast(e.target.value)} />
               </div>
-              <FloatingLabelInput
-                label="Email (optional)"
-                type="email"
-                value={partnerAEmail}
-                onChange={(e) => setPartnerAEmail(e.target.value)}
-                className="bg-white/5 border-[var(--color-mercury)]"
-              />
+              <FloatingLabelInput label="Email (optional)" type="email" value={partnerAEmail} onChange={(e) => setPartnerAEmail(e.target.value)} />
             </div>
           </div>
 
@@ -125,26 +109,10 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
             <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-3">Partner B</p>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <FloatingLabelInput
-                  label="First name"
-                  value={partnerBFirst}
-                  onChange={(e) => setPartnerBFirst(e.target.value)}
-                  className="bg-white/5 border-[var(--color-mercury)]"
-                />
-                <FloatingLabelInput
-                  label="Last name"
-                  value={partnerBLast}
-                  onChange={(e) => setPartnerBLast(e.target.value)}
-                  className="bg-white/5 border-[var(--color-mercury)]"
-                />
+                <FloatingLabelInput label="First name" value={partnerBFirst} onChange={(e) => setPartnerBFirst(e.target.value)} />
+                <FloatingLabelInput label="Last name" value={partnerBLast} onChange={(e) => setPartnerBLast(e.target.value)} />
               </div>
-              <FloatingLabelInput
-                label="Email (optional)"
-                type="email"
-                value={partnerBEmail}
-                onChange={(e) => setPartnerBEmail(e.target.value)}
-                className="bg-white/5 border-[var(--color-mercury)]"
-              />
+              <FloatingLabelInput label="Email (optional)" type="email" value={partnerBEmail} onChange={(e) => setPartnerBEmail(e.target.value)} />
             </div>
           </div>
 
@@ -174,18 +142,14 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
                 setDisplayName(e.target.value);
                 setDisplayNameMode('manual');
               }}
-              className="bg-white/5 border-[var(--color-mercury)]"
             />
           </div>
-
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full rounded-xl bg-[var(--color-neon-amber)]/20 text-[var(--color-neon-amber)] hover:bg-[var(--color-neon-amber)]/30"
-          >
+        </SheetBody>
+        <SheetFooter>
+          <Button variant="silk" onClick={handleSave} disabled={saving} className="h-11 w-full rounded-xl">
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
-        </SheetBody>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );

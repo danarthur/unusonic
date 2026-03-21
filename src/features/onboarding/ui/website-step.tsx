@@ -1,6 +1,6 @@
 /**
  * WebsiteStep – Ghost Writer 3-phase flow (Gemini pattern).
- * Phase 1: Minimal "magic" input. Phase 2: ION thinking (pulse + single-line status).
+ * Phase 1: Minimal "magic" input. Phase 2: Aion thinking (pulse + single-line status).
  * Phase 3: Proposal reveal (pre-filled Genesis card); user confirms, no form feel.
  * @module features/onboarding/ui/website-step
  */
@@ -16,12 +16,12 @@ import { scoutCompanyForOnboarding } from '../actions/scout-for-onboarding';
 import type { ScoutResult } from '@/features/intelligence';
 import type { UserPersona } from '../model/subscription-types';
 import { PATHFINDING_PERSONAS } from '../model/subscription-types';
-import { SIGNAL_PHYSICS, M3_DURATION_S, M3_EASING_ENTER, M3_EASING_EXIT } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS, M3_DURATION_S, M3_EASING_ENTER, M3_EASING_EXIT } from '@/shared/lib/motion-constants';
 
 /** Design system: The Signal Spring (20-design-system) */
 const springConfig = { type: 'spring' as const, stiffness: 200, damping: 20 };
 
-/** Single-line status messages during Phase 2 (cycles to show ION is working). */
+/** Single-line status messages during Phase 2 (cycles to show Aion is working). */
 const THINKING_STATUSES = [
   'Scanning your site…',
   'Detecting industry…',
@@ -150,7 +150,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                   aria-disabled={!url.trim()}
                   className={`btn-sheen-hover relative overflow-hidden flex-1 min-w-[140px] py-3 rounded-full font-medium text-sm tracking-tight text-ceramic border border-white/10 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)] bg-neon-blue flex items-center justify-center ${!url.trim() ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  <span className="relative z-10">Build with ION</span>
+                  <span className="relative z-10">Build with Aion</span>
                 </motion.button>
                 <motion.button
                   type="button"
@@ -200,7 +200,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
             className="w-full liquid-card liquid-levitation rounded-3xl border border-[var(--glass-border)] p-6 md:p-8 flex flex-col gap-6 md:gap-8"
           >
             <p className="text-xs uppercase tracking-widest text-mercury/60">
-              ION prepared this from your site — review and confirm.
+              Aion prepared this from your site — review and confirm.
             </p>
 
             {/* Profile */}
@@ -232,7 +232,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
               </p>
             </section>
 
-            {/* Commission level — ION recommended badge on suggested tier */}
+            {/* Commission level — Aion recommended badge on suggested tier */}
             <section>
               <TierSelector
                 value={selectedTier}

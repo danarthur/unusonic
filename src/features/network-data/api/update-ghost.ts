@@ -1,5 +1,5 @@
 /**
- * Update Ghost Organization profile. Only the org that created the ghost may update.
+ * Update Ghost Organization profile. Only the workspace that owns the ghost may update.
  * @module features/network-data/api/update-ghost
  */
 
@@ -8,6 +8,10 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
+import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { CompanyAttrsSchema } from '@/shared/lib/entity-attrs';
+import { COMPANY_ATTR } from '@/features/network-data/model/attribute-keys';
+import { ZodError } from 'zod';
 
 function nameValid(v: string): boolean {
   return typeof v === 'string' && v.trim().length > 1;
@@ -52,30 +56,10 @@ export async function updateGhostProfile(
   ghostOrgId: string,
   formData: FormData | UpdateGhostProfilePayload
 ): Promise<{ success?: true; error?: string }> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return { error: 'Unauthorized' };
+
   const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) return { error: 'Unauthorized' };
-
-  const { data: entity } = await supabase
-    .from('entities')
-    .select('id')
-    .eq('auth_id', user.id)
-    .maybeSingle();
-  if (!entity) return { error: 'Unauthorized' };
-
-  const { data: aff } = await supabase
-    .from('affiliations')
-    .select('organization_id')
-    .eq('entity_id', entity.id)
-    .in('access_level', ['admin', 'member', 'read_only'])
-    .limit(1)
-    .maybeSingle();
-  const currentOrgId = aff?.organization_id ?? null;
-  if (!currentOrgId) return { error: 'Unauthorized' };
 
   const isFormData = formData instanceof FormData;
   const name = isFormData
@@ -133,16 +117,30 @@ export async function updateGhostProfile(
     address = (formData as UpdateGhostProfilePayload).address ?? null;
   }
 
+  // Resolve entity — accepts both direct entity UUID and legacy_org_id
   const { data: ghost } = await supabase
-    .from('organizations')
-    .select('id, operational_settings')
-    .eq('id', ghostOrgId)
-    .eq('created_by_org_id', currentOrgId)
+    .schema('directory')
+    .from('entities')
+    .select('id, attributes')
+    .or(`id.eq.${ghostOrgId},legacy_org_id.eq.${ghostOrgId}`)
+    .eq('owner_workspace_id', workspaceId)
     .maybeSingle();
 
   if (!ghost) return { error: 'You do not have clearance to edit this entity.' };
 
-  const existingOps = (ghost.operational_settings as Record<string, unknown>) ?? {};
+  // Update display_name — workspace guard is defence-in-depth alongside RLS
+  const { error: nameError } = await supabase
+    .schema('directory')
+    .from('entities')
+    .update({ display_name: name.trim(), avatar_url: logoUrl })
+    .eq('id', ghost.id)
+    .eq('owner_workspace_id', workspaceId);
+
+  if (nameError) return { error: nameError.message };
+
+  // Merge operational settings safely
+  const existingAttrs = (ghost.attributes as Record<string, unknown>) ?? {};
+  const existingOps = (existingAttrs[COMPANY_ATTR.operational_settings] as Record<string, unknown>) ?? {};
   const ops: Record<string, unknown> = {
     ...existingOps,
     doing_business_as: doingBusinessAs ?? existingOps.doing_business_as ?? null,
@@ -152,24 +150,32 @@ export async function updateGhostProfile(
     phone: phoneVal ?? existingOps.phone ?? null,
   };
 
-  const { error } = await supabase
-    .from('organizations')
-    .update({
-      name: name.trim(),
-      website: website?.trim() || null,
-      brand_color: brandColor?.trim() || null,
-      logo_url: logoUrl?.trim() || null,
-      support_email: supportEmail?.trim() || null,
-      default_currency: defaultCurrency?.trim() || null,
-      address: address ?? null,
-      category: category as 'vendor' | 'venue' | 'coordinator' | 'client' | null,
-      operational_settings: ops,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', ghostOrgId);
+  const attrPatch: Record<string, unknown> = {
+    [COMPANY_ATTR.website]: website?.trim() || null,
+    [COMPANY_ATTR.brand_color]: brandColor?.trim() || null,
+    [COMPANY_ATTR.support_email]: supportEmail?.trim() || null,
+    [COMPANY_ATTR.default_currency]: defaultCurrency?.trim() || null,
+    [COMPANY_ATTR.operational_settings]: ops,
+    ...(address !== null ? { [COMPANY_ATTR.address]: address } : {}),
+    ...(category !== null ? { [COMPANY_ATTR.category]: category } : {}),
+  };
 
-  if (error) return { error: error.message };
+  // Validate attribute patch through schema before writing
+  try {
+    CompanyAttrsSchema.partial().parse(attrPatch);
+  } catch (err) {
+    if (err instanceof ZodError) return { error: 'Invalid field values.' };
+    throw err;
+  }
+
+  const { error: attrError } = await supabase.rpc('patch_entity_attributes', {
+    p_entity_id: ghost.id,
+    p_attributes: attrPatch,
+  });
+
+  if (attrError) return { error: attrError.message };
 
   revalidatePath('/network');
+  revalidatePath('/crm');
   return { success: true };
 }

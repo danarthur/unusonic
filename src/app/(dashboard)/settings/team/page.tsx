@@ -10,7 +10,7 @@ import { getRoster, getCurrentUserOrgRole } from '@/features/team-invite/api/act
 import { TeamRoster } from '@/features/team-invite';
 
 export const metadata = {
-  title: 'Team | Settings | Signal',
+  title: 'Team | Settings | Unusonic',
   description: 'Add members. Send invites when ready.',
 };
 

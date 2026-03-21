@@ -7,7 +7,7 @@
 import { SmartLoginForm } from '@/features/auth/smart-login';
 
 export const metadata = {
-  title: 'Create account | Signal',
+  title: 'Create account | Unusonic',
   description: 'Set up your workspace',
 };
 
@@ -21,7 +21,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
       {/* Spotlight / Cove Light — single light source from top, no colored orbs */}
-      <div className="fixed inset-0 z-0 bg-signal-void pointer-events-none" aria-hidden>
+      <div className="fixed inset-0 z-0 bg-unusonic-void pointer-events-none" aria-hidden>
         <div className="absolute inset-0 grain-overlay" aria-hidden />
       </div>
 

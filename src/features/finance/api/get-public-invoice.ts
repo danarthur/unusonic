@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 /**
  * Finance feature – Fetch public invoice by token (client payment portal)
  * Uses system client to bypass RLS; only returns data for matching token.

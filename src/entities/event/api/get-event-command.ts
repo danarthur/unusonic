@@ -54,6 +54,7 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
     ends_at: (r.ends_at as string) ?? '',
     dates_load_in: null,
     dates_load_out: null,
+    venue_entity_id: (r.venue_entity_id as string) ?? null,
     venue_name: null,
     venue_address: null,
     venue_google_maps_id: null,

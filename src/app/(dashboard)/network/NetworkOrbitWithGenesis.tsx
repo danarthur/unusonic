@@ -23,6 +23,7 @@ interface NetworkOrbitWithGenesisProps {
   /** Org brand color for completed Identity card (solid border/icon). */
   brandColor?: string | null;
   onUnpin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
+  onPin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
   /** Soft-deleted connections (restore within 30 days). */
   deletedRelationships?: DeletedRelationship[];
 }
@@ -39,6 +40,7 @@ export function NetworkOrbitWithGenesis({
   hasTeam = false,
   brandColor = null,
   onUnpin,
+  onPin,
   deletedRelationships = [],
 }: NetworkOrbitWithGenesisProps) {
   const router = useRouter();
@@ -83,6 +85,7 @@ export function NetworkOrbitWithGenesis({
         <NetworkOrbitView
           nodes={nodes}
           onUnpin={onUnpin}
+          onPin={onPin}
           sourceOrgId={currentOrgId}
           hasIdentity={hasIdentity}
           hasTeam={hasTeam}

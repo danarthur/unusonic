@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FileCheck, FileText, ExternalLink } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
@@ -9,18 +11,20 @@ import { PipelineTracker } from '@/features/sales/ui/pipeline-tracker';
 import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
 import { getProposalForDeal, getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
 import type { ProposalWithItems } from '@/features/sales/model/types';
-import { SIGNAL_PHYSICS, M3_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS, M3_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
 import { getContractForEvent } from '../actions/get-contract-for-event';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
 import { StakeholderGrid } from './stakeholder-grid';
+import { deleteDeal } from '../actions/delete-deal';
 
 const DEAL_PIPELINE_STAGES = ['Inquiry', 'Proposal', 'Contract sent', 'Won'] as const;
 const STATUS_TO_STAGE: Record<string, number> = {
   inquiry: 0,
   proposal: 1,
   contract_sent: 2,
+  contract_signed: 2,
   won: 3,
   lost: 3,
 };
@@ -39,11 +43,28 @@ export type DealLensProps = {
 };
 
 export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, onHandover, handingOver, onClientLinked }: DealLensProps) {
+  const router = useRouter();
   const currentStage = STATUS_TO_STAGE[deal.status] ?? 0;
   const isLocked = !!deal.event_id;
   const [initialProposal, setInitialProposal] = useState<ProposalWithItems | null>(null);
   const [publicProposalUrl, setPublicProposalUrl] = useState<string | null>(null);
   const [contract, setContract] = useState<Awaited<ReturnType<typeof getContractForEvent>>>(null);
+
+  // Hard delete state — only relevant when deal has no event_id
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    const result = await deleteDeal(deal.id);
+    setIsDeleting(false);
+    if (result.success) {
+      router.push('/crm');
+    } else {
+      toast.error(result.error ?? 'Failed to delete deal');
+      setDeleteConfirm(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -240,7 +261,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             {/* Hero cell: Proposal — CTA to open proposal builder */}
             <motion.div
               variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: 8 } }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className="md:col-span-2 md:row-span-2"
             >
               <LiquidPanel className="h-full p-6 rounded-[28px] flex flex-col border border-white/10">
@@ -315,7 +336,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                       disabled={handingOver}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      transition={SIGNAL_PHYSICS}
+                      transition={UNUSONIC_PHYSICS}
                       className="liquid-levitation w-full py-3 px-5 rounded-[28px] border border-white/10 backdrop-blur-xl font-medium text-sm tracking-tight transition-all hover:brightness-110 disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] bg-[var(--color-neon-blue)]/10 text-[var(--color-neon-blue)] hover:bg-[var(--color-neon-blue)]/20"
                     >
                       {handingOver ? 'Handing over…' : 'Hand over to production'}
@@ -338,7 +359,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             {/* Support cell: Narrative */}
             <motion.div
               variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: 8 } }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
             >
               <LiquidPanel className="h-full p-6 rounded-[28px] border border-white/10">
                 <p className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-4">
@@ -354,7 +375,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             {/* Support cell: Numbers */}
             <motion.div
               variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: 8 } }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
             >
               <LiquidPanel className="h-full p-6 rounded-[28px] border border-white/10">
                 <p className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-4">
@@ -388,6 +409,43 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             </motion.div>
           </div>
         </>
+      )}
+      {/* Hard delete — only for deals not yet handed off to an event */}
+      {!isLocked && (
+        <div className="border-t border-white/[0.06] pt-4 mt-2">
+          {!deleteConfirm ? (
+            <button
+              type="button"
+              onClick={() => setDeleteConfirm(true)}
+              className="text-xs text-ink-muted/60 hover:text-rose-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+            >
+              Permanently delete
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-ink-muted/80 leading-relaxed">
+                Are you sure? This cannot be undone.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="text-xs font-medium text-rose-400 hover:text-rose-300 border border-rose-500/40 bg-rose-500/10 rounded-md px-3 py-1.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting…' : 'Delete permanently'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(false)}
+                  className="text-xs text-ink-muted/60 hover:text-ink-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </motion.div>
   );

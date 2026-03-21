@@ -1,4 +1,5 @@
 'use server';
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -71,7 +72,7 @@ export async function handoverDeal(
   }
 
   const status = (r.status as string) ?? '';
-  if (status !== 'inquiry' && status !== 'proposal' && status !== 'contract_sent') {
+  if (!['inquiry', 'proposal', 'contract_sent', 'contract_signed'].includes(status as string)) {
     return { success: false, error: 'Deal is not ready for handover.' };
   }
 
@@ -162,6 +163,7 @@ export async function handoverDeal(
       starts_at: startAt,
       ends_at: endAt,
       venue_entity_id: venueEntityId,
+      client_entity_id: clientEntityId,
       run_of_show_data: runOfShowData,
     })
     .select('id')
@@ -196,7 +198,7 @@ export async function handoverDeal(
   // Create contract from accepted proposal (client signed during Liquid phase; event didn't exist yet)
   const { data: acceptedProposal } = await supabase
     .from('proposals')
-    .select('id, accepted_at')
+    .select('id, signed_at')
     .eq('deal_id', dealId)
     .eq('status', 'accepted')
     .order('created_at', { ascending: false })
@@ -204,7 +206,7 @@ export async function handoverDeal(
     .maybeSingle();
 
   if (acceptedProposal?.id) {
-    const signedAt = (acceptedProposal as { accepted_at?: string | null }).accepted_at ?? new Date().toISOString();
+    const signedAt = (acceptedProposal as { signed_at?: string | null }).signed_at ?? new Date().toISOString();
     await supabase.from('contracts').insert({
       workspace_id: workspaceId,
       event_id: eventId,
@@ -216,5 +218,6 @@ export async function handoverDeal(
 
   revalidatePath('/crm');
   revalidatePath('/');
+  revalidatePath('/network');
   return { success: true, eventId };
 }

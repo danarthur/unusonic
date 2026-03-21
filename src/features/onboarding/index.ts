@@ -4,7 +4,7 @@
  */
 
 export { PersonaStep } from './ui/PersonaStep';
-export { IonOnboardingShell } from './ui/ion-onboarding-shell';
+export { AionOnboardingShell } from './ui/aion-onboarding-shell';
 export { OnboardingChatInput } from './ui/onboarding-chat-input';
 export { TierStep } from './ui/TierStep';
 export { GenesisOrchestrator } from './ui/genesis-orchestrator';

@@ -74,8 +74,8 @@ export function SignalScoutInput({ value, onChange, onEnrich }: SignalScoutInput
           rounded-xl overflow-hidden
           transition-all duration-300
           ${canActivate
-            ? 'border border-[var(--color-silk)]/50 bg-white/5 focus-within:border-[var(--color-silk)]/70'
-            : 'border border-[var(--color-mercury)] bg-white/[0.02]'
+            ? 'border border-[var(--color-silk)]/50 bg-[oklch(1_0_0/0.05)] focus-within:border-[var(--color-silk)]/70'
+            : 'border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.02)]'
           }
           ${canActivate && isHovered ? 'shadow-[0_0_24px_-6px_oklch(0.70_0.15_250_/_0.25)]' : ''}
         `}
@@ -101,12 +101,12 @@ export function SignalScoutInput({ value, onChange, onEnrich }: SignalScoutInput
           style={
             canActivate
               ? {
-                  background: 'linear-gradient(to right, transparent 0%, rgba(255,255,255,0.015) 40%, rgba(255,255,255,0.04) 100%)',
+                  background: 'linear-gradient(to right, transparent 0%, oklch(1 0 0 / 0.015) 40%, oklch(1 0 0 / 0.04) 100%)',
                 }
               : undefined
           }
-          whileHover={canActivate && !isScanning ? { background: 'linear-gradient(to right, transparent 0%, rgba(255,255,255,0.03) 30%, rgba(255,255,255,0.08) 100%)' } : undefined}
-          whileTap={canActivate && !isScanning ? { backgroundColor: 'rgba(255,255,255,0.08)' } : undefined}
+          whileHover={canActivate && !isScanning ? { background: 'linear-gradient(to right, transparent 0%, oklch(1 0 0 / 0.03) 30%, oklch(1 0 0 / 0.08) 100%)' } : undefined}
+          whileTap={canActivate && !isScanning ? { backgroundColor: 'oklch(1 0 0 / 0.08)' } : undefined}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         >
           <motion.div
@@ -133,7 +133,7 @@ export function SignalScoutInput({ value, onChange, onEnrich }: SignalScoutInput
               ${isScanning ? 'text-[var(--color-silk)]' : canActivate ? 'text-[var(--color-ink-muted)] group-hover:text-[var(--color-silk)]/90' : 'text-[var(--color-ink-muted)]/50'}
             `}
           >
-            {isScanning ? 'Scanning' : status === 'success' ? 'Acquired' : 'ION'}
+            {isScanning ? 'Scanning' : status === 'success' ? 'Acquired' : 'Aion'}
           </span>
         </motion.button>
         {isScanning && (

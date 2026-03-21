@@ -1,0 +1,10 @@
+-- =============================================================================
+-- Session 9: Drop deal_stakeholders hard FK to public.entities
+--
+-- APPLIED: 2026-03-03 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- public.deal_stakeholders had a hard FK: entity_id → public.entities(id).
+-- Dropped here to allow public.entities to be dropped in session 10.
+-- entity_id becomes a soft reference (plain uuid) resolved at the app layer
+-- via directory.entities.legacy_entity_id.
+-- =============================================================================

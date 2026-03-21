@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { SecuritySection } from './SecuritySection';
 
 export const metadata = {
-  title: 'Security | Signal',
+  title: 'Security | Unusonic',
   description: 'Passkeys and Safety Net recovery',
 };
 

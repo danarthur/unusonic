@@ -21,7 +21,7 @@ const SmartLoginForm = dynamic(
 );
 
 export const metadata = {
-  title: 'Sign in | Signal',
+  title: 'Sign in | Unusonic',
   description: 'Sign in to your workspace',
 };
 
@@ -37,7 +37,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
       {/* Spotlight / Cove Light — single light source from top, no colored orbs */}
-      <div className="fixed inset-0 z-0 bg-signal-void pointer-events-none" aria-hidden>
+      <div className="fixed inset-0 z-0 bg-unusonic-void pointer-events-none" aria-hidden>
         <div className="absolute inset-0 grain-overlay" aria-hidden />
       </div>
 

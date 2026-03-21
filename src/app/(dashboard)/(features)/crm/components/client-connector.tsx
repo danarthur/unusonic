@@ -11,7 +11,7 @@ import { CreateClientDialog } from './create-client-dialog';
 import { ClientSummaryCard } from './client-identity-card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { toast } from 'sonner';
@@ -96,7 +96,7 @@ export function ClientConnector({
           onClick={handleAddClientClick}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          transition={SIGNAL_PHYSICS}
+          transition={UNUSONIC_PHYSICS}
           className={cn(
             'w-full rounded-2xl border-2 border-dashed border-white/15 backdrop-blur-xl',
             'flex items-center gap-3 text-left transition-colors',
@@ -127,7 +127,7 @@ export function ClientConnector({
               className="flex w-full max-w-sm flex-col border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0"
             >
               <SheetHeader className="border-b border-white/10 px-6 py-5">
-                <SheetTitle className="text-ceramic font-medium tracking-tight">
+                <SheetTitle>
                   Add client
                 </SheetTitle>
                 <SheetClose />
@@ -182,7 +182,7 @@ export function ClientConnector({
         href={sheetHref}
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
         className={cn(
           'w-full text-left rounded-2xl border border-white/10 backdrop-blur-xl overflow-hidden',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',

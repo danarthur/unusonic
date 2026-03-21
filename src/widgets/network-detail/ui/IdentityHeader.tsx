@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Building2,
   User,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
@@ -54,7 +55,8 @@ export function IdentityHeader({
   const isPartner = details.kind === 'external_partner';
   const isGhost = details.isGhost && details.targetOrgId;
   const dir = details.direction ? directionConfig[details.direction] : null;
-  const Icon = dir?.icon ?? (isPartner ? Building2 : User);
+  const isPersonOrCouple = details.entityDirectoryType === 'person' || details.entityDirectoryType === 'couple';
+  const Icon = dir?.icon ?? (isPartner && !isPersonOrCouple ? Building2 : User);
 
   const avatarUrl =
     (isPartner && (details.orgLogoUrl ?? details.identity.avatarUrl)) ||
@@ -68,12 +70,16 @@ export function IdentityHeader({
     <div className="relative px-4 py-4 md:px-5 md:py-4">
       <div
         className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            brandColor && typeof brandColor === 'string'
-              ? `linear-gradient(to bottom, ${brandColor}12, transparent 50%)`
-              : `linear-gradient(to bottom, var(--color-silk) 0.04, transparent 50%)`,
-        }}
+        style={
+          brandColor && typeof brandColor === 'string'
+            ? {
+                '--brand-color': brandColor,
+                background: `linear-gradient(to bottom, color-mix(in oklch, var(--brand-color) 7%, transparent), transparent 50%)`,
+              } as React.CSSProperties
+            : {
+                background: `linear-gradient(to bottom, color-mix(in oklch, var(--color-silk) 4%, transparent), transparent 50%)`,
+              }
+        }
       />
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex items-center gap-4">
@@ -89,7 +95,7 @@ export function IdentityHeader({
                 <div
                   className="pointer-events-none absolute inset-0"
                   style={{
-                    background: 'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(248,250,252,0.7) 0%, rgba(226,232,240,0.4) 50%, transparent 100%)',
+                    background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.98 0 0 / 0.7) 0%, oklch(0.90 0 0 / 0.4) 50%, transparent 100%)',
                   }}
                   aria-hidden
                 />
@@ -99,6 +105,8 @@ export function IdentityHeader({
                   className="relative z-10 size-full object-contain p-1.5"
                 />
               </>
+            ) : details.entityDirectoryType === 'venue' ? (
+              <MapPin className="size-6 text-[var(--color-ink-muted)]" />
             ) : (
               <span className="text-2xl font-light text-[var(--color-ink-muted)]">{initial}</span>
             )}
@@ -140,7 +148,22 @@ export function IdentityHeader({
               {dir.label} · {dir.sub}
             </span>
           )}
-          {isPartner && isGhost && details.targetOrgId && (
+          {details.lifecycleStatus && details.lifecycleStatus !== 'active' && (
+            <span className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize
+              border-[var(--color-signal-warning)]/30 bg-[var(--color-signal-warning)]/10 text-[var(--color-signal-warning)]">
+              {details.lifecycleStatus}
+            </span>
+          )}
+          {Array.isArray(details.relationshipTags) && details.relationshipTags.slice(0, 3).map((tag: string) => (
+            <span key={tag} className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium
+              border-[var(--color-silk)]/20 bg-[var(--color-silk)]/10 text-[var(--color-silk)]">
+              {tag}
+            </span>
+          ))}
+          {isPartner && isGhost && details.targetOrgId
+            && details.entityDirectoryType !== 'person'
+            && details.entityDirectoryType !== 'couple'
+            && (
             <>
               <Button
                 type="button"

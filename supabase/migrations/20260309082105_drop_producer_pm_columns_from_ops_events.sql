@@ -1,0 +1,10 @@
+-- =============================================================================
+-- Drop producer / project manager columns from ops.events
+--
+-- APPLIED: 2026-03-09 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Removed legacy producer_id and project_manager_id uuid columns from ops.events.
+-- These were legacy FK columns pointing to dropped tables. Personnel assignments
+-- now live exclusively in cortex.relationships (ROSTER_MEMBER edges with role
+-- context stored in context_data).
+-- =============================================================================

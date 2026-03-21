@@ -78,9 +78,7 @@ export function CreateClientDialog({
       >
         <SheetHeader className="flex-col items-stretch gap-2 border-b border-[var(--color-mercury)] px-6 py-6">
           <div className="flex items-center justify-between gap-4">
-            <SheetTitle className="text-xl font-light tracking-tight text-[var(--color-ink)]">
-              Create client
-            </SheetTitle>
+            <SheetTitle>Create client</SheetTitle>
             <SheetClose />
           </div>
           <p className="text-sm text-[var(--color-ink-muted)]">
@@ -138,7 +136,8 @@ export function CreateClientDialog({
 
         <div className="shrink-0 border-t border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 px-6 py-5">
           <Button
-            className="h-12 w-full rounded-xl bg-[var(--color-neon-amber)]/20 text-[var(--color-neon-amber)] hover:bg-[var(--color-neon-amber)]/30"
+            variant="silk"
+            className="h-12 w-full rounded-xl"
             onClick={handleSubmit}
             disabled={!name.trim() || isPending}
           >

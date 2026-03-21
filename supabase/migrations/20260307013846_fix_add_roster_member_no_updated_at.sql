@@ -1,0 +1,8 @@
+-- =============================================================================
+-- Fix: add_roster_member RPC — remove updated_at reference
+--
+-- APPLIED: 2026-03-07 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Patched the add_roster_member RPC created in 20260307013331 to remove a
+-- reference to an updated_at column that does not exist on cortex.relationships.
+-- =============================================================================

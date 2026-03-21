@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -33,7 +33,7 @@ import type {
   LineItemPricingType,
 } from '@/features/sales/api/package-actions';
 import { CeramicSwitch } from '@/shared/ui/switch';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const BLOCK_TYPES: { type: string; label: string; icon: typeof Image }[] = [
@@ -158,7 +158,7 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
             onClick={() => updateBlock(block.id, { quantity: Math.max(1, quantity - 1) })}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="shrink-0 w-10 h-10 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic font-medium text-lg flex items-center justify-center hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             −
@@ -179,7 +179,7 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
             onClick={() => updateBlock(block.id, { quantity: quantity + 1 })}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="shrink-0 w-10 h-10 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic font-medium text-lg flex items-center justify-center hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             +
@@ -273,14 +273,35 @@ export default function CatalogBuilderPage() {
     if (workspaceId && id) loadCatalog();
   }, [workspaceId, id, loadCatalog]);
 
+  // Compute bundle target cost from ingredient target_costs in catalogPackages
+  const estimatedCost = useMemo(() => {
+    const lineItems = flattenBlocksToLineItems(definition.blocks);
+    const byId = new Map(catalogPackages.map((p) => [p.id, p]));
+    let total = 0;
+    let hasAny = false;
+    for (const item of lineItems) {
+      if ('catalogId' in item) {
+        const ref = byId.get((item as { catalogId: string }).catalogId);
+        if (ref?.target_cost != null && Number.isFinite(Number(ref.target_cost))) {
+          total += Number(ref.target_cost) * (('quantity' in item ? Number((item as { quantity: number }).quantity) : 1) || 1);
+          hasAny = true;
+        }
+      }
+    }
+    return hasAny ? total : 0;
+  }, [definition.blocks, catalogPackages]);
+
   const saveDefinition = useCallback(async () => {
     if (!id || !workspaceId) return;
     setSaving(true);
-    const result = await updatePackage(id, { definition });
+    const result = await updatePackage(id, {
+      definition,
+      target_cost: estimatedCost > 0 ? estimatedCost : null,
+    });
     setSaving(false);
     if (result.error) setError(result.error);
     else if (result.package) setPkg(result.package);
-  }, [id, workspaceId, definition]);
+  }, [id, workspaceId, definition, estimatedCost]);
 
   const addBlock = useCallback((type: string, insertIndex?: number) => {
     const newBlock = createBlockByType(type);
@@ -463,12 +484,12 @@ export default function CatalogBuilderPage() {
             onClick={() => { setIonError(null); setIonModalOpen(true); }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--glass-border)] text-ink-muted hover:text-ceramic hover:bg-[var(--glass-bg-hover)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-            title="Ask ION to build this package"
+            title="Ask Aion to build this package"
           >
             <LivingLogo size="sm" status="idle" />
-            Ask ION
+            Ask Aion
           </motion.button>
           <motion.button
             type="button"
@@ -476,7 +497,7 @@ export default function CatalogBuilderPage() {
             disabled={saving}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="px-4 py-2.5 rounded-xl border border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)] font-medium text-sm hover:bg-[var(--color-neon-amber)]/20 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save Changes'}
@@ -487,12 +508,12 @@ export default function CatalogBuilderPage() {
       <Dialog open={ionModalOpen} onOpenChange={setIonModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Ask ION</DialogTitle>
+            <DialogTitle>Ask Aion</DialogTitle>
             <DialogClose className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5" />
           </DialogHeader>
           <div className="px-6 pb-6 flex flex-col gap-4">
             <p className="text-sm text-ink-muted">
-              Describe the package you want. ION will use your catalog and build the blocks for you.
+              Describe the package you want. Aion will use your catalog and build the blocks for you.
             </p>
             <textarea
               value={ionPrompt}
@@ -510,13 +531,13 @@ export default function CatalogBuilderPage() {
               disabled={ionLoading || !ionPrompt.trim()}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className="w-full py-2.5 rounded-xl border border-neon/50 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20 disabled:opacity-50"
             >
               {ionLoading ? 'Building…' : 'Generate package'}
             </motion.button>
             <p className="text-xs text-ink-muted border-t border-[var(--glass-border)] pt-4 mt-2">
-              ION can make mistakes, please double check its work.
+              Aion can make mistakes, please double check its work.
             </p>
           </div>
         </DialogContent>
@@ -532,7 +553,7 @@ export default function CatalogBuilderPage() {
           </div>
           <ul className="p-3 space-y-2 overflow-auto">
             {BLOCK_TYPES.map(({ type, label, icon: Icon }) => (
-              <motion.li key={type} transition={SIGNAL_PHYSICS}>
+              <motion.li key={type} transition={UNUSONIC_PHYSICS}>
                 <div
                   role="button"
                   tabIndex={0}
@@ -574,7 +595,7 @@ export default function CatalogBuilderPage() {
               </div>
               <ul className="p-3 space-y-2 overflow-auto flex-1 min-h-0">
                 {catalogPackages.map((pkg) => (
-                  <motion.li key={pkg.id} transition={SIGNAL_PHYSICS}>
+                  <motion.li key={pkg.id} transition={UNUSONIC_PHYSICS}>
                     <div
                       draggable
                       onDragStart={(e) => {
@@ -608,7 +629,7 @@ export default function CatalogBuilderPage() {
         </aside>
 
         {/* Pane 2: Canvas (center ~50%, scrollable) */}
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-signal-void">
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-unusonic-void">
           <div className="flex-1 min-h-0 overflow-auto p-6">
             <LiquidPanel
               className="min-h-[360px] p-6 rounded-[28px]"
@@ -625,7 +646,7 @@ export default function CatalogBuilderPage() {
                     <motion.li
                       key={block.id}
                       layout
-                      transition={SIGNAL_PHYSICS}
+                      transition={UNUSONIC_PHYSICS}
                       onDragOver={handleCanvasDragOver}
                       onDrop={(e) => handleCanvasDrop(e, index)}
                       className={cn(

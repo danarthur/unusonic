@@ -1,0 +1,15 @@
+-- =============================================================================
+-- RLS initPlan optimization pass
+--
+-- APPLIED: 2026-03-04 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Rewrote RLS policies across ops, directory, cortex, and public schemas to use
+-- (SELECT ...) subquery wrapping so Postgres evaluates the auth check once per
+-- query (initPlan) rather than once per row. Critical for performance on large
+-- result sets.
+--
+-- Pattern applied everywhere:
+--   USING (workspace_id IN (SELECT get_my_workspace_ids()))
+-- instead of:
+--   USING (workspace_id IN (get_my_workspace_ids()))
+-- =============================================================================

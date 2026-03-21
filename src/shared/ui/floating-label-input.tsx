@@ -39,7 +39,11 @@ export function FloatingLabelInput({
         id={inputId}
         value={value}
         defaultValue={defaultValue}
-        className={cn('peer pt-5', className)}
+        className={cn(
+          'peer h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 pt-5 text-ceramic placeholder:text-transparent',
+          'focus-visible:border-[var(--color-silk)]/60 focus-visible:ring-0',
+          className
+        )}
         onFocus={(e) => {
           setFocused(true);
           props.onFocus?.(e);

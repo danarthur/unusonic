@@ -1,5 +1,5 @@
 /**
- * ScoutThoughtLog – ION thought process + recommendation in one window.
+ * ScoutThoughtLog – Aion thought process + recommendation in one window.
  * During scan: thought steps only. When done: thought log + suggested persona · tier so user sees why.
  * M3 fade-through for steps.
  * @module features/onboarding/ui/scout-thought-log
@@ -49,7 +49,7 @@ export function ScoutThoughtLog({ steps, suggestion, className }: ScoutThoughtLo
       className={className}
       role="log"
       aria-live="polite"
-      aria-label="ION thought log and recommendation"
+      aria-label="Aion thought log and recommendation"
     >
       {suggestion && (
         <motion.div

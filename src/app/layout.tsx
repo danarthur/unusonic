@@ -18,12 +18,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Signal",
+  title: "Unusonic",
   description: "The Event Operating System",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Signal",
+    title: "Unusonic",
   },
 };
 

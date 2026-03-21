@@ -1,0 +1,13 @@
+-- =============================================================================
+-- Session 8: ops.events — replace client_id with client_entity_id
+--
+-- APPLIED: 2026-03-01 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Drops the legacy client_id uuid column (which referenced public.organizations)
+-- and replaces it with client_entity_id uuid referencing directory.entities.id.
+-- This completes the ops.events → directory migration for the client relationship.
+--
+-- After this migration:
+--   ops.events.client_entity_id → directory.entities.id  (canonical)
+--   ops.projects.client_entity_id → directory.entities.id  (canonical)
+-- =============================================================================

@@ -54,7 +54,7 @@ export function RecentlyDeletedList({ deletedRelationships, sourceOrgId }: Recen
             {deletedRelationships.map((d) => (
               <li
                 key={d.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-mercury)]/60 bg-white/[0.03] px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-mercury)]/60 bg-[oklch(0.20_0_0/0.15)] px-3 py-2"
               >
                 <span className="text-sm text-[var(--color-ink)] truncate min-w-0">{d.targetName}</span>
                 <Button

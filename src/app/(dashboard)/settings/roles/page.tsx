@@ -10,7 +10,7 @@ import { RoleBuilderShell } from '@/features/role-builder';
 import { ArrowLeft, Shield } from 'lucide-react';
 
 export const metadata = {
-  title: 'Roles | Signal',
+  title: 'Roles | Unusonic',
   description: 'Manage workspace roles and permissions',
 };
 

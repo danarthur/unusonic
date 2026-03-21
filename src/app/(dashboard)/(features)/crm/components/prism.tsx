@@ -10,14 +10,16 @@ import { getDealStakeholders } from '../actions/deal-stakeholders';
 import { getEventSummaryForPrism } from '../actions/get-event-summary';
 import { handoverDeal } from '../actions/handover-deal';
 import { getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
+import { getEventLedger } from '@/features/finance/api/get-event-ledger';
 import { DealLens } from './deal-lens';
 import { PlanLens } from './plan-lens';
 import { LedgerLens } from './ledger-lens';
 import { FrostedPlanLens } from './frosted-plan-lens';
-import { SIGNAL_PHYSICS, M3_FADE_THROUGH_VARIANTS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS, M3_FADE_THROUGH_VARIANTS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealDetail } from '../actions/get-deal';
 import type { EventSummaryForPrism } from '../actions/get-event-summary';
+import type { EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
 import type { StreamCardItem } from './stream-card';
 
 export type PrismLens = 'deal' | 'plan' | 'ledger';
@@ -46,6 +48,7 @@ export function Prism({
   const [loading, setLoading] = useState(false);
   const [handingOver, startHandover] = useTransition();
   const [handoverJustDone, setHandoverJustDone] = useState(false);
+  const [ledger, setLedger] = useState<EventLedgerDTO | null>(null);
   const [linkedDeal, setLinkedDeal] = useState<DealDetail | null>(null);
   const [linkedProposalUrl, setLinkedProposalUrl] = useState<string | null>(null);
   const [linkedDealLoading, setLinkedDealLoading] = useState(false);
@@ -56,7 +59,7 @@ export function Prism({
   const isDeal = selectedItem?.source === 'deal';
   const isEvent = selectedItem?.source === 'event';
   const dealInquiryOrProposal =
-    isDeal && selectedItem?.status && ['inquiry', 'proposal'].includes(selectedItem.status);
+    isDeal && selectedItem?.status && ['inquiry', 'proposal', 'contract_sent', 'contract_signed'].includes(selectedItem.status);
   const planLocked = isDeal && dealInquiryOrProposal && !deal?.event_id;
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function Prism({
       setDeal(null);
       setClient(null);
       setEventSummary(null);
+      setLedger(null);
       setLinkedDeal(null);
       setLinkedProposalUrl(null);
       setLens('deal');
@@ -129,6 +133,21 @@ export function Prism({
       cancelled = true;
     };
   }, [selectedId, isEvent]);
+
+  // Fetch ledger data when the ledger lens is active and an eventId is known
+  const ledgerEventId = isEvent ? selectedId : deal?.event_id ?? null;
+  useEffect(() => {
+    if (lens !== 'ledger' || !ledgerEventId) {
+      return;
+    }
+    let cancelled = false;
+    getEventLedger(ledgerEventId).then((l) => {
+      if (!cancelled) setLedger(l ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [lens, ledgerEventId]);
 
   const refetchDealAndClient = () => {
     if (!selectedId || selectedItem?.source !== 'deal') return;
@@ -217,7 +236,7 @@ export function Prism({
               onClick={onBackToStream}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.98 }}
-              transition={SIGNAL_PHYSICS}
+              transition={UNUSONIC_PHYSICS}
               className="p-2 rounded-xl text-ink-muted hover:text-ceramic hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
               aria-label="Back to Stream"
             >
@@ -304,7 +323,7 @@ export function Prism({
                 initial={false}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className="min-h-[320px]"
               >
                 {deal ? (
@@ -340,7 +359,7 @@ export function Prism({
                 initial={false}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className="min-h-[320px]"
               >
                 <div className="liquid-card p-6 rounded-[28px] border border-white/10 flex flex-col gap-6">
@@ -403,7 +422,7 @@ export function Prism({
                 initial={M3_FADE_THROUGH_VARIANTS.hidden}
                 animate={M3_FADE_THROUGH_VARIANTS.visible}
                 exit={M3_FADE_THROUGH_VARIANTS.hidden}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
               >
                 {planLocked ? (
                   deal ? (
@@ -443,11 +462,12 @@ export function Prism({
                 initial={M3_FADE_THROUGH_VARIANTS.hidden}
                 animate={M3_FADE_THROUGH_VARIANTS.visible}
                 exit={M3_FADE_THROUGH_VARIANTS.hidden}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
               >
                 <LedgerLens
                   eventId={isEvent ? selectedId : deal!.event_id!}
                   eventTitle={selectedItem.title}
+                  ledger={ledger}
                 />
               </motion.div>
             )}
@@ -456,7 +476,7 @@ export function Prism({
                 key="ledger-locked"
                 initial={M3_FADE_THROUGH_VARIANTS.hidden}
                 animate={M3_FADE_THROUGH_VARIANTS.visible}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className="liquid-card p-6 rounded-[28px] text-ink-muted text-sm leading-relaxed"
               >
                 Ledger available after handover.

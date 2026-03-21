@@ -13,8 +13,8 @@ const THEME_COLOR = '#262626';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Signal',
-    short_name: 'Signal',
+    name: 'Unusonic',
+    short_name: 'Unusonic',
     description: 'The Event Operating System',
     start_url: '/',
     display: 'standalone',

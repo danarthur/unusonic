@@ -110,7 +110,7 @@ export default async function DashboardLayout({
       {/* Single full-height wrapper; safe-area and dock padding on mobile */}
       <div className="min-h-screen h-full flex flex-col min-w-0 overscroll-none">
         {/* Same as login/onboarding: spotlight + grain — no colored orbs */}
-        <div className="fixed inset-0 z-0 bg-signal-void pointer-events-none" aria-hidden>
+        <div className="fixed inset-0 z-0 bg-unusonic-void pointer-events-none" aria-hidden>
           <div className="absolute inset-0 grain-overlay" aria-hidden />
         </div>
 

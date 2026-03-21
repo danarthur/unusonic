@@ -139,26 +139,26 @@ export function NodeCrewList({
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               onSubmit={handleSubmit}
-              className="overflow-hidden rounded-xl border border-[var(--color-mercury)] bg-white/5 p-4 space-y-3"
+              className="overflow-hidden liquid-card rounded-2xl p-4 space-y-3"
             >
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   name="firstName"
                   placeholder={getContactFieldLabel('first_name')}
-                  className="bg-white/5 border-[var(--color-mercury)] text-[var(--color-ink)]"
+                  className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
                   required
                 />
                 <Input
                   name="lastName"
                   placeholder={getContactFieldLabel('last_name')}
-                  className="bg-white/5 border-[var(--color-mercury)] text-[var(--color-ink)]"
+                  className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
                 />
               </div>
               <Input
                 name="email"
                 type="email"
                 placeholder={`${getContactFieldLabel('email')} (optional)`}
-                className="bg-white/5 border-[var(--color-mercury)] text-[var(--color-ink)]"
+                className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
               />
               {error && (
                 <p className="text-xs text-[var(--color-signal-error)]">{error}</p>

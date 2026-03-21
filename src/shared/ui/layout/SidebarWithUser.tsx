@@ -208,14 +208,6 @@ export function SidebarWithUser({ user, workspaceName }: SidebarWithUserProps) {
             aria-label="Signal home"
           >
             <LivingLogo size="sm" status={systemStatus} />
-            <div className="flex flex-col items-center">
-              <span className="text-lg font-bold tracking-tighter leading-none text-ceramic">
-                Signal
-              </span>
-              <span className="text-[10px] font-mono font-medium text-ink-muted uppercase tracking-widest">
-                Live OS
-              </span>
-            </div>
           </button>
         </div>
 

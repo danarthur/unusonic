@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useTransition } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Minus, X, FileText, Send, Mail, BookMarked, Calculator, Trash2, PackageOpen } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { upsertProposal, publishProposal, sendProposalLinkToRecipients, deleteProposalItemsByPackageInstanceId, unpackPackageInstance } from '../api/proposal-actions';
+import { upsertProposal, publishProposal, sendForSignature, deleteProposalItemsByPackageInstanceId, unpackPackageInstance } from '../api/proposal-actions';
 import { createPackage } from '../api/package-actions';
 import { PackageSelectorPalette } from './package-selector-palette';
 import { MarginProgressBar } from './MarginProgressBar';
@@ -60,13 +60,23 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
       unit_multiplier?: number | null;
       override_price?: number | null;
       actual_cost?: number | null;
+      internal_notes?: string | null;
       unit_price?: number;
       name: string;
       description?: string | null;
       quantity: number;
-      definition_snapshot?: { margin_meta?: { category?: string } } | null;
+      definition_snapshot?: {
+        margin_meta?: { category?: string };
+        price_meta?: { floor_price?: number | null };
+        tax_meta?: { is_taxable?: boolean | null };
+        crew_meta?: { required_roles?: unknown[] | null };
+      } | null;
     };
     const category = row.definition_snapshot?.margin_meta?.category as ProposalBuilderLineItem['category'] | undefined;
+    const floorPrice = row.definition_snapshot?.price_meta?.floor_price ?? null;
+    const isTaxable = row.definition_snapshot?.tax_meta?.is_taxable ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const requiredRoles = (row.definition_snapshot?.crew_meta?.required_roles as any[] | null | undefined) ?? null;
     const unitType = (row.unit_type === 'hour' || row.unit_type === 'day' ? row.unit_type : 'flat') as ProposalBuilderLineItem['unitType'];
     return {
       id: row.id,
@@ -86,6 +96,10 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
       unitPrice: Number(row.unit_price ?? 0),
       overridePrice: row.override_price != null ? Number(row.override_price) : null,
       actualCost: row.actual_cost != null ? Number(row.actual_cost) : null,
+      floorPrice: floorPrice != null && Number.isFinite(Number(floorPrice)) ? Number(floorPrice) : null,
+      isTaxable: isTaxable,
+      internalNotes: row.internal_notes ?? null,
+      requiredRoles: requiredRoles,
     };
   });
 }
@@ -132,20 +146,16 @@ export function ProposalBuilder({
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [sentUrl, setSentUrl] = useState<string | null>(null);
-  const [sendToEmail, setSendToEmail] = useState<string>(clientEmail ?? '');
-  /** Selected contact ids for "Send to" (after send, used for mailto). */
-  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(() => {
-    if (clientEmail?.trim() && contacts.length) {
-      const match = contacts.find((c) => c.email.trim().toLowerCase() === clientEmail.trim().toLowerCase());
-      return match ? new Set([match.id]) : new Set();
-    }
-    return new Set();
-  });
   const [sendError, setSendError] = useState<string | null>(null);
-  /** After send: result of sending proposal link email to recipients (if any). */
-  const [sendEmailResult, setSendEmailResult] = useState<{ sent: number; failed: number; notConfigured?: boolean; firstError?: string } | null>(null);
   const [saveToCatalogPending, setSaveToCatalogPending] = useState(false);
   const [saveToCatalogMessage, setSaveToCatalogMessage] = useState<string | null>(null);
+  /** Email/name for DocuSeal e-signature. Set by contact pill selection or custom email form. */
+  const [signingEmail, setSigningEmail] = useState<string>(clientEmail ?? '');
+  const [signingName, setSigningName] = useState<string>('');
+  /** Which contact pill is selected in the signature section. */
+  const [selectedSignerContactId, setSelectedSignerContactId] = useState<string | null>(null);
+  /** When true, show the custom name/email inputs below the contact pills. Always shown when no contacts available. */
+  const [showCustomEmailForm, setShowCustomEmailForm] = useState(false);
   const [showDraftSaved, setShowDraftSaved] = useState(false);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -159,27 +169,6 @@ export function ProposalBuilder({
     setProposalId(initialProposal?.id ?? null);
   }, [initialProposal]);
 
-  // Pre-fill "Send to" when client email is available
-  useEffect(() => {
-    if (clientEmail?.trim() && !sendToEmail.trim()) setSendToEmail(clientEmail.trim());
-  }, [clientEmail]);
-
-  const toggleContact = (id: string) => {
-    setSelectedContactIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  /** All recipient emails: selected contacts + manual sendToEmail if different. */
-  const recipientEmails = (() => {
-    const fromContacts = contacts.filter((c) => selectedContactIds.has(c.id)).map((c) => c.email.trim()).filter(Boolean);
-    const manual = sendToEmail.trim();
-    if (manual && !fromContacts.includes(manual)) return [...fromContacts, manual];
-    return fromContacts;
-  })();
 
   // Clear "Draft saved" message after 3s
   useEffect(() => {
@@ -362,12 +351,9 @@ export function ProposalBuilder({
     });
   }, [dealId, lineItems, onSaved]);
 
-  const handleSend = useCallback(() => {
+  /** Save current line items as draft, then send via DocuSeal or legacy flow. */
+  const handleSendSubmit = useCallback((eEmail: string, eName: string) => {
     setSendError(null);
-    if (clientAttached === false) {
-      setSendError('Attach a client to this deal before sending the proposal.');
-      return;
-    }
     setSending(true);
     startTransition(async () => {
       try {
@@ -389,38 +375,41 @@ export function ProposalBuilder({
           overridePrice: item.overridePrice ?? null,
           actualCost: item.actualCost ?? null,
         }));
+
         const upsert = await upsertProposal(dealId, input);
         if (!upsert.proposalId) {
           setSendError(upsert.error ?? 'Failed to save proposal.');
           return;
         }
         setProposalId(upsert.proposalId);
+        onSaved?.(upsert.proposalId, upsert.total);
+
+        // DocuSeal path
+        if (eEmail.trim()) {
+          const result = await sendForSignature(dealId, eEmail.trim(), eName.trim() || eEmail.trim());
+          if (result.success) {
+            setSentUrl(result.publicUrl);
+            setSendError(null);
+          } else {
+            setSendError(result.error);
+          }
+          return;
+        }
+
+        // Fallback: publish link only (reached if email somehow empty)
         const pub = await publishProposal(upsert.proposalId);
         if (pub.publicUrl) {
           setSentUrl(pub.publicUrl);
           setSendError(null);
-          const emails = (() => {
-            const fromContacts = contacts.filter((c) => selectedContactIds.has(c.id)).map((c) => c.email.trim()).filter(Boolean);
-            const manual = sendToEmail.trim();
-            if (manual && !fromContacts.includes(manual)) return [...fromContacts, manual];
-            return fromContacts;
-          })();
-          if (emails.length > 0) {
-            const emailResult = await sendProposalLinkToRecipients(pub.publicUrl, emails, dealTitle);
-            setSendEmailResult(emailResult);
-          } else {
-            setSendEmailResult(null);
-          }
         } else {
           setSendError(pub.error ?? 'Failed to publish proposal.');
-          setSendEmailResult(null);
         }
-        onSaved?.(upsert.proposalId, upsert.total);
       } finally {
         setSending(false);
       }
     });
-  }, [dealId, lineItems, onSaved, clientAttached, dealTitle, contacts, selectedContactIds, sendToEmail]);
+  }, [dealId, lineItems, onSaved]);
+
 
   const handleSaveToCatalog = useCallback(() => {
     if (!workspaceId || lineItems.length === 0) return;
@@ -809,36 +798,105 @@ export function ProposalBuilder({
               )}
             </div>
 
-            {/* Send to: select contacts (from deal stakeholders) */}
-            {contacts.length > 0 && (
-              <div className="shrink-0 pt-4 mt-2 border-t border-white/10">
-                <p className="text-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
-                  Send to
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {contacts.map((c) => (
-                    <label
-                      key={c.id}
-                      className={cn(
-                        'inline-flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer transition-colors text-sm',
-                        selectedContactIds.has(c.id)
-                          ? 'border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-ceramic'
-                          : 'border-white/10 hover:bg-white/5 text-ink-muted'
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedContactIds.has(c.id)}
-                        onChange={() => toggleContact(c.id)}
-                        className="sr-only"
-                      />
-                      <span className="font-medium truncate max-w-[140px]">{c.name}</span>
-                      <span className="text-xs truncate max-w-[120px] opacity-80">{c.email}</span>
-                    </label>
-                  ))}
-                </div>
+            {/* Send for signature — always visible, replaces old "Send to" + signing prompt */}
+            <div className="shrink-0 pt-4 mt-2 border-t border-white/10 space-y-3">
+              <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+                Send for signature
+              </p>
+
+              {/* Contact pills + custom email toggle */}
+              <div className="flex flex-wrap items-center gap-2">
+                {contacts.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      if (selectedSignerContactId === c.id) {
+                        setSelectedSignerContactId(null);
+                        setSigningName('');
+                        setSigningEmail('');
+                      } else {
+                        setSelectedSignerContactId(c.id);
+                        setSigningName(c.name);
+                        setSigningEmail(c.email);
+                        setShowCustomEmailForm(false);
+                      }
+                    }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                      selectedSignerContactId === c.id
+                        ? 'border-[var(--color-neon-amber)]/60 bg-[var(--color-neon-amber)]/10 text-ceramic'
+                        : 'border-white/10 hover:bg-white/5 text-ink-muted'
+                    )}
+                  >
+                    <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                    {c.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !showCustomEmailForm;
+                    setShowCustomEmailForm(next);
+                    if (next) {
+                      setSelectedSignerContactId(null);
+                      setSigningName('');
+                      setSigningEmail('');
+                    }
+                  }}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                    showCustomEmailForm
+                      ? 'border-white/20 bg-white/[0.06] text-ceramic'
+                      : 'border-white/10 hover:bg-white/5 text-ink-muted'
+                  )}
+                >
+                  <Plus className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                  Custom email
+                </button>
               </div>
-            )}
+
+              {/* Custom email form — shown when toggled or when no contacts exist */}
+              {(showCustomEmailForm || contacts.length === 0) && (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={signingName}
+                    onChange={(e) => { setSelectedSignerContactId(null); setSigningName(e.target.value); }}
+                    placeholder="Name"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                  />
+                  <input
+                    type="email"
+                    value={signingEmail}
+                    onChange={(e) => { setSelectedSignerContactId(null); setSigningEmail(e.target.value); }}
+                    placeholder="Email"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                  />
+                </div>
+              )}
+
+              {/* Send button */}
+              <div className="flex items-center justify-between gap-3">
+                {!signingEmail.trim() && (
+                  <p className="text-xs text-ink-muted">
+                    {contacts.length > 0 ? 'Select a contact or add a custom email' : 'Enter an email to send'}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleSendSubmit(signingEmail, signingName)}
+                  disabled={!signingEmail.trim() || lineItems.length === 0 || sending || isPending || clientAttached === false}
+                  className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-ink text-obsidian font-medium text-sm hover:brightness-110 disabled:opacity-40 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                >
+                  <Send className="w-4 h-4" />
+                  {sending ? 'Sending…' : 'Send for signature'}
+                </button>
+              </div>
+              {clientAttached === false && (
+                <p className="text-xs text-[var(--color-signal-error)]">Attach a client to this deal before sending.</p>
+              )}
+            </div>
 
             {/* Total + actions */}
             <div className="shrink-0 pt-6 mt-6 border-t border-white/10">
@@ -850,6 +908,7 @@ export function ProposalBuilder({
                   ${total.toLocaleString()}
                 </span>
               </div>
+
               <div className="flex flex-wrap gap-3">
                   <button
                     type="button"
@@ -869,15 +928,6 @@ export function ProposalBuilder({
                     <FileText className="w-4 h-4" />
                     Save Draft
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={lineItems.length === 0 || sending || isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-ink text-obsidian font-medium text-sm hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
-                  >
-                    <Send className="w-4 h-4" />
-                    {sending ? 'Sending…' : 'Send'}
-                  </button>
                 </div>
                 {saveToCatalogMessage && (
                   <p className="mt-2 text-sm text-ink-muted" role="status">
@@ -895,92 +945,20 @@ export function ProposalBuilder({
                   </p>
                 )}
                 {sentUrl && (
-                  <div className="mt-4 space-y-3">
-                      <p className="text-sm text-ink-muted">
-                        Proposal sent. Share link:{' '}
-                        <a
-                          href={sentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[var(--color-neon-amber)] underline font-medium hover:brightness-110"
-                        >
-                          {sentUrl}
-                        </a>
-                      </p>
-                      {sendEmailResult != null && (
-                        <p className="text-sm text-ink-muted" role="status">
-                          {sendEmailResult.notConfigured
-                            ? typeof window !== 'undefined' && !/localhost|127\.0\.0\.1/.test(window.location?.hostname ?? '')
-                              ? 'Add RESEND_API_KEY in Vercel (Settings → Environment Variables) for Production, then redeploy. Until then, use Open in email to send the link.'
-                              : 'Add RESEND_API_KEY to .env.local to send from the app. Until then, use Open in email to send the link.'
-                            : sendEmailResult.sent > 0
-                              ? `Email sent to ${sendEmailResult.sent} recipient${sendEmailResult.sent === 1 ? '' : 's'}.`
-                              : sendEmailResult.failed > 0 && sendEmailResult.firstError
-                                ? `Email failed: ${sendEmailResult.firstError}`
-                                : null}
-                        </p>
-                      )}
-                      <div className="flex flex-col gap-3">
-                        {contacts.length > 0 && (
-                          <div>
-                            <p className="text-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
-                              Recipients
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {contacts.map((c) => (
-                                <label
-                                  key={c.id}
-                                  className={cn(
-                                    'inline-flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer transition-colors text-sm',
-                                    selectedContactIds.has(c.id)
-                                      ? 'border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-ceramic'
-                                      : 'border-white/10 hover:bg-white/5 text-ink-muted'
-                                  )}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedContactIds.has(c.id)}
-                                    onChange={() => toggleContact(c.id)}
-                                    className="sr-only"
-                                  />
-                                  <span className="font-medium truncate max-w-[140px]">{c.name}</span>
-                                  <span className="text-xs truncate max-w-[120px] opacity-80">{c.email}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div>
-                          <label htmlFor="send-to-email-mobile" className="text-xs font-medium text-ink-muted uppercase tracking-wide">
-                            {contacts.length > 0 ? 'Add another email' : 'Email link to'}
-                          </label>
-                          <input
-                            id="send-to-email-mobile"
-                            type="email"
-                            value={sendToEmail}
-                            onChange={(e) => setSendToEmail(e.target.value)}
-                            placeholder="client@example.com"
-                            className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (recipientEmails.length === 0) return;
-                            const to = recipientEmails.join(',');
-                            const subject = encodeURIComponent('Your proposal');
-                            const body = encodeURIComponent(`View your proposal: ${sentUrl}`);
-                            window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
-                          }}
-                          disabled={recipientEmails.length === 0}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/10 bg-white/[0.04] text-ink font-medium text-sm hover:bg-white/[0.08] disabled:opacity-50 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
-                        >
-                          <Mail className="w-4 h-4" />
-                          Open in email
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm text-[var(--color-neon)]" role="status">
+                      Sent to {signingName || signingEmail}.
+                    </p>
+                    <a
+                      href={sentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-ink-muted underline hover:text-ceramic"
+                    >
+                      View proposal link
+                    </a>
+                  </div>
+                )}
                 </div>
               </div>
             </div>

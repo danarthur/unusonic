@@ -35,7 +35,9 @@ export default async function CRMPage({
   const streamMode = parseStreamMode(params.stream);
   const nodeId = params.nodeId ?? null;
   const kind =
-    params.kind === 'external_partner' || params.kind === 'internal_employee' ? params.kind : null;
+    params.kind === 'external_partner' || params.kind === 'internal_employee' || params.kind === 'extended_team'
+      ? params.kind
+      : null;
 
   let currentOrgId: string | null = null;
   let gigs: StreamCardItem[] = [];

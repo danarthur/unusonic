@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 
 export type ContextualAlert = {
   id: string;
@@ -32,7 +32,7 @@ export function ContextualCardDrawer({ alert, onDismiss, className }: Contextual
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          transition={SIGNAL_PHYSICS}
+          transition={UNUSONIC_PHYSICS}
           className={cn('mt-3', className)}
         >
           <div className="liquid-card-nested mt-2 rounded-2xl border border-[var(--glass-border)] p-4 flex flex-col gap-2">

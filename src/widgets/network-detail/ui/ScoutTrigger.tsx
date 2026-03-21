@@ -67,14 +67,14 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
         border transition-all duration-200
         ${canScan
           ? 'border-[var(--color-silk)]/50 bg-[var(--color-silk)]/5 hover:bg-[var(--color-silk)]/10 hover:border-[var(--color-silk)]/60 text-[var(--color-silk)] cursor-pointer'
-          : 'border-[var(--color-mercury)]/50 bg-white/[0.02] text-[var(--color-ink-muted)]/60 cursor-not-allowed'
+          : 'border-[var(--color-mercury)]/50 bg-[oklch(0.20_0_0/0.05)] text-[var(--color-ink-muted)]/60 cursor-not-allowed'
         }
       `}
     >
       <span
         className={`
           flex shrink-0 items-center justify-center rounded-lg p-1.5
-          ${canScan ? 'bg-[var(--color-silk)]/15' : 'bg-white/5'}
+          ${canScan ? 'bg-[var(--color-silk)]/15' : 'bg-[var(--color-glass-surface)]'}
         `}
       >
         {scanning ? (
@@ -85,7 +85,7 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
       </span>
       <div className="flex flex-col items-start min-w-0">
         <span className="text-[11px] font-semibold uppercase tracking-widest leading-none">
-          {scanning ? 'Scanning' : 'ION'}
+          {scanning ? 'Scanning' : 'Aion'}
         </span>
         <span className="text-[10px] text-[var(--color-ink-muted)] mt-0.5 truncate max-w-[140px]">
           {scanning ? 'Acquiring intelligence…' : 'Auto-fill from website'}

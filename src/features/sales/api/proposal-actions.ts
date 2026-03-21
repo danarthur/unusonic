@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 /**
  * Sales feature – Server Actions: packages, upsert proposal, publish proposal
  * @module features/sales/api/proposal-actions
@@ -8,7 +9,10 @@
 import { unstable_noStore } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { sendProposalLinkEmail } from '@/shared/api/email/send';
+import type { SendProposalLinkSenderOptions } from '@/shared/api/email/send';
+import { createDocuSealSubmission } from './create-docuseal-submission';
 import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../model/types';
 
@@ -62,6 +66,8 @@ export interface ProposalLineItemInput {
   overridePrice?: number | null;
   /** Actual cost for this event (e.g. talent agreed to lower payout); used for margin. */
   actualCost?: number | null;
+  /** PM-only note on this line item — not shown to the client. */
+  internalNotes?: string | null;
   /** True for the bundle header row; children of that package have unit_price 0. */
   isPackageHeader?: boolean | null;
   /** Catalog price when added as package child; used when Unpack restores a la carte price. */
@@ -306,10 +312,10 @@ export async function addPackageToProposal(
   }
   const { data: pkgRow } = await supabase
     .from('packages')
-    .select('name, price')
+    .select('name, price, floor_price, is_taxable, target_cost')
     .eq('id', packageId)
     .maybeSingle();
-  const pkg = pkgRow as { name?: string; price?: number } | null;
+  const pkg = pkgRow as { name?: string; price?: number; floor_price?: number | null; is_taxable?: boolean | null; target_cost?: number | null } | null;
   const displayGroupName = pkg?.name ?? null;
   const bundlePrice = pkg?.price != null && Number.isFinite(Number(pkg.price)) ? Number(pkg.price) : 0;
 
@@ -363,48 +369,79 @@ export async function addPackageToProposal(
     nextSortOrder = 0;
   }
 
-  // Header Row + Zero-Dollar Children: insert bundle header then children at $0 with original_base_price
-  const headerRow = {
-    proposal_id: proposalId,
-    package_id: null as string | null,
-    origin_package_id: packageId,
-    package_instance_id: packageInstanceId,
-    display_group_name: displayGroupName,
-    is_client_visible: true,
-    is_package_header: true,
-    original_base_price: null as number | null,
-    unit_type: 'flat' as const,
-    unit_multiplier: 1,
-    name: displayGroupName ?? 'Package',
-    description: null as string | null,
-    quantity: 1,
-    unit_price: bundlePrice,
-    override_price: null,
-    actual_cost: null,
-    definition_snapshot: null,
-    sort_order: nextSortOrder,
-  };
-  const childRows = expanded.map((item, i) => ({
-    proposal_id: proposalId,
-    package_id: null as string | null,
-    origin_package_id: item.originPackageId,
-    package_instance_id: packageInstanceId,
-    display_group_name: displayGroupName,
-    is_client_visible: true,
-    is_package_header: false,
-    original_base_price: item.unitPrice,
-    unit_type: item.unitType ?? 'flat',
-    unit_multiplier: item.unitMultiplier ?? 1,
-    name: item.name,
-    description: item.description,
-    quantity: item.quantity,
-    unit_price: 0,
-    override_price: null,
-    actual_cost: item.actualCost,
-    definition_snapshot: item.category ? { margin_meta: { category: item.category } } : null,
-    sort_order: nextSortOrder + 1 + i,
-  }));
-  const { error: itemsError } = await supabase.from('proposal_items').insert([headerRow, ...childRows]);
+  // Single-item packages: skip the header+child structure — just add a flat line item at bundle price.
+  // Multi-item packages: insert a bundle header row then children at $0 (Tagged Bursting pattern).
+  let rowsToInsert: object[];
+  if (expanded.length === 1) {
+    const item = expanded[0];
+    rowsToInsert = [{
+      proposal_id: proposalId,
+      package_id: null as string | null,
+      origin_package_id: packageId,
+      package_instance_id: packageInstanceId,
+      display_group_name: null,
+      is_client_visible: true,
+      is_package_header: false,
+      original_base_price: item.unitPrice,
+      unit_type: item.unitType ?? 'flat',
+      unit_multiplier: item.unitMultiplier ?? 1,
+      name: displayGroupName ?? item.name,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      override_price: null,
+      actual_cost: item.actualCost,
+      definition_snapshot: item.category ? { margin_meta: { category: item.category } } : null,
+      sort_order: nextSortOrder,
+    }];
+  } else {
+    const headerRow = {
+      proposal_id: proposalId,
+      package_id: null as string | null,
+      origin_package_id: packageId,
+      package_instance_id: packageInstanceId,
+      display_group_name: displayGroupName,
+      is_client_visible: true,
+      is_package_header: true,
+      original_base_price: null as number | null,
+      unit_type: 'flat' as const,
+      unit_multiplier: 1,
+      name: displayGroupName ?? 'Package',
+      description: null as string | null,
+      quantity: 1,
+      unit_price: bundlePrice,
+      override_price: null,
+      actual_cost: pkg?.target_cost != null && Number.isFinite(Number(pkg.target_cost)) ? Number(pkg.target_cost) : null,
+      definition_snapshot: {
+        margin_meta: { category: 'package' },
+        price_meta: { floor_price: pkg?.floor_price != null ? Number(pkg.floor_price) : null },
+        tax_meta: { is_taxable: pkg?.is_taxable !== false },
+      },
+      sort_order: nextSortOrder,
+    };
+    const childRows = expanded.map((item, i) => ({
+      proposal_id: proposalId,
+      package_id: null as string | null,
+      origin_package_id: item.originPackageId,
+      package_instance_id: packageInstanceId,
+      display_group_name: displayGroupName,
+      is_client_visible: true,
+      is_package_header: false,
+      original_base_price: item.unitPrice,
+      unit_type: item.unitType ?? 'flat',
+      unit_multiplier: item.unitMultiplier ?? 1,
+      name: item.name,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: 0,
+      override_price: null,
+      actual_cost: item.actualCost,
+      definition_snapshot: item.category ? { margin_meta: { category: item.category } } : null,
+      sort_order: nextSortOrder + 1 + i,
+    }));
+    rowsToInsert = [headerRow, ...childRows];
+  }
+  const { error: itemsError } = await supabase.from('proposal_items').insert(rowsToInsert);
   if (itemsError) {
     return { success: false, error: itemsError.message };
   }
@@ -580,6 +617,7 @@ export async function upsertProposal(
       unit_price: String(item.unitPrice),
       override_price: item.overridePrice != null && Number.isFinite(Number(item.overridePrice)) ? Number(item.overridePrice) : null,
       actual_cost: item.actualCost != null && Number.isFinite(Number(item.actualCost)) ? Number(item.actualCost) : null,
+      internal_notes: item.internalNotes ?? null,
       definition_snapshot: item.category ? { margin_meta: { category: item.category } } : null,
       sort_order: index,
     }));
@@ -764,4 +802,115 @@ export async function revertProposalToDraft(proposalId: string): Promise<RevertP
     return { success: false, error: error?.message ?? 'Proposal not found or not accepted.' };
   }
   return { success: true };
+}
+
+// =============================================================================
+// sendForSignature(dealId, clientEmail, clientName): Publish + DocuSeal e-sign
+// Publishes the draft proposal (sets public_token + status='sent'), then creates
+// a DocuSeal submission for e-signature. Stores docuseal_submission_id on the
+// proposal row. Falls back gracefully if DocuSeal is not configured.
+// =============================================================================
+
+export type SendForSignatureResult =
+  | { success: true; publicUrl: string }
+  | { success: false; error: string };
+
+export async function sendForSignature(
+  dealId: string,
+  clientEmail: string,
+  clientName: string
+): Promise<SendForSignatureResult> {
+  const supabase = await createClient();
+
+  // 0. Verify caller owns the deal (defence-in-depth over RLS alone)
+  const workspaceMembership = await getActiveWorkspaceId();
+  if (!workspaceMembership) {
+    return { success: false, error: 'No active workspace.' };
+  }
+
+  // 1. Resolve the draft proposal ID for this deal — include workspace_id for ownership check
+  const { data: draftRow } = await supabase
+    .from('proposals')
+    .select('id, workspace_id')
+    .eq('deal_id', dealId)
+    .eq('status', 'draft')
+    .eq('workspace_id', workspaceMembership)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!draftRow?.id) {
+    return { success: false, error: 'No draft proposal found for this deal.' };
+  }
+
+  const draftProposalId = draftRow.id;
+
+  // 2. Publish the proposal (sets public_token, status → 'sent')
+  const publishResult = await publishProposal(draftProposalId);
+  if (!publishResult.publicToken || !publishResult.publicUrl) {
+    return { success: false, error: publishResult.error ?? 'Failed to publish proposal.' };
+  }
+
+  const { publicToken, publicUrl } = publishResult;
+
+  // 3. Fetch deal title + workspace name for branding
+  const { data: dealRow } = await supabase
+    .from('deals')
+    .select('title, workspace_id')
+    .eq('id', dealId)
+    .maybeSingle();
+  const eventTitle = (dealRow as { title?: string | null } | null)?.title ?? 'Proposal';
+  const workspaceId = (dealRow as { workspace_id?: string | null } | null)?.workspace_id ?? '';
+
+  // Resolve sender name (display name from directory) + workspace name for branding
+  const { data: { user } } = await supabase.auth.getUser();
+  const senderEmail = user?.email ?? null;
+  const [senderEntRes, workspaceRes] = await Promise.all([
+    user?.id
+      ? supabase.schema('directory').from('entities')
+          .select('display_name')
+          .eq('claimed_by_user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from('workspaces').select('name').eq('id', workspaceId).maybeSingle(),
+  ]);
+  const senderName = (senderEntRes.data as { display_name?: string | null } | null)?.display_name ?? null;
+  const workspaceName = (workspaceRes.data as { name?: string | null } | null)?.name ?? null;
+
+  const senderOptions: SendProposalLinkSenderOptions = {
+    senderName,
+    senderReplyTo: senderEmail,
+    workspaceName,
+    workspaceId,
+  };
+
+  // 4. Create DocuSeal submission
+  const submission = await createDocuSealSubmission(
+    draftProposalId,
+    publicToken,
+    clientEmail,
+    clientName,
+    eventTitle,
+    workspaceId
+  );
+
+  if (!submission.success) {
+    // Non-fatal: DocuSeal not configured — fall back to sending a plain proposal link
+    console.warn('[sendForSignature] DocuSeal step skipped:', submission.error);
+    await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
+    return { success: true, publicUrl };
+  }
+
+  // 5. Store docuseal_submission_id
+  const systemClient = getSystemClient();
+  await systemClient
+    .from('proposals')
+    .update({ docuseal_submission_id: submission.submissionId })
+    .eq('id', draftProposalId)
+    .eq('workspace_id', workspaceMembership);
+
+  // 6. Send "Review and sign" email via Resend — publicUrl is the proposal page where signing happens
+  await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
+
+  return { success: true, publicUrl };
 }

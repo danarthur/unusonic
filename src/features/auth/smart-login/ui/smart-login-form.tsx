@@ -19,14 +19,14 @@ import {
   authenticatePasskey,
 } from '@/features/auth/passkey-authenticate/api/authenticate-passkey';
 import { registerPasskey } from '@/features/passkey-registration';
-import { IonOnboardingShell } from '@/features/onboarding/ui/ion-onboarding-shell';
+import { AionOnboardingShell } from '@/features/onboarding/ui/aion-onboarding-shell';
 import { OnboardingChatInput } from '@/features/onboarding/ui/onboarding-chat-input';
 import { getAuthErrorDisplay, shouldShowTechnicalDetails } from '../lib/auth-error-message';
 import { setTrustedDeviceCookie } from '@/shared/lib/trusted-device';
 import type { AuthState, AuthMode } from '../model/types';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import {
-  SIGNAL_PHYSICS,
+  UNUSONIC_PHYSICS,
   GPU_STABILIZE,
   M3_CONTENT_EXIT_TRANSITION,
   M3_FADE_THROUGH_ENTER,
@@ -262,7 +262,7 @@ export function SmartLoginForm({
 
   const SIGNUP_STEPS = 4;
   const signupPrompts = [
-    'Welcome to Signal',
+    'Welcome to Unusonic',
     'What should we call you?',
     "What's your email?",
     'Create your passkey',
@@ -318,7 +318,7 @@ export function SmartLoginForm({
   const isTransitionWelcome = fromSignInRef.current && signupTransitionPhase === 'welcome';
   const isTransitionName = fromSignInRef.current && signupTransitionPhase === 'name';
   const effectivePrompt = isTransitionWelcome
-    ? 'Welcome to Signal'
+    ? 'Welcome to Unusonic'
     : isTransitionName
       ? 'What should we call you?'
       : signupPrompts[signupStep];
@@ -368,8 +368,8 @@ export function SmartLoginForm({
           signupExiting
             ? prefersReducedMotion
               ? { duration: exitDuration, ease: M3_EASING_EXIT }
-              : SIGNAL_PHYSICS
-            : SIGNAL_PHYSICS
+              : UNUSONIC_PHYSICS
+            : UNUSONIC_PHYSICS
         }
         onAnimationComplete={
           signupExiting
@@ -382,9 +382,9 @@ export function SmartLoginForm({
         style={GPU_STABILIZE}
         className="h-full w-full"
       >
-        <IonOnboardingShell
+        <AionOnboardingShell
           prompt={effectivePrompt}
-          welcomeTitle={isTransitionName ? 'Welcome to Signal' : undefined}
+          welcomeTitle={isTransitionName ? 'Welcome to Unusonic' : undefined}
           logoStatus={isSignupPending ? 'loading' : logoAcknowledging ? 'loading' : 'idle'}
           logoLayoutId={fromSignInRef.current && !signupExiting ? 'auth-logo' : undefined}
           onWelcomeComplete={() => setSignupTransitionPhase('name')}
@@ -432,7 +432,7 @@ export function SmartLoginForm({
                     isTransitionName && !prefersReducedMotion
                       ? {
                           opacity: { duration: 0.2 },
-                          y: SIGNAL_PHYSICS,
+                          y: UNUSONIC_PHYSICS,
                           filter: { duration: 0.25, ease: M3_EASING_ENTER },
                         }
                       : { duration: M3_DURATION_S, ease: M3_EASING_ENTER }
@@ -445,7 +445,7 @@ export function SmartLoginForm({
                       onClick={() => setSignupStep(1)}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      transition={SIGNAL_PHYSICS}
+                      transition={UNUSONIC_PHYSICS}
                       className="w-full py-3.5 rounded-full font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 transition-colors"
                     >
                       Get started
@@ -458,7 +458,7 @@ export function SmartLoginForm({
                         disabled={isSignupPending}
                         whileHover={!isSignupPending ? { scale: 1.02 } : undefined}
                         whileTap={!isSignupPending ? { scale: 0.98 } : undefined}
-                        transition={SIGNAL_PHYSICS}
+                        transition={UNUSONIC_PHYSICS}
                         className="w-full py-3.5 rounded-full font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 transition-colors disabled:opacity-70 disabled:pointer-events-none flex items-center justify-center gap-2"
                       >
                         {isSignupPending ? (
@@ -517,7 +517,7 @@ export function SmartLoginForm({
           }
         >
           <div className="w-full max-w-lg" />
-        </IonOnboardingShell>
+        </AionOnboardingShell>
       </motion.div>
     </div>
   );
@@ -553,10 +553,10 @@ export function SmartLoginForm({
                 left: 0,
                 width: '100%',
                 zIndex: 0,
-                transition: SIGNAL_PHYSICS,
+                transition: UNUSONIC_PHYSICS,
               }
         }
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
         className={`w-full max-w-md mx-auto ${signinExiting || anticipating ? 'pointer-events-none' : ''}`}
       >
         <div
@@ -576,7 +576,7 @@ export function SmartLoginForm({
                 layoutId="auth-logo"
                 layout
                 animate={anticipating ? { scale: 0.95 } : { scale: 1 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 style={{ ...GPU_STABILIZE, viewTransitionName: 'auth-logo' } as React.CSSProperties}
                 className="mx-auto mb-6 flex items-center justify-center overflow-visible isolate relative z-10"
               >
@@ -738,7 +738,7 @@ export function SmartLoginForm({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    transition={SIGNAL_PHYSICS}
+                    transition={UNUSONIC_PHYSICS}
                     className="overflow-hidden"
                   >
                     <motion.button
@@ -747,7 +747,7 @@ export function SmartLoginForm({
                       disabled={isPending}
                       whileHover={!isPending ? { scale: 1.02 } : undefined}
                       whileTap={!isPending ? { scale: 0.98 } : undefined}
-                      transition={SIGNAL_PHYSICS}
+                      transition={UNUSONIC_PHYSICS}
                       className="w-full h-12 rounded-xl font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {isPasskeyPending ? (
@@ -772,7 +772,7 @@ export function SmartLoginForm({
                     initial={{ opacity: 0, y: -8, height: 0 }}
                     animate={{ opacity: 1, y: 0, height: 'auto' }}
                     exit={{ opacity: 0, y: -8, height: 0 }}
-                    transition={SIGNAL_PHYSICS}
+                    transition={UNUSONIC_PHYSICS}
                     className="overflow-hidden"
                   >
                     <div className="p-3 rounded-xl bg-surface-error border border-signal-error/40">
@@ -789,7 +789,7 @@ export function SmartLoginForm({
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ ...SIGNAL_PHYSICS, opacity: { duration: 0.2 } }}
+                  transition={{ ...UNUSONIC_PHYSICS, opacity: { duration: 0.2 } }}
                   className="overflow-hidden pt-2 pb-3 px-1"
                 >
                   <form action={signInFormAction} className="space-y-5">
@@ -842,7 +842,7 @@ export function SmartLoginForm({
                           initial={{ opacity: 0, y: -8, height: 0 }}
                           animate={{ opacity: 1, y: 0, height: 'auto' }}
                           exit={{ opacity: 0, y: -8, height: 0 }}
-                          transition={SIGNAL_PHYSICS}
+                          transition={UNUSONIC_PHYSICS}
                           className="overflow-hidden"
                         >
                           <div className="p-3 rounded-xl bg-surface-error border border-signal-error/40">
@@ -911,7 +911,7 @@ export function SmartLoginForm({
 
           <div className="mt-8 pt-5 border-t border-[var(--glass-border)]">
             <p className="text-[11px] text-center text-ink-muted/60 uppercase tracking-widest">
-              Signal
+              Unusonic
             </p>
           </div>
         </div>
@@ -924,7 +924,7 @@ export function SmartLoginForm({
     <LayoutGroup>
       <motion.div
         layout
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
         className="relative w-full min-h-screen flex items-center justify-center"
       >
         {createAccountView}

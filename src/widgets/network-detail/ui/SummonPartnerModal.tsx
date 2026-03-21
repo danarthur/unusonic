@@ -73,7 +73,7 @@ export function SummonPartnerModal({
         >
           <motion.div
             role="presentation"
-            className="absolute inset-0 bg-[var(--color-obsidian)]/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[oklch(0.12_0_0/0.6)] backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -121,7 +121,7 @@ export function SummonPartnerModal({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="booking@example.com"
                 required
-                className="bg-white/5 border-[var(--color-mercury)]"
+                className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
               />
             </div>
             {status === 'error' && message && (

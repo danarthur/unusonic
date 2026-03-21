@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { useOptimistic, useState, useEffect, useRef, Suspense } from 'react';
+import { useOptimistic, useState, useEffect, useRef, Suspense, useCallback } from 'react';
 import { Stream } from './stream';
 import { Prism } from './prism';
 import type { StreamCardItem } from './stream-card';
@@ -64,6 +64,15 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
   useEffect(() => {
     if (clientGigs.length > 0) sharedGigsCache = clientGigs;
   }, [clientGigs]);
+  // When RSC re-renders (e.g. after router.refresh()), sync the fresh gigs into client state.
+  // This is what makes newly created deals appear without a manual page reload.
+  const prevGigsRef = useRef(gigs);
+  useEffect(() => {
+    if (gigs === prevGigsRef.current) return;
+    prevGigsRef.current = gigs;
+    sharedGigsCache = gigs;
+    setClientGigs(gigs);
+  }, [gigs]);
   const hasFetchedRef = useRef(false);
   useEffect(() => {
     if (hasFetchedRef.current) return;
@@ -71,25 +80,27 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
     let cancelled = false;
     getCrmGigs().then((fetched) => {
       if (cancelled) return;
-      if (fetched.length > 0) {
-        sharedGigsCache = fetched;
-        setClientGigs(fetched);
-      }
+      // Always write the result — an empty array means "no data", not "query failed".
+      // The old `fetched.length > 0` guard caused stale cache to persist silently.
+      sharedGigsCache = fetched;
+      setClientGigs(fetched);
     });
     return () => {
       cancelled = true;
     };
   }, []);
-  useEffect(() => {
-    if (gigs.length > 0 && gigs.length >= sharedGigsCache.length) {
-      sharedGigsCache = gigs;
-      setClientGigs(gigs);
-    }
-  }, [gigs]);
   const [optimisticGigs, addOptimisticGig] = useOptimistic(clientGigs, gigsReducer);
   useEffect(() => {
     if (optimisticGigs.length > 0) sharedGigsCache = optimisticGigs;
   }, [optimisticGigs]);
+
+  // Passed to CreateGigModal so it can pull a fresh list immediately after success,
+  // without relying on router.refresh() to propagate through prevGigsRef.
+  const refetchGigs = useCallback(async () => {
+    const fetched = await getCrmGigs();
+    sharedGigsCache = fetched;
+    setClientGigs(fetched);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -127,6 +138,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
           selectedId={selectedId}
           onSelect={setSelected}
           addOptimisticGig={addOptimisticGig}
+          onRefetchList={refetchGigs}
           mode={currentStream}
           onModeChange={setStreamMode}
         />

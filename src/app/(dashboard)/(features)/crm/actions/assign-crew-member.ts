@@ -2,20 +2,20 @@
 
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { createClient } from '@/shared/api/supabase/server';
-import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
-import { updateFlightCheckStatus } from './update-flight-check-status';
+import { applyRuleToCrewMember } from './apply-call-time-rules';
+import { sendCrewAssignmentEmail } from '@/features/crew-notifications/api/send-assignment-email';
 
 export type AssignCrewMemberResult =
   | { success: true }
   | { success: false; error: string };
 
 /**
- * Assigns an internal team member to a crew slot and sets status to confirmed.
- * Updates run_of_show_data.crew_items[crewIndex] with entity_id and assignee_name.
+ * Assigns an internal team member to a crew assignment row and sets status to confirmed.
+ * Updates ops.crew_assignments by assignmentId (UUID).
  */
 export async function assignCrewMember(
   eventId: string,
-  crewIndex: number,
+  assignmentId: string,
   entityId: string,
   assigneeName: string
 ): Promise<AssignCrewMemberResult> {
@@ -23,37 +23,54 @@ export async function assignCrewMember(
   if (!workspaceId) return { success: false, error: 'No active workspace.' };
 
   const supabase = await createClient();
-  const { data: event, error: fetchErr } = await supabase
+
+  // Hydrate assignee_name from directory if the caller didn't provide one
+  let resolvedName = assigneeName?.trim() || null;
+  if (!resolvedName && entityId) {
+    const { data: entity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('id', entityId)
+      .maybeSingle();
+    resolvedName = (entity as { display_name?: string | null } | null)?.display_name ?? null;
+  }
+
+  // Fetch the current row to get the role (needed for email + call-time rules)
+  const { data: assignment, error: fetchErr } = await supabase
     .schema('ops')
-    .from('events')
-    .select('id, run_of_show_data, project:projects!inner(workspace_id)')
-    .eq('id', eventId)
-    .eq('projects.workspace_id', workspaceId)
+    .from('crew_assignments')
+    .select('role')
+    .eq('id', assignmentId)
+    .eq('workspace_id', workspaceId)
     .maybeSingle();
 
-  if (fetchErr || !event) {
-    return { success: false, error: 'Event not found.' };
+  if (fetchErr || !assignment) {
+    return { success: false, error: 'Crew assignment not found.' };
   }
 
-  const ros = (event as { run_of_show_data: RunOfShowData | null }).run_of_show_data ?? {};
-  let crewItems = Array.isArray(ros.crew_items) && ros.crew_items.length > 0
-    ? [...ros.crew_items]
-    : Array.isArray(ros.crew_roles)
-      ? ros.crew_roles.map((role: string) => ({ role: String(role), status: 'requested' as const }))
-      : [];
+  const role = (assignment as { role: string }).role;
 
-  if (crewIndex < 0 || crewIndex >= crewItems.length) {
-    return { success: false, error: 'Invalid crew slot.' };
+  const { error } = await supabase
+    .schema('ops')
+    .from('crew_assignments')
+    .update({
+      entity_id: entityId,
+      assignee_name: resolvedName,
+      status: 'confirmed',
+    })
+    .eq('id', assignmentId)
+    .eq('workspace_id', workspaceId);
+
+  if (error) {
+    console.error('[CRM] assignCrewMember:', error.message);
+    return { success: false, error: error.message };
   }
 
-  const item = crewItems[crewIndex] as { role: string; status: string; entity_id?: string | null; assignee_name?: string | null };
-  crewItems[crewIndex] = {
-    ...item,
-    role: item.role,
-    status: 'confirmed',
-    entity_id: entityId,
-    assignee_name: assigneeName,
-  };
+  // Auto-apply call time rules (fire-and-forget)
+  applyRuleToCrewMember(eventId, assignmentId, role, entityId).catch(() => {});
+  // Send assignment email with confirmation link (fire-and-forget)
+  sendCrewAssignmentEmail(eventId, assignmentId, entityId).catch(() => {});
 
-  return updateFlightCheckStatus(eventId, { crew_items: crewItems });
+  return { success: true };
 }

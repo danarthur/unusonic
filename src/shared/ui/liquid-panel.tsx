@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/utils';
 import {
   M3_FADE_THROUGH_ENTER,
   M3_FADE_THROUGH_EXIT,
-  SIGNAL_PHYSICS,
+  UNUSONIC_PHYSICS,
 } from '@/shared/lib/motion-constants';
 
 interface LiquidPanelProps extends HTMLMotionProps<"div"> {
@@ -15,7 +15,7 @@ interface LiquidPanelProps extends HTMLMotionProps<"div"> {
   hoverEffect?: boolean;
   /** Levitation: floats above grid (scale, deeper shadow) — medium urgency */
   levitate?: boolean;
-  /** Subsurface ION glow: edge glows from within when ION has a contextual suggestion */
+  /** Subsurface Aion glow: edge glows from within when Aion has a contextual suggestion */
   ionHint?: boolean;
 }
 
@@ -32,7 +32,7 @@ export function LiquidPanel({
       initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 8, scale: 0.98, transition: M3_FADE_THROUGH_EXIT }}
-      transition={SIGNAL_PHYSICS}
+      transition={UNUSONIC_PHYSICS}
       whileHover={hoverEffect && !levitate ? { y: -2, scale: 1.002 } : undefined}
       className={cn(
         "liquid-card p-6 relative overflow-hidden transition-all duration-300",

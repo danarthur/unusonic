@@ -1,0 +1,14 @@
+-- =============================================================================
+-- cortex remove_relationship RPC
+--
+-- APPLIED: 2026-03-04 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Created public.remove_relationship(p_source_entity_id, p_target_entity_id, p_relationship_type)
+-- SECURITY DEFINER RPC. Caller must have owner or admin role in the source
+-- entity's workspace (user_has_workspace_role). Deletes the matching edge from
+-- cortex.relationships.
+--
+-- Note: a local draft of this RPC also exists as:
+--   20260228230000_add_remove_relationship_rpc.sql
+-- The DB-applied version (this one, 20260304020940) is the canonical version.
+-- =============================================================================

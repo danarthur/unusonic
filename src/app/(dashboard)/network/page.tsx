@@ -8,7 +8,7 @@ import { Suspense } from 'react';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { PersistOrgCookie } from '@/features/network/ui/PersistOrgCookie';
 import { getOrgDetails } from '@/features/org-management/api';
-import { getNetworkStream, getDeletedRelationships, unpinFromInnerCircle } from '@/features/network-data';
+import { getNetworkStream, getDeletedRelationships, unpinFromInnerCircle, pinToInnerCircle } from '@/features/network-data';
 import { NetworkDetailSheetWithSuspense } from '@/widgets/network-detail';
 import { NetworkOrbitWithGenesis } from './NetworkOrbitWithGenesis';
 import { NetworkGenesisNoOrg } from './NetworkGenesisNoOrg';
@@ -32,11 +32,11 @@ function NetworkPageSkeleton() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
       <div className="shrink-0">
-        <div className="h-8 w-48 animate-pulse rounded bg-white/10" />
-        <div className="mt-2 h-4 w-64 animate-pulse rounded bg-white/5" />
+        <div className="h-8 w-48 animate-pulse rounded bg-[var(--color-glass-surface)]" />
+        <div className="mt-2 h-4 w-64 animate-pulse rounded bg-[oklch(0.20_0_0/0.25)]" />
       </div>
       <div className="flex flex-1 min-h-0 items-center justify-center">
-        <div className="h-32 w-32 animate-pulse rounded-full bg-white/5" />
+        <div className="h-32 w-32 animate-pulse rounded-full bg-[oklch(0.20_0_0/0.25)]" />
       </div>
     </div>
   );
@@ -58,7 +58,7 @@ async function NetworkPageInner({ searchParams }: PageProps) {
   const params = await searchParams;
   const nodeId = params?.nodeId ?? null;
   const kind =
-    params?.kind === 'external_partner' || params?.kind === 'internal_employee'
+    params?.kind === 'external_partner' || params?.kind === 'internal_employee' || params?.kind === 'extended_team'
       ? params.kind
       : null;
 
@@ -93,6 +93,7 @@ async function NetworkPageInner({ searchParams }: PageProps) {
         hasTeam={hasTeam}
         brandColor={brandColor}
         onUnpin={unpinFromInnerCircle}
+        onPin={pinToInnerCircle}
         deletedRelationships={deletedRelationships}
       />
       {nodeId && kind && (

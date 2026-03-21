@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { MapPin, Calendar, Users, Clock, Truck, AlertTriangle } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { useConflictDetection } from '@/features/ops/hooks/use-conflict-detection';
 import { CrewFlightCheck, GearFlightCheck, LogisticsFlightCheck } from './flight-checks';
 import { normalizeCrewItems, normalizeLogistics } from './flight-checks/types';
@@ -83,7 +83,7 @@ export function DispatchSummary({
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={SIGNAL_PHYSICS}
+      transition={UNUSONIC_PHYSICS}
       className="flex flex-col gap-6"
     >
       {/* Conflict alert — critical banner when resources are double-booked */}
@@ -91,7 +91,7 @@ export function DispatchSummary({
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={SIGNAL_PHYSICS}
+          transition={UNUSONIC_PHYSICS}
           className="rounded-[28px] border border-[var(--color-signal-warning)]/50 bg-[var(--color-signal-warning)]/10 p-4 flex items-start gap-4"
           role="alert"
         >

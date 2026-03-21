@@ -9,19 +9,18 @@ export type CreateOrgRelationshipResult = { ok: true; id: string } | { ok: false
 /** Maps RelationshipType to cortex relationship_type. */
 function relTypeToCortexType(type: RelationshipType | string): string {
   switch (type) {
-    case 'vendor':       return 'VENDOR';
-    case 'venue':        return 'VENUE_PARTNER';
+    case 'vendor':         return 'VENDOR';
+    case 'venue':          return 'VENUE_PARTNER';
     case 'client_company': return 'CLIENT';
-    case 'partner':      return 'PARTNER';
-    default:             return String(type).toUpperCase();
+    case 'partner':        return 'PARTNER';
+    default:               return String(type).toUpperCase();
   }
 }
 
 /**
  * Link source_org to target_org (vendor/venue/client/partner).
- * Dual-write: inserts into org_relationships (primary) and cortex.relationships (new schema).
- * RLS: only source_org members can insert.
- * workspace_id is resolved from source org for tenant isolation.
+ * Writes to cortex.relationships via upsert_relationship RPC.
+ * Accepts both entity UUIDs and legacy_org_ids.
  */
 export async function createOrgRelationship(
   sourceOrgId: string,
@@ -31,45 +30,26 @@ export async function createOrgRelationship(
 ): Promise<CreateOrgRelationshipResult> {
   const supabase = await createClient();
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('workspace_id')
-    .eq('id', sourceOrgId)
-    .single();
-  if (!org?.workspace_id) return { ok: false, error: 'Organization not found.' };
+  // Resolve both entities — accept direct entity UUID or legacy_org_id
+  const [sourceRes, targetRes] = await Promise.all([
+    supabase.schema('directory').from('entities').select('id').or(`id.eq.${sourceOrgId},legacy_org_id.eq.${sourceOrgId}`).maybeSingle(),
+    supabase.schema('directory').from('entities').select('id').or(`id.eq.${targetOrgId},legacy_org_id.eq.${targetOrgId}`).maybeSingle(),
+  ]);
 
-  const { data, error } = await supabase
-    .from('org_relationships')
-    .insert({
-      source_org_id: sourceOrgId,
-      target_org_id: targetOrgId,
-      type,
+  if (!sourceRes.data?.id) return { ok: false, error: 'Source organization not found.' };
+  if (!targetRes.data?.id) return { ok: false, error: 'Target organization not found.' };
+
+  const { data, error } = await supabase.rpc('upsert_relationship', {
+    p_source_entity_id: sourceRes.data.id,
+    p_target_entity_id: targetRes.data.id,
+    p_type: relTypeToCortexType(type),
+    p_context_data: {
       notes: notes ?? null,
-      workspace_id: org.workspace_id,
-    })
-    .select('id')
-    .single();
+      tier: 'standard',
+    },
+  });
 
   if (error) return { ok: false, error: error.message };
 
-  // Dual-write: mirror to cortex.relationships (new schema)
-  const [sourceRes, targetRes] = await Promise.all([
-    supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', sourceOrgId).maybeSingle(),
-    supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', targetOrgId).maybeSingle(),
-  ]);
-  if (sourceRes.data?.id && targetRes.data?.id) {
-    await supabase.rpc('upsert_relationship', {
-      p_source_entity_id: sourceRes.data.id,
-      p_target_entity_id: targetRes.data.id,
-      p_type: relTypeToCortexType(type),
-      p_context_data: {
-        notes: notes ?? null,
-        tier: 'standard',
-        legacy_org_relationship_id: data.id,
-      },
-    });
-  }
-  // Non-fatal: cortex mirror failure doesn't block the primary write.
-
-  return { ok: true, id: data.id };
+  return { ok: true, id: (data as string) ?? sourceRes.data.id };
 }

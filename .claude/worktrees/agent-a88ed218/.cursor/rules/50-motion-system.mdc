@@ -1,0 +1,145 @@
+# MOTION SYSTEM & ARCHITECTURE ("Liquid Ceramic" + Material Design 3)
+
+**References:**  
+[M3 Motion – Transition patterns](https://m3.material.io/styles/motion/transitions/transition-patterns) · [Applying transitions](https://m3.material.io/styles/motion/transitions/applying-transitions) · [Great Animations (Emil Kowalski)](https://emilkowal.ski/ui/great-animations)
+
+---
+
+## 0. PRINCIPLES (Great Animations)
+
+From [Great Animations](https://emilkowal.ski/ui/great-animations): use these to judge every transition.
+
+| Principle | Rule |
+| --- | --- |
+| **Natural** | Springs feel natural; avoid instant show/hide. Nothing in the real world appears or disappears instantly. Use SIGNAL_PHYSICS (stiffness, damping, mass) for layout/shared-element. |
+| **Fast** | Snappy = responsive. Ease-out (fast start, slow end) reads as quick response. Keep non-spring transitions **under 300ms**. |
+| **Purpose** | Don’t animate everywhere. Use motion where it adds meaning (state change, modals, explaining flow). **Never animate keyboard-initiated actions** (e.g. Cmd+K, tab) — they’re repeated hundreds of times a day; animation would feel slow. |
+| **Performant** | Animate **transform** and **opacity** only when possible (composite-only; no layout/paint). If the main thread is busy (e.g. loading), prefer **CSS or WAAPI** so the animation stays on the compositor; Framer Motion uses rAF and can drop frames under load. |
+| **Interruptible** | User can change state mid-animation; transition should blend to the new target. Framer Motion supports this; CSS `transition` is interruptible. Avoid one-shot keyframes for UI state. |
+| **Accessible** | Respect `prefers-reduced-motion`. Use `useReducedMotion` (or equivalent) and simplify to opacity-only or disable motion so we don’t degrade the experience. |
+| **Feel right** | Easing and duration should match the product (e.g. Sonner’s slower, elegant toast). Review with fresh eyes; tune until it feels cohesive. |
+
+---
+
+## 1. THE "SIGNAL" PHYSICS SIGNATURE
+We do not use default springs. Our motion must feel dense, expensive, and "ceramic."
+Use these **exact** physics constants for all layout transitions unless strictly overridden:
+
+```typescript
+export const SIGNAL_PHYSICS = {
+  type: 'spring',
+  mass: 1.4,       // High mass creates the "heavy/expensive" feel
+  stiffness: 280,  // Taut tension, not floppy
+  damping: 36,     // Critically damped. No bounce. A "thud" stop.
+  restDelta: 0.001 // High precision stopping
+};
+```
+
+---
+
+## 2. MATERIAL DESIGN 3 (M3) TRANSITION PATTERNS
+
+M3 defines [four primary transition patterns](https://m3.material.io/styles/motion/transitions/transition-patterns) for navigation and choreography. Map Signal flows to these so motion stays consistent and predictable.
+
+| Pattern | When to use | Signal mapping |
+| --- | --- | --- |
+| **Container transform** | One container morphs into another; shared focus. | **Sign In → Create Account:** card exits, full-bleed shell appears; shared logo via `layoutId`. |
+| **Shared axis** | Same content moves along X, Y, or Z (e.g. list → detail). | Stepper flows (name → email → password); horizontal or vertical shared axis. |
+| **Fade through** | Content changes; no shared element. Fade out → fade in. | Mode toggles (Sign in ↔ Create account heading); list item replace. |
+| **Fade** | Simple visibility (dialogs, overlays). | Modals, tooltips, blur-fade for reduced motion. |
+
+**Other M3 patterns** (use when the spec calls for them): forward/backward, lateral, top-level, enter/exit, skeleton loaders.
+
+**Choreography rule:** Motion should create a *visible connection* between related UI (M3 “how it works”). Prefer shared elements (`layoutId`) or shared axis over unrelated fades when the user is moving between related contexts.
+
+---
+
+## 3. MATERIAL DESIGN 3 (M3) IMPLEMENTATION STANDARDS
+
+We follow the [M3 motion system](https://m3.material.io/styles/motion/overview/how-it-works) for easing and choreography.
+
+### A. M3 Easing Tokens (CSS & Framer)
+When not using spring physics (e.g. opacity or color), use M3 standard curves. See [M3 easing and duration](https://m3.material.io/styles/motion/easing-and-duration/tokens-specs).
+
+| Token | Cubic Bezier | Use case |
+| --- | --- | --- |
+| **Emphasized** | 0.2, 0.0, 0.0, 1.0 | Primary focus (e.g. "Create Account"). Gold standard. |
+| **Emphasized decelerate** | 0.05, 0.7, 0.1, 1.0 | Entering: fast start, gentle land. |
+| **Emphasized accelerate** | 0.3, 0.0, 0.8, 0.15 | Exiting: slow start, fast leave. |
+| **Standard** | 0.2, 0.0, 0, 1.0 | Small shifts (checkboxes, hover). |
+
+M3 also documents an **emphasized** curve as a custom cubic (e.g. `0.05, 0, 0.133333, 0.06, 0.166666, 0.4` on some platforms). Prefer the 0.2/0/0/1 variant in web/Framer unless the design system specifies otherwise.
+
+### B. M3 Duration
+- **Standard transition duration:** 300ms (M3 typical). Use with easing when not using springs.
+- **Quick / micro:** ~100–150ms for small feedback (hover, focus).
+- **Slower / large:** Up to 400ms for large layout or container transforms when using easing (not spring).
+
+### C. M3 "Container Transform" Pattern
+This is the core pattern for Sign In → Create Account ([M3 transition patterns](https://m3.material.io/styles/motion/transitions/transition-patterns)).
+
+- **Parent:** The container (e.g. card) morphs; use `layoutId` for shared element.
+- **Child:** Content (text/inputs) does **not** stretch or distort.
+
+**Technique:**
+
+- **Outgoing content:** Fade out (opacity: 0) within the first ~90ms.
+- **Incoming content:** Fade in (opacity: 1) after the container has mostly resized.
+- **Scale counter-action:** If children distort, use `transform: scale(1 / parentScale)` or `layout="preserve-aspect"`. Prefer cross-fade (opacity + y + blur) over morphing text to avoid jitter.
+
+---
+
+## 4. RENDERING PERFORMANCE (The 120fps Mandate)
+To prevent "shimmering" on iOS or Chromium during morphs:
+
+**GpuStabilize Hook:**  
+Always apply this style object to the root `motion.div` of a page transition:
+
+```typescript
+const GPU_STABILIZE = {
+  WebkitBackfaceVisibility: 'hidden',
+  backfaceVisibility: 'hidden',
+  transform: 'translateZ(0)',
+  willChange: 'transform, opacity, filter'
+} as const;
+```
+
+**Filter Performance:**
+
+- Never animate blur > 10px.
+- Always pair filter animations with `willChange: 'filter'`.
+
+---
+
+## 5. ONLINE KNOWLEDGE RETRIEVAL
+If you encounter a new motion challenge, you are authorized to browse the following documentation to relearn the specific implementation details:
+
+- **Great Animations (Emil Kowalski):**  
+  [emilkowal.ski/ui/great-animations](https://emilkowal.ski/ui/great-animations)  
+  Focus: Natural (springs), fast (<300ms), purpose (no keyboard-action animation), performant (transform/opacity; CSS/WAAPI when main thread busy), interruptible, accessible (prefers-reduced-motion), feel right.
+
+- **Material Design 3 Motion:**  
+  [Transition patterns](https://m3.material.io/styles/motion/transitions/transition-patterns) · [Applying transitions](https://m3.material.io/styles/motion/transitions/applying-transitions) · [Easing and duration](https://m3.material.io/styles/motion/easing-and-duration/tokens-specs)  
+  Focus: Container transform, Shared axis, Fade through, Fade; Emphasized easing; 300ms duration.
+
+- **Framer Motion Advanced:**  
+  Search Query: "Framer Motion layoutId shared element transition examples"  
+  Focus: Look for "AnimatePresence mode=popLayout" and "LayoutGroup"; interruptible animations.
+
+- **Performance Engineering:**  
+  Search Query: "CSS will-change best practices 2025" or "Framer Motion performance optimization"  
+  Focus: Look for "layer promotion", "compositor thread", and when to use CSS/WAAPI instead of JS-driven animation.
+
+---
+
+## 6. CODE REVIEW CHECKLIST (Auto-enforce)
+Before generating code, verify:
+
+- [ ] Am I using SIGNAL_PHYSICS for layout/shared-element transitions?
+- [ ] Did I apply GPU_STABILIZE to the moving container?
+- [ ] Is the logo state change triggered by layout animation lifecycle (onAnimationStart/onAnimationComplete), not setTimeout?
+- [ ] Am I using M3 "Emphasized" easing for non-spring values (e.g. opacity, filter)?
+- [ ] Does this flow map to an M3 transition pattern (Container transform, Shared axis, Fade through, Fade)?
+- [ ] Am I avoiding animation on keyboard-initiated actions (shortcuts, repeated focus/tab)?
+- [ ] Is motion limited to transform + opacity (and filter only when needed) for performance?
+- [ ] Is prefers-reduced-motion respected (simplified or disabled motion)?

@@ -4,66 +4,76 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Wallet, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import type { EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
 
 type LedgerLensProps = {
   eventId: string;
   eventTitle: string | null;
+  ledger: EventLedgerDTO | null;
 };
 
-/** Phase 3: Particle Stream — "Label - Amount - Date/Status". Replace with real transactions when finance API is wired. */
-const PLACEHOLDER_PARTICLES = [
-  { id: '1', label: 'Deposit Paid', inbound: true, amount: '$5,000', dateOrStatus: 'Jan 12' },
-  { id: '2', label: 'Vendor Payment (Tent)', inbound: false, amount: '$1,200', dateOrStatus: 'Pending' },
-] as const;
-
-export function LedgerLens({ eventId, eventTitle }: LedgerLensProps) {
+export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={SIGNAL_PHYSICS}
+      transition={UNUSONIC_PHYSICS}
       className="flex flex-col gap-6"
     >
-      {/* Phase 3: Waterfall card — Top: Total Revenue (Green), Middle: Estimated Cost (Red/Muted), Bottom: Projected Margin (Gold) */}
+      {/* Waterfall card — Total Revenue / Estimated Cost / Projected Margin */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <LiquidPanel className="p-6 rounded-[28px] border-l-4 border-l-[var(--color-signal-success)]">
           <p className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">Total revenue</p>
-          <p className="text-xl font-semibold text-[var(--color-signal-success)] tracking-tight tabular-nums">—</p>
+          <p className="text-xl font-semibold text-[var(--color-signal-success)] tracking-tight tabular-nums">
+            {ledger ? ledger.fmt.totalRevenue : '—'}
+          </p>
         </LiquidPanel>
         <LiquidPanel className="p-6 rounded-[28px] border-l-4 border-l-[var(--color-signal-error)]">
           <p className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">Estimated cost</p>
-          <p className="text-xl font-semibold text-ink-muted tracking-tight tabular-nums">—</p>
+          <p className="text-xl font-semibold text-ink-muted tracking-tight tabular-nums">
+            {ledger ? ledger.fmt.totalCost : '—'}
+          </p>
         </LiquidPanel>
         <LiquidPanel className="p-6 rounded-[28px] border-l-4 border-l-[var(--color-signal-warning)]">
           <p className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">Projected margin</p>
-          <p className="text-xl font-semibold text-[var(--color-signal-warning)] tracking-tight tabular-nums">—</p>
+          <p className="text-xl font-semibold text-[var(--color-signal-warning)] tracking-tight tabular-nums">
+            {ledger ? ledger.fmt.margin : '—'}
+          </p>
         </LiquidPanel>
       </div>
 
-      {/* Phase 3: Particle Stream — "Label - Amount - Date/Status" */}
+      {/* Transaction stream */}
       <LiquidPanel className="p-6 rounded-[28px] border-l-4 border-l-[var(--color-neon-rose)]">
         <h2 className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-4">
           Transaction stream
         </h2>
-        <ul className="space-y-2">
-          {PLACEHOLDER_PARTICLES.map((p) => (
-            <li
-              key={p.id}
-              className="flex items-center gap-3 py-2 border-b border-[var(--glass-border)] last:border-0 text-sm"
-            >
-              {p.inbound ? (
-                <ArrowDownRight size={16} className="shrink-0 text-[var(--color-signal-success)]" aria-hidden />
-              ) : (
-                <ArrowUpRight size={16} className="shrink-0 text-ink-muted" aria-hidden />
-              )}
-              <span className="text-ink">{p.label}</span>
-              <span className="tabular-nums text-ink-muted">— {p.amount}</span>
-              <span className="ml-auto text-ink-muted text-xs">{p.dateOrStatus}</span>
-            </li>
-          ))}
-        </ul>
+        {ledger && ledger.transactions.length > 0 ? (
+          <ul className="space-y-2">
+            {ledger.transactions.map((tx) => (
+              <li
+                key={tx.id}
+                className="flex items-center gap-3 py-2 border-b border-[var(--glass-border)] last:border-0 text-sm"
+              >
+                {tx.inbound ? (
+                  <ArrowDownRight size={16} className="shrink-0 text-[var(--color-signal-success)]" aria-hidden />
+                ) : (
+                  <ArrowUpRight size={16} className="shrink-0 text-ink-muted" aria-hidden />
+                )}
+                <span className="text-ink">{tx.label}</span>
+                <span className="tabular-nums text-ink-muted">
+                  — {tx.amount < 0 ? '-' : ''}${Math.abs(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="ml-auto text-ink-muted text-xs">
+                  {tx.status ?? (tx.date ? new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-ink-muted py-2">No transactions recorded yet.</p>
+        )}
         <p className="text-xs text-ink-muted mt-4">
           Open finance for full P&amp;L and invoices.
         </p>

@@ -1,6 +1,6 @@
 /**
- * ION Suggested Actions — Next Best Action cards.
- * Stub data until ION API returns real suggestions.
+ * Aion Suggested Actions — Next Best Action cards.
+ * Stub data until Aion API returns real suggestions.
  */
 
 export type SuggestedAction = {
@@ -14,12 +14,12 @@ export type SuggestedAction = {
   entityId?: string;
 };
 
-/** Placeholder actions for Action Stream. Replace with API/ION when ready. */
+/** Placeholder actions for Action Stream. Replace with API/Aion when ready. */
 export const STUB_SUGGESTED_ACTIONS: SuggestedAction[] = [
   {
     id: '1',
     title: 'Contract for Allegra pending 3 days',
-    detail: 'Send ION follow-up?',
+    detail: 'Send Aion follow-up?',
     cta: 'Send follow-up',
     type: 'follow_up',
     entityId: undefined,
@@ -28,7 +28,7 @@ export const STUB_SUGGESTED_ACTIONS: SuggestedAction[] = [
     id: '2',
     title: 'Invoice #1042 overdue',
     detail: 'Client has not responded.',
-    cta: 'Have ION draft reminder',
+    cta: 'Have Aion draft reminder',
     type: 'invoice',
     entityId: undefined,
   },

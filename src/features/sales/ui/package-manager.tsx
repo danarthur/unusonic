@@ -16,7 +16,7 @@ import { createPackage, updatePackage } from '../api/package-actions';
 import type { Package } from '@/types/supabase';
 import type { PackageCategory } from '../api/package-actions';
 import { CurrencyInput } from '@/shared/ui/currency-input';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const CATEGORIES: { value: PackageCategory; label: string }[] = [
@@ -165,7 +165,7 @@ export function PackageManager({
             onClick={openCreate}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--glass-border)] text-sm font-medium text-ceramic hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <Plus size={16} aria-hidden />
@@ -196,7 +196,7 @@ export function PackageManager({
                   onClick={() => openEdit(pkg)}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  transition={SIGNAL_PHYSICS}
+                  transition={UNUSONIC_PHYSICS}
                   className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   aria-label={`Edit ${pkg.name}`}
                 >

@@ -12,7 +12,7 @@ import { getWorkspaceMembers, getWorkspaceLocations } from '@/app/actions/worksp
 import type { WorkspaceMemberData, LocationData, WorkspacePermissions } from '@/app/actions/workspace';
 
 export const metadata = {
-  title: 'Settings | Signal',
+  title: 'Settings | Unusonic',
   description: 'Manage your Signal settings and integrations',
 };
 

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { COMPANY_ATTR, INDIVIDUAL_ATTR, COUPLE_ATTR } from '@/features/network-data/model/attribute-keys';
 
 export type DealClientContact = {
   id: string;
@@ -81,7 +82,7 @@ export async function getDealClientContext(
         .eq('legacy_org_id', orgId)
         .maybeSingle(),
       supabase.schema('directory').from('entities')
-        .select('id, attributes')
+        .select('id, display_name, attributes')
         .eq('legacy_entity_id', entityIdFromStakeholder)
         .maybeSingle(),
     ]);
@@ -91,32 +92,32 @@ export async function getDealClientContext(
       const attrs = (orgDirRes.data.attributes as Record<string, unknown>) ?? {};
       orgDisplayData = {
         name: orgDirRes.data.display_name ?? '',
-        category: (attrs.category as string | null) ?? null,
-        support_email: (attrs.support_email as string | null) ?? null,
-        website: (attrs.website as string | null) ?? null,
-        address: (attrs.address as DealClientContext['organization']['address']) ?? null,
+        category: (attrs[COMPANY_ATTR.category] as string | null) ?? null,
+        support_email: (attrs[COMPANY_ATTR.support_email] as string | null) ?? null,
+        website: (attrs[COMPANY_ATTR.website] as string | null) ?? null,
+        address: (attrs[COMPANY_ATTR.address] as DealClientContext['organization']['address']) ?? null,
       };
     }
 
     let personEmail: string | null = null;
     if (personDirRes.data) {
       const attrs = (personDirRes.data.attributes as Record<string, unknown>) ?? {};
-      personEmail = (attrs.email as string | null) ?? null;
+      personEmail = (attrs[INDIVIDUAL_ATTR.email] as string | null) ?? null;
     }
 
-    // Contact name: cortex ROSTER_MEMBER edge
+    // Contact name: entity attributes (single source of truth — keeps in sync with updateIndividualEntity writes).
+    // Fall back to splitting display_name for pre-migration ghosts that predate the attribute-key contract.
     let contactFirstName = '';
     let contactLastName = '';
-    if (orgDirRes.data?.id && personDirRes.data?.id) {
-      const { data: rosterEdge } = await supabase.schema('cortex').from('relationships')
-        .select('context_data')
-        .eq('source_entity_id', personDirRes.data.id)
-        .eq('target_entity_id', orgDirRes.data.id)
-        .eq('relationship_type', 'ROSTER_MEMBER')
-        .maybeSingle();
-      const ctx = (rosterEdge?.context_data as Record<string, unknown>) ?? {};
-      contactFirstName = (ctx.first_name as string) ?? '';
-      contactLastName = (ctx.last_name as string) ?? '';
+    if (personDirRes.data) {
+      const personAttrs = (personDirRes.data.attributes as Record<string, unknown>) ?? {};
+      contactFirstName = (personAttrs[INDIVIDUAL_ATTR.first_name] as string) ?? '';
+      contactLastName = (personAttrs[INDIVIDUAL_ATTR.last_name] as string) ?? '';
+      if (!contactFirstName && !contactLastName && personDirRes.data.display_name) {
+        const parts = personDirRes.data.display_name.trim().split(/\s+/);
+        contactFirstName = parts[0] ?? '';
+        contactLastName = parts.slice(1).join(' ');
+      }
     }
 
     if (orgDisplayData) {
@@ -129,7 +130,7 @@ export async function getDealClientContext(
           website: orgDisplayData.website,
           address: orgDisplayData.address && typeof orgDisplayData.address === 'object' ? orgDisplayData.address : null,
         },
-        mainContact: personDirRes.data || personEmail !== null ? {
+        mainContact: personDirRes.data ? {
           id: entityIdFromStakeholder,
           first_name: contactFirstName,
           last_name: contactLastName,
@@ -152,7 +153,7 @@ export async function getDealClientContext(
       .maybeSingle();
     if (personOnlyDir) {
       const attrs = (personOnlyDir.attributes as Record<string, unknown>) ?? {};
-      const personOnlyEmail = (attrs.email as string | null) ?? null;
+      const personOnlyEmail = (attrs[INDIVIDUAL_ATTR.email] as string | null) ?? (attrs[COUPLE_ATTR.partner_a_email] as string | null) ?? null;
       // Use display_name as primary name — never use email as the name
       const personName = personOnlyDir.display_name ?? personOnlyEmail ?? 'Unknown';
       return {
@@ -204,10 +205,13 @@ export async function getDealClientContext(
   if (resolvedOrgDirData) {
     const attrs = (resolvedOrgDirData.attributes as Record<string, unknown>) ?? {};
     mainOrgName = resolvedOrgDirData.display_name ?? '';
-    mainOrgCategory = (attrs.category as string | null) ?? null;
-    mainOrgSupportEmail = (attrs.support_email as string | null) ?? null;
-    mainOrgWebsite = (attrs.website as string | null) ?? null;
-    mainOrgAddress = (attrs.address as DealClientContext['organization']['address']) ?? null;
+    mainOrgCategory = (attrs[COMPANY_ATTR.category] as string | null) ?? null;
+    mainOrgSupportEmail = (attrs[COMPANY_ATTR.support_email] as string | null)
+      ?? (attrs[INDIVIDUAL_ATTR.email] as string | null)      // person/individual clients
+      ?? (attrs[COUPLE_ATTR.partner_a_email] as string | null) // couple clients
+      ?? null;
+    mainOrgWebsite = (attrs[COMPANY_ATTR.website] as string | null) ?? null;
+    mainOrgAddress = (attrs[COMPANY_ATTR.address] as DealClientContext['organization']['address']) ?? null;
     foundOrg = true;
   }
 
@@ -225,10 +229,10 @@ export async function getDealClientContext(
       const attrs = (dirContact.attributes as Record<string, unknown>) ?? {};
       contactData = {
         id: mainContactId,
-        first_name: (attrs.first_name as string) ?? '',
-        last_name: (attrs.last_name as string) ?? '',
-        email: (attrs.email as string | null) ?? null,
-        phone: (attrs.phone as string | null) ?? null,
+        first_name: (attrs[INDIVIDUAL_ATTR.first_name] as string) ?? '',
+        last_name: (attrs[INDIVIDUAL_ATTR.last_name] as string) ?? '',
+        email: (attrs[INDIVIDUAL_ATTR.email] as string | null) ?? null,
+        phone: (attrs[INDIVIDUAL_ATTR.phone] as string | null) ?? null,
       };
     }
   }

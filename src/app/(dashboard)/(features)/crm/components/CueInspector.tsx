@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useOptimistic, startTransition } 
 import { Clock, Mic, Sun, Video, Truck, Copy, Trash2, MousePointerClick } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
 import { cn } from '@/shared/lib/utils';
-import type { Cue, CueType } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
+import type { Cue, CueType, AssignedCrewEntry } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
 
 type CueInspectorProps = {
   selectedCue: Cue | null;
@@ -12,6 +12,7 @@ type CueInspectorProps = {
   onSave: (updates: Partial<Cue>) => Promise<void>;
   onDelete: () => Promise<void>;
   onDuplicate: () => Promise<void>;
+  eventCrew?: AssignedCrewEntry[];
 };
 
 const typeOptions: { value: CueType; label: string; icon: typeof Mic }[] = [
@@ -28,6 +29,7 @@ export function CueInspector({
   onSave,
   onDelete,
   onDuplicate,
+  eventCrew,
 }: CueInspectorProps) {
   const [formState, setFormState] = useState<Partial<Cue>>({});
   const [optimisticCue, setOptimisticCue] = useOptimistic<Partial<Cue>>({});
@@ -46,6 +48,7 @@ export function CueInspector({
       duration_minutes: selectedCue.duration_minutes,
       type: selectedCue.type,
       notes: selectedCue.notes ?? '',
+      assigned_crew: selectedCue.assigned_crew ?? [],
     });
     startTransition(() => {
       setOptimisticCue({
@@ -53,6 +56,7 @@ export function CueInspector({
         duration_minutes: selectedCue.duration_minutes,
         type: selectedCue.type,
         notes: selectedCue.notes ?? '',
+        assigned_crew: selectedCue.assigned_crew ?? [],
       });
     });
   }, [selectedCue, setOptimisticCue]);
@@ -83,6 +87,15 @@ export function CueInspector({
       setOptimisticCue((prev) => ({ ...prev, [key]: value }));
     });
     scheduleSave({ [key]: value } as Partial<Cue>);
+  };
+
+  const handleCrewToggle = (entry: AssignedCrewEntry) => {
+    const current = (formState.assigned_crew as AssignedCrewEntry[]) ?? [];
+    const exists = current.some((c) => c.entity_id === entry.entity_id);
+    const updated = exists
+      ? current.filter((c) => c.entity_id !== entry.entity_id)
+      : [...current, entry];
+    updateField('assigned_crew', updated);
   };
 
   if (!selectedCue) {
@@ -166,6 +179,55 @@ export function CueInspector({
               {activeType.label}
             </div>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-medium text-ink-muted uppercase tracking-wider">Crew</label>
+          {!eventCrew || eventCrew.length === 0 ? (
+            <p className="text-xs text-ink-muted">No crew assigned to this event yet</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {eventCrew.map((entry) => {
+                const isChecked = ((formState.assigned_crew as AssignedCrewEntry[]) ?? []).some(
+                  (c) => c.entity_id === entry.entity_id
+                );
+                return (
+                  <button
+                    key={entry.entity_id}
+                    type="button"
+                    onClick={() => handleCrewToggle(entry)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2 rounded-xl border transition-all text-left',
+                      isChecked
+                        ? 'bg-blue-500/10 border-blue-500/30'
+                        : 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:border-[var(--glass-border-hover)]'
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'w-4 h-4 rounded flex items-center justify-center border shrink-0',
+                        isChecked
+                          ? 'bg-blue-500 border-blue-500'
+                          : 'border-[var(--glass-border)]'
+                      )}
+                    >
+                      {isChecked && (
+                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                          <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="flex-1 text-sm text-ink truncate">{entry.display_name}</span>
+                    {entry.role && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wider bg-blue-500/10 text-blue-400 shrink-0">
+                        {entry.role}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

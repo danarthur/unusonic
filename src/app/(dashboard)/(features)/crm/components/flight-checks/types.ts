@@ -9,7 +9,14 @@ export type CrewItem = {
   entity_id?: string | null;
   assignee_name?: string | null;
 };
-export type GearItem = { id: string; name: string; status: GearStatus };
+export type GearItem = {
+  id: string;
+  name: string;
+  status: GearStatus;
+  quantity?: number;
+  catalog_package_id?: string | null;
+  is_sub_rental?: boolean | null;
+};
 
 export type LogisticsState = {
   venue_access_confirmed?: boolean;
@@ -45,6 +52,9 @@ export function normalizeGearItems(ros: RunOfShowData | null): GearItem[] {
       id: g.id ?? `gear-${i}`,
       name: g.name,
       status: (g.status ?? 'pending') as GearStatus,
+      quantity: g.quantity ?? undefined,
+      catalog_package_id: g.catalog_package_id ?? null,
+      is_sub_rental: g.is_sub_rental ?? null,
     }));
   }
   if (ros.gear_requirements && String(ros.gear_requirements).trim()) {

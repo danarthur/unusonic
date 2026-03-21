@@ -64,7 +64,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
           name="notes"
           defaultValue={initialNotes ?? ''}
           placeholder="Notes about this partner…"
-          className="min-h-[100px] resize-y bg-white/5 border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
+          className="min-h-[100px] resize-y bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
           rows={4}
         />
         {state?.error && (

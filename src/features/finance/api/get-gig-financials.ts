@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 /**
  * Finance feature – Fetch gig financials (invoices, items, payments)
  * Computes collected vs total on the server to avoid client-side math errors.

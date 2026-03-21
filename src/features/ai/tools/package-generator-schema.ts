@@ -1,5 +1,5 @@
 /**
- * ION package definition – Zod schema and types (no 'use server').
+ * Aion package definition – Zod schema and types (no 'use server').
  * Used by package-generator.ts server actions.
  * @module features/ai/tools/package-generator-schema
  */
@@ -56,7 +56,7 @@ export const packageDefinitionSchema = z.object({
 
 export type PackageDefinitionGenerated = z.infer<typeof packageDefinitionSchema>;
 
-/** Catalog item summary for ION context (RAG). */
+/** Catalog item summary for Aion context (RAG). */
 export interface CatalogItemForION {
   id: string;
   name: string;

@@ -39,7 +39,7 @@ export default function InboxPage() {
       <header className="flex items-center gap-4 mb-10 border-b border-stone/30 pb-4">
         <ShieldAlert className="w-10 h-10 text-ink" />
         <div>
-          <h1 className="text-3xl font-bold tracking-tighter">ION // MEMORY_CORE</h1>
+          <h1 className="text-3xl font-bold tracking-tighter">Aion // MEMORY_CORE</h1>
           <p className="text-xs text-ink-muted">SECURE CONNECTION ESTABLISHED</p>
         </div>
       </header>

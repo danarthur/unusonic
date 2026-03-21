@@ -9,7 +9,7 @@ export type CreateGhostOrgResult = { ok: true; id: string } | { ok: false; error
 
 /**
  * Create a Ghost Organization (vendor/venue/partner) — no owner until claimed.
- * Used for the Rolodex: "Add Connection" creates a ghost org and links it.
+ * Writes directly to directory.entities (public.organizations was dropped in Session 10).
  */
 export async function createGhostOrg(input: CreateGhostOrgInput): Promise<CreateGhostOrgResult> {
   const parsed = createGhostOrgSchema.safeParse(input);
@@ -18,45 +18,30 @@ export async function createGhostOrg(input: CreateGhostOrgInput): Promise<Create
   }
 
   const supabase = await createClient();
-  const { workspace_id, name, city, state, type, created_by_org_id } = parsed.data;
+  const { workspace_id, name, city, state, type } = parsed.data;
+
   const category = type === 'client_company' ? 'client' : type === 'partner' ? 'coordinator' : type ?? null;
+  const entityType = type === 'venue' ? 'venue' : 'company';
 
   const { data, error } = await supabase
-    .from('organizations')
-    .insert({
-      workspace_id,
-      name,
-      is_ghost: true,
-      is_claimed: false,
-      owner_id: null,
-      created_by_org_id: created_by_org_id ?? null,
-      address: { city, state: state ?? null },
-      category,
-    })
-    .select('id')
-    .single();
-
-  if (error) return { ok: false, error: error.message };
-
-  // Dual-write: mirror to directory.entities (new schema)
-  const entityType = type === 'venue' ? 'venue' : 'company';
-  await supabase
     .schema('directory')
     .from('entities')
     .insert({
       owner_workspace_id: workspace_id,
       type: entityType,
       display_name: name,
-      claimed_by_user_id: null, // ghost — not yet claimed
+      claimed_by_user_id: null,
       attributes: {
         is_ghost: true,
         is_claimed: false,
         category,
         address: { city, state: state ?? null },
       },
-      legacy_org_id: data.id,
-    });
-  // Non-fatal: if directory.entities insert fails, org was still created in public.organizations.
+    })
+    .select('id')
+    .single();
+
+  if (error) return { ok: false, error: error.message };
 
   return { ok: true, id: data.id };
 }

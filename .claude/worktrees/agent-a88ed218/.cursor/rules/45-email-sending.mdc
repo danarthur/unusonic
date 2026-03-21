@@ -1,0 +1,14 @@
+---
+description: Email sending: current phase is Resend + Reply-To; future phase will be OAuth true sending.
+globs: src/shared/api/email/**/*.ts, src/features/sales/api/proposal-actions.ts
+alwaysApply: false
+---
+# Email sending
+
+**Current phase (until app is finished and profitable):** Resend + Reply-To only. No Gmail API or OAuth.
+
+- **Resend only.** All transactional email is sent via Resend (`RESEND_API_KEY`, `EMAIL_FROM`).
+- **Reply-To pattern.** When sending on behalf of a user (e.g. proposal link), set **`reply_to`** to the **current user's email** (from auth session / profile) so replies go to their inbox. The `from` address stays the app's verified Resend address.
+- Do not add Gmail/OAuth or "true" sending from the user's mailbox yet.
+
+**Future phase (once app is finished and making profit):** We will move to OAuth true sending (e.g. send from the user's own mailbox). Until then, implement only the Reply-To pattern above.

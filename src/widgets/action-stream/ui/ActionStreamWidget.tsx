@@ -21,7 +21,7 @@ type ActionStreamWidgetProps = {
 type CardState = 'idle' | 'loading' | 'success';
 
 /**
- * Action Stream — ION Suggested Actions with in-card execution.
+ * Action Stream — Aion Suggested Actions with in-card execution.
  * Click CTA → loading → checkmark → card exits. No modal; clear from lobby.
  */
 export function ActionStreamWidget({
@@ -33,7 +33,7 @@ export function ActionStreamWidget({
 
   const handleExecute = (id: string) => {
     setExecutingId(id);
-    // Stub: simulate ION execution (replace with real API call).
+    // Stub: simulate Aion execution (replace with real API call).
     setTimeout(() => {
       setExecutingId(null);
       setSuccessId(id);

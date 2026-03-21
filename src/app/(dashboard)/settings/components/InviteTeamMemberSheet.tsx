@@ -128,7 +128,7 @@ export function InviteTeamMemberSheet({
       </SheetTrigger>
       <SheetContent side="center" className="flex max-h-[90vh] flex-col overflow-hidden p-0">
         <SheetHeader className="shrink-0 border-b border-[var(--color-mercury)] p-6 pb-4">
-          <SheetTitle className="flex items-center gap-2 text-ceramic">
+          <SheetTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
             Invite team member
           </SheetTitle>
@@ -287,7 +287,7 @@ export function InviteTeamMemberSheet({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="gap-2">
+            <Button type="submit" variant="silk" disabled={isSubmitting} className="gap-2">
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />

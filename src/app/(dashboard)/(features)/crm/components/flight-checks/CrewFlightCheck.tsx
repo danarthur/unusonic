@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, Users, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Users, RefreshCw, Bell } from 'lucide-react';
 import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { updateFlightCheckStatus } from '../../actions/update-flight-check-status';
 import { syncCrewFromProposalToEvent } from '../../actions/sync-crew-from-proposal';
+import { sendCrewReminderByEntity } from '../../actions/send-crew-reminder-by-entity';
 import type { CrewRolesDiagnostic } from '../../actions/get-crew-roles-from-proposal';
 import { normalizeCrewItems, type CrewItem, type CrewStatus } from './types';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
@@ -39,6 +40,8 @@ export function CrewFlightCheck({
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [assignSheetIndex, setAssignSheetIndex] = useState<number | null>(null);
+  const [reminderSending, setReminderSending] = useState<string | null>(null); // entity_id
+  const [reminderResults, setReminderResults] = useState<Record<string, 'sent' | 'error'>>({}); // entity_id → result
 
   const items = normalizeCrewItems(runOfShowData);
   const showCollapse = items.length > maxVisible;
@@ -114,6 +117,24 @@ export function CrewFlightCheck({
     }
   };
 
+  const handleSendReminder = async (entityId: string) => {
+    setReminderSending(entityId);
+    const result = await sendCrewReminderByEntity(eventId, entityId);
+    setReminderSending(null);
+    setReminderResults((prev) => ({
+      ...prev,
+      [entityId]: result.success ? 'sent' : 'error',
+    }));
+    // Clear the result badge after 4 seconds
+    setTimeout(() => {
+      setReminderResults((prev) => {
+        const next = { ...prev };
+        delete next[entityId];
+        return next;
+      });
+    }, 4000);
+  };
+
   if (items.length === 0) {
     return (
       <LiquidPanel className="p-5 rounded-[28px] border border-white/10">
@@ -169,7 +190,7 @@ export function CrewFlightCheck({
             layout
             initial={false}
             animate={{ opacity: 1 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0"
           >
             <div className="min-w-0 flex-1">
@@ -181,16 +202,43 @@ export function CrewFlightCheck({
               )}
             </div>
             {item.status === 'requested' ? (
-              <motion.button
-                type="button"
-                onClick={() => setAssignSheetIndex(index)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                transition={SIGNAL_PHYSICS}
-                className="shrink-0 px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border border-white/10 bg-white/[0.06] text-neon transition-colors hover:bg-white/[0.1] hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
-              >
-                Select from team
-              </motion.button>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Remind button — only when someone is assigned but unconfirmed */}
+                {item.entity_id && (
+                  reminderResults[item.entity_id] ? (
+                    <span className={`text-[10px] font-medium px-2 py-1 rounded-lg border ${
+                      reminderResults[item.entity_id] === 'sent'
+                        ? 'text-[var(--color-signal-success)] bg-[var(--color-signal-success)]/10 border-[var(--color-signal-success)]/20'
+                        : 'text-[var(--color-signal-error)] bg-[var(--color-signal-error)]/10 border-[var(--color-signal-error)]/20'
+                    }`}>
+                      {reminderResults[item.entity_id] === 'sent' ? 'Sent' : 'Error'}
+                    </span>
+                  ) : (
+                    <motion.button
+                      type="button"
+                      onClick={() => handleSendReminder(item.entity_id!)}
+                      disabled={reminderSending === item.entity_id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={UNUSONIC_PHYSICS}
+                      title="Send reminder email"
+                      className="p-2 rounded-xl text-ink-muted border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:text-ceramic disabled:opacity-60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    >
+                      <Bell size={13} className={reminderSending === item.entity_id ? 'animate-pulse' : ''} aria-hidden />
+                    </motion.button>
+                  )
+                )}
+                <motion.button
+                  type="button"
+                  onClick={() => setAssignSheetIndex(index)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={UNUSONIC_PHYSICS}
+                  className="px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border border-white/10 bg-white/[0.06] text-neon transition-colors hover:bg-white/[0.1] hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
+                >
+                  Select from team
+                </motion.button>
+              </div>
             ) : (
               <motion.button
                 type="button"
@@ -198,7 +246,7 @@ export function CrewFlightCheck({
                 disabled={updating === `${index}`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className={`
                   shrink-0 px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight
                   border transition-colors
@@ -219,8 +267,8 @@ export function CrewFlightCheck({
         onOpenChange={(open) => !open && setAssignSheetIndex(null)}
         role={assignSheetIndex !== null && items[assignSheetIndex] ? items[assignSheetIndex].role : ''}
         eventId={eventId}
-        crewIndex={assignSheetIndex ?? 0}
         onAssigned={onUpdated}
+        assignedEntityIds={items.map((i) => i.entity_id).filter((id): id is string => !!id)}
       />
       {hasMore && (
         <p className="text-xs text-ink-muted mt-2">

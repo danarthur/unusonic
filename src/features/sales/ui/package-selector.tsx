@@ -10,9 +10,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { getPackages } from '../api/proposal-actions';
-import type { Package } from '@/types/supabase';
+import type { Package } from '../api/package-actions';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 
 export type PackageSelectorProps = {
   workspaceId: string;
@@ -78,7 +78,7 @@ export function PackageSelector({
                 <motion.li
                   key={pkg.id}
                   layout
-                  transition={SIGNAL_PHYSICS}
+                  transition={UNUSONIC_PHYSICS}
                   className="flex items-center gap-4 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/40 p-4 hover:border-[var(--glass-border-hover)] transition-colors"
                 >
                   <div className="flex-1 min-w-0">
@@ -95,7 +95,7 @@ export function PackageSelector({
                     onClick={() => handleSelect(pkg)}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    transition={SIGNAL_PHYSICS}
+                    transition={UNUSONIC_PHYSICS}
                     className="shrink-0 p-2.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     aria-label={`Add ${pkg.name} to proposal`}
                   >

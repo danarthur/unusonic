@@ -30,6 +30,10 @@ import {
   addScoutRosterToGhostOrg,
   softDeleteGhostRelationship,
 } from '@/features/network-data';
+import { updateIndividualEntity } from '@/app/(dashboard)/(features)/crm/actions/update-individual-entity';
+import { updateCoupleEntity } from '@/app/(dashboard)/(features)/crm/actions/update-couple-entity';
+import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/crm/actions/reclassify-client-entity';
+import type { IndividualAttrs, CoupleAttrs } from '@/shared/lib/entity-attrs';
 import { ColorTuner } from '@/features/org-identity';
 import { SignalScoutInput } from '@/widgets/network-detail/ui/SignalScoutInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
@@ -387,15 +391,456 @@ function VenueTechSpecsCard({
   );
 }
 
+// ─── Person entity form ───────────────────────────────────────────────────────
+
+function PersonEntityForm({
+  details,
+  initialAttrs,
+  returnPath,
+}: {
+  details: NodeDetail;
+  initialAttrs: IndividualAttrs;
+  returnPath: string;
+}) {
+  const router = useRouter();
+  const [firstName, setFirstName] = React.useState(initialAttrs.first_name ?? '');
+  const [lastName, setLastName] = React.useState(initialAttrs.last_name ?? '');
+  const [email, setEmail] = React.useState(initialAttrs.email ?? '');
+  const [phone, setPhone] = React.useState(initialAttrs.phone ?? '');
+  const [hasChanges, setHasChanges] = React.useState(false);
+  const [isPending, startTransition] = React.useTransition();
+  const [reclassifyPending, startReclassify] = React.useTransition();
+
+  const entityId = details.subjectEntityId ?? '';
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || details.identity.name;
+
+  const handleSave = () => {
+    if (!entityId) return;
+    startTransition(async () => {
+      const result = await updateIndividualEntity({
+        entityId,
+        firstName,
+        lastName,
+        email: email || null,
+        phone: phone || null,
+        displayName,
+      });
+      if (result.success) {
+        toast.success('Saved');
+        setHasChanges(false);
+        router.push(returnPath);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  const handleReclassify = (newType: 'couple' | 'company') => {
+    if (!entityId) return;
+    startReclassify(async () => {
+      const result = await reclassifyClientEntity(entityId, newType);
+      if (result.success) {
+        toast.success(`Reclassified to ${newType}`);
+        router.push(returnPath);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[var(--color-obsidian)] pb-32">
+      <header className="sticky top-0 z-20 bg-[var(--color-obsidian)]/80 backdrop-blur-xl border-b border-[var(--color-mercury)] px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
+            <ArrowLeft className="size-5" />
+          </Button>
+          <div>
+            <p className="text-xs font-medium text-[var(--color-ink-muted)] uppercase tracking-widest">
+              Entity Studio — Individual
+            </p>
+            <h1 className="text-xl font-light text-[var(--color-ink)] tracking-tight">
+              {displayName || 'Individual Client'}
+            </h1>
+          </div>
+        </div>
+        <AnimatePresence>
+          {hasChanges && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="flex items-center gap-3"
+            >
+              <span className="text-xs text-[var(--color-ink-muted)]">Unsaved changes</span>
+              <Button
+                onClick={handleSave}
+                disabled={isPending}
+                className="gap-2 bg-[var(--color-silk)]/20 text-[var(--color-silk)] border-[var(--color-silk)]/40 hover:bg-[var(--color-silk)]/30"
+              >
+                <Save className="size-4" />
+                Save
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+        <section className="liquid-card rounded-2xl p-6 space-y-5">
+          <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+            Contact details
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={LABEL}>First name</label>
+              <Input
+                value={firstName}
+                onChange={(e) => { setFirstName(e.target.value); setHasChanges(true); }}
+                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              />
+            </div>
+            <div>
+              <label className={LABEL}>Last name</label>
+              <Input
+                value={lastName}
+                onChange={(e) => { setLastName(e.target.value); setHasChanges(true); }}
+                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={LABEL}>Email</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setHasChanges(true); }}
+              placeholder="client@example.com"
+              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+            />
+          </div>
+          <div>
+            <label className={LABEL}>Phone</label>
+            <Input
+              value={phone}
+              onChange={(e) => { setPhone(e.target.value); setHasChanges(true); }}
+              placeholder="+1 (555) 000-0000"
+              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+            />
+          </div>
+        </section>
+
+        {details.subjectEntityId && (
+          <>
+            <DealsPanel entityId={details.subjectEntityId} />
+            <FinancePanel entityId={details.subjectEntityId} />
+          </>
+        )}
+
+        <section className="rounded-2xl border border-[var(--color-mercury)]/80 bg-white/[0.02] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--color-mercury)]">
+            <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest">
+              Reclassify
+            </h3>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-xs text-[var(--color-ink-muted)]">
+              Change this client record type. Existing field data from the old type will be cleared.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={reclassifyPending}
+                onClick={() => handleReclassify('couple')}
+                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+              >
+                Change to Couple
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={reclassifyPending}
+                onClick={() => handleReclassify('company')}
+                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+              >
+                Change to Company
+              </Button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ─── Couple entity form ───────────────────────────────────────────────────────
+
+function CoupleEntityForm({
+  details,
+  initialAttrs,
+  returnPath,
+}: {
+  details: NodeDetail;
+  initialAttrs: CoupleAttrs;
+  returnPath: string;
+}) {
+  const router = useRouter();
+  const [partnerAFirst, setPartnerAFirst] = React.useState(initialAttrs.partner_a_first_name ?? '');
+  const [partnerALast, setPartnerALast] = React.useState(initialAttrs.partner_a_last_name ?? '');
+  const [partnerAEmail, setPartnerAEmail] = React.useState(initialAttrs.partner_a_email ?? '');
+  const [partnerBFirst, setPartnerBFirst] = React.useState(initialAttrs.partner_b_first_name ?? '');
+  const [partnerBLast, setPartnerBLast] = React.useState(initialAttrs.partner_b_last_name ?? '');
+  const [partnerBEmail, setPartnerBEmail] = React.useState(initialAttrs.partner_b_email ?? '');
+  const [hasChanges, setHasChanges] = React.useState(false);
+  const [isPending, startTransition] = React.useTransition();
+  const [reclassifyPending, startReclassify] = React.useTransition();
+
+  const entityId = details.subjectEntityId ?? '';
+
+  const displayName = React.useMemo(() => {
+    const a = [partnerAFirst, partnerALast].filter(Boolean).join(' ');
+    const b = [partnerBFirst, partnerBLast].filter(Boolean).join(' ');
+    if (a && b) return `${a} & ${b}`;
+    return a || b || details.identity.name;
+  }, [partnerAFirst, partnerALast, partnerBFirst, partnerBLast, details.identity.name]);
+
+  const handleSave = () => {
+    if (!entityId) return;
+    startTransition(async () => {
+      const result = await updateCoupleEntity({
+        entityId,
+        partnerAFirst,
+        partnerALast,
+        partnerAEmail: partnerAEmail || null,
+        partnerBFirst,
+        partnerBLast,
+        partnerBEmail: partnerBEmail || null,
+        displayName,
+      });
+      if (result.success) {
+        toast.success('Saved');
+        setHasChanges(false);
+        router.push(returnPath);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  const handleReclassify = (newType: 'person' | 'company') => {
+    if (!entityId) return;
+    startReclassify(async () => {
+      const result = await reclassifyClientEntity(entityId, newType);
+      if (result.success) {
+        toast.success(`Reclassified to ${newType}`);
+        router.push(returnPath);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[var(--color-obsidian)] pb-32">
+      <header className="sticky top-0 z-20 bg-[var(--color-obsidian)]/80 backdrop-blur-xl border-b border-[var(--color-mercury)] px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
+            <ArrowLeft className="size-5" />
+          </Button>
+          <div>
+            <p className="text-xs font-medium text-[var(--color-ink-muted)] uppercase tracking-widest">
+              Entity Studio — Couple
+            </p>
+            <h1 className="text-xl font-light text-[var(--color-ink)] tracking-tight">
+              {displayName}
+            </h1>
+          </div>
+        </div>
+        <AnimatePresence>
+          {hasChanges && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="flex items-center gap-3"
+            >
+              <span className="text-xs text-[var(--color-ink-muted)]">Unsaved changes</span>
+              <Button
+                onClick={handleSave}
+                disabled={isPending}
+                className="gap-2 bg-[var(--color-silk)]/20 text-[var(--color-silk)] border-[var(--color-silk)]/40 hover:bg-[var(--color-silk)]/30"
+              >
+                <Save className="size-4" />
+                Save
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+        <section className="liquid-card rounded-2xl p-6 space-y-5">
+          <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+            Partner A
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={LABEL}>First name</label>
+              <Input
+                value={partnerAFirst}
+                onChange={(e) => { setPartnerAFirst(e.target.value); setHasChanges(true); }}
+                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              />
+            </div>
+            <div>
+              <label className={LABEL}>Last name</label>
+              <Input
+                value={partnerALast}
+                onChange={(e) => { setPartnerALast(e.target.value); setHasChanges(true); }}
+                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={LABEL}>Email</label>
+            <Input
+              type="email"
+              value={partnerAEmail}
+              onChange={(e) => { setPartnerAEmail(e.target.value); setHasChanges(true); }}
+              placeholder="partner@example.com"
+              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+            />
+          </div>
+        </section>
+
+        <section className="liquid-card rounded-2xl p-6 space-y-5">
+          <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+            Partner B
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={LABEL}>First name</label>
+              <Input
+                value={partnerBFirst}
+                onChange={(e) => { setPartnerBFirst(e.target.value); setHasChanges(true); }}
+                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              />
+            </div>
+            <div>
+              <label className={LABEL}>Last name</label>
+              <Input
+                value={partnerBLast}
+                onChange={(e) => { setPartnerBLast(e.target.value); setHasChanges(true); }}
+                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={LABEL}>Email</label>
+            <Input
+              type="email"
+              value={partnerBEmail}
+              onChange={(e) => { setPartnerBEmail(e.target.value); setHasChanges(true); }}
+              placeholder="partner@example.com"
+              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+            />
+          </div>
+        </section>
+
+        {details.subjectEntityId && (
+          <>
+            <DealsPanel entityId={details.subjectEntityId} />
+            <FinancePanel entityId={details.subjectEntityId} />
+          </>
+        )}
+
+        <section className="rounded-2xl border border-[var(--color-mercury)]/80 bg-white/[0.02] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--color-mercury)]">
+            <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest">
+              Reclassify
+            </h3>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-xs text-[var(--color-ink-muted)]">
+              Change this client record type. Existing field data from the old type will be cleared.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={reclassifyPending}
+                onClick={() => handleReclassify('person')}
+                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+              >
+                Change to Individual
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={reclassifyPending}
+                onClick={() => handleReclassify('company')}
+                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+              >
+                Change to Company
+              </Button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface EntityStudioClientProps {
   details: NodeDetail;
   sourceOrgId: string;
   returnPath?: string;
+  /** Present when entityDirectoryType === 'person'. Populated from directory.entities.attributes. */
+  initialPersonAttrs?: IndividualAttrs | null;
+  /** Present when entityDirectoryType === 'couple'. Populated from directory.entities.attributes. */
+  initialCoupleAttrs?: CoupleAttrs | null;
 }
 
-export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network' }: EntityStudioClientProps) {
+/**
+ * Route dispatcher — renders one of three form components based on entity type.
+ * Hooks must not be called here; each sub-component manages its own hook lifecycle.
+ */
+export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs }: EntityStudioClientProps) {
+  const dirType = details.entityDirectoryType;
+
+  if (dirType === 'person' && initialPersonAttrs !== undefined) {
+    return (
+      <PersonEntityForm
+        details={details}
+        initialAttrs={initialPersonAttrs ?? { first_name: '', last_name: '', email: undefined, phone: undefined, category: undefined }}
+        returnPath={returnPath}
+      />
+    );
+  }
+  if (dirType === 'couple' && initialCoupleAttrs !== undefined) {
+    return (
+      <CoupleEntityForm
+        details={details}
+        initialAttrs={initialCoupleAttrs ?? { partner_a_first_name: '', partner_a_last_name: '', partner_a_email: undefined, partner_b_first_name: '', partner_b_last_name: '', partner_b_email: undefined, category: undefined }}
+        returnPath={returnPath}
+      />
+    );
+  }
+  return <CompanyEntityForm details={details} sourceOrgId={sourceOrgId} returnPath={returnPath} />;
+}
+
+function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { details: NodeDetail; sourceOrgId: string; returnPath: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [hasChanges, setHasChanges] = React.useState(false);
@@ -421,7 +866,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
     postal_code: (addr as { postal_code?: string }).postal_code ?? '',
     country: (addr as { country?: string }).country ?? '',
   });
-  const [relType, setRelType] = React.useState(details.direction ?? 'vendor');
+  const [relType, setRelType] = React.useState(details.relationshipTypeRaw ?? details.direction ?? 'vendor');
   const [lifecycle, setLifecycle] = React.useState(details.lifecycleStatus ?? 'active');
   const [blacklistReason, setBlacklistReason] = React.useState(details.blacklistReason ?? '');
   const [localTags, setLocalTags] = React.useState<string[]>(tags);
@@ -553,10 +998,10 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
           if (rosterResult.addedCount > 0) {
             toast.success(`Profile and roster updated. Added ${rosterResult.addedCount} team member(s).`);
           } else {
-            toast.success('Profile updated from ION');
+            toast.success('Profile updated from Aion');
           }
         } else {
-          toast.success('Profile updated from ION');
+          toast.success('Profile updated from Aion');
         }
         setHasChanges(false);
         router.refresh();

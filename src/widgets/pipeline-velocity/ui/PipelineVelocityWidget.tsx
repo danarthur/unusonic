@@ -14,7 +14,7 @@ import {
 } from '@/shared/lib/motion-constants';
 
 interface PipelineVelocityWidgetProps {
-  /** Subsurface ION glow when ION has a contextual suggestion */
+  /** Subsurface Aion glow when Aion has a contextual suggestion */
   ionHint?: boolean;
 }
 

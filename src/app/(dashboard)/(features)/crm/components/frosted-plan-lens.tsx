@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock } from 'lucide-react';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { HandoffWizard } from './handoff-wizard';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
@@ -30,7 +30,7 @@ export function FrostedPlanLens({
         layout
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
         className="relative flex flex-col items-center justify-center min-h-[280px] rounded-[28px] overflow-hidden liquid-card p-8 border border-white/10"
       >
         {/* Frosted overlay — blurred so the lock reads as locked */}
@@ -55,7 +55,7 @@ export function FrostedPlanLens({
             onClick={() => setWizardOpen(true)}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            transition={SIGNAL_PHYSICS}
+            transition={UNUSONIC_PHYSICS}
             className="bg-obsidian text-ceramic px-6 py-3 rounded-full liquid-levitation flex items-center gap-2 transition-all hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
           >
             Hand over to production

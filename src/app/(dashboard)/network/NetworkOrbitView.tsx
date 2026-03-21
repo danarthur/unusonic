@@ -7,6 +7,7 @@ import type { NetworkNode } from '@/entities/network';
 interface NetworkOrbitViewProps {
   nodes: NetworkNode[];
   onUnpin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
+  onPin: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
   sourceOrgId: string;
   /** When true, Genesis Card 1 shows as completed (Establish Identity done). */
   hasIdentity?: boolean;
@@ -21,7 +22,7 @@ interface NetworkOrbitViewProps {
 /**
  * Client wrapper: card click pushes ?nodeId=&kind= to URL; sheet is driven by details from server.
  */
-export function NetworkOrbitView({ nodes, onUnpin, sourceOrgId, hasIdentity = false, hasTeam = false, brandColor = null, onOpenOmni, onOpenProfile }: NetworkOrbitViewProps) {
+export function NetworkOrbitView({ nodes, onUnpin, onPin, sourceOrgId, hasIdentity = false, hasTeam = false, brandColor = null, onOpenOmni, onOpenProfile }: NetworkOrbitViewProps) {
   const router = useRouter();
 
   const handleNodeClick = (node: NetworkNode) => {
@@ -34,6 +35,7 @@ export function NetworkOrbitView({ nodes, onUnpin, sourceOrgId, hasIdentity = fa
         nodes={nodes}
         onNodeClick={handleNodeClick}
         onUnpin={onUnpin}
+        onPin={onPin}
         hasIdentity={hasIdentity}
         hasTeam={hasTeam}
         brandColor={brandColor}

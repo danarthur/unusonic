@@ -4,7 +4,7 @@ import { NetworkDetailSheetSkeleton } from './NetworkDetailSheetSkeleton';
 
 interface NetworkDetailSheetWithSuspenseProps {
   nodeId: string;
-  kind: 'internal_employee' | 'external_partner';
+  kind: 'internal_employee' | 'extended_team' | 'external_partner';
   sourceOrgId: string;
   returnPath?: string;
 }

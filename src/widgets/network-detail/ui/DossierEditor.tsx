@@ -54,11 +54,11 @@ function AccordionSection({
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div className="rounded-xl border border-[var(--color-mercury)] bg-white/5 overflow-hidden">
+    <div className="rounded-xl border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[oklch(1_0_0/0.05)] transition-colors"
       >
         <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
           <Icon className="size-3.5" />
@@ -101,8 +101,8 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
   const addr = details.orgAddress ?? {};
   const tags = details.relationshipTags ?? [];
 
-  const [brandColor, setBrandColor] = React.useState(details.orgBrandColor ?? '#1a1a1a');
-  const [relType, setRelType] = React.useState(details.direction ?? 'vendor');
+  const [brandColor, setBrandColor] = React.useState(details.orgBrandColor ?? 'oklch(0.12 0 0)');
+  const [relType, setRelType] = React.useState(details.relationshipTypeRaw ?? details.direction ?? 'vendor');
   const [lifecycle, setLifecycle] = React.useState(details.lifecycleStatus ?? 'active');
   const [blacklistReason, setBlacklistReason] = React.useState(details.blacklistReason ?? '');
   const [tagInput, setTagInput] = React.useState('');
@@ -183,10 +183,10 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           if (rosterResult.addedCount > 0) {
             toast.success(`Profile and roster updated. Added ${rosterResult.addedCount} team member(s).`);
           } else {
-            toast.success('Profile updated from ION');
+            toast.success('Profile updated from Aion');
           }
         } else {
-          toast.success('Profile updated from ION');
+          toast.success('Profile updated from Aion');
         }
         router.refresh();
       });
@@ -196,8 +196,8 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
 
   React.useEffect(() => {
     if (open) {
-      setBrandColor(details.orgBrandColor ?? '#1a1a1a');
-      setRelType(details.direction ?? 'vendor');
+      setBrandColor(details.orgBrandColor ?? 'oklch(0.12 0 0)');
+      setRelType(details.relationshipTypeRaw ?? details.direction ?? 'vendor');
       setLifecycle(details.lifecycleStatus ?? 'active');
       setBlacklistReason(details.blacklistReason ?? '');
       setLocalTags(details.relationshipTags ?? []);
@@ -272,14 +272,17 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           <div className="flex items-center gap-4">
             <div
               className="relative size-14 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[var(--color-mercury)]"
-              style={{ backgroundColor: brandColor ? `${brandColor}20` : undefined }}
+              style={brandColor ? ({
+                '--brand-color': brandColor,
+                background: 'color-mix(in oklch, var(--brand-color) 12%, transparent)',
+              } as React.CSSProperties) : undefined}
             >
               {(enrichmentPreview?.logoUrl ?? details.orgLogoUrl) ? (
                 <>
                   <div
                     className="pointer-events-none absolute inset-0"
                     style={{
-                      background: 'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(248,250,252,0.7) 0%, rgba(226,232,240,0.4) 50%, transparent 100%)',
+                      background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.98 0 0 / 0.7) 0%, oklch(0.90 0 0 / 0.4) 50%, transparent 100%)',
                     }}
                     aria-hidden
                   />
@@ -301,62 +304,66 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="name"
                   defaultValue={details.identity.name}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-[var(--color-ink)]"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={LABEL}>Brand color</label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={brandColor}
-                      onChange={(e) => setBrandColor(e.target.value)}
-                      className="w-9 h-9 p-0 border-0 rounded overflow-hidden cursor-pointer bg-white/5"
-                      aria-label="Brand color"
-                    />
+              {details.entityDirectoryType !== 'person' && details.entityDirectoryType !== 'couple' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={LABEL}>Brand color</label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={brandColor}
+                        onChange={(e) => setBrandColor(e.target.value)}
+                        className="w-9 h-9 p-0 border-0 rounded overflow-hidden cursor-pointer bg-[oklch(1_0_0/0.05)]"
+                        aria-label="Brand color"
+                      />
+                      <Input
+                        value={brandColor}
+                        onChange={(e) => setBrandColor(e.target.value || '#000000')}
+                        className="flex-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={LABEL}>Logo URL</label>
                     <Input
-                      value={brandColor}
-                      onChange={(e) => setBrandColor(e.target.value || '#000000')}
-                      className="flex-1 bg-white/5 border-[var(--color-mercury)] font-mono text-xs"
+                      name="logoUrl"
+                      defaultValue={details.orgLogoUrl ?? ''}
+                      className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+                      placeholder="https://..."
                     />
                   </div>
                 </div>
-                <div>
-                  <label className={LABEL}>Logo URL</label>
-                  <Input
-                    name="logoUrl"
-                    defaultValue={details.orgLogoUrl ?? ''}
-                    className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
-                    placeholder="https://..."
-                  />
-                </div>
+              )}
+            </div>
+          </div>
+          {details.entityDirectoryType !== 'person' && details.entityDirectoryType !== 'couple' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={LABEL}>Doing business as</label>
+                <Input
+                  name="doingBusinessAs"
+                  defaultValue={doingBusinessAs}
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+                  placeholder="e.g. NV Productions LLC"
+                />
+              </div>
+              <div>
+                <label className={LABEL}>Entity type</label>
+                <select
+                  name="entityType"
+                  defaultValue={entityType || 'organization'}
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                >
+                  <option value="organization">Organization</option>
+                  <option value="single_operator">Single operator</option>
+                </select>
               </div>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={LABEL}>Doing business as</label>
-              <Input
-                name="doingBusinessAs"
-                defaultValue={doingBusinessAs}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
-                placeholder="e.g. NV Productions LLC"
-              />
-            </div>
-            <div>
-              <label className={LABEL}>Entity type</label>
-              <select
-                name="entityType"
-                defaultValue={entityType || 'organization'}
-                className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
-              >
-                <option value="organization">Organization</option>
-                <option value="single_operator">Single operator</option>
-              </select>
-            </div>
-          </div>
+          )}
         </div>
 
         <input type="hidden" name="brandColor" value={brandColor} />
@@ -369,10 +376,10 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 name="website"
                 defaultValue={details.orgWebsite ?? ''}
                 placeholder="https://example.com"
-                className="mt-1 bg-white/5 border-[var(--color-mercury)] font-mono text-xs"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] font-mono text-xs"
               />
               <p className="text-[10px] text-[var(--color-ink-muted)] mt-1.5">
-                Paste a URL above, then use ION to auto-fill identity and contact details.
+                Paste a URL above, then use Aion to auto-fill identity and contact details.
               </p>
               <div className="mt-3">
                 <ScoutTrigger
@@ -388,7 +395,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 defaultValue={details.orgSupportEmail ?? ''}
                 type="email"
                 placeholder="booking@example.com"
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
               />
             </div>
             <div>
@@ -397,7 +404,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 name="phone"
                 defaultValue={phone}
                 placeholder="Main office line"
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -406,7 +413,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_street"
                   defaultValue={(addr as { street?: string }).street ?? ''}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
                 />
               </div>
               <div>
@@ -414,7 +421,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_city"
                   defaultValue={(addr as { city?: string }).city ?? ''}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
                 />
               </div>
               <div>
@@ -422,7 +429,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_state"
                   defaultValue={(addr as { state?: string }).state ?? ''}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
                 />
               </div>
               <div>
@@ -430,7 +437,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_postal_code"
                   defaultValue={(addr as { postal_code?: string }).postal_code ?? ''}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
                 />
               </div>
             </div>
@@ -439,7 +446,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
               <Input
                 name="address_country"
                 defaultValue={(addr as { country?: string }).country ?? ''}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
               />
             </div>
           </div>
@@ -452,7 +459,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
               <select
                 value={relType}
                 onChange={(e) => setRelType(e.target.value as 'vendor' | 'client' | 'partner')}
-                className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
               >
                 <option value="vendor">Vendor</option>
                 <option value="client">Client</option>
@@ -464,7 +471,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
               <select
                 value={lifecycle}
                 onChange={(e) => setLifecycle(e.target.value as typeof lifecycle)}
-                className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
               >
                 <option value="prospect">Prospect</option>
                 <option value="active">Active</option>
@@ -483,7 +490,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                   value={blacklistReason}
                   onChange={(e) => setBlacklistReason(e.target.value)}
                   placeholder="Reason for blacklisting"
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
                 />
               </motion.div>
             )}
@@ -507,7 +514,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                     placeholder="Add tag"
-                    className="w-24 bg-white/5 border-[var(--color-mercury)] text-xs h-7"
+                    className="w-24 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs h-7"
                   />
                   <Button type="button" variant="ghost" size="sm" onClick={addTag} className="h-7 px-2">
                     Add
@@ -518,7 +525,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           </div>
         </AccordionSection>
 
-        {(relType === 'vendor' || relType === 'partner') && (
+        {(relType === 'vendor' || relType === 'partner') && details.entityDirectoryType !== 'person' && details.entityDirectoryType !== 'couple' && (
           <AccordionSection id="ledger" label="Financial" icon={DollarSign}>
             <div className="space-y-3">
               <div>
@@ -527,7 +534,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                   name="taxId"
                   defaultValue={taxId}
                   placeholder="XX-XXXXXXX"
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] font-mono"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] font-mono"
                 />
               </div>
               <div>
@@ -535,7 +542,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <select
                   name="defaultCurrency"
                   defaultValue={details.orgDefaultCurrency ?? 'USD'}
-                  className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
                 >
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
@@ -547,7 +554,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <select
                   name="paymentTerms"
                   defaultValue={paymentTerms}
-                  className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
                 >
                   <option value="">—</option>
                   <option value="immediate">Immediate</option>
@@ -560,18 +567,20 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           </AccordionSection>
         )}
 
-        <AccordionSection id="roster" label="Roster" icon={Users} defaultOpen>
-          <DossierRosterSection
-            crew={crew}
-            sourceOrgId={sourceOrgId}
-            ghostOrgId={ghostOrgId}
-            onRefresh={() => router.refresh()}
-            editingMemberId={editingMemberId}
-            setEditingMemberId={setEditingMemberId}
-            showAddCrew={showAddCrew}
-            setShowAddCrew={setShowAddCrew}
-          />
-        </AccordionSection>
+        {details.entityDirectoryType !== 'person' && details.entityDirectoryType !== 'couple' && (
+          <AccordionSection id="roster" label="Roster" icon={Users} defaultOpen>
+            <DossierRosterSection
+              crew={crew}
+              sourceOrgId={sourceOrgId}
+              ghostOrgId={ghostOrgId}
+              onRefresh={() => router.refresh()}
+              editingMemberId={editingMemberId}
+              setEditingMemberId={setEditingMemberId}
+              showAddCrew={showAddCrew}
+              setShowAddCrew={setShowAddCrew}
+            />
+          </AccordionSection>
+        )}
 
         <AccordionSection id="notes" label="Private notes" icon={FileText}>
           <div>
@@ -580,7 +589,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
               name="notes"
               defaultValue={details.notes ?? ''}
               placeholder="Notes about this partner…"
-              className="min-h-[100px] resize-y bg-white/5 border-[var(--color-mercury)] text-[var(--color-ink)]"
+              className="min-h-[100px] resize-y bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
               rows={4}
             />
           </div>
@@ -658,7 +667,7 @@ function DossierRosterSection({
         {crew.map((m) => (
           <li
             key={m.id}
-            className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2"
+            className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-3 py-2"
           >
             <div className="size-10 shrink-0 rounded-full bg-[var(--color-glass-surface)] border border-[var(--color-mercury)] flex items-center justify-center overflow-hidden">
               {m.avatarUrl ? (
@@ -718,20 +727,20 @@ function DossierRosterSection({
           ref={addCrewRef}
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          className="overflow-hidden rounded-xl border border-[var(--color-mercury)] bg-white/5 p-4 space-y-3"
+          className="overflow-hidden rounded-xl border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] p-4 space-y-3"
         >
           <div className="grid grid-cols-2 gap-3">
             <Input
               name="addCrew_firstName"
               placeholder="First name"
-              className="bg-white/5 border-[var(--color-mercury)]"
+              className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
             />
-            <Input name="addCrew_lastName" placeholder="Last name" className="bg-white/5 border-[var(--color-mercury)]" />
+            <Input name="addCrew_lastName" placeholder="Last name" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
           </div>
-          <Input name="addCrew_email" type="email" placeholder="Email (optional)" className="bg-white/5 border-[var(--color-mercury)]" />
+          <Input name="addCrew_email" type="email" placeholder="Email (optional)" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
           <div className="grid grid-cols-2 gap-3">
-            <Input name="addCrew_role" placeholder="Role (e.g. admin)" className="bg-white/5 border-[var(--color-mercury)]" />
-            <Input name="addCrew_jobTitle" placeholder="Job title" className="bg-white/5 border-[var(--color-mercury)]" />
+            <Input name="addCrew_role" placeholder="Role (e.g. admin)" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
+            <Input name="addCrew_jobTitle" placeholder="Job title" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
           </div>
           {error && <p className="text-xs text-[var(--color-signal-error)]">{error}</p>}
           <div className="flex gap-2">
@@ -781,7 +790,7 @@ function CrewMemberEditor({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="rounded-xl border border-[var(--color-mercury)] bg-white/5 p-4 space-y-3"
+      className="rounded-xl border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] p-4 space-y-3"
     >
       <p className="text-xs font-medium text-[var(--color-ink-muted)]">Edit {member.name}</p>
       <div className="flex items-center gap-3">
@@ -798,7 +807,7 @@ function CrewMemberEditor({
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
             placeholder="https://..."
-            className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+            className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
           />
         </div>
       </div>
@@ -808,7 +817,7 @@ function CrewMemberEditor({
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm"
           >
             <option value="owner">Owner</option>
             <option value="admin">Admin</option>
@@ -822,7 +831,7 @@ function CrewMemberEditor({
             value={jobTitle}
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="e.g. Production Manager"
-            className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+            className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
           />
         </div>
       </div>
@@ -832,7 +841,7 @@ function CrewMemberEditor({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="Direct line"
-          className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+          className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
         />
       </div>
       <div className="flex gap-2">

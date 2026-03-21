@@ -9,7 +9,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { OnboardingWizard } from './components/onboarding-wizard';
 
 export const metadata = {
-  title: 'Setup | Signal',
+  title: 'Setup | Unusonic',
   description: 'One-time setup for your workspace',
 };
 
@@ -85,7 +85,7 @@ export default async function OnboardingPage() {
   return (
     <div className="min-h-screen w-full relative">
       {/* Match login: spotlight + grain — no colored orbs */}
-      <div className="fixed inset-0 z-0 bg-signal-void pointer-events-none" aria-hidden>
+      <div className="fixed inset-0 z-0 bg-unusonic-void pointer-events-none" aria-hidden>
         <div className="absolute inset-0 grain-overlay" aria-hidden />
       </div>
       <div className="relative z-10">

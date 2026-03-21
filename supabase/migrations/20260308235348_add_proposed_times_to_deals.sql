@@ -1,0 +1,9 @@
+-- =============================================================================
+-- Add proposed_times to public.deals
+--
+-- APPLIED: 2026-03-08 via Supabase MCP. Documentation only — do NOT run again.
+--
+-- Adds a proposed_times jsonb[] column to public.deals to store the structured
+-- call time slot proposals created by the deal handoff wizard (PlanLens stage).
+-- Each element: { date, start_time, end_time, label }.
+-- =============================================================================

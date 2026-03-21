@@ -26,7 +26,7 @@ import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { CoupleEditSheet } from './couple-edit-sheet';
 import { IndividualEditSheet } from './individual-edit-sheet';
 import { reclassifyClientEntity, type ClientEntityType } from '../actions/reclassify-client-entity';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
 
@@ -327,7 +327,7 @@ export function StakeholderGrid({
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={SIGNAL_PHYSICS}
+          transition={UNUSONIC_PHYSICS}
           className="space-y-1"
         >
           <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted/80">
@@ -430,7 +430,7 @@ export function StakeholderGrid({
                 key={s.id}
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className={cn('flex items-center gap-3', cardClass)}
                 style={{ background: 'var(--color-glass-surface)' }}
               >
@@ -479,7 +479,7 @@ export function StakeholderGrid({
         onClick={handleAddConnection}
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
         className={cn(
           'w-full rounded-2xl border-2 border-dashed border-white/15 backdrop-blur-xl',
           'flex items-center gap-3 text-left transition-colors',
@@ -513,7 +513,7 @@ export function StakeholderGrid({
       <Sheet open={setupHintOpen} onOpenChange={setSetupHintOpen}>
         <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
           <SheetHeader className="border-b border-white/10 px-6 py-5">
-            <SheetTitle className="text-ceramic font-medium tracking-tight">Add connection</SheetTitle>
+            <SheetTitle>Add connection</SheetTitle>
             <SheetClose />
           </SheetHeader>
           <SheetBody className="flex flex-col gap-4 px-6 py-5">
@@ -534,7 +534,7 @@ export function StakeholderGrid({
       <Sheet open={contactSheetOpen} onOpenChange={setContactSheetOpen}>
         <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
           <SheetHeader className="border-b border-white/10 px-6 py-5">
-            <SheetTitle className="text-ceramic font-medium tracking-tight">
+            <SheetTitle>
               Who is the lead on this deal?
             </SheetTitle>
             <SheetClose />
@@ -596,7 +596,7 @@ export function StakeholderGrid({
       <Sheet open={addContactOpen} onOpenChange={setAddContactOpen}>
         <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
           <SheetHeader className="border-b border-white/10 px-6 py-5">
-            <SheetTitle className="text-ceramic font-medium tracking-tight">
+            <SheetTitle>
               Add contact to {pendingOrg?.name ?? 'organization'}
             </SheetTitle>
             <SheetClose />
@@ -680,7 +680,7 @@ export function StakeholderGrid({
       <Sheet open={!!reclassifySheet} onOpenChange={(open) => { if (!open) setReclassifySheet(null); }}>
         <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
           <SheetHeader className="border-b border-white/10 px-6 py-5">
-            <SheetTitle className="text-ceramic font-medium tracking-tight">Change client type</SheetTitle>
+            <SheetTitle>Change client type</SheetTitle>
             <SheetClose />
           </SheetHeader>
           <SheetBody className="flex flex-col gap-3 px-6 py-5">
@@ -721,7 +721,7 @@ export function StakeholderGrid({
       <Sheet open={roleSheetOpen} onOpenChange={setRoleSheetOpen}>
         <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
           <SheetHeader className="border-b border-white/10 px-6 py-5">
-            <SheetTitle className="text-ceramic font-medium tracking-tight">
+            <SheetTitle>
               What is their role?
             </SheetTitle>
             <SheetClose />

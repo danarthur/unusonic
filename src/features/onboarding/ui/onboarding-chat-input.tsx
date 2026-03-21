@@ -1,6 +1,6 @@
 /**
  * OnboardingChatInput
- * Chat-style input matching IonInput visual language. No SessionContext required.
+ * Chat-style input matching AionInput visual language. No SessionContext required.
  * Uses data-lpignore / data-form-type / data-1p-ignore so password-manager
  * extensions don’t overlay the field and block typing (if typing fails, try incognito).
  * @module features/onboarding/ui/onboarding-chat-input

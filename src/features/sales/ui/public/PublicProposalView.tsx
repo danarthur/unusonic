@@ -3,10 +3,12 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { Download } from 'lucide-react';
 import { ProposalHero } from './ProposalHero';
 import { LineItemGrid } from './LineItemGrid';
 import { AcceptanceBar } from './AcceptanceBar';
 import { SignProposalDialog } from './SignProposalDialog';
+import { DocuSealSignPanel } from './DocuSealSignPanel';
 import type { PublicProposalDTO } from '../../model/public-proposal';
 import { cn } from '@/shared/lib/utils';
 
@@ -34,6 +36,10 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
       window.close();
     }
   }, [router]);
+
+  // Signed PDF download href: direct URL if starts with http, otherwise treat as Supabase storage path
+  const rawPdfPath = (data.proposal as { signed_pdf_path?: string | null }).signed_pdf_path ?? null;
+  const signedPdfHref: string | null = rawPdfPath?.startsWith('http') ? rawPdfPath : null;
 
   return (
     <div
@@ -81,22 +87,48 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
           <p className="text-sm text-ink-muted mt-1.5 max-w-sm mx-auto">
             Your signature has been recorded. Thank you.
           </p>
-          <button
-            type="button"
-            onClick={handleDone}
-            className={cn(
-              'mt-4 rounded-2xl h-10 px-6 font-medium text-sm tracking-tight',
-              'border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-ink',
-              'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--glass-bg)]'
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <button
+              type="button"
+              onClick={handleDone}
+              className={cn(
+                'rounded-2xl h-10 px-6 font-medium text-sm tracking-tight',
+                'border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-ink',
+                'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--glass-bg)]'
+              )}
+            >
+              Done
+            </button>
+            {signedPdfHref && (
+              <a
+                href={signedPdfHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-2xl h-10 px-5 font-medium text-sm tracking-tight',
+                  'border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-ink-muted hover:text-ink',
+                  'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--glass-bg)]'
+                )}
+              >
+                <Download className="w-4 h-4" />
+                Download signed PDF
+              </a>
             )}
-          >
-            Done
-          </button>
+          </div>
           <p className="text-xs text-ink-muted mt-2">
             You can close this tab if the page does not change.
           </p>
         </motion.div>
+      ) : data.embedSrc ? (
+        /* DocuSeal e-signature flow */
+        <div className="mt-8">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-4">
+            Sign your proposal
+          </h2>
+          <DocuSealSignPanel embedSrc={data.embedSrc} />
+        </div>
       ) : (
+        /* Legacy text-sign flow */
         <AcceptanceBar
           total={data.total}
           onReviewAndSign={openSign}
@@ -104,12 +136,15 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
         />
       )}
 
-      <SignProposalDialog
-        open={signOpen}
-        onClose={closeSign}
-        token={token}
-        onSuccess={onSignSuccess}
-      />
+      {/* Legacy text-sign dialog — only rendered when no DocuSeal embedSrc */}
+      {!data.embedSrc && (
+        <SignProposalDialog
+          open={signOpen}
+          onClose={closeSign}
+          token={token}
+          onSuccess={onSignSuccess}
+        />
+      )}
     </div>
   );
 }

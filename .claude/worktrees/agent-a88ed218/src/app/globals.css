@@ -1,0 +1,538 @@
+@import "tailwindcss";
+
+@theme {
+  /* 1. COLOR PALETTE (OKLCH) 
+     We define these as CSS variables so they can be animated 
+     and used in the alpha-channel syntax (e.g., bg-obsidian/50).
+  */
+  --color-obsidian: oklch(0.12 0 0);       /* The Void — matte charcoal for premium contrast */
+  --color-ceramic: oklch(0.98 0 0);        /* The Ink (Not White) */
+  --color-mercury: oklch(1 0 0 / 0.05);    /* The Edge (Reflective) — subtle, not frame-like */
+  
+  --color-neon-blue: oklch(0.70 0.15 250); /* The "Kiki" Signal */
+  --color-neon-rose: oklch(0.65 0.20 350); /* Alert Signal */
+  --color-neon-amber: oklch(0.78 0.15 70); /* Industrial accent */
+  
+  --color-glass-surface: oklch(0.20 0 0 / 0.5); /* Adjusted for darker void */
+  --color-glass-highlight: oklch(1 0 0 / 0.1);  /* Sharp refractive edge */
+
+  /* Semantic aliases (OKLCH) */
+  --color-ink: oklch(0.98 0 0);            /* Primary text = Ceramic */
+  --color-ink-muted: oklch(0.98 0 0 / 0.6);
+  --color-muted: oklch(0.98 0 0 / 0.6);    /* Body / secondary (design: text-mercury) */
+  --color-canvas: var(--color-obsidian);
+  --color-silk: oklch(0.70 0.15 250);      /* Accent = Neon Blue */
+  --color-walnut: oklch(0.55 0.02 60);     /* Warm secondary */
+
+  /* SEMANTIC SIGNALS (The "Lights in the Void")
+     L (0.75) and C (~0.18) locked; only H (Hue) rotates.
+     Same optical weight = no painful vibration on dark.
+  */
+  --color-signal-success: oklch(0.75 0.18 145); /* Emerald Laser */
+  --color-signal-warning: oklch(0.75 0.16 85);  /* Molten Gold */
+  --color-signal-error: oklch(0.70 0.18 20);    /* Infrared Ruby */
+  --color-signal-info: oklch(0.75 0.15 240);   /* Hologram Blue */
+
+  /* SURFACE VARIANTS (Tinted Glass for badges / soft backgrounds) */
+  --color-surface-100: oklch(0.22 0 0); /* Solid Ceramic (claimed cards) */
+  --color-surface-success: oklch(0.25 0.1 145 / 0.2);
+  --color-surface-warning: oklch(0.25 0.1 85 / 0.2);
+  --color-surface-error: oklch(0.25 0.1 20 / 0.2);
+
+  /* 2. FONTS (Next.js Geist) 
+     Ensure these match your layout.tsx variable names 
+  */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Legacy variables for components still using var(--…) — OKLCH-backed */
+:root {
+  --background: oklch(0.12 0 0);
+  --foreground: oklch(0.98 0 0);
+  --sidebar-bg: oklch(0.15 0 0 / 0.92);
+  --glass-border: oklch(1 0 0 / 0.05);
+  --glass-border-hover: oklch(1 0 0 / 0.15);
+  --glass-bg: oklch(0.20 0 0 / 0.5);
+  --glass-bg-hover: oklch(0.22 0 0 / 0.55);
+  --glass-shadow: 0 4px 24px -1px oklch(0 0 0 / 0.2);
+  --glass-shadow-hover: 0 20px 40px -4px oklch(0 0 0 / 0.4);
+  --ring: oklch(0.70 0.15 250 / 0.4);
+  --surface-100: oklch(0.22 0 0);
+  /* Calendar: today cell highlight */
+  --today-ring: oklch(0.70 0.15 250 / 0.35);
+  --today-bg: oklch(0.70 0.15 250 / 0.06);
+  /* Nested glass (event tiles, month cards) */
+  --glass-shadow-nested: 0 6px 16px -10px oklch(0 0 0 / 0.25), inset 0 1px 0 0 oklch(1 0 0 / 0.04);
+  --glass-shadow-nested-hover: 0 8px 20px -8px oklch(0 0 0 / 0.35), inset 0 1px 0 0 oklch(1 0 0 / 0.06);
+}
+
+/* 3. BASE LAYER 
+   Setting the stage for the "Post-Enterprise" environment.
+*/
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+  html {
+    background-color: var(--color-obsidian);
+  }
+  body {
+    background-color: var(--color-obsidian);
+    color: var(--color-ceramic);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    
+    /* Film grain texture */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+  }
+
+  /* Headings feel "tight" and "heavy" */
+  h1, h2, h3, h4 {
+    letter-spacing: -0.03em; /* tracking-tight */
+    font-weight: 500;
+  }
+
+  /* Liquid PWA: prevent iOS zoom on input focus (16px minimum) */
+  input, select, textarea {
+    font-size: max(1rem, 16px);
+  }
+}
+
+/* 4. UTILITIES LAYER (The Physics Engine) 
+   These are your "Liquid Ceramic" components.
+*/
+@layer utilities {
+  /* GPU-accelerated blur/transform — reduces jitter during auth transitions (Flicker Defense) */
+  .gpu-accelerated {
+    will-change: transform, opacity, filter;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+
+  /* Liquid fill (clip-path) — own stacking context + full will-change for 120fps */
+  .liquid-fill-target {
+    will-change: transform, opacity, filter, clip-path;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  
+  /* The "Liquid Card" - The atom of your UI. M3 extra-large corner (28dp). */
+  .liquid-card {
+    @apply relative overflow-hidden transition-all duration-300 rounded-[28px];
+    
+    /* Material */
+    background: var(--color-glass-surface);
+    backdrop-filter: blur(24px) saturate(140%);
+    
+    /* Border (The Mercury Rim) */
+    border: 1px solid var(--color-mercury);
+    
+    /* Shadow (Depth) */
+    box-shadow: 
+      0 4px 24px -1px oklch(0 0 0 / 0.2), 
+      inset 0 1px 0 0 var(--color-glass-highlight);
+  }
+
+  /* Alias: same physics as liquid-card for panels/blades */
+  .glass-panel {
+    @apply relative overflow-hidden rounded-3xl transition-all duration-300;
+    background: var(--color-glass-surface);
+    backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid var(--color-mercury);
+    box-shadow: 
+      0 4px 24px -1px oklch(0 0 0 / 0.2), 
+      inset 0 1px 0 0 var(--color-glass-highlight);
+  }
+  .glass-panel:hover {
+    background: oklch(0.22 0 0 / 0.5);
+    border-color: oklch(1 0 0 / 0.15);
+    transform: translateY(-2px) scale(1.002);
+    box-shadow: 
+      0 20px 40px -4px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+  }
+
+  /* Hover State for Interactive Cards */
+  .liquid-card:hover {
+    background: oklch(0.22 0 0 / 0.5);
+    border-color: oklch(1 0 0 / 0.15);
+    transform: translateY(-2px) scale(1.002);
+    box-shadow: 
+      0 20px 40px -4px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+  }
+
+  /* The "Neon Text" - For key metrics or active states */
+  .text-neon {
+    color: var(--color-neon-blue);
+    text-shadow: 0 0 20px oklch(0.70 0.15 250 / 0.5);
+  }
+
+  /* Primary avatar (workspace profile) - Signal brand glow, separates from page */
+  .avatar-primary {
+    @apply rounded-xl overflow-hidden;
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 0.05),
+      0 0 16px oklch(0.70 0.15 250 / 0.15);
+  }
+
+  /* Sidebar panel - pops from background, Signal brand glow */
+  .sidebar-panel {
+    @apply relative overflow-hidden transition-all duration-500;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border-right: 1px solid oklch(1 0 0 / 0.12);
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 0.04) inset,
+      4px 0 24px -4px oklch(0 0 0 / 0.35),
+      8px 0 32px -8px oklch(0 0 0 / 0.2),
+      0 0 40px -8px oklch(0.70 0.15 250 / 0.08);
+  }
+  
+  /* Utility to center content in a Bento Cell */
+  .bento-center {
+    @apply flex flex-col items-center justify-center h-full w-full;
+  }
+
+  /* Legacy aliases: liquid-panel = same physics as liquid-card. M3 extra-large corner. */
+  .liquid-panel {
+    @apply relative overflow-hidden transition-all duration-300 rounded-[28px];
+    background: var(--color-glass-surface);
+    backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid var(--color-mercury);
+    box-shadow:
+      0 4px 24px -1px oklch(0 0 0 / 0.2),
+      inset 0 1px 0 0 var(--color-glass-highlight);
+  }
+  .liquid-panel:hover {
+    background: oklch(0.22 0 0 / 0.5);
+    border-color: oklch(1 0 0 / 0.15);
+    transform: translateY(-2px) scale(1.002);
+    box-shadow:
+      0 20px 40px -4px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+  }
+  .liquid-panel-nested {
+    box-shadow: 0 6px 16px -10px oklch(0 0 0 / 0.25), inset 0 1px 0 0 oklch(1 0 0 / 0.04);
+  }
+  /* Softer nested cards (e.g. status cells on lobby) — less visual weight. M3 large corner (16dp). */
+  .liquid-card-nested {
+    @apply relative overflow-hidden transition-all duration-300 rounded-2xl;
+    background: oklch(0.18 0 0 / 0.4);
+    backdrop-filter: blur(16px) saturate(120%);
+    border: 1px solid oklch(1 0 0 / 0.06);
+    box-shadow: 0 4px 16px -8px oklch(0 0 0 / 0.2), inset 0 1px 0 0 oklch(1 0 0 / 0.03);
+  }
+  .liquid-card-nested:hover {
+    background: oklch(0.20 0 0 / 0.45);
+    border-color: oklch(1 0 0 / 0.08);
+  }
+  .liquid-panel-hover:hover {
+    background: oklch(0.22 0 0 / 0.5);
+    border-color: oklch(1 0 0 / 0.15);
+    transform: translateY(-2px) scale(1.002);
+    box-shadow:
+      0 20px 40px -4px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+  }
+  .active-glass {
+    background: oklch(0.22 0 0 / 0.5);
+    border-color: oklch(1 0 0 / 0.15);
+    box-shadow:
+      0 4px 24px -1px oklch(0 0 0 / 0.2),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+  }
+
+  /* M3 Button variants (m3.material.io/components/buttons): Stadium shape, 40dp, Signal tokens */
+  .m3-btn-outlined {
+    @apply inline-flex items-center justify-center gap-2 min-h-[40px] px-6 rounded-full text-sm font-medium transition-colors duration-200;
+    border: 1px solid var(--glass-border);
+    color: var(--color-ceramic);
+    background: transparent;
+  }
+  .m3-btn-outlined:hover {
+    background: oklch(1 0 0 / 0.06);
+    border-color: oklch(1 0 0 / 0.12);
+  }
+  .m3-btn-tonal {
+    @apply inline-flex items-center justify-center gap-2 min-h-[40px] px-6 rounded-full text-sm font-medium transition-colors duration-200;
+    background: oklch(0.70 0.15 250 / 0.2);
+    color: var(--color-neon-blue);
+    border: none;
+  }
+  .m3-btn-tonal:hover {
+    background: oklch(0.70 0.15 250 / 0.3);
+  }
+  .m3-btn-text {
+    @apply inline-flex items-center justify-center gap-2 min-h-[40px] px-4 rounded-full text-sm font-medium transition-colors duration-200;
+    color: var(--color-muted);
+    background: transparent;
+    border: none;
+  }
+  .m3-btn-text:hover {
+    color: var(--color-ceramic);
+    background: oklch(1 0 0 / 0.04);
+  }
+  .m3-btn-icon {
+    @apply inline-flex items-center justify-center size-10 rounded-full transition-colors duration-200;
+    color: var(--color-muted);
+    background: transparent;
+    border: none;
+  }
+  .m3-btn-icon:hover {
+    color: var(--color-neon-blue);
+    background: oklch(1 0 0 / 0.04);
+  }
+  .m3-btn-icon:focus-visible {
+    @apply outline-none ring-2 ring-offset-2 ring-offset-[var(--color-obsidian)];
+    --tw-ring-color: var(--ring);
+  }
+  /* M3 Card corners: 12dp, 16dp, 28dp */
+  .m3-card-corner-medium { border-radius: 12px; }
+  .m3-card-corner-large { border-radius: 16px; }
+  .m3-card-corner-extra-large { border-radius: 28px; }
+
+  /* Pulse strip bar — same glass as liquid-card but softer, shallower shadow so it doesn’t cut into content below */
+  .liquid-card-pulse {
+    @apply relative overflow-hidden transition-all duration-300 rounded-[28px];
+    background: var(--color-glass-surface);
+    backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid var(--color-mercury);
+    box-shadow:
+      0 4px 24px -1px oklch(0 0 0 / 0.2),
+      inset 0 1px 0 0 var(--color-glass-highlight);
+  }
+
+  /* Liquid PWA: tactile feedback on touch (heavy, premium feel) */
+  .touch-tactile {
+    @apply active:scale-95 touch-manipulation;
+  }
+
+  /* Spotlight / Cove Light — single light source from top, no colored orbs.
+     Use for auth pages, landing. Industrial Luxury: instrument, not lava lamp. */
+  .bg-signal-void {
+    background-color: var(--color-obsidian);
+    background-image: radial-gradient(
+      circle at 50% 0%,
+      oklch(0.22 0 0 / 1) 0%,
+      transparent 55%
+    );
+  }
+
+  /* Lobby ambient state tint — subtle shift only; no orbs. Single gradient from top. */
+  /* Lobby scroll: content fades as it moves above the pulse bar so glass effect reads; mask is viewport-top. */
+  .lobby-scroll-fade-top {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 140px);
+    mask-image: linear-gradient(to bottom, transparent 0, black 140px);
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+
+  .lobby-ambient-growth {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 120% 80% at 50% -20%,
+      oklch(0.45 0.08 260 / 0.04) 0%,
+      transparent 50%
+    );
+    pointer-events: none;
+  }
+  .lobby-ambient-execution {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 120% 80% at 50% -20%,
+      oklch(0.55 0.12 70 / 0.045) 0%,
+      transparent 50%
+    );
+    pointer-events: none;
+  }
+
+  /* Levitation: card floats above grid (scale, deeper shadow) — medium urgency */
+  .liquid-card-levitation {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow:
+      0 8px 32px -4px oklch(0 0 0 / 0.35),
+      0 24px 48px -8px oklch(0 0 0 / 0.25),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+  }
+
+  /* Subsurface ION glow: edge glows from within, light bleeds into content (no badge) */
+  .liquid-card-ion-glow {
+    border-color: oklch(0.70 0.15 250 / 0.35);
+    box-shadow:
+      0 4px 24px -1px oklch(0 0 0 / 0.2),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.1),
+      inset 0 0 24px -4px oklch(0.70 0.15 250 / 0.12),
+      0 0 0 1px oklch(0.70 0.15 250 / 0.15);
+  }
+
+  /* Cockpit approach: luminance depth — no blur. Full situational awareness. */
+  /* Recessed: inactive cards "settle" into surface. Stay sharp; lower luminance, dimmer border. */
+  .lobby-recessed {
+    filter: brightness(0.88);
+    transition: filter 0.35s ease;
+  }
+  .lobby-recessed .liquid-card,
+  .lobby-recessed .liquid-panel {
+    border-color: oklch(1 0 0 / 0.04);
+    transition: border-color 0.35s ease, box-shadow 0.35s ease;
+  }
+  /* Active rim: focused card "pops" forward — brighter border, deeper shadow. No blur elsewhere. */
+  .lobby-active-rim .liquid-card,
+  .lobby-active-rim .liquid-panel {
+    border-color: oklch(1 0 0 / 0.4);
+    box-shadow:
+      0 8px 32px -4px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.15);
+    transition: border-color 0.35s ease, box-shadow 0.35s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lobby-recessed,
+    .lobby-recessed .liquid-card,
+    .lobby-recessed .liquid-panel,
+    .lobby-active-rim .liquid-card,
+    .lobby-active-rim .liquid-panel {
+      transition: none;
+    }
+  }
+}
+
+/* Levitation shadows (OKLCH) */
+.liquid-levitation {
+  box-shadow:
+    0 4px 6px -1px oklch(0 0 0 / 0.08),
+    0 20px 25px -5px oklch(0 0 0 / 0.15);
+}
+.liquid-levitation-strong {
+  box-shadow:
+    0 4px 6px -1px oklch(0 0 0 / 0.1),
+    0 20px 25px -5px oklch(0 0 0 / 0.2),
+    0 40px 50px -12px oklch(0 0 0 / 0.25);
+}
+.liquid-levitation-bar {
+  box-shadow:
+    0 -4px 6px -1px oklch(0 0 0 / 0.1),
+    0 -10px 20px -5px oklch(0 0 0 / 0.15);
+}
+
+/* Liquid Glass Input: gradient rim, soft glow when focused, traveling sheen (specular shimmer).
+   Outer = .liquid-glass-input (gradient border + shimmer), inner = .liquid-glass-input-inner (glass). */
+.liquid-glass-input {
+  position: relative;
+  border-radius: 9999px;
+  padding: 1px;
+  /* Gradient rim: subtle mercury → blue tint, not a solid line */
+  background: linear-gradient(
+    135deg,
+    oklch(1 0 0 / 0.06) 0%,
+    oklch(0.70 0.15 250 / 0.12) 25%,
+    oklch(1 0 0 / 0.06) 50%,
+    oklch(0.70 0.15 250 / 0.12) 75%,
+    oklch(1 0 0 / 0.06) 100%
+  );
+  background-size: 200% 200%;
+  background-position: 0% 0%;
+  transition: box-shadow 0.35s ease, background 0.35s ease, transform 0.35s ease;
+}
+/* Hover: slight rim brightening + subtle lift (box grows a touch and rises) */
+.liquid-glass-input:hover {
+  transform: translateY(-2px) scale(1.008);
+  background: linear-gradient(
+    135deg,
+    oklch(1 0 0 / 0.08) 0%,
+    oklch(0.70 0.15 250 / 0.18) 25%,
+    oklch(1 0 0 / 0.08) 50%,
+    oklch(0.70 0.15 250 / 0.18) 75%,
+    oklch(1 0 0 / 0.08) 100%
+  );
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.06);
+}
+/* Focused: thin rim highlight + very tight glow so it doesn’t fill the parent and read as a blue rectangle */
+.liquid-glass-input:focus-within {
+  box-shadow: 0 0 0 1px oklch(0.70 0.15 250 / 0.3), 0 0 8px oklch(0.70 0.15 250 / 0.1);
+  background: linear-gradient(
+    135deg,
+    oklch(1 0 0 / 0.05) 0%,
+    oklch(1 0 0 / 0.22) 15%,
+    oklch(0.70 0.15 250 / 0.3) 50%,
+    oklch(1 0 0 / 0.22) 85%,
+    oklch(1 0 0 / 0.05) 100%
+  );
+  background-size: 400% 400%;
+  animation: liquid-glass-shimmer 3s ease-in-out infinite;
+}
+.liquid-glass-input-inner {
+  position: relative;
+  border-radius: 9999px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  /* Match page background so the outer gradient only shows in the 1px rim, not behind the content. */
+  background: var(--color-obsidian);
+  overflow: hidden;
+}
+/* Traveling sheen: diagonal moving highlight across the gradient rim. */
+@keyframes liquid-glass-shimmer {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+
+/* Primary CTA hover: restrained lift + single refined sheen (premium, not cheesy). */
+@keyframes btn-sheen {
+  0% { transform: translateX(-100%); opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translateX(220%); opacity: 0; }
+}
+.btn-sheen-hover {
+  position: relative;
+  transition:
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.btn-sheen-hover:hover {
+  transform: scale(1.012);
+  box-shadow:
+    0 6px 28px -2px oklch(0 0 0 / 0.22),
+    0 0 0 1px oklch(1 0 0 / 0.08),
+    inset 0 1px 0 0 oklch(1 0 0 / 0.12);
+}
+.btn-sheen-hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 38%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.06) 28%,
+    oklch(1 0 0 / 0.12) 50%,
+    oklch(1 0 0 / 0.06) 72%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transform: translateX(-100%);
+  will-change: transform;
+}
+.btn-sheen-hover:hover::before {
+  animation: btn-sheen 0.78s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Film grain overlay — fine texture (baseFrequency 0.85), subtle (opacity 0.035).
+   Layout adds position (e.g. absolute inset-0). Not TV static — perceived mass. */
+.grain-overlay {
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}

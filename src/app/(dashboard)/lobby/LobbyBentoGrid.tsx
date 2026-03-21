@@ -17,10 +17,10 @@ import { ContextualCardDrawer } from './ContextualCardDrawer';
 import {
   M3_STAGGER_CHILDREN,
   M3_STAGGER_DELAY,
-  SIGNAL_PHYSICS,
+  UNUSONIC_PHYSICS,
 } from '@/shared/lib/motion-constants';
 
-/** Stub: ION-suggested contextual alert. Replace with API when ready. */
+/** Stub: Aion-suggested contextual alert. Replace with API when ready. */
 const STUB_CONTEXTUAL_ALERT = process.env.NODE_ENV === 'development'
   ? {
       id: 'weather-1',
@@ -54,7 +54,7 @@ function BentoGridInner() {
           },
           hidden: {},
         }}
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
       >
         <LobbyBentoCell id="live-gig" className="lg:col-span-3 lg:row-span-2 min-h-[320px] order-2 lg:order-1">
           <LiveGigMonitorWidget levitate />
@@ -88,7 +88,7 @@ function BentoGridInner() {
           },
           hidden: {},
         }}
-        transition={SIGNAL_PHYSICS}
+        transition={UNUSONIC_PHYSICS}
       >
         <LobbyBentoCell id="live-gig" className="md:col-span-2 md:row-span-2 min-h-[280px] order-2 md:order-1">
           <LiveGigMonitorWidget levitate={isLevitation} />
@@ -121,7 +121,7 @@ function BentoGridInner() {
         },
         hidden: {},
       }}
-      transition={SIGNAL_PHYSICS}
+      transition={UNUSONIC_PHYSICS}
     >
       <LobbyBentoCell id="pipeline" className="md:col-span-2 md:row-span-2 min-h-[280px] order-2 md:order-1">
         <PipelineVelocityWidget />

@@ -17,7 +17,7 @@ import {
 } from '../api/proposal-actions';
 import type { Package } from '@/types/supabase';
 import { Popover, PopoverContent, PopoverAnchor } from '@/shared/ui/popover';
-import { SIGNAL_PHYSICS } from '@/shared/lib/motion-constants';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 export type PackageSelectorPaletteProps = {
@@ -177,7 +177,7 @@ export function PackageSelectorPalette({
                   <motion.li
                     key={pkg.id}
                     layout
-                    transition={SIGNAL_PHYSICS}
+                    transition={UNUSONIC_PHYSICS}
                     className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 hover:border-white/20 hover:bg-white/[0.06] transition-colors cursor-pointer"
                     onClick={() => handleSelectPackage(pkg)}
                   >
@@ -202,7 +202,7 @@ export function PackageSelectorPalette({
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
-                transition={SIGNAL_PHYSICS}
+                transition={UNUSONIC_PHYSICS}
                 className="p-4 space-y-4"
               >
                 <div className="flex items-center justify-between gap-2">

@@ -7,12 +7,13 @@
 'use server';
 
 import 'server-only';
-import { unstable_noStore } from 'next/cache';
+import { unstable_noStore, revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { createClient } from '@/shared/api/supabase/server';
 import type { NetworkGraph, ValidateInvitationResult } from '../model/types';
+import { COMPANY_ATTR, PERSON_ATTR } from '@/features/network-data/model/attribute-keys';
 
-const CURRENT_ORG_COOKIE = 'signal_current_org_id';
+const CURRENT_ORG_COOKIE = 'unusonic_current_org_id';
 
 const ORG_ROLE_PRIORITY: Record<string, number> = {
   owner: 0,
@@ -336,7 +337,7 @@ export async function getNetworkGraph(
           : [];
         return {
           id: person.id,
-          email: (personAttrs.email as string) ?? null,
+          email: (personAttrs[PERSON_ATTR.email] as string) ?? null,
           is_ghost: person.claimed_by_user_id == null,
           role_label: (ctx.role_label ?? ctx.job_title ?? null) as string | null,
           access_level: (ctx.access_level ?? 'member') as 'admin' | 'member' | 'read_only',
@@ -351,10 +352,10 @@ export async function getNetworkGraph(
       id: legacyOrgId ?? orgEntityId,
       name: orgEnt.display_name,
       slug: orgEnt.handle ?? null,
-      is_claimed: (attrs.is_claimed as boolean) ?? true,
+      is_claimed: (attrs[COMPANY_ATTR.is_claimed] as boolean) ?? true,
       claimed_at: null,
-      created_by_org_id: (attrs.created_by_org_id as string | null) ?? null,
-      category: (attrs.category as NetworkGraph['organizations'][0]['category']) ?? null,
+      created_by_org_id: (attrs[COMPANY_ATTR.created_by_org_id] as string | null) ?? null,
+      category: (attrs[COMPANY_ATTR.category] as NetworkGraph['organizations'][0]['category']) ?? null,
       private_notes: priv?.private_notes ?? null,
       internal_rating: priv?.internal_rating ?? null,
       roster,
@@ -379,6 +380,7 @@ export async function getNetworkGraph(
     const person = personEntityMap.get(personEntityId);
     if (!person) return null;
     const personAttrs = (person.attributes as Record<string, unknown>) ?? {};
+    // (PERSON_ATTR used below for email — person entities store email at PERSON_ATTR.email)
     const orgIds = entityOrgIds.get(personEntityId) ?? [];
     const orgNames = orgIds.map((id) => orgNameById.get(id) ?? '').filter(Boolean);
 
@@ -395,7 +397,7 @@ export async function getNetworkGraph(
 
     return {
       id: person.id,
-      email: (personAttrs.email as string) ?? null,
+      email: (personAttrs[PERSON_ATTR.email] as string) ?? null,
       is_ghost: person.claimed_by_user_id == null,
       role_label: (ctx.role_label ?? ctx.job_title ?? null) as string | null,
       access_level: (ctx.access_level ?? 'member') as 'admin' | 'member' | 'read_only',
@@ -466,5 +468,7 @@ export async function updatePrivateNotes(
     ignoreDuplicates: false,
   });
   if (error) return { ok: false, error: error.message };
+  revalidatePath('/crm');
+  revalidatePath('/network');
   return { ok: true };
 }

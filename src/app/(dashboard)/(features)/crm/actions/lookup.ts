@@ -1,7 +1,9 @@
 'use server';
+/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { PERSON_ATTR, VENUE_ATTR, INDIVIDUAL_ATTR } from '@/features/network-data/model/attribute-keys';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -88,11 +90,11 @@ export async function searchOmni(query: string): Promise<OmniResult[]> {
       if (seenIds.has(row.id)) continue;
       const attrs = (row.attributes as Record<string, unknown>) ?? {};
       // Skip persons with category = 'client' — already shown above as org type
-      if ((attrs.category as string | null) === 'client') continue;
+      if ((attrs[INDIVIDUAL_ATTR.category] as string | null) === 'client') continue;
       seenIds.add(row.id);
-      const first = (attrs.first_name as string) ?? '';
-      const last = (attrs.last_name as string) ?? '';
-      const email = (attrs.email as string) ?? null;
+      const first = (attrs[INDIVIDUAL_ATTR.first_name] as string) ?? '';
+      const last = (attrs[INDIVIDUAL_ATTR.last_name] as string) ?? '';
+      const email = (attrs[PERSON_ATTR.email] as string) ?? null;
       const orgId = (attrs.organization_id as string) ?? null;
       results.push({
         type: 'contact',
@@ -108,6 +110,80 @@ export async function searchOmni(query: string): Promise<OmniResult[]> {
     return results.slice(0, 5);
   } catch {
     return [];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// getEntityDisplayName: resolve a single entity's display_name by ID
+// Used by wizard to populate the venue label when deal.venue_id is already set.
+// -----------------------------------------------------------------------------
+export async function getEntityDisplayName(entityId: string): Promise<string | null> {
+  if (!entityId) return null;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('id', entityId)
+      .maybeSingle();
+    return (data?.display_name as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// createGhostVenueEntity: create a ghost venue in directory.entities + VENUE_PARTNER cortex edge.
+// Used by the handoff wizard "Create [name]" path.
+// Returns the new entity ID, or null on failure.
+// -----------------------------------------------------------------------------
+export async function createGhostVenueEntity(name: string): Promise<string | null> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  try {
+    const supabase = await createClient();
+
+    const { data: entity, error } = await supabase
+      .schema('directory')
+      .from('entities')
+      .insert({
+        type: 'venue',
+        display_name: trimmed,
+        owner_workspace_id: workspaceId,
+        attributes: {},
+      })
+      .select('id')
+      .single();
+
+    if (error || !entity) return null;
+    const entityId = (entity as { id: string }).id;
+
+    // Resolve workspace org entity for the cortex edge
+    const { data: workspaceOrgEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('owner_workspace_id', workspaceId)
+      .eq('type', 'company')
+      .neq('attributes->>is_ghost', 'true')
+      .maybeSingle();
+
+    if (workspaceOrgEntity?.id) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: workspaceOrgEntity.id,
+        p_target_entity_id: entityId,
+        p_type: 'VENUE_PARTNER',
+        p_context_data: { deleted_at: null, lifecycle_status: 'active' },
+      });
+    }
+
+    return entityId;
+  } catch {
+    return null;
   }
 }
 
@@ -156,11 +232,11 @@ export async function getVenueSuggestions(
         addressStr = [addrObj.street, cityStr, stateStr].filter(Boolean).join(', ') || null;
       }
 
-      if (!cityStr) cityStr = (attrs.city as string) ?? null;
-      if (!stateStr) stateStr = (attrs.state as string) ?? null;
+      if (!cityStr) cityStr = (attrs[VENUE_ATTR.city] as string) ?? null;
+      if (!stateStr) stateStr = (attrs[VENUE_ATTR.state] as string) ?? null;
       if (!addressStr) {
-        const formatted = (attrs.formatted_address as string) ?? null;
-        const fallback = [(attrs.street as string), cityStr, stateStr].filter(Boolean).join(', ') || null;
+        const formatted = (attrs[VENUE_ATTR.formatted_address] as string) ?? null;
+        const fallback = [(attrs[VENUE_ATTR.street] as string), cityStr, stateStr].filter(Boolean).join(', ') || null;
         addressStr = formatted ?? fallback;
       }
 

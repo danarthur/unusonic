@@ -1,6 +1,6 @@
 /**
  * Canonical display labels for contact-related fields.
- * Use these whenever a contact field is shown (CRM, network crew, ION roster, Genesis, search).
+ * Use these whenever a contact field is shown (CRM, network crew, Aion roster, Genesis, search).
  * Keeps labels consistent across the site when fields are "called" for display.
  */
 

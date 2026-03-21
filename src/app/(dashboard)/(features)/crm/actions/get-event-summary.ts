@@ -6,7 +6,7 @@ import {
   type RunOfShowData,
 } from '@/entities/event/api/get-event-summary';
 
-/** Event summary for Prism Plan/Ledger lenses. Same shape as entity EventSummary. */
+/** Event summary for Prism Plan/Ledger lenses and Event Studio. Same shape as entity EventSummary. */
 export type EventSummaryForPrism = {
   title: string | null;
   client_name: string | null;
@@ -14,6 +14,10 @@ export type EventSummaryForPrism = {
   ends_at: string | null;
   location_name: string | null;
   location_address: string | null;
+  venue_entity_id: string | null;
+  /** Aliases for location_name / location_address — used by PlanVitalsRow. Populated from location_name / location_address. */
+  venue_name?: string | null;
+  venue_address?: string | null;
   run_of_show_data: RunOfShowData | null;
 };
 
@@ -32,6 +36,9 @@ export async function getEventSummaryForPrism(
     ends_at: s.ends_at ?? null,
     location_name: s.location_name,
     location_address: s.location_address,
+    venue_entity_id: s.venue_entity_id ?? null,
+    venue_name: s.location_name,
+    venue_address: s.location_address,
     run_of_show_data: s.run_of_show_data ?? null,
   };
 }

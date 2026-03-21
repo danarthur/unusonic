@@ -37,7 +37,7 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
           >
             {message.role === 'assistant' && (
               <span className="text-xs text-stone-600 uppercase tracking-widest block mb-1">
-                ION
+                Aion
               </span>
             )}
             {message.content}
@@ -48,7 +48,7 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
         <div className="flex items-start">
           <div className="max-w-[80%] rounded-lg px-5 py-3 text-sm text-stone-400">
             <span className="text-xs text-stone-600 uppercase tracking-widest block mb-1">
-              ION
+              Aion
             </span>
             <span className="inline-block w-2 h-2 bg-stone-600 rounded-full animate-pulse" />
           </div>
