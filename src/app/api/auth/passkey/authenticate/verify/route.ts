@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthenticationResponse, type AuthenticatorTransportFuture } from '@simplewebauthn/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { createClient } from '@/shared/api/supabase/server';
 import { cookies } from 'next/headers';
 
 const CHALLENGE_COOKIE = 'webauthn_assert_challenge';
@@ -171,18 +172,16 @@ export async function POST(request: NextRequest) {
       (body.redirectTo as string)?.trim()?.startsWith('/') === true
         ? (body.redirectTo as string).trim()
         : '/lobby';
-    // Route through /auth/callback so PKCE code exchange happens correctly.
-    // Use request origin so localhost stays on localhost, not Vercel Site URL.
-    const callbackUrl = new URL('/auth/callback', origin);
-    callbackUrl.searchParams.set('next', nextPath);
-    const redirectUrl = callbackUrl.href;
+
+    // Generate a magic link OTP to get a hashed_token, then verify it server-side.
+    // This avoids the implicit vs PKCE redirect ambiguity — session is established
+    // via cookies in this route handler and the client navigates directly to the app.
     const { data: linkData, error: linkError } = await system.auth.admin.generateLink({
       type: 'magiclink',
       email,
-      options: { redirectTo: redirectUrl },
     });
 
-    if (linkError || !linkData?.properties?.action_link) {
+    if (linkError || !linkData?.properties?.hashed_token) {
       console.error('[passkey/authenticate/verify] generateLink', linkError);
       return NextResponse.json(
         { error: 'Could not create sign-in link' },
@@ -190,20 +189,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rewrite redirect_to in the action_link to ensure it points at this request's origin
-    // (e.g. localhost) rather than the Supabase project Site URL (Vercel).
-    let finalRedirectUrl = linkData.properties.action_link as string;
-    try {
-      const parsed = new URL(finalRedirectUrl);
-      parsed.searchParams.set('redirect_to', redirectUrl);
-      finalRedirectUrl = parsed.toString();
-    } catch {
-      // keep original if rewrite fails
+    // Exchange the OTP token server-side — sets session cookies on this response.
+    const supabase = await createClient();
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      token_hash: linkData.properties.hashed_token,
+      type: 'magiclink',
+    });
+
+    if (otpError) {
+      console.error('[passkey/authenticate/verify] verifyOtp', otpError);
+      return NextResponse.json(
+        { error: 'Could not establish session' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       verified: true,
-      redirectUrl: finalRedirectUrl,
+      redirectUrl: `${origin}${nextPath}`,
     });
   } catch (e) {
     console.error('[passkey/authenticate/verify]', e);
