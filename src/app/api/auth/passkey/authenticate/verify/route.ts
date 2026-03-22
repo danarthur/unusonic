@@ -11,15 +11,17 @@ import { cookies } from 'next/headers';
 
 const CHALLENGE_COOKIE = 'webauthn_assert_challenge';
 
-/** Prefer env-pinned origin in production; fall back to request headers for local dev. */
+/**
+ * Derive the request origin from headers.
+ * Used for building the callback redirect URL — must reflect the actual host
+ * so that the redirect_to matches what's in the Supabase allowlist.
+ * (WebAuthn RP ID is pinned separately via NEXT_PUBLIC_WEBAUTHN_RP_ID.)
+ */
 function getOrigin(request: NextRequest): string {
-  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
-  }
   const origin = request.headers.get('origin');
   if (origin) return origin;
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
-  const proto = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol?.replace(':', '') || 'http';
+  const proto = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol?.replace(':', '') || 'https';
   if (host) return `${proto}://${host}`;
   return request.nextUrl.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }

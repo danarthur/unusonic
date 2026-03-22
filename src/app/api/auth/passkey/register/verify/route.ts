@@ -29,9 +29,6 @@ function getRpId(request: NextRequest): string {
 }
 
 function getExpectedOrigin(request: NextRequest): string {
-  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
-  }
   return (
     request.headers.get('origin') ||
     request.nextUrl.origin ||
