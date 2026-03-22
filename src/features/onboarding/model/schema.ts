@@ -1,5 +1,5 @@
 /**
- * Signal Onboarding – Validation schemas for Ghost org creation and claiming.
+ * Unusonic Onboarding – Validation schemas for Ghost org creation and claiming.
  * @module features/onboarding/model/schema
  */
 

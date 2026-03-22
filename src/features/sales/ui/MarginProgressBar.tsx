@@ -32,7 +32,7 @@ export function MarginProgressBar({
             'text-sm font-semibold tabular-nums',
             isGreen && 'text-[var(--color-signal-success)]',
             isYellow && 'text-[var(--color-signal-warning)]',
-            isRed && 'text-[var(--color-signal-error)]'
+            isRed && 'text-[var(--color-unusonic-error)]'
           )}
         >
           {Number.isFinite(marginPercent) ? `${marginPercent.toFixed(1)}%` : '—'}
@@ -44,13 +44,13 @@ export function MarginProgressBar({
             'h-full rounded-full transition-all duration-300',
             isGreen && 'bg-[var(--color-signal-success)]',
             isYellow && 'bg-[var(--color-signal-warning)]',
-            isRed && 'bg-[var(--color-signal-error)]'
+            isRed && 'bg-[var(--color-unusonic-error)]'
           )}
           style={{ width: `${clamped}%` }}
         />
       </div>
       {isRed && showWarningIcon && (
-        <p className="flex items-center gap-1.5 text-xs text-[var(--color-signal-error)]">
+        <p className="flex items-center gap-1.5 text-xs text-[var(--color-unusonic-error)]">
           <AlertTriangle size={14} aria-hidden />
           Margin below 20%. Consider raising price or lowering cost.
         </p>

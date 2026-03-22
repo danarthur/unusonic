@@ -11,8 +11,11 @@ import { cookies } from 'next/headers';
 
 const CHALLENGE_COOKIE = 'webauthn_assert_challenge';
 
-/** Prefer request Host so localhost stays localhost (don't use NEXT_PUBLIC_APP_URL when testing locally). */
+/** Prefer env-pinned origin in production; fall back to request headers for local dev. */
 function getOrigin(request: NextRequest): string {
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
   const origin = request.headers.get('origin');
   if (origin) return origin;
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
@@ -22,6 +25,9 @@ function getOrigin(request: NextRequest): string {
 }
 
 function getRpId(request: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
+    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
+  }
   try {
     return new URL(getOrigin(request)).hostname || 'localhost';
   } catch {
@@ -57,9 +63,8 @@ export async function POST(request: NextRequest) {
 
     const challenge = challengeRow.challenge;
 
-    // One-time use: delete so the same cookie can't be replayed
-    await system.from('webauthn_challenges').delete().eq('id', challengeId);
-
+    // Parse and validate body before consuming the challenge — a malformed request
+    // should not burn the one-time challenge, letting the user retry without re-initiating.
     const body = await request.json();
     const response = body as {
       id: string;
@@ -79,6 +84,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // One-time use: delete only after body is confirmed valid so a malformed
+    // request doesn't permanently consume the challenge.
+    await system.from('webauthn_challenges').delete().eq('id', challengeId);
 
     const { data: passkeyRow, error: passkeyError } = await system
       .from('passkeys')
@@ -117,6 +126,7 @@ export async function POST(request: NextRequest) {
       expectedChallenge: challenge,
       expectedOrigin: origin,
       expectedRPID: getRpId(request),
+      requireUserVerification: true,
       credential: {
         id: passkeyRow.credential_id,
         publicKey: new Uint8Array(publicKeyBytes),
@@ -155,16 +165,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const redirectPath =
+    const nextPath =
       (body.redirectTo as string)?.trim()?.startsWith('/') === true
         ? (body.redirectTo as string).trim()
-        : '/';
-    // Use request origin so localhost sign-in redirects to localhost, not Vercel/Site URL
-    const redirectUrl = new URL(redirectPath, origin).href;
+        : '/lobby';
+    // Route through /auth/callback so PKCE code exchange happens correctly.
+    // Use request origin so localhost stays on localhost, not Vercel Site URL.
+    const callbackUrl = new URL('/auth/callback', origin);
+    callbackUrl.searchParams.set('next', nextPath);
+    const redirectUrl = callbackUrl.href;
     const { data: linkData, error: linkError } = await system.auth.admin.generateLink({
       type: 'magiclink',
       email,
-      options: redirectUrl ? { redirectTo: redirectUrl } : undefined,
+      options: { redirectTo: redirectUrl },
     });
 
     if (linkError || !linkData?.properties?.action_link) {
@@ -175,13 +188,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // action_link points at Supabase (/auth/v1/verify). Only rewrite redirect_to so it sends
-    // the user back to this request's origin (e.g. localhost), not the project Site URL (Vercel).
+    // Rewrite redirect_to in the action_link to ensure it points at this request's origin
+    // (e.g. localhost) rather than the Supabase project Site URL (Vercel).
     let finalRedirectUrl = linkData.properties.action_link as string;
     try {
       const parsed = new URL(finalRedirectUrl);
-      const redirectToOrigin = new URL(redirectPath, origin).href;
-      parsed.searchParams.set('redirect_to', redirectToOrigin);
+      parsed.searchParams.set('redirect_to', redirectUrl);
       finalRedirectUrl = parsed.toString();
     } catch {
       // keep original if rewrite fails

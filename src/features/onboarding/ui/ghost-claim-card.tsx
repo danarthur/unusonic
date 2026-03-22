@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import type { GhostOrgPreview } from '../model/types';
 import { claimGhostOrganizationBySlug } from '../api/actions';
 
@@ -46,9 +47,16 @@ export function GhostClaimCard({ data, isPending }: GhostClaimCardProps) {
           <button
             type="submit"
             disabled={isPending}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-ceramic py-3 font-semibold text-obsidian transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-ceramic py-3 font-semibold text-obsidian transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? 'Claiming…' : 'Yes, Claim This Profile'}
+            {isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Claiming…
+              </>
+            ) : (
+              'Yes, claim this profile'
+            )}
           </button>
         </form>
       </div>

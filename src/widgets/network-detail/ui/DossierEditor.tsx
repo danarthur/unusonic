@@ -742,7 +742,7 @@ function DossierRosterSection({
             <Input name="addCrew_role" placeholder="Role (e.g. admin)" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
             <Input name="addCrew_jobTitle" placeholder="Job title" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
           </div>
-          {error && <p className="text-xs text-[var(--color-signal-error)]">{error}</p>}
+          {error && <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
           <div className="flex gap-2">
             <Button type="button" size="sm" disabled={status === 'loading'} onClick={handleAddCrew} className="bg-[var(--color-silk)]/20 text-[var(--color-silk)]">
               {status === 'loading' ? 'Adding…' : 'Add contact'}

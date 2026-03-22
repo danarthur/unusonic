@@ -8,7 +8,7 @@
 
 import { useState, useTransition, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Camera, Loader2, X, ArrowRight } from 'lucide-react';
+import { User, Camera, Loader2, X, Check } from 'lucide-react';
 import {
   updateProfile,
   updateOnboardingStep,
@@ -20,6 +20,7 @@ import { OnboardingChatInput } from '@/features/onboarding/ui/onboarding-chat-in
 import { WebsiteStep } from '@/features/onboarding/ui/website-step';
 import type { ScoutOnboardingPayload } from '@/features/onboarding/ui/website-step';
 import type { LivingLogoStatus } from '@/shared/ui/branding/living-logo';
+import { M3_EASING_ENTER, M3_EASING_EXIT } from '@/shared/lib/motion-constants';
 
 interface OnboardingState {
   user: { id: string; email: string };
@@ -38,7 +39,6 @@ interface OnboardingWizardProps {
 }
 
 const STEPS = 3;
-const springConfig = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
   const [isPending, startTransition] = useTransition();
@@ -53,12 +53,25 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
   const minStep = initialState.profile.fullName?.trim() ? 1 : 0;
 
   const [currentStep, setCurrentStep] = useState(computeInitialStep);
+
+  // Direction-aware transitions: track which way the step is moving (computed once at init).
+  const prevStepRef = useRef<number | null>(null);
+  const stepDirectionRef = useRef<1 | -1>(1);
+  if (prevStepRef.current === null) {
+    prevStepRef.current = currentStep;
+  } else if (prevStepRef.current !== currentStep) {
+    stepDirectionRef.current = currentStep > prevStepRef.current ? 1 : -1;
+    prevStepRef.current = currentStep;
+  }
+  const slideX = stepDirectionRef.current * 24;
+
   const [fullName, setFullName] = useState(initialState.profile.fullName);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialState.profile.avatarUrl);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [scoutPayload, setScoutPayload] = useState<ScoutOnboardingPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [genesisLogoStatus, setGenesisLogoStatus] = useState<LivingLogoStatus>('idle');
+  const [profileSubmitted, setProfileSubmitted] = useState(false);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,7 +99,11 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
         return;
       }
       await updateOnboardingStep(1);
-      setCurrentStep(1);
+      setProfileSubmitted(true);
+      setTimeout(() => {
+        setProfileSubmitted(false);
+        setCurrentStep(1);
+      }, 350);
     });
   };
 
@@ -146,14 +163,13 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
         ) : undefined
       }
     >
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout" initial={false}>
         {currentStep === 0 && (
           <motion.div
             key="profile"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={springConfig}
+            initial={{ opacity: 0, x: slideX }}
+            animate={{ opacity: 1, x: 0, transition: { duration: 0.28, ease: M3_EASING_ENTER } }}
+            exit={{ opacity: 0, x: -slideX, transition: { duration: 0.18, ease: M3_EASING_EXIT } }}
             className="w-full max-w-lg flex flex-col items-center gap-6"
           >
             {/* Avatar */}
@@ -177,21 +193,24 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
                 {avatarUrl ? (
                   <>
                     <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-ink/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-ink/50 opacity-40 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Camera className="w-5 h-5 text-ceramic" />
                     </div>
                   </>
                 ) : avatarUploading ? (
                   <Loader2 className="w-6 h-6 text-ink-muted animate-spin" />
                 ) : (
-                  <User className="w-8 h-8 text-ink-muted/50" />
+                  <div className="flex flex-col items-center gap-1">
+                    <User className="w-7 h-7 text-ink-muted/50" />
+                    <Camera className="w-4 h-4 text-ink-muted/40 group-hover:text-ink-muted/80 transition-colors" />
+                  </div>
                 )}
               </motion.button>
               {avatarUrl && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setAvatarUrl(null); }}
-                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-signal-error text-ceramic flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-unusonic-error text-ceramic flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -199,18 +218,30 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
             </div>
             <p className="text-xs text-ceramic/40">{initialState.user.email}</p>
             {error && (
-              <p className="text-sm text-signal-error">{error}</p>
+              <p className="text-sm text-unusonic-error">{error}</p>
             )}
+            <AnimatePresence mode="wait">
+              {profileSubmitted && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 1.2, 1], opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 20, duration: 0.3 }}
+                  className="flex items-center justify-center"
+                >
+                  <Check className="w-6 h-6 text-neon-blue" />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 
         {currentStep === 1 && (
           <motion.div
             key="website"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={springConfig}
+            initial={{ opacity: 0, x: slideX }}
+            animate={{ opacity: 1, x: 0, transition: { duration: 0.28, ease: M3_EASING_ENTER } }}
+            exit={{ opacity: 0, x: -slideX, transition: { duration: 0.18, ease: M3_EASING_EXIT } }}
             className="w-full"
           >
             <WebsiteStep onUseScout={handleUseScout} onSkip={handleSkipWebsite} />
@@ -220,10 +251,9 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
         {currentStep === 2 && (
           <motion.div
             key="genesis"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={springConfig}
+            initial={{ opacity: 0, x: slideX }}
+            animate={{ opacity: 1, x: 0, transition: { duration: 0.28, ease: M3_EASING_ENTER } }}
+            exit={{ opacity: 0, x: -slideX, transition: { duration: 0.18, ease: M3_EASING_EXIT } }}
             className="w-full"
           >
             <GenesisOrchestrator

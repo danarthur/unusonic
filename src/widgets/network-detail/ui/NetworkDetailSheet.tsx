@@ -81,7 +81,7 @@ function InternalMemberRoleCard({
         disabled={saving}
       />
       {error && (
-        <p className="mt-2 text-xs text-[var(--color-signal-error)]">{error}</p>
+        <p className="mt-2 text-xs text-[var(--color-unusonic-error)]">{error}</p>
       )}
     </div>
   );
@@ -146,7 +146,7 @@ function InlineEditField({
           className="w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-2 py-1 text-sm text-[var(--color-ink)] outline-none focus:border-[var(--color-silk)]/50 disabled:opacity-50"
         />
         {saveError && (
-          <p className="mt-1 text-xs text-[var(--color-signal-error)]">{saveError}</p>
+          <p className="mt-1 text-xs text-[var(--color-unusonic-error)]">{saveError}</p>
         )}
       </div>
     );
@@ -327,7 +327,7 @@ function RosterStatusCard({
             {details.lastModifiedAt ? ` · ${new Date(details.lastModifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
           </p>
         )}
-        {dnrError && <p className="text-xs text-[var(--color-signal-error)]">{dnrError}</p>}
+        {dnrError && <p className="text-xs text-[var(--color-unusonic-error)]">{dnrError}</p>}
       </div>
 
       {/* Archive / Unarchive */}
@@ -380,7 +380,7 @@ function RosterStatusCard({
             </button>
           )}
         </div>
-        {archiveError && <p className="text-xs text-[var(--color-signal-error)]">{archiveError}</p>}
+        {archiveError && <p className="text-xs text-[var(--color-unusonic-error)]">{archiveError}</p>}
       </div>
 
       {/* Remove from roster */}
@@ -397,7 +397,7 @@ function RosterStatusCard({
               type="button"
               onClick={() => handleRemove(forceCount !== null ? true : false)}
               disabled={removing}
-              className="rounded-lg bg-[var(--color-signal-error)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-signal-error)] hover:bg-[var(--color-signal-error)]/25 transition-colors disabled:opacity-50"
+              className="rounded-lg bg-[var(--color-unusonic-error)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/25 transition-colors disabled:opacity-50"
             >
               {removing
                 ? 'Removing…'
@@ -421,13 +421,13 @@ function RosterStatusCard({
               setForceCount(null);
               setRemoveError(null);
             }}
-            className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[var(--color-signal-error)]/50 hover:text-[var(--color-signal-error)] transition-colors"
+            className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[var(--color-unusonic-error)]/50 hover:text-[var(--color-unusonic-error)] transition-colors"
           >
             Remove from roster
           </button>
         )}
       </div>
-      {removeError && <p className="text-xs text-[var(--color-signal-error)]">{removeError}</p>}
+      {removeError && <p className="text-xs text-[var(--color-unusonic-error)]">{removeError}</p>}
     </div>
   );
 }

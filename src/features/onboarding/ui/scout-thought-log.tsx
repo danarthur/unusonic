@@ -73,7 +73,8 @@ export function ScoutThoughtLog({ steps, suggestion, className }: ScoutThoughtLo
           </p>
           <div
             tabIndex={0}
-            className="max-h-12 focus-within:max-h-24 transition-[max-height] duration-300 ease-out rounded-lg outline-none focus-within:ring-1 focus-within:ring-[var(--color-mercury)]/20 focus-within:ring-inset"
+            className="max-h-12 focus-within:max-h-24 transition-[max-height] duration-300 rounded-lg outline-none focus-within:ring-1 focus-within:ring-[var(--color-mercury)]/20 focus-within:ring-inset"
+            style={{ transitionTimingFunction: `cubic-bezier(${M3_EASING_ENTER.join(', ')})` }}
           >
             <ul
               ref={listRef}

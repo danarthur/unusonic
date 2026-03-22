@@ -677,7 +677,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                     type="button"
                     onClick={() => deleteSlot(slot.id)}
                     disabled={saving || editingId !== null}
-                    className="p-1 rounded text-ink-muted hover:text-[var(--color-signal-error)] hover:bg-[var(--color-signal-error)]/10 focus:outline-none disabled:opacity-40 transition-colors"
+                    className="p-1 rounded text-ink-muted hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 focus:outline-none disabled:opacity-40 transition-colors"
                     title="Remove"
                   >
                     <Trash2 size={11} aria-hidden />
@@ -1009,7 +1009,7 @@ export function PlanVitalsRow({
             </span>
           )}
           {fieldError && (
-            <p className="text-[10px] text-[var(--color-signal-error)]">{fieldError}</p>
+            <p className="text-[10px] text-[var(--color-unusonic-error)]">{fieldError}</p>
           )}
           <div className="border-t border-white/5 pt-3 flex flex-col gap-3">
             {(['loadIn', 'loadOut'] as const).map((field) => {
@@ -1073,7 +1073,7 @@ export function PlanVitalsRow({
               );
             })}
             {loadFieldError && (
-              <p className="text-[10px] text-[var(--color-signal-error)]">{loadFieldError}</p>
+              <p className="text-[10px] text-[var(--color-unusonic-error)]">{loadFieldError}</p>
             )}
           </div>
         </div>
@@ -1176,7 +1176,7 @@ export function PlanVitalsRow({
                       type="button"
                       onClick={clearVenue}
                       disabled={savingVenue}
-                      className="text-xs py-1.5 px-2 rounded-lg border border-white/10 text-ink-muted hover:bg-white/5 hover:text-[var(--color-signal-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+                      className="text-xs py-1.5 px-2 rounded-lg border border-white/10 text-ink-muted hover:bg-white/5 hover:text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
                     >
                       {savingVenue ? '…' : 'Clear'}
                     </button>

@@ -4,15 +4,14 @@ import * as React from 'react';
 import { useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import { createGenesisOrganization } from '@/features/onboarding/api/actions';
 import { initializeOrganization } from '@/features/onboarding/actions/complete-setup';
-import { TierSelector, type GenesisTierId } from '@/features/org-identity/ui/TierSelector';
-import { ColorTuner } from '@/features/org-identity/ui/ColorTuner';
-import { LogoField } from '@/features/org-identity/ui/LogoField';
+import type { GenesisTierId } from '@/features/org-identity/ui/TierSelector';
 import { Input } from '@/shared/ui/input';
-import { cn } from '@/shared/lib/utils';
 import type { UserPersona } from '@/features/onboarding/model/subscription-types';
 import type { OnboardingGenesisContext } from '@/features/onboarding/model/types';
+import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 
 const GENESIS_TO_SUBSCRIPTION: Record<GenesisTierId, 'foundation' | 'growth' | 'venue_os'> = {
   scout: 'foundation',
@@ -28,8 +27,6 @@ const PERSONA_TO_ORG_TYPE: Record<UserPersona, 'solo' | 'agency' | 'venue'> = {
 
 export interface GenesisPrefill {
   name: string;
-  logoUrl: string;
-  brandColor: string | null;
   tier: GenesisTierId;
 }
 
@@ -37,16 +34,14 @@ interface GenesisCreateCardProps {
   slug: string;
   /** When set, uses initializeOrganization (first-time onboarding) instead of createGenesisOrganization */
   onboardingContext?: OnboardingGenesisContext;
-  /** Pre-fill from Aion website scout (onboarding) */
+  /** Pre-fill from name input or Aion website scout */
   prefill?: GenesisPrefill;
 }
 
 export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisCreateCardProps) {
   const router = useRouter();
   const [name, setName] = React.useState(prefill?.name ?? '');
-  const [tier, setTier] = React.useState<GenesisTierId>(prefill?.tier ?? 'scout');
-  const [brandColor, setBrandColor] = React.useState<string | null>(prefill?.brandColor ?? null);
-  const [logoUrl, setLogoUrl] = React.useState(prefill?.logoUrl ?? '');
+  const tier: GenesisTierId = prefill?.tier ?? 'scout';
 
   const [state, submitAction, isPending] = useActionState(
     async (_prev: { ok: boolean; error?: string } | null, formData: FormData) => {
@@ -56,15 +51,12 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
           type: PERSONA_TO_ORG_TYPE[onboardingContext.persona],
           subscriptionTier: GENESIS_TO_SUBSCRIPTION[(formData.get('tier') as GenesisTierId) ?? 'scout'],
         });
-        if (result.success) {
-          router.refresh();
-          return { ok: true };
-        }
+        if (result.success) return { ok: true };
         return { ok: false, error: result.error };
       }
       const result = await createGenesisOrganization(null, formData);
       if (result.ok) {
-        router.refresh();
+        router.push('/lobby');
         return { ok: true };
       }
       return { ok: false, error: result.error };
@@ -74,19 +66,19 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={UNUSONIC_PHYSICS}
       className="w-full"
     >
-      <form action={submitAction} className="flex flex-col gap-8 liquid-card glass-panel rounded-3xl p-8 border border-mercury">
+      <form action={submitAction} className="flex flex-col gap-8 liquid-card glass-panel rounded-3xl p-8 border border-[var(--glass-border)]">
         {/* Slug (read-only) */}
         <div>
           <span className="text-xs font-medium uppercase tracking-widest text-ink-muted">
-            Signal frequency
+            Studio URL
           </span>
-          <p className="mt-2 text-lg text-ceramic font-mono">signal.events/{slug}</p>
+          <p className="mt-2 text-lg text-ceramic font-mono">unusonic.events/{slug}</p>
         </div>
 
         {/* Name */}
@@ -105,71 +97,34 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="h-11 border-mercury bg-obsidian/50 text-ceramic placeholder:text-ink-muted/60 text-base rounded-xl px-4"
+            className="h-11 border-[var(--glass-border)] bg-obsidian/50 text-ceramic placeholder:text-ink-muted/60 text-base rounded-xl px-4"
           />
-        </section>
-
-        {/* Brand */}
-        <section className="space-y-5">
-          <span className="text-xs font-medium uppercase tracking-widest text-ink-muted">
-            Brand
-          </span>
-          <ColorTuner value={brandColor} onChange={setBrandColor} />
-          <LogoField
-            value={logoUrl}
-            onChange={setLogoUrl}
-            brandColor={brandColor}
-            label="Logo"
-          />
-        </section>
-
-        {/* Tier */}
-        <section>
-          <TierSelector value={tier} onChange={setTier} label="Commission level" />
         </section>
 
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="tier" value={tier} />
-        <input type="hidden" name="brand_color" value={brandColor ?? ''} />
-        <input type="hidden" name="logo_url" value={logoUrl} />
 
         {state?.ok === false && state?.error && (
-          <p className="text-sm text-signal-error -mt-2">{state.error}</p>
+          <p className="text-sm text-unusonic-error -mt-2">{state.error}</p>
         )}
 
-        <button
+        <motion.button
           type="submit"
           disabled={isPending || !name.trim()}
-          className={cn(
-            'liquid-levitation mt-2 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-medium transition-all duration-300',
-            'border border-mercury h-12',
-            'bg-neon-blue/15 text-neon-blue',
-            'hover:bg-neon-blue/25 hover:border-neon-blue/40',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue/40 focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian',
-            'disabled:pointer-events-none disabled:opacity-50',
-            'shadow-[0_0_0_1px_var(--color-mercury),inset_0_1px_0_0_var(--color-glass-highlight)]'
-          )}
+          whileHover={!isPending && name.trim() ? { scale: 1.02 } : undefined}
+          whileTap={!isPending && name.trim() ? { scale: 0.98 } : undefined}
+          transition={UNUSONIC_PHYSICS}
+          className="w-full py-3.5 rounded-full font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 transition-colors disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
         >
           {isPending ? (
-            <span className="text-ink-muted">Launching…</span>
-          ) : (
             <>
-              <svg
-                className="size-4 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-              <span>Launch organization</span>
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+              Launching…
             </>
+          ) : (
+            'Launch workspace'
           )}
-        </button>
+        </motion.button>
       </form>
     </motion.div>
   );

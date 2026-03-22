@@ -160,7 +160,7 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex flex-col h-full min-h-0">
         {dropError && (
-          <div className="shrink-0 px-4 py-2 bg-[var(--color-signal-error)]/10 border-b border-[var(--color-signal-error)]/30 text-sm text-[var(--color-signal-error)]" role="alert">
+          <div className="shrink-0 px-4 py-2 bg-[var(--color-unusonic-error)]/10 border-b border-[var(--color-unusonic-error)]/30 text-sm text-[var(--color-unusonic-error)]" role="alert">
             {dropError}
           </div>
         )}

@@ -184,7 +184,7 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
               </Button>
             </div>
             {state?.ok === false && state?.error && (
-              <p className="text-sm text-[var(--color-signal-error)]">{state.error}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)]">{state.error}</p>
             )}
           </motion.form>
         )}

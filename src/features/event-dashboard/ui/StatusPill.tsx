@@ -31,7 +31,7 @@ const LIFECYCLE_COLORS: Record<EventLifecycleStatus, string> = {
   live: 'border border-mercury bg-[var(--color-surface-success)] text-[var(--color-signal-success)]',
   post: 'border border-mercury bg-ink-muted/20 text-ink-muted',
   archived: 'border border-mercury bg-ink-muted/15 text-ink-muted',
-  cancelled: 'border border-mercury bg-[var(--color-surface-error)] text-[var(--color-signal-error)]',
+  cancelled: 'border border-mercury bg-[var(--color-surface-error)] text-[var(--color-unusonic-error)]',
 };
 
 interface StatusPillProps {

@@ -1,5 +1,5 @@
 /**
- * Signal Subscription & Persona Types
+ * Unusonic Subscription & Persona Types
  * Tiered profiles for Progressive Disclosure onboarding
  * @module features/onboarding/model/subscription-types
  */
@@ -86,6 +86,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, {
       '2-way PMS integration',
       'Geofenced staff scheduling',
       'Automated BEO generation',
+      'Custom domain (white-label)',
     ],
     suggestedPersonas: ['venue_brand'],
   },

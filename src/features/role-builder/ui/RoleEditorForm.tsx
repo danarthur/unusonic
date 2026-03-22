@@ -57,7 +57,7 @@ export function RoleEditorForm({
             className="bg-[var(--glass-bg)] border-[var(--glass-border)] text-ceramic placeholder:text-ink-muted/70"
           />
           {errors?.name?.message && (
-            <p className="text-[var(--color-signal-error)] text-xs leading-relaxed mt-1">{String(errors.name.message)}</p>
+            <p className="text-[var(--color-unusonic-error)] text-xs leading-relaxed mt-1">{String(errors.name.message)}</p>
           )}
         </div>
         <div>
@@ -72,7 +72,7 @@ export function RoleEditorForm({
             className="bg-[var(--glass-bg)] border-[var(--glass-border)] text-ceramic placeholder:text-ink-muted/70 font-mono text-sm"
           />
           {errors?.slug?.message && (
-            <p className="text-[var(--color-signal-error)] text-xs leading-relaxed mt-1">{String(errors.slug.message)}</p>
+            <p className="text-[var(--color-unusonic-error)] text-xs leading-relaxed mt-1">{String(errors.slug.message)}</p>
           )}
         </div>
       </div>

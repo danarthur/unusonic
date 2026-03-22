@@ -30,7 +30,7 @@ export async function registerPasskey(): Promise<RegisterPasskeyResult> {
     }
     const options = await optionsRes.json();
 
-    const credential = await startRegistration(options);
+    const credential = await startRegistration({ optionsJSON: options });
     if (!credential) {
       return { ok: false, error: 'Registration was cancelled.' };
     }

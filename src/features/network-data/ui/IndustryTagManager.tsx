@@ -171,9 +171,9 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
 
       {/* Confirmation dialog */}
       {deleteState.phase === 'confirm' && (
-        <div className="rounded-xl border border-[var(--color-signal-error)]/30 bg-[var(--color-signal-error)]/5 p-4 space-y-3">
+        <div className="rounded-xl border border-[var(--color-unusonic-error)]/30 bg-[var(--color-unusonic-error)]/5 p-4 space-y-3">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="size-4 text-[var(--color-signal-error)] mt-0.5 shrink-0" />
+            <AlertTriangle className="size-4 text-[var(--color-unusonic-error)] mt-0.5 shrink-0" />
             <p className="text-sm text-[var(--color-ink)]">
               <strong>&ldquo;{deleteState.tag.label}&rdquo;</strong> is applied to{' '}
               <strong>{deleteState.usageCount}</strong>{' '}
@@ -215,7 +215,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
             </Button>
           </div>
           {mergeError && (
-            <p className="text-xs text-[var(--color-signal-error)]">{mergeError}</p>
+            <p className="text-xs text-[var(--color-unusonic-error)]">{mergeError}</p>
           )}
           <ul className="flex flex-col gap-1.5">
             {tags
@@ -278,7 +278,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
                     size="icon-sm"
                     onClick={() => handleDeleteClick(entry)}
                     disabled={isBusy || isCounting || isDeleting || merging || !!mergeFrom}
-                    className="text-[var(--color-ink-muted)] hover:text-[var(--color-signal-error)]"
+                    className="text-[var(--color-ink-muted)] hover:text-[var(--color-unusonic-error)]"
                   >
                     {isBusy && (isCounting || isDeleting) ? (
                       <span className="size-3 rounded-full border-2 border-current border-t-transparent animate-spin" />

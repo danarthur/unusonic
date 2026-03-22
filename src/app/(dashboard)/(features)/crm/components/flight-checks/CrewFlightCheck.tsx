@@ -156,7 +156,7 @@ export function CrewFlightCheck({
             {syncing ? 'Syncing…' : 'Pull crew from proposal'}
           </button>
           {syncError && (
-            <p className="text-xs text-[var(--color-signal-error)]">{syncError}</p>
+            <p className="text-xs text-[var(--color-unusonic-error)]">{syncError}</p>
           )}
           {syncMessage && (
             <p className="text-xs text-ink-muted leading-relaxed">{syncMessage}</p>
@@ -209,7 +209,7 @@ export function CrewFlightCheck({
                     <span className={`text-[10px] font-medium px-2 py-1 rounded-lg border ${
                       reminderResults[item.entity_id] === 'sent'
                         ? 'text-[var(--color-signal-success)] bg-[var(--color-signal-success)]/10 border-[var(--color-signal-success)]/20'
-                        : 'text-[var(--color-signal-error)] bg-[var(--color-signal-error)]/10 border-[var(--color-signal-error)]/20'
+                        : 'text-[var(--color-unusonic-error)] bg-[var(--color-unusonic-error)]/10 border-[var(--color-unusonic-error)]/20'
                     }`}>
                       {reminderResults[item.entity_id] === 'sent' ? 'Sent' : 'Error'}
                     </span>

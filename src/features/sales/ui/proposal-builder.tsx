@@ -894,7 +894,7 @@ export function ProposalBuilder({
                 </button>
               </div>
               {clientAttached === false && (
-                <p className="text-xs text-[var(--color-signal-error)]">Attach a client to this deal before sending.</p>
+                <p className="text-xs text-[var(--color-unusonic-error)]">Attach a client to this deal before sending.</p>
               )}
             </div>
 
@@ -940,7 +940,7 @@ export function ProposalBuilder({
                   </p>
                 )}
                 {sendError && (
-                  <p className="mt-3 text-sm text-[var(--color-signal-error)]" role="alert">
+                  <p className="mt-3 text-sm text-[var(--color-unusonic-error)]" role="alert">
                     {sendError}
                   </p>
                 )}

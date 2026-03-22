@@ -103,7 +103,7 @@ export function SkillPresetManager({ workspaceId, initialPresets }: SkillPresetM
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => handleRemove(preset)}
-                className="text-[var(--color-ink-muted)] hover:text-[var(--color-signal-error)]"
+                className="text-[var(--color-ink-muted)] hover:text-[var(--color-unusonic-error)]"
               >
                 <Trash2 className="size-4" />
               </Button>

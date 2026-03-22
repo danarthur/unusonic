@@ -1,5 +1,5 @@
 /**
- * Signal Onboarding – Result types for Ghost org and claim flows.
+ * Unusonic Onboarding – Result types for Ghost org and claim flows.
  * @module features/onboarding/model/types
  */
 

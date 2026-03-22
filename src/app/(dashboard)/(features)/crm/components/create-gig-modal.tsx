@@ -29,12 +29,12 @@ function FeasibilityBadge({ status, message }: { status: FeasibilityStatus; mess
   const styles: Record<FeasibilityStatus, string> = {
     clear: 'border-[var(--color-signal-success)] bg-[var(--color-surface-success)]/20 text-[var(--color-signal-success)]',
     caution: 'border-[var(--color-signal-warning)] bg-[var(--color-surface-warning)]/20 text-[var(--color-signal-warning)]',
-    critical: 'border-[var(--color-signal-error)] bg-[var(--color-surface-error)]/20 text-[var(--color-signal-error)]',
+    critical: 'border-[var(--color-unusonic-error)] bg-[var(--color-surface-error)]/20 text-[var(--color-unusonic-error)]',
   };
   const dots: Record<FeasibilityStatus, string> = {
     clear: 'bg-[var(--color-signal-success)]',
     caution: 'bg-[var(--color-signal-warning)]',
-    critical: 'bg-[var(--color-signal-error)]',
+    critical: 'bg-[var(--color-unusonic-error)]',
   };
   return (
     <span
@@ -936,12 +936,12 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
 
           <div className="flex flex-col gap-2 p-6 pt-4 border-t border-[var(--glass-border)] shrink-0 bg-[var(--glass-bg)]/50 min-w-0 overflow-hidden">
             {!hasWorkspace && (
-              <p className="text-sm text-[var(--color-signal-error)] break-words">
+              <p className="text-sm text-[var(--color-unusonic-error)] break-words">
                 No workspace selected. Complete onboarding first.
               </p>
             )}
             {hasWorkspace && error && (
-              <p className="text-sm text-[var(--color-signal-error)] break-words">{error}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)] break-words">{error}</p>
             )}
             <div className="flex gap-2 min-w-0">
             {stage === 1 ? (

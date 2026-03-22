@@ -139,7 +139,7 @@ export function SwapItemPicker({
               )}
             </div>
             {error && (
-              <p className="px-3 pb-3 text-xs text-[var(--color-signal-error)]" role="alert">
+              <p className="px-3 pb-3 text-xs text-[var(--color-unusonic-error)]" role="alert">
                 {error}
               </p>
             )}

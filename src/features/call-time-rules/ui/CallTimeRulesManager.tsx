@@ -85,7 +85,7 @@ function TagInput({ value, onChange, placeholder }: TagInputProps) {
           <button
             type="button"
             onClick={() => onChange(value.filter((t) => t !== tag))}
-            className="text-ink-muted hover:text-[var(--color-signal-error)] transition-colors"
+            className="text-ink-muted hover:text-[var(--color-unusonic-error)] transition-colors"
           >
             <X size={10} />
           </button>
@@ -368,7 +368,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
             <span className="text-sm text-ceramic">Only apply when crew has no call time set</span>
           </label>
 
-          {error && <p className="text-xs text-[var(--color-signal-error)]">{error}</p>}
+          {error && <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
 
           <div className="flex gap-2 pt-2">
             <button
@@ -534,7 +534,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                       type="button"
                       onClick={() => handleDelete(rule.id)}
                       disabled={deletingId === rule.id}
-                      className="p-1.5 rounded-lg text-ink-muted hover:text-[var(--color-signal-error)] hover:bg-[var(--color-signal-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+                      className="p-1.5 rounded-lg text-ink-muted hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
                       title="Delete"
                     >
                       <Trash2 size={13} />

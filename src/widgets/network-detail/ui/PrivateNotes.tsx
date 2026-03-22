@@ -68,7 +68,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
           rows={4}
         />
         {state?.error && (
-          <p className="text-xs text-[var(--color-signal-error)]">{state.error}</p>
+          <p className="text-xs text-[var(--color-unusonic-error)]">{state.error}</p>
         )}
         <button
           type="submit"

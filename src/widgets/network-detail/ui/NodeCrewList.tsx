@@ -161,7 +161,7 @@ export function NodeCrewList({
                 className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
               />
               {error && (
-                <p className="text-xs text-[var(--color-signal-error)]">{error}</p>
+                <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
               )}
               <div className="flex gap-2">
                 <Button

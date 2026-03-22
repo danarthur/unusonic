@@ -120,7 +120,7 @@ export function AssignCrewSheet({
             </div>
           )}
           {error && (
-            <p className="text-xs text-[var(--color-signal-error)] mb-3">{error}</p>
+            <p className="text-xs text-[var(--color-unusonic-error)] mb-3">{error}</p>
           )}
           {!loading && members.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">

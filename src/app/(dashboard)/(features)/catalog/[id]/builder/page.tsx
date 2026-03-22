@@ -457,7 +457,7 @@ export default function CatalogBuilderPage() {
   if (error || !pkg) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
-        <p className="text-sm text-[var(--color-signal-error)]">{error ?? 'Package not found.'}</p>
+        <p className="text-sm text-[var(--color-unusonic-error)]">{error ?? 'Package not found.'}</p>
         <Link href="/catalog" className="mt-4 text-sm text-neon hover:underline">
           Back to Master menu
         </Link>
@@ -523,7 +523,7 @@ export default function CatalogBuilderPage() {
               disabled={ionLoading}
             />
             {ionError && (
-              <p className="text-sm text-[var(--color-signal-error)]">{ionError}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)]">{ionError}</p>
             )}
             <motion.button
               type="button"

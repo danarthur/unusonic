@@ -22,6 +22,8 @@ interface OnboardingChatInputProps {
   disabled?: boolean;
   /** Input type (e.g. 'password' for password fields) */
   type?: 'text' | 'email' | 'password';
+  /** Hide the submit arrow button (e.g. when an external CTA handles the action) */
+  hideSubmit?: boolean;
 }
 
 export function OnboardingChatInput({
@@ -32,6 +34,7 @@ export function OnboardingChatInput({
   isLoading = false,
   disabled = false,
   type = 'text',
+  hideSubmit = false,
 }: OnboardingChatInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const canSubmit = value.trim().length > 0 && !isLoading && !disabled;
@@ -84,25 +87,34 @@ export function OnboardingChatInput({
         />
       </div>
 
-      <div className="pr-1 flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
-        {isLoading ? (
-          <div className="p-3 rounded-full bg-ink/10 text-ink-muted">
-            <Loader2 size={20} className="animate-spin" />
-          </div>
-        ) : canSubmit ? (
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleSubmit}
-            className="p-3 rounded-full bg-ink text-canvas liquid-levitation hover:bg-walnut transition-colors flex items-center justify-center"
-          >
-            <ArrowUp size={20} strokeWidth={2.5} />
-          </motion.button>
-        ) : (
-          <div className="w-14 h-14" />
-        )}
-      </div>
+      {!hideSubmit && (
+        <div className="pr-1 flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+          {isLoading ? (
+            <div
+              role="status"
+              aria-busy={true}
+              aria-label="Submitting…"
+              className="p-3 rounded-full bg-ink/10 text-ink-muted"
+            >
+              <Loader2 size={20} className="animate-spin" />
+            </div>
+          ) : canSubmit ? (
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSubmit}
+              aria-busy={isLoading}
+              aria-label="Submit"
+              className="p-3 rounded-full bg-ink text-canvas liquid-levitation hover:bg-walnut transition-colors flex items-center justify-center"
+            >
+              <ArrowUp size={20} strokeWidth={2.5} />
+            </motion.button>
+          ) : (
+            <div className="w-14 h-14" />
+          )}
+        </div>
+      )}
       </div>
     </div>
   );

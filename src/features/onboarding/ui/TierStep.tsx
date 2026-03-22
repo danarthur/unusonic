@@ -96,7 +96,7 @@ export function TierStep({
                 </div>
                 <p className="text-xs text-ink-muted">{cfg.price}</p>
                 {isFoundationGated && (
-                  <p className="text-[10px] text-[var(--color-signal-warning)] mt-1">
+                  <p className="text-[10px] text-[var(--color-unusonic-warning)] mt-1">
                     {projectCount} projects. Upgrade for more.
                   </p>
                 )}
@@ -116,11 +116,14 @@ export function TierStep({
         >
           <label className="flex items-center justify-between cursor-pointer">
             <span className="text-sm text-ink">PMS integration (2-way sync)</span>
-            <button
+            <motion.button
               type="button"
               role="switch"
               aria-checked={pmsEnabled}
               onClick={() => onPmsChange(!pmsEnabled)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               className={`
                 relative w-11 h-6 rounded-full transition-colors
                 ${pmsEnabled ? 'bg-neon-blue' : 'bg-ink/20'}
@@ -132,7 +135,7 @@ export function TierStep({
                 className="absolute top-1 left-1 w-4 h-4 rounded-full bg-ink"
                 style={{ x: pmsEnabled ? 20 : 0 }}
               />
-            </button>
+            </motion.button>
           </label>
         </motion.div>
       )}
@@ -145,14 +148,14 @@ export function TierStep({
             className={`
               p-5 rounded-2xl border-2 transition-all duration-300
               ${signalPayEnabled
-                ? 'border-[var(--color-signal-success)] bg-[color:var(--color-signal-success)/0.1] shadow-lg'
+                ? 'border-[var(--color-unusonic-success)] bg-[color:var(--color-unusonic-success)/0.1] shadow-lg'
                 : 'border-[var(--glass-border)] bg-ink/[0.02]'
               }
             `}
         >
           <div className="flex items-start gap-4">
-            <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${signalPayEnabled ? 'bg-[color:var(--color-signal-success)/0.2]' : 'bg-ink/5'}`}>
-              <Zap className={`w-5 h-5 ${signalPayEnabled ? 'text-[var(--color-signal-success)]' : 'text-ink-muted'}`} />
+            <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${signalPayEnabled ? 'bg-[color:var(--color-unusonic-success)/0.2]' : 'bg-ink/5'}`}>
+              <Zap className={`w-5 h-5 ${signalPayEnabled ? 'text-[var(--color-unusonic-success)]' : 'text-ink-muted'}`} />
             </div>
             <div className="flex-1 min-w-0">
               <label className="flex items-start justify-between gap-3 cursor-pointer">
@@ -164,14 +167,17 @@ export function TierStep({
                     Auto-billing for AI agents ($1/resolution).
                   </p>
                 </div>
-                <button
+                <motion.button
                   type="button"
                   role="switch"
                   aria-checked={signalPayEnabled}
                   onClick={() => onSignalPayChange(!signalPayEnabled)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                   className={`
                     flex-shrink-0 relative w-12 h-7 rounded-full transition-colors
-                    ${signalPayEnabled ? 'bg-[var(--color-signal-success)] shadow-lg' : 'bg-ink/20'}
+                    ${signalPayEnabled ? 'bg-[var(--color-unusonic-success)] shadow-lg' : 'bg-ink/20'}
                   `}
                 >
                   <motion.span
@@ -180,7 +186,7 @@ export function TierStep({
                     className="absolute top-1 left-1 w-5 h-5 rounded-full bg-ink shadow"
                     style={{ x: signalPayEnabled ? 22 : 0 }}
                   />
-                </button>
+                </motion.button>
               </label>
             </div>
           </div>

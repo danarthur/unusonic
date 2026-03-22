@@ -13,6 +13,7 @@ import {
 import { usePulseMetrics } from '@/widgets/global-pulse';
 import { GlobalPulseStrip } from '@/widgets/global-pulse';
 import { LobbyBentoGrid } from './LobbyBentoGrid';
+import { PlanPromptBanner } from './PlanPromptBanner';
 import { ChatInterface } from '@/app/(dashboard)/(features)/brain/components/ChatInterface';
 
 /**
@@ -81,6 +82,7 @@ export default function LobbyPage() {
                   className="flex flex-col gap-4 pt-[7.5rem]"
                   variants={{ visible: { transition: { staggerChildren: 0.05 } }, hidden: {} }}
                 >
+                  <PlanPromptBanner />
                   <LobbyBentoGrid />
                 </motion.div>
               </motion.div>

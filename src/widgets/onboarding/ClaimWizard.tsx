@@ -183,7 +183,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                 className="bg-white/5 border-[var(--color-mercury)]"
               />
               {confirmPassword && password !== confirmPassword && (
-                <p className="mt-1 text-xs text-[var(--color-signal-error)]">Passwords do not match.</p>
+                <p className="mt-1 text-xs text-[var(--color-unusonic-error)]">Passwords do not match.</p>
               )}
             </div>
             <div className="flex gap-3 pt-2">
@@ -206,7 +206,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
               </Button>
             </div>
             {state?.ok === false && state?.error && (
-              <p className="text-sm text-[var(--color-signal-error)]">{state.error}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)]">{state.error}</p>
             )}
           </motion.form>
         )}

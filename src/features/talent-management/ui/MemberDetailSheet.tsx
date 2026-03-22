@@ -352,7 +352,7 @@ export function MemberDetailSheet({
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => handleRemoveSkill(s.id)}
-                          className="text-[var(--color-ink-muted)] hover:text-[var(--color-signal-error)]"
+                          className="text-[var(--color-ink-muted)] hover:text-[var(--color-unusonic-error)]"
                         >
                           <Trash2 className="size-4" />
                         </Button>

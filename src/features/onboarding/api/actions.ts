@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
 /**
- * Signal Onboarding – Server Actions for Ghost org creation and claiming.
+ * Unusonic Onboarding – Server Actions for Ghost org creation and claiming.
  * Session 10: fully migrated to directory.entities + cortex.relationships.
  * All writes to public.organizations, public.affiliations, public.org_members, public.entities removed.
  * @module features/onboarding/api/actions

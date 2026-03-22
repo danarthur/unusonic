@@ -183,7 +183,7 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
                   />
                 </FormProvider>
                 {form.formState.errors?.root?.message && (
-                  <p className="text-[var(--color-signal-error)] text-sm leading-relaxed mt-3">{form.formState.errors.root.message}</p>
+                  <p className="text-[var(--color-unusonic-error)] text-sm leading-relaxed mt-3">{form.formState.errors.root.message}</p>
                 )}
               </LiquidPanel>
             </motion.div>
@@ -208,7 +208,7 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
                   />
                 </FormProvider>
                 {form.formState.errors?.root?.message && (
-                  <p className="text-[var(--color-signal-error)] text-sm leading-relaxed mt-3">{form.formState.errors.root.message}</p>
+                  <p className="text-[var(--color-unusonic-error)] text-sm leading-relaxed mt-3">{form.formState.errors.root.message}</p>
                 )}
               </LiquidPanel>
             </motion.div>

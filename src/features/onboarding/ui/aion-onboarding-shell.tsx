@@ -120,7 +120,7 @@ export function AionOnboardingShell({
         )}
 
         {/* Aion prompt — optional welcomeTitle (merged Welcome + Name); cross-fade for prompt text */}
-        <div className="w-full max-w-lg text-center space-y-1">
+        <div className="relative w-full max-w-lg text-center space-y-1 min-h-[1.25rem]">
           {welcomeTitle ? (
             <p className="text-sm font-medium tracking-tight text-ceramic">
               {welcomeTitle}
@@ -147,13 +147,13 @@ export function AionOnboardingShell({
             <AnimatePresence mode="wait">
               <motion.h1
                 key={prompt}
-                initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+                initial={{ opacity: 0, y: 6, filter: 'blur(3px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, y: -10, filter: 'blur(4px)', position: 'absolute' }}
+                exit={{ opacity: 0, y: -6 }}
                 transition={{
                   duration: M3_DURATION_S,
                   ease: M3_EASING_ENTER,
-                  filter: { duration: M3_DURATION_S * 0.8, ease: M3_EASING_ENTER },
+                  filter: { duration: M3_DURATION_S * 0.6, ease: M3_EASING_ENTER },
                 }}
                 className="text-xs font-medium uppercase tracking-widest text-ink-muted gpu-accelerated"
               >
@@ -206,14 +206,23 @@ export function AionOnboardingShell({
             ) : null}
           </div>
           {!hideStepIndicator ? (
-            <span className="ml-auto text-[10px] uppercase tracking-widest text-ceramic/30">
-              {stepIndex + 1} of {stepTotal}
-            </span>
+            <div className="ml-auto flex items-center gap-1.5">
+              {Array.from({ length: stepTotal }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={i === stepIndex ? { scale: 1.25 } : { scale: 1 }}
+                  transition={UNUSONIC_PHYSICS}
+                  className={`rounded-full transition-colors duration-300 ${
+                    i === stepIndex
+                      ? 'w-1.5 h-1.5 bg-neon-blue'
+                      : 'w-1.5 h-1.5 bg-ink/30'
+                  }`}
+                />
+              ))}
+            </div>
           ) : null}
         </div>
-        <p className="text-center mt-3 text-[11px] text-ceramic/40">
-          Can&apos;t type? Try a private window or disable your password manager for this site.
-        </p>
+
       </div>
 
       {/* Sign out footer — hidden during signup */}
@@ -222,7 +231,7 @@ export function AionOnboardingShell({
         <form action={signOutAction} className="pointer-events-auto w-fit">
           <button
             type="submit"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-ceramic/40 hover:text-ceramic/60 hover:bg-white/5 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-ceramic/40 hover:text-ceramic/60 hover:bg-ink/5 transition-colors"
           >
             <LogOut className="w-3 h-3" />
             <span>Sign out</span>

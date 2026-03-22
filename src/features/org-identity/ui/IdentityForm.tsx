@@ -198,7 +198,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
       </div>
 
       {state?.ok === false && (
-        <p className="text-sm text-[var(--color-signal-error)]">{state.error}</p>
+        <p className="text-sm text-[var(--color-unusonic-error)]">{state.error}</p>
       )}
 
       <div className="pt-8">

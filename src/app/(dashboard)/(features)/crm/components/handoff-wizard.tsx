@@ -491,7 +491,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.98 }}
                         transition={UNUSONIC_PHYSICS}
-                        className="p-2 rounded-xl text-ink-muted hover:text-signal-error hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        className="p-2 rounded-xl text-ink-muted hover:text-unusonic-error hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                         aria-label="Remove role"
                       >
                         <Trash2 size={18} aria-hidden />
@@ -516,7 +516,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
         </AnimatePresence>
 
         {error && (
-          <p className="mt-4 text-sm text-signal-error" role="alert">
+          <p className="mt-4 text-sm text-unusonic-error" role="alert">
             {error}
           </p>
         )}

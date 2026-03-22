@@ -67,7 +67,7 @@ export function PackageSelector({
           {loading ? (
             <p className="text-sm text-ink-muted">Loading…</p>
           ) : error ? (
-            <p className="text-sm text-[var(--color-signal-error)]">{error}</p>
+            <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>
           ) : packages.length === 0 ? (
             <p className="text-sm text-ink-muted">
               No packages yet. Add master packages in Catalog.

@@ -16,6 +16,9 @@ const CHALLENGE_COOKIE = 'webauthn_assert_challenge';
 const CHALLENGE_MAX_AGE = 300; // 5 minutes
 
 function getRpId(request: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
+    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
+  }
   const origin =
     request.headers.get('origin') ||
     request.nextUrl.origin ||
@@ -45,36 +48,41 @@ export async function POST(request: NextRequest) {
     const system = getSystemClient();
 
     if (email) {
-      // Identified flow: restrict to this user's passkeys
-      const { data: listData } = await system.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-      const user = listData?.users?.find((u) => (u.email ?? '').toLowerCase() === email);
+      // Identified flow: restrict to this user's passkeys.
+      // GoTrue admin REST supports ?email= for a targeted single-user lookup — avoids the
+      // listUsers full-table scan and the SDK's 1000-user cap. getUserByEmail does not exist
+      // in @supabase/auth-js v2.x so we call the REST endpoint directly.
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+      const adminRes = await fetch(
+        `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}&page=1&per_page=1`,
+        { headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } }
+      );
+      const adminData = adminRes.ok ? await adminRes.json() : null;
+      const user = adminData?.users?.[0] ?? null;
       if (!user?.id) {
         return NextResponse.json(
-          { error: 'No account found with that email' },
-          { status: 404 }
+          { error: 'Sign in with passkey is not available for this account.' },
+          { status: 400 }
         );
       }
       const allowCredentials = await getAllowCredentials(system, user.id);
       if (allowCredentials.length === 0) {
         return NextResponse.json(
-          {
-            error:
-              'No passkey set up for this account. Sign in with password or add a passkey in settings.',
-          },
+          { error: 'Sign in with passkey is not available for this account.' },
           { status: 400 }
         );
       }
       options = await generateAuthenticationOptions({
         rpID: rpId,
+        userVerification: 'required',
         allowCredentials,
       });
     } else {
       // Discoverable flow: no email, browser shows all passkeys for this site
       options = await generateAuthenticationOptions({
         rpID: rpId,
+        userVerification: 'required',
         allowCredentials: [], // discoverable / resident credentials
       });
     }

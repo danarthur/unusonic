@@ -16,9 +16,8 @@ import { scoutCompanyForOnboarding } from '../actions/scout-for-onboarding';
 import type { ScoutResult } from '@/features/intelligence';
 import type { UserPersona } from '../model/subscription-types';
 import { PATHFINDING_PERSONAS } from '../model/subscription-types';
-import { UNUSONIC_PHYSICS, M3_DURATION_S, M3_EASING_ENTER, M3_EASING_EXIT } from '@/shared/lib/motion-constants';
 
-/** Design system: The Signal Spring (20-design-system) */
+/** Design system: Unusonic spring (20-design-system) */
 const springConfig = { type: 'spring' as const, stiffness: 200, damping: 20 };
 
 /** Single-line status messages during Phase 2 (cycles to show Aion is working). */
@@ -102,6 +101,17 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
   const personaLabel = result ? PATHFINDING_PERSONAS[result.suggestedPersona]?.label ?? 'Solo Planner' : '';
   const tierLabel = result ? GENESIS_TIERS.find((t) => t.id === result.suggestedTier)?.name ?? 'Scout' : '';
 
+  /** Phase order for directional slide transitions: advancing = right-to-left, going back = left-to-right. */
+  const PHASE_ORDER: Record<'idle' | 'thinking' | 'proposal', number> = { idle: 0, thinking: 1, proposal: 2 };
+  const prevPhaseRef = useRef<'idle' | 'thinking' | 'proposal'>(phase);
+  const phaseDirection = useRef<1 | -1>(1);
+  if (prevPhaseRef.current !== phase) {
+    phaseDirection.current = PHASE_ORDER[phase] > PHASE_ORDER[prevPhaseRef.current] ? 1 : -1;
+    prevPhaseRef.current = phase;
+  }
+  const slideX = phaseDirection.current * 24;
+  const phaseTransition = { duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] as const };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -114,10 +124,10 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
         {phase === 'idle' && (
           <motion.div
             key="phase-idle"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER }}
+            initial={{ opacity: 0, x: slideX }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -slideX }}
+            transition={phaseTransition}
             className="w-full flex flex-col items-center gap-6 text-center"
           >
             <div className="w-full max-w-md space-y-4">
@@ -148,7 +158,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                   whileTap={url.trim() ? { scale: 0.98 } : undefined}
                   transition={springConfig}
                   aria-disabled={!url.trim()}
-                  className={`btn-sheen-hover relative overflow-hidden flex-1 min-w-[140px] py-3 rounded-full font-medium text-sm tracking-tight text-ceramic border border-white/10 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)] bg-neon-blue flex items-center justify-center ${!url.trim() ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`btn-sheen-hover relative overflow-hidden flex-1 min-w-[140px] py-3 rounded-full font-medium text-sm tracking-tight text-ceramic border border-[oklch(1_0_0/0.1)] shadow-[0_4px_24px_-1px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)] bg-neon-blue flex items-center justify-center ${!url.trim() ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   <span className="relative z-10">Build with Aion</span>
                 </motion.button>
@@ -164,7 +174,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                 </motion.button>
               </div>
             </div>
-            {error && <p className="text-sm text-signal-error">{error}</p>}
+            {error && <p className="text-sm text-unusonic-error">{error}</p>}
           </motion.div>
         )}
 
@@ -172,21 +182,41 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
         {phase === 'thinking' && (
           <motion.div
             key="phase-thinking"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER }}
-            className="w-full flex flex-col items-center justify-center gap-8 py-12"
+            initial={{ opacity: 0, x: slideX }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -slideX }}
+            transition={phaseTransition}
+            className="w-full flex flex-col items-center justify-center gap-6 py-8"
           >
-            <div className="liquid-card liquid-levitation rounded-3xl border border-[var(--glass-border)] p-10 flex flex-col items-center gap-6 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2),inset_0_1px_0_0_var(--color-glass-highlight)]">
+            <div className="liquid-card liquid-levitation rounded-3xl border border-[var(--glass-border)] p-8 flex flex-col items-center gap-6 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2),inset_0_1px_0_0_var(--color-glass-highlight)]">
               <LivingLogo status="loading" size="xl" className="text-ceramic" />
               <p className="text-sm text-mercury min-h-[1.25rem] text-center max-w-xs">
                 {THINKING_STATUSES[statusIndex]}
               </p>
             </div>
-            <p className="text-xs uppercase tracking-widest text-mercury/50">
-              {url}
-            </p>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={springConfig}
+              className="text-center w-full max-w-xs"
+            >
+              <p className="text-xs text-ceramic/40 font-mono truncate">{url.trim()}</p>
+            </motion.div>
+            {/* Skeleton preview — shape of the proposal card */}
+            <div className="w-full liquid-card rounded-3xl border border-[var(--glass-border)] p-6 opacity-50">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="size-14 rounded-xl bg-ink/10 animate-pulse shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 rounded-md bg-ink/10 animate-pulse w-3/4" />
+                  <div className="h-3 rounded-md bg-ink/10 animate-pulse w-1/2" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-6 rounded-full bg-ink/10 animate-pulse w-20" />
+                <div className="h-6 rounded-full bg-ink/10 animate-pulse w-16" />
+                <div className="h-6 rounded-full bg-ink/10 animate-pulse w-24" />
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -194,9 +224,10 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
         {phase === 'proposal' && result && (
           <motion.div
             key="phase-proposal"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: M3_DURATION_S * 1.2, ease: M3_EASING_ENTER }}
+            initial={{ opacity: 0, x: slideX }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -slideX }}
+            transition={phaseTransition}
             className="w-full liquid-card liquid-levitation rounded-3xl border border-[var(--glass-border)] p-6 md:p-8 flex flex-col gap-6 md:gap-8"
           >
             <p className="text-xs uppercase tracking-widest text-mercury/60">

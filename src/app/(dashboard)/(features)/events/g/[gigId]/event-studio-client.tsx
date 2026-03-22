@@ -474,7 +474,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
                         type="button"
                         onClick={() => handleRemoveCrew(slot.id)}
                         aria-label={`Remove ${role}`}
-                        className="shrink-0 p-1 rounded text-ink-muted/40 hover:text-[var(--color-signal-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        className="shrink-0 p-1 rounded text-ink-muted/40 hover:text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
                         <UserX size={13} />
                       </button>
@@ -521,7 +521,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
                     type="button"
                     onClick={() => handleRemoveCrew(c.id)}
                     aria-label={`Remove ${c.role}`}
-                    className="shrink-0 p-1 rounded text-ink-muted/40 hover:text-[var(--color-signal-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="shrink-0 p-1 rounded text-ink-muted/40 hover:text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   >
                     <UserX size={13} />
                   </button>

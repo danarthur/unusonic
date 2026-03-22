@@ -8,7 +8,7 @@
  * 4. Redirect to returned redirectUrl (magic link) to establish session
  */
 
-import { startAuthentication } from '@simplewebauthn/browser';
+import { startAuthentication, WebAuthnError } from '@simplewebauthn/browser';
 
 export type AuthenticatePasskeyResult =
   | { ok: true }
@@ -49,7 +49,7 @@ async function doAuthenticate(
   }
   const authOptions = await optionsRes.json();
 
-  const credential = await startAuthentication(authOptions);
+  const credential = await startAuthentication({ optionsJSON: authOptions });
   if (!credential) {
     return { ok: false, error: 'Sign-in was cancelled.' };
   }
@@ -105,6 +105,9 @@ export async function authenticatePasskey(
 
     return { ok: false, error: result.error };
   } catch (e) {
+    if (e instanceof Error && (e.name === 'AbortError' || e.message.toLowerCase().includes('abort'))) {
+      return { ok: true };
+    }
     return {
       ok: false,
       error: e instanceof Error ? e.message : 'Passkey sign-in failed',
@@ -118,8 +121,18 @@ export async function authenticatePasskey(
  * the user selects a passkey from the autofill menu.
  */
 export async function runConditionalMediation(
-  redirectTo?: string
+  redirectTo?: string,
+  retryCount = 0
 ): Promise<AuthenticatePasskeyResult> {
+  if (
+    typeof window === 'undefined' ||
+    typeof PublicKeyCredential === 'undefined' ||
+    typeof PublicKeyCredential.isConditionalMediationAvailable !== 'function' ||
+    !(await PublicKeyCredential.isConditionalMediationAvailable())
+  ) {
+    return { ok: true };
+  }
+
   const base = typeof window !== 'undefined' ? window.location.origin : '';
   const optionsUrl = `${base}/api/auth/passkey/authenticate/options`;
   const verifyUrl = `${base}/api/auth/passkey/authenticate/verify`;
@@ -163,7 +176,8 @@ export async function runConditionalMediation(
       const data = await verifyRes.json().catch(() => ({}));
       const msg = (data.error as string) || `Verification failed (${verifyRes.status})`;
       if (isChallengeExpiredError(verifyRes.status, msg)) {
-        return runConditionalMediation(redirectTo); // Retry once
+        if (retryCount >= 1) return { ok: false, error: msg };
+        return runConditionalMediation(redirectTo, retryCount + 1);
       }
       return { ok: false, error: msg };
     }
@@ -175,6 +189,9 @@ export async function runConditionalMediation(
     }
     return { ok: false, error: 'Invalid response from server' };
   } catch (e) {
+    if (e instanceof Error && (e.name === 'AbortError' || e.message.toLowerCase().includes('abort'))) {
+      return { ok: true };
+    }
     return {
       ok: false,
       error: e instanceof Error ? e.message : 'Passkey sign-in failed',

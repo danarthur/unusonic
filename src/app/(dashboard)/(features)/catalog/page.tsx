@@ -396,7 +396,7 @@ export default function CatalogPage() {
               disabled={ionLoading}
             />
             {ionError && (
-              <p className="text-sm text-[var(--color-signal-error)]">{ionError}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)]">{ionError}</p>
             )}
             <motion.button
               type="button"
@@ -416,7 +416,7 @@ export default function CatalogPage() {
       {loading ? (
         <div className="text-sm text-ink-muted py-12 text-center">Loading…</div>
       ) : error ? (
-        <p className="text-sm text-[var(--color-signal-error)]">{error}</p>
+        <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>
       ) : packages.length === 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <LiquidPanel className="p-12 rounded-[28px] text-center flex flex-col items-center justify-center">
@@ -818,7 +818,7 @@ export default function CatalogPage() {
           <div className="overflow-y-auto overflow-x-hidden overscroll-contain py-2" style={{ maxHeight: 'calc(90vh - 5.5rem)' }}>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 pt-4 pb-10">
             {formError && (
-              <p className="text-sm text-[var(--color-signal-error)]">{formError}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
             )}
             <div>
               <label htmlFor="cat-name" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
@@ -1135,7 +1135,7 @@ export default function CatalogPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="cat-stock" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
-                      Total stock quantity <span className="text-[var(--color-signal-error)]">*</span>
+                      Total stock quantity <span className="text-[var(--color-unusonic-error)]">*</span>
                     </label>
                     <input
                       id="cat-stock"

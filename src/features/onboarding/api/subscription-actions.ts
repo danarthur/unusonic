@@ -1,5 +1,5 @@
 /**
- * Signal Onboarding – Persona & Subscription Actions
+ * Unusonic Onboarding – Persona & Subscription Actions
  * Progressive Disclosure: persona → tier → SignalPay
  * @module features/onboarding/api/subscription-actions
  */

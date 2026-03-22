@@ -257,7 +257,7 @@ export function CueInspector({
         <button
           type="button"
           onClick={handleDelete}
-          className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[var(--color-surface-error)] hover:opacity-90 text-xs font-medium text-[var(--color-signal-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[var(--color-surface-error)] hover:opacity-90 text-xs font-medium text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           <Trash2 size={12} />
           Delete

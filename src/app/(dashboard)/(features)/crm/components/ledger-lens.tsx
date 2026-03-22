@@ -30,7 +30,7 @@ export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
             {ledger ? ledger.fmt.totalRevenue : '—'}
           </p>
         </LiquidPanel>
-        <LiquidPanel className="p-6 rounded-[28px] border-l-4 border-l-[var(--color-signal-error)]">
+        <LiquidPanel className="p-6 rounded-[28px] border-l-4 border-l-[var(--color-unusonic-error)]">
           <p className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">Estimated cost</p>
           <p className="text-xl font-semibold text-ink-muted tracking-tight tabular-nums">
             {ledger ? ledger.fmt.totalCost : '—'}

@@ -163,7 +163,7 @@ export function PackageSelectorPalette({
               Loading…
             </div>
           ) : error ? (
-            <p className="p-4 text-sm text-[var(--color-signal-error)]">{error}</p>
+            <p className="p-4 text-sm text-[var(--color-unusonic-error)]">{error}</p>
           ) : !selected ? (
             <ul className="p-2 space-y-1">
               {filteredPackages.length === 0 ? (
@@ -236,7 +236,7 @@ export function PackageSelectorPalette({
                   )}
                 </div>
                 {applyError && (
-                  <p className="text-sm text-[var(--color-signal-error)]" role="alert">
+                  <p className="text-sm text-[var(--color-unusonic-error)]" role="alert">
                     {applyError}
                   </p>
                 )}

@@ -103,7 +103,7 @@ export function JobTitleManager({ workspaceId, initialTitles }: JobTitleManagerP
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => handleRemove(jt)}
-                className="text-[var(--color-ink-muted)] hover:text-[var(--color-signal-error)]"
+                className="text-[var(--color-ink-muted)] hover:text-[var(--color-unusonic-error)]"
               >
                 <Trash2 className="size-4" />
               </Button>

@@ -151,7 +151,7 @@ function StatusDot({ status }: { status: string }) {
   const colors: Record<string, string> = {
     paid: 'bg-signal-success',
     sent: 'bg-signal-warning',
-    overdue: 'bg-signal-error',
+    overdue: 'bg-unusonic-error',
     draft: 'bg-surface-100',
   };
   const color = colors[status] ?? colors.draft;

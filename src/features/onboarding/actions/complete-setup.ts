@@ -1,5 +1,5 @@
 /**
- * Signal Onboarding – Server-Side Event Orchestration (EDA)
+ * Unusonic Onboarding – Server-Side Event Orchestration (EDA)
  * initializeOrganization: Transaction + Async Triggers (Afterburner)
  * @module features/onboarding/actions/complete-setup
  */

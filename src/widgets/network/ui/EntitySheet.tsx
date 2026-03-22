@@ -207,7 +207,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                       </div>
                     </div>
                     {notesState?.error && (
-                      <p className="text-xs text-[var(--color-signal-error)]">{notesState.error}</p>
+                      <p className="text-xs text-[var(--color-unusonic-error)]">{notesState.error}</p>
                     )}
                     <Button type="submit" variant="default" size="sm">
                       Save

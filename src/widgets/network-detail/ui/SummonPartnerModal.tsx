@@ -125,7 +125,7 @@ export function SummonPartnerModal({
               />
             </div>
             {status === 'error' && message && (
-              <p className="text-sm text-[var(--color-signal-error)]">{message}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)]">{message}</p>
             )}
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={handleClose} className="flex-1">

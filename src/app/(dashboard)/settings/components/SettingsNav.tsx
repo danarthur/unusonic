@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Settings, Users, Shield, User, Lock, Mail } from 'lucide-react';
+import { Settings, Users, Shield, User, Lock, Mail, LayoutGrid } from 'lucide-react';
 
 const ITEMS: { href: string; label: string; icon: typeof Settings }[] = [
   { href: '/settings', label: 'Overview', icon: Settings },
+  { href: '/settings/plan', label: 'Plan', icon: LayoutGrid },
   { href: '/settings/team', label: 'Team', icon: Users },
   { href: '/settings/roles', label: 'Roles', icon: Shield },
   { href: '/settings/security', label: 'Security', icon: Lock },

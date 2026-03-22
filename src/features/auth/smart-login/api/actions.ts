@@ -16,15 +16,32 @@ import {
 import { loginSchema, signupSchema, signupForPasskeySchema } from '../model/schema';
 import type { AuthState, ProfileStatus } from '../model/types';
 
-/** Generates a random password that satisfies schema (8+ chars, 1 upper, 1 number). */
+/** Generates a cryptographically random password that satisfies schema (8+ chars, 1 upper, 1 number). */
 function randomPassword(): string {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const upper = 'ABCDEFGHJKMNPQRSTUVWXYZ';
-  let s = '';
-  for (let i = 0; i < 14; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  s += upper[Math.floor(Math.random() * upper.length)];
-  s += '3';
-  return s.split('').sort(() => Math.random() - 0.5).join('');
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const pool = lower + digits;
+
+  const buf = new Uint32Array(14);
+  crypto.getRandomValues(buf);
+  const chars = Array.from(buf, (n) => pool[n % pool.length]);
+
+  // Guarantee at least one uppercase and one digit
+  const upBuf = new Uint32Array(2);
+  crypto.getRandomValues(upBuf);
+  chars.push(upper[upBuf[0] % upper.length]);
+  chars.push(digits[upBuf[1] % digits.length]);
+
+  // Fisher-Yates shuffle with CSPRNG
+  const shuffleBuf = new Uint32Array(chars.length);
+  crypto.getRandomValues(shuffleBuf);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = shuffleBuf[i] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join('');
 }
 
 const initialState: AuthState = {

@@ -211,7 +211,7 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
                   'w-full rounded-xl border bg-white/5 py-3 pl-8 pr-4 font-mono text-sm transition-colors outline-none uppercase tracking-wider',
                   'border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/50',
                   'focus:border-[var(--color-silk)]/50 focus:ring-2 focus:ring-[var(--color-silk)]/20',
-                  !isValidHex && inputRaw.length === 6 && 'border-[var(--color-signal-error)]/50'
+                  !isValidHex && inputRaw.length === 6 && 'border-[var(--color-unusonic-error)]/50'
                 )}
                 maxLength={6}
                 placeholder="1A2B3C"
@@ -223,7 +223,7 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
               {isValidHex ? (
                 <>Oklch: {oklchLabel}</>
               ) : (
-                <span className={cn(inputRaw.length === 6 && 'text-[var(--color-signal-error)]')}>
+                <span className={cn(inputRaw.length === 6 && 'text-[var(--color-unusonic-error)]')}>
                   {inputRaw.length === 6 ? 'Invalid hex' : 'Enter 6 hex digits'}
                 </span>
               )}

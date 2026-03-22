@@ -175,7 +175,7 @@ export function PackageManager({
         {loading ? (
           <p className="text-sm text-ink-muted">Loading…</p>
         ) : error ? (
-          <p className="text-sm text-[var(--color-signal-error)]">{error}</p>
+          <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>
         ) : packages.length === 0 ? (
           <p className="text-sm text-ink-muted">No packages yet. Add one to use in proposals.</p>
         ) : (
@@ -216,7 +216,7 @@ export function PackageManager({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 pb-6">
             {formError && (
-              <p className="text-sm text-[var(--color-signal-error)]">{formError}</p>
+              <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
             )}
             <div>
               <label htmlFor="pkg-name" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">

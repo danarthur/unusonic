@@ -286,7 +286,7 @@ function FinancePanel({ entityId }: { entityId: string }) {
             <span className={cn(
               'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
               inv.status === 'paid' && 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]',
-              inv.status === 'overdue' && 'bg-[var(--color-signal-error)]/15 text-[var(--color-signal-error)]',
+              inv.status === 'overdue' && 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]',
               inv.status === 'sent' && 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]',
               !['paid','overdue','sent'].includes(inv.status ?? '') && 'bg-white/10 text-[var(--color-ink-muted)]',
             )}>
@@ -377,7 +377,7 @@ function VenueTechSpecsCard({
         </div>
       </div>
       {saveError && (
-        <p className="mt-2 text-xs text-[var(--color-signal-error)]">{saveError}</p>
+        <p className="mt-2 text-xs text-[var(--color-unusonic-error)]">{saveError}</p>
       )}
       <button
         type="button"
@@ -1398,7 +1398,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 variant="outline"
                 size="sm"
                 onClick={() => setDeleteConfirmOpen(true)}
-                className="gap-2 border-[var(--color-signal-error)]/50 text-[var(--color-signal-error)] hover:bg-[var(--color-signal-error)]/10"
+                className="gap-2 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
               >
                 <Trash2 className="size-4" />
                 Delete connection
@@ -1471,7 +1471,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               size="sm"
               onClick={handleDelete}
               disabled={isPending}
-              className="flex-1 border-[var(--color-signal-error)]/50 text-[var(--color-signal-error)] hover:bg-[var(--color-signal-error)]/10"
+              className="flex-1 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
             >
               Delete
             </Button>

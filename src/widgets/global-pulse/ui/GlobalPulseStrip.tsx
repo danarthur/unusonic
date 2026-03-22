@@ -125,7 +125,7 @@ export function GlobalPulseStrip() {
               aria-label="Account recovery needed"
             >
               <Shield className="w-4 h-4" />
-              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-signal-error" aria-hidden />
+              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-unusonic-error" aria-hidden />
             </button>
           </PopoverTrigger>
           <PopoverContent

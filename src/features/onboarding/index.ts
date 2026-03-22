@@ -1,5 +1,5 @@
 /**
- * Signal Onboarding – Public API
+ * Unusonic Onboarding – Public API
  * @module features/onboarding
  */
 

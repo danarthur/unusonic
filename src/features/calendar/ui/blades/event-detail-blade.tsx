@@ -109,7 +109,7 @@ export function EventDetailBlade({ eventId }: EventDetailBladeProps) {
           </div>
         )}
         {error && (
-          <p className="text-sm text-[var(--color-signal-error)] py-4">{error}</p>
+          <p className="text-sm text-[var(--color-unusonic-error)] py-4">{error}</p>
         )}
         {!loading && !error && detail && (
           <div className="space-y-6">

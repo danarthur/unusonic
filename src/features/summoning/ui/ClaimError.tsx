@@ -24,8 +24,8 @@ export function ClaimError({
       className="w-full max-w-md rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-6 sm:p-8 shadow-xl backdrop-blur-xl text-center"
     >
       <div className="flex justify-center mb-4">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--color-surface-error)] border border-[var(--color-signal-error)]/30">
-          <AlertCircle className="size-7 text-[var(--color-signal-error)]" />
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--color-surface-error)] border border-[var(--color-unusonic-error)]/30">
+          <AlertCircle className="size-7 text-[var(--color-unusonic-error)]" />
         </div>
       </div>
       <h1 className="text-xl font-medium tracking-tight text-[var(--color-ink)]">

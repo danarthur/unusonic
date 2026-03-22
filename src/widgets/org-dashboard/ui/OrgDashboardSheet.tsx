@@ -355,7 +355,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                             </div>
                           </div>
                           {saveState?.error && (
-                            <p className="text-xs text-[var(--color-signal-error)]">{saveState.error}</p>
+                            <p className="text-xs text-[var(--color-unusonic-error)]">{saveState.error}</p>
                           )}
                           <Button
                             type="submit"
@@ -453,7 +453,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                         />
                       </div>
                       {saveState?.error && (
-                        <p className="text-xs text-[var(--color-signal-error)]">{saveState.error}</p>
+                        <p className="text-xs text-[var(--color-unusonic-error)]">{saveState.error}</p>
                       )}
                       <Button type="submit" disabled={savePending}>
                         {savePending ? 'Saving…' : 'Save'}

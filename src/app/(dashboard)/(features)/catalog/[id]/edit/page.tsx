@@ -244,7 +244,7 @@ export default function CatalogEditPage() {
   if (error || !pkg) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
-        <p className="text-sm text-[var(--color-signal-error)]">{error ?? 'Item not found.'}</p>
+        <p className="text-sm text-[var(--color-unusonic-error)]">{error ?? 'Item not found.'}</p>
         <Link href="/catalog" className="mt-4 text-sm text-neon hover:underline">
           Back to catalog
         </Link>
@@ -273,7 +273,7 @@ export default function CatalogEditPage() {
         <div className="overflow-y-auto overflow-x-hidden overscroll-contain flex-1 min-h-0 py-2" style={{ maxHeight: 'calc(100vh - 10rem)' }}>
           <form onSubmit={handleSubmit} className="flex flex-col gap-5 pt-6 px-6 pb-12">
           {formError && (
-            <p className="text-sm text-[var(--color-signal-error)]">{formError}</p>
+            <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
           )}
           <div>
             <label htmlFor="edit-name" className={labelClass}>Name</label>
@@ -616,7 +616,7 @@ export default function CatalogEditPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit-stock" className={labelClass}>
-                    Total stock quantity <span className="text-[var(--color-signal-error)]">*</span>
+                    Total stock quantity <span className="text-[var(--color-unusonic-error)]">*</span>
                   </label>
                   <input
                     id="edit-stock"

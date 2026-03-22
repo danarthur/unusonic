@@ -12,7 +12,7 @@
 import { useActionState, useState, useEffect, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { Loader2, Eye, EyeOff, ArrowRight, ChevronDown, User } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ArrowRight, ChevronDown } from 'lucide-react';
 import { signInAction, signUpForPasskey } from '../api/actions';
 import {
   runConditionalMediation,
@@ -50,7 +50,7 @@ function AuthErrorBlock({ error }: { error: string }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-signal-error text-center">{display.friendly}</p>
+      <p className="text-sm text-unusonic-error text-center">{display.friendly}</p>
       {showToggle && (
         <button
           type="button"
@@ -98,7 +98,7 @@ export function SmartLoginForm({
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [isPasskeyPending, setIsPasskeyPending] = useState(false);
-  const [signupStep, setSignupStep] = useState(0);
+  const [signupStep, setSignupStep] = useState(defaultMode === 'signup' ? 1 : 0);
   const conditionalAbortRef = useRef<AbortController | null>(null);
   const conditionalMediationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasRunConditionalMediationThisFocusRef = useRef(false);
@@ -185,6 +185,7 @@ export function SmartLoginForm({
       if (conditionalMediationTimeoutRef.current) {
         clearTimeout(conditionalMediationTimeoutRef.current);
       }
+      conditionalAbortRef.current?.abort();
     };
   }, []);
 
@@ -252,7 +253,7 @@ export function SmartLoginForm({
       } else {
         setSignupExiting(false);
         fromSignInRef.current = true;
-        setSignupStep(0);
+        setSignupStep(1);
         setSignupTransitionPhase('name');
         setAnticipating(true);
         setMode('signup');
@@ -260,9 +261,9 @@ export function SmartLoginForm({
     }
   };
 
-  const SIGNUP_STEPS = 4;
+  const SIGNUP_STEPS = 3;
   const signupPrompts = [
-    'Welcome to Unusonic',
+    '', // index 0 unused — flow starts at step 1
     'What should we call you?',
     "What's your email?",
     'Create your passkey',
@@ -276,7 +277,9 @@ export function SmartLoginForm({
       }
       setPasskeyError(null);
       setSignupTransitionPhase(null);
-      setSignupStep(2);
+      // Skip email step if already pre-filled from sign-in form
+      const emailAlreadyValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+      setSignupStep(emailAlreadyValid ? 3 : 2);
       // Brief logo acknowledgement when user submits name (living logo responds)
       if (logoAckTimeoutRef.current) clearTimeout(logoAckTimeoutRef.current);
       setLogoAcknowledging(true);
@@ -293,23 +296,32 @@ export function SmartLoginForm({
       setPasskeyError(null);
       setSignupStep(3);
     } else if (signupStep === 3) {
-      // Passkey step: create account with random password, then register passkey, then redirect
+      // Passkey step: create account with random password, then register passkey, then redirect.
+      // Navigation uses window.location.href (not router.push) so the React transition completes
+      // immediately and isSignupPending resets — router.push inside startTransition keeps isPending
+      // true through the entire navigation, making the button appear stuck.
       setPasskeyError(null);
       startTransition(async () => {
-        const result = await signUpForPasskey({
-          email: email.trim().toLowerCase(),
-          fullName: fullName.trim(),
-        });
-        if (!result.ok) {
-          setPasskeyError(result.error ?? 'Failed to create account');
-          return;
+        try {
+          const result = await signUpForPasskey({
+            email: email.trim().toLowerCase(),
+            fullName: fullName.trim(),
+          });
+          if (!result.ok) {
+            setPasskeyError(result.error ?? 'Failed to create account');
+            return;
+          }
+          const passkeyResult = await registerPasskey();
+          if (!passkeyResult.ok) {
+            // Account exists but passkey failed — navigate anyway so the user isn't locked out.
+            // They can add a passkey from Settings once inside.
+            window.location.href = '/onboarding';
+            return;
+          }
+          window.location.href = '/onboarding';
+        } catch (e) {
+          setPasskeyError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
         }
-        const passkeyResult = await registerPasskey();
-        if (!passkeyResult.ok) {
-          setPasskeyError(passkeyResult.error ?? 'Passkey setup failed. You can add one later in Settings.');
-          return;
-        }
-        router.push('/onboarding');
       });
     }
   };
@@ -323,9 +335,9 @@ export function SmartLoginForm({
       ? 'What should we call you?'
       : signupPrompts[signupStep];
   const effectiveStepIndex = isTransitionWelcome ? 0 : isTransitionName ? 1 : signupStep;
-  // When coming from Sign In, "What should we call you?" is the first step for the user — show "1 of 4" and only "Sign in"
-  const displayStepIndex = isTransitionName ? 0 : effectiveStepIndex;
-  const isFirstStepForUser = effectiveStepIndex === 0 || isTransitionName;
+  // Steps are 1-based (1=name, 2=email, 3=passkey); convert to 0-based for the dot indicator (0–2).
+  const displayStepIndex = isTransitionName ? 0 : Math.max(0, effectiveStepIndex - 1);
+  const isFirstStepForUser = signupStep <= 1 || isTransitionName;
   const showNameInput = signupStep === 1 || isTransitionName;
   const exitDuration = prefersReducedMotion ? 0.3 : 0.28;
 
@@ -404,7 +416,7 @@ export function SmartLoginForm({
           hideSignOut
           footer={
             (
-              <AnimatePresence mode="sync" initial={false}>
+              <AnimatePresence mode="popLayout" initial={false}>
                 <motion.div
                   key={isTransitionName ? 'name' : signupStep}
                   initial={
@@ -412,45 +424,34 @@ export function SmartLoginForm({
                       ? { opacity: 0, y: 8, filter: 'blur(4px)' }
                       : prefersReducedMotion
                         ? { opacity: 0 }
-                        : { opacity: 0, x: stepDirection === 'forward' ? 24 : -24 }
+                        : { opacity: 0, x: stepDirection === 'forward' ? 16 : -16 }
                   }
                   animate={
                     isTransitionName && !prefersReducedMotion
                       ? { opacity: 1, y: 0, filter: 'blur(0px)' }
                       : prefersReducedMotion
                         ? { opacity: 1 }
-                        : { opacity: 1, x: 0 }
+                        : { opacity: 1, x: 0, transition: { duration: 0.22, ease: M3_EASING_ENTER } }
                   }
                   exit={
                     isTransitionName && !prefersReducedMotion
                       ? { opacity: 0, y: -8 }
                       : prefersReducedMotion
                         ? { opacity: 0 }
-                        : { opacity: 0, x: stepDirection === 'forward' ? -24 : 24 }
+                        : { opacity: 0, x: stepDirection === 'forward' ? -16 : 16, transition: { duration: 0.15, ease: M3_EASING_EXIT } }
                   }
                   transition={
                     isTransitionName && !prefersReducedMotion
                       ? {
-                          opacity: { duration: 0.2 },
+                          opacity: { duration: 0.15 },
                           y: UNUSONIC_PHYSICS,
-                          filter: { duration: 0.25, ease: M3_EASING_ENTER },
+                          filter: { duration: 0.2, ease: M3_EASING_ENTER },
                         }
-                      : { duration: M3_DURATION_S, ease: M3_EASING_ENTER }
+                      : { duration: 0.15, ease: M3_EASING_EXIT }
                   }
-                  className="w-full space-y-4 overflow-hidden py-3 px-1 gpu-accelerated"
+                  className="w-full space-y-4 py-3 px-1 gpu-accelerated"
                 >
-                  {signupStep === 0 && !isTransitionName ? (
-                    <motion.button
-                      type="button"
-                      onClick={() => setSignupStep(1)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      transition={UNUSONIC_PHYSICS}
-                      className="w-full py-3.5 rounded-full font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 transition-colors"
-                    >
-                      Get started
-                    </motion.button>
-                  ) : signupStep === 3 ? (
+                  {signupStep === 3 ? (
                     <>
                       <motion.button
                         type="button"
@@ -578,7 +579,7 @@ export function SmartLoginForm({
                 animate={anticipating ? { scale: 0.95 } : { scale: 1 }}
                 transition={UNUSONIC_PHYSICS}
                 style={{ ...GPU_STABILIZE, viewTransitionName: 'auth-logo' } as React.CSSProperties}
-                className="mx-auto mb-6 flex items-center justify-center overflow-visible isolate relative z-10"
+                className="mx-auto flex items-center justify-center overflow-visible isolate relative z-10"
               >
                 <motion.div
                   animate={isPending ? { opacity: [0.7, 1, 0.7] } : {}}
@@ -587,6 +588,10 @@ export function SmartLoginForm({
                   <LivingLogo size="lg" status={isPending ? 'loading' : 'idle'} />
                 </motion.div>
               </motion.div>
+              <div className="mt-3 mb-5 text-center">
+                <p className="text-sm font-medium text-ceramic tracking-tight">Unusonic</p>
+                <p className="text-[11px] text-ink-muted/50 tracking-widest uppercase mt-1">Sign in to your workspace</p>
+              </div>
 
             {/* M3 Container transform: outgoing content fades in 90ms so container (card) is the focus. */}
             <motion.div
@@ -601,163 +606,59 @@ export function SmartLoginForm({
                 You were signed out after a period of inactivity.
               </p>
             )}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={mode}
-                initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, y: -10, filter: 'blur(4px)', position: 'absolute' }}
-                transition={M3_FADE_THROUGH_ENTER}
-                className="text-center gpu-accelerated"
-              >
-                <h1 className="text-2xl font-medium text-ceramic tracking-tight">
-                  {mode === 'signin' || signinExiting || anticipating || signupExiting ? 'Sign in' : 'Create account'}
-                </h1>
-                <AnimatePresence mode="wait">
-                  <motion.p
-                    key={isPending ? loadingMessageIndex : `${mode}-default`}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.2 }}
-                    className="text-sm text-ink-muted mt-1.5"
-                  >
-                    {isPending
-                      ? loadingMessages[loadingMessageIndex]
-                      : mode === 'signin' || signinExiting || anticipating || signupExiting
-                        ? 'Use passkey or password'
-                        : 'Set up your workspace'}
-                  </motion.p>
-                </AnimatePresence>
-              </motion.div>
-            </AnimatePresence>
-
-          <div className="flex items-center justify-center gap-1 p-1 mb-6 rounded-xl bg-ink/[0.03] border border-[var(--glass-border)]">
-            <button
-              type="button"
-              onClick={() => handleModeSwitch('signin')}
-              disabled={isPending}
-              className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 disabled:cursor-not-allowed ${
-                mode === 'signin'
-                  ? 'bg-canvas shadow-sm text-ink'
-                  : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeSwitch('signup')}
-              disabled={isPending}
-              className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 disabled:cursor-not-allowed ${
-                mode === 'signup'
-                  ? 'bg-canvas shadow-sm text-ink'
-                  : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
 
           {(mode === 'signin' || signinExiting || anticipating || signupExiting) ? (
             <div className="space-y-5">
-              {/* Selector-style field: click/focus triggers passkey autofill via conditional mediation */}
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-xs font-medium text-ink-muted uppercase tracking-widest mb-2"
-                >
-                  Account
-                </label>
-                <div
-                  className="relative flex items-center
-                    rounded-xl bg-canvas/50 border border-[var(--glass-border)]
-                    focus-within:border-[var(--glass-border-hover)] focus-within:ring-2 focus-within:ring-ring/30
-                    transition-all duration-200
-                    hover:border-[var(--glass-border-hover)]"
-                  role="presentation"
-                >
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="username webauthn"
-                    required={showPasswordForm}
-                    disabled={isPending}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onFocus={handleEmailFocus}
-                    onBlur={handleEmailBlur}
-                    data-lpignore="true"
-                    data-form-type="other"
-                    data-1p-ignore
-                    className="w-full h-12 pl-4 pr-12 rounded-xl bg-transparent
-                      text-ink placeholder:text-ink-muted
-                      focus:outline-none focus:ring-0
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      pointer-events-auto cursor-pointer
-                      transition-all duration-200"
-                    placeholder="Select account or enter email"
-                    aria-describedby="passkey-hint"
-                  />
-                  <div
-                    className="absolute right-3 flex items-center gap-1.5 pointer-events-none"
-                    aria-hidden
-                  >
-                    <User className="w-4 h-4 text-ink-muted/70" />
-                    <ChevronDown className="w-4 h-4 text-ink-muted/60" />
-                  </div>
-                </div>
-                <p id="passkey-hint" className="text-[11px] text-ink-muted/50 mt-1.5">
-                  Click to select passkey or type email, then continue
-                </p>
-              </div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="username webauthn"
+                required={showPasswordForm}
+                disabled={isPending}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={handleEmailFocus}
+                onBlur={handleEmailBlur}
+                data-lpignore="true"
+                data-form-type="other"
+                data-1p-ignore
+                className="w-full h-12 px-4 rounded-xl bg-canvas/50 border border-[var(--glass-border)]
+                  text-ink placeholder:text-ink-muted
+                  focus:outline-none focus:border-[var(--glass-border-hover)] focus:ring-2 focus:ring-ring/30
+                  hover:border-[var(--glass-border-hover)]
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-all duration-200"
+                placeholder="your@email.com"
+              />
 
-              {/* Trust this device: skip inactivity logout on this browser */}
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={trustDevice}
-                  onChange={(e) => setTrustDevice(e.target.checked)}
-                  disabled={isPending}
-                  className="h-4 w-4 rounded border-[var(--glass-border)] bg-canvas/50 text-neon-blue focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
-                  aria-describedby="trust-device-hint"
-                />
-                <span className="text-sm text-ink-muted group-hover:text-ink transition-colors">
-                  Keep me signed in on this device
-                </span>
-              </label>
-              <p id="trust-device-hint" className="text-[11px] text-ink-muted/50 -mt-1">
-                Uncheck on shared devices so you’re signed out after a period of inactivity.
-              </p>
-
-              {/* When email is filled (e.g. from NordPass), explicit Continue runs passkey flow */}
+              {/* Always-visible Continue CTA — disabled until email is valid */}
               <AnimatePresence>
-                {signInEmailValid && !showPasswordForm ? (
+                {!showPasswordForm ? (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
+                    key="continue-cta"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={UNUSONIC_PHYSICS}
-                    className="overflow-hidden"
                   >
                     <motion.button
                       type="button"
                       onClick={handleContinueWithPasskey}
-                      disabled={isPending}
-                      whileHover={!isPending ? { scale: 1.02 } : undefined}
-                      whileTap={!isPending ? { scale: 0.98 } : undefined}
+                      disabled={!signInEmailValid || isPending}
+                      whileHover={signInEmailValid && !isPending ? { scale: 1.02 } : undefined}
+                      whileTap={signInEmailValid && !isPending ? { scale: 0.98 } : undefined}
                       transition={UNUSONIC_PHYSICS}
-                      className="w-full h-12 rounded-xl font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full h-12 rounded-xl font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-25 disabled:cursor-not-allowed transition-all duration-200"
                     >
                       {isPasskeyPending ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                          Signing in with passkey…
+                          Signing in…
                         </>
                       ) : (
                         <>
-                          Continue with passkey
+                          Continue
                           <ArrowRight className="w-4 h-4" />
                         </>
                       )}
@@ -775,7 +676,7 @@ export function SmartLoginForm({
                     transition={UNUSONIC_PHYSICS}
                     className="overflow-hidden"
                   >
-                    <div className="p-3 rounded-xl bg-surface-error border border-signal-error/40">
+                    <div className="p-3 rounded-xl bg-surface-error border border-unusonic-error/40">
                       <AuthErrorBlock error={passkeyError} />
                     </div>
                   </motion.div>
@@ -815,9 +716,6 @@ export function SmartLoginForm({
                           disabled={isPending}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          data-lpignore="true"
-                          data-form-type="other"
-                          data-1p-ignore
                           className="w-full h-11 px-4 pr-11 rounded-xl bg-canvas/50 border border-[var(--glass-border)] text-ink placeholder:text-ink-muted focus:outline-none focus:border-[var(--glass-border-hover)] focus:ring-2 focus:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto cursor-text transition-all duration-200"
                           placeholder="Password"
                         />
@@ -845,7 +743,7 @@ export function SmartLoginForm({
                           transition={UNUSONIC_PHYSICS}
                           className="overflow-hidden"
                         >
-                          <div className="p-3 rounded-xl bg-surface-error border border-signal-error/40">
+                          <div className="p-3 rounded-xl bg-surface-error border border-unusonic-error/40">
                             <AuthErrorBlock error={passkeyError ?? currentState.error ?? ''} />
                           </div>
                         </motion.div>
@@ -878,30 +776,35 @@ export function SmartLoginForm({
                   type="button"
                   onClick={() => setShowPasswordForm(true)}
                   disabled={isPending}
-                  className="w-full text-sm text-ink-muted hover:text-ink underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                  className="w-full text-sm text-ink-muted/70 hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  Use password instead
+                  Other sign-in options
                 </motion.button>
               )}
               </AnimatePresence>
 
+
               <p className="text-center">
                 <a
                   href="/recover"
-                  className="text-sm text-ink-muted hover:text-ink underline transition-colors"
+                  className="text-sm text-ink-muted hover:text-ink transition-colors"
                 >
                   Lost access?
                 </a>
               </p>
-              <p className="text-center mt-3">
-                <span className="text-[11px] text-ink-muted/60">
-                  Can&apos;t type in the fields? Try a{' '}
-                  <span className="text-ink-muted/80">private window</span>
-                  {' '}or disable your password manager for this site.
-                </span>
+              <p className="text-center">
+                <button
+                  type="button"
+                  onClick={() => handleModeSwitch('signup')}
+                  disabled={isPending}
+                  className="text-sm text-ink-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  New here?{' '}
+                  <span className="text-ink-muted hover:text-ceramic transition-colors">Create account</span>
+                </button>
               </p>
             </div>
           ) : null}
@@ -909,11 +812,6 @@ export function SmartLoginForm({
             </motion.div>
           </div>
 
-          <div className="mt-8 pt-5 border-t border-[var(--glass-border)]">
-            <p className="text-[11px] text-center text-ink-muted/60 uppercase tracking-widest">
-              Unusonic
-            </p>
-          </div>
         </div>
       </div>
     </motion.div>

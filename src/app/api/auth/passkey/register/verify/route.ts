@@ -8,8 +8,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { cookies } from 'next/headers';
+
+const CHALLENGE_COOKIE = 'webauthn_reg_challenge';
 
 function getRpId(request: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
+    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
+  }
   const origin =
     request.headers.get('origin') ||
     request.nextUrl.origin ||
@@ -20,6 +26,18 @@ function getRpId(request: NextRequest): string {
   } catch {
     return 'localhost';
   }
+}
+
+function getExpectedOrigin(request: NextRequest): string {
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  return (
+    request.headers.get('origin') ||
+    request.nextUrl.origin ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'http://localhost:3000'
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -57,12 +75,19 @@ export async function POST(request: NextRequest) {
     }
 
     const system = getSystemClient();
+    const challengeId = (await cookies()).get(CHALLENGE_COOKIE)?.value;
+    if (!challengeId) {
+      return NextResponse.json(
+        { error: 'No registration in progress. Start passkey setup again.' },
+        { status: 400 }
+      );
+    }
+
     const { data: challengeRow, error: challengeError } = await system
       .from('webauthn_challenges')
       .select('id, challenge')
+      .eq('id', challengeId)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
       .maybeSingle();
 
     if (challengeError || !challengeRow?.challenge) {
@@ -72,19 +97,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const origin =
-      request.headers.get('origin') ||
-      request.nextUrl.origin ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      'http://localhost:3000';
+    // Delete challenge before verification (one-time use)
+    await system.from('webauthn_challenges').delete().eq('id', challengeRow.id);
+    (await cookies()).delete(CHALLENGE_COOKIE);
 
     const verification = await verifyRegistrationResponse({
       response: response as Parameters<typeof verifyRegistrationResponse>[0]['response'],
       expectedChallenge: challengeRow.challenge,
-      expectedOrigin: origin,
+      expectedOrigin: getExpectedOrigin(request),
       expectedRPID: getRpId(request),
-      // Accept credentials even when authenticator didn't perform user verification (e.g. NordPass skip/cancel)
-      requireUserVerification: false,
+      requireUserVerification: true,
     });
 
     if (!verification.verified || !verification.registrationInfo) {
@@ -107,11 +129,6 @@ export async function POST(request: NextRequest) {
       counter: credential.counter,
       transports: response.response.transports ?? null,
     });
-
-    await system
-      .from('webauthn_challenges')
-      .delete()
-      .eq('id', challengeRow.id);
 
     return NextResponse.json({ verified: true });
   } catch (e) {

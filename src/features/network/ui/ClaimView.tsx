@@ -120,7 +120,7 @@ export function ClaimView({
           )}
         </Button>
         {state?.ok === false && state?.error && (
-          <p className="text-sm text-[var(--color-signal-error)]">{state.error}</p>
+          <p className="text-sm text-[var(--color-unusonic-error)]">{state.error}</p>
         )}
       </form>
     </motion.div>

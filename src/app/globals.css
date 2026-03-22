@@ -28,10 +28,10 @@
      L (0.75) and C (~0.18) locked; only H (Hue) rotates.
      Same optical weight = no painful vibration on dark.
   */
-  --color-signal-success: oklch(0.75 0.18 145); /* Emerald Laser */
-  --color-signal-warning: oklch(0.75 0.16 85);  /* Molten Gold */
-  --color-signal-error: oklch(0.70 0.18 20);    /* Infrared Ruby */
-  --color-signal-info: oklch(0.75 0.15 240);   /* Hologram Blue */
+  --color-unusonic-success: oklch(0.75 0.18 145); /* Emerald Laser */
+  --color-unusonic-warning: oklch(0.75 0.16 85);  /* Molten Gold */
+  --color-unusonic-error: oklch(0.70 0.18 20);    /* Infrared Ruby */
+  --color-unusonic-info: oklch(0.75 0.15 240);   /* Hologram Blue */
 
   /* SURFACE VARIANTS (Tinted Glass for badges / soft backgrounds) */
   --color-surface-100: oklch(0.22 0 0); /* Solid Ceramic (claimed cards) */

@@ -34,7 +34,7 @@ const STATUS_GRADIENTS: Record<
   },
   error: {
     specular: 'oklch(0.95 0.05 20)',
-    body: 'var(--color-signal-error)',
+    body: 'var(--color-unusonic-error)',
     rim: 'oklch(0.45 0.18 20)',
   },
   ambient: {

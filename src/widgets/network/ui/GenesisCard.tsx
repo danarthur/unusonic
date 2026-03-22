@@ -108,7 +108,7 @@ export function GenesisCard() {
         <input type="hidden" name="brand_color" value={brandColor ?? ''} />
 
         {state?.ok === false && state?.error && (
-          <p className="text-sm text-signal-error -mt-2">{state.error}</p>
+          <p className="text-sm text-unusonic-error -mt-2">{state.error}</p>
         )}
 
         <button

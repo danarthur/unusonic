@@ -151,7 +151,7 @@ export function AddCompanyDialog({
               ))}
             </select>
           </div>
-          {error && <p className="text-sm text-[var(--color-signal-error)]">{error}</p>}
+          {error && <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>}
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel

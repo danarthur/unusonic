@@ -9,10 +9,17 @@ import { generateRegistrationOptions, type AuthenticatorTransportFuture } from '
 import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { cookies } from 'next/headers';
 
-const rpName = 'Signal';
+const rpName = 'Unusonic';
+
+const CHALLENGE_COOKIE = 'webauthn_reg_challenge';
+const CHALLENGE_MAX_AGE = 300;
 
 function getRpId(request: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
+    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
+  }
   const origin =
     request.headers.get('origin') ||
     request.nextUrl.origin ||
@@ -40,12 +47,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const origin =
-      request.headers.get('origin') ||
-      request.nextUrl.origin ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      'http://localhost:3000';
-
     const options = await generateRegistrationOptions({
       rpName,
       rpID: getRpId(request),
@@ -57,14 +58,24 @@ export async function POST(request: NextRequest) {
       // Allow both platform (Touch ID, Windows Hello) and cross-platform (e.g. NordPass)
       authenticatorSelection: {
         residentKey: 'preferred',
-        userVerification: 'preferred',
+        userVerification: 'required',
       },
     });
 
     const system = getSystemClient();
+    const challengeId = crypto.randomUUID();
     await system.from('webauthn_challenges').insert({
+      id: challengeId,
       user_id: user.id,
       challenge: options.challenge,
+    });
+
+    (await cookies()).set(CHALLENGE_COOKIE, challengeId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: CHALLENGE_MAX_AGE,
+      path: '/api/auth',
     });
 
     return NextResponse.json(options);
