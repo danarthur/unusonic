@@ -27,6 +27,12 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   const status = (proposal as { status?: string }).status;
   if (status !== 'sent' && status !== 'viewed' && status !== 'accepted') return null;
 
+  // embed_src is only valid while the proposal is unsigned — clear it once accepted
+  const embedSrc: string | null =
+    status !== 'accepted'
+      ? ((proposal as { docuseal_embed_src?: string | null }).docuseal_embed_src ?? null)
+      : null;
+
   const proposalId = proposal.id;
   const dealId = (proposal as { deal_id?: string }).deal_id;
   const workspaceId = proposal.workspace_id;
@@ -90,11 +96,11 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   const startsAt = eventRow?.starts_at ?? (deal.proposed_date ? `${deal.proposed_date}T08:00:00.000Z` : null);
   const eventIdForReturn = eventRow?.id ?? deal.event_id ?? dealId;
 
-  // 3. Workspace (logo, name) – optional; logo_url may not be in generated workspaces type
-  type WorkspaceRow = { id: string; name?: string; logo_url?: string | null };
-  const { data: workspaceData } = await (supabase as any)
+  // 3. Workspace (name) — logo_url does not exist on this table
+  type WorkspaceRow = { id: string; name?: string };
+  const { data: workspaceData } = await supabase
     .from('workspaces')
-    .select('id, name, logo_url')
+    .select('id, name')
     .eq('id', workspaceId)
     .maybeSingle();
   const workspace = workspaceData as WorkspaceRow | null;
@@ -148,10 +154,10 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
       startsAt,
     },
     workspace: workspace
-      ? { id: workspace.id, name: workspace.name ?? '', logoUrl: workspace.logo_url ?? null }
-      : { id: workspaceId ?? '', name: 'Signal', logoUrl: null },
+      ? { id: workspace.id, name: workspace.name ?? '', logoUrl: null }
+      : { id: workspaceId ?? '', name: 'Unusonic', logoUrl: null },
     items: itemsWithImages,
     total,
-    embedSrc: null,
+    embedSrc,
   };
 }

@@ -2,13 +2,13 @@
 
 import 'server-only';
 import { Resend } from 'resend';
-import { render } from '@react-email/render';
+import { render, toPlainText } from '@react-email/render';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { ReminderEmail } from '../ui/emails/ReminderEmail';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.RESEND_FROM ?? 'Signal <noreply@signal.live>';
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.signal.live';
+const FROM = process.env.RESEND_FROM ?? 'Unusonic <noreply@unusonic.com>';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.unusonic.com';
 
 type CallTimeSlot = { id: string; label: string; time: string };
 
@@ -101,7 +101,7 @@ export async function sendCrewReminder(
     project: { workspace_id: string; workspaces: { name: string } };
   };
 
-  const workspaceName = event.project?.workspaces?.name ?? 'Signal';
+  const workspaceName = event.project?.workspaces?.name ?? 'Unusonic';
   const slots = Array.isArray(event.run_of_show_data?.call_time_slots)
     ? (event.run_of_show_data!.call_time_slots as CallTimeSlot[])
     : [];
@@ -189,26 +189,27 @@ export async function sendCrewReminder(
 
   const callTime = resolveCallTimeDisplay(a.call_time_slot_id, a.call_time_override, slots, event.starts_at);
 
-  const html = await render(
-    ReminderEmail({
-      recipientName,
-      role: a.role,
-      eventName: event.title ?? 'Untitled event',
-      eventDate,
-      venueName: event.venue_name,
-      venueAddress: event.venue_address,
-      callTime,
-      confirmUrl,
-      declineUrl,
-      workspaceName,
-    })
-  );
+  const emailElement = ReminderEmail({
+    recipientName,
+    role: a.role,
+    eventName: event.title ?? 'Untitled event',
+    eventDate,
+    venueName: event.venue_name,
+    venueAddress: event.venue_address,
+    callTime,
+    confirmUrl,
+    declineUrl,
+    workspaceName,
+  });
+  const html = await render(emailElement);
+  const text = toPlainText(html);
 
   const { error: sendErr } = await resend.emails.send({
     from: FROM,
     to: recipientEmail,
     subject: `Reminder: please confirm ${a.role} for ${event.title ?? 'an event'}`,
     html,
+    text,
   });
 
   if (sendErr) {

@@ -48,13 +48,13 @@ export function LineItemGrid({ items, className }: LineItemGridProps) {
               'bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)]',
               'liquid-levitation liquid-panel-hover',
               'transition-all duration-300',
-              isSingle && 'max-h-[320px] sm:max-h-[360px] flex flex-col'
+              imageUrl && isSingle && 'max-h-[320px] sm:max-h-[360px] flex flex-col'
             )}
           >
-            {imageUrl ? (
+            {imageUrl && (
               <div
                 className={cn(
-                  'relative bg-[var(--muted)] overflow-hidden shrink-0',
+                  'relative bg-[var(--surface-100)] overflow-hidden shrink-0',
                   isSingle ? 'aspect-[4/3] max-h-[180px] sm:max-h-[200px]' : 'aspect-[4/3] sm:aspect-square'
                 )}
               >
@@ -64,17 +64,6 @@ export function LineItemGrid({ items, className }: LineItemGridProps) {
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
-              </div>
-            ) : (
-              <div
-                className={cn(
-                  'relative bg-[var(--muted)] flex items-center justify-center shrink-0',
-                  isSingle ? 'aspect-[4/3] max-h-[180px] sm:max-h-[200px]' : 'aspect-[4/3] sm:aspect-square'
-                )}
-              >
-                <span className="text-3xl font-light text-ink-muted/50 select-none">
-                  {item.name.charAt(0)}
-                </span>
               </div>
             )}
             <div className="p-4 sm:p-5 flex flex-col gap-2">

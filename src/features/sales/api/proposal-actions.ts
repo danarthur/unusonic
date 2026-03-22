@@ -13,6 +13,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { sendProposalLinkEmail } from '@/shared/api/email/send';
 import type { SendProposalLinkSenderOptions } from '@/shared/api/email/send';
 import { createDocuSealSubmission } from './create-docuseal-submission';
+import { getPublicProposal } from './get-public-proposal';
 import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../model/types';
 
@@ -877,12 +878,7 @@ export async function sendForSignature(
   const senderName = (senderEntRes.data as { display_name?: string | null } | null)?.display_name ?? null;
   const workspaceName = (workspaceRes.data as { name?: string | null } | null)?.name ?? null;
 
-  const senderOptions: SendProposalLinkSenderOptions = {
-    senderName,
-    senderReplyTo: senderEmail,
-    workspaceName,
-    workspaceId,
-  };
+  const clientFirstName = clientName?.trim().split(/\s+/)[0] ?? null;
 
   // 4. Create DocuSeal submission
   const submission = await createDocuSealSubmission(
@@ -894,6 +890,23 @@ export async function sendForSignature(
     workspaceId
   );
 
+  // 4b. Fetch rich proposal data for email (event date, total, payment terms).
+  // getPublicProposal was already called inside createDocuSealSubmission — we call it
+  // again here so sendForSignature owns the data without coupling to DocuSeal internals.
+  const proposalData = await getPublicProposal(publicToken);
+
+  const senderOptions: SendProposalLinkSenderOptions = {
+    senderName,
+    senderReplyTo: senderEmail,
+    workspaceName,
+    workspaceId,
+    clientFirstName,
+    eventDate: proposalData?.event.startsAt ?? null,
+    total: proposalData?.total ?? null,
+    depositPercent: (proposalData?.proposal as { deposit_percent?: number | null } | undefined)?.deposit_percent ?? null,
+    paymentDueDays: (proposalData?.proposal as { payment_due_days?: number | null } | undefined)?.payment_due_days ?? null,
+  };
+
   if (!submission.success) {
     // Non-fatal: DocuSeal not configured — fall back to sending a plain proposal link
     console.warn('[sendForSignature] DocuSeal step skipped:', submission.error);
@@ -901,11 +914,14 @@ export async function sendForSignature(
     return { success: true, publicUrl };
   }
 
-  // 5. Store docuseal_submission_id
+  // 5. Store docuseal_submission_id + embed_src
   const systemClient = getSystemClient();
   await systemClient
     .from('proposals')
-    .update({ docuseal_submission_id: submission.submissionId })
+    .update({
+      docuseal_submission_id: submission.submissionId,
+      docuseal_embed_src: submission.embedSrc,
+    })
     .eq('id', draftProposalId)
     .eq('workspace_id', workspaceMembership);
 

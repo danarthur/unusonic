@@ -1,6 +1,6 @@
 /**
  * Courier – transactional email sender. Server-only.
- * Uses Resend. Set RESEND_API_KEY and optionally EMAIL_FROM (e.g. Signal <onboarding@yourdomain.com>).
+ * Uses Resend. Set RESEND_API_KEY and optionally EMAIL_FROM (e.g. Unusonic <onboarding@yourdomain.com>).
  *
  * We do not use Gmail API / OAuth. We use the Reply-To pattern: emails are sent via Resend from
  * a verified app address; reply_to is set to the current user's email so replies go to their inbox.
@@ -9,7 +9,7 @@
 
 import 'server-only';
 import { Resend } from 'resend';
-import { render } from '@react-email/render';
+import { render, toPlainText } from '@react-email/render';
 import { SummonEmail } from './templates/SummonEmail';
 import { GuardianInviteEmail } from './templates/GuardianInviteEmail';
 import { RecoveryVetoEmail } from './templates/RecoveryVetoEmail';
@@ -24,7 +24,7 @@ function getResend() {
   return key?.trim() ? new Resend(key.trim()) : null;
 }
 function getFrom() {
-  return process.env.EMAIL_FROM ?? 'Signal <onboarding@resend.dev>';
+  return process.env.EMAIL_FROM ?? 'Unusonic <onboarding@resend.dev>';
 }
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
@@ -56,7 +56,7 @@ export async function getWorkspaceFrom(
     if (ws?.sending_domain_status === 'verified' && ws.sending_domain) {
       const localpart = ws.sending_from_localpart ?? 'hello';
       const displayName =
-        senderName?.trim() || ws.sending_from_name?.trim() || 'Signal';
+        senderName?.trim() || ws.sending_from_name?.trim() || 'Unusonic';
       return `${displayName} <${localpart}@${ws.sending_domain}>`;
     }
   } catch {
@@ -79,12 +79,15 @@ export async function sendSummonEmail(
     return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
   }
   const claimUrl = `${baseUrl.replace(/\/$/, '')}/claim/${token}`;
-  const html = await render(SummonEmail({ originName, claimUrl }));
+  const element = SummonEmail({ originName, claimUrl });
+  const html = await render(element);
+  const text = toPlainText(html);
   const { error } = await resend.emails.send({
     from: getFrom(),
     to: [to],
-    subject: 'Signal Frequency Received.',
+    subject: 'You have a Project Brief.',
     html,
+    text,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
@@ -102,12 +105,15 @@ export async function sendGuardianInviteEmail(
     return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
   }
   const acceptUrl = `${baseUrl.replace(/\/$/, '')}/settings/security`;
-  const html = await render(GuardianInviteEmail({ ownerDisplayName, acceptUrl }));
+  const element = GuardianInviteEmail({ ownerDisplayName, acceptUrl });
+  const html = await render(element);
+  const text = toPlainText(html);
   const { error } = await resend.emails.send({
     from: getFrom(),
     to: [to],
-    subject: `${ownerDisplayName} invited you as a Safety Net guardian on Signal`,
+    subject: `${ownerDisplayName} invited you as a Safety Net guardian on Unusonic`,
     html,
+    text,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
@@ -125,12 +131,15 @@ export async function sendRecoveryVetoEmail(
   if (!resend) {
     return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
   }
-  const html = await render(RecoveryVetoEmail({ cancelUrl }));
+  const element = RecoveryVetoEmail({ cancelUrl });
+  const html = await render(element);
+  const text = toPlainText(html);
   const { error } = await resend.emails.send({
     from: getFrom(),
     to: [to],
-    subject: 'Signal: A recovery was started — cancel if this wasn’t you',
+    subject: "Unusonic: A recovery was started — cancel if this wasn’t you",
     html,
+    text,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
@@ -154,6 +163,16 @@ export type SendProposalLinkSenderOptions = {
    * never pass this to auth emails (summon, guardian, recovery veto).
    */
   workspaceId?: string | null;
+  /** Client first name for personalised greeting in the email body. */
+  clientFirstName?: string | null;
+  /** ISO date string for the event — shown in the details block. */
+  eventDate?: string | null;
+  /** Proposal total (sum of client-visible items) — shown in the details block. */
+  total?: number | null;
+  /** Deposit percentage e.g. 50 — shown as payment terms. */
+  depositPercent?: number | null;
+  /** Days until full balance is due e.g. 30 — shown as Net 30. */
+  paymentDueDays?: number | null;
 };
 
 /**
@@ -171,22 +190,42 @@ export async function sendProposalLinkEmail(
     return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
   }
   const fromStr = getFrom();
-  const html = await render(ProposalLinkEmail({
+  const firstName = senderOptions?.clientFirstName?.trim() || null;
+  const element = ProposalLinkEmail({
     proposalUrl,
     dealTitle,
     senderName: senderOptions?.senderName ?? null,
     workspaceName: senderOptions?.workspaceName ?? null,
-  }));
-  const subject = dealTitle?.trim() ? `Proposal ready to sign — ${dealTitle}` : 'Your proposal is ready to sign';
+    clientFirstName: firstName,
+    eventDate: senderOptions?.eventDate ?? null,
+    total: senderOptions?.total ?? null,
+    depositPercent: senderOptions?.depositPercent ?? null,
+    paymentDueDays: senderOptions?.paymentDueDays ?? null,
+  });
+  const html = await render(element);
+  const text = toPlainText(html);
+  const subject = firstName && dealTitle?.trim()
+    ? `${firstName}, your ${dealTitle} proposal is ready`
+    : dealTitle?.trim()
+    ? `Your ${dealTitle} proposal is ready`
+    : 'Your proposal is ready';
   const emailPart = fromEmailPart(fromStr);
+  // From name: "Daniel at Invisible Touch Events" — hybrid person+company is the
+  // B2B standard. Pure person name looks personal; pure company name looks automated.
+  const senderDisplayName = senderOptions?.senderName?.trim()
+    ? senderOptions.workspaceName?.trim()
+      ? `${senderOptions.senderName.trim()} at ${senderOptions.workspaceName.trim()}`
+      : senderOptions.senderName.trim()
+    : null;
   const fromAddress = senderOptions?.workspaceId
-    ? await getWorkspaceFrom(senderOptions.workspaceId, senderOptions.senderName ?? null)
-    : (senderOptions?.senderName?.trim() ? `${senderOptions.senderName.trim()} <${emailPart}>` : fromStr);
+    ? await getWorkspaceFrom(senderOptions.workspaceId, senderDisplayName ?? senderOptions.senderName ?? null)
+    : (senderDisplayName ? `${senderDisplayName} <${emailPart}>` : fromStr);
   const payload: Parameters<Resend['emails']['send']>[0] = {
     from: fromAddress,
     to: [to],
     subject,
     html,
+    text,
   };
   if (senderOptions?.senderReplyTo?.trim()) {
     payload.replyTo = [senderOptions.senderReplyTo.trim()];
@@ -212,13 +251,16 @@ export async function sendProposalAcceptedEmail(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const resend = getResend();
   if (!resend) return { ok: false, error: 'Email not configured.' };
-  const html = await render(ProposalAcceptedEmail({ signerName, dealTitle, signedAt, portalUrl, workspaceName }));
+  const element = ProposalAcceptedEmail({ signerName, dealTitle, signedAt, portalUrl, workspaceName });
+  const html = await render(element);
+  const text = toPlainText(html);
   const fromAddress = workspaceId ? await getWorkspaceFrom(workspaceId) : getFrom();
   const { error } = await resend.emails.send({
     from: fromAddress,
     to: [to],
     subject: `Agreement confirmed — ${dealTitle}`,
     html,
+    text,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
@@ -240,13 +282,16 @@ export async function sendProposalSignedNotificationEmail(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const resend = getResend();
   if (!resend) return { ok: false, error: 'Email not configured.' };
-  const html = await render(ProposalSignedEmail({ signerName, dealTitle, signedAt, crmUrl, workspaceName }));
+  const element = ProposalSignedEmail({ signerName, dealTitle, signedAt, crmUrl, workspaceName });
+  const html = await render(element);
+  const text = toPlainText(html);
   const fromAddress = workspaceId ? await getWorkspaceFrom(workspaceId) : getFrom();
   const { error } = await resend.emails.send({
     from: fromAddress,
     to: [to],
     subject: `${signerName} signed — ${dealTitle}`,
     html,
+    text,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };

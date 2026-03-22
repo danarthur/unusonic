@@ -2,13 +2,13 @@
 
 import 'server-only';
 import { Resend } from 'resend';
-import { render } from '@react-email/render';
+import { render, toPlainText } from '@react-email/render';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { AssignmentEmail } from '../ui/emails/AssignmentEmail';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.RESEND_FROM ?? 'Signal <noreply@signal.live>';
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.signal.live';
+const FROM = process.env.RESEND_FROM ?? 'Unusonic <noreply@unusonic.com>';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.unusonic.com';
 
 type CallTimeSlot = { id: string; label: string; time: string };
 
@@ -90,7 +90,7 @@ export async function sendCrewAssignmentEmail(
     call_time_override: string | null;
   };
 
-  const workspaceName = (event.project?.workspaces as { name?: string } | null)?.name ?? 'Signal';
+  const workspaceName = (event.project?.workspaces as { name?: string } | null)?.name ?? 'Unusonic';
 
   // Resolve venue name: prefer stored venue_name, fall back to directory entity display_name
   let venueName = event.venue_name ?? null;
@@ -176,26 +176,27 @@ export async function sendCrewAssignmentEmail(
 
   const callTime = resolveCallTimeDisplay(assignment.call_time_slot_id, assignment.call_time_override, slots, event.starts_at);
 
-  const html = await render(
-    AssignmentEmail({
-      recipientName,
-      role,
-      eventName: event.title ?? 'Untitled event',
-      eventDate,
-      venueName: venueName,
-      venueAddress: event.venue_address,
-      callTime,
-      confirmUrl,
-      declineUrl,
-      workspaceName,
-    })
-  );
+  const emailElement = AssignmentEmail({
+    recipientName,
+    role,
+    eventName: event.title ?? 'Untitled event',
+    eventDate,
+    venueName: venueName,
+    venueAddress: event.venue_address,
+    callTime,
+    confirmUrl,
+    declineUrl,
+    workspaceName,
+  });
+  const html = await render(emailElement);
+  const text = toPlainText(html);
 
   const { error: sendErr } = await resend.emails.send({
     from: FROM,
     to: recipientEmail,
     subject: `You're booked: ${role} for ${event.title ?? 'an event'}`,
     html,
+    text,
   });
 
   if (sendErr) {

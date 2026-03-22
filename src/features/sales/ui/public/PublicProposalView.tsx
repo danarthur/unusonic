@@ -9,6 +9,7 @@ import { LineItemGrid } from './LineItemGrid';
 import { AcceptanceBar } from './AcceptanceBar';
 import { SignProposalDialog } from './SignProposalDialog';
 import { DocuSealSignPanel } from './DocuSealSignPanel';
+import { ProposalSummaryBlock } from './ProposalSummaryBlock';
 import type { PublicProposalDTO } from '../../model/public-proposal';
 import { cn } from '@/shared/lib/utils';
 
@@ -53,6 +54,18 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
     >
       <ProposalHero data={data} className="mb-8 sm:mb-10" />
 
+      {!signed && (
+        <ProposalSummaryBlock
+          eventTitle={data.event.title}
+          startsAt={data.event.startsAt}
+          total={data.total}
+          depositPercent={(data.proposal as { deposit_percent?: number | null }).deposit_percent}
+          paymentDueDays={(data.proposal as { payment_due_days?: number | null }).payment_due_days}
+          paymentNotes={(data.proposal as { payment_notes?: string | null }).payment_notes}
+          className="mb-8"
+        />
+      )}
+
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -71,23 +84,39 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
           animate={{ opacity: 1, y: 0 }}
           transition={spring}
           className={cn(
-            'sticky z-20 mt-auto left-0 right-0',
-            'rounded-3xl border border-[var(--glass-border)]',
-            'bg-[var(--glass-bg)] backdrop-blur-xl liquid-levitation-bar',
-            'px-6 pt-6 sm:pt-8 text-center'
+            'mt-8 rounded-3xl border border-[var(--glass-border)]',
+            'bg-[var(--glass-bg)] backdrop-blur-xl liquid-levitation-strong',
+            'px-6 pt-8 pb-8 text-center'
           )}
-          style={{
-            bottom: 'env(safe-area-inset-bottom, 0px)',
-            paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1.25rem))',
-          }}
         >
           <p className="font-serif text-2xl sm:text-3xl font-light text-ink tracking-tight">
             It&apos;s a Date.
           </p>
-          <p className="text-sm text-ink-muted mt-1.5 max-w-sm mx-auto">
-            Your signature has been recorded. Thank you.
+          <p className="text-sm text-ink-muted mt-2 max-w-sm mx-auto leading-relaxed">
+            Your agreement has been recorded. A confirmation has been sent to your email.
           </p>
-          <div className="flex items-center justify-center gap-3 mt-4">
+
+          {/* Event recap */}
+          <div className="mt-5 flex flex-col items-center gap-1 text-sm text-ink">
+            <p className="font-medium">{data.event.title}</p>
+            {data.event.startsAt && (
+              <p className="text-ink-muted">
+                {new Date(data.event.startsAt).toLocaleDateString(undefined, {
+                  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                })}
+              </p>
+            )}
+            <p className="font-semibold tabular-nums">
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(data.total)}
+            </p>
+          </div>
+
+          {/* Next steps */}
+          <p className="mt-5 text-xs text-ink-muted max-w-xs mx-auto leading-relaxed">
+            A signed copy has been sent to your email. Reply to that email with any questions — it goes directly to {data.workspace.name}.
+          </p>
+
+          <div className="flex items-center justify-center gap-3 mt-5">
             <button
               type="button"
               onClick={handleDone}
@@ -97,7 +126,7 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
                 'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--glass-bg)]'
               )}
             >
-              Done
+              Close
             </button>
             {signedPdfHref && (
               <a
@@ -111,17 +140,14 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
                 )}
               >
                 <Download className="w-4 h-4" />
-                Download signed PDF
+                Download PDF
               </a>
             )}
           </div>
-          <p className="text-xs text-ink-muted mt-2">
-            You can close this tab if the page does not change.
-          </p>
         </motion.div>
       ) : data.embedSrc ? (
         /* DocuSeal e-signature flow */
-        <div className="mt-8">
+        <div className="mt-6">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-4">
             Sign your proposal
           </h2>

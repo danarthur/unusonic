@@ -19,6 +19,7 @@ export const runtime = 'nodejs';
 type DocuSealSubmitter = {
   id: number;
   email: string;
+  name?: string | null;
   status: string;
   completed_at: string | null;
   metadata: Record<string, string>;
@@ -187,7 +188,7 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
   const portalUrl = p.public_token ? `${baseUrl}/p/${p.public_token}` : baseUrl;
   const crmUrl = `${baseUrl}/crm`;
 
-  const signerName = submitter.email; // DocuSeal submitter name not always in payload — use email as fallback
+  const signerName = submitter.name?.trim() || submitter.email;
   const dealTitle = p.deal_id; // resolved below
 
   // Fetch deal title for notification emails
@@ -218,16 +219,15 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     .limit(3);
 
   if (adminRows?.length) {
-    // Get admin emails from auth via directory.entities
     const adminUserIds = adminRows.map((r: { user_id: string }) => r.user_id);
-    const { data: adminEnts } = await supabase
-      .schema('directory').from('entities')
-      .select('claimed_by_user_id, attributes')
-      .in('claimed_by_user_id', adminUserIds);
+    // Primary: profiles.email (auth email, always set)
+    const { data: adminProfiles } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .in('id', adminUserIds);
 
-    for (const ent of adminEnts ?? []) {
-      const attrs = (ent.attributes as Record<string, unknown>) ?? {};
-      const adminEmail = (attrs['email'] as string | null) ?? (attrs['support_email'] as string | null) ?? null;
+    for (const profile of adminProfiles ?? []) {
+      const adminEmail = (profile as { email?: string | null }).email ?? null;
       if (adminEmail) {
         await sendProposalSignedNotificationEmail(
           adminEmail,
