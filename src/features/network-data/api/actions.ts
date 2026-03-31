@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
  * Network Orbit – Server Actions: getNetworkStream, pinToInnerCircle, summonPartner.
  * @module features/network-data/api/actions
@@ -129,7 +129,13 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const outerOrbitEntityIds = [...new Set(outerOrbitEdges.map((e) => e.target_entity_id))];
   const allPartnerEntityIds = [...new Set([...innerCircleEntityIds, ...outerOrbitEntityIds])];
 
-  const [personEntRes, partnerEntRes, invoicesRes] = await Promise.all([
+  // All person entity IDs (roster + inner circle persons) for crew_skills lookup
+  const allPersonEntityIds = [...new Set([...personEntityIds, ...innerCircleEntityIds])];
+
+  // All entity IDs for referral count lookup (roster + partners)
+  const allEntityIds = [...new Set([...personEntityIds, ...allPartnerEntityIds])];
+
+  const [personEntRes, partnerEntRes, invoicesRes, crewSkillsRes, referralCountRes, capabilitiesRes] = await Promise.all([
     personEntityIds.length > 0
       ? supabase.schema('directory').from('entities')
           .select('id, display_name, avatar_url, type, attributes')
@@ -147,12 +153,56 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
           .in('bill_to_entity_id', allPartnerEntityIds)
           .not('status', 'in', '(paid,void)')
       : { data: [] as { bill_to_entity_id: string; total_amount: number }[] },
+    // Crew skills from ops.crew_skills (source of truth)
+    allPersonEntityIds.length > 0
+      ? supabase.schema('ops').from('crew_skills')
+          .select('entity_id, skill_tag')
+          .in('entity_id', allPersonEntityIds)
+          .eq('workspace_id', orgId)
+      : { data: [] as { entity_id: string; skill_tag: string }[] },
+    // Batch referral count — how many deals each entity has referred
+    allEntityIds.length > 0
+      ? supabase
+          .from('deals')
+          .select('referrer_entity_id')
+          .in('referrer_entity_id', allEntityIds)
+          .not('referrer_entity_id', 'is', null)
+      : { data: [] as { referrer_entity_id: string }[] },
+    // Business capabilities from ops.entity_capabilities
+    allPersonEntityIds.length > 0
+      ? supabase.schema('ops').from('entity_capabilities')
+          .select('entity_id, capability')
+          .in('entity_id', allPersonEntityIds)
+          .eq('workspace_id', orgId)
+      : { data: [] as { entity_id: string; capability: string }[] },
   ]);
+
+  // Build skills map from ops.crew_skills
+  const crewSkillsByEntityId = new Map<string, string[]>();
+  for (const row of crewSkillsRes.data ?? []) {
+    const list = crewSkillsByEntityId.get(row.entity_id) ?? [];
+    list.push(row.skill_tag);
+    crewSkillsByEntityId.set(row.entity_id, list);
+  }
+
+  // Build capabilities map from ops.entity_capabilities
+  const capabilitiesByEntityId = new Map<string, string[]>();
+  for (const row of (capabilitiesRes.data ?? []) as { entity_id: string; capability: string }[]) {
+    const list = capabilitiesByEntityId.get(row.entity_id) ?? [];
+    list.push(row.capability);
+    capabilitiesByEntityId.set(row.entity_id, list);
+  }
 
   // Aggregate outstanding balance per entity in JS
   const balanceMap = new Map<string, number>();
   for (const inv of (invoicesRes.data ?? [])) {
     balanceMap.set(inv.bill_to_entity_id, (balanceMap.get(inv.bill_to_entity_id) ?? 0) + (inv.total_amount ?? 0));
+  }
+
+  // Aggregate referral count per entity
+  const referralCountMap = new Map<string, number>();
+  for (const row of (referralCountRes.data ?? []) as { referrer_entity_id: string }[]) {
+    referralCountMap.set(row.referrer_entity_id, (referralCountMap.get(row.referrer_entity_id) ?? 0) + 1);
   }
 
   const personMap = new Map((personEntRes.data ?? []).map((p) => [p.id, p]));
@@ -170,20 +220,32 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       person?.display_name || email || 'Unknown';
     const avatarUrl = person?.avatar_url ?? null;
     const role = (ctx.role as string) ?? 'member';
-    const jobTitle = (ctx.job_title as string | null) ?? null;
+    const jobTitle = (attrs[PERSON_ATTR.job_title] as string | null) ?? (ctx.job_title as string | null) ?? null;
     const entityType = (person?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
+    const phone = (attrs[PERSON_ATTR.phone] as string | null) ?? null;
+    const w9Status = (attrs[PERSON_ATTR.w9_status] as boolean | null) ?? null;
+    const coiExpiry = (attrs[PERSON_ATTR.coi_expiry] as string | null) ?? null;
+    const market = (attrs[PERSON_ATTR.market] as string | null) ?? null;
+    const unionStatus = (attrs[PERSON_ATTR.union_status] as string | null) ?? null;
     return {
       id: edge.id,
       entityId: edge.source_entity_id,
       kind: isExternal ? 'extended_team' : 'internal_employee',
       gravity: 'core',
+      roleGroup: jobTitle || null,
       identity: { name, avatarUrl, label: jobTitle || role || 'Member', entityType },
       meta: {
         email: email ?? undefined,
-        tags: [],
+        phone: phone ?? undefined,
+        tags: crewSkillsByEntityId.get(edge.source_entity_id) ?? [],
+        capabilities: capabilitiesByEntityId.get(edge.source_entity_id) ?? [],
         connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
         doNotRebook: (ctx.do_not_rebook as boolean) ?? false,
         archived: (ctx.archived as boolean) ?? false,
+        w9_status: w9Status,
+        coi_expiry: coiExpiry,
+        market,
+        union_status: unionStatus,
       },
     };
   }
@@ -217,10 +279,15 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     }
   }
 
-  const innerCircleNodes: NetworkNode[] = innerCircleEdges.map((edge): NetworkNode => {
+  // Deduplicate: if a person has both ROSTER_MEMBER and PARTNER edges, roster wins
+  const rosterEntityIdSet = new Set(personEntityIds);
+  const dedupedInnerCircleEdges = innerCircleEdges.filter((e) => !rosterEntityIdSet.has(e.target_entity_id));
+
+  const innerCircleNodes: NetworkNode[] = dedupedInnerCircleEdges.map((edge): NetworkNode => {
     const partner = partnerMap.get(edge.target_entity_id);
     const ctx = (edge.context_data as Record<string, unknown>) ?? {};
     const balance = balanceMap.get(edge.target_entity_id) ?? 0;
+    const refCount = referralCountMap.get(edge.target_entity_id) ?? 0;
     const entityType = (partner?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
     // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
@@ -231,21 +298,30 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         : entityType === 'person'
           ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
           : undefined;
+    // For person entities in inner circle (freelancers), derive roleGroup from job_title
+    const personJobTitle = entityType === 'person' ? (attrs[PERSON_ATTR.job_title] as string | null) ?? null : null;
     return {
       id: edge.id,
       entityId: edge.target_entity_id,
       kind: 'external_partner',
       gravity: 'inner_circle',
+      roleGroup: personJobTitle,
       identity: {
         name: partner?.display_name ?? 'Unknown',
         avatarUrl: null,
-        label: cortexTypeToLabel(edge.relationship_type),
+        label: entityType === 'person' ? (personJobTitle || 'Freelancer') : cortexTypeToLabel(edge.relationship_type),
         entityType,
       },
       meta: {
         email,
-        tags: (ctx.industry_tags as string[] | null) ?? [],
+        tags: entityType === 'person'
+          ? (crewSkillsByEntityId.get(edge.target_entity_id) ?? [])
+          : ((ctx.industry_tags as string[] | null) ?? []),
+        capabilities: entityType === 'person'
+          ? (capabilitiesByEntityId.get(edge.target_entity_id) ?? [])
+          : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        ...(refCount > 0 ? { referral_count: refCount } : {}),
         connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
       },
     };
@@ -255,6 +331,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const ctx = (rel.context_data as Record<string, unknown>) ?? {};
     const partnerEnt = partnerEntMap.get(rel.target_entity_id);
     const balance = balanceMap.get(rel.target_entity_id) ?? 0;
+    const refCount = referralCountMap.get(rel.target_entity_id) ?? 0;
 
     // Use the edge column as the canonical type source — context_data.relationship_type
     // is not a defined cortex field and should not influence labels.
@@ -285,6 +362,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         email,
         tags: Array.isArray(ctx.industry_tags) ? (ctx.industry_tags as string[]) : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        ...(refCount > 0 ? { referral_count: refCount } : {}),
         connectedSince: (rel as { created_at?: string }).created_at ?? undefined,
       },
     };
@@ -440,6 +518,63 @@ export async function summonPartnerAsGhost(
   if (!ghost.ok) return { ok: false, error: ghost.error };
 
   return summonPartner(sourceOrgId, ghost.id, 'partner');
+}
+
+/**
+ * Create a Ghost person entity by name and connect it to sourceOrg as a preferred partner.
+ * Used by OmniSearch when the user wants to add an individual freelancer (not a company).
+ * Creates: directory person entity (ghost) + PARTNER edge with tier='preferred'.
+ */
+export async function summonPersonGhost(
+  sourceOrgId: string,
+  name: string,
+): Promise<{ ok: true; entityId: string } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { orgId } = await getCurrentEntityAndOrg(supabase);
+  if (!orgId || orgId !== sourceOrgId) return { ok: false, error: 'Not authorized.' };
+
+  const { data: srcDirEnt } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, owner_workspace_id')
+    .eq('legacy_org_id', sourceOrgId)
+    .maybeSingle();
+  if (!srcDirEnt) return { ok: false, error: 'Organization not found.' };
+
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: 'Name is required.' };
+
+  // Split display name into first/last best-effort
+  const parts = trimmed.split(/\s+/);
+  const first_name = parts[0] ?? trimmed;
+  const last_name = parts.slice(1).join(' ') || null;
+
+  // Create ghost person entity
+  const { data: ghostEnt, error: entErr } = await supabase
+    .schema('directory')
+    .from('entities')
+    .insert({
+      display_name: trimmed,
+      type: 'person',
+      claimed_by_user_id: null,
+      owner_workspace_id: srcDirEnt.owner_workspace_id,
+      attributes: { is_ghost: true, first_name, last_name },
+    })
+    .select('id')
+    .single();
+  if (entErr || !ghostEnt) return { ok: false, error: entErr?.message ?? 'Failed to create profile.' };
+
+  // Create PARTNER edge from org → person with tier='preferred' (inner circle)
+  const { error: relErr } = await supabase.rpc('upsert_relationship', {
+    p_source_entity_id: srcDirEnt.id,
+    p_target_entity_id: ghostEnt.id,
+    p_type: 'PARTNER',
+    p_context_data: { tier: 'preferred', lifecycle_status: 'active', deleted_at: null },
+  });
+  if (relErr) return { ok: false, error: relErr.message };
+
+  revalidatePath('/network');
+  return { ok: true, entityId: ghostEnt.id };
 }
 
 export type CreateGhostWithContactPayload = {
@@ -658,10 +793,14 @@ export async function createConnectionFromScout(
 
 export type NetworkSearchOrg = {
   id: string;
+  /** The directory.entities UUID — always set, used for roster lookups. */
+  entity_uuid?: string;
   name: string;
   logo_url?: string | null;
   is_ghost?: boolean;
-  /** 'connection' = already in your rolodex; 'global' = public Signal directory. */
+  /** Entity type from directory.entities — 'company', 'person', 'couple', 'venue', etc. */
+  entity_type?: string | null;
+  /** 'connection' = already in your rolodex; 'global' = public Unusonic directory. */
   _source?: 'connection' | 'global';
 };
 
@@ -672,7 +811,8 @@ export type NetworkSearchOrg = {
  */
 export async function searchNetworkOrgs(
   sourceOrgId: string,
-  query: string
+  query: string,
+  options?: { entityType?: string }
 ): Promise<NetworkSearchOrg[]> {
   const supabase = await createClient();
   const { orgId } = await getCurrentEntityAndOrg(supabase);
@@ -688,12 +828,15 @@ export async function searchNetworkOrgs(
     .select('id, owner_workspace_id')
     .eq('legacy_org_id', sourceOrgId)
     .maybeSingle();
-  let workspaceId: string | null = srcEntity?.owner_workspace_id ?? null;
+  const workspaceId: string | null = srcEntity?.owner_workspace_id ?? null;
   let connectionResults: NetworkSearchOrg[] = [];
   let connectionIds: string[] = [];
 
   if (srcEntity?.id && workspaceId) {
     // CORTEX PATH: get my active connection target entity IDs
+    // NOTE: ROSTER_MEMBER is intentionally excluded from this filter.
+    // Crew-specific search (which surfaces internal team members) should use
+    // searchCrewMembers() from src/app/(dashboard)/(features)/crm/actions/deal-crew.ts instead.
     const { data: cortexRels } = await supabase
       .schema('cortex')
       .from('relationships')
@@ -706,22 +849,30 @@ export async function searchNetworkOrgs(
       .map((r) => r.target_entity_id);
 
     if (activeTargetIds.length > 0) {
-      const { data: targetEntities } = await supabase
+      const connQ = supabase
         .schema('directory')
         .from('entities')
-        .select('id, display_name, avatar_url, attributes, legacy_org_id')
+        .select('id, type, display_name, avatar_url, attributes, legacy_org_id')
         .in('id', activeTargetIds)
-        .ilike('display_name', `%${q}%`)
-        .limit(10);
+        .ilike('display_name', `%${q}%`);
+      const { data: targetEntities } = await (options?.entityType
+        ? connQ.eq('type', options.entityType)
+        : connQ
+      ).limit(10);
 
       connectionResults = (targetEntities ?? []).map((e) => {
         const attrs = (e.attributes as Record<string, unknown>) ?? {};
         const legacyId = (e.legacy_org_id as string | null) ?? e.id;
+        const first = (attrs.first_name as string | undefined) ?? '';
+        const last = (attrs.last_name as string | undefined) ?? '';
+        const constructed = [first, last].filter(Boolean).join(' ').trim();
         return {
           id: legacyId,
-          name: e.display_name,
+          entity_uuid: e.id,
+          name: constructed || e.display_name,
           logo_url: (e.avatar_url as string | null) ?? null,
           is_ghost: (attrs.is_ghost as boolean) ?? false,
+          entity_type: (e.type as string) ?? null,
           _source: 'connection' as const,
         };
       });
@@ -735,13 +886,16 @@ export async function searchNetworkOrgs(
 
   // 2. GLOBAL DIRECTORY — preferred: directory.entities; fallback: organizations
   let globalResults: NetworkSearchOrg[] = [];
-  const { data: globalEntities } = await supabase
+  const globalQ = supabase
     .schema('directory')
     .from('entities')
-    .select('id, display_name, avatar_url, attributes, legacy_org_id')
+    .select('id, type, display_name, avatar_url, attributes, legacy_org_id')
     .eq('owner_workspace_id', workspaceId)
-    .ilike('display_name', `%${q}%`)
-    .limit(15);
+    .ilike('display_name', `%${q}%`);
+  const { data: globalEntities } = await (options?.entityType
+    ? globalQ.eq('type', options.entityType)
+    : globalQ
+  ).limit(15);
 
   if (globalEntities?.length) {
     const globalFiltered = globalEntities
@@ -755,11 +909,16 @@ export async function searchNetworkOrgs(
     globalResults = globalFiltered.map((e) => {
       const attrs = (e.attributes as Record<string, unknown>) ?? {};
       const eid = (e.legacy_org_id as string | null) ?? e.id;
+      const first = (attrs.first_name as string | undefined) ?? '';
+      const last = (attrs.last_name as string | undefined) ?? '';
+      const constructed = [first, last].filter(Boolean).join(' ').trim();
       return {
         id: eid,
-        name: e.display_name,
+        entity_uuid: e.id,
+        name: constructed || e.display_name,
         logo_url: (e.avatar_url as string | null) ?? null,
         is_ghost: (attrs.is_ghost as boolean) ?? false,
+        entity_type: (e.type as string) ?? null,
         _source: 'global' as const,
       };
     });
@@ -932,7 +1091,7 @@ export async function getNetworkNodeDetails(
         identity: {
           name,
           avatarUrl: personEnt?.avatar_url ?? null,
-          label: (ctx.job_title as string | null) ?? role ?? 'Member',
+          label: (attrs[PERSON_ATTR.job_title] as string | null) ?? (ctx.job_title as string | null) ?? role ?? 'Member',
           email: email ?? undefined,
         },
         direction: null,
@@ -1045,19 +1204,19 @@ export async function getNetworkNodeDetails(
   const sys = getSystemClient();
 
   if (targetEntityIdForCrew) {
-    const { data: crewRels } = await sys
+    const { data: crewRels } = await (sys as any)
       .schema('cortex').from('relationships')
       .select('id, source_entity_id, context_data')
       .eq('target_entity_id', targetEntityIdForCrew)
       .eq('relationship_type', 'ROSTER_MEMBER')
-      .limit(500);
+      .limit(500) as { data: { id: string; source_entity_id: string; context_data: unknown }[] | null };
 
     if (crewRels?.length) {
       const personEntIds = [...new Set(crewRels.map((r) => r.source_entity_id))];
-      const { data: personEnts } = await sys
+      const { data: personEnts } = await (sys as any)
         .schema('directory').from('entities')
         .select('id, display_name, avatar_url, attributes')
-        .in('id', personEntIds);
+        .in('id', personEntIds) as { data: { id: string; display_name: string | null; avatar_url: string | null; attributes: unknown }[] | null };
       const personEntMap = new Map((personEnts ?? []).map((e) => [e.id, e]));
 
       crew = crewRels.map((r) => {
@@ -1076,7 +1235,7 @@ export async function getNetworkNodeDetails(
           name,
           email: (attrs[PERSON_ATTR.email] as string | null) ?? null,
           role: (ctx.role as string | null) ?? null,
-          jobTitle: (ctx.job_title as string | null) ?? null,
+          jobTitle: (attrs[PERSON_ATTR.job_title] as string | null) ?? (ctx.job_title as string | null) ?? null,
           avatarUrl: personEnt?.avatar_url ?? null,
           phone: (attrs[PERSON_ATTR.phone] as string | null) ?? null,
         };
@@ -1442,12 +1601,12 @@ export async function addContactToGhostOrg(
   const lastName = (payload.lastName ?? '').trim() ?? '';
   const emailVal =
     (payload.email ? String(payload.email).trim() : '') ||
-    `ghost-${crypto.randomUUID()}@signal.local`;
+    `ghost-${crypto.randomUUID()}@unusonic.local`;
   const role = (payload.role ? String(payload.role).trim() : null) ?? 'member';
   const jobTitle = payload.jobTitle ? String(payload.jobTitle).trim() || null : null;
 
   // Use add_contact_to_ghost_org RPC (already migrated to directory + cortex)
-  const { error: rpcErr } = await supabase.rpc('add_contact_to_ghost_org', {
+  const { data: rpcResult, error: rpcErr } = await supabase.rpc('add_contact_to_ghost_org', {
     p_ghost_org_id: ghostOrgId,
     p_workspace_id: ghostWorkspaceId,
     p_creator_org_id: sourceOrgId,
@@ -1458,6 +1617,12 @@ export async function addContactToGhostOrg(
     p_job_title: jobTitle,
   });
   if (rpcErr) return { ok: false, error: rpcErr.message ?? 'Failed to add to crew.' };
+
+  // RPC returns jsonb { ok, error } — check the payload, not just the Postgres error
+  const rpcPayload = rpcResult as { ok?: boolean; error?: string } | null;
+  if (rpcPayload && rpcPayload.ok === false) {
+    return { ok: false, error: rpcPayload.error ?? 'Failed to add to crew.' };
+  }
 
   revalidatePath('/network');
   return { ok: true };
@@ -1494,7 +1659,7 @@ export async function addScoutRosterToGhostOrg(
     const firstName = (m.firstName ?? '').trim() || 'Contact';
     const lastName = (m.lastName ?? '').trim() ?? '';
     const emailRaw = m.email && typeof m.email === 'string' ? m.email.trim() : '';
-    const emailVal = emailRaw || `ghost-${crypto.randomUUID()}@signal.local`;
+    const emailVal = emailRaw || `ghost-${crypto.randomUUID()}@unusonic.local`;
     const jobTitle = m.jobTitle && typeof m.jobTitle === 'string' ? m.jobTitle.trim() || null : null;
 
     const { error: rpcErr } = await supabase.rpc('add_contact_to_ghost_org', {

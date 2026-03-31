@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
  * Finance feature – Public payment actions (client portal)
  * Mock: create payment for remaining balance, mark invoice paid, revalidate.

@@ -22,16 +22,16 @@ const LIFECYCLE_LABELS: Record<EventLifecycleStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-/** Brand: Liquid Ceramic — mercury rim, glass/semantic surfaces, silk for active. */
+/** Brand: Stage Engineering — matte surfaces, OKLCH tokens, semantic status colors. */
 const LIFECYCLE_COLORS: Record<EventLifecycleStatus, string> = {
-  lead: 'border border-mercury bg-[var(--color-glass-surface)] text-ceramic',
-  tentative: 'border border-mercury bg-[var(--color-surface-warning)] text-[var(--color-signal-warning)]',
-  confirmed: 'border border-mercury bg-[var(--color-surface-success)] text-[var(--color-signal-success)]',
-  production: 'border border-mercury bg-silk/25 text-neon-blue',
-  live: 'border border-mercury bg-[var(--color-surface-success)] text-[var(--color-signal-success)]',
-  post: 'border border-mercury bg-ink-muted/20 text-ink-muted',
-  archived: 'border border-mercury bg-ink-muted/15 text-ink-muted',
-  cancelled: 'border border-mercury bg-[var(--color-surface-error)] text-[var(--color-unusonic-error)]',
+  lead: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)]',
+  tentative: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--color-surface-warning)] text-[var(--color-unusonic-warning)]',
+  confirmed: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--color-surface-success)] text-[var(--color-unusonic-success)]',
+  production: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-accent)]/25 text-[var(--stage-accent)]',
+  live: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--color-surface-success)] text-[var(--color-unusonic-success)]',
+  post: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-text-secondary)]/20 text-[var(--stage-text-secondary)]',
+  archived: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-text-secondary)]/15 text-[var(--stage-text-secondary)]',
+  cancelled: 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--color-surface-error)] text-[var(--color-unusonic-error)]',
 };
 
 interface StatusPillProps {

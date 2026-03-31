@@ -39,12 +39,12 @@ function RosterList({
 }) {
   if (loading) {
     return (
-      <p className="py-12 text-center text-sm text-[var(--color-ink-muted)]">Loading roster…</p>
+      <p className="py-12 text-center text-sm text-[var(--stage-text-secondary)]">Loading roster…</p>
     );
   }
   if (roster.length === 0) {
     return (
-      <p className="py-12 text-center text-sm text-[var(--color-ink-muted)]">
+      <p className="py-12 text-center text-sm text-[var(--stage-text-secondary)]">
         No people in this organization yet.
       </p>
     );
@@ -59,32 +59,32 @@ function RosterList({
               type="button"
               onClick={() => onMemberClick(member.id)}
               className={cn(
-                'flex w-full flex-wrap items-center gap-3 rounded-xl border border-white/10 px-4 py-3 text-left transition-colors',
-                'bg-white/5 hover:bg-white/10',
+                'flex w-full flex-wrap items-center gap-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] px-4 py-3 text-left transition-colors',
+                'bg-[oklch(1_0_0_/_0.05)] hover:bg-[oklch(1_0_0_/_0.10)]',
                 isGhost && 'opacity-90'
               )}
             >
               <div
                 className={cn(
                   'flex size-10 shrink-0 items-center justify-center rounded-full border-2',
-                  isGhost ? 'border-white/20 bg-transparent border-dashed' : 'border-transparent bg-white/10'
+                  isGhost ? 'border-[oklch(1_0_0_/_0.10)] bg-transparent border-dashed' : 'border-transparent bg-[oklch(1_0_0_/_0.10)]'
                 )}
               >
-                <User className="size-5 text-[var(--color-ink-muted)]" />
+                <User className="size-5 text-[var(--stage-text-secondary)]" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium tracking-tight text-[var(--color-ink)]">
+                <p className="truncate font-medium tracking-tight text-[var(--stage-text-primary)]">
                   {member.display_name}
                 </p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                   {member.job_title && (
-                    <span className="text-xs text-[var(--color-ink-muted)]">{member.job_title}</span>
+                    <span className="text-xs text-[var(--stage-text-secondary)]">{member.job_title}</span>
                   )}
                   <Badge
                     variant={isGhost ? 'outline' : 'secondary'}
                     className={cn(
                       'text-[10px] font-medium',
-                      isGhost && 'border-white/20 text-[var(--color-ink-muted)]'
+                      isGhost && 'border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]'
                     )}
                   >
                     {isGhost ? 'Pending' : 'Active'}
@@ -95,13 +95,13 @@ function RosterList({
                     {member.skill_tags.slice(0, 4).map((tag) => (
                       <span
                         key={tag}
-                        className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                        className="rounded bg-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                       >
                         {tag}
                       </span>
                     ))}
                     {member.skill_tags.length > 4 && (
-                      <span className="text-[10px] text-[var(--color-ink-muted)]">
+                      <span className="text-[10px] text-[var(--stage-text-secondary)]">
                         +{member.skill_tags.length - 4}
                       </span>
                     )}
@@ -213,7 +213,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
     { id: 'team', label: 'Team', icon: <Users className="size-4" /> },
     { id: 'network', label: 'Network', icon: <Network className="size-4" /> },
   ];
-  const accentColor = brandColor ?? 'var(--color-silk)';
+  const accentColor = brandColor ?? 'var(--stage-accent)';
 
   return (
     <>
@@ -222,7 +222,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
           <>
             <motion.div
               role="presentation"
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md"
+              className="fixed inset-0 z-50 bg-black/60 "
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -239,15 +239,15 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className={cn(
-                'fixed inset-4 z-50 flex flex-col overflow-hidden rounded-3xl',
-                'bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl',
+                'fixed inset-4 z-50 flex flex-col overflow-hidden rounded-[var(--stage-radius-panel)]',
+                'bg-[oklch(1_0_0_/_0.05)] bg-[var(--stage-surface)] border border-[oklch(1_0_0_/_0.10)] shadow-2xl',
                 'md:inset-6 lg:inset-8'
               )}
               style={{ ['--dashboard-accent' as string]: accentColor }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header — breadcrumb style */}
-              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-6 py-4 md:px-8">
+              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[oklch(1_0_0_/_0.10)] px-6 py-4 md:px-8">
                 <div className="flex min-w-0 items-center gap-3">
                   {details?.logo_url ? (
                     <img
@@ -256,13 +256,13 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                       className="size-10 shrink-0 rounded-xl object-cover"
                     />
                   ) : (
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                      <Building2 className="size-5 text-[var(--color-ink-muted)]" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)]">
+                      <Building2 className="size-5 text-[var(--stage-text-secondary)]" />
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="text-xs text-[var(--color-ink-muted)]">Network</p>
-                    <h2 className="truncate text-xl font-medium tracking-tight text-[var(--color-ink)]">
+                    <p className="text-xs text-[var(--stage-text-secondary)]">Network</p>
+                    <h2 className="truncate text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
                       {org?.name ?? details?.name ?? 'Organization'}
                     </h2>
                   </div>
@@ -279,7 +279,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
               </div>
 
               {/* Tabs — active tab uses brand color accent */}
-              <div className="flex shrink-0 gap-1 border-b border-white/10 px-6 md:px-8">
+              <div className="flex shrink-0 gap-1 border-b border-[oklch(1_0_0_/_0.10)] px-6 md:px-8">
                 {tabs.map((t) => (
                   <button
                     key={t.id}
@@ -288,8 +288,8 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                     className={cn(
                       'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors',
                       tab === t.id
-                        ? 'text-[var(--color-ink)] border-b-2'
-                        : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] border-b-2 border-transparent'
+                        ? 'text-[var(--stage-text-primary)] border-b-2'
+                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border-b-2 border-transparent'
                     )}
                     style={tab === t.id ? { borderBottomColor: accentColor } : undefined}
                   >
@@ -305,12 +305,12 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                   {tab === 'identity' && org && (
                     <>
                       {detailsLoading ? (
-                        <p className="text-sm text-[var(--color-ink-muted)]">Loading…</p>
+                        <p className="text-sm text-[var(--stage-text-secondary)]">Loading…</p>
                       ) : (
                         <form action={saveAction} className="space-y-6">
                           <input type="hidden" name="org_id" value={org.id} />
                           <div className="space-y-4">
-                            <h3 className="text-sm font-medium text-[var(--color-ink-muted)]">
+                            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)]">
                               Logo & Brand
                             </h3>
                             <OrgLogoUpload
@@ -319,8 +319,8 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                               onSuccess={(url) => setDetails((d) => (d ? { ...d, logo_url: url } : null))}
                             />
                             <div>
-                              <p className="mb-2 text-xs font-medium text-[var(--color-ink-muted)]">
-                                Brand Signal (avatar accent)
+                              <p className="mb-2 text-xs font-medium text-[var(--stage-text-secondary)]">
+                                Brand color (avatar accent)
                               </p>
                               <BrandColorPicker
                                 value={brandColor}
@@ -330,7 +330,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                             </div>
                           </div>
                           <div className="space-y-4">
-                            <h3 className="text-sm font-medium text-[var(--color-ink-muted)]">
+                            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)]">
                               Name & Description
                             </h3>
                             <FloatingLabelInput
@@ -338,7 +338,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                               name="name"
                               value={name}
                               onChange={(e) => setName(e.target.value)}
-                              className="rounded-lg border-white/10 bg-white/5"
+                              className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                             />
                             <div className="relative">
                               <Textarea
@@ -346,10 +346,10 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                                 placeholder=" "
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                className="min-h-[100px] resize-y rounded-lg border-white/10 bg-white/5 pt-5"
+                                className="min-h-[100px] resize-y rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] pt-5"
                                 rows={3}
                               />
-                              <label className="pointer-events-none absolute left-3 top-3 text-sm text-[var(--color-ink-muted)]">
+                              <label className="pointer-events-none absolute left-3 top-3 text-sm text-[var(--stage-text-secondary)]">
                                 Description
                               </label>
                             </div>
@@ -381,7 +381,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                       <input type="hidden" name="description" value={description} />
                       <input type="hidden" name="brand_color" value={brandColor ?? ''} />
                       <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-[var(--color-ink-muted)]">
+                        <h3 className="text-sm font-medium text-[var(--stage-text-secondary)]">
                           Contact & Web
                         </h3>
                         <FloatingLabelInput
@@ -390,7 +390,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                           type="url"
                           value={website}
                           onChange={(e) => setWebsite(e.target.value)}
-                          className="rounded-lg border-white/10 bg-white/5"
+                          className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                         />
                         <FloatingLabelInput
                           label="Support email"
@@ -398,19 +398,19 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                           type="email"
                           value={supportEmail}
                           onChange={(e) => setSupportEmail(e.target.value)}
-                          className="rounded-lg border-white/10 bg-white/5"
+                          className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                         />
                         <FloatingLabelInput
                           label="Default currency (e.g. USD)"
                           name="default_currency"
                           value={defaultCurrency}
                           onChange={(e) => setDefaultCurrency(e.target.value)}
-                          className="rounded-lg border-white/10 bg-white/5"
+                          className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                           maxLength={3}
                         />
                       </div>
                       <div className="space-y-4">
-                        <h3 className="flex items-center gap-2 text-sm font-medium text-[var(--color-ink-muted)]">
+                        <h3 className="flex items-center gap-2 text-sm font-medium text-[var(--stage-text-secondary)]">
                           <MapPin className="size-4" />
                           Address
                         </h3>
@@ -419,7 +419,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                           name="address_street"
                           value={address.street ?? ''}
                           onChange={(e) => setAddress((a) => ({ ...a, street: e.target.value }))}
-                          className="rounded-lg border-white/10 bg-white/5"
+                          className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                         />
                         <div className="grid grid-cols-2 gap-3">
                           <FloatingLabelInput
@@ -427,14 +427,14 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                             name="address_city"
                             value={address.city ?? ''}
                             onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
-                            className="rounded-lg border-white/10 bg-white/5"
+                            className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                           />
                           <FloatingLabelInput
                             label="State / Region"
                             name="address_state"
                             value={address.state ?? ''}
                             onChange={(e) => setAddress((a) => ({ ...a, state: e.target.value }))}
-                            className="rounded-lg border-white/10 bg-white/5"
+                            className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                           />
                         </div>
                         <FloatingLabelInput
@@ -442,14 +442,14 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                           name="address_postal_code"
                           value={address.postal_code ?? ''}
                           onChange={(e) => setAddress((a) => ({ ...a, postal_code: e.target.value }))}
-                          className="rounded-lg border-white/10 bg-white/5"
+                          className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                         />
                         <FloatingLabelInput
                           label="Country"
                           name="address_country"
                           value={address.country ?? ''}
                           onChange={(e) => setAddress((a) => ({ ...a, country: e.target.value }))}
-                          className="rounded-lg border-white/10 bg-white/5"
+                          className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
                         />
                       </div>
                       {saveState?.error && (
@@ -476,7 +476,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                   {tab === 'network' && org && details && (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-4">
-                        <p className="text-sm text-[var(--color-ink-muted)]">
+                        <p className="text-sm text-[var(--stage-text-secondary)]">
                           Vendors, venues, and partners. Ghost orgs become network nodes when they join.
                         </p>
                         <Button

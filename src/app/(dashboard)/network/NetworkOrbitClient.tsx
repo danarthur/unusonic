@@ -28,7 +28,7 @@ export function NetworkOrbitClient({ orgId, open: controlledOpen, onOpenChange, 
       <Button
         variant="outline"
         onClick={() => setOpen(true)}
-        className="gap-2 rounded-2xl border-[var(--color-mercury)] bg-[var(--color-glass-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-silk)]/40 hover:bg-[var(--color-glass-highlight)] hover:text-[var(--color-ink)]"
+        className="gap-2 rounded-2xl border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]"
       >
         <Search className="size-4" />
         Seek Network

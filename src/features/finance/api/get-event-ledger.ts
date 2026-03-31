@@ -1,5 +1,5 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
@@ -142,7 +142,7 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
   const invoiceIds = invoices.map((i) => i.id);
 
   // Payments (to compute collected)
-  let paymentsByInvoice: Record<string, number> = {};
+  const paymentsByInvoice: Record<string, number> = {};
   if (invoiceIds.length > 0) {
     const { data: payments } = await supabase
       .from('payments')

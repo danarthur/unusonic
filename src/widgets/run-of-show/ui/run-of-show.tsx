@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { GripVertical, Mic, Sun, Video, Truck } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import type { Cue, CueType } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
@@ -10,11 +10,11 @@ import { fetchCues, updateCueOrder } from '@/app/(dashboard)/(features)/crm/acti
 
 /* --- ICONS MAPPING --- */
 const typeIcons: Record<CueType, { icon: typeof Mic; color: string; bg: string }> = {
-  stage: { icon: Mic, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-  audio: { icon: Video, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-  lighting: { icon: Sun, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-  video: { icon: Video, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-  logistics: { icon: Truck, color: 'text-ink-muted', bg: 'bg-ink/10' },
+  stage: { icon: Mic, color: 'text-[oklch(0.65_0.15_300)]', bg: 'bg-[oklch(0.65_0.15_300_/_0.1)]' },
+  audio: { icon: Video, color: 'text-[oklch(0.65_0.15_250)]', bg: 'bg-[oklch(0.65_0.15_250_/_0.1)]' },
+  lighting: { icon: Sun, color: 'text-[var(--color-unusonic-warning)]', bg: 'bg-[var(--color-unusonic-warning)]/10' },
+  video: { icon: Video, color: 'text-[var(--color-unusonic-success)]', bg: 'bg-[var(--color-unusonic-success)]/10' },
+  logistics: { icon: Truck, color: 'text-[var(--stage-text-secondary)]', bg: 'bg-[var(--stage-text-primary)]/10' },
 };
 
 const DEFAULT_START_TIME = '18:00';
@@ -129,12 +129,12 @@ export function RunOfShow({
     <div className={cn("flex flex-col", className)}>
       {loading ? (
         <div className="flex flex-col gap-3 pb-20">
-          <LiquidPanel className="h-16 !p-0 animate-pulse" />
-          <LiquidPanel className="h-16 !p-0 animate-pulse" />
-          <LiquidPanel className="h-16 !p-0 animate-pulse" />
+          <StagePanel className="h-16 !p-0 stage-skeleton" padding="none" />
+          <StagePanel className="h-16 !p-0 stage-skeleton" padding="none" />
+          <StagePanel className="h-16 !p-0 stage-skeleton" padding="none" />
         </div>
       ) : error ? (
-        <div className="py-8 text-center text-xs text-ink-muted italic">{error}</div>
+        <div className="py-8 text-center text-xs text-[var(--stage-text-secondary)] italic">{error}</div>
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
           <Droppable droppableId="run-of-show">
@@ -158,14 +158,15 @@ export function RunOfShow({
                           data-cue-id={cue.id}
                         >
                           {/* Wrapper to avoid ref conflicts with DnD */}
-                          <LiquidPanel
-                            hoverEffect
+                          <StagePanel
+                            interactive
+                            nested
                             className={cn(
-                              "!p-3 flex items-center gap-4 transition-all duration-200 liquid-panel-nested",
+                              "!p-3 flex items-center gap-4 transition-all duration-200",
                               snapshot.isDragging
-                                ? "shadow-2xl scale-[1.02] z-50 ring-1 ring-[var(--color-signal-success)]/50"
-                                : "hover:border-[var(--glass-border-hover)]",
-                              cue.id === selectedCueId && "ring-1 ring-[var(--color-signal-success)]/40",
+                                ? "shadow-2xl brightness-[1.03] z-50 ring-1 ring-[var(--color-unusonic-success)]/50"
+                                : "hover:border-[oklch(1_0_0_/_0.12)]",
+                              cue.id === selectedCueId && "ring-1 ring-[var(--color-unusonic-success)]/40",
                               cue.id.startsWith('temp-') && "opacity-60 grayscale"
                             )}
                             onClick={() => onSelectCue?.(cue.id)}
@@ -173,25 +174,25 @@ export function RunOfShow({
                             {/* DRAG HANDLE */}
                             <div
                               {...provided.dragHandleProps}
-                              className="text-ink-muted hover:text-ink cursor-grab active:cursor-grabbing p-1"
+                              className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-grab active:cursor-grabbing p-1"
                             >
                               <GripVertical size={18} />
                             </div>
 
                             {/* TIME PILL */}
                             <div className="flex flex-col items-end min-w-[60px]">
-                              <span className="font-mono text-sm font-medium text-ink">
+                              <span className="font-mono text-sm font-medium text-[var(--stage-text-primary)]">
                                 {computedStartTimes[index] ?? DEFAULT_START_TIME}
                               </span>
-                              <span className="font-mono text-[10px] text-ink-muted">{cue.duration_minutes ?? 0}m</span>
+                              <span className="font-mono text-[10px] text-[var(--stage-text-secondary)]">{cue.duration_minutes ?? 0}m</span>
                             </div>
 
                             {/* CONNECTOR */}
-                            <div className="h-8 w-px bg-ink/20 relative hidden md:block">
+                            <div className="h-8 w-px bg-[var(--stage-text-primary)]/20 relative hidden md:block">
                               <div
                                 className={cn(
                                   "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full",
-                                  Meta.color === 'text-ink-muted' ? 'bg-ink-muted' : Meta.color.replace('text-', 'bg-')
+                                  Meta.color === 'text-[var(--stage-text-secondary)]' ? 'bg-[var(--stage-text-secondary)]' : Meta.color.replace('text-', 'bg-')
                                 )}
                               />
                             </div>
@@ -199,16 +200,16 @@ export function RunOfShow({
                             {/* CONTENT */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
-                                <h3 className="text-base font-medium text-ink truncate">{cue.title}</h3>
+                                <h3 className="text-base font-medium text-[var(--stage-text-primary)] truncate">{cue.title}</h3>
                                 <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wider", Meta.bg, Meta.color)}>
                                   {cue.type}
                                 </span>
                               </div>
                               {cue.notes && (
-                                <p className="text-xs text-ink-muted truncate">{cue.notes}</p>
+                                <p className="text-xs text-[var(--stage-text-secondary)] truncate">{cue.notes}</p>
                               )}
                             </div>
-                          </LiquidPanel>
+                          </StagePanel>
                         </div>
                       )}
                     </Draggable>

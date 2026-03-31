@@ -5,8 +5,21 @@ import { motion } from 'framer-motion';
 import { Plus, Search } from 'lucide-react';
 import { StreamCard, type StreamCardItem } from './stream-card';
 import { CreateGigModal } from './create-gig-modal';
+import {
+  FilterChipBar,
+  INITIAL_FILTERS,
+  hasActiveFilters,
+  applyFilters,
+  type StreamFilters,
+} from './stream-filter-chips';
+import {
+  SortControl,
+  INITIAL_SORT,
+  applySortOrder,
+  type StreamSort,
+} from './stream-sort-control';
 import type { OptimisticUpdate } from './crm-production-queue';
-import { UNUSONIC_PHYSICS, FLUID_SPRING, PILL_SLIDE_SPRING, M3_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 export type StreamMode = 'inquiry' | 'active' | 'past';
@@ -33,8 +46,10 @@ function filterByMode(items: StreamCardItem[], mode: StreamMode): StreamCardItem
       (i) =>
         (i.source === 'event' &&
           i.lifecycle_status !== 'cancelled' &&
-          (i.event_date ?? '') >= today) ||
-        (i.source === 'deal' && (i.status === 'contract_sent' || i.status === 'contract_signed'))
+          (i.event_date == null || i.event_date >= today)) ||
+        (i.source === 'deal' &&
+          (i.status === 'contract_sent' || i.status === 'contract_signed' || i.status === 'deposit_received') &&
+          (i.event_date == null || i.event_date >= today))
     );
   }
   if (mode === 'past') {
@@ -44,15 +59,16 @@ function filterByMode(items: StreamCardItem[], mode: StreamMode): StreamCardItem
         (i.source === 'deal' && (i.status === 'won' || i.status === 'lost')) ||
         // Past-dated deals that never converted (any pre-handover status)
         (i.source === 'deal' &&
-          (i.status === 'inquiry' || i.status === 'proposal' || i.status === 'contract_sent' || i.status === 'contract_signed') &&
+          (i.status === 'inquiry' || i.status === 'proposal' || i.status === 'contract_sent' || i.status === 'contract_signed' || i.status === 'deposit_received') &&
           i.event_date != null &&
           i.event_date < today) ||
         // Cancelled events (regardless of date)
         (i.source === 'event' && i.lifecycle_status === 'cancelled') ||
-        // Past-dated events
+        // Past-dated events (must have a date — dateless events stay in Active)
         (i.source === 'event' &&
           i.lifecycle_status !== 'cancelled' &&
-          (i.event_date ?? '') < today)
+          i.event_date != null &&
+          i.event_date < today)
     );
   }
   return items;
@@ -79,6 +95,28 @@ export function Stream({
 }) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<StreamFilters>(INITIAL_FILTERS);
+  const [sort, setSort] = useState<StreamSort>(INITIAL_SORT);
+  const [sortBeforeAttention, setSortBeforeAttention] = useState<StreamSort | null>(null);
+
+  const handleFiltersChange = (newFilters: StreamFilters) => {
+    const wasAttention = filters.needsAttention;
+    const isAttention = newFilters.needsAttention;
+
+    if (!wasAttention && isAttention) {
+      // Entering attention mode — save current sort, switch to priority
+      setSortBeforeAttention(sort);
+      setSort({ field: 'priority', direction: 'desc' });
+    } else if (wasAttention && !isAttention) {
+      // Leaving attention mode — restore previous sort
+      if (sortBeforeAttention) {
+        setSort(sortBeforeAttention);
+        setSortBeforeAttention(null);
+      }
+    }
+
+    setFilters(newFilters);
+  };
 
   const today = new Date().toISOString().slice(0, 10);
   const tagged: StreamCardItem[] = items.map((i) => {
@@ -93,126 +131,154 @@ export function Stream({
 
   const modeFiltered = filterByMode(tagged, mode);
 
-  // Fix 3: apply search filter — case-insensitive substring match on title, client_name, location
+  // Layer 1: apply chip filters
+  const chipFiltered = applyFilters(modeFiltered, filters);
+
+  // Layer 3: apply search — expanded to match archetype, lead source, owner name
   const q = searchQuery.trim().toLowerCase();
-  const filtered = q
-    ? modeFiltered.filter(
+  const searched = q
+    ? chipFiltered.filter(
         (i) =>
           (i.title ?? '').toLowerCase().includes(q) ||
           (i.client_name ?? '').toLowerCase().includes(q) ||
-          (i.location ?? '').toLowerCase().includes(q)
+          (i.location ?? '').toLowerCase().includes(q) ||
+          (i.event_archetype ?? '').toLowerCase().includes(q) ||
+          (i.lead_source ?? '').toLowerCase().includes(q) ||
+          (i.owner_name ?? '').toLowerCase().includes(q)
       )
-    : modeFiltered;
+    : chipFiltered;
+
+  // Layer 2: apply sort — force priority when needs-attention filter is active
+  const effectiveSort: StreamSort = filters.needsAttention
+    ? { field: 'priority', direction: 'desc' }
+    : sort;
+  const filtered = applySortOrder(searched, effectiveSort);
+
+  const filtersActive = hasActiveFilters(filters);
+  const hasResults = modeFiltered.length > 0 || searchQuery.length > 0 || filtersActive;
 
   return (
-    <div className={cn('flex flex-col h-full min-h-0', className)}>
-      <header className="shrink-0 flex flex-col gap-4 p-4 border-b border-white/10">
+    <div className={cn('flex flex-col h-full min-h-0', className)} style={{ background: 'var(--stage-surface)' }}>
+      <header className="shrink-0 flex flex-col gap-4 p-4">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-[clamp(1.25rem,3vw,1.5rem)] font-medium text-ceramic tracking-tight leading-none">
-              Production Grid
+            <h1 className="text-xl font-medium tracking-tight leading-none" style={{ color: 'var(--stage-text-primary)' }}>
+              Productions
             </h1>
-            <p className="text-sm text-ink-muted leading-relaxed mt-1">
+            <p className="text-sm leading-relaxed mt-1" style={{ color: 'var(--stage-text-secondary)' }}>
               {items.length === 0
                 ? 'No productions yet.'
-                : 'Lead your pipeline from inquiry to execution.'}
+                : 'Inquiry to wrap.'}
             </p>
           </div>
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
-            className="shrink-0 px-4 py-2.5 rounded-full liquid-levitation flex items-center gap-2 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)] border border-white/10 text-ceramic bg-[var(--glass-bg)] backdrop-blur-xl"
+            className="stage-btn stage-btn-primary"
           >
             <Plus size={16} aria-hidden /> New production
           </button>
         </div>
 
-        {/* Liquid Glass segmented control — single pill whose position we animate so the slide is visibly physical */}
+        {/* Stream Mode: underline-style tabs */}
         <div
-          className="relative flex rounded-[28px] overflow-visible p-1 min-h-[44px] border border-white/10 backdrop-blur-2xl"
-          style={{
-            background: 'oklch(0.22 0 0 / 0.5)',
-            boxShadow: 'inset 0 1px 0 0 oklch(1 0 0 / 0.08)',
-          }}
+          className="relative flex"
           role="tablist"
           aria-label="Filter stream"
         >
-          {/* Sliding pill — x animated with PILL_SLIDE_SPRING so it clearly glides between segments */}
-          <motion.span
-            className="absolute top-1 bottom-1 rounded-[24px] border border-white/10 backdrop-blur-md z-0"
-            style={{
-              width: 'calc((100% - 8px) / 3)',
-              left: 4,
-              background: 'oklch(0.28 0 0 / 0.6)',
-              boxShadow:
-                'inset 0 1px 0 0 oklch(1 0 0 / 0.12), 0 2px 8px -2px oklch(0 0 0 / 0.25)',
-            }}
-            animate={{ x: `${STREAM_TABS.findIndex((t) => t.value === mode) * 100}%` }}
-            transition={PILL_SLIDE_SPRING}
-            aria-hidden
-          />
           {STREAM_TABS.map((tab) => (
-            <motion.button
+            <button
               key={tab.value}
               type="button"
               role="tab"
               aria-selected={mode === tab.value}
-              onClick={() => { onModeChange(tab.value); setSearchQuery(''); }}
-              whileTap={{ scale: 0.98 }}
-              transition={FLUID_SPRING}
+              onClick={() => {
+                onModeChange(tab.value);
+                setSearchQuery('');
+                setFilters(INITIAL_FILTERS);
+                if (sortBeforeAttention) {
+                  setSort(sortBeforeAttention);
+                  setSortBeforeAttention(null);
+                }
+              }}
               className={cn(
-                'relative z-10 flex-1 py-2.5 text-sm font-medium tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] rounded-[24px]',
+                'relative flex-1 py-2.5 text-sm font-medium tracking-tight transition-colors focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                 mode === tab.value
-                  ? 'text-ceramic'
-                  : 'text-ink-muted hover:text-ceramic'
+                  ? 'text-[var(--stage-text-primary)]'
+                  : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
               )}
             >
               {tab.label}
-            </motion.button>
+              {mode === tab.value && (
+                <motion.div
+                  layoutId="stream-mode-indicator"
+                  className="absolute bottom-0 left-2 right-2 h-[2px]"
+                  style={{ background: 'var(--stage-accent)' }}
+                  transition={STAGE_LIGHT}
+                />
+              )}
+            </button>
           ))}
+          <div className="absolute bottom-0 left-0 right-0 h-px" style={{ background: 'var(--stage-edge-subtle)' }} />
         </div>
       </header>
 
-      {/* Fix 3: Search input — only shown when there are items or a query is active */}
-      {(modeFiltered.length > 0 || searchQuery.length > 0) && (
-        <div className="shrink-0 px-4 pb-3 border-b border-white/10">
-          <div className="relative flex items-center">
-            <Search
-              size={14}
-              className="absolute left-3 text-ink-muted pointer-events-none shrink-0"
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search productions…"
-              className="w-full pl-8 pr-3 py-2 rounded-xl text-sm text-ceramic placeholder:text-ink-muted bg-[oklch(0.18_0_0)] border border-white/10 focus:outline-none focus:ring-1 focus:ring-white/20"
-            />
+      {/* Filter chips + search + sort */}
+      {hasResults && (
+        <div className="shrink-0 px-4 flex flex-col gap-3 pb-3">
+          {/* Layer 1: Filter chips */}
+          <FilterChipBar
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            items={modeFiltered}
+          />
+
+          {/* Search + Sort row */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 flex items-center">
+              <Search
+                size={14}
+                className="absolute left-3 pointer-events-none shrink-0"
+                style={{ color: 'var(--stage-text-secondary)' }}
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search productions…"
+                className="w-full pl-8 pr-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]/30"
+                style={{
+                  background: 'var(--stage-surface-elevated)',
+                  borderRadius: 'var(--stage-radius-input, 6px)',
+                  border: '1px solid var(--stage-edge-subtle)',
+                }}
+              />
+            </div>
+            <SortControl sort={sort} onSortChange={setSort} />
           </div>
+
+          {/* Layer 3: Result count */}
+          {(q || filtersActive) && (
+            <p className="text-[10px] tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+              {filtersActive && !q && ' (filtered)'}
+            </p>
+          )}
         </div>
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <motion.ul
+        <ul
           key={`stream-list-${mode}`}
           className="flex flex-col gap-3"
-          initial="hidden"
-          animate="visible"
-          variants={{
-            visible: { transition: { staggerChildren: M3_STAGGER_CHILDREN } },
-            hidden: {},
-          }}
         >
           {filtered.map((item) => (
             <motion.li
-              key={item.id}
-              layout
-              variants={{
-                visible: { opacity: 1, y: 0 },
-                hidden: { opacity: 0, y: 8 },
-              }}
-              transition={UNUSONIC_PHYSICS}
+              key={`${item.source}-${item.id}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={STAGE_MEDIUM}
             >
               <StreamCard
                 item={item}
@@ -222,17 +288,40 @@ export function Stream({
             </motion.li>
           ))}
 
-          {/* P1.4: empty state */}
           {filtered.length === 0 && (
             <motion.li
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center text-sm text-ink-muted py-12 list-none"
+              className="text-center text-sm py-12 list-none"
+              style={{ color: 'var(--stage-text-secondary)' }}
             >
-              {searchQuery ? 'No results for that search.' : 'Nothing here yet.'}
+              {searchQuery || filtersActive ? (
+                <span>
+                  No results.{' '}
+                  {filtersActive && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilters(INITIAL_FILTERS);
+                        setSearchQuery('');
+                        if (sortBeforeAttention) {
+                          setSort(sortBeforeAttention);
+                          setSortBeforeAttention(null);
+                        }
+                      }}
+                      className="underline"
+                      style={{ color: 'var(--stage-text-primary)' }}
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </span>
+              ) : (
+                'Nothing here yet.'
+              )}
             </motion.li>
           )}
-        </motion.ul>
+        </ul>
       </div>
 
       <CreateGigModal

@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, ChevronDown } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { generateInvoice } from '../api/convertProposalToInvoice';
 
@@ -39,12 +39,12 @@ function DropdownProposals({
         />
       </Button>
       {open && (
-        <ul className="liquid-panel-nested mt-2 rounded-xl overflow-hidden divide-y divide-[var(--glass-border)]">
+        <ul className="stage-panel-nested mt-2 rounded-xl overflow-hidden divide-y divide-[oklch(1_0_0_/_0.08)]">
           {proposalIds.map((p) => (
             <li key={p.id}>
               <button
                 type="button"
-                className="w-full px-4 py-3 text-left text-sm text-ink hover:bg-[var(--glass-bg-hover)] transition-colors flex items-center justify-between"
+                className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors flex items-center justify-between"
                 onClick={() => {
                   onSelect(p.id);
                   setOpen(false);
@@ -52,7 +52,7 @@ function DropdownProposals({
                 disabled={loadingProposalId === p.id}
               >
                 <span className="font-mono text-xs">{p.id.slice(0, 8)}…</span>
-                <span className="text-ink-muted capitalize text-xs">
+                <span className="text-[var(--stage-text-secondary)] capitalize text-xs">
                   {loadingProposalId === p.id ? 'Creating…' : p.status}
                 </span>
               </button>
@@ -97,8 +97,8 @@ export function QuickActions({
   }
 
   return (
-    <LiquidPanel className={`flex flex-col gap-4 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+    <StagePanel className={`flex flex-col gap-4 ${className ?? ''}`}>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Actions
       </h2>
       <div className="flex flex-col gap-3">
@@ -116,17 +116,17 @@ export function QuickActions({
               onSelect={handleGenerateFromProposal}
             />
             {error && (
-              <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">
+              <p className="mt-2 text-xs text-[var(--color-unusonic-error)]">
                 {error}
               </p>
             )}
           </div>
         ) : (
-          <p className="text-xs text-ink-muted">
+          <p className="text-xs text-[var(--stage-text-secondary)]">
             No proposals available to convert. Create one in the Deal room.
           </p>
         )}
       </div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

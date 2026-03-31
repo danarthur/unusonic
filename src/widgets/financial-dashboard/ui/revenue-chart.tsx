@@ -84,7 +84,7 @@ export function RevenueChart({ data, className = '' }: RevenueChartProps) {
   
   if (chartData.length < 2) {
     return (
-      <div className={`h-16 flex items-center justify-center text-xs text-ink-muted ${className}`}>
+      <div className={`h-16 flex items-center justify-center text-xs text-[var(--stage-text-secondary)] ${className}`}>
         No revenue data yet — connect QuickBooks or add invoices
       </div>
     );
@@ -149,7 +149,7 @@ export function RevenueChart({ data, className = '' }: RevenueChartProps) {
               cx={x}
               cy={y}
               r="2"
-              fill="var(--background)"
+              fill="var(--stage-surface)"
               stroke="var(--walnut)"
               strokeWidth="1.5"
               initial={{ scale: 0, opacity: 0 }}
@@ -168,7 +168,7 @@ export function RevenueChart({ data, className = '' }: RevenueChartProps) {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springConfig, delay: 0.6 + i * 0.05 }}
-            className="text-[10px] text-ink-muted font-medium"
+            className="text-[10px] text-[var(--stage-text-secondary)] font-medium"
           >
             {point.label}
           </motion.span>

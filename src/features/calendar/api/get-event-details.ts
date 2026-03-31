@@ -61,6 +61,7 @@ export async function getEventDetails(eventId: string): Promise<EventDetailDTO |
   if (!workspaceId) return null;
 
   const { data: row, error } = await supabase
+    .schema('ops')
     .from('events')
     .select(`
       id,

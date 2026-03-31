@@ -16,7 +16,9 @@ import { RecoveryVetoEmail } from './templates/RecoveryVetoEmail';
 import { ProposalLinkEmail } from './templates/ProposalLinkEmail';
 import { ProposalAcceptedEmail } from './templates/ProposalAcceptedEmail';
 import { ProposalSignedEmail } from './templates/ProposalSignedEmail';
+import { ProposalReminderEmail } from './templates/ProposalReminderEmail';
 import { createClient } from '@/shared/api/supabase/server';
+import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
 
 /** Read at send-time so env is available when server actions run (not only at module load). */
 function getResend() {
@@ -173,7 +175,60 @@ export type SendProposalLinkSenderOptions = {
   depositPercent?: number | null;
   /** Days until full balance is due e.g. 30 — shown as Net 30. */
   paymentDueDays?: number | null;
+  /** Entity type of the client — used to detect couple vs individual for subject line logic. */
+  entityType?: 'person' | 'couple' | 'company' | 'venue' | null;
+  /** Event archetype key (e.g. 'wedding', 'concert') — collision-free personalization signal. */
+  eventArchetype?: string | null;
 };
+
+/**
+ * Build a collision-free proposal email subject line.
+ * Uses entityType (couple detection) and eventArchetype (label-based personalization)
+ * before falling back to word-boundary checking against the deal title.
+ */
+export function buildProposalSubjectLine(params: {
+  firstName: string | null;
+  dealTitle: string | null;
+  entityType: string | null;
+  eventArchetype: string | null;
+  variant: 'send' | 'reminder';
+}): string {
+  const { firstName, dealTitle, entityType, eventArchetype, variant } = params;
+  const isReady = variant === 'send' ? 'is ready' : 'is still open';
+
+  // Resolve human-readable archetype label (e.g. 'wedding' → 'Wedding')
+  const archetypeLabel = eventArchetype
+    ? (DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS] ?? null)
+    : null;
+
+  // Signal 1: Couple entity — treat as a social unit, never name-prefix
+  if (entityType === 'couple') {
+    return archetypeLabel
+      ? `Your ${archetypeLabel} proposal ${isReady}`
+      : `Your proposal ${isReady}`;
+  }
+
+  // Signal 2: Archetype known — safe to personalize, no collision possible
+  if (archetypeLabel) {
+    return firstName
+      ? `${firstName}, your ${archetypeLabel} proposal ${isReady}`
+      : `Your ${archetypeLabel} proposal ${isReady}`;
+  }
+
+  // Signal 3: No archetype — word-boundary check on deal title
+  if (dealTitle) {
+    const titleWords = dealTitle.toLowerCase().split(/\W+/);
+    const nameInTitle = !!(firstName && titleWords.includes(firstName.toLowerCase()));
+    if (nameInTitle || !firstName) {
+      return `Your ${dealTitle} proposal ${isReady}`;
+    }
+    return `${firstName}, your ${dealTitle} proposal ${isReady}`;
+  }
+
+  return firstName
+    ? `${firstName}, your proposal ${isReady}`
+    : `Your proposal ${isReady}`;
+}
 
 /**
  * Send "Review and sign" proposal email to the client. Called from sendForSignature.
@@ -184,7 +239,7 @@ export async function sendProposalLinkEmail(
   proposalUrl: string,
   dealTitle?: string | null,
   senderOptions?: SendProposalLinkSenderOptions | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; messageId?: string } | { ok: false; error: string }> {
   const resend = getResend();
   if (!resend) {
     return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
@@ -201,14 +256,18 @@ export async function sendProposalLinkEmail(
     total: senderOptions?.total ?? null,
     depositPercent: senderOptions?.depositPercent ?? null,
     paymentDueDays: senderOptions?.paymentDueDays ?? null,
+    entityType: senderOptions?.entityType ?? null,
+    eventArchetype: senderOptions?.eventArchetype ?? null,
   });
   const html = await render(element);
   const text = toPlainText(html);
-  const subject = firstName && dealTitle?.trim()
-    ? `${firstName}, your ${dealTitle} proposal is ready`
-    : dealTitle?.trim()
-    ? `Your ${dealTitle} proposal is ready`
-    : 'Your proposal is ready';
+  const subject = buildProposalSubjectLine({
+    firstName,
+    dealTitle: dealTitle ?? null,
+    entityType: senderOptions?.entityType ?? null,
+    eventArchetype: senderOptions?.eventArchetype ?? null,
+    variant: 'send',
+  });
   const emailPart = fromEmailPart(fromStr);
   // From name: "Daniel at Invisible Touch Events" — hybrid person+company is the
   // B2B standard. Pure person name looks personal; pure company name looks automated.
@@ -230,9 +289,9 @@ export async function sendProposalLinkEmail(
   if (senderOptions?.senderReplyTo?.trim()) {
     payload.replyTo = [senderOptions.senderReplyTo.trim()];
   }
-  const { error } = await resend.emails.send(payload);
+  const { data, error } = await resend.emails.send(payload);
   if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  return { ok: true, messageId: data?.id ?? undefined };
 }
 
 /**
@@ -240,18 +299,23 @@ export async function sendProposalLinkEmail(
  * Called from the DocuSeal webhook handler.
  * Pass workspaceId to use the workspace's verified sending domain (if configured).
  */
-export async function sendProposalAcceptedEmail(
-  to: string,
-  signerName: string,
-  dealTitle: string,
-  signedAt: string,
-  portalUrl: string,
-  workspaceName?: string | null,
-  workspaceId?: string | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendProposalAcceptedEmail(opts: {
+  to: string;
+  signerName: string;
+  dealTitle: string;
+  signedAt: string;
+  portalUrl: string;
+  workspaceName?: string | null;
+  workspaceId?: string | null;
+  eventDate?: string | null;
+  totalFormatted?: string | null;
+  depositAmount?: string | null;
+  depositDueDays?: number | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const resend = getResend();
   if (!resend) return { ok: false, error: 'Email not configured.' };
-  const element = ProposalAcceptedEmail({ signerName, dealTitle, signedAt, portalUrl, workspaceName });
+  const { to, signerName, dealTitle, signedAt, portalUrl, workspaceName, workspaceId, eventDate, totalFormatted, depositAmount, depositDueDays } = opts;
+  const element = ProposalAcceptedEmail({ signerName, dealTitle, signedAt, portalUrl, workspaceName, eventDate, totalFormatted, depositAmount, depositDueDays });
   const html = await render(element);
   const text = toPlainText(html);
   const fromAddress = workspaceId ? await getWorkspaceFrom(workspaceId) : getFrom();
@@ -267,22 +331,83 @@ export async function sendProposalAcceptedEmail(
 }
 
 /**
+ * Send a "just a reminder" email to the client for an unsigned proposal.
+ * Workspace-aware: uses verified custom sending domain when configured.
+ */
+export async function sendProposalReminderEmail(opts: {
+  to: string;
+  proposalUrl: string;
+  eventTitle: string;
+  workspaceId: string;
+  senderName?: string | null;
+  clientFirstName?: string | null;
+  eventDate?: string | null;
+  proposalTotal?: number | null;
+  entityType?: string | null;
+  eventArchetype?: string | null;
+}): Promise<{ ok: true; messageId?: string } | { ok: false; error: string }> {
+  const resend = getResend();
+  if (!resend) return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
+  const senderDisplayName = opts.senderName?.trim() ?? null;
+  const fromAddress = await getWorkspaceFrom(opts.workspaceId, senderDisplayName);
+  // Resolve workspace name for the email footer
+  const supabase = await createClient();
+  const { data: ws } = await supabase
+    .from('workspaces')
+    .select('name')
+    .eq('id', opts.workspaceId)
+    .maybeSingle();
+  const workspaceName = (ws as { name?: string } | null)?.name ?? 'Unusonic';
+  const element = ProposalReminderEmail({
+    proposalUrl: opts.proposalUrl,
+    eventTitle: opts.eventTitle,
+    workspaceName,
+    senderName: opts.senderName ?? null,
+    clientFirstName: opts.clientFirstName ?? null,
+    eventDate: opts.eventDate ?? null,
+    proposalTotal: opts.proposalTotal ?? null,
+  });
+  const html = await render(element);
+  const text = toPlainText(html);
+  const subject = buildProposalSubjectLine({
+    firstName: opts.clientFirstName?.trim() ?? null,
+    dealTitle: opts.eventTitle ?? null,
+    entityType: opts.entityType ?? null,
+    eventArchetype: opts.eventArchetype ?? null,
+    variant: 'reminder',
+  });
+  const { data, error } = await resend.emails.send({
+    from: fromAddress,
+    to: [opts.to],
+    subject,
+    html,
+    text,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, messageId: data?.id ?? undefined };
+}
+
+/**
  * Send internal PM notification when a client signs a proposal.
  * Called from the DocuSeal webhook handler.
  * Pass workspaceId to use the workspace's verified sending domain (if configured).
  */
-export async function sendProposalSignedNotificationEmail(
-  to: string,
-  signerName: string,
-  dealTitle: string,
-  signedAt: string,
-  crmUrl: string,
-  workspaceName?: string | null,
-  workspaceId?: string | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendProposalSignedNotificationEmail(opts: {
+  to: string;
+  signerName: string;
+  dealTitle: string;
+  signedAt: string;
+  crmUrl: string;
+  workspaceName?: string | null;
+  workspaceId?: string | null;
+  totalFormatted?: string | null;
+  signerEmail?: string | null;
+  eventDate?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const resend = getResend();
   if (!resend) return { ok: false, error: 'Email not configured.' };
-  const element = ProposalSignedEmail({ signerName, dealTitle, signedAt, crmUrl, workspaceName });
+  const { to, signerName, dealTitle, signedAt, crmUrl, workspaceName, workspaceId, totalFormatted, signerEmail, eventDate } = opts;
+  const element = ProposalSignedEmail({ signerName, dealTitle, signedAt, crmUrl, workspaceName, totalFormatted, signerEmail, eventDate });
   const html = await render(element);
   const text = toPlainText(html);
   const fromAddress = workspaceId ? await getWorkspaceFrom(workspaceId) : getFrom();
@@ -290,6 +415,58 @@ export async function sendProposalSignedNotificationEmail(
     from: fromAddress,
     to: [to],
     subject: `${signerName} signed — ${dealTitle}`,
+    html,
+    text,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// =============================================================================
+// sendPaymentReminderEmail — automated payment cadence emails
+// =============================================================================
+
+import { PaymentReminderEmail, type PaymentReminderTone } from './templates/PaymentReminderEmail';
+
+export async function sendPaymentReminderEmail(opts: {
+  to: string;
+  recipientName: string | null;
+  eventTitle: string;
+  workspaceId: string;
+  workspaceName: string;
+  amount: string;
+  dueDate: string;
+  reminderType: 'deposit' | 'balance';
+  tone: PaymentReminderTone;
+  paymentUrl: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const resend = getResend();
+  if (!resend) return { ok: false, error: 'Email not configured.' };
+  const element = PaymentReminderEmail({
+    recipientName: opts.recipientName,
+    eventTitle: opts.eventTitle,
+    workspaceName: opts.workspaceName,
+    amount: opts.amount,
+    dueDate: opts.dueDate,
+    reminderType: opts.reminderType,
+    tone: opts.tone,
+    paymentUrl: opts.paymentUrl,
+  });
+  const html = await render(element);
+  const text = toPlainText(html);
+  const fromAddress = await getWorkspaceFrom(opts.workspaceId);
+
+  const typeLabel = opts.reminderType === 'deposit' ? 'Deposit' : 'Balance';
+  const subject = opts.tone === 'formal'
+    ? `Final notice: ${typeLabel.toLowerCase()} due — ${opts.eventTitle}`
+    : opts.tone === 'firm'
+    ? `${typeLabel} past due — ${opts.eventTitle}`
+    : `${typeLabel} reminder — ${opts.eventTitle}`;
+
+  const { error } = await resend.emails.send({
+    from: fromAddress,
+    to: [opts.to],
+    subject,
     html,
     text,
   });

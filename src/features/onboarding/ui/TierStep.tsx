@@ -1,6 +1,6 @@
 /**
  * Pathfinding Step 2: The Power Source (Tier Selection)
- * Foundation gatekeeper, Venue OS pms toggle, Autonomous SignalPay toggle
+ * Foundation gatekeeper, Venue OS pms toggle, Autonomous UnusonicPay toggle
  * @module features/onboarding/ui/TierStep
  */
 
@@ -24,8 +24,8 @@ interface TierStepProps {
   onTierChange: (tier: SubscriptionTier) => void;
   pmsEnabled: boolean;
   onPmsChange: (enabled: boolean) => void;
-  signalPayEnabled: boolean;
-  onSignalPayChange: (enabled: boolean) => void;
+  unusonicPayEnabled: boolean;
+  onUnusonicPayChange: (enabled: boolean) => void;
   projectCount?: number;
 }
 
@@ -37,23 +37,23 @@ export function TierStep({
   onTierChange,
   pmsEnabled,
   onPmsChange,
-  signalPayEnabled,
-  onSignalPayChange,
+  unusonicPayEnabled,
+  onUnusonicPayChange,
   projectCount = 0,
 }: TierStepProps) {
   const suggestedTier = persona ? TIER_PERSONA_MAP[persona] : 'foundation';
   const showPmsToggle = persona === 'venue_brand';
-  const showSignalPayToggle = selectedTier === 'autonomous';
+  const showUnusonicPayToggle = selectedTier === 'autonomous';
 
   const foundationGated = projectCount >= FOUNDATION_PROJECT_LIMIT;
 
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h2 className="text-xl font-light text-ink tracking-tight">
+        <h2 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
           Plan
         </h2>
-        <p className="text-sm text-ink-muted mt-1.5 font-light">
+        <p className="text-sm text-[var(--stage-text-secondary)] mt-1.5 font-light">
           Select tier. {persona && `Suggested: ${SUBSCRIPTION_TIERS[suggestedTier].label}`}
         </p>
       </div>
@@ -69,32 +69,30 @@ export function TierStep({
               type="button"
               onClick={() => !isFoundationGated && onTierChange(key)}
               disabled={isFoundationGated}
-              whileHover={!isFoundationGated ? { scale: 1.02 } : {}}
-              whileTap={!isFoundationGated ? { scale: 0.98 } : {}}
               transition={springConfig}
               className={`
                 relative p-5 rounded-xl border-2 text-left
                 transition-all duration-300
                 ${isSelected
-                  ? 'border-[var(--color-neon-blue)] bg-[color:var(--color-neon-blue)/0.1]'
+                  ? 'border-[var(--stage-accent,oklch(0.72_0.14_55))] bg-[var(--stage-accent,oklch(0.72_0.14_55))]/10'
                   : isFoundationGated
-                    ? 'border-ink/10 bg-ink/5 opacity-60 cursor-not-allowed'
-                    : 'border-[var(--glass-border)] hover:border-[var(--glass-border-hover)]'
+                    ? 'border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] opacity-60 cursor-not-allowed'
+                    : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] hover:border-[oklch(1_0_0/0.08)]'
                 }
               `}
             >
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm font-medium ${isSelected ? 'text-[var(--color-neon-blue)]' : 'text-ink'}`}>
+                  <span className={`text-sm font-medium ${isSelected ? 'text-[var(--stage-accent,oklch(0.72_0.14_55))]' : 'text-[var(--stage-text-primary)]'}`}>
                     {cfg.label}
                   </span>
                   {isSuggested && (
-                    <span className="text-[10px] uppercase tracking-wider text-ink-muted">
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)]">
                       Suggested
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-ink-muted">{cfg.price}</p>
+                <p className="text-[11px] text-[var(--stage-text-secondary)]">{cfg.price}</p>
                 {isFoundationGated && (
                   <p className="text-[10px] text-[var(--color-unusonic-warning)] mt-1">
                     {projectCount} projects. Upgrade for more.
@@ -112,27 +110,25 @@ export function TierStep({
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={springConfig}
-          className="p-4 rounded-xl border border-[var(--glass-border)] bg-ink/[0.02]"
+          className="p-4 rounded-xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[oklch(1_0_0_/_0.02)]"
         >
           <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-sm text-ink">PMS integration (2-way sync)</span>
+            <span className="text-sm text-[var(--stage-text-primary)]">PMS integration (2-way sync)</span>
             <motion.button
               type="button"
               role="switch"
               aria-checked={pmsEnabled}
               onClick={() => onPmsChange(!pmsEnabled)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               className={`
                 relative w-11 h-6 rounded-full transition-colors
-                ${pmsEnabled ? 'bg-neon-blue' : 'bg-ink/20'}
+                ${pmsEnabled ? 'bg-[var(--stage-accent)]' : 'bg-[oklch(1_0_0_/_0.20)]'}
               `}
             >
               <motion.span
                 layout
                 transition={springConfig}
-                className="absolute top-1 left-1 w-4 h-4 rounded-full bg-ink"
+                className="absolute top-1 left-1 w-4 h-4 rounded-full bg-[var(--stage-text-primary)]"
                 style={{ x: pmsEnabled ? 20 : 0 }}
               />
             </motion.button>
@@ -140,51 +136,49 @@ export function TierStep({
         </motion.div>
       )}
 
-      {showSignalPayToggle && (
+      {showUnusonicPayToggle && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           transition={springConfig}
             className={`
-              p-5 rounded-2xl border-2 transition-all duration-300
-              ${signalPayEnabled
+              p-5 rounded-[var(--stage-radius-nested,8px)] border-2 transition-all duration-300
+              ${unusonicPayEnabled
                 ? 'border-[var(--color-unusonic-success)] bg-[color:var(--color-unusonic-success)/0.1] shadow-lg'
-                : 'border-[var(--glass-border)] bg-ink/[0.02]'
+                : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[oklch(1_0_0_/_0.02)]'
               }
             `}
         >
           <div className="flex items-start gap-4">
-            <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${signalPayEnabled ? 'bg-[color:var(--color-unusonic-success)/0.2]' : 'bg-ink/5'}`}>
-              <Zap className={`w-5 h-5 ${signalPayEnabled ? 'text-[var(--color-unusonic-success)]' : 'text-ink-muted'}`} />
+            <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${unusonicPayEnabled ? 'bg-[color:var(--color-unusonic-success)/0.2]' : 'bg-[oklch(1_0_0_/_0.05)]'}`}>
+              <Zap className={`w-5 h-5 ${unusonicPayEnabled ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--stage-text-secondary)]'}`} />
             </div>
             <div className="flex-1 min-w-0">
               <label className="flex items-start justify-between gap-3 cursor-pointer">
                 <div>
-                  <p className="text-sm font-medium text-ink">
-                    SignalPay
+                  <p className="text-sm font-medium text-[var(--stage-text-primary)]">
+                    UnusonicPay
                   </p>
-                  <p className="text-xs text-ink-muted mt-1 font-light">
+                  <p className="text-[11px] text-[var(--stage-text-secondary)] mt-1 font-light">
                     Auto-billing for AI agents ($1/resolution).
                   </p>
                 </div>
                 <motion.button
                   type="button"
                   role="switch"
-                  aria-checked={signalPayEnabled}
-                  onClick={() => onSignalPayChange(!signalPayEnabled)}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
+                  aria-checked={unusonicPayEnabled}
+                  onClick={() => onUnusonicPayChange(!unusonicPayEnabled)}
                   transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                   className={`
                     flex-shrink-0 relative w-12 h-7 rounded-full transition-colors
-                    ${signalPayEnabled ? 'bg-[var(--color-unusonic-success)] shadow-lg' : 'bg-ink/20'}
+                    ${unusonicPayEnabled ? 'bg-[var(--color-unusonic-success)] shadow-lg' : 'bg-[oklch(1_0_0_/_0.20)]'}
                   `}
                 >
                   <motion.span
                     layout
                     transition={springConfig}
-                    className="absolute top-1 left-1 w-5 h-5 rounded-full bg-ink shadow"
-                    style={{ x: signalPayEnabled ? 22 : 0 }}
+                    className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[var(--stage-text-primary)] shadow"
+                    style={{ x: unusonicPayEnabled ? 22 : 0 }}
                   />
                 </motion.button>
               </label>

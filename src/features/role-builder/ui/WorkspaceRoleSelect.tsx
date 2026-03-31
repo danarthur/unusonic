@@ -26,7 +26,7 @@ export interface WorkspaceRoleSelectProps {
 
 /**
  * Dropdown of workspace roles (system + custom) for assigning a member's role.
- * Uses getWorkspaceRolesForBuilder and updateMemberRole. Styled for Signal (liquid-card, ceramic/mercury).
+ * Uses getWorkspaceRolesForBuilder and updateMemberRole. Styled for Unusonic (stage-panel, Stage Engineering tokens).
  */
 export function WorkspaceRoleSelect({
   workspaceId,
@@ -83,17 +83,17 @@ export function WorkspaceRoleSelect({
   if (loading) {
     return (
       <div className={className}>
-        <label className="block text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5">
+        <label className="block text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">
           {label}
         </label>
-        <div className="h-9 w-full rounded-xl border border-white/10 bg-white/5 animate-pulse" />
+        <div className="h-9 w-full rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface)] stage-skeleton" />
       </div>
     );
   }
 
   return (
     <div className={className}>
-      <label className="block text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5">
+      <label className="block text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">
         {label}
       </label>
       <Select
@@ -104,9 +104,8 @@ export function WorkspaceRoleSelect({
         <SelectTrigger
           size="default"
           className={cn(
-            'w-full rounded-xl border border-mercury/20 bg-white/5 text-ceramic',
-            'hover:bg-white/[0.07] focus:border-neon/30 focus:ring-2 focus:ring-neon/20',
-            'transition-colors',
+            'w-full rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)]',
+            'hover:bg-[var(--stage-surface)]/80 focus:border-[var(--stage-accent)]/30 focus:ring-2 focus:ring-[var(--stage-accent)]/20',
             triggerClassName
           )}
         >
@@ -117,20 +116,20 @@ export function WorkspaceRoleSelect({
         <SelectContent
           align="start"
           position="popper"
-          className="rounded-xl border border-mercury/20 bg-obsidian/95 backdrop-blur-xl shadow-[0_8px_32px_-8px_oklch(0_0_0/0.4)] max-h-64 overflow-y-auto"
+          className="rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface)] max-h-64 overflow-y-auto"
         >
           {roles.map((r) => (
             <SelectItem
               key={r.id}
               value={r.id}
-              className="py-2.5 pr-8 pl-3 text-ceramic focus:bg-neon/10 focus:text-ceramic"
+              className="py-2.5 pr-8 pl-3 text-[var(--stage-text-primary)] focus:bg-[var(--stage-accent)]/10 focus:text-[var(--stage-text-primary)]"
             >
               <div className="flex items-center gap-2">
                 <span className="font-medium">{r.name}</span>
                 {r.is_system && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] uppercase tracking-wider text-mercury/80 border-mercury/20"
+                    className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)]/80 border-[var(--stage-border)]"
                   >
                     System
                   </Badge>
@@ -141,7 +140,7 @@ export function WorkspaceRoleSelect({
         </SelectContent>
       </Select>
       {error && (
-        <p className="mt-1.5 text-xs text-red-400/90">{error}</p>
+        <p className="mt-1.5 text-xs text-[var(--color-unusonic-error)]/90">{error}</p>
       )}
     </div>
   );

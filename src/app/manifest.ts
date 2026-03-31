@@ -1,6 +1,6 @@
 /**
  * PWA Web App Manifest (Next.js Metadata API)
- * Enables "Add to Home Screen" with Liquid Ceramic branding.
+ * Enables "Add to Home Screen" with Unusonic branding.
  * @see https://nextjs.org/docs/app/api-reference/file-conventions/metadata/manifest
  */
 

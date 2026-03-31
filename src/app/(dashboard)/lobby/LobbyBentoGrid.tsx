@@ -1,155 +1,190 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { useLobbyTopology } from '@/widgets/global-pulse/lib/use-lobby-topology';
-import { PipelineVelocityWidget } from '@/widgets/pipeline-velocity';
-import { ActionStreamWidget } from '@/widgets/action-stream';
-import { LiveGigMonitorWidget } from '@/widgets/live-gig-monitor';
-import { RunOfShowFeedWidget } from '@/widgets/run-of-show-feed';
-import { SentimentPulseWidget } from '@/widgets/sentiment-pulse';
-import { CashFlowStream } from '@/app/(dashboard)/(features)/finance/components/CashFlowStream';
-import { DailyBriefingClient } from '@/app/(dashboard)/(features)/inbox/components/DailyBriefingClient';
-import { LobbyFocusProvider } from './LobbyFocusContext';
-import { LobbyBentoCell } from './LobbyBentoCell';
-import { ContextualCardDrawer } from './ContextualCardDrawer';
+import type { DashboardData } from '@/widgets/dashboard/api';
+import { TodayScheduleWidget } from '@/widgets/today-schedule';
+import { WeekStripWidget } from '@/widgets/week-strip';
+import { ActionQueueWidget } from '@/widgets/action-queue';
+import { DealPipelineWidget } from '@/widgets/deal-pipeline';
+import { FinancialPulseWidget } from '@/widgets/financial-pulse';
+import { ActivityFeedWidget } from '@/widgets/activity-feed';
+import { RevenueTrendWidget } from '@/widgets/revenue-trend';
+import { EventTypeDistWidget } from '@/widgets/event-type-dist';
+import { ClientConcentrationWidget } from '@/widgets/client-concentration';
 import {
-  M3_STAGGER_CHILDREN,
-  M3_STAGGER_DELAY,
-  UNUSONIC_PHYSICS,
+  STAGE_MEDIUM,
+  STAGE_STAGGER_CHILDREN,
+  STAGE_STAGGER_DELAY,
 } from '@/shared/lib/motion-constants';
 
-/** Stub: Aion-suggested contextual alert. Replace with API when ready. */
-const STUB_CONTEXTUAL_ALERT = process.env.NODE_ENV === 'development'
-  ? {
-      id: 'weather-1',
-      type: 'weather',
-      title: 'Rain expected at doors',
-      detail: 'Outdoor setup may need cover. Consider moving load-in earlier.',
-      parentCardId: 'live-gig',
-    }
-  : null;
+// ── Animation helpers ─────────────────────────────────────────────────────
 
-function BentoGridInner() {
-  const { urgency, isFocusLayout, isLevitation } = useLobbyTopology();
-  const [contextualAlert, setContextualAlert] = useState<typeof STUB_CONTEXTUAL_ALERT>(
-    STUB_CONTEXTUAL_ALERT
-  );
+const gridVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: STAGE_STAGGER_CHILDREN,
+      delayChildren: STAGE_STAGGER_DELAY,
+    },
+  },
+};
 
-  const isActiveMode = urgency !== 'growth';
+const cellVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0 },
+};
 
-  // Focus Layout (Critical): Hero 60%, secondary column right
-  if (isFocusLayout) {
-    return (
-      <motion.div
-        key="focus"
-        layout
-        className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:grid-rows-[minmax(320px,1fr)_minmax(200px,auto)]"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          visible: {
-            transition: { staggerChildren: M3_STAGGER_CHILDREN, delayChildren: M3_STAGGER_DELAY },
-          },
-          hidden: {},
-        }}
-        transition={UNUSONIC_PHYSICS}
-      >
-        <LobbyBentoCell id="live-gig" className="lg:col-span-3 lg:row-span-2 min-h-[320px] order-2 lg:order-1">
-          <LiveGigMonitorWidget levitate />
-          <ContextualCardDrawer
-            alert={contextualAlert}
-            onDismiss={() => setContextualAlert(null)}
-          />
-        </LobbyBentoCell>
-        <LobbyBentoCell id="ros" className="lg:col-span-2 lg:row-span-1 min-h-[280px] order-1 lg:order-2">
-          <RunOfShowFeedWidget />
-        </LobbyBentoCell>
-        <LobbyBentoCell id="sentiment" className="lg:col-span-2 min-h-[200px] order-3">
-          <SentimentPulseWidget />
-        </LobbyBentoCell>
-      </motion.div>
-    );
-  }
+// ── Props ─────────────────────────────────────────────────────────────────
 
-  // Standard Execution (State B)
-  if (isActiveMode) {
-    return (
-      <motion.div
-        key={isLevitation ? 'levitation' : 'execution'}
-        layout
-        className="grid grid-cols-1 md:grid-cols-4 gap-4 md:grid-rows-[minmax(280px,1fr)_minmax(280px,1fr)_minmax(200px,auto)]"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          visible: {
-            transition: { staggerChildren: M3_STAGGER_CHILDREN, delayChildren: M3_STAGGER_DELAY },
-          },
-          hidden: {},
-        }}
-        transition={UNUSONIC_PHYSICS}
-      >
-        <LobbyBentoCell id="live-gig" className="md:col-span-2 md:row-span-2 min-h-[280px] order-2 md:order-1">
-          <LiveGigMonitorWidget levitate={isLevitation} />
-          <ContextualCardDrawer
-            alert={contextualAlert}
-            onDismiss={() => setContextualAlert(null)}
-          />
-        </LobbyBentoCell>
-        <LobbyBentoCell id="ros" className="md:col-span-2 md:row-span-2 min-h-[280px] order-1 md:order-2">
-          <RunOfShowFeedWidget />
-        </LobbyBentoCell>
-        <LobbyBentoCell id="sentiment" className="col-span-full min-h-[200px] order-3">
-          <SentimentPulseWidget />
-        </LobbyBentoCell>
-      </motion.div>
-    );
-  }
-
-  // Growth (State A)
-  return (
-    <motion.div
-      key="growth"
-      layout
-      className="grid grid-cols-1 md:grid-cols-4 gap-4 md:grid-rows-[minmax(280px,1fr)_minmax(280px,1fr)_minmax(200px,auto)]"
-      initial="hidden"
-      animate="visible"
-      variants={{
-        visible: {
-          transition: { staggerChildren: M3_STAGGER_CHILDREN, delayChildren: M3_STAGGER_DELAY },
-        },
-        hidden: {},
-      }}
-      transition={UNUSONIC_PHYSICS}
-    >
-      <LobbyBentoCell id="pipeline" className="md:col-span-2 md:row-span-2 min-h-[280px] order-2 md:order-1">
-        <PipelineVelocityWidget />
-      </LobbyBentoCell>
-      <LobbyBentoCell id="action-stream" className="md:col-span-2 md:row-span-2 min-h-[280px] order-1 md:order-2">
-        <ActionStreamWidget />
-      </LobbyBentoCell>
-      <LobbyBentoCell id="inbox" className="md:col-span-2 min-h-[200px] order-3">
-        <LiquidPanel className="h-full flex flex-col min-h-0 !p-4">
-          <h2 className="text-xs font-medium text-muted uppercase tracking-widest tracking-tight mb-3 shrink-0">
-            Inbox
-          </h2>
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <DailyBriefingClient items={[]} />
-          </div>
-        </LiquidPanel>
-      </LobbyBentoCell>
-      <LobbyBentoCell id="cash-flow" className="md:col-span-2 min-h-[200px] order-4">
-        <CashFlowStream />
-      </LobbyBentoCell>
-    </motion.div>
-  );
+interface LobbyBentoGridProps {
+  dashboardData?: DashboardData;
 }
 
-export function LobbyBentoGrid() {
+// ── Grid ──────────────────────────────────────────────────────────────────
+
+/**
+ * Temporal-hierarchy Bento Grid.
+ * Single responsive layout — no state branching.
+ *
+ * Desktop (lg): 4-column grid with explicit row placement
+ *   Row 1: Today (2) | This Week (1) | Action Queue (1)
+ *   Row 2: Deal Pipeline (2) | Financial Pulse (2)
+ *   Row 3: Activity Feed (1) | Revenue Trend (1) | Event Types (1) | Clients (1)
+ *
+ * Cards stretch to fill row height (align-items: stretch).
+ * Content areas use flex-1 to expand — lists show more items,
+ * charts grow taller. No dead space inside or between cards.
+ *
+ * Tablet (md): 2-column, natural stacking
+ * Mobile: 1-column, Action Queue first
+ */
+export function LobbyBentoGrid({ dashboardData }: LobbyBentoGridProps) {
   return (
-    <LobbyFocusProvider>
-      <BentoGridInner />
-    </LobbyFocusProvider>
+    <motion.div
+      className="stage-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+      initial="hidden"
+      animate="visible"
+      variants={gridVariants}
+    >
+      {/* ── Row 1: Now → This Week → Action Queue ──────────────
+       * Max 320px on desktop — lists scroll internally.
+       * Mobile: uncapped (stacked, no row-height contention).
+       * ──────────────────────────────────────────────────────── */}
+
+      {/* Action Queue — surfaces first on mobile, third on desktop */}
+      <motion.div
+        className="order-1 md:order-3 lg:order-3 lg:col-span-1 lg:max-h-80"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <ActionQueueWidget
+          data={dashboardData?.actions ?? []}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* Today's Schedule — hero cell, 2-col wide */}
+      <motion.div
+        className="order-2 md:order-1 lg:order-1 lg:col-span-2 lg:max-h-80"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <TodayScheduleWidget
+          data={dashboardData?.today ?? { events: [], nextEvent: null }}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* Week Strip — compact 7-day overview */}
+      <motion.div
+        className="order-3 md:order-2 lg:order-2 lg:col-span-1 lg:max-h-80"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <WeekStripWidget
+          data={dashboardData?.week ?? []}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* ── Row 2: Pipeline + Financial Pulse ──────────────────── */}
+
+      {/* Deal Pipeline — 2-col wide */}
+      <motion.div
+        className="order-4 lg:col-span-2"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <DealPipelineWidget
+          data={dashboardData?.pipeline}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* Financial Pulse — 2-col wide */}
+      <motion.div
+        className="order-5 lg:col-span-2"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <FinancialPulseWidget
+          data={dashboardData?.finance}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* ── Row 3: Activity + Trends ───────────────────────────
+       * Max 360px — Activity Feed scrolls, charts get breathing room.
+       * ──────────────────────────────────────────────────────── */}
+
+      {/* Activity Feed */}
+      <motion.div
+        className="order-6 lg:col-span-1 lg:max-h-[360px]"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <ActivityFeedWidget
+          data={dashboardData?.activity ?? []}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* Revenue Trend */}
+      <motion.div
+        className="order-7 lg:col-span-1 lg:max-h-[360px]"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <RevenueTrendWidget
+          data={dashboardData?.revenueTrend ?? { months: [] }}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* Event Type Distribution */}
+      <motion.div
+        className="order-8 lg:col-span-1 lg:max-h-[360px]"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <EventTypeDistWidget
+          data={dashboardData?.eventTypes ?? { types: [] }}
+          loading={!dashboardData}
+        />
+      </motion.div>
+
+      {/* Client Concentration */}
+      <motion.div
+        className="order-9 lg:col-span-1 lg:max-h-[360px]"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <ClientConcentrationWidget
+          data={dashboardData?.clientConcentration ?? { clients: [] }}
+          loading={!dashboardData}
+        />
+      </motion.div>
+    </motion.div>
   );
 }

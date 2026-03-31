@@ -20,10 +20,10 @@ export default async function DealPage({
   if (!data) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-6">
-        <p className="text-ink-muted">Gig not found or you don’t have access.</p>
+        <p className="text-[var(--stage-text-secondary)]">Gig not found or you don’t have access.</p>
         <Link
           href="/crm"
-          className="inline-flex items-center gap-2 text-ink hover:underline"
+          className="inline-flex items-center gap-2 text-[var(--stage-text-primary)] hover:underline"
         >
           <ArrowLeft size={16} /> Back to CRM
         </Link>
@@ -36,27 +36,27 @@ export default async function DealPage({
       <header className="mb-6 flex items-center gap-4 shrink-0 flex-wrap">
         <Link
           href={`/events/g/${data.gig.id}`}
-          className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          aria-label="Back to Command Center"
+          className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+          aria-label="Back to Studio"
         >
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-light text-ink tracking-tight">
+          <h1 className="text-2xl font-light text-[var(--stage-text-primary)] tracking-tight">
             {data.gig.title}
           </h1>
-          <p className="text-sm text-ink-muted mt-0.5">Deal room</p>
+          <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">Deal room</p>
         </div>
         <Link
           href={`/events/g/${data.gig.id}`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
         >
           <LayoutDashboard size={18} />
-          Command Center
+          Studio
         </Link>
         <Link
           href={`/events/${data.gig.id}/finance`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
         >
           <Wallet size={18} />
           Finance

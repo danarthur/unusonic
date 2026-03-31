@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * QBO Connect card – Liquid Ceramic style.
+ * QBO Connect card – Stage Engineering style.
  * Idle / Loading / Connected states; Connect QuickBooks and Disconnect.
  */
 
@@ -64,17 +64,17 @@ export function QboConnectCard({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={springConfig}
-          className="liquid-panel p-4 flex items-center gap-4"
+          className="stage-panel-elevated p-4 flex items-center gap-4"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-            <Building2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--color-unusonic-success)]/10 flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5 text-[var(--color-unusonic-success)]" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-ink truncate">
+            <p className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
               QuickBooks
             </p>
-            <p className="text-xs text-ink-muted flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-xs text-[var(--stage-text-secondary)] flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-unusonic-success)]" />
               Active
               {realmId && (
                 <span className="font-mono text-[10px] opacity-80 ml-1 truncate" title={realmId}>
@@ -86,14 +86,12 @@ export function QboConnectCard({
           <motion.button
             onClick={handleDisconnect}
             disabled={isPending}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             transition={springConfig}
             className="px-4 py-2 rounded-xl text-sm font-medium
-              text-red-600 dark:text-red-400
-              bg-red-500/5 hover:bg-red-500/10
-              border border-red-500/20 hover:border-red-500/30
-              transition-colors duration-200
+              text-[var(--color-unusonic-error)]
+              bg-[var(--color-unusonic-error)]/10 hover:bg-[var(--color-unusonic-error)]/20
+              border border-[var(--color-unusonic-error)]/20 hover:border-[var(--color-unusonic-error)]/30
+              transition-colors hover:brightness-[1.03]
               disabled:opacity-50 disabled:cursor-not-allowed
               flex items-center gap-2"
           >
@@ -112,7 +110,7 @@ export function QboConnectCard({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={springConfig}
-              className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"
+              className="flex items-center gap-2 text-sm text-[var(--color-unusonic-success)]"
             >
               <CheckCircle2 className="w-4 h-4" />
               Successfully disconnected
@@ -123,7 +121,7 @@ export function QboConnectCard({
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-sm text-red-500"
+            className="text-sm text-[var(--color-unusonic-error)]"
           >
             {error}
           </motion.p>
@@ -139,15 +137,11 @@ export function QboConnectCard({
         disabled={isPending}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        whileHover={{
-          scale: 1.01,
-          boxShadow: '0 16px 36px -12px rgba(74, 69, 62, 0.28)',
-        }}
-        whileTap={{ scale: 0.99 }}
         transition={springConfig}
         className="group relative overflow-hidden
-          liquid-panel p-5
-          hover:border-[var(--glass-border-hover)]
+          stage-panel-elevated p-5
+          hover:brightness-[1.04]
+          transition-[filter]
           disabled:opacity-50 disabled:cursor-not-allowed
           cursor-pointer"
       >
@@ -165,21 +159,21 @@ export function QboConnectCard({
         />
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl
-            bg-ink/5 group-hover:bg-ink/10
-            border border-[var(--glass-border)]
+            bg-[var(--stage-surface-nested)] group-hover:bg-[var(--stage-surface)]
+            border border-[var(--stage-border)]
             flex items-center justify-center
-            transition-all duration-300 shrink-0">
+            transition-colors shrink-0">
             {isPending ? (
-              <Loader2 className="w-6 h-6 text-ink-muted animate-spin" />
+              <Loader2 className="w-6 h-6 text-[var(--stage-text-secondary)] animate-spin" />
             ) : (
-              <Link2 className="w-6 h-6 text-ink-muted" />
+              <Link2 className="w-6 h-6 text-[var(--stage-text-secondary)]" />
             )}
           </div>
           <div className="flex-1 text-left">
-            <p className="text-base font-medium text-ink group-hover:text-walnut transition-colors">
+            <p className="text-base font-medium text-[var(--stage-text-primary)] group-hover:text-walnut transition-colors">
               Connect QuickBooks
             </p>
-            <p className="text-sm text-ink-muted mt-0.5">
+            <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">
               Sync invoices & payments automatically
             </p>
           </div>
@@ -192,7 +186,7 @@ export function QboConnectCard({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={springConfig}
-            className="text-sm text-red-500 px-1"
+            className="text-sm text-[var(--color-unusonic-error)] px-1"
           >
             {error}
           </motion.p>

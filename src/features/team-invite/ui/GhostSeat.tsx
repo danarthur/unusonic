@@ -28,8 +28,8 @@ export function GhostSeat({ email, status, className }: GhostSeatProps) {
       className={cn(
         'size-16 shrink-0 rounded-full flex items-center justify-center border-2 transition-colors duration-300 relative',
         isEmpty
-          ? 'border-dashed border-[var(--color-mercury)] text-[var(--color-ink-muted)]/40'
-          : 'border-solid border-[var(--color-silk)]/50 bg-[var(--color-silk)]/10 text-[var(--color-silk)]',
+          ? 'border-dashed border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)]/40'
+          : 'border-solid border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/10 text-[var(--stage-accent)]',
         className
       )}
     >
@@ -40,7 +40,7 @@ export function GhostSeat({ email, status, className }: GhostSeatProps) {
       )}
       {status === 'sending' && (
         <span
-          className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-[var(--color-silk)] animate-ping opacity-80"
+          className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-[var(--stage-accent)] animate-ping opacity-80"
           aria-hidden
         />
       )}

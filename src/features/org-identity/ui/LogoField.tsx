@@ -100,21 +100,21 @@ export function LogoField({
   return (
     <div className={cn('space-y-3', className)}>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+        <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           {label}
         </span>
-        <div className="flex rounded-xl border border-mercury bg-obsidian/50 p-0.5">
+        <div className="flex rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)]/80 p-0.5">
           <button
             type="button"
             onClick={() => setMode('upload')}
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
               mode === 'upload'
-                ? 'bg-neon-blue/15 text-neon-blue'
-                : 'text-ink-muted hover:text-ceramic'
+                ? 'bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-accent)]'
+                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
             )}
           >
-            <Upload className="size-3.5" />
+            <Upload className="size-3.5" strokeWidth={1.5} />
             Upload
           </button>
           <button
@@ -123,11 +123,11 @@ export function LogoField({
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
               mode === 'link'
-                ? 'bg-neon-blue/15 text-neon-blue'
-                : 'text-ink-muted hover:text-ceramic'
+                ? 'bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-accent)]'
+                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
             )}
           >
-            <Link2 className="size-3.5" />
+            <Link2 className="size-3.5" strokeWidth={1.5} />
             Link
           </button>
         </div>
@@ -141,7 +141,7 @@ export function LogoField({
             disabled={uploading}
             className={cn(
               'relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border transition-colors disabled:opacity-50',
-              'border-mercury bg-obsidian/50 hover:bg-obsidian/70'
+              'border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)]/80 hover:bg-[var(--stage-surface)]'
             )}
             style={
               brandColor
@@ -152,16 +152,16 @@ export function LogoField({
             {value ? (
               <img src={value} alt="" className="size-full object-cover" />
             ) : (
-              <Building2 className="size-8 text-ink-muted" />
+              <Building2 className="size-8 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
             )}
             {uploading && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-obsidian/80 backdrop-blur-sm">
-                <Loader2 className="size-6 animate-spin text-neon-blue" />
+              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[var(--stage-void)]/90">
+                <Loader2 className="size-6 animate-spin text-[var(--stage-accent)]" strokeWidth={1.5} />
               </div>
             )}
           </button>
           <div className="min-w-0 flex-1 pt-1">
-            <p className="text-xs text-ink-muted">
+            <p className="text-xs text-[var(--stage-text-secondary)]">
               PNG, JPEG or WebP. Click the tile to upload.
             </p>
           </div>
@@ -182,9 +182,9 @@ export function LogoField({
             value={linkUrl}
             onChange={handleLinkChange}
             onBlur={handleLinkBlur}
-            className="border-mercury bg-obsidian/50 text-ceramic placeholder:text-ink-muted/60 text-sm"
+            className="border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 text-sm"
           />
-          <p className="text-[10px] text-ink-muted">
+          <p className="text-[10px] text-[var(--stage-text-secondary)]">
             Paste a public image URL.
           </p>
         </div>

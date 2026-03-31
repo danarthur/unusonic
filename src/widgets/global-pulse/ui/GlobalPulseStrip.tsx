@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { TrendingUp, Radio, AlertCircle, Shield } from 'lucide-react';
+import { AlertCircle, Shield } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -45,15 +45,15 @@ export function GlobalPulseStrip() {
   if (metrics.loading) {
     return (
       <motion.div
-        className="liquid-card-pulse px-4 py-3 md:px-6 md:py-3 flex items-center justify-between gap-4"
+        className="stage-panel px-4 py-3 md:px-6 md:py-3 flex items-center justify-between gap-4"
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={M3_FADE_THROUGH_ENTER}
       >
-        <div className="h-5 w-24 liquid-card-nested animate-pulse !rounded-lg" />
+        <div className="h-5 w-24 stage-panel-nested stage-skeleton !rounded-lg" />
         <div className="md:flex gap-6 hidden">
-          <div className="h-5 w-16 liquid-card-nested animate-pulse !rounded-lg" />
-          <div className="h-5 w-16 liquid-card-nested animate-pulse !rounded-lg" />
+          <div className="h-5 w-16 stage-panel-nested stage-skeleton !rounded-lg" />
+          <div className="h-5 w-16 stage-panel-nested stage-skeleton !rounded-lg" />
         </div>
       </motion.div>
     );
@@ -61,7 +61,7 @@ export function GlobalPulseStrip() {
 
   return (
     <motion.div
-      className="liquid-card-pulse px-4 py-3 md:px-6 md:py-3 flex items-center justify-between gap-4"
+      className="stage-panel px-4 py-3 md:px-6 md:py-3 flex items-center justify-between gap-4"
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={M3_FADE_THROUGH_ENTER}
@@ -69,8 +69,8 @@ export function GlobalPulseStrip() {
     >
       {/* Mobile: single Health Index */}
       <div className="md:hidden flex items-center gap-2 min-w-0">
-        <span className="text-[10px] font-medium uppercase tracking-widest text-muted">Health</span>
-        <span className="text-lg font-medium text-ceramic tracking-tight tabular-nums">
+        <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Health</span>
+        <span className="text-lg font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums">
           {healthIndex}%
         </span>
       </div>
@@ -79,38 +79,38 @@ export function GlobalPulseStrip() {
       <div className="hidden md:flex items-center gap-6 flex-1">
         <div className="flex items-center gap-2">
           <div className="relative flex items-center gap-2">
-            <Sparkline values={velocitySparkline} stroke="var(--color-neon-blue)" opacity={0.5} className="shrink-0" />
+            <Sparkline values={velocitySparkline} stroke="var(--stage-accent)" opacity={0.5} className="shrink-0" />
             <div>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-muted">Velocity</span>
-              <span className="text-sm font-medium text-ceramic tracking-tight tabular-nums block">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Velocity</span>
+              <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums block">
                 {revenueFormatted}
-                <span className="text-muted font-normal"> / {targetFormatted}</span>
+                <span className="text-[var(--stage-text-secondary)] font-normal"> / {targetFormatted}</span>
               </span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex items-center gap-2">
-            <MiniBarStrip values={pulseBars} fill="var(--color-neon-blue)" opacity={0.5} className="shrink-0" />
+            <MiniBarStrip values={pulseBars} fill="var(--stage-accent)" opacity={0.5} className="shrink-0" />
             <div>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-muted">Pulse</span>
-              <span className="text-sm font-medium text-ceramic tracking-tight tabular-nums block">
-                {metrics.activeGigsNext72h} <span className="text-muted font-normal">next 72h</span>
+              <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Pulse</span>
+              <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums block">
+                {metrics.activeGigsNext72h} <span className="text-[var(--stage-text-secondary)] font-normal">next 72h</span>
               </span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-muted shrink-0" aria-hidden />
-          <span className="text-[10px] font-medium uppercase tracking-widest text-muted">Alerts</span>
-          <span className="text-sm font-medium text-ceramic tracking-tight tabular-nums">
+          <AlertCircle className="w-4 h-4 text-[var(--stage-text-secondary)] shrink-0" aria-hidden />
+          <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Alerts</span>
+          <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums">
             {metrics.alertsCount}
           </span>
         </div>
       </div>
 
       {metrics.error && (
-        <span className="text-xs text-muted shrink-0" role="status">
+        <span className="text-xs text-[var(--stage-text-secondary)] shrink-0" role="status">
           {metrics.error}
         </span>
       )}
@@ -131,11 +131,11 @@ export function GlobalPulseStrip() {
           <PopoverContent
             side="bottom"
             align="end"
-            className="liquid-card m3-card-corner-extra-large p-4 max-w-[280px] border-[var(--glass-border)]"
+            className="stage-panel m3-card-corner-extra-large p-4 max-w-[280px] border-[oklch(1_0_0_/_0.08)]"
             sideOffset={8}
           >
-            <p className="text-sm font-medium text-ceramic">Back up your account</p>
-            <p className="text-xs text-muted leading-relaxed mt-1">
+            <p className="text-sm font-medium text-[var(--stage-text-primary)]">Back up your account</p>
+            <p className="text-xs text-[var(--stage-text-secondary)] leading-relaxed mt-1">
               Set up a recovery kit so you never get locked out.
             </p>
             <div className="flex flex-wrap gap-2 mt-3">

@@ -1,70 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
-import { signOutAction } from '@/shared/api/auth/sign-out';
-import { getTrustedDeviceCookie } from '@/shared/lib/trusted-device';
-import { INACTIVITY_LOGOUT_MS } from '@/shared/lib/constants';
-
-const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'focus'] as const;
-
 /**
- * When the device is not trusted, signs the user out after a period of inactivity.
- * Trusted device is set via "Keep me signed in on this device" at login.
- * Does not run when the tab is hidden (time paused).
+ * Inactivity logout provider.
+ *
+ * Disabled by default as of 2026-03-29. In a passkey-first auth model,
+ * the device IS the credential — app-level inactivity timeouts provide
+ * no real security benefit (the attacker at the keyboard can re-authenticate
+ * with the device's biometric). Device-level screen lock is the correct
+ * security boundary.
+ *
+ * The implementation is preserved for future admin-configurable re-enablement
+ * (P3: workspace session policy settings for enterprise/compliance customers).
+ *
+ * @see docs/reference/auth/session-management.md
  */
+
 export function InactivityLogoutProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
-  const isHiddenRef = useRef(false);
-
-  const scheduleLogout = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      timeoutRef.current = null;
-      void signOutAction({ reason: 'inactivity' });
-    }, INACTIVITY_LOGOUT_MS);
-  }, []);
-
-  const onActivity = useCallback(() => {
-    lastActivityRef.current = Date.now();
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    scheduleLogout();
-  }, [scheduleLogout]);
-
-  useEffect(() => {
-    if (getTrustedDeviceCookie()) return;
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        isHiddenRef.current = true;
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-      } else {
-        isHiddenRef.current = false;
-        lastActivityRef.current = Date.now();
-        scheduleLogout();
-      }
-    };
-
-    scheduleLogout();
-    document.addEventListener('visibilitychange', handleVisibility);
-    ACTIVITY_EVENTS.forEach((ev) => document.addEventListener(ev, onActivity));
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      ACTIVITY_EVENTS.forEach((ev) => document.removeEventListener(ev, onActivity));
-    };
-  }, [onActivity, scheduleLogout]);
-
+  // Disabled by default. Future: accept `enabled` prop driven by workspace
+  // session policy settings (admin-configurable idle timeout for SOC2/ISO).
   return <>{children}</>;
 }

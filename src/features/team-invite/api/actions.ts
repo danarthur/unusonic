@@ -9,15 +9,13 @@ import { getOrgDetails } from '@/features/org-management/api';
 import { listOrgMembers } from '@/entities/organization/api/list-org-members';
 import { upsertGhostMemberSchema, type UpsertGhostMemberInput } from '../model/schema';
 import type { RosterBadgeData, RosterBadgeStatus, RosterMemberDisplay } from '../model/types';
+import type { OrgMemberRole } from '@/entities/organization/model/types';
 
 export type InviteEmployeeResult = { ok: true; message: string } | { ok: false; error: string };
 export type UpsertGhostResult = { ok: true; member: RosterBadgeData } | { ok: false; error: string };
 export type DeployInvitesResult = { ok: true; sent: number } | { ok: false; error: string };
 
-/** Phase 1: owner, admin, manager, member, restricted (Observer). */
-export type OrgMemberRole = 'owner' | 'admin' | 'manager' | 'member' | 'restricted';
-
-/** Map DB/Supabase errors to Signal-friendly messages (no raw RLS or constraint text). */
+/** Map DB/Supabase errors to Unusonic-friendly messages (no raw RLS or constraint text). */
 function normalizeRosterError(err: { message?: string; code?: string } | null | undefined): string {
   if (!err?.message) return 'Something went wrong. Please try again.';
   const msg = err.message.toLowerCase();
@@ -45,19 +43,36 @@ export async function getCurrentUserOrgRole(orgId: string): Promise<OrgMemberRol
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: entity } = await supabase
+
+  // Find person entity by auth user
+  const { data: personEnt } = await supabase
+    .schema('directory')
     .from('entities')
     .select('id')
-    .eq('auth_id', user.id)
+    .eq('claimed_by_user_id', user.id)
     .maybeSingle();
-  if (!entity) return null;
-  const { data: member } = await supabase
-    .from('org_members')
-    .select('role')
-    .eq('org_id', orgId)
-    .eq('entity_id', entity.id)
+  if (!personEnt) return null;
+
+  // Find org entity by legacy org id
+  const { data: orgEnt } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id')
+    .eq('legacy_org_id', orgId)
     .maybeSingle();
-  return (member?.role as OrgMemberRole) ?? null;
+  if (!orgEnt) return null;
+
+  // Find ROSTER_MEMBER edge
+  const { data: rel } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('context_data')
+    .eq('source_entity_id', personEnt.id)
+    .eq('target_entity_id', orgEnt.id)
+    .eq('relationship_type', 'ROSTER_MEMBER')
+    .maybeSingle();
+
+  return ((rel?.context_data as Record<string, unknown>)?.role as OrgMemberRole) ?? null;
 }
 
 /** List roster for current org with status per member. Captain first in list. */
@@ -67,9 +82,10 @@ export async function getRoster(orgId: string): Promise<{ members: RosterMemberD
   let currentEntityId: string | null = null;
   if (user) {
     const { data: entity } = await supabase
+      .schema('directory')
       .from('entities')
       .select('id')
-      .eq('auth_id', user.id)
+      .eq('claimed_by_user_id', user.id)
       .maybeSingle();
     currentEntityId = entity?.id ?? null;
   }
@@ -122,7 +138,7 @@ export async function getRoster(orgId: string): Promise<{ members: RosterMemberD
   return { members, captainId };
 }
 
-/** Create or update a ghost member (no email sent). Uses entity + affiliation + org_member. */
+/** Create or update a ghost member (no email sent). Uses add_ghost_member RPC / cortex.relationships. */
 export async function upsertGhostMember(
   orgId: string,
   input: UpsertGhostMemberInput,
@@ -152,42 +168,77 @@ export async function upsertGhostMember(
   if (existingMemberId) {
     const myEntityId = await getCurrentEntityId();
     if (!myEntityId) return { ok: false, error: 'Your account is not linked to an organization.' };
-    const { data: aff } = await supabase
-      .from('affiliations')
-      .select('organization_id')
-      .eq('entity_id', myEntityId)
-      .eq('organization_id', orgId)
-      .in('access_level', ['admin', 'member'])
-      .eq('status', 'active')
-      .maybeSingle();
-    if (!aff) return { ok: false, error: 'You do not have permission to add members to this organization.' };
 
-    const { data: existing } = await supabase
-      .from('org_members')
-      .select('id, entity_id, profile_id')
+    // Auth check: verify caller has a ROSTER_MEMBER or MEMBER edge to this org
+    const { data: orgEntForAuth } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('legacy_org_id', orgId)
+      .maybeSingle();
+    if (!orgEntForAuth) return { ok: false, error: 'Organization not found.' };
+
+    const { data: authRel } = await supabase
+      .schema('cortex')
+      .from('relationships')
+      .select('context_data')
+      .eq('source_entity_id', myEntityId)
+      .eq('target_entity_id', orgEntForAuth.id)
+      .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+      .maybeSingle();
+    if (!authRel) return { ok: false, error: 'You do not have permission to add members to this organization.' };
+
+    // Fetch the relationship by its cortex edge UUID
+    const { data: rel } = await supabase
+      .schema('cortex')
+      .from('relationships')
+      .select('id, source_entity_id, target_entity_id, context_data')
       .eq('id', existingMemberId)
-      .eq('org_id', orgId)
+      .eq('relationship_type', 'ROSTER_MEMBER')
       .maybeSingle();
-    if (!existing) return { ok: false, error: 'Member not found.' };
-    if (existing.profile_id != null) return { ok: false, error: 'Cannot edit a claimed member here.' };
+    if (!rel) return { ok: false, error: 'Member not found.' };
 
-    const entityId = existing.entity_id;
-    if (!entityId) return { ok: false, error: 'Invalid member.' };
+    // Check the person entity has not been claimed
+    const { data: personEnt } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('claimed_by_user_id')
+      .eq('id', rel.source_entity_id)
+      .maybeSingle();
+    if (personEnt?.claimed_by_user_id != null) return { ok: false, error: 'Cannot edit a claimed member here.' };
 
-    await supabase.from('entities').update({ email: emailTrim }).eq('id', entityId);
-    type OrgMemberRole = 'admin' | 'member' | 'owner' | 'restricted';
-    const updatePayload: { first_name: string; last_name: string; job_title: string | null; role: OrgMemberRole; avatar_url?: string | null } = {
+    // Update email on directory entity
+    await supabase.rpc('patch_entity_attributes', {
+      p_entity_id: rel.source_entity_id,
+      p_attributes: { email: emailTrim },
+    });
+
+    // Update roster fields via patch_relationship_context
+    const dbRole = role === 'manager' ? 'member' : role;
+    const patch: Record<string, unknown> = {
       first_name,
       last_name,
       job_title: job_title?.trim() || null,
-      role: (role === 'manager' ? 'member' : role) as OrgMemberRole,
+      role: dbRole,
     };
-    if (inputAvatarUrl !== undefined) updatePayload.avatar_url = inputAvatarUrl || null;
-    const { error: memberErr } = await supabase
-      .from('org_members')
-      .update(updatePayload)
-      .eq('id', existingMemberId);
-    if (memberErr) return { ok: false, error: normalizeRosterError(memberErr) };
+    if (inputAvatarUrl !== undefined) patch.avatar_url = inputAvatarUrl || null;
+
+    const { error: patchErr } = await supabase.rpc('patch_relationship_context', {
+      p_source_entity_id: rel.source_entity_id,
+      p_target_entity_id: rel.target_entity_id,
+      p_relationship_type: 'ROSTER_MEMBER',
+      p_patch: patch,
+    });
+    if (patchErr) return { ok: false, error: normalizeRosterError(patchErr) };
+
+    // If avatar supplied, also update directory.entities.avatar_url directly
+    if (inputAvatarUrl !== undefined) {
+      await supabase
+        .schema('directory')
+        .from('entities')
+        .update({ avatar_url: inputAvatarUrl || null })
+        .eq('id', rel.source_entity_id);
+    }
 
     const name = [first_name, last_name].filter(Boolean).join(' ').trim() || emailTrim;
     revalidatePath('/settings/team');
@@ -207,47 +258,43 @@ export async function upsertGhostMember(
     };
   }
 
-  type OrgMemberRole = 'admin' | 'member' | 'owner' | 'restricted';
+  type RpcOrgMemberRole = 'admin' | 'member' | 'owner' | 'restricted';
   const { data: rpcResult, error: rpcErr } = await supabase.rpc('add_ghost_member', {
     p_org_id: orgId,
     p_workspace_id: workspaceId,
     p_first_name: first_name,
     p_last_name: last_name,
     p_email: emailTrim,
-    p_role: (role === 'manager' ? 'member' : role) as OrgMemberRole,
+    p_role: (role === 'manager' ? 'member' : role) as RpcOrgMemberRole,
     p_job_title: job_title?.trim() || null,
   });
 
   if (rpcErr) {
     return { ok: false, error: normalizeRosterError(rpcErr) };
   }
-  const result = rpcResult as { ok: boolean; error?: string; id?: string; name?: string; first_name?: string; last_name?: string; role?: string; email?: string; job_title?: string | null } | null;
+  const result = rpcResult as {
+    ok: boolean;
+    error?: string;
+    id?: string;
+    entity_id?: string;
+    name?: string;
+    first_name?: string;
+    last_name?: string;
+    role?: string;
+    email?: string;
+    job_title?: string | null;
+  } | null;
   if (!result || !result.ok) {
     return { ok: false, error: result?.error ?? 'Failed to add member.' };
   }
 
-  if (inputAvatarUrl && result.id) {
-    await supabase.from('org_members').update({ avatar_url: inputAvatarUrl }).eq('id', result.id);
-  }
-
-  // Non-fatal cortex ROSTER_MEMBER edge mirror for newly created ghost member
-  if (result.id) {
-    const { data: newOm } = await supabase
-      .from('org_members').select('entity_id').eq('id', result.id).maybeSingle();
-    if (newOm?.entity_id) {
-      const [personDirRes, orgDirRes] = await Promise.all([
-        supabase.schema('directory').from('entities').select('id').eq('legacy_entity_id', newOm.entity_id).maybeSingle(),
-        supabase.schema('directory').from('entities').select('id').eq('legacy_org_id', orgId).maybeSingle(),
-      ]);
-      if (personDirRes.data?.id && orgDirRes.data?.id) {
-        await supabase.rpc('upsert_relationship', {
-          p_source_entity_id: personDirRes.data.id,
-          p_target_entity_id: orgDirRes.data.id,
-          p_type: 'ROSTER_MEMBER',
-          p_context_data: { first_name: result.first_name ?? first_name, last_name: result.last_name ?? last_name, role: result.role ?? role, job_title: result.job_title ?? job_title?.trim() ?? null },
-        });
-      }
-    }
+  // Update avatar on directory entity if supplied (add_ghost_member returns entity_id)
+  if (inputAvatarUrl && result.entity_id) {
+    await supabase
+      .schema('directory')
+      .from('entities')
+      .update({ avatar_url: inputAvatarUrl })
+      .eq('id', result.entity_id);
   }
 
   const name = (result.name ?? [result.first_name, result.last_name].filter(Boolean).join(' ').trim()) || result.email || emailTrim;
@@ -286,7 +333,7 @@ export async function inviteEmployee(email: string): Promise<InviteEmployeeResul
   return { ok: false, error: result.error };
 }
 
-/** Deploy invites: create invitation rows and send emails for unsent ghosts. */
+/** Send invites: create invitation rows and send emails for unsent ghosts. */
 export async function deployInvites(orgId: string, memberIds: string[]): Promise<DeployInvitesResult> {
   if (memberIds.length === 0) return { ok: true, sent: 0 };
 
@@ -297,52 +344,88 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
   } = await supabase.auth.getUser();
   if (authError || !user) return { ok: false, error: 'You must be signed in.' };
 
+  // Resolve caller's directory entity
   const { data: myEntity } = await supabase
+    .schema('directory')
     .from('entities')
     .select('id')
-    .eq('auth_id', user.id)
+    .eq('claimed_by_user_id', user.id)
     .maybeSingle();
   if (!myEntity) return { ok: false, error: 'Unauthorized.' };
 
-  const { data: aff } = await supabase
-    .from('affiliations')
-    .select('organization_id')
-    .eq('entity_id', myEntity.id)
-    .eq('organization_id', orgId)
-    .in('access_level', ['admin', 'member'])
-    .eq('status', 'active')
-    .maybeSingle();
-  if (!aff) return { ok: false, error: 'You do not have permission to send invites for this organization.' };
-
-  const { data: members } = await supabase
-    .from('org_members')
-    .select('id, entity_id, first_name, last_name')
-    .eq('org_id', orgId)
-    .in('id', memberIds)
-    .is('profile_id', null);
-
-  if (!members?.length) return { ok: true, sent: 0 };
-
-  const entityIds = [...new Set(members.map((m) => m.entity_id).filter(Boolean))] as string[];
-  const { data: entities } = await supabase
+  // Auth check: verify caller has a ROSTER_MEMBER or MEMBER edge to this org
+  const { data: myOrgEnt } = await supabase
+    .schema('directory')
     .from('entities')
-    .select('id, email')
-    .in('id', entityIds);
-  const emailByEntityId = new Map((entities ?? []).map((e) => [e.id, e.email]));
+    .select('id')
+    .eq('legacy_org_id', orgId)
+    .maybeSingle();
+  if (!myOrgEnt) return { ok: false, error: 'You do not have permission to send invites for this organization.' };
+
+  const { data: authRel2 } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('id')
+    .eq('source_entity_id', myEntity.id)
+    .eq('target_entity_id', myOrgEnt.id)
+    .in('relationship_type', ['ROSTER_MEMBER', 'MEMBER'])
+    .maybeSingle();
+  if (!authRel2) return { ok: false, error: 'You do not have permission to send invites for this organization.' };
+
+  // Resolve org entity for the member edge lookup (same as myOrgEnt above)
+  const orgEntForDeploy = myOrgEnt;
+
+  // Fetch matching ROSTER_MEMBER edges by edge UUID (memberIds are cortex edge UUIDs)
+  const { data: rels } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('id, source_entity_id, context_data')
+    .eq('target_entity_id', orgEntForDeploy.id)
+    .eq('relationship_type', 'ROSTER_MEMBER')
+    .in('id', memberIds);
+  if (!rels?.length) return { ok: true, sent: 0 };
+
+  // Batch-fetch person entities to check claimed status and get email
+  const sourceIds = rels.map((r) => r.source_entity_id);
+  const { data: personEnts } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, claimed_by_user_id, attributes')
+    .in('id', sourceIds);
+  const personById = new Map((personEnts ?? []).map((e) => [e.id, e]));
+
+  // Filter to unclaimed ghosts only with a valid email
+  type DeployMember = { id: string; entity_id: string; email: string; first_name?: string; last_name?: string };
+  const members: DeployMember[] = rels
+    .map((r): DeployMember | null => {
+      const ent = personById.get(r.source_entity_id);
+      if (!ent || ent.claimed_by_user_id != null) return null;
+      const attrs = (ent.attributes as Record<string, unknown>) ?? {};
+      const ctx = (r.context_data as Record<string, unknown>) ?? {};
+      const email = attrs.email as string | undefined;
+      if (!email) return null;
+      const first_name =
+        (ctx.first_name as string | undefined) ?? (attrs.first_name as string | undefined);
+      const last_name =
+        (ctx.last_name as string | undefined) ?? (attrs.last_name as string | undefined);
+      return { id: r.id, entity_id: r.source_entity_id, email, first_name, last_name };
+    })
+    .filter((m): m is DeployMember => m !== null);
+
+  if (!members.length) return { ok: true, sent: 0 };
 
   let sent = 0;
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   for (const m of members) {
-    const email = m.entity_id ? emailByEntityId.get(m.entity_id) : null;
-    if (!email?.trim()) continue;
+    if (!m.email.trim()) continue;
 
     const { data: existing } = await supabase
       .from('invitations')
       .select('id')
       .eq('organization_id', orgId)
-      .ilike('email', email.trim())
+      .ilike('email', m.email.trim())
       .maybeSingle();
     if (existing) continue;
 
@@ -350,7 +433,7 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
     const { error: invErr } = await supabase.from('invitations').insert({
       organization_id: orgId,
       created_by_org_id: orgId,
-      email: email.trim(),
+      email: m.email.trim(),
       token,
       expires_at: expiresAt.toISOString(),
       status: 'pending',

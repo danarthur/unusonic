@@ -49,13 +49,16 @@ function startsAtFromEventDate(eventDate: string | null): string {
     d.setUTCHours(8, 0, 0, 0);
     return d.toISOString();
   }
-  const d = new Date(eventDate);
+  // Parse yyyy-MM-dd as local date to avoid UTC shift (Oct 1 becoming Sep 30 in western TZ)
+  const parts = eventDate.split('-');
+  const d = parts.length === 3
+    ? new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 8, 0, 0)
+    : new Date(eventDate);
   if (Number.isNaN(d.getTime())) {
     const fallback = new Date();
     fallback.setUTCHours(8, 0, 0, 0);
     return fallback.toISOString();
   }
-  d.setUTCHours(8, 0, 0, 0);
   return d.toISOString();
 }
 
@@ -68,13 +71,16 @@ function endsAtFromEventDate(eventDate: string | null): string {
     d.setUTCHours(18, 0, 0, 0);
     return d.toISOString();
   }
-  const d = new Date(eventDate);
+  // Parse yyyy-MM-dd as local date to avoid UTC shift
+  const parts = eventDate.split('-');
+  const d = parts.length === 3
+    ? new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 18, 0, 0)
+    : new Date(eventDate);
   if (Number.isNaN(d.getTime())) {
     const fallback = new Date();
     fallback.setUTCHours(18, 0, 0, 0);
     return fallback.toISOString();
   }
-  d.setUTCHours(18, 0, 0, 0);
   return d.toISOString();
 }
 

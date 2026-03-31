@@ -4,6 +4,7 @@ export {
   unpinFromInnerCircle,
   summonPartner,
   summonPartnerAsGhost,
+  summonPersonGhost,
   createGhostWithContact,
   createConnectionFromScout,
   searchNetworkOrgs,

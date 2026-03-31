@@ -23,7 +23,7 @@ export const inviteTeamMemberPayloadSchema = z
   })
   .refine(
     (data) => !data.grant_workspace_access || (data.workspace_role_id != null && data.workspace_role_id !== ''),
-    { message: 'When granting Signal login access, a workspace role is required.', path: ['workspace_role_id'] }
+    { message: 'When granting Unusonic login access, a workspace role is required.', path: ['workspace_role_id'] }
   );
 
 export type InviteTeamMemberPayload = z.infer<typeof inviteTeamMemberPayloadSchema>;

@@ -11,10 +11,9 @@ import {
   SheetClose,
   SheetBody,
 } from '@/shared/ui/sheet';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { StagePanel } from '@/shared/ui/stage-panel';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import {
-  getCallTimeRules,
   upsertCallTimeRule,
   deleteCallTimeRule,
   type WorkspaceCallTimeRule,
@@ -52,9 +51,9 @@ function RuleDescription({ rule }: { rule: WorkspaceCallTimeRule }) {
       : `→ ${rule.offset_minutes != null ? offsetToDisplay(rule.offset_minutes) : '—'} from show`;
 
   return (
-    <p className="text-xs text-ink-muted mt-0.5 truncate">
+    <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5 truncate">
       {criteria.length > 0 ? criteria.join(' · ') : 'All crew'}{' '}
-      <span className="text-ceramic/70">{action}</span>
+      <span className="text-[var(--stage-text-tertiary)]">{action}</span>
     </p>
   );
 }
@@ -75,19 +74,19 @@ function TagInput({ value, onChange, placeholder }: TagInputProps) {
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 rounded-lg border border-white/10 bg-white/5 p-2 min-h-[40px]">
+    <div className="flex flex-wrap gap-1.5 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-2 min-h-[40px]">
       {value.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-xs text-ceramic"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--stage-surface-elevated)] text-xs text-[var(--stage-text-primary)]"
         >
           {tag}
           <button
             type="button"
             onClick={() => onChange(value.filter((t) => t !== tag))}
-            className="text-ink-muted hover:text-[var(--color-unusonic-error)] transition-colors"
+            className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors"
           >
-            <X size={10} />
+            <X size={10} strokeWidth={1.5} />
           </button>
         </span>
       ))}
@@ -101,7 +100,7 @@ function TagInput({ value, onChange, placeholder }: TagInputProps) {
         }}
         onBlur={add}
         placeholder={value.length === 0 ? placeholder : ''}
-        className="flex-1 min-w-[100px] bg-transparent text-sm text-ceramic placeholder:text-ink-muted/50 focus:outline-none"
+        className="flex-1 min-w-[100px] bg-transparent text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none"
       />
     </div>
   );
@@ -200,7 +199,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
         <SheetBody className="flex flex-col gap-5">
           {/* Name */}
           <div>
-            <label className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5 block">
+            <label className="text-xs font-medium text-[var(--stage-text-secondary)] mb-1.5 block">
               Rule name
             </label>
             <input
@@ -208,16 +207,19 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               placeholder="e.g. DJs → Load-in"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-ceramic placeholder:text-ink-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             />
           </div>
 
           {/* Criteria — Roles */}
           <div>
-            <label className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-1 block">
+            <label className="text-xs font-medium text-[var(--stage-text-secondary)] mb-1 block">
               Matches roles
             </label>
-            <p className="text-xs text-ink-muted/60 mb-1.5">Enter, press comma or Return to add. Partial match — "DJ" matches "DJ", "Lead DJ", "DJ Booth".</p>
+            <p className="text-xs text-[var(--stage-text-tertiary)] mb-1.5">
+              Enter, press comma or Return to add. Partial match — &ldquo;DJ&rdquo; matches &ldquo;DJ&rdquo;,
+              &ldquo;Lead DJ&rdquo;, &ldquo;DJ Booth&rdquo;.
+            </p>
             <TagInput
               value={form.role_patterns}
               onChange={(v) => set('role_patterns', v)}
@@ -227,10 +229,10 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
 
           {/* Criteria — Event type */}
           <div>
-            <label className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5 block">
+            <label className="text-xs font-medium text-[var(--stage-text-secondary)] mb-1.5 block">
               Event type (optional)
             </label>
-            <p className="text-xs text-ink-muted/60 mb-2">Leave blank to apply to all event types.</p>
+            <p className="text-xs text-[var(--stage-text-tertiary)] mb-2">Leave blank to apply to all event types.</p>
             <div className="flex flex-wrap gap-1.5">
               {EVENT_ARCHETYPES.map((a) => {
                 const active = form.event_archetypes.includes(a);
@@ -241,8 +243,8 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                     onClick={() => toggleArchetype(a)}
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors capitalize ${
                       active
-                        ? 'border-[var(--color-neon-blue)]/40 bg-[var(--color-neon-blue)]/10 text-[var(--color-neon-blue)]'
-                        : 'border-white/10 text-ink-muted hover:border-white/20 hover:text-ceramic'
+                        ? 'border-[var(--color-unusonic-info)]/40 bg-[var(--color-unusonic-info)]/10 text-[var(--color-unusonic-info)]'
+                        : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:border-[var(--stage-border-hover)] hover:text-[var(--stage-text-primary)]'
                     }`}
                   >
                     {a}
@@ -254,17 +256,17 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
 
           {/* Action */}
           <div>
-            <label className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5 block">
+            <label className="text-xs font-medium text-[var(--stage-text-secondary)] mb-1.5 block">
               Assigns to
             </label>
             <div className="flex gap-1.5 mb-3">
               <button
                 type="button"
                 onClick={() => set('action_type', 'slot')}
-                className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                className={`flex-1 py-1.5 rounded-[var(--stage-radius-button)] border text-xs font-medium transition-colors ${
                   form.action_type === 'slot'
-                    ? 'border-[var(--color-neon-blue)]/40 bg-[var(--color-neon-blue)]/10 text-[var(--color-neon-blue)]'
-                    : 'border-white/10 text-ink-muted hover:bg-white/5'
+                    ? 'border-[var(--color-unusonic-info)]/40 bg-[var(--color-unusonic-info)]/10 text-[var(--color-unusonic-info)]'
+                    : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface)]'
                 }`}
               >
                 Named slot
@@ -272,10 +274,10 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               <button
                 type="button"
                 onClick={() => set('action_type', 'offset')}
-                className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                className={`flex-1 py-1.5 rounded-[var(--stage-radius-button)] border text-xs font-medium transition-colors ${
                   form.action_type === 'offset'
-                    ? 'border-[var(--color-neon-blue)]/40 bg-[var(--color-neon-blue)]/10 text-[var(--color-neon-blue)]'
-                    : 'border-white/10 text-ink-muted hover:bg-white/5'
+                    ? 'border-[var(--color-unusonic-info)]/40 bg-[var(--color-unusonic-info)]/10 text-[var(--color-unusonic-info)]'
+                    : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface)]'
                 }`}
               >
                 Offset from show
@@ -284,7 +286,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
 
             {form.action_type === 'slot' && (
               <div>
-                <p className="text-xs text-ink-muted/60 mb-1.5">
+                <p className="text-xs text-[var(--stage-text-tertiary)] mb-1.5">
                   Matches a named slot on the event by label (case-insensitive). If the slot doesn&apos;t exist on the event yet, the rule waits until you hit &ldquo;Apply rules&rdquo;.
                 </p>
                 <input
@@ -292,14 +294,14 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                   value={form.slot_label ?? ''}
                   onChange={(e) => set('slot_label', e.target.value)}
                   placeholder="Load-in"
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-ceramic placeholder:text-ink-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 />
               </div>
             )}
 
             {form.action_type === 'offset' && (
               <div>
-                <p className="text-xs text-ink-muted/60 mb-2">Sets a call time relative to show start.</p>
+                <p className="text-xs text-[var(--stage-text-tertiary)] mb-2">Sets a call time relative to show start.</p>
                 <div className="flex items-center gap-2">
                   <select
                     value={offsetSign === -1 ? 'before' : 'after'}
@@ -307,7 +309,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                       const s = e.target.value === 'before' ? -1 : 1;
                       set('offset_minutes', s * absOffset);
                     }}
-                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-ceramic focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   >
                     <option value="before">Before</option>
                     <option value="after">After</option>
@@ -321,9 +323,9 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                       const h = Math.max(0, parseInt(e.target.value, 10) || 0);
                       set('offset_minutes', offsetSign * (h * 60 + offsetMins));
                     }}
-                    className="w-16 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-ceramic text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="w-16 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   />
-                  <span className="text-sm text-ink-muted">h</span>
+                  <span className="text-sm text-[var(--stage-text-secondary)]">h</span>
                   <input
                     type="number"
                     min={0}
@@ -333,10 +335,10 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                       const m = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
                       set('offset_minutes', offsetSign * (offsetHours * 60 + m));
                     }}
-                    className="w-16 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-ceramic text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="w-16 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   />
-                  <span className="text-sm text-ink-muted">min</span>
-                  <span className="text-sm text-ink-muted">show</span>
+                  <span className="text-sm text-[var(--stage-text-secondary)]">min</span>
+                  <span className="text-sm text-[var(--stage-text-secondary)]">show</span>
                 </div>
               </div>
             )}
@@ -344,16 +346,16 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
 
           {/* Priority */}
           <div>
-            <label className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5 block">
+            <label className="text-xs font-medium text-[var(--stage-text-secondary)] mb-1.5 block">
               Priority
             </label>
-            <p className="text-xs text-ink-muted/60 mb-1.5">Higher number wins when multiple rules match the same crew member.</p>
+            <p className="text-xs text-[var(--stage-text-tertiary)] mb-1.5">Higher number wins when multiple rules match the same crew member.</p>
             <input
               type="number"
               min={0}
               value={form.priority}
               onChange={(e) => set('priority', parseInt(e.target.value, 10) || 0)}
-              className="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-ceramic focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="w-24 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             />
           </div>
 
@@ -363,9 +365,9 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               type="checkbox"
               checked={form.apply_only_when_unset}
               onChange={(e) => set('apply_only_when_unset', e.target.checked)}
-              className="rounded border-white/20 bg-white/5 text-[var(--color-neon-blue)] focus:ring-[var(--ring)]"
+              className="rounded border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--color-unusonic-info)] focus:ring-[var(--stage-accent)]"
             />
-            <span className="text-sm text-ceramic">Only apply when crew has no call time set</span>
+            <span className="text-sm text-[var(--stage-text-primary)]">Only apply when crew has no call time set</span>
           </label>
 
           {error && <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
@@ -375,14 +377,14 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               type="button"
               onClick={save}
               disabled={saving}
-              className="flex-1 py-2.5 rounded-xl bg-[var(--color-neon-blue)]/20 text-[var(--color-neon-blue)] font-medium text-sm hover:bg-[var(--color-neon-blue)]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60 transition-colors"
+              className="flex-1 py-2.5 rounded-xl bg-[var(--color-unusonic-info)]/20 text-[var(--color-unusonic-info)] font-medium text-sm hover:bg-[var(--color-unusonic-info)]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
             >
               {saving ? 'Saving…' : rule ? 'Update rule' : 'Add rule'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-white/10 text-ink-muted text-sm hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] transition-colors"
+              className="px-4 py-2.5 rounded-xl border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] text-sm hover:bg-[var(--stage-surface)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
             >
               Cancel
             </button>
@@ -444,7 +446,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
   return (
     <>
       <div className="flex items-center justify-between mb-5">
-        <p className="text-sm text-ink-muted">
+        <p className="text-sm text-[var(--stage-text-secondary)]">
           {rules.length === 0
             ? 'No rules yet. Rules apply automatically when crew is assigned.'
             : `${rules.length} rule${rules.length === 1 ? '' : 's'} · applied when crew is assigned`}
@@ -452,28 +454,28 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
         <button
           type="button"
           onClick={openNew}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 text-sm font-medium text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--stage-edge-subtle)] text-sm font-medium text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
         >
-          <Plus size={14} aria-hidden />
+          <Plus size={14} strokeWidth={1.5} aria-hidden />
           Add rule
         </button>
       </div>
 
       {rules.length === 0 ? (
-        <LiquidPanel className="p-8 rounded-[28px] border border-dashed border-white/10 flex flex-col items-center gap-3 text-center">
-          <Clock size={28} className="text-ink-muted/50" aria-hidden />
-          <p className="text-sm text-ink-muted">
+        <StagePanel className="p-8 rounded-[var(--stage-radius-panel)] border border-dashed border-[var(--stage-edge-subtle)] flex flex-col items-center gap-3 text-center">
+          <Clock size={28} className="text-[var(--stage-text-tertiary)]" strokeWidth={1.5} aria-hidden />
+          <p className="text-sm text-[var(--stage-text-secondary)]">
             Add your first rule to automatically assign call times when crew is booked.
           </p>
           <button
             type="button"
             onClick={openNew}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-neon-blue)]/10 border border-[var(--color-neon-blue)]/20 text-sm font-medium text-[var(--color-neon-blue)] hover:bg-[var(--color-neon-blue)]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-unusonic-info)]/10 border border-[var(--color-unusonic-info)]/20 text-sm font-medium text-[var(--color-unusonic-info)] hover:bg-[var(--color-unusonic-info)]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
           >
-            <Plus size={14} aria-hidden />
+            <Plus size={14} strokeWidth={1.5} aria-hidden />
             Add first rule
           </button>
-        </LiquidPanel>
+        </StagePanel>
       ) : (
         <ul className="space-y-2">
           <AnimatePresence initial={false}>
@@ -483,40 +485,40 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                 layout
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.97 }}
-                transition={UNUSONIC_PHYSICS}
+                exit={{ opacity: 0, y: -4 }}
+                transition={STAGE_LIGHT}
               >
-                <LiquidPanel className="p-4 rounded-2xl border border-white/10 flex items-center gap-4">
+                <StagePanel className="p-4 rounded-2xl border border-[var(--stage-edge-subtle)] flex items-center gap-4">
                   {/* Priority arrows */}
                   <div className="flex flex-col gap-0.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => adjustPriority(rule.id, 'up')}
                       disabled={idx === 0}
-                      className="p-0.5 text-ink-muted hover:text-ceramic disabled:opacity-20 transition-colors focus:outline-none"
+                      className="p-0.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-20 transition-colors focus:outline-none"
                       title="Increase priority"
                     >
-                      <ChevronUp size={14} />
+                      <ChevronUp size={14} strokeWidth={1.5} />
                     </button>
                     <button
                       type="button"
                       onClick={() => adjustPriority(rule.id, 'down')}
                       disabled={idx === rules.length - 1}
-                      className="p-0.5 text-ink-muted hover:text-ceramic disabled:opacity-20 transition-colors focus:outline-none"
+                      className="p-0.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-20 transition-colors focus:outline-none"
                       title="Decrease priority"
                     >
-                      <ChevronDown size={14} />
+                      <ChevronDown size={14} strokeWidth={1.5} />
                     </button>
                   </div>
 
                   {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-ceramic tracking-tight truncate">{rule.name}</p>
+                    <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight truncate">{rule.name}</p>
                     <RuleDescription rule={rule} />
                   </div>
 
                   {/* Priority badge */}
-                  <span className="shrink-0 text-[10px] font-mono text-ink-muted/50 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded">
+                  <span className="shrink-0 text-[10px] font-mono text-[var(--stage-text-tertiary)] bg-[var(--stage-surface)] border border-[var(--stage-edge-subtle)] px-1.5 py-0.5 rounded">
                     P{rule.priority}
                   </span>
 
@@ -525,22 +527,22 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                     <button
                       type="button"
                       onClick={() => openEdit(rule)}
-                      className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className="p-1.5 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                       title="Edit"
                     >
-                      <Pencil size={13} />
+                      <Pencil size={13} strokeWidth={1.5} />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(rule.id)}
                       disabled={deletingId === rule.id}
-                      className="p-1.5 rounded-lg text-ink-muted hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+                      className="p-1.5 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
                       title="Delete"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={13} strokeWidth={1.5} />
                     </button>
                   </div>
-                </LiquidPanel>
+                </StagePanel>
               </motion.li>
             ))}
           </AnimatePresence>

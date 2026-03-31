@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
  * Sales feature – Server Actions: packages, upsert proposal, publish proposal
  * @module features/sales/api/proposal-actions
@@ -16,6 +16,7 @@ import { createDocuSealSubmission } from './create-docuseal-submission';
 import { getPublicProposal } from './get-public-proposal';
 import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../model/types';
+import { resolveRequiredRoles, type RequiredRole, type PackageDefinition } from './package-types';
 
 /** Base URL for public links (proposal, claim, etc.). Prefer NEXT_PUBLIC_APP_URL; on Vercel fall back to VERCEL_URL so links in emails are always absolute. */
 function getPublicBaseUrl(): string {
@@ -73,6 +74,20 @@ export interface ProposalLineItemInput {
   isPackageHeader?: boolean | null;
   /** Catalog price when added as package child; used when Unpack restores a la carte price. */
   originalBasePrice?: number | null;
+  /** When true, client can toggle this item on/off in the proposal portal. */
+  isOptional?: boolean | null;
+  /** Crew roles snapshot — from package definition at add time. Editable for talent assignment in builder. */
+  requiredRoles?: RequiredRole[] | null;
+  /** Catalog floor price locked at proposal-add time. */
+  floorPrice?: number | null;
+  /** Whether this item is taxable (from package definition). */
+  isTaxable?: boolean | null;
+  /** Start time in HH:MM 24h format (e.g., "12:00"). For hourly/daily items. */
+  timeStart?: string | null;
+  /** End time in HH:MM 24h format (e.g., "16:00"). For hourly/daily items. */
+  timeEnd?: string | null;
+  /** When true, time range is shown on client-facing proposal. Default true. */
+  showTimesOnProposal?: boolean | null;
 }
 
 export interface GetPackagesResult {
@@ -118,6 +133,68 @@ export async function getProposalForDeal(dealId: string): Promise<ProposalWithIt
     .eq('proposal_id', proposal.id)
     .order('sort_order', { ascending: true });
   return { ...proposal, items: items ?? [] };
+}
+
+// =============================================================================
+// getProposalHistoryForDeal(dealId): All proposals for a deal, newest first (lightweight — no line items)
+// =============================================================================
+
+export type ProposalHistoryEntry = {
+  id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  view_count: number;
+  accepted_at: string | null;
+  deposit_paid_at: string | null;
+  deposit_percent: number | null;
+  public_token: string | null;
+  total: number;
+  email_delivered_at: string | null;
+  email_bounced_at: string | null;
+};
+
+export async function getProposalHistoryForDeal(dealId: string): Promise<ProposalHistoryEntry[]> {
+  unstable_noStore();
+  const supabase = await createClient();
+
+  const { data: proposals } = await supabase
+    .from('proposals')
+    .select('id, status, created_at, updated_at, view_count, accepted_at, deposit_paid_at, deposit_percent, public_token, email_delivered_at, email_bounced_at')
+    .eq('deal_id', dealId)
+    .order('created_at', { ascending: false });
+
+  if (!proposals?.length) return [];
+
+  // Fetch totals: sum of (override_price ?? unit_price) * quantity per proposal
+  const proposalIds = proposals.map((p) => p.id);
+  const { data: items } = await supabase
+    .from('proposal_items')
+    .select('proposal_id, quantity, unit_price, override_price')
+    .in('proposal_id', proposalIds);
+
+  const totalByProposal = new Map<string, number>();
+  for (const item of items ?? []) {
+    const price = (item.override_price as number | null) ?? (item.unit_price as number) ?? 0;
+    const qty = (item.quantity as number) ?? 1;
+    const prev = totalByProposal.get(item.proposal_id as string) ?? 0;
+    totalByProposal.set(item.proposal_id as string, prev + price * qty);
+  }
+
+  return proposals.map((p) => ({
+    id: p.id,
+    status: p.status,
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+    view_count: p.view_count,
+    accepted_at: p.accepted_at ?? null,
+    deposit_paid_at: p.deposit_paid_at ?? null,
+    deposit_percent: p.deposit_percent ?? null,
+    public_token: p.public_token ?? null,
+    total: totalByProposal.get(p.id) ?? 0,
+    email_delivered_at: (p as Record<string, unknown>).email_delivered_at as string | null ?? null,
+    email_bounced_at: (p as Record<string, unknown>).email_bounced_at as string | null ?? null,
+  }));
 }
 
 /** Return the public URL for the deal's sent proposal, or null. Use for "View shared link" so the token is always correct. */
@@ -197,6 +274,18 @@ async function resolveWorkspaceIdFromDeal(
     : null;
 }
 
+/** Build a definition_snapshot JSONB object from line item data. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildSnapshot(item: any): Record<string, unknown> | null {
+  const snap: Record<string, unknown> = {};
+  if (item.category) snap.margin_meta = { category: item.category };
+  if (item.requiredRoles?.length) snap.crew_meta = { required_roles: item.requiredRoles };
+  if (item.floorPrice != null) snap.price_meta = { floor_price: item.floorPrice };
+  if (item.isTaxable != null) snap.tax_meta = { is_taxable: item.isTaxable };
+  if (item.timeStart || item.timeEnd) snap.schedule_meta = { time_start: item.timeStart ?? null, time_end: item.timeEnd ?? null };
+  return Object.keys(snap).length > 0 ? snap : null;
+}
+
 // =============================================================================
 // getExpandedPackageLineItems(packageId): Deep copy — items inside package (for preview + apply)
 // =============================================================================
@@ -211,6 +300,9 @@ export interface ExpandedLineItem {
   category: ProposalLineItemCategory | null;
   originPackageId: string | null;
   actualCost: number | null;
+  requiredRoles: RequiredRole[] | null;
+  floorPrice: number | null;
+  isTaxable: boolean;
 }
 
 export async function getExpandedPackageLineItems(
@@ -245,6 +337,7 @@ export async function getExpandedPackageLineItems(
 
   if (catalogIds.length === 0) {
     const cat = (pkg.category as string) as ProposalLineItemCategory;
+    const roles = resolveRequiredRoles(def as PackageDefinition | null);
     return {
       items: [
         {
@@ -257,6 +350,9 @@ export async function getExpandedPackageLineItems(
           category: cat ?? null,
           originPackageId: pkg.id,
           actualCost: pkg.target_cost != null ? Number(pkg.target_cost) : null,
+          requiredRoles: roles.length > 0 ? roles : null,
+          floorPrice: (pkg as { floor_price?: number }).floor_price != null ? Number((pkg as { floor_price?: number }).floor_price) : null,
+          isTaxable: (pkg as { is_taxable?: boolean }).is_taxable !== false,
         },
       ],
     };
@@ -264,12 +360,12 @@ export async function getExpandedPackageLineItems(
   const ids = [...new Set(catalogIds.map((c) => c.id))];
   const { data: catalogPackages, error: catError } = await supabase
     .from('packages')
-    .select('id, name, description, price, category, target_cost, unit_type, unit_multiplier')
+    .select('id, name, description, price, category, target_cost, unit_type, unit_multiplier, definition, floor_price, is_taxable')
     .in('id', ids);
   if (catError || !catalogPackages?.length) {
     return { items: [], error: catError?.message ?? 'Could not load package ingredients.' };
   }
-  type CatalogRow = { id: string; name: string; description: string | null; price: number; category: string; target_cost: number | null; unit_type?: string; unit_multiplier?: number };
+  type CatalogRow = { id: string; name: string; description: string | null; price: number; category: string; target_cost: number | null; unit_type?: string; unit_multiplier?: number; definition?: unknown; floor_price?: number | null; is_taxable?: boolean };
   const byId = new Map((catalogPackages as CatalogRow[]).map((r) => [r.id, r]));
   const items: ExpandedLineItem[] = [];
   for (const { id, qty } of catalogIds) {
@@ -278,6 +374,7 @@ export async function getExpandedPackageLineItems(
     const cat = (ref.category as string) as ProposalLineItemCategory;
     const ut = (ref.unit_type === 'hour' || ref.unit_type === 'day' ? ref.unit_type : 'flat') as UnitType;
     const um = Number(ref.unit_multiplier) > 0 ? Number(ref.unit_multiplier) : 1;
+    const ingredientRoles = resolveRequiredRoles(ref.definition as PackageDefinition | null);
     items.push({
       name: ref.name,
       description: ref.description ?? null,
@@ -288,6 +385,9 @@ export async function getExpandedPackageLineItems(
       category: cat ?? null,
       originPackageId: ref.id,
       actualCost: ref.target_cost != null ? Number(ref.target_cost) : null,
+      requiredRoles: ingredientRoles.length > 0 ? ingredientRoles : null,
+      floorPrice: ref.floor_price != null ? Number(ref.floor_price) : null,
+      isTaxable: ref.is_taxable !== false,
     });
   }
   return { items };
@@ -313,10 +413,11 @@ export async function addPackageToProposal(
   }
   const { data: pkgRow } = await supabase
     .from('packages')
-    .select('name, price, floor_price, is_taxable, target_cost')
+    .select('name, price, floor_price, is_taxable, target_cost, definition')
     .eq('id', packageId)
     .maybeSingle();
-  const pkg = pkgRow as { name?: string; price?: number; floor_price?: number | null; is_taxable?: boolean | null; target_cost?: number | null } | null;
+  const pkg = pkgRow as { name?: string; price?: number; floor_price?: number | null; is_taxable?: boolean | null; target_cost?: number | null; definition?: unknown } | null;
+  const pkgDef = pkg?.definition as PackageDefinition | null;
   const displayGroupName = pkg?.name ?? null;
   const bundlePrice = pkg?.price != null && Number.isFinite(Number(pkg.price)) ? Number(pkg.price) : 0;
 
@@ -392,7 +493,10 @@ export async function addPackageToProposal(
       unit_price: item.unitPrice,
       override_price: null,
       actual_cost: item.actualCost,
-      definition_snapshot: item.category ? { margin_meta: { category: item.category } } : null,
+      time_start: null,
+      time_end: null,
+      show_times_on_proposal: true,
+      definition_snapshot: buildSnapshot(item),
       sort_order: nextSortOrder,
     }];
   } else {
@@ -413,11 +517,15 @@ export async function addPackageToProposal(
       unit_price: bundlePrice,
       override_price: null,
       actual_cost: pkg?.target_cost != null && Number.isFinite(Number(pkg.target_cost)) ? Number(pkg.target_cost) : null,
-      definition_snapshot: {
-        margin_meta: { category: 'package' },
-        price_meta: { floor_price: pkg?.floor_price != null ? Number(pkg.floor_price) : null },
-        tax_meta: { is_taxable: pkg?.is_taxable !== false },
-      },
+      time_start: null as string | null,
+      time_end: null as string | null,
+      show_times_on_proposal: true,
+      definition_snapshot: buildSnapshot({
+        category: 'package',
+        requiredRoles: resolveRequiredRoles(pkgDef as PackageDefinition | null),
+        floorPrice: pkg?.floor_price != null ? Number(pkg.floor_price) : null,
+        isTaxable: pkg?.is_taxable !== false,
+      }),
       sort_order: nextSortOrder,
     };
     const childRows = expanded.map((item, i) => ({
@@ -437,7 +545,10 @@ export async function addPackageToProposal(
       unit_price: 0,
       override_price: null,
       actual_cost: item.actualCost,
-      definition_snapshot: item.category ? { margin_meta: { category: item.category } } : null,
+      time_start: null as string | null,
+      time_end: null as string | null,
+      show_times_on_proposal: true,
+      definition_snapshot: buildSnapshot(item),
       sort_order: nextSortOrder + 1 + i,
     }));
     rowsToInsert = [headerRow, ...childRows];
@@ -574,6 +685,19 @@ export async function upsertProposal(
     proposalId = existing.id;
     await supabase.from('proposal_items').delete().eq('proposal_id', proposalId);
   } else {
+    // Inherit workspace payment defaults for new proposals
+    const { data: wsDefaults } = await supabase
+      .from('workspaces')
+      .select('default_deposit_percent, default_deposit_deadline_days, default_balance_due_days_before_event')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    const wsd = wsDefaults as {
+      default_deposit_percent?: number | null;
+      default_deposit_deadline_days?: number | null;
+      default_balance_due_days_before_event?: number | null;
+    } | null;
+
     const publicToken = crypto.randomUUID();
     const { data: inserted, error: insertError } = await supabase
       .from('proposals')
@@ -582,6 +706,9 @@ export async function upsertProposal(
         deal_id: dealId,
         status: 'draft',
         public_token: publicToken,
+        deposit_percent: wsd?.default_deposit_percent ?? 50,
+        deposit_deadline_days: wsd?.default_deposit_deadline_days ?? 7,
+        payment_due_days: wsd?.default_balance_due_days_before_event ?? 14,
       })
       .select('id')
       .single();
@@ -619,7 +746,11 @@ export async function upsertProposal(
       override_price: item.overridePrice != null && Number.isFinite(Number(item.overridePrice)) ? Number(item.overridePrice) : null,
       actual_cost: item.actualCost != null && Number.isFinite(Number(item.actualCost)) ? Number(item.actualCost) : null,
       internal_notes: item.internalNotes ?? null,
-      definition_snapshot: item.category ? { margin_meta: { category: item.category } } : null,
+      is_optional: item.isOptional ?? false,
+      time_start: item.timeStart ?? null,
+      time_end: item.timeEnd ?? null,
+      show_times_on_proposal: item.showTimesOnProposal ?? true,
+      definition_snapshot: buildSnapshot(item),
       sort_order: index,
     }));
 
@@ -854,14 +985,23 @@ export async function sendForSignature(
 
   const { publicToken, publicUrl } = publishResult;
 
+  // 2b. Advance deal status to 'contract_sent' — only if it hasn't already passed that stage
+  await supabase
+    .from('deals')
+    .update({ status: 'contract_sent' })
+    .eq('id', dealId)
+    .eq('workspace_id', workspaceMembership)
+    .in('status', ['inquiry', 'proposal']);
+
   // 3. Fetch deal title + workspace name for branding
   const { data: dealRow } = await supabase
     .from('deals')
-    .select('title, workspace_id')
+    .select('title, workspace_id, event_archetype, organization_id')
     .eq('id', dealId)
     .maybeSingle();
-  const eventTitle = (dealRow as { title?: string | null } | null)?.title ?? 'Proposal';
-  const workspaceId = (dealRow as { workspace_id?: string | null } | null)?.workspace_id ?? '';
+  const deal = dealRow as { title?: string | null; workspace_id?: string | null; event_archetype?: string | null; organization_id?: string | null } | null;
+  const eventTitle = deal?.title ?? 'Proposal';
+  const workspaceId = deal?.workspace_id ?? '';
 
   // Resolve sender name (display name from directory) + workspace name for branding
   const { data: { user } } = await supabase.auth.getUser();
@@ -877,6 +1017,17 @@ export async function sendForSignature(
   ]);
   const senderName = (senderEntRes.data as { display_name?: string | null } | null)?.display_name ?? null;
   const workspaceName = (workspaceRes.data as { name?: string | null } | null)?.name ?? null;
+
+  // Look up client entity type for couple-aware subject line logic
+  const entityTypeRes = deal?.organization_id
+    ? await supabase
+        .schema('directory')
+        .from('entities')
+        .select('type')
+        .eq('id', deal.organization_id)
+        .maybeSingle()
+    : null;
+  const entityType = (entityTypeRes?.data as { type?: string } | null)?.type ?? null;
 
   const clientFirstName = clientName?.trim().split(/\s+/)[0] ?? null;
 
@@ -905,12 +1056,22 @@ export async function sendForSignature(
     total: proposalData?.total ?? null,
     depositPercent: (proposalData?.proposal as { deposit_percent?: number | null } | undefined)?.deposit_percent ?? null,
     paymentDueDays: (proposalData?.proposal as { payment_due_days?: number | null } | undefined)?.payment_due_days ?? null,
+    entityType: entityType as 'person' | 'couple' | 'company' | 'venue' | null,
+    eventArchetype: deal?.event_archetype ?? null,
   };
 
   if (!submission.success) {
     // Non-fatal: DocuSeal not configured — fall back to sending a plain proposal link
     console.warn('[sendForSignature] DocuSeal step skipped:', submission.error);
-    await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
+    const fallbackResult = await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
+    if (fallbackResult.ok && fallbackResult.messageId) {
+      const sys = getSystemClient();
+      await sys
+        .from('proposals')
+        .update({ resend_message_id: fallbackResult.messageId } as Record<string, unknown>)
+        .eq('id', draftProposalId)
+        .eq('workspace_id', workspaceMembership);
+    }
     return { success: true, publicUrl };
   }
 
@@ -926,7 +1087,154 @@ export async function sendForSignature(
     .eq('workspace_id', workspaceMembership);
 
   // 6. Send "Review and sign" email via Resend — publicUrl is the proposal page where signing happens
-  await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
+  const emailResult = await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
+
+  // Store Resend message ID for delivery/bounce webhook tracking
+  if (emailResult.ok && emailResult.messageId) {
+    await systemClient
+      .from('proposals')
+      .update({ resend_message_id: emailResult.messageId } as Record<string, unknown>)
+      .eq('id', draftProposalId)
+      .eq('workspace_id', workspaceMembership);
+  }
 
   return { success: true, publicUrl };
+}
+
+// =============================================================================
+// sendProposalReminder(dealId): Send a follow-up reminder for an unsigned proposal
+// =============================================================================
+
+export async function sendProposalReminder(
+  dealId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  // Auth — server client RLS scopes to user's workspace automatically
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Not authorised' };
+
+  // Fetch deal with latest proposal
+  const { data: dealRow } = await supabase
+    .from('deals')
+    .select('id, workspace_id, title, main_contact_id, event_archetype, proposals(id, status, public_token, created_at)')
+    .eq('id', dealId)
+    .maybeSingle();
+
+  if (!dealRow) return { ok: false, error: 'Not authorised' };
+
+  const deal = dealRow as {
+    id: string;
+    workspace_id: string | null;
+    title: string | null;
+    main_contact_id: string | null;
+    event_archetype: string | null;
+    proposals: { id: string; status: string; public_token: string | null; created_at: string }[];
+  };
+
+  // Find the most recent sent/viewed proposal. Sort descending so activeProposals[0]
+  // is always the latest one (guards against multiple sent proposals from resends).
+  const activeProposals = (deal.proposals ?? [])
+    .filter((p) => p.status === 'sent' || p.status === 'viewed')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  if (activeProposals.length === 0) {
+    // Check if there's an already-accepted one
+    const accepted = (deal.proposals ?? []).some((p) => p.status === 'accepted');
+    if (accepted) return { ok: false, error: 'Proposal already signed' };
+    return { ok: false, error: 'No active proposal to remind' };
+  }
+
+  const proposal = activeProposals[0];
+  const publicToken = (proposal as { public_token?: string | null }).public_token;
+  if (!publicToken) return { ok: false, error: 'Proposal has no public link' };
+
+  const base = getPublicBaseUrl();
+  const proposalUrl = base ? `${base}/p/${publicToken}` : `/p/${publicToken}`;
+
+  // Resolve client email from main_contact_id → directory.entities.attributes
+  let clientEmail: string | null = null;
+  let clientFirstName: string | null = null;
+  let clientEntityType: string | null = null;
+  if (deal.main_contact_id) {
+    const { data: entityRow } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('type, attributes, display_name')
+      .eq('id', deal.main_contact_id)
+      .maybeSingle();
+    if (entityRow) {
+      const attrs = (entityRow as { attributes?: Record<string, unknown> | null }).attributes ?? {};
+      const entityType = (entityRow as { type?: string }).type ?? 'person';
+      clientEntityType = entityType;
+      if (entityType === 'company') {
+        clientEmail =
+          (attrs['support_email'] as string | null) ??
+          (attrs['email'] as string | null) ??
+          null;
+      } else if (entityType === 'couple') {
+        // Couples store primary contact email under partner_a_email
+        clientEmail =
+          (attrs['partner_a_email'] as string | null) ??
+          (attrs['email'] as string | null) ??
+          null;
+      } else {
+        clientEmail = (attrs['email'] as string | null) ?? null;
+      }
+      // display_name is a proper column, not an attributes JSONB field — no ESLint violation
+      const displayName = (entityRow as { display_name?: string | null }).display_name ?? null;
+      clientFirstName = displayName?.split(' ')[0] ?? null;
+    }
+  }
+
+  if (!clientEmail?.trim()) {
+    return { ok: false, error: 'No email address on file for this client' };
+  }
+
+  // Stamp reminder_sent_at
+  await supabase
+    .from('proposals')
+    .update({ reminder_sent_at: new Date().toISOString() })
+    .eq('id', proposal.id);
+
+  // Resolve sender name from directory entity (same source as sendForSignature)
+  const { data: senderEntity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('display_name')
+    .eq('claimed_by_user_id', user.id)
+    .maybeSingle();
+  const senderName = (senderEntity as { display_name?: string | null } | null)?.display_name ?? null;
+
+  // Fetch rich proposal data for reminder enrichment (status is 'sent' or 'viewed' — both valid)
+  const proposalData = publicToken
+    ? await getPublicProposal(publicToken).catch(() => null)
+    : null;
+
+  const { sendProposalReminderEmail } = await import('@/shared/api/email/send');
+  const emailResult = await sendProposalReminderEmail({
+    to: clientEmail.trim(),
+    proposalUrl,
+    eventTitle: deal.title ?? 'your event',
+    workspaceId: deal.workspace_id ?? '',
+    senderName,
+    clientFirstName,
+    eventDate: proposalData?.event?.startsAt ?? null,
+    proposalTotal: proposalData?.total ?? null,
+    entityType: clientEntityType,
+    eventArchetype: deal.event_archetype ?? null,
+  });
+
+  if (!emailResult.ok) return { ok: false, error: emailResult.error };
+
+  // Store Resend message ID for delivery/bounce webhook tracking
+  if (emailResult.messageId) {
+    await supabase
+      .from('proposals')
+      .update({ resend_message_id: emailResult.messageId } as Record<string, unknown>)
+      .eq('id', proposal.id);
+  }
+
+  return { ok: true };
 }

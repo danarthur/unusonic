@@ -12,923 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  cortex: {
-    Tables: {
-      memory: {
-        Row: {
-          content: string
-          created_at: string | null
-          embedding: string | null
-          entity_id: string | null
-          fts_vector: unknown
-          id: string
-          metadata: Json | null
-          updated_at: string | null
-        }
-        Insert: {
-          content: string
-          created_at?: string | null
-          embedding?: string | null
-          entity_id?: string | null
-          fts_vector?: unknown
-          id?: string
-          metadata?: Json | null
-          updated_at?: string | null
-        }
-        Update: {
-          content?: string
-          created_at?: string | null
-          embedding?: string | null
-          entity_id?: string | null
-          fts_vector?: unknown
-          id?: string
-          metadata?: Json | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      relationships: {
-        Row: {
-          connection_strength: number | null
-          context_data: Json | null
-          created_at: string | null
-          id: string
-          relationship_type: string
-          source_entity_id: string
-          target_entity_id: string
-        }
-        Insert: {
-          connection_strength?: number | null
-          context_data?: Json | null
-          created_at?: string | null
-          id?: string
-          relationship_type: string
-          source_entity_id: string
-          target_entity_id: string
-        }
-        Update: {
-          connection_strength?: number | null
-          context_data?: Json | null
-          created_at?: string | null
-          id?: string
-          relationship_type?: string
-          source_entity_id?: string
-          target_entity_id?: string
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      hybrid_search: {
-        Args: {
-          full_text_weight?: number
-          match_count?: number
-          query_embedding: string
-          query_text: string
-          rrf_k?: number
-          semantic_weight?: number
-        }
-        Returns: {
-          content: string
-          entity_id: string
-          id: string
-          metadata: Json
-          similarity: number
-        }[]
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  directory: {
-    Tables: {
-      entities: {
-        Row: {
-          attributes: Json | null
-          avatar_url: string | null
-          claimed_by_user_id: string | null
-          created_at: string | null
-          display_name: string
-          embedding: string | null
-          handle: string | null
-          id: string
-          legacy_entity_id: string | null
-          legacy_org_id: string | null
-          owner_workspace_id: string | null
-          search_vector: unknown
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          attributes?: Json | null
-          avatar_url?: string | null
-          claimed_by_user_id?: string | null
-          created_at?: string | null
-          display_name: string
-          embedding?: string | null
-          handle?: string | null
-          id?: string
-          legacy_entity_id?: string | null
-          legacy_org_id?: string | null
-          owner_workspace_id?: string | null
-          search_vector?: unknown
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          attributes?: Json | null
-          avatar_url?: string | null
-          claimed_by_user_id?: string | null
-          created_at?: string | null
-          display_name?: string
-          embedding?: string | null
-          handle?: string | null
-          id?: string
-          legacy_entity_id?: string | null
-          legacy_org_id?: string | null
-          owner_workspace_id?: string | null
-          search_vector?: unknown
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  finance: {
-    Tables: {
-      invoices: {
-        Row: {
-          bill_to_entity_id: string
-          created_at: string | null
-          due_date: string | null
-          id: string
-          invoice_number: string
-          project_id: string | null
-          status: string | null
-          total_amount: number
-          workspace_id: string
-        }
-        Insert: {
-          bill_to_entity_id: string
-          created_at?: string | null
-          due_date?: string | null
-          id?: string
-          invoice_number: string
-          project_id?: string | null
-          status?: string | null
-          total_amount: number
-          workspace_id: string
-        }
-        Update: {
-          bill_to_entity_id?: string
-          created_at?: string | null
-          due_date?: string | null
-          id?: string
-          invoice_number?: string
-          project_id?: string | null
-          status?: string | null
-          total_amount?: number
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  ops: {
-    Tables: {
-      assignments: {
-        Row: {
-          agreed_rate: number | null
-          entity_id: string
-          event_id: string | null
-          id: string
-          rate_type: string | null
-          role: string
-          status: string | null
-        }
-        Insert: {
-          agreed_rate?: number | null
-          entity_id: string
-          event_id?: string | null
-          id?: string
-          rate_type?: string | null
-          role: string
-          status?: string | null
-        }
-        Update: {
-          agreed_rate?: number | null
-          entity_id?: string
-          event_id?: string | null
-          id?: string
-          rate_type?: string | null
-          role?: string
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "assignments_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      crew_assignments: {
-        Row: {
-          assignee_name: string | null
-          booking_type: string
-          call_time_override: string | null
-          call_time_slot_id: string | null
-          created_at: string
-          entity_id: string | null
-          event_id: string
-          id: string
-          pay_rate: number | null
-          pay_rate_type: string | null
-          quantity_index: number
-          role: string
-          scheduled_hours: number | null
-          sort_order: number
-          source_package_id: string | null
-          status: string
-          status_updated_at: string | null
-          status_updated_by: string | null
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          assignee_name?: string | null
-          booking_type?: string
-          call_time_override?: string | null
-          call_time_slot_id?: string | null
-          created_at?: string
-          entity_id?: string | null
-          event_id: string
-          id?: string
-          pay_rate?: number | null
-          pay_rate_type?: string | null
-          quantity_index?: number
-          role?: string
-          scheduled_hours?: number | null
-          sort_order?: number
-          source_package_id?: string | null
-          status?: string
-          status_updated_at?: string | null
-          status_updated_by?: string | null
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          assignee_name?: string | null
-          booking_type?: string
-          call_time_override?: string | null
-          call_time_slot_id?: string | null
-          created_at?: string
-          entity_id?: string | null
-          event_id?: string
-          id?: string
-          pay_rate?: number | null
-          pay_rate_type?: string | null
-          quantity_index?: number
-          role?: string
-          scheduled_hours?: number | null
-          sort_order?: number
-          source_package_id?: string | null
-          status?: string
-          status_updated_at?: string | null
-          status_updated_by?: string | null
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "crew_assignments_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      crew_confirmation_tokens: {
-        Row: {
-          action_taken: string | null
-          assignment_id: string | null
-          created_at: string
-          crew_index: number | null
-          email: string
-          entity_id: string | null
-          event_id: string
-          expires_at: string
-          id: string
-          role: string
-          token: string
-          used_at: string | null
-        }
-        Insert: {
-          action_taken?: string | null
-          assignment_id?: string | null
-          created_at?: string
-          crew_index?: number | null
-          email: string
-          entity_id?: string | null
-          event_id: string
-          expires_at?: string
-          id?: string
-          role: string
-          token?: string
-          used_at?: string | null
-        }
-        Update: {
-          action_taken?: string | null
-          assignment_id?: string | null
-          created_at?: string
-          crew_index?: number | null
-          email?: string
-          entity_id?: string | null
-          event_id?: string
-          expires_at?: string
-          id?: string
-          role?: string
-          token?: string
-          used_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "crew_confirmation_tokens_assignment_id_fkey"
-            columns: ["assignment_id"]
-            isOneToOne: false
-            referencedRelation: "crew_assignments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "crew_confirmation_tokens_assignment_id_fkey"
-            columns: ["assignment_id"]
-            isOneToOne: false
-            referencedRelation: "entity_crew_schedule"
-            referencedColumns: ["assignment_id"]
-          },
-        ]
-      }
-      deal_stakeholders: {
-        Row: {
-          created_at: string
-          deal_id: string
-          entity_id: string | null
-          id: string
-          is_primary: boolean
-          organization_id: string | null
-          role: Database["public"]["Enums"]["deal_stakeholder_role"]
-        }
-        Insert: {
-          created_at?: string
-          deal_id: string
-          entity_id?: string | null
-          id?: string
-          is_primary?: boolean
-          organization_id?: string | null
-          role?: Database["public"]["Enums"]["deal_stakeholder_role"]
-        }
-        Update: {
-          created_at?: string
-          deal_id?: string
-          entity_id?: string | null
-          id?: string
-          is_primary?: boolean
-          organization_id?: string | null
-          role?: Database["public"]["Enums"]["deal_stakeholder_role"]
-        }
-        Relationships: []
-      }
-      event_expenses: {
-        Row: {
-          amount: number
-          category: string
-          created_at: string
-          event_id: string
-          id: string
-          label: string
-          note: string | null
-          paid_at: string | null
-          payment_type: string
-          qbo_account_id: string | null
-          qbo_purchase_id: string | null
-          qbo_synced_at: string | null
-          updated_at: string
-          vendor_entity_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          amount?: number
-          category?: string
-          created_at?: string
-          event_id: string
-          id?: string
-          label: string
-          note?: string | null
-          paid_at?: string | null
-          payment_type?: string
-          qbo_account_id?: string | null
-          qbo_purchase_id?: string | null
-          qbo_synced_at?: string | null
-          updated_at?: string
-          vendor_entity_id?: string | null
-          workspace_id: string
-        }
-        Update: {
-          amount?: number
-          category?: string
-          created_at?: string
-          event_id?: string
-          id?: string
-          label?: string
-          note?: string | null
-          paid_at?: string | null
-          payment_type?: string
-          qbo_account_id?: string | null
-          qbo_purchase_id?: string | null
-          qbo_synced_at?: string | null
-          updated_at?: string
-          vendor_entity_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_expenses_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      event_gear_items: {
-        Row: {
-          catalog_package_id: string | null
-          created_at: string
-          department: string | null
-          event_id: string
-          id: string
-          is_sub_rental: boolean
-          name: string
-          quantity: number
-          sort_order: number
-          status: string
-          status_updated_at: string | null
-          status_updated_by: string | null
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          catalog_package_id?: string | null
-          created_at?: string
-          department?: string | null
-          event_id: string
-          id?: string
-          is_sub_rental?: boolean
-          name: string
-          quantity?: number
-          sort_order?: number
-          status?: string
-          status_updated_at?: string | null
-          status_updated_by?: string | null
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          catalog_package_id?: string | null
-          created_at?: string
-          department?: string | null
-          event_id?: string
-          id?: string
-          is_sub_rental?: boolean
-          name?: string
-          quantity?: number
-          sort_order?: number
-          status?: string
-          status_updated_at?: string | null
-          status_updated_by?: string | null
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_gear_items_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      events: {
-        Row: {
-          actor: string | null
-          client_entity_id: string | null
-          compliance_docs: Json | null
-          confidentiality_level: string | null
-          created_at: string | null
-          crm_estimated_value: number | null
-          crm_probability: number | null
-          dates_load_in: string | null
-          dates_load_out: string | null
-          ends_at: string
-          event_archetype: string | null
-          guest_count_actual: number | null
-          guest_count_expected: number | null
-          id: string
-          internal_code: string | null
-          lead_source: string | null
-          lifecycle_status: string | null
-          location_address: string | null
-          location_name: string | null
-          logistics_dock_info: string | null
-          logistics_power_info: string | null
-          notes: string | null
-          project_id: string | null
-          run_of_show_data: Json | null
-          slug: string | null
-          starts_at: string
-          status: string
-          tech_requirements: Json | null
-          title: string
-          updated_at: string | null
-          venue_address: string | null
-          venue_entity_id: string | null
-          venue_google_maps_id: string | null
-          venue_name: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          actor?: string | null
-          client_entity_id?: string | null
-          compliance_docs?: Json | null
-          confidentiality_level?: string | null
-          created_at?: string | null
-          crm_estimated_value?: number | null
-          crm_probability?: number | null
-          dates_load_in?: string | null
-          dates_load_out?: string | null
-          ends_at: string
-          event_archetype?: string | null
-          guest_count_actual?: number | null
-          guest_count_expected?: number | null
-          id?: string
-          internal_code?: string | null
-          lead_source?: string | null
-          lifecycle_status?: string | null
-          location_address?: string | null
-          location_name?: string | null
-          logistics_dock_info?: string | null
-          logistics_power_info?: string | null
-          notes?: string | null
-          project_id?: string | null
-          run_of_show_data?: Json | null
-          slug?: string | null
-          starts_at: string
-          status?: string
-          tech_requirements?: Json | null
-          title: string
-          updated_at?: string | null
-          venue_address?: string | null
-          venue_entity_id?: string | null
-          venue_google_maps_id?: string | null
-          venue_name?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          actor?: string | null
-          client_entity_id?: string | null
-          compliance_docs?: Json | null
-          confidentiality_level?: string | null
-          created_at?: string | null
-          crm_estimated_value?: number | null
-          crm_probability?: number | null
-          dates_load_in?: string | null
-          dates_load_out?: string | null
-          ends_at?: string
-          event_archetype?: string | null
-          guest_count_actual?: number | null
-          guest_count_expected?: number | null
-          id?: string
-          internal_code?: string | null
-          lead_source?: string | null
-          lifecycle_status?: string | null
-          location_address?: string | null
-          location_name?: string | null
-          logistics_dock_info?: string | null
-          logistics_power_info?: string | null
-          notes?: string | null
-          project_id?: string | null
-          run_of_show_data?: Json | null
-          slug?: string | null
-          starts_at?: string
-          status?: string
-          tech_requirements?: Json | null
-          title?: string
-          updated_at?: string | null
-          venue_address?: string | null
-          venue_entity_id?: string | null
-          venue_google_maps_id?: string | null
-          venue_name?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "events_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      projects: {
-        Row: {
-          client_entity_id: string | null
-          created_at: string | null
-          end_date: string | null
-          id: string
-          name: string
-          start_date: string | null
-          status: string | null
-          workspace_id: string
-        }
-        Insert: {
-          client_entity_id?: string | null
-          created_at?: string | null
-          end_date?: string | null
-          id?: string
-          name: string
-          start_date?: string | null
-          status?: string | null
-          workspace_id: string
-        }
-        Update: {
-          client_entity_id?: string | null
-          created_at?: string | null
-          end_date?: string | null
-          id?: string
-          name?: string
-          start_date?: string | null
-          status?: string | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      workspace_call_time_rules: {
-        Row: {
-          action_type: string
-          apply_only_when_unset: boolean
-          created_at: string
-          entity_ids: string[]
-          event_archetypes: string[]
-          id: string
-          name: string
-          offset_minutes: number | null
-          priority: number
-          role_patterns: string[]
-          slot_label: string | null
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          action_type?: string
-          apply_only_when_unset?: boolean
-          created_at?: string
-          entity_ids?: string[]
-          event_archetypes?: string[]
-          id?: string
-          name: string
-          offset_minutes?: number | null
-          priority?: number
-          role_patterns?: string[]
-          slot_label?: string | null
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          action_type?: string
-          apply_only_when_unset?: boolean
-          created_at?: string
-          entity_ids?: string[]
-          event_archetypes?: string[]
-          id?: string
-          name?: string
-          offset_minutes?: number | null
-          priority?: number
-          role_patterns?: string[]
-          slot_label?: string | null
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      workspace_industry_tags: {
-        Row: {
-          created_at: string
-          id: string
-          label: string
-          sort_order: number
-          tag: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          label: string
-          sort_order?: number
-          tag: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          label?: string
-          sort_order?: number
-          tag?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      workspace_permissions: {
-        Row: {
-          id: string
-          key: string
-        }
-        Insert: {
-          id?: string
-          key: string
-        }
-        Update: {
-          id?: string
-          key?: string
-        }
-        Relationships: []
-      }
-      workspace_role_permissions: {
-        Row: {
-          permission_id: string
-          role_id: string
-        }
-        Insert: {
-          permission_id: string
-          role_id: string
-        }
-        Update: {
-          permission_id?: string
-          role_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_role_permissions_permission_id_fkey"
-            columns: ["permission_id"]
-            isOneToOne: false
-            referencedRelation: "workspace_permissions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workspace_role_permissions_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "workspace_roles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workspace_roles: {
-        Row: {
-          created_at: string
-          id: string
-          is_system: boolean
-          name: string
-          slug: string
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_system?: boolean
-          name: string
-          slug: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_system?: boolean
-          name?: string
-          slug?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: []
-      }
-      workspace_ros_templates: {
-        Row: {
-          created_at: string
-          cues: Json
-          description: string | null
-          id: string
-          name: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          cues?: Json
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          cues?: Json
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      entity_crew_schedule: {
-        Row: {
-          assignee_name: string | null
-          assignment_id: string | null
-          call_time_override: string | null
-          call_time_slot_id: string | null
-          ends_at: string | null
-          entity_id: string | null
-          event_archetype: string | null
-          event_id: string | null
-          event_title: string | null
-          role: string | null
-          starts_at: string | null
-          status: string | null
-          venue_name: string | null
-          workspace_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "crew_assignments_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       agent_configs: {
@@ -1117,18 +200,28 @@ export type Database = {
           event_archetype: string | null
           event_id: string | null
           id: string
+          lead_source: string | null
+          lead_source_detail: string | null
+          lead_source_id: string | null
+          lost_at: string | null
+          lost_reason: string | null
+          lost_to_competitor_name: string | null
           main_contact_id: string | null
           notes: string | null
           organization_id: string | null
+          owner_entity_id: string | null
+          owner_user_id: string | null
           preferred_crew: Json | null
           proposed_date: string
           proposed_end_time: string | null
           proposed_start_time: string | null
+          referrer_entity_id: string | null
           status: string
           title: string | null
           updated_at: string
           venue_id: string | null
           venue_name: string | null
+          won_at: string | null
           workspace_id: string
         }
         Insert: {
@@ -1138,18 +231,28 @@ export type Database = {
           event_archetype?: string | null
           event_id?: string | null
           id?: string
+          lead_source?: string | null
+          lead_source_detail?: string | null
+          lead_source_id?: string | null
+          lost_at?: string | null
+          lost_reason?: string | null
+          lost_to_competitor_name?: string | null
           main_contact_id?: string | null
           notes?: string | null
           organization_id?: string | null
+          owner_entity_id?: string | null
+          owner_user_id?: string | null
           preferred_crew?: Json | null
           proposed_date: string
           proposed_end_time?: string | null
           proposed_start_time?: string | null
+          referrer_entity_id?: string | null
           status?: string
           title?: string | null
           updated_at?: string
           venue_id?: string | null
           venue_name?: string | null
+          won_at?: string | null
           workspace_id: string
         }
         Update: {
@@ -1159,18 +262,28 @@ export type Database = {
           event_archetype?: string | null
           event_id?: string | null
           id?: string
+          lead_source?: string | null
+          lead_source_detail?: string | null
+          lead_source_id?: string | null
+          lost_at?: string | null
+          lost_reason?: string | null
+          lost_to_competitor_name?: string | null
           main_contact_id?: string | null
           notes?: string | null
           organization_id?: string | null
+          owner_entity_id?: string | null
+          owner_user_id?: string | null
           preferred_crew?: Json | null
           proposed_date?: string
           proposed_end_time?: string | null
           proposed_start_time?: string | null
+          referrer_entity_id?: string | null
           status?: string
           title?: string | null
           updated_at?: string
           venue_id?: string | null
           venue_name?: string | null
+          won_at?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -1412,6 +525,42 @@ export type Database = {
         }
         Relationships: []
       }
+      proposal_client_selections: {
+        Row: {
+          item_id: string
+          proposal_id: string
+          selected: boolean
+          updated_at: string
+        }
+        Insert: {
+          item_id: string
+          proposal_id: string
+          selected?: boolean
+          updated_at?: string
+        }
+        Update: {
+          item_id?: string
+          proposal_id?: string
+          selected?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_client_selections_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_client_selections_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_items: {
         Row: {
           actual_cost: number | null
@@ -1422,6 +571,7 @@ export type Database = {
           id: string
           internal_notes: string | null
           is_client_visible: boolean
+          is_optional: boolean
           is_package_header: boolean
           name: string
           origin_package_id: string | null
@@ -1431,7 +581,10 @@ export type Database = {
           package_instance_id: string | null
           proposal_id: string
           quantity: number
+          show_times_on_proposal: boolean
           sort_order: number
+          time_end: string | null
+          time_start: string | null
           unit_multiplier: number
           unit_price: number
           unit_type: string
@@ -1445,6 +598,7 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           is_client_visible?: boolean
+          is_optional?: boolean
           is_package_header?: boolean
           name: string
           origin_package_id?: string | null
@@ -1454,7 +608,10 @@ export type Database = {
           package_instance_id?: string | null
           proposal_id: string
           quantity?: number
+          show_times_on_proposal?: boolean
           sort_order?: number
+          time_end?: string | null
+          time_start?: string | null
           unit_multiplier?: number
           unit_price: number
           unit_type?: string
@@ -1468,6 +625,7 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           is_client_visible?: boolean
+          is_optional?: boolean
           is_package_header?: boolean
           name?: string
           origin_package_id?: string | null
@@ -1477,7 +635,10 @@ export type Database = {
           package_instance_id?: string | null
           proposal_id?: string
           quantity?: number
+          show_times_on_proposal?: boolean
           sort_order?: number
+          time_end?: string | null
+          time_start?: string | null
           unit_multiplier?: number
           unit_price?: number
           unit_type?: string
@@ -1502,65 +663,101 @@ export type Database = {
       proposals: {
         Row: {
           accepted_at: string | null
+          client_selections_locked_at: string | null
           created_at: string
           deal_id: string
+          deposit_deadline_days: number | null
+          deposit_paid_at: string | null
           deposit_percent: number | null
+          docuseal_embed_src: string | null
           docuseal_submission_id: string | null
+          email_bounced_at: string | null
+          email_delivered_at: string | null
           expires_at: string | null
+          first_viewed_at: string | null
           id: string
+          last_viewed_at: string | null
           payment_due_days: number | null
           payment_notes: string | null
           public_token: string
+          reminder_sent_at: string | null
+          resend_message_id: string | null
           scope_notes: string | null
           signed_at: string | null
           signed_ip: string | null
           signed_pdf_path: string | null
           signer_name: string | null
           status: Database["public"]["Enums"]["proposal_status"]
+          stripe_payment_intent_id: string | null
           terms_and_conditions: string | null
           updated_at: string
+          view_count: number
           workspace_id: string
         }
         Insert: {
           accepted_at?: string | null
+          client_selections_locked_at?: string | null
           created_at?: string
           deal_id: string
+          deposit_deadline_days?: number | null
+          deposit_paid_at?: string | null
           deposit_percent?: number | null
+          docuseal_embed_src?: string | null
           docuseal_submission_id?: string | null
+          email_bounced_at?: string | null
+          email_delivered_at?: string | null
           expires_at?: string | null
+          first_viewed_at?: string | null
           id?: string
+          last_viewed_at?: string | null
           payment_due_days?: number | null
           payment_notes?: string | null
           public_token?: string
+          reminder_sent_at?: string | null
+          resend_message_id?: string | null
           scope_notes?: string | null
           signed_at?: string | null
           signed_ip?: string | null
           signed_pdf_path?: string | null
           signer_name?: string | null
           status?: Database["public"]["Enums"]["proposal_status"]
+          stripe_payment_intent_id?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
+          view_count?: number
           workspace_id: string
         }
         Update: {
           accepted_at?: string | null
+          client_selections_locked_at?: string | null
           created_at?: string
           deal_id?: string
+          deposit_deadline_days?: number | null
+          deposit_paid_at?: string | null
           deposit_percent?: number | null
+          docuseal_embed_src?: string | null
           docuseal_submission_id?: string | null
+          email_bounced_at?: string | null
+          email_delivered_at?: string | null
           expires_at?: string | null
+          first_viewed_at?: string | null
           id?: string
+          last_viewed_at?: string | null
           payment_due_days?: number | null
           payment_notes?: string | null
           public_token?: string
+          reminder_sent_at?: string | null
+          resend_message_id?: string | null
           scope_notes?: string | null
           signed_at?: string | null
           signed_ip?: string | null
           signed_pdf_path?: string | null
           signer_name?: string | null
           status?: Database["public"]["Enums"]["proposal_status"]
+          stripe_payment_intent_id?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
+          view_count?: number
           workspace_id?: string
         }
         Relationships: [
@@ -1773,10 +970,16 @@ export type Database = {
         Row: {
           autonomous_resolution_count: number | null
           created_at: string | null
+          default_balance_due_days_before_event: number
+          default_deposit_deadline_days: number
+          default_deposit_percent: number
           default_tax_rate: number
           dmarc_status: string | null
           id: string
+          logo_url: string | null
           name: string
+          portal_theme_config: Json
+          portal_theme_preset: string
           resend_domain_id: string | null
           sending_domain: string | null
           sending_domain_status: string | null
@@ -1793,10 +996,16 @@ export type Database = {
         Insert: {
           autonomous_resolution_count?: number | null
           created_at?: string | null
+          default_balance_due_days_before_event?: number
+          default_deposit_deadline_days?: number
+          default_deposit_percent?: number
           default_tax_rate?: number
           dmarc_status?: string | null
           id?: string
+          logo_url?: string | null
           name: string
+          portal_theme_config?: Json
+          portal_theme_preset?: string
           resend_domain_id?: string | null
           sending_domain?: string | null
           sending_domain_status?: string | null
@@ -1813,10 +1022,16 @@ export type Database = {
         Update: {
           autonomous_resolution_count?: number | null
           created_at?: string | null
+          default_balance_due_days_before_event?: number
+          default_deposit_deadline_days?: number
+          default_deposit_percent?: number
           default_tax_rate?: number
           dmarc_status?: string | null
           id?: string
+          logo_url?: string | null
           name?: string
+          portal_theme_config?: Json
+          portal_theme_preset?: string
           resend_domain_id?: string | null
           sending_domain?: string | null
           sending_domain_status?: string | null
@@ -1837,6 +1052,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_catalog_item_assignee: {
+        Args: {
+          p_entity_id: string
+          p_package_id: string
+          p_role_note?: string
+        }
+        Returns: string
+      }
+      add_catalog_role_assignee: {
+        Args: { p_package_id: string; p_role_note: string }
+        Returns: string
+      }
       add_contact_to_ghost_org:
         | {
             Args: {
@@ -1898,7 +1125,21 @@ export type Database = {
       }
       current_entity_id: { Args: never; Returns: string }
       get_active_workspace_id: { Args: never; Returns: string }
+      get_catalog_item_assignees: {
+        Args: { p_package_id: string }
+        Returns: {
+          created_at: string
+          entity_id: string
+          id: string
+          package_id: string
+          role_note: string
+        }[]
+      }
       get_current_org_id: { Args: never; Returns: string }
+      get_deal_crew_enriched: {
+        Args: { p_deal_id: string; p_workspace_id: string }
+        Returns: Json
+      }
       get_ghost_entity_by_email: { Args: { p_email: string }; Returns: string }
       get_member_permissions: {
         Args: { p_user_id?: string; p_workspace_id: string }
@@ -1909,6 +1150,15 @@ export type Database = {
       get_my_workspace_ids: { Args: never; Returns: string[] }
       get_user_id_by_email: { Args: { user_email: string }; Returns: string }
       get_user_workspace_ids: { Args: never; Returns: string[] }
+      increment_proposal_view: {
+        Args: {
+          p_now: string
+          p_proposal_id: string
+          p_set_first: boolean
+          p_was_sent: boolean
+        }
+        Returns: undefined
+      }
       insert_ghost_entity: { Args: { p_email: string }; Returns: string }
       is_member_of: { Args: { _workspace_id: string }; Returns: boolean }
       is_workspace_member: { Args: { w_id: string }; Returns: boolean }
@@ -1970,6 +1220,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      remove_catalog_item_assignee: {
+        Args: { p_assignee_id: string }
+        Returns: undefined
+      }
       remove_relationship: {
         Args: {
           p_relationship_type: string
@@ -1993,6 +1247,10 @@ export type Database = {
           similarity: number
           title: string
         }[]
+      }
+      seed_workspace_lead_sources: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
       }
       strip_industry_tag: {
         Args: { p_tag: string; p_workspace_id: string }
@@ -2254,18 +1512,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  cortex: {
-    Enums: {},
-  },
-  directory: {
-    Enums: {},
-  },
-  finance: {
-    Enums: {},
-  },
-  ops: {
-    Enums: {},
-  },
   public: {
     Enums: {
       affiliation_access_level: ["admin", "member", "read_only"],

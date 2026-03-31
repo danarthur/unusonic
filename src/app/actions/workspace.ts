@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
  * Workspace Server Actions
  * Handles workspace setup and management
@@ -570,7 +570,7 @@ const WORKSPACE_ROLE_SLUG_TO_LEGACY: Record<string, 'owner' | 'admin' | 'member'
 };
 
 /**
- * Invite a team member: add to roster (org_members) and optionally grant Signal login (Auth invite + workspace_members).
+ * Invite a team member: add to roster (org_members) and optionally grant Unusonic login (Auth invite + workspace_members).
  * Roster and software access are decoupled; grant_workspace_access controls whether we send an Auth invite and add workspace_members.
  * If Step 2 (Auth invite or workspace_members insert) fails, Step 1 (roster) is rolled back.
  */
@@ -712,11 +712,11 @@ export async function inviteTeamMember(
   revalidatePath('/network');
   return {
     success: true,
-    message: `Invite sent to ${email}. They have been added to the roster and will get Signal login access when they accept.`,
+    message: `Invite sent to ${email}. They have been added to the roster and will get Unusonic login access when they accept.`,
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 async function rollbackRosterStep(
   _supabase: Awaited<ReturnType<typeof createClient>>,
   _orgMemberId: string,

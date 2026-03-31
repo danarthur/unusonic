@@ -16,7 +16,7 @@ export const DEV_SESSION = {
   },
   workspace: {
     id: '7c977570-ae46-444f-91db-90a5f595b819',
-    name: 'Signal Main',
+    name: 'Unusonic Main',
     plan: 'enterprise',
   },
 };
@@ -29,6 +29,7 @@ export async function getSession(): Promise<Session> {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.warn('[Session] No authenticated user — returning DEV_SESSION fallback');
       return DEV_SESSION;
     }
 
@@ -42,6 +43,7 @@ export async function getSession(): Promise<Session> {
       .maybeSingle();
 
     if (memberError || !membership) {
+      console.warn('[Session] No workspace membership for user', user.id);
       return DEV_SESSION;
     }
 
@@ -61,7 +63,8 @@ export async function getSession(): Promise<Session> {
         plan: 'enterprise' as const,
       },
     };
-  } catch {
+  } catch (err) {
+    console.error('[Session] Failed to resolve session:', err);
     return DEV_SESSION;
   }
 }

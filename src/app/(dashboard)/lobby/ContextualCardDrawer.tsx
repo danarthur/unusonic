@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
 export type ContextualAlert = {
   id: string;
@@ -32,20 +32,20 @@ export function ContextualCardDrawer({ alert, onDismiss, className }: Contextual
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          transition={UNUSONIC_PHYSICS}
+          transition={STAGE_LIGHT}
           className={cn('mt-3', className)}
         >
-          <div className="liquid-card-nested mt-2 rounded-2xl border border-[var(--glass-border)] p-4 flex flex-col gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-widest text-muted">
+          <div className="stage-panel-nested mt-2 rounded-2xl border border-[oklch(1_0_0_/_0.08)] p-4 flex flex-col gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               Contextual
             </span>
-            <p className="text-sm font-medium text-ceramic tracking-tight">{alert.title}</p>
-            <p className="text-xs text-muted leading-relaxed">{alert.detail}</p>
+            <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">{alert.title}</p>
+            <p className="text-xs text-[var(--stage-text-secondary)] leading-relaxed">{alert.detail}</p>
             {onDismiss && (
               <button
                 type="button"
                 onClick={onDismiss}
-                className="mt-2 text-[10px] font-medium uppercase tracking-wider text-neon hover:underline self-start"
+                className="mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-accent)] hover:underline self-start"
               >
                 Dismiss
               </button>

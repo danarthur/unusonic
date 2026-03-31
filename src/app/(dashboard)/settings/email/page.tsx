@@ -27,10 +27,10 @@ export default async function EmailSettingsPage() {
     .maybeSingle();
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Email</h1>
-        <p className="mt-1 text-sm text-ink-muted">
+        <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">Email</h1>
+        <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
           Configure a custom sending domain so emails arrive from your brand.
         </p>
       </div>

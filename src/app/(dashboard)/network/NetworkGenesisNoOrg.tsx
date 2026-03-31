@@ -16,7 +16,7 @@ const noopUnpin = async () => ({ ok: true } as const);
 
 /**
  * When user has no org (getCurrentOrgId() null), show the same 3-card Genesis view
- * so refresh doesn’t drop them to the single “Initialize Command Center” card.
+ * so refresh doesn’t drop them to the single “Initialize Studio” card.
  * Card 1 “Establish Identity” opens the create-org form in a sheet.
  */
 export function NetworkGenesisNoOrg() {
@@ -25,13 +25,13 @@ export function NetworkGenesisNoOrg() {
   return (
     <div className="flex flex-1 flex-col min-h-0 gap-6 p-6">
       <header className="shrink-0">
-        <h1 className="text-2xl font-light tracking-tight text-[var(--color-ink)]">
+        <h1 className="text-2xl font-light tracking-tight text-[var(--stage-text-primary)]">
           Network
         </h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+        <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
           Your team and partners.
         </p>
-        <p className="mt-2 text-xs font-medium uppercase tracking-widest text-[var(--color-silk)]/90" role="status">
+        <p className="mt-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-accent)]/90" role="status">
           No organization linked. Create one to begin.
         </p>
       </header>

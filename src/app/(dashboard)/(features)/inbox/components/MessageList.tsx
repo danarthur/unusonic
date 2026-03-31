@@ -12,7 +12,7 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="flex-1 w-full max-w-2xl mx-auto px-4 py-12">
-        <div className="text-center text-stone-700 mt-20 font-light italic">
+        <div className="text-center text-[var(--stage-text-primary)] mt-20 font-light italic">
           "Ready for input, {SITE_CONFIG.owner}."
         </div>
       </div>
@@ -31,12 +31,12 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
           <div
             className={`max-w-[80%] rounded-lg px-5 py-3 text-sm leading-relaxed ${
               message.role === 'user'
-                ? 'bg-stone-900 text-stone-200 border border-stone-800'
-                : 'text-stone-400'
+                ? 'bg-[oklch(0.15_0_0)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0/0.08)]'
+                : 'text-[var(--stage-text-secondary)]'
             }`}
           >
             {message.role === 'assistant' && (
-              <span className="text-xs text-stone-600 uppercase tracking-widest block mb-1">
+              <span className="text-xs text-[var(--stage-text-secondary)] uppercase tracking-widest block mb-1">
                 Aion
               </span>
             )}
@@ -46,11 +46,11 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
       ))}
       {isLoading && (
         <div className="flex items-start">
-          <div className="max-w-[80%] rounded-lg px-5 py-3 text-sm text-stone-400">
-            <span className="text-xs text-stone-600 uppercase tracking-widest block mb-1">
+          <div className="max-w-[80%] rounded-lg px-5 py-3 text-sm text-[var(--stage-text-tertiary)]">
+            <span className="text-xs text-[var(--stage-text-secondary)] uppercase tracking-widest block mb-1">
               Aion
             </span>
-            <span className="inline-block w-2 h-2 bg-stone-600 rounded-full animate-pulse" />
+            <span className="inline-block w-2 h-2 bg-[var(--stage-surface)] rounded-full animate-ping" />
           </div>
         </div>
       )}

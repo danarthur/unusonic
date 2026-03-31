@@ -6,9 +6,9 @@
 
 import type { Database } from '@/types/supabase';
 
-export type EmploymentStatus = Database['public']['Enums']['employment_status'];
+export type EmploymentStatus = 'internal_employee' | 'external_contractor';
 export type SkillLevel = Database['public']['Enums']['skill_level'];
-export type OrgMemberRole = Database['public']['Enums']['org_member_role'];
+export type OrgMemberRole = 'owner' | 'admin' | 'manager' | 'member' | 'restricted';
 
 export interface TalentSkillRow {
   id: string;
@@ -44,7 +44,11 @@ export interface OrgMemberRow {
 export type OrgMemberInsert = Partial<OrgMemberRow> & { org_id: string };
 export type OrgMemberUpdate = Partial<OrgMemberRow>;
 
-/** Skill node for display (e.g. badge under member name). */
+/**
+ * @deprecated Use CrewSkillDTO instead. Backed by public.talent_skills (dead org_member_id key).
+ * Migrate callers to ops.crew_skills via getCrewSkillsForEntity.
+ *
+ * Skill node for display (e.g. badge under member name). */
 export interface TalentSkillDTO {
   id: string;
   skill_tag: string;
@@ -53,9 +57,21 @@ export interface TalentSkillDTO {
   verified: boolean;
 }
 
+/** Skill record from ops.crew_skills — replaces TalentSkillDTO for new code. */
+export interface CrewSkillDTO {
+  id: string;
+  skill_tag: string;
+  proficiency: SkillLevel | null;
+  hourly_rate: number | null;
+  verified: boolean;
+  notes?: string | null;
+}
+
 /** Org member with skills (expanded card). Ghost members have profile_id null. */
 export interface OrgMemberWithSkillsDTO {
   id: string;
+  /** directory.entities.id for the person entity — used for ops.crew_skills lookups. */
+  entity_id: string | null;
   profile_id: string | null;
   org_id: string;
   first_name: string | null;
@@ -65,6 +81,10 @@ export interface OrgMemberWithSkillsDTO {
   employment_status: EmploymentStatus;
   role: OrgMemberRole;
   default_hourly_rate: number;
+  /**
+   * @deprecated Legacy skills from public.talent_skills. Use getCrewSkillsForEntity() instead.
+   * Kept for backward-compat with callers that haven't migrated. Do not read this field in new code.
+   */
   skills: TalentSkillDTO[];
   /** From profiles join (fallback when first_name/last_name empty). */
   profiles?: { full_name: string | null; email: string | null } | null;

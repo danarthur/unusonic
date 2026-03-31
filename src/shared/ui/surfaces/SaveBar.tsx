@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, X } from 'lucide-react';
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 export interface SaveBarProps {
@@ -34,18 +35,18 @@ export function SaveBar({
           initial={{ y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          transition={STAGE_HEAVY}
           className={cn(
             'fixed bottom-6 left-1/2 z-30 -translate-x-1/2',
-            'liquid-card flex items-center justify-between gap-4 px-4 py-3 rounded-2xl',
-            'border-mercury shadow-[var(--glass-shadow)]',
+            'flex items-center justify-between gap-4 px-4 py-3 rounded-[var(--stage-radius-panel)]',
+            'bg-[var(--stage-surface-raised)] border border-[oklch(1_0_0_/_0.10)] shadow-[0_12px_40px_oklch(0_0_0_/_0.35)]',
             'min-w-[min(100%-2rem,360px)]',
             className
           )}
         >
-          <span className="text-sm font-medium text-ink-muted">Unsaved changes</span>
+          <span className="text-sm font-medium text-[var(--stage-text-secondary)]">Unsaved changes</span>
           {error && (
-            <span className="text-sm text-neon-rose truncate flex-1 min-w-0 mx-2" role="alert">
+            <span className="text-sm text-[var(--color-unusonic-error)] truncate flex-1 min-w-0 mx-2" role="alert">
               {error}
             </span>
           )}
@@ -54,22 +55,22 @@ export function SaveBar({
               type="button"
               onClick={onReset}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink-muted hover:text-ceramic hover:bg-ceramic/10 transition-colors focus:outline-none focus:ring-2 focus:ring-neon-blue/40 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-50"
             >
-              <X className="size-4" />
+              <X className="size-4" strokeWidth={1.5} />
               Reset
             </button>
             <button
               type="button"
               onClick={onSubmit}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-obsidian bg-ceramic hover:bg-ceramic/90 transition-colors focus:outline-none focus:ring-2 focus:ring-neon-blue/40 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-on-accent)] bg-[var(--stage-accent)] hover:brightness-[1.06] transition-[filter] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-50"
             >
               {isSubmitting ? (
-                <span className="animate-pulse">Locking…</span>
+                <span className="opacity-70">Locking…</span>
               ) : (
                 <>
-                  <Save className="size-4" />
+                  <Save className="size-4" strokeWidth={1.5} />
                   Lock
                 </>
               )}

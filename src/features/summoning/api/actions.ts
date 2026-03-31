@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
  * Summoning Protocol – Invite ghosts, cure relationships, claim account with Magnet.
  * @module features/summoning/api/actions
@@ -137,7 +137,7 @@ export async function createPartnerSummon(
           });
         }
         revalidatePath('/network');
-        return { ok: true, cured: true, message: 'Partner already on Signal. Relationship updated.' };
+        return { ok: true, cured: true, message: 'Partner already on Unusonic. Relationship updated.' };
       }
     }
   }

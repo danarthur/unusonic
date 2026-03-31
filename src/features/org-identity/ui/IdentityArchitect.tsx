@@ -67,16 +67,16 @@ export function IdentityArchitect({ org }: IdentityArchitectProps) {
   return (
     <>
       {/* LEFT: THE FORGE */}
-      <div className="border-r border-white/5 p-8 overflow-y-auto lg:p-12 flex flex-col min-h-0">
+      <div className="border-r border-[oklch(1_0_0_/_0.05)] p-8 overflow-y-auto lg:p-12 flex flex-col min-h-0">
         <div className="flex items-center justify-between gap-4 mb-8">
-          <h1 className="text-3xl font-light tracking-tight text-[var(--color-ink)]">
+          <h1 className="text-3xl font-light tracking-tight text-[var(--stage-text-primary)]">
             Establish Identity
           </h1>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push('/network')}
-            className="shrink-0 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] gap-1.5"
+            className="shrink-0 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] gap-1.5"
           >
             <ArrowLeft className="size-4" />
             Leave
@@ -86,13 +86,13 @@ export function IdentityArchitect({ org }: IdentityArchitectProps) {
           orgId={org.id}
           defaultValues={defaultValues}
           onValuesChange={setMirror}
-          submitLabel={isReEdit ? 'Save changes' : 'Initialize System'}
+          submitLabel={isReEdit ? 'Save changes' : 'Create studio'}
         />
       </div>
 
       {/* RIGHT: THE MIRROR (fixed, with ambient glow from brand color) */}
       <div
-        className="hidden lg:flex flex-col items-center justify-center relative overflow-hidden bg-[var(--color-obsidian)] min-h-0"
+        className="hidden lg:flex flex-col items-center justify-center relative overflow-hidden bg-[var(--stage-void)] min-h-0"
         style={
           mirror.brand_color
             ? { ['--color-brand-500' as string]: mirror.brand_color }

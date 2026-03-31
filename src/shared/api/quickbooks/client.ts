@@ -117,7 +117,7 @@ export class QuickBooksClient {
   }
 
   /**
-   * Execute a QBO REST request with idempotency (Request-Id + requestid) and error handling.
+   * Run a QBO REST request with idempotency (Request-Id + requestid) and error handling.
    * On 429, throws RateLimitError with retry-after; consumer handles backoff.
    */
   private async request<T>(

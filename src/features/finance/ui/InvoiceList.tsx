@@ -9,7 +9,7 @@ import { useCallback } from 'react';
 import Link from 'next/link';
 import { Link2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { formatCurrency } from '../model/types';
 import type { InvoiceDTO } from '../model/types';
@@ -65,46 +65,46 @@ function formatDate(iso: string): string {
 function StatusBadge({ status }: { status: string }) {
   const base = 'inline-flex px-2.5 py-1 rounded-full text-xs font-medium capitalize';
   if (status === 'paid') {
-    return <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300`}>Paid</span>;
+    return <span className={`${base} bg-[oklch(0.45_0.08_145_/_0.25)] text-[var(--color-unusonic-success)]`}>Paid</span>;
   }
   if (status === 'draft') {
-    return <span className={`${base} bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400`}>Draft</span>;
+    return <span className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}>Draft</span>;
   }
   if (status === 'overdue') {
-    return <span className={`${base} bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300`}>Overdue</span>;
+    return <span className={`${base} bg-[oklch(0.35_0.08_20_/_0.25)] text-[var(--color-unusonic-error)]`}>Overdue</span>;
   }
   if (status === 'sent') {
-    return <span className={`${base} bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400`}>Sent</span>;
+    return <span className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}>Sent</span>;
   }
   if (status === 'cancelled') {
-    return <span className={`${base} bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-500`}>Cancelled</span>;
+    return <span className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}>Cancelled</span>;
   }
-  return <span className={`${base} bg-stone-100 text-stone-600`}>{status}</span>;
+  return <span className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}>{status}</span>;
 }
 
 export function InvoiceList({ invoices, className }: InvoiceListProps) {
   return (
-    <LiquidPanel className={`overflow-hidden flex flex-col ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-4 shrink-0">
+    <StagePanel className={`overflow-hidden flex flex-col ${className ?? ''}`}>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4 shrink-0">
         Invoices
       </h2>
       <div className="min-h-0 overflow-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-[var(--glass-border)]">
-              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+            <tr className="border-b border-[oklch(1_0_0_/_0.08)]">
+              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                 ID
               </th>
-              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                 Date
               </th>
-              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                 Amount
               </th>
-              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                 Status
               </th>
-              <th className="pb-3 w-32 text-right text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <th className="pb-3 w-32 text-right text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                 Actions
               </th>
             </tr>
@@ -112,7 +112,7 @@ export function InvoiceList({ invoices, className }: InvoiceListProps) {
           <tbody>
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-sm text-ink-muted">
+                <td colSpan={5} className="py-8 text-center text-sm text-[var(--stage-text-secondary)]">
                   No invoices yet
                 </td>
               </tr>
@@ -120,15 +120,15 @@ export function InvoiceList({ invoices, className }: InvoiceListProps) {
               invoices.map((inv) => (
                 <tr
                   key={inv.id}
-                  className="border-b border-[var(--glass-border)] last:border-b-0"
+                  className="border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0"
                 >
-                  <td className="py-3 pr-4 font-mono text-sm text-ink">
+                  <td className="py-3 pr-4 font-mono text-sm text-[var(--stage-text-primary)]">
                     {inv.invoice_number ?? inv.id.slice(0, 8)}
                   </td>
-                  <td className="py-3 pr-4 text-sm text-ink-muted">
+                  <td className="py-3 pr-4 text-sm text-[var(--stage-text-secondary)]">
                     {formatDate(inv.issue_date)}
                   </td>
-                  <td className="py-3 pr-4 font-mono text-sm text-ink">
+                  <td className="py-3 pr-4 font-mono text-sm text-[var(--stage-text-primary)]">
                     {formatCurrency(Number(inv.total_amount))}
                   </td>
                   <td className="py-3 pr-4">
@@ -148,6 +148,6 @@ export function InvoiceList({ invoices, className }: InvoiceListProps) {
           </tbody>
         </table>
       </div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

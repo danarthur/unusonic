@@ -58,7 +58,7 @@ export function IndustryTagPicker({
         {Array.from({ length: 5 }).map((_, i) => (
           <span
             key={i}
-            className="h-6 w-16 animate-pulse rounded-full bg-[var(--color-mercury)]/20"
+            className="h-6 w-16 stage-skeleton rounded-full bg-[oklch(1_0_0_/_0.08)]/20"
           />
         ))}
       </div>
@@ -67,10 +67,10 @@ export function IndustryTagPicker({
 
   if (dictionary.length === 0) {
     return (
-      <p className="text-xs text-[var(--color-ink-muted)]">
+      <p className="text-xs text-[var(--stage-text-secondary)]">
         No categories configured.{' '}
         {showManageLink && (
-          <Link href="/settings/network-tags" className="text-[var(--color-silk)] hover:underline">
+          <Link href="/settings/network-tags" className="text-[var(--stage-accent)] hover:underline">
             Add some in Settings.
           </Link>
         )}
@@ -92,8 +92,8 @@ export function IndustryTagPicker({
               className={cn(
                 'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
                 isSelected
-                  ? 'bg-[var(--color-silk)]/20 text-[var(--color-silk)] border border-[var(--color-silk)]/40'
-                  : 'border border-dashed border-[var(--color-mercury)]/60 text-[var(--color-ink-muted)] hover:border-[var(--color-silk)]/40 hover:text-[var(--color-silk)]',
+                  ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border border-[var(--stage-accent)]/40'
+                  : 'border border-dashed border-[oklch(1_0_0_/_0.08)]/60 text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/40 hover:text-[var(--stage-accent)]',
                 disabled && 'pointer-events-none opacity-60'
               )}
             >
@@ -103,8 +103,8 @@ export function IndustryTagPicker({
         })}
       </div>
       {showManageLink && (
-        <p className="text-[10px] text-[var(--color-ink-muted)]/60">
-          <Link href="/settings/network-tags" className="hover:text-[var(--color-ink-muted)] transition-colors">
+        <p className="text-[10px] text-[var(--stage-text-secondary)]/60">
+          <Link href="/settings/network-tags" className="hover:text-[var(--stage-text-secondary)] transition-colors">
             Manage categories →
           </Link>
         </p>

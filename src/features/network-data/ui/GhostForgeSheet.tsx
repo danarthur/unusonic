@@ -48,10 +48,10 @@ const PAYMENT_TERMS_OPTIONS = [
 ];
 
 const inputCls =
-  'h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-silk)]/50';
-const labelCls = 'text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]';
+  'h-11 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:border-[var(--stage-accent)]/50';
+const labelCls = 'text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]';
 const selectCls =
-  'h-11 w-full rounded-xl border border-[var(--color-mercury)] bg-white/5 px-3 text-sm text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-silk)]/50 appearance-none';
+  'h-11 w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 text-sm text-[var(--stage-text-primary)] focus:outline-none focus:border-[var(--stage-accent)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] appearance-none';
 
 /**
  * Ghost Forge – slide-over to capture new connection: org or person + primary contact.
@@ -178,26 +178,26 @@ export function GhostForgeSheet({
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent
         side="center"
-        className="flex w-full max-w-md flex-col border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0"
+        className="flex w-full max-w-md flex-col border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0"
       >
-        <SheetHeader className="flex-col items-stretch gap-2 border-b border-[var(--color-mercury)] px-6 py-6">
+        <SheetHeader className="flex-col items-stretch gap-2 border-b border-[oklch(1_0_0_/_0.08)] px-6 py-6">
           <div className="flex items-center justify-between gap-4">
             <SheetTitle>Add connection</SheetTitle>
             <SheetClose />
           </div>
-          <p className="text-sm text-[var(--color-ink-muted)]">
+          <p className="text-sm text-[var(--stage-text-secondary)]">
             Ask Aion to scout a website for details, or add them manually.
           </p>
 
-          <div className="mt-4 flex gap-1 rounded-lg border border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 p-1">
+          <div className="mt-4 flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 p-1">
             <button
               type="button"
               onClick={() => setMode('scout')}
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
                 mode === 'scout'
-                  ? 'bg-[var(--color-silk)]/20 text-[var(--color-silk)] shadow-sm'
-                  : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                  ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
+                  : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
               )}
             >
               Aion
@@ -208,8 +208,8 @@ export function GhostForgeSheet({
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
                 mode === 'manual'
-                  ? 'bg-[var(--color-silk)]/20 text-[var(--color-silk)] shadow-sm'
-                  : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                  ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
+                  : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
               )}
             >
               Add manually
@@ -220,16 +220,16 @@ export function GhostForgeSheet({
         <SheetBody className="flex-1 space-y-6 px-6 pt-6 overflow-y-auto">
           {mode === 'scout' && (
             <motion.section
-              className="rounded-2xl border border-[var(--color-mercury)]/80 bg-white/[0.02] p-5 space-y-4"
+              className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] p-5 space-y-4"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={formStagger}
             >
               <div>
-                <h3 className="text-sm font-medium text-[var(--color-ink)] tracking-tight">
+                <h3 className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">
                   Ask Aion to scout
                 </h3>
-                <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
+                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
                   Paste a company website — Aion will pull the name, logo, and team so you don&apos;t have to type it.
                 </p>
               </div>
@@ -239,7 +239,7 @@ export function GhostForgeSheet({
                 onEnrich={handleScoutApply}
               />
               {isScoutPending && (
-                <p className="text-[10px] uppercase tracking-wider text-[var(--color-silk)]/90">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--stage-accent)]/90">
                   Creating connection…
                 </p>
               )}
@@ -249,15 +249,15 @@ export function GhostForgeSheet({
           {mode === 'manual' && (
             <>
               {/* Type toggle */}
-              <div className="flex gap-1 rounded-lg border border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 p-1">
+              <div className="flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 p-1">
                 <button
                   type="button"
                   onClick={() => setType('organization')}
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
                     type === 'organization'
-                      ? 'bg-[var(--color-silk)]/20 text-[var(--color-silk)] shadow-sm'
-                      : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                      ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
+                      : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
                   )}
                 >
                   <Building2 className="size-4" />
@@ -269,8 +269,8 @@ export function GhostForgeSheet({
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
                     type === 'person'
-                      ? 'bg-[var(--color-silk)]/20 text-[var(--color-silk)] shadow-sm'
-                      : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                      ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
+                      : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
                   )}
                 >
                   <User className="size-4" />
@@ -293,7 +293,7 @@ export function GhostForgeSheet({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Jane Doe"
-                      className={cn('h-12 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-silk)]/50')}
+                      className={cn('h-12 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:border-[var(--stage-accent)]/50')}
                     />
                   </motion.div>
 
@@ -306,7 +306,7 @@ export function GhostForgeSheet({
                   >
                     <label className={labelCls}>Phone</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
                       <Input
                         type="tel"
                         value={phone}
@@ -324,9 +324,9 @@ export function GhostForgeSheet({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...formStagger, delay: 0.1 }}
                   >
-                    <label className={labelCls}>Email <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <label className={labelCls}>Email <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
                       <Input
                         type="email"
                         value={email}
@@ -344,9 +344,9 @@ export function GhostForgeSheet({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...formStagger, delay: 0.12 }}
                   >
-                    <label className={labelCls}>Market <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <label className={labelCls}>Market <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
                       <Input
                         value={market}
                         onChange={(e) => setMarket(e.target.value)}
@@ -363,7 +363,7 @@ export function GhostForgeSheet({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...formStagger, delay: 0.14 }}
                   >
-                    <label className={labelCls}>Union status <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <label className={labelCls}>Union status <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <Input
                       value={unionStatus}
                       onChange={(e) => setUnionStatus(e.target.value)}
@@ -389,7 +389,7 @@ export function GhostForgeSheet({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Acme Corp"
-                      className="h-12 rounded-xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-silk)]/50"
+                      className="h-12 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:border-[var(--stage-accent)]/50"
                     />
                   </motion.div>
 
@@ -421,9 +421,9 @@ export function GhostForgeSheet({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...formStagger, delay: 0.1 }}
                   >
-                    <label className={labelCls}>Website <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                    <label className={labelCls}>Website <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <div className="relative">
-                      <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
                       <Input
                         value={website}
                         onChange={(e) => setWebsite(e.target.value)}
@@ -435,12 +435,12 @@ export function GhostForgeSheet({
 
                   {/* Primary contact */}
                   <motion.div
-                    className="space-y-3 border-t border-[var(--color-mercury)] pt-4"
+                    className="space-y-3 border-t border-[oklch(1_0_0_/_0.08)] pt-4"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...formStagger, delay: 0.12 }}
                   >
-                    <span className={cn(labelCls, 'block mb-2')}>Primary contact <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></span>
+                    <span className={cn(labelCls, 'block mb-2')}>Primary contact <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></span>
                     <Input
                       value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
@@ -448,7 +448,7 @@ export function GhostForgeSheet({
                       className={inputCls}
                     />
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
                       <Input
                         type="email"
                         value={email}
@@ -461,7 +461,7 @@ export function GhostForgeSheet({
 
                   {/* Compliance fields */}
                   <motion.div
-                    className="space-y-3 border-t border-[var(--color-mercury)] pt-4"
+                    className="space-y-3 border-t border-[oklch(1_0_0_/_0.08)] pt-4"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...formStagger, delay: 0.14 }}
@@ -474,14 +474,14 @@ export function GhostForgeSheet({
                         type="checkbox"
                         checked={w9Status}
                         onChange={(e) => setW9Status(e.target.checked)}
-                        className="h-4 w-4 rounded border-[var(--color-mercury)] bg-white/5 accent-[var(--color-silk)]"
+                        className="h-4 w-4 rounded border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] accent-[var(--stage-accent)]"
                       />
-                      <span className="text-sm text-[var(--color-ink-muted)]">W-9 on file</span>
+                      <span className="text-sm text-[var(--stage-text-secondary)]">W-9 on file</span>
                     </label>
 
                     {/* COI expiry */}
                     <div className="space-y-1.5">
-                      <label className={labelCls}>COI expires <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                      <label className={labelCls}>COI expires <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                       <input
                         type="date"
                         value={coiExpiry}
@@ -492,7 +492,7 @@ export function GhostForgeSheet({
 
                     {/* Payment terms */}
                     <div className="space-y-1.5">
-                      <label className={labelCls}>Payment terms <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                      <label className={labelCls}>Payment terms <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                       <select
                         value={paymentTerms}
                         onChange={(e) => setPaymentTerms(e.target.value)}
@@ -512,7 +512,7 @@ export function GhostForgeSheet({
                     {relType === 'venue' && (
                       <motion.div
                         key="venue-fields"
-                        className="space-y-3 border-t border-[var(--color-mercury)] pt-4"
+                        className="space-y-3 border-t border-[oklch(1_0_0_/_0.08)] pt-4"
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
@@ -522,7 +522,7 @@ export function GhostForgeSheet({
 
                         {/* Dock address */}
                         <div className="space-y-1.5">
-                          <label className={labelCls}>Dock address <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                          <label className={labelCls}>Dock address <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                           <Input
                             value={dockAddress}
                             onChange={(e) => setDockAddress(e.target.value)}
@@ -533,7 +533,7 @@ export function GhostForgeSheet({
 
                         {/* House PM name */}
                         <div className="space-y-1.5">
-                          <label className={labelCls}>House PM name <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                          <label className={labelCls}>House PM name <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                           <Input
                             value={venuePmName}
                             onChange={(e) => setVenuePmName(e.target.value)}
@@ -544,9 +544,9 @@ export function GhostForgeSheet({
 
                         {/* House PM phone */}
                         <div className="space-y-1.5">
-                          <label className={labelCls}>House PM phone <span className="normal-case tracking-normal text-[var(--color-ink-muted)]/60">(optional)</span></label>
+                          <label className={labelCls}>House PM phone <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                           <div className="relative">
-                            <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                            <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
                             <Input
                               type="tel"
                               value={venuePmPhone}
@@ -566,15 +566,15 @@ export function GhostForgeSheet({
         </SheetBody>
 
         {mode === 'manual' && (
-          <div className="shrink-0 border-t border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 px-6 py-5">
+          <div className="shrink-0 border-t border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 px-6 py-5">
             <Button
-              className="h-12 w-full rounded-xl bg-[var(--color-silk)]/20 text-[var(--color-silk)] hover:bg-[var(--color-silk)]/30"
+              className="h-12 w-full rounded-xl bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/30"
               onClick={handleSubmit}
               disabled={isSubmitDisabled}
             >
               {isPending ? 'Adding…' : 'Add & open'}
             </Button>
-            <p className="mt-3 text-center text-[10px] uppercase tracking-wider text-[var(--color-ink-muted)]">
+            <p className="mt-3 text-center text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)]">
               You can add notes and details next.
             </p>
           </div>

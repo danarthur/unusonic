@@ -35,7 +35,7 @@ import {
   VENUE_OPS,
   INDIVIDUAL_ATTR,
   COUPLE_ATTR,
-} from '@/features/network-data/model/attribute-keys';
+} from '@/entities/directory/model/attribute-keys';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +138,10 @@ const VenueOpsSchema = z
  * Use `readEntityAttrs(raw, 'person')` to get PersonAttrs.
  */
 export const PersonAttrsSchema = z.object({
+  [PERSON_ATTR.first_name]: z.string().catch(''),
+  [PERSON_ATTR.last_name]: z.string().catch(''),
+  [PERSON_ATTR.job_title]: optStr,
+  skills: z.array(z.string()).catch([]),   // denormalized snapshot — written by Phase 4 skill mutations
   [PERSON_ATTR.email]: optStr,
   [PERSON_ATTR.phone]: optStr,
   [PERSON_ATTR.market]: optStr,

@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, Package } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { StagePanel } from '@/shared/ui/stage-panel';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { updateFlightCheckStatus } from '../../actions/update-flight-check-status';
 import { normalizeGearItems, type GearItem, type GearStatus } from './types';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
@@ -59,32 +59,32 @@ export function GearFlightCheck({
 
   if (items.length === 0) {
     return (
-      <LiquidPanel className="p-5 rounded-[28px] border border-white/10">
+      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
         <div className="flex items-center gap-3">
-          <Package size={20} className="shrink-0 text-ink-muted" aria-hidden />
+          <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
           <div>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted">Gear</h3>
-            <p className="text-sm text-ink-muted mt-0.5">No gear requirements yet</p>
+            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Gear</h3>
+            <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">No gear requirements yet</p>
           </div>
         </div>
-      </LiquidPanel>
+      </StagePanel>
     );
   }
 
   return (
-    <LiquidPanel className="p-5 rounded-[28px] border border-white/10">
+    <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-xl"
+        className="w-full flex items-center justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-xl"
       >
         <div className="flex items-center gap-3">
-          <Package size={20} className="shrink-0 text-ink-muted" aria-hidden />
-          <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted">Gear</h3>
+          <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Gear</h3>
         </div>
         {showCollapse && (
-          <span className="text-ink-muted">
-            {collapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          <span className="text-[var(--stage-text-secondary)]">
+            {collapsed ? <ChevronDown size={18} strokeWidth={1.5} /> : <ChevronUp size={18} strokeWidth={1.5} />}
           </span>
         )}
       </button>
@@ -95,39 +95,36 @@ export function GearFlightCheck({
             layout
             initial={false}
             animate={{ opacity: 1 }}
-            transition={UNUSONIC_PHYSICS}
-            className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0"
+            transition={STAGE_LIGHT}
+            className="flex items-center justify-between gap-4 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0"
           >
-            <span className="text-ceramic font-medium tracking-tight text-sm truncate min-w-0">
+            <span className="text-[var(--stage-text-primary)] font-medium tracking-tight text-sm truncate min-w-0">
               {item.name}
             </span>
-            <motion.button
+            <button
               type="button"
               onClick={() => cycleStatus(item.id)}
               disabled={updating === item.id}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={UNUSONIC_PHYSICS}
               className={`
                 shrink-0 px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight
                 border transition-colors
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]
                 disabled:opacity-60
-                ${item.status === 'loaded' ? 'bg-[var(--color-signal-success)]/20 text-ceramic border-[var(--color-signal-success)]/40 hover:brightness-110' : ''}
-                ${item.status === 'pulled' ? 'bg-[var(--color-neon-blue)]/15 text-ceramic border-[var(--color-neon-blue)]/30 hover:brightness-110' : ''}
-                ${item.status === 'pending' ? 'bg-white/[0.06] text-ink-muted border-white/10 hover:bg-white/[0.1] hover:text-ceramic' : ''}
+                ${item.status === 'loaded' ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40' : ''}
+                ${item.status === 'pulled' ? 'bg-[var(--color-unusonic-info)]/15 text-[var(--stage-text-primary)] border-[var(--color-unusonic-info)]/30' : ''}
+                ${item.status === 'pending' ? 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)]' : ''}
               `}
             >
               {updating === item.id ? '…' : GEAR_LABELS[item.status]}
-            </motion.button>
+            </button>
           </motion.li>
         ))}
       </ul>
       {hasMore && (
-        <p className="text-xs text-ink-muted mt-2">
+        <p className="text-xs text-[var(--stage-text-secondary)] mt-2">
           +{items.length - maxVisible} more
         </p>
       )}
-    </LiquidPanel>
+    </StagePanel>
   );
 }

@@ -19,6 +19,7 @@ export const inviteTalentSchema = z
     employment_status: employmentStatusSchema,
     role: inviteRoleSchema.default('member'),
     skill_tags: z.array(z.string().min(1).max(120)).default([]),
+    capabilities: z.array(z.string().min(1).max(120)).default([]),
   })
   .refine(
     (data) => {

@@ -33,9 +33,11 @@ import {
 import { updateIndividualEntity } from '@/app/(dashboard)/(features)/crm/actions/update-individual-entity';
 import { updateCoupleEntity } from '@/app/(dashboard)/(features)/crm/actions/update-couple-entity';
 import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/crm/actions/reclassify-client-entity';
-import type { IndividualAttrs, CoupleAttrs } from '@/shared/lib/entity-attrs';
+import type { IndividualAttrs, CoupleAttrs, PersonAttrs } from '@/shared/lib/entity-attrs';
+import { EmployeeEntityForm } from './EmployeeEntityForm';
+import { FreelancerEntityForm } from './FreelancerEntityForm';
 import { ColorTuner } from '@/features/org-identity';
-import { SignalScoutInput } from '@/widgets/network-detail/ui/SignalScoutInput';
+import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import {
@@ -51,7 +53,7 @@ import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 
-const LABEL = 'text-[10px] font-medium text-[var(--color-ink-muted)] uppercase tracking-widest';
+const LABEL = 'text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest';
 
 function AccordionSection({
   label,
@@ -66,13 +68,13 @@ function AccordionSection({
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div className="rounded-2xl border border-[var(--color-mercury)] bg-white/5 overflow-hidden">
+    <div className="stage-panel rounded-2xl overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-white/5 transition-colors"
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0_/_0.05)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
       >
-        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           <Icon className="size-3.5" />
           {label}
         </span>
@@ -87,7 +89,7 @@ function AccordionSection({
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[var(--color-mercury)]">{children}</div>
+            <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -99,12 +101,12 @@ function AccordionSection({
 
 function AssignmentRow({ entry, muted = false }: { entry: CrewScheduleEntry; muted?: boolean }) {
   return (
-    <li className="flex items-start gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5">
+    <li className="flex items-start gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className={cn('text-sm font-medium truncate', muted ? 'text-[var(--color-ink-muted)]' : 'text-[var(--color-ink)]')}>
+        <p className={cn('text-sm font-medium truncate', muted ? 'text-[var(--stage-text-secondary)]' : 'text-[var(--stage-text-primary)]')}>
           {entry.event_title ?? 'Untitled event'}
         </p>
-        <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
+        <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
           {entry.role}
           {entry.starts_at ? ` · ${new Date(entry.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
           {entry.venue_name ? ` · ${entry.venue_name}` : ''}
@@ -113,12 +115,12 @@ function AssignmentRow({ entry, muted = false }: { entry: CrewScheduleEntry; mut
       <span className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
         muted
-          ? 'bg-white/5 text-[var(--color-ink-muted)]/60'
+          ? 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)]/60'
           : entry.status === 'confirmed'
             ? 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]'
             : entry.status === 'dispatched'
-              ? 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]'
-              : 'bg-white/10 text-[var(--color-ink-muted)]',
+              ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]'
+              : 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
       )}>
         {entry.status}
       </span>
@@ -147,8 +149,8 @@ function AssignmentsPanel({ entityId }: { entityId: string }) {
   if (loading) return (
     <AccordionSection label="Assignments" icon={Calendar}>
       <div className="space-y-2">
-        <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
-        <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
+        <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
+        <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
       </div>
     </AccordionSection>
   );
@@ -159,7 +161,7 @@ function AssignmentsPanel({ entityId }: { entityId: string }) {
       <div className="space-y-4">
         {upcoming && upcoming.length > 0 && (
           <div>
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               Upcoming
             </p>
             <ul className="space-y-2">
@@ -175,7 +177,7 @@ function AssignmentsPanel({ entityId }: { entityId: string }) {
             <button
               type="button"
               onClick={() => setShowPast((p) => !p)}
-              className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
+              className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
             >
               <ChevronDown className={cn('size-3 transition-transform', showPast && 'rotate-180')} />
               {showPast ? 'Hide history' : `Show history (${history.length})`}
@@ -205,7 +207,7 @@ function DealsPanel({ entityId }: { entityId: string }) {
 
   if (loading) return (
     <AccordionSection label="Related deals" icon={Briefcase}>
-      <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
+      <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
     </AccordionSection>
   );
   if (!data || data.length === 0) return null;
@@ -214,12 +216,12 @@ function DealsPanel({ entityId }: { entityId: string }) {
     <AccordionSection label="Related deals" icon={Briefcase}>
       <ul className="space-y-2">
         {data.map((deal) => (
-          <li key={deal.id} className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5">
+          <li key={deal.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2.5">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--color-ink)] capitalize">
+              <p className="text-sm font-medium text-[var(--stage-text-primary)] capitalize">
                 {deal.event_archetype?.replace(/_/g, ' ') ?? 'Deal'}
               </p>
-              <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
+              <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
                 {new Date(deal.proposed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 {deal.budget_estimated ? ` · $${deal.budget_estimated.toLocaleString()}` : ''}
               </p>
@@ -227,9 +229,9 @@ function DealsPanel({ entityId }: { entityId: string }) {
             <span className={cn(
               'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
               deal.status === 'confirmed' && 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]',
-              deal.status === 'signed' && 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]',
-              deal.status === 'prospect' && 'bg-white/10 text-[var(--color-ink-muted)]',
-              !['confirmed','signed','prospect'].includes(deal.status) && 'bg-white/10 text-[var(--color-ink-muted)]',
+              deal.status === 'signed' && 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]',
+              deal.status === 'prospect' && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
+              !['confirmed','signed','prospect'].includes(deal.status) && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
             )}>
               {deal.status}
             </span>
@@ -251,7 +253,7 @@ function FinancePanel({ entityId }: { entityId: string }) {
 
   if (loading) return (
     <AccordionSection label="Financial obligations" icon={Receipt}>
-      <div className="h-8 rounded-lg bg-white/5 animate-pulse" />
+      <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
     </AccordionSection>
   );
   if (!data || data.length === 0) return null;
@@ -264,7 +266,7 @@ function FinancePanel({ entityId }: { entityId: string }) {
     <AccordionSection label="Financial obligations" icon={Receipt}>
       {totalOutstanding > 0 && (
         <div className="rounded-lg bg-[oklch(0.75_0.15_60)]/10 border border-[oklch(0.75_0.15_60)]/20 px-3 py-2 mb-3">
-          <p className="text-xs text-[var(--color-ink-muted)]">Outstanding</p>
+          <p className="text-xs text-[var(--stage-text-secondary)]">Outstanding</p>
           <p className="text-lg font-semibold text-[oklch(0.75_0.15_60)]">
             ${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
@@ -272,13 +274,13 @@ function FinancePanel({ entityId }: { entityId: string }) {
       )}
       <ul className="space-y-2">
         {data.map((inv) => (
-          <li key={inv.id} className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5">
+          <li key={inv.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2.5">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--color-ink)]">
+              <p className="text-sm font-medium text-[var(--stage-text-primary)]">
                 ${(inv.total_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               {inv.due_date && (
-                <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
+                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
                   Due {new Date(inv.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </p>
               )}
@@ -287,8 +289,8 @@ function FinancePanel({ entityId }: { entityId: string }) {
               'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
               inv.status === 'paid' && 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]',
               inv.status === 'overdue' && 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]',
-              inv.status === 'sent' && 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]',
-              !['paid','overdue','sent'].includes(inv.status ?? '') && 'bg-white/10 text-[var(--color-ink-muted)]',
+              inv.status === 'sent' && 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]',
+              !['paid','overdue','sent'].includes(inv.status ?? '') && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
             )}>
               {inv.status ?? 'draft'}
             </span>
@@ -332,46 +334,46 @@ function VenueTechSpecsCard({
   }
 
   return (
-    <div className="rounded-2xl bg-[var(--color-surface-100)] p-5">
-      <h3 className="mb-4 text-sm font-medium text-[var(--color-ink-muted)]">Technical Specs</h3>
+    <div className="rounded-2xl bg-[var(--stage-surface-elevated)] p-5">
+      <h3 className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Technical Specs</h3>
       <div className="space-y-3">
         <div>
-          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Capacity</label>
+          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Capacity</label>
           <input
             type="number"
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
-            className="w-full rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            className="w-full rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
             placeholder="e.g. 500"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Load-in notes</label>
+          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Load-in notes</label>
           <textarea
             value={loadInNotes}
             onChange={(e) => setLoadInNotes(e.target.value)}
             rows={3}
-            className="w-full resize-none rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            className="w-full resize-none rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
             placeholder="Dock access, elevator, stairs..."
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Power notes</label>
+          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Power notes</label>
           <input
             type="text"
             value={powerNotes}
             onChange={(e) => setPowerNotes(e.target.value)}
-            className="w-full rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            className="w-full rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
             placeholder="200A 3-phase, 4× 20A circuits..."
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-[var(--color-ink-muted)]">Stage dimensions</label>
+          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Stage dimensions</label>
           <input
             type="text"
             value={stageNotes}
             onChange={(e) => setStageNotes(e.target.value)}
-            className="w-full rounded-lg bg-[var(--color-surface-200)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-silk)]/40"
+            className="w-full rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
             placeholder="40ft W × 30ft D × 20ft H"
           />
         </div>
@@ -383,7 +385,7 @@ function VenueTechSpecsCard({
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="mt-4 w-full rounded-xl bg-[var(--color-silk)]/10 py-2 text-sm font-medium text-[var(--color-silk)] transition-opacity hover:opacity-80 disabled:opacity-40"
+        className="mt-4 w-full rounded-xl bg-[var(--stage-accent)]/10 py-2 text-sm font-medium text-[var(--stage-accent)] transition-opacity hover:opacity-80 disabled:opacity-40"
       >
         {saving ? 'Saving…' : 'Save specs'}
       </button>
@@ -451,17 +453,17 @@ function PersonEntityForm({
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-obsidian)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--color-obsidian)]/80 backdrop-blur-xl border-b border-[var(--color-mercury)] px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
+      <header className="sticky top-0 z-20 bg-[var(--stage-void)]/80  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
             <ArrowLeft className="size-5" />
           </Button>
           <div>
-            <p className="text-xs font-medium text-[var(--color-ink-muted)] uppercase tracking-widest">
+            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
               Entity Studio — Individual
             </p>
-            <h1 className="text-xl font-light text-[var(--color-ink)] tracking-tight">
+            <h1 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
               {displayName || 'Individual Client'}
             </h1>
           </div>
@@ -474,11 +476,11 @@ function PersonEntityForm({
               exit={{ opacity: 0, y: -4 }}
               className="flex items-center gap-3"
             >
-              <span className="text-xs text-[var(--color-ink-muted)]">Unsaved changes</span>
+              <span className="text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
               <Button
                 onClick={handleSave}
                 disabled={isPending}
-                className="gap-2 bg-[var(--color-silk)]/20 text-[var(--color-silk)] border-[var(--color-silk)]/40 hover:bg-[var(--color-silk)]/30"
+                className="gap-2 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
               >
                 <Save className="size-4" />
                 Save
@@ -489,8 +491,8 @@ function PersonEntityForm({
       </header>
 
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        <section className="liquid-card rounded-2xl p-6 space-y-5">
-          <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+        <section className="stage-panel rounded-2xl p-6 space-y-5">
+          <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
             Contact details
           </h3>
           <div className="grid grid-cols-2 gap-4">
@@ -499,7 +501,7 @@ function PersonEntityForm({
               <Input
                 value={firstName}
                 onChange={(e) => { setFirstName(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
@@ -507,7 +509,7 @@ function PersonEntityForm({
               <Input
                 value={lastName}
                 onChange={(e) => { setLastName(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
           </div>
@@ -518,7 +520,7 @@ function PersonEntityForm({
               value={email}
               onChange={(e) => { setEmail(e.target.value); setHasChanges(true); }}
               placeholder="client@example.com"
-              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
           </div>
           <div>
@@ -527,7 +529,7 @@ function PersonEntityForm({
               value={phone}
               onChange={(e) => { setPhone(e.target.value); setHasChanges(true); }}
               placeholder="+1 (555) 000-0000"
-              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
           </div>
         </section>
@@ -539,14 +541,14 @@ function PersonEntityForm({
           </>
         )}
 
-        <section className="rounded-2xl border border-[var(--color-mercury)]/80 bg-white/[0.02] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--color-mercury)]">
-            <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest">
+        <section className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
+            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest">
               Reclassify
             </h3>
           </div>
           <div className="px-5 py-4 space-y-3">
-            <p className="text-xs text-[var(--color-ink-muted)]">
+            <p className="text-xs text-[var(--stage-text-secondary)]">
               Change this client record type. Existing field data from the old type will be cleared.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -556,7 +558,7 @@ function PersonEntityForm({
                 size="sm"
                 disabled={reclassifyPending}
                 onClick={() => handleReclassify('couple')}
-                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
               >
                 Change to Couple
               </Button>
@@ -566,7 +568,7 @@ function PersonEntityForm({
                 size="sm"
                 disabled={reclassifyPending}
                 onClick={() => handleReclassify('company')}
-                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
               >
                 Change to Company
               </Button>
@@ -648,17 +650,17 @@ function CoupleEntityForm({
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-obsidian)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--color-obsidian)]/80 backdrop-blur-xl border-b border-[var(--color-mercury)] px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
+      <header className="sticky top-0 z-20 bg-[var(--stage-void)]/80  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
             <ArrowLeft className="size-5" />
           </Button>
           <div>
-            <p className="text-xs font-medium text-[var(--color-ink-muted)] uppercase tracking-widest">
+            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
               Entity Studio — Couple
             </p>
-            <h1 className="text-xl font-light text-[var(--color-ink)] tracking-tight">
+            <h1 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
               {displayName}
             </h1>
           </div>
@@ -671,11 +673,11 @@ function CoupleEntityForm({
               exit={{ opacity: 0, y: -4 }}
               className="flex items-center gap-3"
             >
-              <span className="text-xs text-[var(--color-ink-muted)]">Unsaved changes</span>
+              <span className="text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
               <Button
                 onClick={handleSave}
                 disabled={isPending}
-                className="gap-2 bg-[var(--color-silk)]/20 text-[var(--color-silk)] border-[var(--color-silk)]/40 hover:bg-[var(--color-silk)]/30"
+                className="gap-2 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
               >
                 <Save className="size-4" />
                 Save
@@ -686,8 +688,8 @@ function CoupleEntityForm({
       </header>
 
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        <section className="liquid-card rounded-2xl p-6 space-y-5">
-          <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+        <section className="stage-panel rounded-2xl p-6 space-y-5">
+          <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
             Partner A
           </h3>
           <div className="grid grid-cols-2 gap-4">
@@ -696,7 +698,7 @@ function CoupleEntityForm({
               <Input
                 value={partnerAFirst}
                 onChange={(e) => { setPartnerAFirst(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
@@ -704,7 +706,7 @@ function CoupleEntityForm({
               <Input
                 value={partnerALast}
                 onChange={(e) => { setPartnerALast(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
           </div>
@@ -715,13 +717,13 @@ function CoupleEntityForm({
               value={partnerAEmail}
               onChange={(e) => { setPartnerAEmail(e.target.value); setHasChanges(true); }}
               placeholder="partner@example.com"
-              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
           </div>
         </section>
 
-        <section className="liquid-card rounded-2xl p-6 space-y-5">
-          <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+        <section className="stage-panel rounded-2xl p-6 space-y-5">
+          <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
             Partner B
           </h3>
           <div className="grid grid-cols-2 gap-4">
@@ -730,7 +732,7 @@ function CoupleEntityForm({
               <Input
                 value={partnerBFirst}
                 onChange={(e) => { setPartnerBFirst(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
@@ -738,7 +740,7 @@ function CoupleEntityForm({
               <Input
                 value={partnerBLast}
                 onChange={(e) => { setPartnerBLast(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
           </div>
@@ -749,7 +751,7 @@ function CoupleEntityForm({
               value={partnerBEmail}
               onChange={(e) => { setPartnerBEmail(e.target.value); setHasChanges(true); }}
               placeholder="partner@example.com"
-              className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
           </div>
         </section>
@@ -761,14 +763,14 @@ function CoupleEntityForm({
           </>
         )}
 
-        <section className="rounded-2xl border border-[var(--color-mercury)]/80 bg-white/[0.02] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--color-mercury)]">
-            <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest">
+        <section className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
+            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest">
               Reclassify
             </h3>
           </div>
           <div className="px-5 py-4 space-y-3">
-            <p className="text-xs text-[var(--color-ink-muted)]">
+            <p className="text-xs text-[var(--stage-text-secondary)]">
               Change this client record type. Existing field data from the old type will be cleared.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -778,7 +780,7 @@ function CoupleEntityForm({
                 size="sm"
                 disabled={reclassifyPending}
                 onClick={() => handleReclassify('person')}
-                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
               >
                 Change to Individual
               </Button>
@@ -788,7 +790,7 @@ function CoupleEntityForm({
                 size="sm"
                 disabled={reclassifyPending}
                 onClick={() => handleReclassify('company')}
-                className="border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
               >
                 Change to Company
               </Button>
@@ -810,14 +812,38 @@ interface EntityStudioClientProps {
   initialPersonAttrs?: IndividualAttrs | null;
   /** Present when entityDirectoryType === 'couple'. Populated from directory.entities.attributes. */
   initialCoupleAttrs?: CoupleAttrs | null;
+  /** Present when kind === 'internal_employee'. Parsed as PersonAttrs from directory.entities.attributes. */
+  initialEmployeeAttrs?: PersonAttrs | null;
 }
 
 /**
  * Route dispatcher — renders one of three form components based on entity type.
  * Hooks must not be called here; each sub-component manages its own hook lifecycle.
  */
-export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs }: EntityStudioClientProps) {
+export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs, initialEmployeeAttrs }: EntityStudioClientProps) {
   const dirType = details.entityDirectoryType;
+
+  if (details.kind === 'internal_employee' || details.kind === 'extended_team') {
+    return (
+      <EmployeeEntityForm
+        details={details}
+        sourceOrgId={sourceOrgId}
+        initialAttrs={initialEmployeeAttrs ?? null}
+        returnPath={returnPath ?? '/network'}
+      />
+    );
+  }
+
+  if (details.kind === 'external_partner' && dirType === 'person') {
+    return (
+      <FreelancerEntityForm
+        details={details}
+        sourceOrgId={sourceOrgId}
+        initialAttrs={initialEmployeeAttrs ?? null}
+        returnPath={returnPath ?? '/network'}
+      />
+    );
+  }
 
   if (dirType === 'person' && initialPersonAttrs !== undefined) {
     return (
@@ -980,7 +1006,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
           updateRelationshipNotes(relationshipId, notes),
         ]);
 
-        let err =
+        const err =
           profileResult.error ||
           (relResult.ok === false ? relResult.error : null) ||
           (notesResult.ok === false ? notesResult.error : null);
@@ -1089,17 +1115,17 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-obsidian)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--color-obsidian)]/80 backdrop-blur-xl border-b border-[var(--color-mercury)] px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
+      <header className="sticky top-0 z-20 bg-[var(--stage-void)]/80  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
             <ArrowLeft className="size-5" />
           </Button>
           <div>
-            <p className="text-xs font-medium text-[var(--color-ink-muted)] uppercase tracking-widest">
+            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
               Entity Studio
             </p>
-            <h1 className="text-xl font-light text-[var(--color-ink)] tracking-tight">
+            <h1 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
               {name || 'Untitled Entity'}
             </h1>
           </div>
@@ -1112,11 +1138,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               exit={{ opacity: 0, y: -4 }}
               className="flex items-center gap-3"
             >
-              <span className="text-xs text-[var(--color-ink-muted)]">Unsaved changes</span>
+              <span className="text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
               <Button
                 onClick={handleSave}
                 disabled={isPending}
-                className="gap-2 bg-[var(--color-silk)]/20 text-[var(--color-silk)] border-[var(--color-silk)]/40 hover:bg-[var(--color-silk)]/30"
+                className="gap-2 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
               >
                 <Save className="size-4" />
                 Save
@@ -1129,13 +1155,13 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
       <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Column A: Identity (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
-          <section className="liquid-card rounded-2xl p-6 space-y-6">
-            <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+          <section className="stage-panel rounded-2xl p-6 space-y-6">
+            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
               Core Identity
             </h3>
             <div className="flex items-center gap-4">
               <div
-                className="relative size-16 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[var(--color-mercury)]"
+                className="relative size-16 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[oklch(1_0_0_/_0.08)]"
                 style={{ backgroundColor: brandColor && !logoUrl ? `${brandColor}20` : undefined }}
               >
                 {logoUrl ? (
@@ -1144,7 +1170,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                     <div
                       className="pointer-events-none absolute inset-0"
                       style={{
-                        background: 'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(248,250,252,0.7) 0%, rgba(226,232,240,0.4) 50%, transparent 100%)',
+                        background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.97 0 0 / 0.7) 0%, oklch(0.91 0.01 250 / 0.4) 50%, transparent 100%)',
                       }}
                       aria-hidden
                     />
@@ -1155,7 +1181,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                     />
                   </>
                 ) : (
-                  <span className="text-2xl font-light text-[var(--color-ink-muted)]">
+                  <span className="text-2xl font-light text-[var(--stage-text-secondary)]">
                     {(name?.[0] ?? '?').toUpperCase()}
                   </span>
                 )}
@@ -1166,7 +1192,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   <Input
                     value={name}
                     onChange={(e) => { setName(e.target.value); markChanged(); }}
-                    className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                    className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
                   />
                 </div>
                 <div>
@@ -1175,7 +1201,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                     value={logoUrl}
                     onChange={(e) => { setLogoUrl(e.target.value); markChanged(); }}
                     placeholder="https://..."
-                    className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                    className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                   />
                 </div>
               </div>
@@ -1186,7 +1212,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 value={doingBusinessAs}
                 onChange={(e) => { setDoingBusinessAs(e.target.value); markChanged(); }}
                 placeholder="e.g. NV Productions LLC"
-                className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
@@ -1194,7 +1220,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               <select
                 value={entityType}
                 onChange={(e) => { setEntityType(e.target.value); markChanged(); }}
-                className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 <option value="organization">Organization</option>
                 <option value="single_operator">Single operator</option>
@@ -1206,11 +1232,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
 
         {/* Column B: Intelligence + Classification (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
-          <section className="liquid-card rounded-2xl p-6 space-y-6">
-            <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest border-b border-[var(--color-mercury)] pb-4">
+          <section className="stage-panel rounded-2xl p-6 space-y-6">
+            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
               Digital Intelligence
             </h3>
-            <SignalScoutInput
+            <AionScoutInput
               value={website}
               onChange={(v) => { setWebsite(v); markChanged(); }}
               onEnrich={handleEnrich}
@@ -1222,7 +1248,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   value={supportEmail}
                   onChange={(e) => { setSupportEmail(e.target.value); markChanged(); }}
                   placeholder="booking@example.com"
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
                 />
               </div>
               <div>
@@ -1231,7 +1257,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   value={phone}
                   onChange={(e) => { setPhone(e.target.value); markChanged(); }}
                   placeholder="Main office line"
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
                 />
               </div>
             </div>
@@ -1241,7 +1267,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.street}
                   onChange={(e) => { setAddress((a) => ({ ...a, street: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -1249,7 +1275,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.city}
                   onChange={(e) => { setAddress((a) => ({ ...a, city: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -1257,7 +1283,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.state}
                   onChange={(e) => { setAddress((a) => ({ ...a, state: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -1265,7 +1291,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.postal_code}
                   onChange={(e) => { setAddress((a) => ({ ...a, postal_code: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
             </div>
@@ -1274,7 +1300,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               <Input
                 value={address.country}
                 onChange={(e) => { setAddress((a) => ({ ...a, country: e.target.value })); markChanged(); }}
-                className="mt-1 bg-white/5 border-[var(--color-mercury)] text-xs"
+                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
               />
             </div>
           </section>
@@ -1286,7 +1312,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <select
                   value={relType}
                   onChange={(e) => { setRelType(e.target.value as 'vendor' | 'partner' | 'client'); markChanged(); }}
-                  className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <option value="vendor">Vendor</option>
                   <option value="client">Client</option>
@@ -1298,7 +1324,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <select
                   value={lifecycle}
                   onChange={(e) => { setLifecycle(e.target.value as 'prospect' | 'active' | 'dormant' | 'blacklisted'); markChanged(); }}
-                  className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <option value="prospect">Prospect</option>
                   <option value="active">Active</option>
@@ -1312,7 +1338,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   <Input
                     value={blacklistReason}
                     onChange={(e) => { setBlacklistReason(e.target.value); markChanged(); }}
-                    className="mt-1 bg-white/5 border-[var(--color-mercury)]"
+                    className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
                   />
                 </div>
               )}
@@ -1322,14 +1348,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   {localTags.map((t) => (
                     <span
                       key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-[var(--color-silk)]/15 text-[var(--color-silk)] px-2 py-0.5 text-xs"
+                      className="inline-flex items-center gap-1 rounded-full bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] px-2 py-0.5 text-xs"
                     >
                       {t}
                       <button type="button" onClick={() => { setLocalTags(localTags.filter((x) => x !== t)); markChanged(); }}>×</button>
                     </span>
                   ))}
                   <div className="flex gap-1">
-                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-white/5" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
+                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-[oklch(1_0_0_/_0.05)]" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
                     <Button type="button" variant="ghost" size="sm" onClick={addTag}>Add</Button>
                   </div>
                 </div>
@@ -1342,11 +1368,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               <div className="space-y-4">
                 <div>
                   <label className={LABEL}>Tax ID</label>
-                  <Input value={taxId} onChange={(e) => { setTaxId(e.target.value); markChanged(); }} className="mt-1 bg-white/5" />
+                  <Input value={taxId} onChange={(e) => { setTaxId(e.target.value); markChanged(); }} className="mt-1 bg-[oklch(1_0_0_/_0.05)]" />
                 </div>
                 <div>
                   <label className={LABEL}>Currency</label>
-                  <select value={defaultCurrency} onChange={(e) => { setDefaultCurrency(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm">
+                  <select value={defaultCurrency} onChange={(e) => { setDefaultCurrency(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]">
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
                     <option value="GBP">GBP</option>
@@ -1354,7 +1380,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 </div>
                 <div>
                   <label className={LABEL}>Payment terms</label>
-                  <select value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-white/5 border border-[var(--color-mercury)] px-3 py-2 text-sm">
+                  <select value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]">
                     <option value="">—</option>
                     <option value="immediate">Immediate</option>
                     <option value="net_15">Net 15</option>
@@ -1371,14 +1397,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               value={notes}
               onChange={(e) => { setNotes(e.target.value); markChanged(); }}
               placeholder="Internal notes about this partner…"
-              className="min-h-[100px] resize-y bg-white/5 border-[var(--color-mercury)]"
+              className="min-h-[100px] resize-y bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               rows={4}
             />
           </AccordionSection>
 
-          <section className="rounded-2xl border border-[var(--color-mercury)]/80 bg-white/[0.02] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--color-mercury)]">
-              <h3 className="text-xs font-bold text-[var(--color-ink-muted)] uppercase tracking-widest">
+          <section className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
+              <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest">
                 Danger zone
               </h3>
             </div>
@@ -1388,7 +1414,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 variant="outline"
                 size="sm"
                 onClick={() => setResetConfirmOpen(true)}
-                className="gap-2 border-[var(--color-mercury)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/5"
+                className="gap-2 border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
               >
                 <RotateCcw className="size-4" />
                 Reset all fields
@@ -1440,14 +1466,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
             <DialogTitle>Reset all fields?</DialogTitle>
             <DialogClose />
           </DialogHeader>
-          <p className="px-6 pb-6 text-sm text-[var(--color-ink-muted)]">
+          <p className="px-6 pb-6 text-sm text-[var(--stage-text-secondary)]">
             This will clear every field on this form. You can save afterward to persist the reset, or leave without saving to keep existing data.
           </p>
           <div className="flex gap-3 px-6 pb-6">
             <Button variant="outline" size="sm" onClick={() => setResetConfirmOpen(false)} className="flex-1">
               Cancel
             </Button>
-            <Button size="sm" onClick={resetToEmpty} className="flex-1 bg-[var(--color-silk)]/20 text-[var(--color-silk)] border border-[var(--color-silk)]/40">
+            <Button size="sm" onClick={resetToEmpty} className="flex-1 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border border-[var(--stage-accent)]/40">
               Reset
             </Button>
           </div>
@@ -1460,7 +1486,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
             <DialogTitle>Delete this connection?</DialogTitle>
             <DialogClose />
           </DialogHeader>
-          <p className="px-6 pb-6 text-sm text-[var(--color-ink-muted)]">
+          <p className="px-6 pb-6 text-sm text-[var(--stage-text-secondary)]">
             This connection will be removed from your network. You can restore it within 30 days from the Network page. After that it may be permanently deleted.
           </p>
           <div className="flex gap-3 px-6 pb-6">
@@ -1494,12 +1520,14 @@ function RosterSection({
   onRefresh: () => void;
 }) {
   const [showAdd, setShowAdd] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const addRef = React.useRef<HTMLDivElement>(null);
 
   const handleAdd = async () => {
     const el = addRef.current;
     if (!el) return;
     const get = (n: string) => (el.querySelector(`[name="${n}"]`) as HTMLInputElement)?.value?.trim() ?? '';
+    setSaving(true);
     const result = await addContactToGhostOrg(sourceOrgId, ghostOrgId, {
       firstName: get('ac_firstName') || 'Contact',
       lastName: get('ac_lastName'),
@@ -1507,11 +1535,12 @@ function RosterSection({
       role: get('ac_role') || undefined,
       jobTitle: get('ac_jobTitle') || undefined,
     });
+    setSaving(false);
     if (result.ok) {
       setShowAdd(false);
       onRefresh();
     } else {
-      toast.error(result.error);
+      toast.error(result.error ?? 'Failed to add contact');
     }
   };
 
@@ -1519,35 +1548,43 @@ function RosterSection({
     <div className="space-y-3">
       <ul className="space-y-2">
         {crew.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-white/5 px-3 py-2">
-            <div className="size-10 rounded-full bg-[var(--color-glass-surface)] flex items-center justify-center overflow-hidden">
-              {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="size-full object-cover" /> : <span className="text-sm text-[var(--color-ink-muted)]">{(m.name?.[0] ?? '?').toUpperCase()}</span>}
+          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2">
+            <div className="size-10 rounded-full bg-[var(--stage-surface-raised)] flex items-center justify-center overflow-hidden">
+              {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" /> : <span className="text-sm text-[var(--stage-text-secondary)]">{(m.name?.[0] ?? '?').toUpperCase()}</span>}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--color-ink)]">{m.name}</p>
-              <p className="text-xs text-[var(--color-ink-muted)] truncate">{[m.jobTitle, m.role, m.email].filter(Boolean).join(' · ')}</p>
+              <p className="text-sm font-medium text-[var(--stage-text-primary)]">{m.name}</p>
+              {(() => {
+                const visibleEmail = m.email && !m.email.startsWith('ghost-') && !m.email.endsWith('.local') ? m.email : null;
+                const subtitle = [m.jobTitle, visibleEmail].filter(Boolean).join(' · ');
+                return subtitle ? (
+                  <p className="text-xs text-[var(--stage-text-secondary)] truncate">{subtitle}</p>
+                ) : null;
+              })()}
             </div>
           </li>
         ))}
       </ul>
       {!showAdd ? (
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2 border-[var(--color-silk)]/40 text-[var(--color-silk)]">
+        <Button type="button" variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2 border-[var(--stage-accent)]/40 text-[var(--stage-accent)]">
           Add contact
         </Button>
       ) : (
-        <div ref={addRef} className="rounded-xl border border-[var(--color-mercury)] bg-white/5 p-4 space-y-3">
+        <div ref={addRef} className="rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_firstName" placeholder="First name" className="bg-white/5" />
-            <Input name="ac_lastName" placeholder="Last name" className="bg-white/5" />
+            <Input name="ac_firstName" placeholder="First name" className="bg-[oklch(1_0_0_/_0.05)]" />
+            <Input name="ac_lastName" placeholder="Last name" className="bg-[oklch(1_0_0_/_0.05)]" />
           </div>
-          <Input name="ac_email" type="email" placeholder="Email" className="bg-white/5" />
+          <Input name="ac_email" type="email" placeholder="Email" className="bg-[oklch(1_0_0_/_0.05)]" />
           <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_role" placeholder="Role" className="bg-white/5" />
-            <Input name="ac_jobTitle" placeholder="Job title" className="bg-white/5" />
+            <Input name="ac_role" placeholder="Role" className="bg-[oklch(1_0_0_/_0.05)]" />
+            <Input name="ac_jobTitle" placeholder="Job title" className="bg-[oklch(1_0_0_/_0.05)]" />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={handleAdd} className="bg-[var(--color-silk)]/20 text-[var(--color-silk)]">Add</Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleAdd} disabled={saving} className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]">
+              {saving ? 'Saving…' : 'Add'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setShowAdd(false)}>Cancel</Button>
           </div>
         </div>
       )}

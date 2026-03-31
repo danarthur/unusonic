@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from 'react'
 import { Input } from '@/shared/ui/input'
-import { LiquidPanel } from '@/shared/ui/liquid-panel'
+import { StagePanel } from '@/shared/ui/stage-panel'
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
@@ -68,8 +68,8 @@ export function CommandCenter() {
             }}
             placeholder="What is your command?"
             disabled={status === 'loading'}
-            className="liquid-panel !p-0 !rounded-2xl text-ink placeholder:text-ink-muted
-                     focus:border-[var(--glass-border)] focus:ring-ink/20 focus:ring-2
+            className="stage-panel !p-0 !rounded-2xl text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]
+                     focus:border-[oklch(1_0_0_/_0.12)] focus:ring-[oklch(1_0_0_/_0.20)] focus:ring-2
                      h-14 px-6 text-base font-light
                      transition-all duration-200
                      disabled:opacity-50 disabled:cursor-not-allowed"
@@ -78,29 +78,29 @@ export function CommandCenter() {
           {/* Status Indicator */}
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center">
             {status === 'loading' && (
-              <Loader2 className="w-5 h-5 text-ink-muted animate-spin" />
+              <Loader2 className="w-5 h-5 text-[var(--stage-text-secondary)] animate-spin" />
             )}
             {status === 'success' && (
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-[var(--color-unusonic-success)]" />
             )}
             {status === 'error' && (
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-5 h-5 text-[var(--color-unusonic-error)]" />
             )}
           </div>
         </form>
 
         {/* Error Message */}
         {status === 'error' && errorMessage && (
-          <LiquidPanel className="!p-4 text-rose-600 text-sm">
+          <StagePanel className="!p-4 text-[var(--color-unusonic-error)] text-sm">
             {errorMessage}
-          </LiquidPanel>
+          </StagePanel>
         )}
 
         {/* Success Message */}
         {status === 'success' && (
-          <LiquidPanel className="!p-4 text-emerald-600 text-sm text-center">
+          <StagePanel className="!p-4 text-[var(--color-unusonic-success)] text-sm text-center">
             Command sent successfully
-          </LiquidPanel>
+          </StagePanel>
         )}
       </div>
     </div>

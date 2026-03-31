@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
 import {
   M3_FADE_THROUGH_ENTER,
@@ -11,77 +10,34 @@ import {
   M3_STAGGER_CHILDREN,
   M3_STAGGER_DELAY,
 } from '@/shared/lib/motion-constants';
-
-type FinanceRow = {
-  id: string;
-  amount: number | null;
-  client_name: string | null;
-  status: string | null;
-  invoice_number: string | null;
-};
+import { useFinanceData, type FinanceRow } from '@/widgets/global-pulse/lib/use-finance-data';
 
 export function FinancialUpdates() {
-  const [invoices, setInvoices] = useState<FinanceRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    async function fetchFinances() {
-      try {
-        const response = await fetch('/api/finance', { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Finance API error:', response.status, errorText);
-          setError('Unable to load finances');
-          setInvoices([]);
-          return;
-        }
-        const data = await response.json();
-        setInvoices(Array.isArray(data) ? data : []);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return;
-        }
-        console.error('Finance widget failed:', err);
-        setError('Unable to load finances');
-        setInvoices([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchFinances();
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, []);
+  const { data: invoices, loading, error } = useFinanceData();
 
   return (
     <div className="w-full space-y-4">
       {/* Header - Matching your 'Telemetry' style */}
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium font-mono text-muted uppercase tracking-widest">
+        <h3 className="text-xs font-medium font-mono text-[var(--stage-text-secondary)] uppercase tracking-widest">
           Cash Flow
         </h3>
         <span className="flex h-1.5 w-1.5 items-center justify-center">
-          <span className="absolute inline-flex h-1.5 w-1.5 animate-ping rounded-full bg-signal-success opacity-75" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-signal-success" />
+          <span className="absolute inline-flex h-1.5 w-1.5 animate-ping rounded-full bg-[var(--color-unusonic-success)] opacity-75" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-unusonic-success)]" />
         </span>
       </div>
 
       {/* Content Card */}
       <div className="flex flex-col gap-2">
         {loading ? (
-          <LiquidPanel className="h-24 w-full animate-pulse !p-0" />
+          <StagePanel className="h-24 w-full stage-skeleton !p-0" padding="none" />
         ) : error ? (
-          <div className="py-6 text-center text-xs text-muted italic leading-relaxed">
+          <div className="py-6 text-center text-xs text-[var(--stage-text-secondary)] italic leading-relaxed">
             {error}
           </div>
         ) : invoices.length === 0 ? (
-          <div className="py-6 text-center text-xs text-muted italic leading-relaxed">
+          <div className="py-6 text-center text-xs text-[var(--stage-text-secondary)] italic leading-relaxed">
             No active invoices
           </div>
         ) : (
@@ -105,26 +61,27 @@ export function FinancialUpdates() {
                 variants={M3_SHARED_AXIS_Y_VARIANTS}
                 transition={M3_FADE_THROUGH_ENTER}
               >
-                <LiquidPanel
-                  hoverEffect
-                  className="group relative flex cursor-pointer items-center justify-between !p-3 transition-all liquid-panel-nested"
+                <StagePanel
+                  interactive
+                  nested
+                  className="group relative flex cursor-pointer items-center justify-between !p-3 transition-all"
                 >
                   <div className="flex flex-col">
-                    <span className="font-medium text-sm text-ceramic group-hover:text-ceramic">
+                    <span className="font-medium text-sm text-[var(--stage-text-primary)] group-hover:text-[var(--stage-text-primary)]">
                       {inv.client_name || 'Client Payment'}
                     </span>
-                    <span className="font-mono text-[10px] text-muted leading-relaxed">
+                    <span className="font-mono text-[10px] text-[var(--stage-text-secondary)] leading-relaxed">
                       {inv.invoice_number ? `INV-${inv.invoice_number.slice(0, 5)}` : 'INV-00000'}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs font-medium text-ceramic">
+                    <span className="font-mono text-xs font-medium text-[var(--stage-text-primary)]">
                       ${inv.amount?.toLocaleString() ?? '0'}
                     </span>
                     <StatusDot status={inv.status || 'draft'} />
                   </div>
-                </LiquidPanel>
+                </StagePanel>
               </motion.div>
             ))}
           </motion.div>
@@ -135,10 +92,8 @@ export function FinancialUpdates() {
       <Link href="/finance" className="block w-full">
         <motion.button
           type="button"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
           transition={M3_FADE_THROUGH_ENTER}
-          className="w-full m3-btn-outlined text-[10px] uppercase tracking-wider"
+          className="w-full stage-btn stage-btn-secondary text-[10px] uppercase tracking-wider hover:brightness-[1.03] transition-[filter]"
         >
           View Ledger
         </motion.button>
@@ -149,10 +104,10 @@ export function FinancialUpdates() {
 
 function StatusDot({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    paid: 'bg-signal-success',
-    sent: 'bg-signal-warning',
+    paid: 'bg-[var(--color-unusonic-success)]',
+    sent: 'bg-[var(--color-unusonic-warning)]',
     overdue: 'bg-unusonic-error',
-    draft: 'bg-surface-100',
+    draft: 'bg-[var(--stage-surface-elevated)]',
   };
   const color = colors[status] ?? colors.draft;
   return <div className={cn('h-1.5 w-1.5 rounded-full', color)} />;

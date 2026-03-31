@@ -1,5 +1,5 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
@@ -47,6 +47,7 @@ export async function getOrgMemberWithSkills(
 
     return {
       id: rel.id,
+      entity_id: personEnt.data?.id ?? null,
       profile_id: personEnt.data?.claimed_by_user_id ?? null,
       org_id: orgId,
       first_name: (ctx.first_name as string | null) ?? null,
@@ -103,6 +104,7 @@ export async function getOrgMemberByProfileAndOrg(
 
       return {
         id: rel.id,
+        entity_id: personRes.data.id ?? null,
         profile_id: personRes.data.claimed_by_user_id ?? null,
         org_id: orgId,
         first_name: (ctx.first_name as string | null) ?? null,

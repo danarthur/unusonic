@@ -1,163 +1,152 @@
-# Supabase migrations audit
+# Supabase Migration Audit
 
-**Last synced with DB:** 2026-02-25 (via `list_migrations`).  
-**Applied in DB:** 28 migrations (see §1).  
-**Local layout:** `migrations/` = pending or to verify; `migrations/archive/` = already applied (reference only).
-
----
-
-## 1. Applied in database (source of truth)
-
-These versions are recorded in `supabase_migrations.schema_migrations`. Do not run these again; local equivalents are in `archive/` where they exist.
-
-| DB version    | Name |
-|---------------|------|
-| 20260215012414 | ops_assignments_rls_policy |
-| 20260215013012 | security_search_path_functions |
-| 20260215013018 | security_move_pg_trgm_to_extensions |
-| 20260215120041 | subscription_tiers_and_personas |
-| 20260215132325 | init_context_mesh |
-| 20260215211300 | sovereign_passkey_recovery |
-| 20260215212521 | sovereign_recovery_timelock_and_cleanup |
-| 20260215213440 | recovery_cancel_token_and_pgcron |
-| 20260215213522 | get_user_id_by_email_rpc |
-| 20260216212319 | profiles_add_signal_columns_and_backfill |
-| 20260216224506 | profiles_add_onboarding_summary |
-| 20260218063757 | create_deals_table |
-| 20260218070437 | workspaces_insert_policy_for_onboarding |
-| 20260218070452 | workspace_members_insert_policy |
-| 20260218070520 | onboarding_create_org_and_member_policies |
-| 20260218070843 | workspaces_insert_allow_authenticated_session |
-| 20260218074303 | grant_ops_schema_to_api_roles |
-| 20260218095716 | grant_ops_events_insert_for_crystallize |
-| 20260218215013 | create_packages_table |
-| 20260218225401 | packages_definition_and_tags |
-| 20260218232922 | package_category_add_retail_sale_and_fee |
-| 20260218234817 | workspace_tags_and_package_tags |
-| 20260219001331 | catalog_embeddings_for_ion |
-| 20260219050958 | margin_guardrails_packages_floor_and_target_cost |
-| 20260223021714 | rental_inventory_packages_columns |
-| 20260223055329 | ops_projects_allow_insert_for_crystallize |
-| 20260223062237 | create_public_proposals_and_proposal_items |
-| 20260223065734 | proposals_deal_id_replace_event_id |
-| 20260223091139 | proposal_items_tagged_bursting_columns |
-| 20260223093132 | proposal_and_packages_unit_type_multiplier |
-| 20260223193734 | proposal_items_header_row_and_original_price |
-| 20260224005333 | create_public_entities_for_app_compat |
-| 20260224005423 | entities_rls_select_own_only |
-| 20260224010032 | create_public_organizations_for_app_compat |
+**Last synced:** 2026-03-30 (Session 15 — proposal email tracking, deal note attachments/pinning, deal_notes grants)
+**DB total:** ~99 applied migrations (estimate — new columns and grants applied via MCP)
+**Local files:** 66
 
 ---
 
-## 2. Local migrations folder (active)
+## How to use this folder
 
-Only files that are **pending** or **need verification** live here. Everything else is in `archive/`.
+Every `.sql` file here has a filename prefixed with the exact version timestamp the DB recorded when it was applied. If you see a local file and the same timestamp in `list_migrations`, it is already applied — do not run it again.
 
-| File | Status | Notes |
-|------|--------|------|
-| `20260219000001_proposal_items_origin_and_snapshot.sql` | Verify | May be superseded by applied `proposal_items_header_row_and_original_price`; confirm before running. |
-| `20260219100001_proposal_items_margin_override_actual.sql` | Verify | Different from applied `margin_guardrails_packages_floor_and_target_cost`; confirm before running. |
-| `20260223100000_create_affiliations_and_org_members.sql` | **Pending** | Not in DB. Creates `public.affiliations` and `public.org_members` (app compat). Run when ready. |
-| `20260225000000_add_manager_role_phase1_access.sql` | **Pending** | Not in DB. Adds `manager` to `org_member_role` enum. Run when ready. |
+**To check state:** call `mcp__claude_ai_Supabase__list_migrations` and compare against local filenames. If all local timestamps appear in the DB list, nothing is pending.
 
 ---
 
-## 3. Archive (`migrations/archive/`)
+## DB-only migrations (applied directly, no local file)
 
-These local files match migrations **already applied** (by content or by name). Kept for reference only. Do not run again; do not remove their rows from `schema_migrations`.
+These 21 migrations are in the DB but were applied outside the local folder (via SQL editor or MCP). They are fully applied — do not recreate or re-apply them.
 
-- subscription_tiers_and_personas  
-- init_context_mesh  
-- sovereign_passkey_recovery  
-- sovereign_recovery_timelock_cleanup  
-- recovery_veto_and_recover_flow / get_user_id_by_email_rpc  
-- pgcron_webauthn_cleanup  
-- events_profiles_fk_on_delete_set_null  
-- create_deals_table (local duplicate; applied as 20260218063757)  
-- deals_fk_ops_directory (FKs + grants; applied with deal/proposal flow)  
-- catalog_embeddings_for_ion  
-- create_packages_table  
-- rental_inventory_packages_columns  
-
----
-
-## 4. Running new migrations
-
-1. Create: `supabase migration new <name>` (or add a timestamped `.sql` file).
-2. Apply: `supabase db push` or run in Supabase SQL Editor; then verify with `list_migrations`.
-3. One-off scripts (e.g. diagnostics) go in `scripts/debug/`, not in `migrations/`.
-
----
-
-## 5. Post-Session-10 app-code fixes (no new migrations)
-
-These were code-only changes to remove residual references to tables dropped in Session 10 (`public.organizations`, `public.entities`, `public.affiliations`, `public.org_relationships`). No new migrations were required.
-
-| File | Fix |
-|------|-----|
-| `src/entities/organization/api/create-ghost-org.ts` | Rewrote: writes only to `directory.entities`; returns `directory.entities.id`. |
-| `src/features/org-management/api/update-org.ts` | Rewrote: updates `directory.entities` directly; uses `patch_entity_attributes` RPC for JSONB fields. |
-| `src/features/org-management/api/get-org-details.ts` | Removed dead `public.organizations` fallback; uses `.or('id.eq.X,legacy_org_id.eq.X')` lookup. |
-| `src/features/network-data/api/update-ghost.ts` | Full rewrite: removed `public.entities`/`public.affiliations`/`public.organizations`; uses `getActiveWorkspaceId()` + `patch_entity_attributes` RPC. |
-| `src/entities/network/api/create-org-relationship.ts` | Rewrote: resolves both entities from `directory.entities`; uses `upsert_relationship` RPC; no more `public.org_relationships`. |
-| `src/entities/network/api/list-org-relationships.ts` | Removed dead fallback to `public.org_relationships`; uses `.or('id.eq.X,legacy_org_id.eq.X')` for source lookup. |
-
----
-
-## 6. Individual + Couple client types (no new migrations)
-
-Extended the CRM to support `type='person'` (individual clients) and `type='couple'` (couple clients) in `directory.entities`. Previously only `type='company'` was used for clients. The `directory.entities` check constraint already allowed `person`; no schema change was needed.
-
-**New server actions:**
-
-| File | Purpose |
-|------|---------|
-| `src/app/(dashboard)/(features)/crm/actions/update-individual-entity.ts` | Updates `person` entity via `patch_entity_attributes` RPC. |
-| `src/app/(dashboard)/(features)/crm/actions/update-couple-entity.ts` | Updates `couple` entity via `patch_entity_attributes` RPC. |
-| `src/app/(dashboard)/(features)/crm/actions/reclassify-client-entity.ts` | Changes entity type (company/person/couple); validates `category: 'client'` before writing. |
-
-**New UI:** `src/app/(dashboard)/(features)/crm/components/individual-edit-sheet.tsx` — sheet for editing person client fields. Stakeholder grid updated to handle `entity_type === 'person'` and to show a reclassify button on the Bill-To card.
+| DB version | Name |
+|---|---|
+| 20260301204537 | patch_directory_org_attrs2 |
+| 20260303003322 | fix_schema_grants_directory_cortex_finance |
+| 20260311083944 | phase9_create_run_of_show_cues_and_templates |
+| 20260311200606 | phase5_normalize_crew_gear |
+| 20260311203128 | add_assigned_gear_to_ros_cues_and_crew_schedule |
+| 20260311233346 | fix_function_search_path_non_vector |
+| 20260312024109 | expand_deals_event_archetype_check |
+| 20260312050209 | add_department_to_event_gear_items |
+| 20260312055329 | grant_ops_event_gear_items_to_authenticated |
+| 20260312055347 | grant_ops_crew_assignments_to_authenticated |
+| 20260312203720 | session12_crew_assignments_schema |
+| 20260312210929 | session4_tax_and_finance |
+| 20260312211932 | session4_invoice_tax_line |
+| 20260313015837 | add_is_draft_to_packages |
+| 20260313195556 | add_internal_notes_to_proposal_items |
+| 20260314064842 | add_internal_notes_to_proposal_items (second pass) |
+| 20260314071656 | add_docuseal_fields_to_proposals |
+| 20260314190426 | add_index_finance_invoices_bill_to_entity_id |
+| 20260320064013 | add_couple_to_entities_type_check |
+| 20260323XXXXXX | add_win_probability_signal_columns_to_deals |
+| *(2026-03-23)* | fix_add_contact_to_ghost_org_uuid_lookup — Updated `add_contact_to_ghost_org` RPC to look up the ghost org by `id = p_ghost_org_id OR legacy_org_id = p_ghost_org_id` (previously only `legacy_org_id`). Removed `is_ghost` requirement from the lookup. Fixed display name to include last name. Changed ghost email placeholder domain from `@signal.local` to `@unusonic.local`. |
+| *(2026-03-23)* | consolidate_industry_partner_delete_dupes_then_update — Eliminated `INDUSTRY_PARTNER` relationship type: (1) deleted rows where a `VENUE_PARTNER` edge already existed for the same entity pair (unique constraint would have blocked UPDATE); (2) updated remaining `INDUSTRY_PARTNER` to `VENUE_PARTNER` for venue-type target entities; (3) updated remainder to `PARTNER`. `INDUSTRY_PARTNER` no longer exists in the DB. |
+| *(2026-03-26)* | create_ops_deal_notes — `ops.deal_notes` table for timestamped deal diary entries with `author_user_id`, `deal_id`, `content text`, `workspace_id`. RLS via `get_my_workspace_ids()`. |
+| *(2026-03-26)* | create_ops_workspace_lead_sources — `ops.workspace_lead_sources` table with `name`, `category`, `workspace_id`, `sort_order`. 16 seeded defaults across 5 categories (Digital, Referral, Direct, Industry, Other). RLS via `get_my_workspace_ids()`. |
+| *(2026-03-26)* | add_lead_source_columns_to_deals — Added `lead_source_id uuid` (FK to `ops.workspace_lead_sources`), `lead_source_detail text`, `referrer_entity_id uuid` (FK to `directory.entities`) to `public.deals`. Dropped old `lead_source` text CHECK constraint. Backfilled existing deals. |
+| *(2026-03-26)* | add_payment_defaults_to_workspaces — Added `default_deposit_percent integer`, `default_deposit_deadline_days integer`, `default_balance_due_days_before_event integer` to `public.workspaces`. |
+| *(2026-03-26)* | add_deposit_deadline_days_to_proposals — Added `deposit_deadline_days integer` to `public.proposals`. |
+| *(2026-03-26)* | create_finance_payment_reminder_log — `finance.payment_reminder_log` table tracking sent payment reminders per deal. Columns: `deal_id`, `workspace_id`, `cadence_step text`, `sent_at`, `recipient_email`. RLS via `get_my_workspace_ids()`. |
+| *(2026-03-29)* | add_proposal_email_tracking — Added `resend_message_id text`, `email_delivered_at timestamptz`, `email_bounced_at timestamptz` to `public.proposals`. Index on `resend_message_id` for webhook lookup. |
+| *(2026-03-29)* | add_deal_note_attachments — Added `attachments jsonb` to `ops.deal_notes`. Created `deal-attachments` private storage bucket with RLS policy scoped to workspace. |
+| *(2026-03-29)* | add_deal_note_pinned_at — Added `pinned_at timestamptz` to `ops.deal_notes` for pinned note sorting. |
+| *(2026-03-29)* | grant_ops_deal_notes — Table-level SELECT/INSERT/UPDATE/DELETE grants on `ops.deal_notes` for `authenticated` role. |
 
 ---
 
-## 8. Entity attribute contract remediation (no new migrations — one schema fix)
+## Current schema state (2026-03-26)
 
-### Schema fix: `add_couple_to_entities_type_check`
+### Tables
 
-Applied to drop the old `CHECK (type = ANY (ARRAY['company', 'person', 'venue']))` constraint on `directory.entities` and replace it with `CHECK (type = ANY (ARRAY['company', 'person', 'venue', 'couple']))`. Required because `reclassifyClientEntity` was failing with a constraint violation when setting entity type to `'couple'`.
+| Schema | Table | Notes |
+|---|---|---|
+| `directory` | `entities` | All people, companies, venues, couples. `claimed_by_user_id` nullable (Ghost Protocol). |
+| `cortex` | `relationships` | Graph edges. SELECT only from client — all writes via SECURITY DEFINER RPCs. |
+| `cortex` | `memory` | Planned RAG/vector store. Currently empty. |
+| `ops` | `events` | New standard. Replaces legacy `public.events`. |
+| `ops` | `projects` | Parent of events (one project → many events). |
+| `ops` | `assignments` | Generic assignment table. |
+| `ops` | `crew_assignments` | Crew-specific assignments with job title, rate, hours. |
+| `ops` | `crew_confirmation_tokens` | Single-use tokens for crew to confirm assignments. |
+| `ops` | `deal_stakeholders` | Entities attached to a deal in a specific role. |
+| `ops` | `entity_crew_schedule` | View/materialized crew availability across events. |
+| `ops` | `event_expenses` | Expenses logged against an event. |
+| `ops` | `event_gear_items` | Gear line items assigned to an event. |
+| `ops` | `workspace_call_time_rules` | Per-workspace call time rule configuration. |
+| `ops` | `workspace_industry_tags` | Controlled vocabulary of industry tags per workspace. |
+| `ops` | `workspace_job_titles` | Curated job title list per workspace (applied 2026-03-23). |
+| `ops` | `deal_crew` | Production team for a deal. `entity_id` nullable (role-only slots). `confirmed_at` distinguishes open slots / suggestions from confirmed crew (assigned != confirmed — crew must confirm separately). `catalog_item_id` traces origin package. |
+| `ops` | `deal_notes` | Timestamped deal diary entries with `author_user_id` attribution. `attachments jsonb` for file metadata, `pinned_at timestamptz` for pinned notes. Applied 2026-03-26, extended 2026-03-29. |
+| `ops` | `workspace_lead_sources` | Workspace-configurable lead source dictionary. 16 seeded defaults across 5 categories. Applied 2026-03-26. |
+| `ops` | `workspace_permissions` | Capability flags per workspace. |
+| `ops` | `workspace_role_permissions` | Role → capability mapping. |
+| `ops` | `workspace_roles` | Custom roles per workspace. |
+| `ops` | `workspace_ros_templates` | Run-of-show templates per workspace. |
+| `ops` | `workspace_skill_presets` | Curated skill tag quick-picks per workspace (applied 2026-03-23). |
+| `finance` | `invoices` | Invoices linked to proposals/events. |
+| `finance` | `payment_reminder_log` | Tracks sent payment reminders per deal — cadence step, sent_at, recipient. Applied 2026-03-26. |
+| `public` | `deals` | Deal pipeline records. Win probability signal columns (2026-03-23): `owner_user_id uuid`, `lost_reason text`, `lost_to_competitor_name text`, `won_at timestamptz`, `lost_at timestamptz`. `deals_status_check` constraint expanded (2026-03-24) to include `contract_signed` and `deposit_received`. Lead source columns (2026-03-26): `lead_source_id uuid` (FK to `ops.workspace_lead_sources`), `lead_source_detail text`, `referrer_entity_id uuid` (FK to `directory.entities`). Old `lead_source text` CHECK constraint dropped. |
+| `catalog` | `item_assignees` | Default crew for catalog packages. `entity_id` nullable — NULL = role-only slot. CHECK + partial unique indexes. Accessed only via SECURITY DEFINER RPCs (catalog schema not PostgREST-exposed). |
+| `public` | `packages` | Catalog packages. `is_draft` column present. |
+| `public` | `package_tags` | Package ↔ workspace_tag junction. |
+| `public` | `proposals` | Client proposals. Has `docuseal_embed_src`, `view_count`, `first_viewed_at`, `last_viewed_at`, `signer_name`, `expiry_at`, `payment_terms_days`, `scope`, `deposit_percent`, `stripe_deposit_payment_intent_id`, `deposit_deadline_days` (added 2026-03-26). Email tracking: `resend_message_id`, `email_delivered_at`, `email_bounced_at` (added 2026-03-29). |
+| `public` | `proposal_items` | Line items. Has `internal_notes`, `is_optional`, `is_selected`. |
+| `public` | `proposal_client_selections` | Tracks which optional items a client has selected. |
+| `public` | `run_of_show_cues` | RoS cue entries (legacy public location; content managed by ops.workspace_ros_templates). |
+| `public` | `workspaces` | Has `sending_domain`, `sending_domain_status`, `logo_url`, email domain columns, and payment defaults (2026-03-26): `default_deposit_percent`, `default_deposit_deadline_days`, `default_balance_due_days_before_event`. |
+| `public` | `workspace_members` | Workspace membership. |
+| `public` | `workspace_tags` | Tag vocabulary per workspace. |
+| `public` | `profiles` | User profiles. |
+| `public` | `passkeys` | WebAuthn credentials. |
+| `public` | `guardians` | Sovereign recovery guardians. |
+| `public` | `recovery_shards` | Shamir secret shards. |
+| `public` | `recovery_requests` | In-flight recovery requests. |
+| `public` | `agent_configs` | Aion agent configuration per workspace. |
+| `public` | `catalog_embeddings` | Vector embeddings for catalog packages. |
+| `public` | `commercial_organizations` | Legacy org table (migration target: `directory.entities`). |
+| `public` | `organization_members` | Legacy (migration target: `cortex.relationships`). |
 
-### App-code changes (no migrations)
+### Key RPCs
 
-| Change | Files |
-|--------|-------|
-| New typed attribute accessor layer | `src/shared/lib/entity-attrs.ts` — full rewrite with Zod schemas per entity type and `readEntityAttrs()` accessor |
-| Write-path validation | `crm/actions/update-individual-entity.ts`, `crm/actions/update-couple-entity.ts`, `features/network-data/api/update-ghost.ts` — each validates patch through appropriate `*AttrsSchema.partial()` before calling `patch_entity_attributes` RPC |
-| ESLint guardrail | `eslint.config.mjs` — `no-restricted-syntax` rule bans raw `attrs.` and `attrs['...']` access in server action and API files |
-| Vitest setup | `vitest.config.ts`, `package.json` (`”test”: “vitest run”`), `src/features/network-data/model/__tests__/attribute-keys.test.ts` (25 tests) |
-| Entity Studio form dispatch | `src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx` — refactored to pure dispatcher; added `PersonEntityForm` and `CoupleEntityForm` |
-| Attribute key additions | `src/features/network-data/model/attribute-keys.ts` — added `website` to `VENUE_ATTR`; added JSDoc on `COUPLE_ATTR.partner_a_first` alias mismatch |
+| Function | Purpose |
+|---|---|
+| `get_my_workspace_ids()` | Returns workspace IDs for current user — used in all RLS policies for `ops`/`finance`/`directory` schemas. |
+| `user_has_workspace_role(workspace_id, roles[])` | Checks if current user has any of the given roles in the workspace. |
+| `get_member_permissions(workspace_id)` | Returns capability set for current user. |
+| `patch_entity_attributes(entity_id, patch)` | Safe JSONB merge for `directory.entities.attributes`. Strips sentinel keys. |
+| `patch_relationship_context(source, target, type, patch)` | JSONB merge on `cortex.relationships.context_data`. |
+| `add_roster_member(...)` | Adds a `ROSTER_MEMBER` edge to `cortex.relationships`. SECURITY DEFINER. |
+| `remove_relationship(source, target, type)` | Removes a cortex edge. Requires owner/admin. SECURITY DEFINER. |
+| `upsert_relationship(...)` | Creates or updates a cortex edge. SECURITY DEFINER. |
+| `claim_ghost_entity_workspace(...)` | Claims a ghost entity when a user signs up. SECURITY DEFINER. |
+| `merge_industry_tags(workspace_id, tags[])` | Upserts industry tags for a workspace. |
+| `create_draft_invoice_from_proposal(proposal_id)` | Finance automation — creates a draft invoice. |
+| `increment_proposal_view(proposal_id, now, set_first, was_sent)` | Atomic proposal view counter. SECURITY DEFINER. Called via system client only (applied 2026-03-23). |
+| `get_catalog_item_assignees(p_package_id)` | Returns assignee rows for a catalog package. Workspace-checked via package join. SECURITY DEFINER (catalog schema not PostgREST-exposed). |
+| `add_catalog_item_assignee(p_package_id, p_entity_id, p_role_note)` | Adds a named-person assignee to a catalog item. SECURITY DEFINER. |
+| `add_catalog_role_assignee(p_package_id, p_role_note)` | Adds a role-only slot (entity_id NULL) to a catalog item. SECURITY DEFINER. |
+| `remove_catalog_item_assignee(p_assignee_id)` | Removes a catalog item assignee row. SECURITY DEFINER. |
 
 ---
 
-## 10. Custom email sending domain (Session 4 — 2026-03-21)
+## Recent migrations (2026-03-30)
 
-Migration: `20260321000000_add_email_domain_to_workspaces.sql`
-
-Adds 6 columns to `public.workspaces` to support per-workspace custom sending domains via Resend:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `sending_domain` | text | The DNS domain the workspace will send from (e.g. `mail.company.com`). UNIQUE per workspace. |
-| `resend_domain_id` | text | Resend's internal domain ID — used to fetch DNS status and to delete the domain. |
-| `sending_domain_status` | text | CHECK: one of `not_started`, `pending`, `verified`, `temporary_failure`, `failure`. |
-| `sending_from_name` | text | Display name in the From header (e.g. `"Acme Events"`). |
-| `sending_from_localpart` | text | Local part of the From address (e.g. `"hello"` → `hello@mail.company.com`). |
-| `dmarc_status` | text | CHECK: `not_started`, `pending`, `verified`, `failure`. Signal generates the DMARC record; checked server-side via `dns.resolveTxt()`. |
-
-No new tables. No RLS changes (columns inherit existing workspace row policies). Resend webhook endpoint `/api/webhooks/resend` keeps this status column current via the `domain.updated` event.
+| File | Description |
+|---|---|
+| `20260324000000_create_catalog_item_assignees.sql` | `catalog.item_assignees` junction table — links `public.packages` to default assignee entities or role-only slots. `entity_id` is nullable: CHECK `entity_id IS NOT NULL OR (role_note IS NOT NULL AND role_note != '')`. Partial unique index on `(package_id, entity_id) WHERE entity_id IS NOT NULL` and on `(package_id, role_note) WHERE entity_id IS NULL AND role_note IS NOT NULL`. RLS join-based through `public.packages.workspace_id`. 4 SECURITY DEFINER RPCs in `public` schema: `get_catalog_item_assignees`, `add_catalog_item_assignee`, `add_catalog_role_assignee`, `remove_catalog_item_assignee`. |
+| `20260324000100_create_ops_deal_crew.sql` | `ops.deal_crew` — deal production team. `entity_id` is nullable (role-only slots). CHECK same pattern as `catalog.item_assignees`. Two partial unique indexes. `confirmed_at NULL` = assigned but not yet confirmed (crew must confirm separately); set = confirmed. `source` = `manual\|proposal`. `catalog_item_id` tracks which package surfaced the suggestion. On handoff, confirmed rows seed event crew assignments. |
+| `20260324000200_expand_deals_status_check.sql` | Expanded `public.deals` CHECK constraint `deals_status_check` to include `'contract_signed'` and `'deposit_received'`. |
+| *(DB-only, 2026-03-26)* | `ops.deal_notes` — timestamped deal diary entries. `ops.workspace_lead_sources` — workspace-configurable lead sources (16 seeded defaults). `finance.payment_reminder_log` — payment reminder cadence tracking. New columns on `public.deals` (`lead_source_id`, `lead_source_detail`, `referrer_entity_id`), `public.workspaces` (3 payment default columns), `public.proposals` (`deposit_deadline_days`). See DB-only migrations table above for details. |
+| *(DB-only, 2026-03-29)* | `add_proposal_email_tracking` — `resend_message_id text`, `email_delivered_at timestamptz`, `email_bounced_at timestamptz` on `public.proposals` with index. `add_deal_note_attachments` — `attachments jsonb` on `ops.deal_notes`, `deal-attachments` storage bucket. `add_deal_note_pinned_at` — `pinned_at timestamptz` on `ops.deal_notes`. `grant_ops_deal_notes` — table grants for authenticated role. |
 
 ---
 
-## 9. Refreshing this audit
+## Running new migrations
 
-To refresh the “Applied in database” list, call the Supabase MCP `list_migrations` (or query `supabase_migrations.schema_migrations`) and update §1 and §2 accordingly.
+1. Write SQL in a new file: `supabase/migrations/YYYYMMDDHHMMSS_descriptive_name.sql`
+2. Apply via `mcp__claude_ai_Supabase__apply_migration` (preferred) or Supabase SQL editor
+3. The DB records the actual apply timestamp as the version — rename the file to match if needed
+4. Update this doc if a new table or RPC is added
+
+One-off debug scripts go in `scripts/debug/`, not in `migrations/`.

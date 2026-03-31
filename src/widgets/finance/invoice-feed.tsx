@@ -8,7 +8,7 @@
 import { useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, FileText } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { syncEventFinancials } from '@/features/finance/sync';
 import type { FinanceInvoiceRow } from '@/features/finance/sync';
 
@@ -36,20 +36,20 @@ function StatusBadge({ status }: { status: string }) {
   const base = 'inline-flex px-2.5 py-1 rounded-full text-xs font-medium capitalize';
   if (status === 'paid') {
     return (
-      <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-500/20`}>
+      <span className={`${base} bg-[oklch(0.45_0.08_145_/_0.25)] text-[var(--color-unusonic-success)] border border-[oklch(0.65_0.18_145_/_0.2)]`}>
         Paid
       </span>
     );
   }
   if (status === 'overdue') {
     return (
-      <span className={`${base} bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border border-rose-200/50 dark:border-rose-500/20`}>
+      <span className={`${base} bg-[oklch(0.35_0.08_20_/_0.25)] text-[var(--color-unusonic-error)] border border-[oklch(0.65_0.18_20_/_0.2)]`}>
         Overdue
       </span>
     );
   }
   return (
-    <span className={`${base} bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400`}>
+    <span className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] `}>
       {status === 'open' ? 'Open' : status}
     </span>
   );
@@ -97,21 +97,19 @@ export function InvoiceFeed({
   };
 
   return (
-    <LiquidPanel className={`overflow-hidden flex flex-col ${className ?? ''}`}>
+    <StagePanel className={`overflow-hidden flex flex-col ${className ?? ''}`}>
       <div className="flex items-center justify-between mb-4 shrink-0">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
           QBO Invoices
         </h2>
         <motion.button
           type="button"
           onClick={handleSyncNow}
           disabled={isPending || !eventId}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
           transition={spring}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium
-            bg-ink/5 hover:bg-ink/10 text-ink-muted hover:text-ink
-            disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            bg-[oklch(1_0_0_/_0.05)] hover:bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]
+            disabled:opacity-50 disabled:cursor-not-allowed transition-[color,background-color,filter] hover:brightness-[1.03]"
         >
           {isPending ? (
             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -128,7 +126,7 @@ export function InvoiceFeed({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="text-xs text-ink-muted mb-2"
+            className="text-xs text-[var(--stage-text-secondary)] mb-2"
           >
             {syncMessage}
           </motion.p>
@@ -137,7 +135,7 @@ export function InvoiceFeed({
 
       <div className="min-h-0 overflow-auto">
         {invoices.length === 0 ? (
-          <div className="py-8 flex flex-col items-center justify-center gap-2 text-center text-sm text-ink-muted">
+          <div className="py-8 flex flex-col items-center justify-center gap-2 text-center text-sm text-[var(--stage-text-secondary)]">
             <FileText className="w-8 h-8 opacity-40" />
             <p>No QBO invoices yet</p>
             {eventId && (
@@ -147,17 +145,17 @@ export function InvoiceFeed({
         ) : (
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[var(--glass-border)]">
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <tr className="border-b border-[oklch(1_0_0_/_0.08)]">
+                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Doc #
                 </th>
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Due
                 </th>
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Amount
                 </th>
-                <th className="pb-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                <th className="pb-3 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Status
                 </th>
               </tr>
@@ -169,15 +167,15 @@ export function InvoiceFeed({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={spring}
-                  className="border-b border-[var(--glass-border)] last:border-b-0"
+                  className="border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0"
                 >
-                  <td className="py-3 pr-4 font-mono text-sm text-ink">
+                  <td className="py-3 pr-4 font-mono text-sm text-[var(--stage-text-primary)]">
                     {inv.qbo_doc_number ?? inv.qbo_id}
                   </td>
-                  <td className="py-3 pr-4 text-sm text-ink-muted">
+                  <td className="py-3 pr-4 text-sm text-[var(--stage-text-secondary)]">
                     {formatDate(inv.due_date)}
                   </td>
-                  <td className="py-3 pr-4 font-mono text-sm text-ink">
+                  <td className="py-3 pr-4 font-mono text-sm text-[var(--stage-text-primary)]">
                     {formatCurrency(inv.amount)}
                   </td>
                   <td className="py-3">
@@ -189,6 +187,6 @@ export function InvoiceFeed({
           </table>
         )}
       </div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

@@ -10,12 +10,16 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ChevronLeft, LayoutGrid, HelpCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { ChevronLeft, LayoutGrid, HelpCircle, Users } from 'lucide-react';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { getPackage, updatePackage } from '@/features/sales/api/package-actions';
-import type { PackageWithTags, PackageCategory, IngredientMeta, PackageDefinition } from '@/features/sales/api/package-actions';
+import { getCatalogItemAssignees, addCatalogItemAssignee, addCatalogRoleAssignee, removeCatalogItemAssignee, type CatalogAssigneeRow } from '@/features/sales/api/catalog-assignee-actions';
+import { listWorkspaceJobTitles } from '@/features/talent-management/api/job-title-actions';
+import { searchNetworkOrgs } from '@/features/network-data';
+import type { NetworkSearchOrg } from '@/features/network-data';
+import type { PackageWithTags, PackageCategory, IngredientMeta, PackageDefinition, PackageTag } from '@/features/sales/api/package-actions';
 import {
   getWorkspaceTags,
   createWorkspaceTag,
@@ -23,7 +27,6 @@ import {
 } from '@/features/sales/api/workspace-tag-actions';
 import { SmartTagInput } from '@/shared/ui/smart-tag-input';
 import { CurrencyInput } from '@/shared/ui/currency-input';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const CATEGORIES: { value: PackageCategory; label: string }[] = [
@@ -35,11 +38,10 @@ const CATEGORIES: { value: PackageCategory; label: string }[] = [
   { value: 'fee', label: 'Fee (Digital/Admin)' },
 ];
 
-const STAFF_ROLES = ['DJ', 'Photographer', 'Security', 'Bartender', 'Caterer', 'Coordinator', 'Videographer', 'Other'] as const;
 
 const inputClass =
-  'w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
-const labelClass = 'block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1';
+  'w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
+const labelClass = 'block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1';
 
 export default function CatalogEditPage() {
   const params = useParams();
@@ -79,6 +81,19 @@ export default function CatalogEditPage() {
   const floorHelpTriggerRef = useRef<HTMLButtonElement>(null);
   const floorHelpCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Default crew state
+  const [jobTitles, setJobTitles] = useState<string[]>([]);
+  const [assignees, setAssignees] = useState<CatalogAssigneeRow[]>([]);
+  const [inheritedAssignees, setInheritedAssignees] = useState<(CatalogAssigneeRow & { ingredient_name: string })[]>([]);
+  const [crewMode, setCrewMode] = useState<'person' | 'role'>('person');
+  const [crewSearch, setCrewSearch] = useState('');
+  const [crewResults, setCrewResults] = useState<NetworkSearchOrg[]>([]);
+  const [crewSearchLoading, setCrewSearchLoading] = useState(false);
+  const [crewPickerOpen, setCrewPickerOpen] = useState(false);
+  const [roleInput, setRoleInput] = useState('');
+  const [roleAdding, setRoleAdding] = useState(false);
+  const crewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const loadPackage = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -96,7 +111,7 @@ export default function CatalogEditPage() {
         setFloorPrice(p.floor_price != null ? String(Number(p.floor_price)) : '');
         setTargetCost(p.target_cost != null ? String(Number(p.target_cost)) : '');
         setSelectedTags(
-          (p.tags ?? []).map((t) => ({ ...t, workspace_id: p.workspace_id }))
+          (p.tags ?? []).map((t: PackageTag) => ({ ...t, workspace_id: p.workspace_id }))
         );
         const meta = (p.definition as { ingredient_meta?: IngredientMeta } | null)?.ingredient_meta;
         if (meta) {
@@ -136,6 +151,87 @@ export default function CatalogEditPage() {
   useEffect(() => {
     loadPackage();
   }, [loadPackage]);
+
+  // Load assignees, inherited crew, and job titles separately (non-blocking)
+  useEffect(() => {
+    if (!id) return;
+    getCatalogItemAssignees(id).then(setAssignees);
+    listWorkspaceJobTitles().then(setJobTitles);
+  }, [id]);
+
+  // For bundle packages: load crew inherited from ingredient items
+  useEffect(() => {
+    if (!id || !pkg || pkg.category !== 'package') { setInheritedAssignees([]); return; }
+    const def = (pkg.definition as { blocks?: { type: string; catalogId?: string }[] } | null);
+    const ingredientIds = [...new Set(
+      (def?.blocks ?? []).filter((b) => b.type === 'line_item' && b.catalogId).map((b) => b.catalogId as string)
+    )];
+    if (!ingredientIds.length) { setInheritedAssignees([]); return; }
+
+    Promise.all(
+      ingredientIds.map(async (ingId) => {
+        const [rows, ingPkg] = await Promise.all([
+          getCatalogItemAssignees(ingId),
+          getPackage(ingId),
+        ]);
+        const ingName = ingPkg.package?.name ?? 'Ingredient';
+        return rows.map((r) => ({ ...r, ingredient_name: ingName }));
+      })
+    ).then((nested) => setInheritedAssignees(nested.flat()));
+  }, [id, pkg]);
+
+  const handleCrewSearch = useCallback((q: string) => {
+    setCrewSearch(q);
+    if (crewDebounceRef.current) clearTimeout(crewDebounceRef.current);
+    if (q.trim().length < 1) { setCrewResults([]); return; }
+    // sourceOrgId for searchNetworkOrgs: use workspaceId as proxy (org root entity)
+    // This matches the pattern used elsewhere — workspaceId is passed, server resolves the entity
+    const orgId = workspaceId;
+    if (!orgId) return;
+    crewDebounceRef.current = setTimeout(async () => {
+      setCrewSearchLoading(true);
+      const r = await searchNetworkOrgs(orgId, q);
+      setCrewResults(r);
+      setCrewSearchLoading(false);
+    }, 250);
+  }, [workspaceId]);
+
+  const handleAddAssignee = async (org: NetworkSearchOrg) => {
+    if (!id) return;
+    const entityId = org.entity_uuid ?? org.id;
+    const result = await addCatalogItemAssignee(id, entityId);
+    if (result.success) {
+      setAssignees(await getCatalogItemAssignees(id));
+      setCrewSearch('');
+      setCrewResults([]);
+      setCrewPickerOpen(false);
+      toast.success(`${org.name} added to default crew`);
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const handleRemoveAssignee = async (assigneeRowId: string) => {
+    const result = await removeCatalogItemAssignee(assigneeRowId);
+    if (result.success) {
+      setAssignees((prev) => prev.filter((a) => a.id !== assigneeRowId));
+    }
+  };
+
+  const handleAddRole = async () => {
+    if (!id || !roleInput.trim()) return;
+    setRoleAdding(true);
+    const role = roleInput.trim();
+    const result = await addCatalogRoleAssignee(id, role);
+    if (result.success) {
+      setAssignees(await getCatalogItemAssignees(id));
+      setRoleInput('');
+      toast.success(`${role} added to default crew`);
+    } else {
+      toast.error(result.error);
+    }
+    setRoleAdding(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,9 +309,9 @@ export default function CatalogEditPage() {
 
   if (!hasWorkspace || !workspaceId) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Select a workspace to edit catalog items.</p>
-        <Link href="/catalog" className="mt-4 text-sm text-neon hover:underline">
+        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
           Back to catalog
         </Link>
       </div>
@@ -224,9 +320,9 @@ export default function CatalogEditPage() {
 
   if (!id) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Missing item.</p>
-        <Link href="/catalog" className="mt-4 text-sm text-neon hover:underline">
+        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
           Back to catalog
         </Link>
       </div>
@@ -235,7 +331,7 @@ export default function CatalogEditPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Loading item…</p>
       </div>
     );
@@ -243,9 +339,9 @@ export default function CatalogEditPage() {
 
   if (error || !pkg) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm text-[var(--color-unusonic-error)]">{error ?? 'Item not found.'}</p>
-        <Link href="/catalog" className="mt-4 text-sm text-neon hover:underline">
+        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
           Back to catalog
         </Link>
       </div>
@@ -259,19 +355,19 @@ export default function CatalogEditPage() {
       <header className="flex items-center gap-4 shrink-0 mb-6">
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ceramic transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
         >
-          <ChevronLeft size={18} aria-hidden />
+          <ChevronLeft size={18} strokeWidth={1.5} aria-hidden />
           Catalog
         </Link>
-        <h1 className="text-xl font-medium text-ceramic tracking-tight truncate flex-1">
+        <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight truncate flex-1">
           Edit item
         </h1>
       </header>
 
-      <LiquidPanel className="rounded-[28px] overflow-hidden flex flex-col flex-1 min-h-0 max-h-[calc(100vh-10rem)]">
+      <StagePanel className="rounded-[var(--stage-radius-panel)] overflow-hidden flex flex-col flex-1 min-h-0 max-h-[calc(100vh-10rem)]">
         <div className="overflow-y-auto overflow-x-hidden overscroll-contain flex-1 min-h-0 py-2" style={{ maxHeight: 'calc(100vh - 10rem)' }}>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5 pt-6 px-6 pb-12">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5 pt-6 px-6 pb-6">
           {formError && (
             <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
           )}
@@ -372,7 +468,7 @@ export default function CatalogEditPage() {
                       }
                     }
                   }}
-                  className="inline-flex text-ink-muted hover:text-ceramic cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] p-0.5"
+                  className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
                   aria-label="Price help"
                   aria-expanded={showPriceHelp}
                 >
@@ -384,7 +480,7 @@ export default function CatalogEditPage() {
                 priceHelpPosition &&
                 createPortal(
                   <div
-                    className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-ink-muted leading-relaxed rounded-xl border border-[var(--glass-border)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] backdrop-blur-xl bg-[var(--color-glass-surface)]"
+                    className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
                     style={{ top: priceHelpPosition.top, left: priceHelpPosition.left }}
                     role="tooltip"
                     onMouseEnter={() => {
@@ -453,7 +549,7 @@ export default function CatalogEditPage() {
                           }
                         }
                       }}
-                      className="inline-flex text-ink-muted hover:text-ceramic cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] p-0.5"
+                      className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
                       aria-label="Floor price help"
                       aria-expanded={showFloorHelp}
                     >
@@ -465,7 +561,7 @@ export default function CatalogEditPage() {
                     floorHelpPosition &&
                     createPortal(
                       <div
-                        className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-ink-muted leading-relaxed rounded-xl border border-[var(--glass-border)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] backdrop-blur-xl bg-[var(--color-glass-surface)]"
+                        className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
                         style={{ top: floorHelpPosition.top, left: floorHelpPosition.left }}
                         role="tooltip"
                         onMouseEnter={() => {
@@ -477,7 +573,7 @@ export default function CatalogEditPage() {
                         }}
                         onMouseLeave={() => setShowFloorHelp(false)}
                       >
-                        The lowest price you're willing to accept. The system can warn or block quotes below this so you don't sell at a loss. Should be at or above your Target cost.
+                        The lowest price you&apos;re willing to accept. The system can warn or block quotes below this so you don&apos;t sell at a loss. Should be at or above your Target cost.
                       </div>,
                       document.body
                     )}
@@ -528,7 +624,7 @@ export default function CatalogEditPage() {
                           }
                         }
                       }}
-                      className="inline-flex text-ink-muted hover:text-ceramic cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] p-0.5"
+                      className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
                       aria-label="Target cost help"
                       aria-expanded={showCostHelp}
                     >
@@ -540,7 +636,7 @@ export default function CatalogEditPage() {
                     costHelpPosition &&
                     createPortal(
                       <div
-                        className="fixed z-[9999] w-56 px-3 py-2.5 text-xs font-normal text-ink-muted leading-relaxed rounded-xl border border-[var(--glass-border)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] backdrop-blur-xl bg-[var(--color-glass-surface)]"
+                        className="fixed z-[9999] w-56 px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
                         style={{ top: costHelpPosition.top, left: costHelpPosition.left }}
                         role="tooltip"
                         onMouseEnter={() => {
@@ -574,8 +670,8 @@ export default function CatalogEditPage() {
           </div>
 
           {category === 'service' && (
-            <div className="space-y-4 rounded-xl border border-[var(--glass-border)] p-4 bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Service</p>
+            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Service</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit-duration" className={labelClass}>Duration (hours)</label>
@@ -599,7 +695,7 @@ export default function CatalogEditPage() {
                     className={inputClass}
                   >
                     <option value="">Select role…</option>
-                    {STAFF_ROLES.map((r) => (
+                    {jobTitles.map((r) => (
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
@@ -609,8 +705,8 @@ export default function CatalogEditPage() {
           )}
 
           {category === 'rental' && (
-            <div className="space-y-4 rounded-xl border border-[var(--glass-border)] p-4 bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                 Inventory & Fulfillment
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -628,7 +724,7 @@ export default function CatalogEditPage() {
                     placeholder="e.g. 100"
                     required
                   />
-                  <p className="text-xs text-ink-muted mt-1">
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
                     How many units you own or can fulfill. Used to prevent overbooking.
                   </p>
                 </div>
@@ -638,11 +734,11 @@ export default function CatalogEditPage() {
                       type="checkbox"
                       checked={isSubRental}
                       onChange={(e) => setIsSubRental(e.target.checked)}
-                      className="rounded border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-neon focus:ring-[var(--ring)]"
+                      className="rounded border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-nested)] text-[var(--stage-accent)] focus:ring-[var(--stage-accent)]"
                     />
-                    <span className="text-sm text-ceramic">We sub-rent this item from another vendor</span>
+                    <span className="text-sm text-[var(--stage-text-primary)]">We sub-rent this item from another vendor</span>
                   </label>
-                  <p className="text-xs text-ink-muted mt-1">
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
                     When checked, Target Cost becomes Vendor Rental Cost (what the vendor charges you).
                   </p>
                 </div>
@@ -654,7 +750,7 @@ export default function CatalogEditPage() {
                     onChange={setReplacementCost}
                     placeholder="0.00"
                   />
-                  <p className="text-xs text-ink-muted mt-1">
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
                     What you will charge the client if this item is destroyed or lost.
                   </p>
                 </div>
@@ -672,7 +768,7 @@ export default function CatalogEditPage() {
                     <option value="2">2 days</option>
                     <option value="3">3 days</option>
                   </select>
-                  <p className="text-xs text-ink-muted mt-1">
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
                     How many days this item needs for cleaning/prep before it can be rented again.
                   </p>
                 </div>
@@ -681,8 +777,8 @@ export default function CatalogEditPage() {
           )}
 
           {category === 'retail_sale' && (
-            <div className="space-y-4 rounded-xl border border-[var(--glass-border)] p-4 bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Retail</p>
+            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Retail</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit-stock-retail" className={labelClass}>Total stock quantity</label>
@@ -715,8 +811,8 @@ export default function CatalogEditPage() {
           )}
 
           {category === 'talent' && (
-            <div className="space-y-4 rounded-xl border border-[var(--glass-border)] p-4 bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Talent</p>
+            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Talent</p>
               <div>
                 <label htmlFor="edit-contact" className={labelClass}>Contact info</label>
                 <input
@@ -732,16 +828,16 @@ export default function CatalogEditPage() {
           )}
 
           {isBundle && (
-            <div className="rounded-xl border border-neon/30 bg-neon/5 p-4">
-              <p className="text-sm text-ceramic mb-2">Bundle (Package)</p>
-              <p className="text-xs text-ink-muted mb-3">
+            <div className="rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface-nested)] p-4">
+              <p className="text-sm text-[var(--stage-text-primary)] mb-2">Bundle (Package)</p>
+              <p className="text-xs text-[var(--stage-text-secondary)] mb-3">
                 Drag ingredients from your catalog into this package in the Builder.
               </p>
               <Link
                 href={`/catalog/${id}/builder`}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-neon/50 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.14)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)] font-medium text-sm hover:brightness-[1.06] transition-[filter]"
               >
-                <LayoutGrid size={18} aria-hidden />
+                <LayoutGrid size={18} strokeWidth={1.5} aria-hidden />
                 Open in Builder
               </Link>
             </div>
@@ -750,24 +846,149 @@ export default function CatalogEditPage() {
             <button
               type="button"
               onClick={() => router.push('/catalog')}
-              className="flex-1 px-4 py-3 rounded-xl border border-[var(--glass-border)] text-ceramic font-medium text-sm hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               Cancel
             </button>
-            <motion.button
+            <button
               type="submit"
               disabled={saving}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={UNUSONIC_PHYSICS}
-              className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)] font-medium text-sm hover:bg-[var(--color-neon-amber)]/20 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:brightness-[1.06] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               {saving ? 'Saving…' : 'Save'}
-            </motion.button>
+            </button>
           </div>
         </form>
+
+        {/* Default crew section — outside the form so inputs don't trigger save */}
+        {id && (
+          <div className="border-t border-[oklch(1_0_0_/_0.06)] pt-5 mt-2 px-6 pb-12">
+            <div className="flex items-center gap-2 mb-3">
+              <Users size={14} strokeWidth={1.5} className="text-[var(--stage-text-secondary)]" />
+              <p className={labelClass + ' mb-0'}>Default crew</p>
+            </div>
+            <p className="text-xs text-[var(--stage-text-secondary)]/60 mb-3 leading-relaxed">
+              When this item is on a proposal, these people will be suggested as production crew on the deal.
+            </p>
+
+            {/* Inherited from ingredients (bundles only) — read-only */}
+            {inheritedAssignees.length > 0 && (
+              <div className="flex flex-col gap-1.5 mb-3">
+                <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 mb-1">From ingredients</p>
+                {inheritedAssignees.map((a) => (
+                  <div key={`${a.id}-inherited`} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.04)] bg-[var(--stage-surface-nested)] opacity-60">
+                    {a.entity_id === null && (
+                      <span className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
+                    )}
+                    <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{a.entity_id ? (a.entity_name ?? a.entity_id) : (a.role_note ?? '—')}</span>
+                    <span className="text-[10px] text-[var(--stage-text-secondary)]/40 shrink-0">{a.ingredient_name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Direct assignments on this package */}
+            {assignees.length > 0 && (
+              <div className="flex flex-col gap-1.5 mb-3">
+                {inheritedAssignees.length > 0 && (
+                  <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 mb-1">Added directly</p>
+                )}
+                {assignees.map((a) => (
+                  <div key={a.id} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--stage-surface-nested)]">
+                    {a.entity_id === null && (
+                      <span className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
+                    )}
+                    <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{a.entity_id ? (a.entity_name ?? a.entity_id) : (a.role_note ?? '—')}</span>
+                    {a.entity_id && a.role_note && <span className="text-xs text-[var(--stage-text-secondary)]/50">{a.role_note}</span>}
+                    <button type="button" onClick={() => handleRemoveAssignee(a.id)} className="text-[var(--stage-text-secondary)]/30 hover:text-[var(--color-unusonic-error)]/70 transition-colors focus:outline-none" aria-label="Remove">
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-1 mb-3 p-1 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface-nested)] border border-[oklch(1_0_0_/_0.06)] w-fit">
+              <button
+                type="button"
+                onClick={() => setCrewMode('person')}
+                className={cn(
+                  'px-3 py-1 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors focus:outline-none',
+                  crewMode === 'person' ? 'bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]/50 hover:text-[var(--stage-text-secondary)]'
+                )}
+              >
+                Named person
+              </button>
+              <button
+                type="button"
+                onClick={() => setCrewMode('role')}
+                className={cn(
+                  'px-3 py-1 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors focus:outline-none',
+                  crewMode === 'role' ? 'bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]/50 hover:text-[var(--stage-text-secondary)]'
+                )}
+              >
+                Role type
+              </button>
+            </div>
+
+            {crewMode === 'person' && (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={crewSearch}
+                  onChange={(e) => { handleCrewSearch(e.target.value); setCrewPickerOpen(true); }}
+                  onFocus={() => setCrewPickerOpen(true)}
+                  placeholder="Search network to add crew…"
+                  className={inputClass}
+                />
+                {crewPickerOpen && (crewResults.length > 0 || crewSearchLoading) && (
+                  <div className="absolute left-0 top-full mt-1 z-20 w-full rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface-raised)] overflow-hidden shadow-lg">
+                    {crewSearchLoading && (
+                      <div className="px-4 py-3 text-xs text-[var(--stage-text-secondary)]/40">Searching…</div>
+                    )}
+                    {crewResults.map((r) => (
+                      <button
+                        key={r.entity_uuid ?? r.id}
+                        type="button"
+                        onClick={() => handleAddAssignee(r)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] transition-colors"
+                      >
+                        {r.name}
+                        {r.entity_type && <span className="ml-1.5 text-[10px] opacity-50 capitalize">{r.entity_type}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {crewMode === 'role' && (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={roleInput}
+                  onChange={(e) => setRoleInput(e.target.value)}
+                  placeholder="e.g. DJ, Photographer, Security…"
+                  className={inputClass}
+                  list="staff-roles-list"
+                />
+                <datalist id="staff-roles-list">
+                  {jobTitles.map((r) => <option key={r} value={r} />)}
+                </datalist>
+                <button
+                  type="button"
+                  disabled={!roleInput.trim() || roleAdding}
+                  onClick={handleAddRole}
+                  className="shrink-0 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] disabled:opacity-40 transition-colors focus:outline-none"
+                >
+                  {roleAdding ? 'Adding…' : 'Add'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         </div>
-      </LiquidPanel>
+      </StagePanel>
     </div>
   );
 }

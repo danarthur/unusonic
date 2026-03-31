@@ -11,6 +11,8 @@ import {
   Font,
 } from '@react-email/components';
 
+/* eslint-disable stage-engineering/no-raw-colors -- React Email: email clients require raw hex colors */
+
 type ReminderEmailProps = {
   recipientName: string;
   role: string;
@@ -52,7 +54,7 @@ export function ReminderEmail({
 
           {/* Wordmark */}
           <Text style={{ color: '#a0a0b0', fontSize: '13px', fontWeight: '600', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '0 0 32px' }}>
-            Signal
+            Unusonic
           </Text>
 
           {/* Heading */}
@@ -155,7 +157,7 @@ export function ReminderEmail({
           <Text style={{ color: '#444455', fontSize: '12px', margin: '0' }}>
             This is a reminder — you may have already received an initial booking email.
             No account required. This link expires in 7 days.
-            Sent by {workspaceName} via Signal.
+            Sent by {workspaceName} via Unusonic.
           </Text>
         </Container>
       </Body>

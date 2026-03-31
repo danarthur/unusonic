@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody, SheetFooter } from '@/shared/ui/sheet';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { Button } from '@/shared/ui/button';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { updateCoupleEntity } from '../actions/update-couple-entity';
+import { cn } from '@/shared/lib/utils';
 
 type CoupleEditSheetProps = {
   open: boolean;
@@ -21,9 +23,10 @@ type CoupleEditSheetProps = {
     displayName: string;
   };
   onSaved?: () => void;
+  onChangeType?: (newType: 'company' | 'person') => Promise<void>;
 };
 
-export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, onSaved }: CoupleEditSheetProps) {
+export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, onSaved, onChangeType }: CoupleEditSheetProps) {
   const [partnerAFirst, setPartnerAFirst] = useState(initialValues.partnerAFirst);
   const [partnerALast, setPartnerALast] = useState(initialValues.partnerALast);
   const [partnerAEmail, setPartnerAEmail] = useState(initialValues.partnerAEmail ?? '');
@@ -33,6 +36,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
   const [displayName, setDisplayName] = useState(initialValues.displayName);
   const [displayNameMode, setDisplayNameMode] = useState<'auto' | 'manual'>('auto');
   const [saving, setSaving] = useState(false);
+  const [changingType, setChangingType] = useState<string | null>(null);
 
   // Re-sync when initialValues change (sheet reopened with fresh data)
   useEffect(() => {
@@ -46,7 +50,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
       setDisplayName(initialValues.displayName);
       setDisplayNameMode('auto');
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);  
 
   // Auto-generate display name
   useEffect(() => {
@@ -94,7 +98,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
         <SheetBody className="flex flex-col gap-5">
           {/* Partner A */}
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-3">Partner A</p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-3">Partner A</p>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <FloatingLabelInput label="First name" value={partnerAFirst} onChange={(e) => setPartnerAFirst(e.target.value)} />
@@ -106,7 +110,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
 
           {/* Partner B */}
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-3">Partner B</p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-3">Partner B</p>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <FloatingLabelInput label="First name" value={partnerBFirst} onChange={(e) => setPartnerBFirst(e.target.value)} />
@@ -119,9 +123,9 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
           {/* Display name */}
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted">Display name</p>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Display name</p>
               {displayNameMode === 'auto' && (
-                <span className="rounded-full border border-[var(--color-mercury)] bg-white/5 px-2 py-0.5 text-[10px] text-ink-muted">
+                <span className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-[10px] text-[var(--stage-text-secondary)]">
                   auto
                 </span>
               )}
@@ -129,7 +133,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
                 <button
                   type="button"
                   onClick={() => setDisplayNameMode('auto')}
-                  className="rounded-full border border-[var(--color-mercury)] bg-white/5 px-2 py-0.5 text-[10px] text-ink-muted hover:text-ink transition-colors"
+                  className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-[10px] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                 >
                   reset to auto
                 </button>
@@ -144,9 +148,37 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
               }}
             />
           </div>
+          {onChangeType && (
+            <div className="pt-4 border-t border-[oklch(1_0_0_/_0.10)] space-y-2">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Client type</p>
+              <p className="text-xs text-[var(--stage-text-secondary)]/70">Switch if this client was entered as the wrong type.</p>
+              <div className="flex gap-2">
+                {([['company', 'Company'], ['person', 'Individual']] as const).map(([type, label]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    disabled={!!changingType || saving}
+                    onClick={async () => {
+                      setChangingType(type);
+                      await onChangeType(type);
+                      setChangingType(null);
+                      onOpenChange(false);
+                    }}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                      'border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] disabled:opacity-40'
+                    )}
+                  >
+                    {changingType === type ? <Loader2 className="size-3 animate-spin inline mr-1" /> : null}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </SheetBody>
         <SheetFooter>
-          <Button variant="silk" onClick={handleSave} disabled={saving} className="h-11 w-full rounded-xl">
+          <Button variant="silk" onClick={handleSave} disabled={saving || !!changingType} className="h-11 w-full rounded-xl">
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </SheetFooter>

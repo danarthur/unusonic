@@ -7,7 +7,8 @@ import { format, isBefore, startOfDay } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, AlertCircle } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { useModalLayer } from '@/shared/lib/use-modal-layer';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 /** Parse "yyyy-MM-dd" as local date. new Date("yyyy-MM-dd") is UTC midnight and shifts to previous day in western timezones. */
 export function parseLocalDateString(dateStr: string): Date {
@@ -25,16 +26,16 @@ export const DAY_PICKER_CLASSNAMES = {
   /** Hide caption label when using dropdown layout to avoid duplicate month text (dropdown already shows month). */
   caption_label: 'hidden',
   dropdowns: 'flex gap-2 justify-center',
-  dropdown: 'min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--background)] px-3 py-2 text-sm text-ink',
+  dropdown: 'min-w-0 rounded-xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)]',
   weekdays: 'flex gap-1 w-full justify-between',
-  weekday: 'w-9 py-1.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted text-center',
+  weekday: 'w-9 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] text-center',
   week: 'flex gap-1 w-full justify-between',
   day: 'w-9 h-9 p-0',
   day_button: cn(
-    'h-9 w-9 rounded-xl text-sm font-medium transition-all',
-    'hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-inset',
-    'data-[selected]:bg-walnut data-[selected]:text-canvas data-[selected]:font-semibold',
-    'data-[outside]:text-ink-muted/50'
+    'h-9 w-9 rounded-xl text-sm font-medium transition-colors duration-200',
+    'hover:bg-[var(--stage-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset',
+    'data-[selected]:bg-walnut data-[selected]:text-[oklch(0.10_0_0)] data-[selected]:font-semibold',
+    'data-[outside]:text-[var(--stage-text-secondary)]/50'
   ),
   today: 'bg-[var(--today-bg)] ring-1 ring-[var(--today-ring)]',
 } as const;
@@ -48,13 +49,8 @@ export interface CalendarPanelProps {
 }
 
 export function CalendarPanel({ value, onChange, onClose, className }: CalendarPanelProps) {
-  const [selected, setSelected] = useState<Date | undefined>(value ? parseLocalDateString(value) : undefined);
-  useEffect(() => {
-    if (value) setSelected(parseLocalDateString(value));
-    else setSelected(undefined);
-  }, [value]);
+  const selected = value ? parseLocalDateString(value) : undefined;
   const handleSelect = (date: Date | undefined) => {
-    setSelected(date);
     if (date) {
       onChange(format(date, 'yyyy-MM-dd'));
       onClose?.();
@@ -65,12 +61,12 @@ export function CalendarPanel({ value, onChange, onClose, className }: CalendarP
       role="dialog"
       aria-label="Choose date"
       className={cn(
-        'overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] shadow-[var(--glass-shadow)] backdrop-blur-xl',
+        'overflow-hidden rounded-2xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] shadow-lg',
         className
       )}
     >
       <div className="px-4 pt-4 pb-1">
-        <p className="text-xs font-medium text-ink-muted uppercase tracking-wider">Choose date</p>
+        <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Choose date</p>
       </div>
       <div className="p-4 pt-2">
       <DayPicker
@@ -87,11 +83,11 @@ export function CalendarPanel({ value, onChange, onClose, className }: CalendarP
       />
       </div>
       {onClose && (
-        <div className="border-t border-[var(--glass-border)] px-4 py-3 flex justify-end">
+        <div className="border-t border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] px-4 py-3 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="text-sm font-medium text-ink-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-inset rounded-lg px-3 py-1.5 transition-colors"
+            className="text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset rounded-lg px-3 py-1.5 transition-colors"
           >
             Close
           </button>
@@ -123,18 +119,11 @@ export function CeramicDatePicker({
   overlayContainerRef,
 }: CeramicDatePickerProps) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Date | undefined>(
-    value ? parseLocalDateString(value) : undefined
-  );
   const ref = useRef<HTMLDivElement>(null);
-  const overlayContentRef = useRef<HTMLDivElement>(null);
+  const overlayPanelRef = useRef<HTMLDivElement>(null);
   const today = startOfDay(new Date());
   const isPastDate = value ? isBefore(parseLocalDateString(value), today) : false;
-
-  useEffect(() => {
-    if (value) setSelected(parseLocalDateString(value));
-    else setSelected(undefined);
-  }, [value]);
+  const selected = value ? parseLocalDateString(value) : undefined;
 
   useEffect(() => {
     if (open && !overlayContainerRef && ref.current) {
@@ -143,7 +132,6 @@ export function CeramicDatePicker({
   }, [open, overlayContainerRef]);
 
   const handleSelect = (date: Date | undefined) => {
-    setSelected(date);
     if (date) {
       onChange(format(date, 'yyyy-MM-dd'));
       setOpen(false);
@@ -154,7 +142,7 @@ export function CeramicDatePicker({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (ref.current?.contains(target)) return;
-      if (overlayContentRef.current?.contains(target)) return;
+      if (overlayPanelRef.current?.contains(target)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -163,17 +151,23 @@ export function CeramicDatePicker({
 
   const useOverlay = open && overlayContainerRef != null;
 
+  useModalLayer({
+    open: Boolean(useOverlay),
+    onClose: () => setOpen(false),
+    containerRef: overlayPanelRef,
+  });
+
   const calendarContent = (
     <motion.div
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.97 }}
-      transition={UNUSONIC_PHYSICS}
+      transition={STAGE_MEDIUM}
       className={cn(
-        'overflow-hidden rounded-3xl border p-4 shadow-[var(--glass-shadow)] backdrop-blur-xl',
+        'overflow-hidden rounded-[var(--stage-radius-panel)] border p-4 shadow-lg',
         useOverlay
-          ? 'border-white/20 bg-obsidian/95 text-ceramic shadow-2xl'
-          : 'border-[var(--glass-border)] bg-[var(--glass-bg)]'
+          ? 'border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)] shadow-2xl'
+          : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)]'
       )}
     >
       <DayPicker
@@ -202,20 +196,24 @@ export function CeramicDatePicker({
         className={cn(
           'flex w-full min-w-[11rem] max-w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors duration-200',
           isPastDate
-            ? 'border-amber-500/60 bg-amber-500/5 text-ink'
-            : 'border-[var(--glass-border)] bg-[var(--glass-bg)] text-ink hover:bg-[var(--glass-bg-hover)]',
-          'focus:outline-none focus:ring-2 focus:ring-[var(--ring)]'
+            ? 'border-[oklch(0.80_0.16_85/0.45)] bg-[oklch(0.80_0.16_85/0.08)] text-[var(--stage-text-primary)]'
+            : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]',
+          'focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]'
         )}
       >
-        <Calendar size={16} className={cn('shrink-0', isPastDate ? 'text-amber-600' : 'text-ink-muted')} strokeWidth={1.5} />
-        <span className={cn('truncate min-w-0', value ? 'text-ink' : 'text-ink-muted/70')}>
+        <Calendar
+          size={16}
+          className={cn('shrink-0', isPastDate ? 'text-[var(--color-unusonic-warning)]' : 'text-[var(--stage-text-secondary)]')}
+          strokeWidth={1.5}
+        />
+        <span className={cn('truncate min-w-0', value ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]/70')}>
           {value ? format(parseLocalDateString(value), 'PPP') : placeholder}
         </span>
       </button>
 
       {isPastDate && (
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-amber-600">
-          <AlertCircle size={12} strokeWidth={2} />
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-unusonic-warning)]">
+          <AlertCircle size={12} strokeWidth={1.5} />
           This date is in the past — use for logging historical events
         </p>
       )}
@@ -226,7 +224,7 @@ export function CeramicDatePicker({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            transition={UNUSONIC_PHYSICS}
+            transition={STAGE_MEDIUM}
             className="absolute left-0 right-0 top-full z-50 mt-1.5 min-w-[320px]"
           >
             <div className="w-full max-w-[320px]">
@@ -243,13 +241,16 @@ export function CeramicDatePicker({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-obsidian/40 backdrop-blur-xl"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[oklch(0.06_0_0/0.75)]"
             onClick={() => setOpen(false)}
           >
             <div
-              ref={overlayContentRef}
-              className="w-full max-w-[320px] mx-4"
+              ref={overlayPanelRef}
+              className="w-full max-w-[320px] mx-4 outline-none"
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal
+              aria-label="Choose date"
             >
               {calendarContent}
             </div>

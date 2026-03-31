@@ -16,6 +16,8 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { formatCurrency, formatEventDate } from '@/shared/lib/format-currency';
+import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
 
 export interface ProposalLinkEmailProps {
   proposalUrl: string;
@@ -27,25 +29,10 @@ export interface ProposalLinkEmailProps {
   total?: number | null;
   depositPercent?: number | null;
   paymentDueDays?: number | null;
+  entityType?: string | null;
+  eventArchetype?: string | null;
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 export function ProposalLinkEmail({
   proposalUrl,
@@ -57,21 +44,30 @@ export function ProposalLinkEmail({
   total,
   depositPercent,
   paymentDueDays,
+  entityType,
+  eventArchetype,
 }: ProposalLinkEmailProps) {
-  const from = senderName?.trim() || workspaceName?.trim() || 'your production company';
+  const from = workspaceName?.trim() || senderName?.trim() || 'your production company';
   const firstName = clientFirstName?.trim() || null;
   const brandLine = workspaceName?.trim() || null;
 
   // Preview text: include total investment so the client knows what they're opening
   const totalStr = total && total > 0 ? formatCurrency(total) : null;
-  const previewText = firstName && dealTitle && totalStr
-    ? `${firstName} — ${dealTitle} · ${totalStr} · review and sign online`
-    : firstName && dealTitle
-    ? `${firstName}, your ${dealTitle} proposal is ready to review and sign`
-    : dealTitle && totalStr
-    ? `${dealTitle} · ${totalStr} · review the scope and sign online`
-    : dealTitle
-    ? `Your ${dealTitle} proposal is ready — review the scope and sign online`
+  // Use same signal priority as buildProposalSubjectLine for consistency
+  const isCouple = entityType === 'couple';
+  const archetypeLabel = eventArchetype
+    ? (DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS] ?? null)
+    : null;
+  const scopeLabel = archetypeLabel ?? dealTitle ?? null;
+
+  const previewText = firstName && scopeLabel && totalStr && !isCouple
+    ? `${firstName} — ${scopeLabel} · ${totalStr} · review and sign online`
+    : firstName && scopeLabel && !isCouple
+    ? `${firstName}, your ${scopeLabel} proposal is ready to review and sign`
+    : scopeLabel && totalStr
+    ? `${scopeLabel} · ${totalStr} · review the scope and sign online`
+    : scopeLabel
+    ? `Your ${scopeLabel} proposal is ready — review the scope and sign online`
     : `Your proposal is ready — review the scope and sign online`;
 
   const depositAmount =
@@ -89,7 +85,10 @@ export function ProposalLinkEmail({
 
   return (
     <Html>
-      <Head />
+      <Head>
+        <meta name="color-scheme" content="light dark" />
+        <meta name="supported-color-schemes" content="light dark" />
+      </Head>
       <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
@@ -111,7 +110,12 @@ export function ProposalLinkEmail({
                 : `${from} has prepared a proposal for you. Review the scope and pricing below, then sign to confirm your booking.`}
             </Text>
 
-            {/* Event details block */}
+            {/* Hero total — most important number, shown at display scale before the detail table */}
+            {totalStr && (
+              <Text style={heroTotal}>{totalStr}</Text>
+            )}
+
+            {/* Event details block — scope, date, payment terms */}
             {showDetailsBlock && (
               <Section style={detailsBlock}>
                 {dealTitle && (
@@ -130,17 +134,7 @@ export function ProposalLinkEmail({
                       <Text style={detailLabelText}>Date</Text>
                     </Column>
                     <Column style={detailValue}>
-                      <Text style={detailValueText}>{formatDate(eventDate)}</Text>
-                    </Column>
-                  </Row>
-                )}
-                {total != null && total > 0 && (
-                  <Row style={detailRow}>
-                    <Column style={detailLabel}>
-                      <Text style={detailLabelText}>Total</Text>
-                    </Column>
-                    <Column style={detailValue}>
-                      <Text style={{ ...detailValueText, fontWeight: 700 }}>{formatCurrency(total)}</Text>
+                      <Text style={detailValueText}>{formatEventDate(eventDate)}</Text>
                     </Column>
                   </Row>
                 )}
@@ -158,7 +152,7 @@ export function ProposalLinkEmail({
             )}
 
             {/* CTA */}
-            <Section style={{ textAlign: 'center' as const, margin: '28px 0 16px' }}>
+            <Section style={{ textAlign: 'center' as const, margin: '32px 0 20px' }}>
               <Button href={proposalUrl} style={button}>
                 Review and sign
               </Button>
@@ -180,6 +174,7 @@ export function ProposalLinkEmail({
               Or copy this link into your browser:{'\n'}
               {proposalUrl}
             </Text>
+            <Text style={platformAttr}>via Unusonic</Text>
           </Section>
         </Container>
       </Body>
@@ -199,7 +194,7 @@ const container = {
 };
 
 const section = {
-  padding: '36px 32px',
+  padding: '40px 36px',
   borderRadius: '16px',
   backgroundColor: '#161616',
   border: '1px solid rgba(255,255,255,0.07)',
@@ -243,15 +238,15 @@ const detailRow = {
 };
 
 const detailLabel = {
-  width: '80px',
-  paddingTop: '12px',
-  paddingBottom: '12px',
+  width: '88px',
+  paddingTop: '14px',
+  paddingBottom: '14px',
   verticalAlign: 'top' as const,
 };
 
 const detailValue = {
-  paddingTop: '12px',
-  paddingBottom: '12px',
+  paddingTop: '14px',
+  paddingBottom: '14px',
   verticalAlign: 'top' as const,
 };
 
@@ -283,8 +278,8 @@ const button = {
 };
 
 const trustLine = {
-  color: 'rgba(245,245,245,0.45)',
-  fontSize: '12px',
+  color: 'rgba(245,245,245,0.55)',
+  fontSize: '13px',
   textAlign: 'center' as const,
   margin: '0 0 4px',
   lineHeight: 1.5,
@@ -306,8 +301,26 @@ const footerLink = {
   color: 'rgba(245,245,245,0.2)',
   fontSize: '11px',
   lineHeight: 1.5,
-  margin: 0,
+  margin: '0 0 16px',
   wordBreak: 'break-all' as const,
+};
+
+const heroTotal = {
+  color: '#f5f5f5',
+  fontSize: '30px',
+  fontWeight: 700,
+  letterSpacing: '-0.03em',
+  textAlign: 'center' as const,
+  margin: '20px 0 4px',
+};
+
+const platformAttr = {
+  color: 'rgba(245,245,245,0.2)',
+  fontSize: '10px',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+  margin: '4px 0 0',
+  textAlign: 'center' as const,
 };
 
 export default ProposalLinkEmail;

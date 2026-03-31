@@ -31,7 +31,7 @@ export function LobbyBentoCell({ id, children, className, enableBokeh = true }: 
       onMouseLeave={() => setFocusedCardId(null)}
       tabIndex={0}
       className={cn(
-        'outline-none focus:outline-none rounded-[28px]',
+        'outline-none focus:outline-none rounded-[var(--stage-radius-panel,12px)]',
         focused && 'relative z-20 lobby-active-rim',
         hasBokehActive && !focused && 'lobby-recessed relative z-0',
         className

@@ -57,7 +57,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
             {/* Backdrop — dim and blur the network behind */}
             <motion.div
               role="presentation"
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md"
+              className="fixed inset-0 z-50 bg-[oklch(0_0_0_/_0.6)]"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -75,23 +75,23 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className={cn(
-                'fixed inset-4 z-50 flex flex-col overflow-hidden rounded-3xl',
-                'bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl',
+                'fixed inset-4 z-50 flex flex-col overflow-hidden rounded-[var(--stage-radius-panel)]',
+                'bg-[var(--stage-surface)] border border-[oklch(1_0_0_/_0.10)] shadow-2xl',
                 'md:inset-6 lg:inset-8'
               )}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-6 py-4 md:px-8">
+              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[oklch(1_0_0_/_0.10)] px-6 py-4 md:px-8">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                    <Building2 className="size-5 text-[var(--color-ink-muted)]" />
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)]">
+                    <Building2 className="size-5 text-[var(--stage-text-secondary)]" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="truncate text-xl font-medium tracking-tight text-[var(--color-ink)]">
+                    <h2 className="truncate text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
                       {org?.name ?? 'Organization'}
                     </h2>
-                    <p className="text-sm text-[var(--color-ink-muted)]">
+                    <p className="text-sm text-[var(--stage-text-secondary)]">
                       {org?.roster?.length ?? roster.length} people
                     </p>
                   </div>
@@ -108,7 +108,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
               </div>
 
               {/* Tabs */}
-              <div className="flex shrink-0 gap-1 border-b border-white/10 px-6 md:px-8">
+              <div className="flex shrink-0 gap-1 border-b border-[oklch(1_0_0_/_0.10)] px-6 md:px-8">
                 {tabs.map((t) => (
                   <button
                     key={t.id}
@@ -117,8 +117,8 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                     className={cn(
                       'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors',
                       tab === t.id
-                        ? 'text-[var(--color-ink)] border-b-2 border-[var(--color-silk)]'
-                        : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                        ? 'text-[var(--stage-text-primary)] border-b-2 border-[var(--stage-accent)]'
+                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
                     )}
                   >
                     {t.id === 'roster' && <Users className="size-4" />}
@@ -133,7 +133,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                 {org && tab === 'roster' && (
                   <div className="mx-auto max-w-2xl space-y-3">
                     {loading ? (
-                      <p className="py-12 text-center text-sm text-[var(--color-ink-muted)]">
+                      <p className="py-12 text-center text-sm text-[var(--stage-text-secondary)]">
                         Loading roster…
                       </p>
                     ) : (
@@ -149,8 +149,8 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                                   setMemberSheetOpen(true);
                                 }}
                                 className={cn(
-                                  'flex w-full flex-wrap items-center gap-3 rounded-xl border border-white/10 px-4 py-3 text-left transition-colors',
-                                  'bg-white/5 hover:bg-white/10',
+                                  'flex w-full flex-wrap items-center gap-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] px-4 py-3 text-left transition-colors',
+                                  'bg-[oklch(1_0_0_/_0.05)] hover:bg-[oklch(1_0_0_/_0.10)]',
                                   isGhost && 'opacity-90'
                                 )}
                               >
@@ -158,19 +158,19 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                                   className={cn(
                                     'flex size-10 shrink-0 items-center justify-center rounded-full border-2',
                                     isGhost
-                                      ? 'border-white/20 bg-transparent border-dashed'
-                                      : 'border-transparent bg-white/10'
+                                      ? 'border-[oklch(1_0_0_/_0.20)] bg-transparent border-dashed'
+                                      : 'border-transparent bg-[oklch(1_0_0_/_0.10)]'
                                   )}
                                 >
-                                  <User className="size-5 text-[var(--color-ink-muted)]" />
+                                  <User className="size-5 text-[var(--stage-text-secondary)]" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate font-medium tracking-tight text-[var(--color-ink)]">
+                                  <p className="truncate font-medium tracking-tight text-[var(--stage-text-primary)]">
                                     {member.display_name}
                                   </p>
                                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                     {member.job_title && (
-                                      <span className="text-xs text-[var(--color-ink-muted)]">
+                                      <span className="text-xs text-[var(--stage-text-secondary)]">
                                         {member.job_title}
                                       </span>
                                     )}
@@ -178,7 +178,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                                       variant={isGhost ? 'outline' : 'secondary'}
                                       className={cn(
                                         'text-[10px] font-medium',
-                                        isGhost && 'border-white/20 text-[var(--color-ink-muted)]'
+                                        isGhost && 'border-[oklch(1_0_0_/_0.20)] text-[var(--stage-text-secondary)]'
                                       )}
                                     >
                                       {isGhost ? 'Pending' : 'Active'}
@@ -189,13 +189,13 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                                       {member.skill_tags.slice(0, 4).map((tag) => (
                                         <span
                                           key={tag}
-                                          className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                                          className="rounded bg-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                                         >
                                           {tag}
                                         </span>
                                       ))}
                                       {member.skill_tags.length > 4 && (
-                                        <span className="text-[10px] text-[var(--color-ink-muted)]">
+                                        <span className="text-[10px] text-[var(--stage-text-secondary)]">
                                           +{member.skill_tags.length - 4}
                                         </span>
                                       )}
@@ -209,7 +209,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
                       </ul>
                     )}
                     {!loading && roster.length === 0 && (
-                      <p className="py-12 text-center text-sm text-[var(--color-ink-muted)]">
+                      <p className="py-12 text-center text-sm text-[var(--stage-text-secondary)]">
                         No people in this organization yet.
                       </p>
                     )}
@@ -218,7 +218,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
 
                 {org && tab === 'settings' && (
                   <div className="mx-auto max-w-2xl space-y-4 py-4">
-                    <p className="text-sm text-[var(--color-ink-muted)]">
+                    <p className="text-sm text-[var(--stage-text-secondary)]">
                       Organization settings (name, logo) — coming soon.
                     </p>
                   </div>

@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { LiquidPanel } from '@/shared/ui/liquid-panel'
+import { StagePanel } from '@/shared/ui/stage-panel'
 
 interface ShellProps {
   children: React.ReactNode
@@ -18,7 +18,7 @@ export function Shell({ children }: ShellProps) {
   ]
 
   return (
-    <div className="min-h-screen bg-canvas relative text-ink">
+    <div className="min-h-screen bg-[var(--stage-void)] relative text-[var(--stage-text-primary)]">
       {/* Cinematic vignette overlay */}
       <div 
         className="fixed inset-0 bg-cinematic pointer-events-none z-0"
@@ -32,7 +32,7 @@ export function Shell({ children }: ShellProps) {
 
       {/* Ghost Menu - Fixed at bottom center */}
       <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
-        <LiquidPanel className="flex items-center gap-4 !rounded-full !px-6 !py-3">
+        <StagePanel className="flex items-center gap-4 !rounded-full !px-6 !py-3">
           {routes.map((route) => {
             const isActive = pathname === route.path
             return (
@@ -47,14 +47,14 @@ export function Shell({ children }: ShellProps) {
                 <div
                   className={`w-3 h-3 rounded-full transition-all duration-300 ${
                     isActive
-                      ? 'bg-silk shadow-[0_0_8px_rgba(212,196,168,0.5)] scale-110'
-                      : 'bg-stone/60 opacity-60'
+                      ? 'bg-[var(--stage-accent)] shadow-[0_0_8px_oklch(0.88_0_0_/_0.5)] brightness-110'
+                      : 'bg-[oklch(1_0_0_/_0.30)] opacity-60'
                   }`}
                 />
               </Link>
             )
           })}
-        </LiquidPanel>
+        </StagePanel>
       </nav>
     </div>
   )

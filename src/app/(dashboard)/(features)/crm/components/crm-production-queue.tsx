@@ -3,7 +3,7 @@
 import { useState, useOptimistic } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { Sparkles, Plus, FileText, Wallet, Clock, MapPin } from 'lucide-react';
 import { CreateGigModal } from './create-gig-modal';
 
@@ -47,17 +47,17 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
       <div className="flex-1 min-h-[80vh] p-6 overflow-y-auto">
         <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-[clamp(1.75rem,4vw,2.25rem)] font-light text-ink tracking-tight mb-2">Production Queue</h1>
-            <p className="text-ink-muted">
+            <h1 className="text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight mb-2">Production queue</h1>
+            <p className="text-[var(--stage-text-secondary)]">
               {optimisticGigs.length === 0
                 ? 'No productions yet.'
-                : 'Lead your pipeline from inquiry to execution.'}
+                : 'Lead your pipeline from inquiry to wrap.'}
             </p>
           </div>
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
-            className="bg-obsidian text-ceramic px-6 py-3 rounded-full liquid-levitation flex items-center gap-2 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+            className="bg-[var(--stage-void)] text-[var(--stage-text-primary)] px-6 py-3 rounded-full flex items-center gap-2 transition-colors hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
           >
             <Plus size={18} /> New production
           </button>
@@ -68,7 +68,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
           initial="hidden"
           animate="visible"
           variants={{
-            visible: { transition: { staggerChildren: 0.05 } },
+            visible: { transition: {} },
             hidden: {},
           }}
         >
@@ -80,17 +80,17 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                 visible: { opacity: 1, y: 0 },
                 hidden: { opacity: 0, y: 12 },
               }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
             >
-              <LiquidPanel
-                hoverEffect={!gig.isOptimistic}
-                className={`h-full flex flex-col justify-between ${gig.isOptimistic ? 'opacity-75 animate-pulse' : ''}`}
+              <StagePanel
+                interactive={!gig.isOptimistic}
+                className={`h-full flex flex-col justify-between ${gig.isOptimistic ? 'opacity-45 stage-skeleton pointer-events-none' : ''}`}
               >
                 <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 liquid-panel liquid-panel-nested !rounded-full text-2xl text-ink">
+                  <div className="p-2 stage-panel stage-panel-nested !rounded-full text-2xl text-[var(--stage-text-primary)]">
                     <Sparkles size={18} />
                   </div>
-                  <span className="liquid-panel liquid-panel-nested !rounded-full !p-0 px-2 py-1 text-xs font-mono text-ink-muted">
+                  <span className="stage-panel stage-panel-nested !rounded-full !p-0 px-2 py-1 text-xs font-mono text-[var(--stage-text-secondary)]">
                     {gig.status ?? '—'}
                   </span>
                 </div>
@@ -103,41 +103,41 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                         ? `/events/g/${gig.id}`
                         : `/crm/deal/${gig.id}`
                   }
-                  className="flex flex-col flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-inset focus-visible:rounded-2xl"
+                  className="flex flex-col flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset focus-visible:rounded-2xl"
                   onClick={(e) => gig.isOptimistic && e.preventDefault()}
                 >
-                  <h3 className="text-xl font-light text-ink mb-1 group-hover:text-emerald-600 transition-colors">
+                  <h3 className="text-xl font-medium text-[var(--stage-text-primary)] mb-1 group-hover:text-[var(--color-unusonic-success)] transition-colors">
                     {gig.title ?? 'Untitled Production'}
                   </h3>
-                  <p className="text-sm text-ink-muted mb-4">{gig.client_name ?? 'Client'}</p>
+                  <p className="text-sm text-[var(--stage-text-secondary)] mb-4">{gig.client_name ?? 'Client'}</p>
 
-                  <div className="flex items-center gap-4 text-xs text-ink-muted border-t border-[var(--glass-border)] pt-4 mt-2">
+                  <div className="flex items-center gap-4 text-xs text-[var(--stage-text-secondary)] border-t border-[oklch(1_0_0_/_0.08)] pt-4 mt-2">
                     <span className="flex items-center gap-1.5">
-                      <Clock size={14} className="shrink-0 text-ink-muted" aria-hidden />
+                      <Clock size={14} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
                       {gig.event_date
-                        ? new Date(gig.event_date).toLocaleDateString()
+                        ? new Date(gig.event_date + 'T00:00:00').toLocaleDateString()
                         : 'TBD'}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <MapPin size={14} className="shrink-0 text-ink-muted" aria-hidden />
+                      <MapPin size={14} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
                       {gig.location?.split(',')[0] ?? 'TBD'}
                     </span>
                   </div>
                 </Link>
 
-                <div className="mt-4 pt-3 border-t border-[var(--glass-border)] flex gap-2 flex-wrap">
+                <div className="mt-4 pt-3 border-t border-[oklch(1_0_0_/_0.08)] flex gap-2 flex-wrap">
                   {!gig.isOptimistic && gig.source === 'event' && (
                     <>
                       <Link
                         href={`/events/${gig.id}/deal`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
                       >
                         <FileText size={14} />
                         Deal room
                       </Link>
                       <Link
                         href={`/events/${gig.id}/finance`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
                       >
                         <Wallet size={14} />
                         Finance
@@ -145,7 +145,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                     </>
                   )}
                 </div>
-              </LiquidPanel>
+              </StagePanel>
             </motion.div>
           ))}
         </motion.div>

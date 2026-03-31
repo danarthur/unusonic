@@ -29,7 +29,7 @@ export function RoleSidebar({
   return (
     <nav className="flex flex-col gap-6">
       <section>
-        <p className="text-xs uppercase tracking-widest text-ink-muted mb-2">System templates</p>
+        <p className="text-xs uppercase tracking-widest text-[var(--stage-text-secondary)] mb-2">System templates</p>
         <ul className="space-y-1">
           {systemRoles.map((role, i) => (
             <motion.li
@@ -52,7 +52,7 @@ export function RoleSidebar({
       </section>
       {!readOnly && (
       <section>
-        <p className="text-xs uppercase tracking-widest text-ink-muted mb-2">Custom roles</p>
+        <p className="text-xs uppercase tracking-widest text-[var(--stage-text-secondary)] mb-2">Custom roles</p>
         <ul className="space-y-1">
           {customRoles.map((role, i) => (
             <motion.li
@@ -95,10 +95,10 @@ function RoleSidebarItem({
   return (
     <div
       className={cn(
-        'group flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors',
-        'border-[var(--glass-border)] bg-[var(--glass-bg)]',
-        isSelected && 'border-[var(--color-neon-blue)]/30 bg-[var(--color-neon-blue)]/10',
-        !isSelected && 'hover:border-[var(--glass-border-hover)] hover:bg-[var(--glass-bg-hover)]'
+        'group flex items-center gap-2 rounded-[var(--stage-radius-input)] border px-3 py-2.5 transition-colors',
+        'border-[var(--stage-border)] bg-[var(--stage-surface)]',
+        isSelected && 'border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/10',
+        !isSelected && 'hover:border-[var(--stage-border-hover)] hover:bg-[var(--stage-surface-hover)]'
       )}
     >
       <button
@@ -106,10 +106,10 @@ function RoleSidebarItem({
         onClick={onSelect}
         className="flex-1 flex items-center gap-2 min-w-0 text-left"
       >
-        <Users className="size-4 text-ink-muted shrink-0" />
-        <span className="text-ceramic text-sm font-medium tracking-tight truncate">{role.name}</span>
+        <Users className="size-4 text-[var(--stage-text-secondary)] shrink-0" />
+        <span className="text-[var(--stage-text-primary)] text-sm font-medium tracking-tight truncate">{role.name}</span>
         {isSystem && (
-          <Badge variant="outline" className="shrink-0 text-[10px] uppercase tracking-wider text-ink-muted border-[var(--glass-border)]">
+          <Badge variant="outline" className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)] border-[var(--stage-border)]">
             System
           </Badge>
         )}
@@ -119,7 +119,7 @@ function RoleSidebarItem({
           type="button"
           variant="ghost"
           size="sm"
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted hover:text-ceramic"
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]"
           onClick={(e) => {
             e.stopPropagation();
             onDuplicate();

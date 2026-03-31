@@ -24,13 +24,13 @@ export function SummonEmail({ originName, claimUrl }: SummonEmailProps) {
   return (
     <Html>
       <Head />
-      <Preview>Signal Frequency Received — {originName} has sent you a Project Brief.</Preview>
+      <Preview>Unusonic — {originName} has sent you a Project Brief.</Preview>
       <Body style={main}>
         <Container style={container}>
           <Section style={section}>
-            <Text style={heading}>Signal Frequency Received.</Text>
+            <Text style={heading}>You have a Project Brief.</Text>
             <Text style={body}>
-              {originName} has sent you a Project Brief on Signal.
+              {originName} has sent you a Project Brief on Unusonic.
             </Text>
             <Button href={claimUrl} style={button}>
               View Project

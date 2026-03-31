@@ -35,17 +35,18 @@ export function RecentlyDeletedList({ deletedRelationships, sourceOrgId }: Recen
   };
 
   return (
-    <div className="border-t border-[var(--color-mercury)]/60 pt-4 overflow-hidden">
+    <div className="border-t border-[oklch(1_0_0_/_0.06)] pt-4 overflow-hidden">
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-3 py-2 text-left hover:text-[var(--color-ink)] transition-colors"
+        className="w-full flex items-center justify-between gap-3 py-2 text-left hover:text-[var(--stage-text-primary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
       >
-        <span className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+        <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           Recently deleted ({deletedRelationships.length}) — restore within 30 days
         </span>
         <ChevronDown
-          className={cn('size-4 text-[var(--color-ink-muted)] transition-transform shrink-0', open && 'rotate-180')}
+          className={cn('size-4 text-[var(--stage-text-secondary)] transition-transform shrink-0', open && 'rotate-180')}
         />
       </button>
       {open && (
@@ -54,16 +55,16 @@ export function RecentlyDeletedList({ deletedRelationships, sourceOrgId }: Recen
             {deletedRelationships.map((d) => (
               <li
                 key={d.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-mercury)]/60 bg-[oklch(0.20_0_0/0.15)] px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-lg border border-[oklch(1_0_0_/_0.06)] bg-[oklch(0.20_0_0/0.15)] px-3 py-2"
               >
-                <span className="text-sm text-[var(--color-ink)] truncate min-w-0">{d.targetName}</span>
+                <span className="text-sm text-[var(--stage-text-primary)] truncate min-w-0">{d.targetName}</span>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => handleRestore(d.id)}
                   disabled={isPending || !d.canRestore}
-                  className="shrink-0 gap-1.5 border-[var(--color-silk)]/40 text-[var(--color-silk)]"
+                  className="shrink-0 gap-1.5 border-[var(--stage-accent)]/40 text-[var(--stage-accent)]"
                 >
                   <RotateCcw className="size-3.5" />
                   Restore

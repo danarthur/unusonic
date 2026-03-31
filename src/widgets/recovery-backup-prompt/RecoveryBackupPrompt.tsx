@@ -17,22 +17,26 @@ export function RecoveryBackupPrompt() {
   } | null>(null);
   const [dismissedUntil, setDismissedUntil] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [clientNow, setClientNow] = useState<number | null>(null);
 
   useEffect(() => {
     getRecoveryStatus().then(setStatus);
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(DISMISS_KEY);
-      if (raw) setDismissedUntil(parseInt(raw, 10));
-    } catch {
-      // ignore
-    }
-    setMounted(true);
+    queueMicrotask(() => {
+      try {
+        const raw = localStorage.getItem(DISMISS_KEY);
+        if (raw) setDismissedUntil(parseInt(raw, 10));
+      } catch {
+        // ignore
+      }
+      setMounted(true);
+      setClientNow(Date.now());
+    });
   }, []);
 
-  const now = Date.now();
+  const now = clientNow ?? 0;
   const isDismissed = dismissedUntil != null && now < dismissedUntil;
 
   const hasRecoveryKit = status?.hasRecoveryKit ?? false;
@@ -43,10 +47,15 @@ export function RecoveryBackupPrompt() {
   const showByAge = accountAgeDays >= MIN_ACCOUNT_AGE_DAYS;
 
   const visible =
-    mounted && status != null && !hasRecoveryKit && showByAge && !isDismissed;
+    mounted &&
+    clientNow != null &&
+    status != null &&
+    !hasRecoveryKit &&
+    showByAge &&
+    !isDismissed;
 
   function handleDismiss() {
-    const until = now + DISMISS_DAYS * 24 * 60 * 60 * 1000;
+    const until = Date.now() + DISMISS_DAYS * 24 * 60 * 60 * 1000;
     try {
       localStorage.setItem(DISMISS_KEY, String(until));
       setDismissedUntil(until);
@@ -60,25 +69,25 @@ export function RecoveryBackupPrompt() {
   return (
     <div
       role="status"
-      className="liquid-card rounded-2xl border border-neon-blue/25 bg-neon-blue/5 backdrop-blur-xl p-4 flex items-start gap-4"
+      className="stage-panel rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.14)] bg-[var(--stage-surface)] p-4 flex items-start gap-4"
     >
-      <Shield className="w-5 h-5 text-neon shrink-0 mt-0.5" />
+      <Shield className="w-5 h-5 text-[var(--stage-text-primary)] shrink-0 mt-0.5" strokeWidth={1.5} aria-hidden />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-ceramic">Back up your account</p>
-        <p className="text-sm text-muted leading-relaxed mt-1">
+        <p className="text-sm font-medium text-[var(--stage-text-primary)]">Back up your account</p>
+        <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-1">
           Ensure you never get locked out. Set up a recovery kit with your Safety Net guardians.
         </p>
         <div className="flex flex-wrap gap-2 mt-3">
           <Link
             href="/settings/security"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neon-blue/20 text-neon hover:bg-neon-blue/30 transition-colors text-sm font-medium"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[oklch(1_0_0_/_0.12)] bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors text-sm font-medium"
           >
             Back up now
           </Link>
           <button
             type="button"
             onClick={handleDismiss}
-            className="text-sm text-muted hover:text-ceramic transition-colors leading-relaxed"
+            className="text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors leading-relaxed"
           >
             Remind me later
           </button>
@@ -88,9 +97,9 @@ export function RecoveryBackupPrompt() {
         type="button"
         onClick={handleDismiss}
         aria-label="Dismiss"
-        className="p-1 rounded-lg text-muted hover:text-ceramic hover:bg-white/10 transition-colors shrink-0"
+        className="p-1 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors shrink-0"
       >
-        <X className="w-4 h-4" />
+        <X className="w-4 h-4" strokeWidth={1.5} />
       </button>
     </div>
   );

@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useTransition, useRef } from 'react';
+import { useState, useTransition, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Camera, Loader2, X, Check } from 'lucide-react';
 import {
@@ -53,17 +53,14 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
   const minStep = initialState.profile.fullName?.trim() ? 1 : 0;
 
   const [currentStep, setCurrentStep] = useState(computeInitialStep);
+  const [slideX, setSlideX] = useState(24);
 
-  // Direction-aware transitions: track which way the step is moving (computed once at init).
-  const prevStepRef = useRef<number | null>(null);
-  const stepDirectionRef = useRef<1 | -1>(1);
-  if (prevStepRef.current === null) {
-    prevStepRef.current = currentStep;
-  } else if (prevStepRef.current !== currentStep) {
-    stepDirectionRef.current = currentStep > prevStepRef.current ? 1 : -1;
-    prevStepRef.current = currentStep;
-  }
-  const slideX = stepDirectionRef.current * 24;
+  const goToStep = useCallback((next: number, prev: number) => {
+    if (prev !== next) {
+      setSlideX((next > prev ? 1 : -1) * 24);
+    }
+    setCurrentStep(next);
+  }, []);
 
   const [fullName, setFullName] = useState(initialState.profile.fullName);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialState.profile.avatarUrl);
@@ -102,7 +99,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
       setProfileSubmitted(true);
       setTimeout(() => {
         setProfileSubmitted(false);
-        setCurrentStep(1);
+        goToStep(1, 0);
       }, 350);
     });
   };
@@ -110,24 +107,26 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
   const handleUseScout = (payload: ScoutOnboardingPayload) => {
     setError(null);
     setScoutPayload(payload);
+    const from = currentStep;
     startTransition(async () => {
       await updateOnboardingStep(2);
-      setCurrentStep(2);
+      goToStep(2, from);
     });
   };
 
   const handleSkipWebsite = () => {
     setError(null);
     setScoutPayload(null);
+    const from = currentStep;
     startTransition(async () => {
       await updateOnboardingStep(2);
-      setCurrentStep(2);
+      goToStep(2, from);
     });
   };
 
   const handleBack = () => {
     if (currentStep > minStep) {
-      setCurrentStep(currentStep - 1);
+      goToStep(currentStep - 1, currentStep);
       setError(null);
     }
   };
@@ -185,24 +184,22 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={avatarUploading}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-24 h-24 rounded-2xl border-2 border-dashed border-[var(--glass-border)]
-                  hover:border-walnut/40 bg-ink/[0.02] flex items-center justify-center overflow-hidden"
+                className="w-24 h-24 rounded-2xl border-2 border-dashed border-[oklch(1_0_0_/_0.12)]
+                  hover:border-[oklch(1_0_0_/_0.20)] bg-[oklch(1_0_0_/_0.03)] hover:brightness-[1.03] transition-[filter,border-color] flex items-center justify-center overflow-hidden"
               >
                 {avatarUrl ? (
                   <>
                     <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-ink/50 opacity-40 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Camera className="w-5 h-5 text-ceramic" />
+                    <div className="absolute inset-0 bg-[oklch(0.10_0_0_/_0.50)] opacity-40 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Camera className="w-5 h-5 text-[var(--stage-text-primary)]" />
                     </div>
                   </>
                 ) : avatarUploading ? (
-                  <Loader2 className="w-6 h-6 text-ink-muted animate-spin" />
+                  <Loader2 className="w-6 h-6 text-[var(--stage-text-secondary)] animate-spin" />
                 ) : (
                   <div className="flex flex-col items-center gap-1">
-                    <User className="w-7 h-7 text-ink-muted/50" />
-                    <Camera className="w-4 h-4 text-ink-muted/40 group-hover:text-ink-muted/80 transition-colors" />
+                    <User className="w-7 h-7 text-[var(--stage-text-secondary)]/50" />
+                    <Camera className="w-4 h-4 text-[var(--stage-text-secondary)]/40 group-hover:text-[var(--stage-text-secondary)]/80 transition-colors" />
                   </div>
                 )}
               </motion.button>
@@ -210,13 +207,13 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setAvatarUrl(null); }}
-                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-unusonic-error text-ceramic flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-unusonic-error text-[var(--stage-text-primary)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3" />
                 </button>
               )}
             </div>
-            <p className="text-xs text-ceramic/40">{initialState.user.email}</p>
+            <p className="text-xs text-[var(--stage-text-primary)]/40">{initialState.user.email}</p>
             {error && (
               <p className="text-sm text-unusonic-error">{error}</p>
             )}
@@ -229,7 +226,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
                   transition={{ type: 'spring', stiffness: 200, damping: 20, duration: 0.3 }}
                   className="flex items-center justify-center"
                 >
-                  <Check className="w-6 h-6 text-neon-blue" />
+                  <Check className="w-6 h-6 text-[var(--color-unusonic-success)]" strokeWidth={1.5} />
                 </motion.div>
               )}
             </AnimatePresence>

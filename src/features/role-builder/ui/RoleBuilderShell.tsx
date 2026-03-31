@@ -5,7 +5,7 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { getDefaultFormValues, type RoleBuilderFormValues } from '../model/schema';
 import { getPermissionLabel, type PermissionScope } from '../model/permission-metadata';
 import {
@@ -131,25 +131,25 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
   if (loading) {
     return (
       <div className="grid gap-6 md:grid-cols-[240px_1fr]">
-        <LiquidPanel className="p-4">
-          <div className="h-5 w-28 rounded bg-ink/15 animate-pulse" />
+        <StagePanel className="p-4">
+          <div className="h-5 w-28 rounded bg-[var(--stage-text-primary)]/15 stage-skeleton" />
           <div className="mt-4 space-y-2">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-11 rounded-lg bg-ink/10 animate-pulse" />
+              <div key={i} className="h-11 rounded-[var(--stage-radius-input)] bg-[var(--stage-text-primary)]/10 stage-skeleton" />
             ))}
           </div>
-        </LiquidPanel>
-        <LiquidPanel className="p-6">
-          <div className="h-6 w-48 rounded bg-ink/15 animate-pulse" />
-          <div className="mt-4 h-24 rounded-lg bg-ink/10 animate-pulse" />
-        </LiquidPanel>
+        </StagePanel>
+        <StagePanel className="p-6">
+          <div className="h-6 w-48 rounded bg-[var(--stage-text-primary)]/15 stage-skeleton" />
+          <div className="mt-4 h-24 rounded-[var(--stage-radius-input)] bg-[var(--stage-text-primary)]/10 stage-skeleton" />
+        </StagePanel>
       </div>
     );
   }
 
   return (
     <div className="grid gap-6 md:grid-cols-[240px_1fr]">
-      <aside className="liquid-card p-4 border border-[var(--glass-border)]">
+      <aside className="stage-panel p-4 border border-[var(--stage-border)]">
         <RoleSidebar
           systemRoles={systemRoles}
           customRoles={canUseFullRoleBuilder ? customRoles : []}
@@ -170,9 +170,9 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
               exit={M3_FADE_THROUGH_VARIANTS.hidden}
               transition={{ duration: 0.2 }}
             >
-              <LiquidPanel className="p-6">
-                <h2 className="text-ceramic tracking-tight font-medium mb-1">New custom role</h2>
-                <p className="text-ink-muted text-sm leading-relaxed mb-6">
+              <StagePanel className="p-6">
+                <h2 className="text-[var(--stage-text-primary)] tracking-tight font-medium mb-1">New custom role</h2>
+                <p className="text-[var(--stage-text-secondary)] text-sm leading-relaxed mb-6">
                   Based on {draftFromDuplicate?.name}. Edit name and permissions below.
                 </p>
                 <FormProvider {...form}>
@@ -185,7 +185,7 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
                 {form.formState.errors?.root?.message && (
                   <p className="text-[var(--color-unusonic-error)] text-sm leading-relaxed mt-3">{form.formState.errors.root.message}</p>
                 )}
-              </LiquidPanel>
+              </StagePanel>
             </motion.div>
           )}
 
@@ -197,9 +197,9 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
               exit={M3_FADE_THROUGH_VARIANTS.hidden}
               transition={{ duration: 0.2 }}
             >
-              <LiquidPanel className="p-6">
-                <h2 className="text-ceramic tracking-tight font-medium mb-1">Edit role</h2>
-                <p className="text-ink-muted text-sm leading-relaxed mb-6">{selectedRole.name}</p>
+              <StagePanel className="p-6">
+                <h2 className="text-[var(--stage-text-primary)] tracking-tight font-medium mb-1">Edit role</h2>
+                <p className="text-[var(--stage-text-secondary)] text-sm leading-relaxed mb-6">{selectedRole.name}</p>
                 <FormProvider {...form}>
                   <RoleEditorForm
                     isSystemRole={false}
@@ -210,7 +210,7 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
                 {form.formState.errors?.root?.message && (
                   <p className="text-[var(--color-unusonic-error)] text-sm leading-relaxed mt-3">{form.formState.errors.root.message}</p>
                 )}
-              </LiquidPanel>
+              </StagePanel>
             </motion.div>
           )}
 
@@ -222,14 +222,14 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
               exit={M3_FADE_THROUGH_VARIANTS.hidden}
               transition={{ duration: 0.2 }}
             >
-              <LiquidPanel className="p-6">
-                <h2 className="text-ceramic tracking-tight font-medium mb-1">{selectedRole.name}</h2>
-                <p className="text-ink-muted text-sm leading-relaxed mb-4">
+              <StagePanel className="p-6">
+                <h2 className="text-[var(--stage-text-primary)] tracking-tight font-medium mb-1">{selectedRole.name}</h2>
+                <p className="text-[var(--stage-text-secondary)] text-sm leading-relaxed mb-4">
                   {canUseFullRoleBuilder
                     ? 'System template. Duplicate to create a custom role with these permissions.'
                     : 'System template. Upgrade to Venue OS or Autonomous to create custom roles.'}
                 </p>
-                <ul className="space-y-1.5 text-sm text-ink-muted leading-relaxed mb-6">
+                <ul className="space-y-1.5 text-sm text-[var(--stage-text-secondary)] leading-relaxed mb-6">
                   {selectedRole.permissionKeys.map((key) => (
                     <li key={key}>{getPermissionLabel(key)}</li>
                   ))}
@@ -240,13 +240,13 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
                     variant="outline"
                     size="sm"
                     onClick={() => handleDuplicateToCustom?.(selectedRole)}
-                    className="border-[var(--glass-border)] text-ink-muted hover:text-ceramic hover:border-[var(--glass-border-hover)]"
+                    className="border-[var(--stage-border)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-border-hover)]"
                   >
                     <Copy className="size-4 mr-2" />
                     Duplicate to custom role
                   </Button>
                 )}
-              </LiquidPanel>
+              </StagePanel>
             </motion.div>
           )}
 
@@ -258,9 +258,9 @@ export function RoleBuilderShell({ workspaceId, subscriptionTier = 'foundation' 
               exit={M3_FADE_THROUGH_VARIANTS.hidden}
               transition={{ duration: 0.2 }}
             >
-              <LiquidPanel className="p-12 text-center">
-                <p className="text-ink-muted leading-relaxed">Select a role or duplicate a system template to edit.</p>
-              </LiquidPanel>
+              <StagePanel className="p-12 text-center">
+                <p className="text-[var(--stage-text-secondary)] leading-relaxed">Select a role or duplicate a system template to edit.</p>
+              </StagePanel>
             </motion.div>
           )}
         </AnimatePresence>

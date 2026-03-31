@@ -3,10 +3,8 @@
  * Gatekeeper layer: profile ↔ org with employment_status and role.
  */
 
-import type { Database } from '@/types/supabase';
-
-export type EmploymentStatus = Database['public']['Enums']['employment_status'];
-export type OrgMemberRole = Database['public']['Enums']['org_member_role'];
+export type EmploymentStatus = 'internal_employee' | 'external_contractor';
+export type OrgMemberRole = 'owner' | 'admin' | 'manager' | 'member' | 'restricted';
 
 // Legacy row shapes (organizations + org_members tables dropped in Session 10; kept for backward compat)
 export interface OrgRow {

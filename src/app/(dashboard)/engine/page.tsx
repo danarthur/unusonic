@@ -11,7 +11,7 @@ interface SettingToggleProps {
 function SettingToggle({ label, enabled, onChange }: SettingToggleProps) {
   return (
     <div className="flex items-center justify-between py-4 border-b border-subtle/20 last:border-0">
-      <span className="text-neutral-200 text-base">{label}</span>
+      <span className="text-[var(--stage-text-primary)] text-base">{label}</span>
       <button
         onClick={() => onChange(!enabled)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -39,8 +39,8 @@ export default function EnginePage() {
     <div className="min-h-screen pt-8 md:pt-16 pb-24 md:pb-8">
       <div className="w-full max-w-2xl mx-auto px-4">
         <div className="space-y-2 mb-8">
-          <h1 className="text-2xl font-light text-neutral-200">Kit</h1>
-          <p className="text-muted text-sm">Configure your system preferences</p>
+          <h1 className="text-2xl font-light text-[var(--stage-text-primary)]">Kit</h1>
+          <p className="text-[var(--stage-text-secondary)] text-sm">Configure your system preferences</p>
         </div>
 
         <div className="space-y-0">

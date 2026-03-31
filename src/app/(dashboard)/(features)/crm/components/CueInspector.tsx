@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useOptimistic, startTransition } from 'react';
 import { Clock, Mic, Sun, Video, Truck, Copy, Trash2, MousePointerClick } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
 import type { Cue, CueType, AssignedCrewEntry } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
 
@@ -68,7 +68,7 @@ export function CueInspector({
 
   const handleDelete = async () => {
     if (!selectedCue) return;
-    if (!window.confirm('Nix this cue?')) return;
+    if (!window.confirm('This will permanently remove the cue.')) return;
     await onDelete();
   };
 
@@ -100,25 +100,25 @@ export function CueInspector({
 
   if (!selectedCue) {
     return (
-      <LiquidPanel className="h-full flex items-center justify-center">
+      <StagePanel className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <MousePointerClick size={24} className="text-ink-muted/70" />
-          <p className="text-sm text-ink-muted">Select a cue to edit</p>
+          <MousePointerClick size={24} className="text-[var(--stage-text-secondary)]/70" />
+          <p className="text-sm text-[var(--stage-text-secondary)]">Select a cue to edit</p>
         </div>
-      </LiquidPanel>
+      </StagePanel>
     );
   }
 
   return (
-    <LiquidPanel className="h-full flex flex-col gap-6">
+    <StagePanel className="h-full flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-xs font-medium uppercase tracking-wider text-ink-muted">Cue Inspector</h3>
-          <p className="text-xs text-ink-muted mt-1">Adjust timing, type, and notes.</p>
+          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Cue Inspector</h3>
+          <p className="text-xs text-[var(--stage-text-secondary)] mt-1">Adjust timing, type, and notes.</p>
         </div>
         <div className="text-right">
-          <p className="text-xs font-medium uppercase tracking-wider text-ink-muted">Starts at</p>
-          <div className="font-mono text-4xl font-light text-ink tracking-tight">
+          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Starts at</p>
+          <div className="font-mono text-4xl font-medium text-[var(--stage-text-primary)] tracking-tight">
             {computedStartTime ?? '--:--'}
           </div>
         </div>
@@ -126,33 +126,33 @@ export function CueInspector({
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-ink-muted uppercase tracking-wider">Title</label>
+          <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Title</label>
           <input
             value={(formState.title as string) ?? ''}
             onChange={(event) => updateField('title', event.target.value)}
-            className="w-full bg-[var(--glass-bg)] rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-all border border-[var(--glass-border)]"
+            className="w-full bg-[var(--ctx-well)] rounded-md px-4 py-3 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors border border-[oklch(1_0_0_/_0.08)]"
             placeholder="Cue title"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-ink-muted uppercase tracking-wider">Duration</label>
-            <div className="w-full bg-[var(--glass-bg)] rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus-within:ring-2 focus-within:ring-[var(--ring)] transition-all border border-[var(--glass-border)] flex items-center gap-2">
-              <Clock size={14} className="text-ink-muted" />
+            <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Duration</label>
+            <div className="w-full bg-[var(--ctx-well)] rounded-md px-4 py-3 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus-within:ring-2 focus-within:ring-[var(--stage-accent)] transition-colors border border-[oklch(1_0_0_/_0.08)] flex items-center gap-2">
+              <Clock size={14} className="text-[var(--stage-text-secondary)]" />
               <input
                 type="number"
                 min={1}
                 value={Number(formState.duration_minutes ?? 0)}
                 onChange={(event) => updateField('duration_minutes', Number(event.target.value))}
-                className="w-full bg-transparent border-none outline-none text-sm text-ink placeholder:text-ink-muted/50 focus:ring-0"
+                className="w-full bg-transparent border-none outline-none text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:ring-0"
               />
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-ink-muted uppercase tracking-wider">Type</label>
-            <div className="liquid-panel liquid-panel-nested !rounded-2xl !p-1 flex items-center gap-2">
+            <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Type</label>
+            <div className="stage-panel stage-panel-nested !rounded-2xl !p-1 flex items-center gap-2">
               {typeOptions.map((option) => {
                 const Icon = option.icon;
                 const isActive = (formState.type ?? selectedCue?.type) === option.value;
@@ -162,10 +162,10 @@ export function CueInspector({
                     type="button"
                     onClick={() => updateField('type', option.value)}
                     className={cn(
-                      'h-9 w-9 rounded-lg flex items-center justify-center transition-all',
+                      'h-9 w-9 rounded-lg flex items-center justify-center transition-colors',
                       isActive
-                        ? 'bg-ink text-[var(--background)]'
-                        : 'text-ink-muted hover:text-ink hover:bg-ink/5'
+                        ? 'bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)]'
+                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]'
                     )}
                     aria-label={option.label}
                   >
@@ -174,7 +174,7 @@ export function CueInspector({
                 );
               })}
             </div>
-            <div className="flex items-center gap-2 text-xs text-ink-muted uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs text-[var(--stage-text-secondary)] uppercase tracking-wider">
               <activeType.icon size={12} />
               {activeType.label}
             </div>
@@ -182,9 +182,9 @@ export function CueInspector({
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-ink-muted uppercase tracking-wider">Crew</label>
+          <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Crew</label>
           {!eventCrew || eventCrew.length === 0 ? (
-            <p className="text-xs text-ink-muted">No crew assigned to this event yet</p>
+            <p className="text-xs text-[var(--stage-text-secondary)]">No crew assigned to this event yet</p>
           ) : (
             <div className="flex flex-col gap-1">
               {eventCrew.map((entry) => {
@@ -197,29 +197,29 @@ export function CueInspector({
                     type="button"
                     onClick={() => handleCrewToggle(entry)}
                     className={cn(
-                      'w-full flex items-center gap-3 px-3 py-2 rounded-xl border transition-all text-left',
+                      'w-full flex items-center gap-3 px-3 py-2 rounded-xl border transition-colors text-left',
                       isChecked
-                        ? 'bg-blue-500/10 border-blue-500/30'
-                        : 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:border-[var(--glass-border-hover)]'
+                        ? 'bg-[var(--color-unusonic-info)]/10 border-[var(--color-unusonic-info)]/30'
+                        : 'bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.08)] hover:border-[oklch(1_0_0_/_0.12)]'
                     )}
                   >
                     <div
                       className={cn(
                         'w-4 h-4 rounded flex items-center justify-center border shrink-0',
                         isChecked
-                          ? 'bg-blue-500 border-blue-500'
-                          : 'border-[var(--glass-border)]'
+                          ? 'bg-[var(--color-unusonic-info)] border-[var(--color-unusonic-info)]'
+                          : 'border-[oklch(1_0_0_/_0.08)]'
                       )}
                     >
                       {isChecked && (
                         <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                          <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </div>
-                    <span className="flex-1 text-sm text-ink truncate">{entry.display_name}</span>
+                    <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{entry.display_name}</span>
                     {entry.role && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wider bg-blue-500/10 text-blue-400 shrink-0">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wider bg-[var(--color-unusonic-info)]/10 text-[var(--color-unusonic-info)] shrink-0">
                         {entry.role}
                       </span>
                     )}
@@ -231,13 +231,13 @@ export function CueInspector({
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-ink-muted uppercase tracking-wider">Notes</label>
+          <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Notes</label>
           <textarea
             value={(formState.notes as string) ?? ''}
             onChange={(event) => updateField('notes', event.target.value)}
             rows={6}
             className={cn(
-              "w-full bg-[var(--glass-bg)] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-all border border-[var(--glass-border)]",
+              "w-full bg-[var(--ctx-well)] rounded-md px-4 py-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors border border-[oklch(1_0_0_/_0.08)]",
               "resize-none outline-none min-h-[120px]"
             )}
             placeholder="Add cue notes..."
@@ -245,24 +245,24 @@ export function CueInspector({
         </div>
       </div>
 
-      <div className="mt-auto pt-2 border-t border-[var(--glass-border)] grid grid-cols-2 gap-3">
+      <div className="mt-auto pt-2 border-t border-[oklch(1_0_0_/_0.08)] grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={onDuplicate}
-          className="h-10 flex items-center justify-center gap-2 rounded-lg bg-ink/5 hover:bg-ink/10 text-xs font-medium text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[oklch(1_0_0_/_0.05)] hover:bg-[oklch(1_0_0_/_0.10)] text-xs font-medium text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
         >
           <Copy size={12} />
-          Duplicate
+          Duplicate cue
         </button>
         <button
           type="button"
           onClick={handleDelete}
-          className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[var(--color-surface-error)] hover:opacity-90 text-xs font-medium text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[var(--color-unusonic-error)]/10 hover:bg-[var(--color-unusonic-error)]/15 text-xs font-medium text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
         >
           <Trash2 size={12} />
-          Delete
+          Delete cue
         </button>
       </div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

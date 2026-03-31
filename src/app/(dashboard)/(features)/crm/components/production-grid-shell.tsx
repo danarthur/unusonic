@@ -12,6 +12,8 @@ import { cn } from '@/shared/lib/utils';
 
 /** Module-level cache so the list survives remounts (e.g. Next.js re-rendering the page segment). */
 let sharedGigsCache: StreamCardItem[] = [];
+let sharedGigsCacheTs = 0;
+const STALE_MS = 30_000; // consider cache stale after 30s
 
 function buildCrmSearch(stream: StreamMode, selectedId: string | null): string {
   const params = new URLSearchParams();
@@ -57,38 +59,46 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
     setCurrentStream(streamMode);
   }, [streamMode]);
 
+  // Use cached data for instant render on revisits, RSC props as fallback
   const [clientGigs, setClientGigs] = useState<StreamCardItem[]>(() => {
     if (sharedGigsCache.length > 0) return sharedGigsCache;
     return gigs;
   });
   useEffect(() => {
-    if (clientGigs.length > 0) sharedGigsCache = clientGigs;
+    if (clientGigs.length > 0) {
+      sharedGigsCache = clientGigs;
+      sharedGigsCacheTs = Date.now();
+    }
   }, [clientGigs]);
+
   // When RSC re-renders (e.g. after router.refresh()), sync the fresh gigs into client state.
-  // This is what makes newly created deals appear without a manual page reload.
   const prevGigsRef = useRef(gigs);
   useEffect(() => {
     if (gigs === prevGigsRef.current) return;
     prevGigsRef.current = gigs;
     sharedGigsCache = gigs;
+    sharedGigsCacheTs = Date.now();
     setClientGigs(gigs);
   }, [gigs]);
+
+  // Background refresh: if cache is stale or we mounted with empty data,
+  // fetch fresh in the background so the list stays current without blocking render.
   const hasFetchedRef = useRef(false);
   useEffect(() => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
+    const isStale = Date.now() - sharedGigsCacheTs > STALE_MS;
+    const isEmpty = sharedGigsCache.length === 0 && gigs.length === 0;
+    if (!isStale && !isEmpty) return; // fresh data from RSC or cache, skip
     let cancelled = false;
     getCrmGigs().then((fetched) => {
       if (cancelled) return;
-      // Always write the result — an empty array means "no data", not "query failed".
-      // The old `fetched.length > 0` guard caused stale cache to persist silently.
       sharedGigsCache = fetched;
+      sharedGigsCacheTs = Date.now();
       setClientGigs(fetched);
     });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => { cancelled = true; };
+  }, [gigs]);
   const [optimisticGigs, addOptimisticGig] = useOptimistic(clientGigs, gigsReducer);
   useEffect(() => {
     if (optimisticGigs.length > 0) sharedGigsCache = optimisticGigs;
@@ -125,11 +135,11 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-[80vh] md:min-h-0 relative bg-transparent">
+    <div className="flex flex-col md:flex-row h-full min-h-[80vh] md:min-h-0 relative" style={{ background: 'var(--stage-void)' }}>
       {/* Left: Stream. On mobile hidden when item selected; on desktop always visible. */}
       <aside
         className={cn(
-          'flex flex-col shrink-0 border-r border-white/10 w-full md:w-[380px] md:min-w-[320px] max-w-[420px]',
+          'flex flex-col shrink-0 border-r border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] w-full md:w-[380px] md:min-w-[320px] max-w-[420px]',
           selectedId && 'hidden md:flex'
         )}
       >
@@ -154,8 +164,8 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
         {selectedId ? (
           <Suspense
             fallback={
-              <div className="flex flex-col items-center justify-center flex-1 min-h-[200px] gap-3 text-ink-muted text-sm">
-                <div className="h-8 w-8 rounded-xl bg-white/5 border border-white/10 animate-pulse" aria-hidden />
+              <div className="flex flex-col items-center justify-center flex-1 min-h-[200px] gap-3 text-[var(--stage-text-secondary)] text-sm">
+                <div className="h-8 w-8 stage-skeleton" style={{ background: 'var(--stage-surface)', borderRadius: 'var(--stage-radius-nested, 8px)' }} aria-hidden />
                 <p>Loading…</p>
               </div>
             }
@@ -170,7 +180,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
           </Suspense>
         ) : (
           <div className="bento-center flex-1 p-8 text-center">
-            <p className="text-ink-muted leading-relaxed text-sm max-w-sm">
+            <p className="text-[var(--stage-text-secondary)] leading-relaxed text-sm max-w-sm">
               Select a production from the stream.
             </p>
           </div>

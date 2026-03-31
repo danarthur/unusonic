@@ -32,11 +32,11 @@ export function CurrencyInput({
   return (
     <div
       className={cn(
-        'flex items-center rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 overflow-hidden focus-within:ring-2 focus-within:ring-[var(--ring)] focus-within:border-transparent',
+        'flex items-center rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] overflow-hidden hover:border-[var(--stage-border-hover)] focus-within:border-[var(--stage-accent)] focus-within:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out',
         className
       )}
     >
-      <span className="pl-4 text-sm text-ink-muted tabular-nums shrink-0" aria-hidden>
+      <span className="pl-4 text-sm text-[var(--stage-text-secondary)] tabular-nums shrink-0" aria-hidden>
         $
       </span>
       <input
@@ -51,7 +51,7 @@ export function CurrencyInput({
         disabled={disabled}
         id={id}
         className={cn(
-          'w-full min-w-0 py-2.5 pr-4 text-ceramic text-sm bg-transparent border-0 focus:outline-none focus:ring-0 tabular-nums text-right placeholder:text-ink-muted [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+          'w-full min-w-0 py-2.5 pr-4 text-[var(--stage-text-primary)] text-sm bg-transparent border-0 focus:outline-none focus:ring-0 tabular-nums text-right placeholder:text-[var(--stage-text-secondary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
           inputClassName
         )}
         {...props}

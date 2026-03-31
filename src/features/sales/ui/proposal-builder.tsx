@@ -1,18 +1,51 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useTransition } from 'react';
-import { motion } from 'framer-motion';
-import { Plus, Minus, X, FileText, Send, Mail, BookMarked, Calculator, Trash2, PackageOpen } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Minus, X, FileText, Send, Mail, BookMarked, Trash2, PackageOpen } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetBody } from '@/shared/ui/sheet';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { upsertProposal, publishProposal, sendForSignature, deleteProposalItemsByPackageInstanceId, unpackPackageInstance } from '../api/proposal-actions';
 import { createPackage } from '../api/package-actions';
 import { PackageSelectorPalette } from './package-selector-palette';
-import { MarginProgressBar } from './MarginProgressBar';
 import type { ProposalWithItems, ProposalBuilderLineItem, ProposalLineItemCategory, UnitType } from '../model/types';
 import { CurrencyInput } from '@/shared/ui/currency-input';
 import { cn } from '@/shared/lib/utils';
+import { ProposalLineInspector } from './proposal-line-inspector';
+import { ProposalProductionTeam } from './proposal-production-team';
+import { getCurrentOrgId } from '@/features/network/api/actions';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import type { ProposalLineItemInput } from '../api/proposal-actions';
+
+/** Map a UI line item to the server action input shape. Single source of truth — no duplicates. */
+function toLineItemInput(item: ProposalBuilderLineItem): ProposalLineItemInput {
+  return {
+    packageId: item.packageId ?? null,
+    originPackageId: item.originPackageId ?? item.packageId ?? null,
+    packageInstanceId: item.packageInstanceId ?? null,
+    displayGroupName: item.displayGroupName ?? null,
+    isClientVisible: item.isClientVisible ?? true,
+    isPackageHeader: item.isPackageHeader ?? false,
+    originalBasePrice: item.originalBasePrice ?? null,
+    unitType: item.unitType ?? 'flat',
+    unitMultiplier: item.unitMultiplier ?? 1,
+    category: item.category ?? null,
+    name: item.name,
+    description: item.description ?? null,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    overridePrice: item.overridePrice ?? null,
+    actualCost: item.actualCost ?? null,
+    isOptional: item.isOptional ?? false,
+    requiredRoles: item.requiredRoles ?? null,
+    floorPrice: item.floorPrice ?? null,
+    isTaxable: item.isTaxable ?? null,
+    timeStart: item.timeStart ?? null,
+    timeEnd: item.timeEnd ?? null,
+    showTimesOnProposal: item.showTimesOnProposal ?? true,
+  };
+}
 
 /** Contact with email (from deal stakeholders) for "Send to" picker. */
 export type ProposalContact = { id: string; name: string; email: string };
@@ -55,6 +88,7 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
       display_group_name?: string | null;
       is_client_visible?: boolean | null;
       is_package_header?: boolean | null;
+      is_optional?: boolean | null;
       original_base_price?: number | null;
       unit_type?: string | null;
       unit_multiplier?: number | null;
@@ -65,6 +99,9 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
       name: string;
       description?: string | null;
       quantity: number;
+      time_start?: string | null;
+      time_end?: string | null;
+      show_times_on_proposal?: boolean | null;
       definition_snapshot?: {
         margin_meta?: { category?: string };
         price_meta?: { floor_price?: number | null };
@@ -75,7 +112,7 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
     const category = row.definition_snapshot?.margin_meta?.category as ProposalBuilderLineItem['category'] | undefined;
     const floorPrice = row.definition_snapshot?.price_meta?.floor_price ?? null;
     const isTaxable = row.definition_snapshot?.tax_meta?.is_taxable ?? null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const requiredRoles = (row.definition_snapshot?.crew_meta?.required_roles as any[] | null | undefined) ?? null;
     const unitType = (row.unit_type === 'hour' || row.unit_type === 'day' ? row.unit_type : 'flat') as ProposalBuilderLineItem['unitType'];
     return {
@@ -86,6 +123,7 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
       displayGroupName: row.display_group_name ?? null,
       isClientVisible: row.is_client_visible ?? true,
       isPackageHeader: row.is_package_header ?? false,
+      isOptional: row.is_optional ?? false,
       originalBasePrice: row.original_base_price != null && Number.isFinite(Number(row.original_base_price)) ? Number(row.original_base_price) : null,
       unitType: unitType ?? 'flat',
       unitMultiplier: row.unit_multiplier != null && Number.isFinite(Number(row.unit_multiplier)) ? Number(row.unit_multiplier) : 1,
@@ -100,6 +138,9 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
       isTaxable: isTaxable,
       internalNotes: row.internal_notes ?? null,
       requiredRoles: requiredRoles,
+      timeStart: row.time_start ?? null,
+      timeEnd: row.time_end ?? null,
+      showTimesOnProposal: row.show_times_on_proposal ?? true,
     };
   });
 }
@@ -161,14 +202,29 @@ export function ProposalBuilder({
   const [paletteOpen, setPaletteOpen] = useState(false);
   /** When true, actual_cost is editable for Rental/Retail (sub-rental or custom order). */
   const [subRentalCostUnlocked, setSubRentalCostUnlocked] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sourceOrgId, setSourceOrgId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
   // Sync line items when parent refetches proposal (e.g. after drop from catalog or "Apply to proposal" in palette).
   useEffect(() => {
     setLineItems(mapProposalItemsToLineItems(initialProposal));
     setProposalId(initialProposal?.id ?? null);
   }, [initialProposal]);
 
+  // Fetch workspace org id for crew search in production team card
+  useEffect(() => {
+    getCurrentOrgId().then((id) => setSourceOrgId(id));
+  }, []);
+
+
+  // Mobile breakpoint detection for sheet inspector
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const handler = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Clear "Draft saved" message after 3s
   useEffect(() => {
@@ -202,6 +258,9 @@ export function ProposalBuilder({
         originalBasePrice: null,
         unitType: 'flat' as UnitType,
         unitMultiplier: 1,
+        timeStart: null,
+        timeEnd: null,
+        showTimesOnProposal: true,
       },
     ]);
   }, []);
@@ -239,24 +298,7 @@ export function ProposalBuilder({
         return prev > index ? prev - 1 : prev;
       });
       // Persist delete to server after commit (avoid "Cannot call startTransition while rendering")
-      const input = next.map((item) => ({
-        packageId: item.packageId ?? null,
-        originPackageId: item.originPackageId ?? item.packageId ?? null,
-        packageInstanceId: item.packageInstanceId ?? null,
-        displayGroupName: item.displayGroupName ?? null,
-        isClientVisible: item.isClientVisible ?? true,
-        isPackageHeader: item.isPackageHeader ?? false,
-        originalBasePrice: item.originalBasePrice ?? null,
-        unitType: item.unitType ?? 'flat',
-        unitMultiplier: item.unitMultiplier ?? 1,
-        category: item.category ?? null,
-        name: item.name,
-        description: item.description ?? null,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        overridePrice: item.overridePrice ?? null,
-        actualCost: item.actualCost ?? null,
-      }));
+      const input = next.map(toLineItemInput);
       setTimeout(() => {
         startTransition(async () => {
           const result = await upsertProposal(dealId, input);
@@ -320,27 +362,45 @@ export function ProposalBuilder({
     );
   }, []);
 
+  const handleToggleOptional = useCallback((index: number) => {
+    setLineItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, isOptional: !item.isOptional } : item))
+    );
+  }, []);
+
+  const updateRoleAssignment = useCallback((lineIdx: number, roleIdx: number, entityId: string | null, name: string | null) => {
+    setLineItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== lineIdx || !item.requiredRoles) return item;
+        const roles = [...item.requiredRoles];
+        roles[roleIdx] = { ...roles[roleIdx], entity_id: entityId, assignee_name: name };
+        return { ...item, requiredRoles: roles };
+      })
+    );
+  }, []);
+
+  const updateTimeStart = useCallback((index: number, value: string | null) => {
+    setLineItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, timeStart: value } : item))
+    );
+  }, []);
+
+  const updateTimeEnd = useCallback((index: number, value: string | null) => {
+    setLineItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, timeEnd: value } : item))
+    );
+  }, []);
+
+  const updateShowTimesOnProposal = useCallback((index: number, value: boolean) => {
+    setLineItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, showTimesOnProposal: value } : item))
+    );
+  }, []);
+
   const handleSaveDraft = useCallback(() => {
     setSaving(true);
     startTransition(async () => {
-      const input = lineItems.map((item) => ({
-        packageId: item.packageId ?? null,
-        originPackageId: item.originPackageId ?? item.packageId ?? null,
-        packageInstanceId: item.packageInstanceId ?? null,
-        displayGroupName: item.displayGroupName ?? null,
-        isClientVisible: item.isClientVisible ?? true,
-        isPackageHeader: item.isPackageHeader ?? false,
-        originalBasePrice: item.originalBasePrice ?? null,
-        unitType: item.unitType ?? 'flat',
-        unitMultiplier: item.unitMultiplier ?? 1,
-        category: item.category ?? null,
-        name: item.name,
-        description: item.description ?? null,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        overridePrice: item.overridePrice ?? null,
-        actualCost: item.actualCost ?? null,
-      }));
+      const input = lineItems.map(toLineItemInput);
       const result = await upsertProposal(dealId, input);
       setSaving(false);
       if (result.proposalId) {
@@ -357,24 +417,7 @@ export function ProposalBuilder({
     setSending(true);
     startTransition(async () => {
       try {
-        const input = lineItems.map((item) => ({
-          packageId: item.packageId ?? null,
-          originPackageId: item.originPackageId ?? item.packageId ?? null,
-          packageInstanceId: item.packageInstanceId ?? null,
-          displayGroupName: item.displayGroupName ?? null,
-          isClientVisible: item.isClientVisible ?? true,
-          isPackageHeader: item.isPackageHeader ?? false,
-          originalBasePrice: item.originalBasePrice ?? null,
-          unitType: item.unitType ?? 'flat',
-          unitMultiplier: item.unitMultiplier ?? 1,
-          category: item.category ?? null,
-          name: item.name,
-          description: item.description ?? null,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          overridePrice: item.overridePrice ?? null,
-          actualCost: item.actualCost ?? null,
-        }));
+        const input = lineItems.map(toLineItemInput);
 
         const upsert = await upsertProposal(dealId, input);
         if (!upsert.proposalId) {
@@ -430,7 +473,7 @@ export function ProposalBuilder({
       if (result.error) {
         setSaveToCatalogMessage(result.error);
       } else {
-        setSaveToCatalogMessage('Saved to Catalog. You can add it to other proposals from Add from Catalog.');
+        setSaveToCatalogMessage('Saved to catalog');
       }
     });
   }, [workspaceId, lineItems]);
@@ -438,21 +481,21 @@ export function ProposalBuilder({
   if (readOnly) {
     return (
       <div className={cn('flex flex-col gap-4', className)}>
-        <LiquidPanel className="p-6 rounded-[28px] border border-white/10">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-4">
+        <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)]">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
             Proposal (locked)
           </h2>
           {lineItems.length === 0 ? (
-            <p className="text-sm text-ink-muted">No line items.</p>
+            <p className="text-sm text-[var(--stage-text-secondary)]">No line items.</p>
           ) : (
             <ul className="space-y-2">
               {lineItems.map((item, i) => (
                 <li
                   key={item.id ?? i}
-                  className="flex items-center justify-between gap-4 py-2 border-b border-white/10 last:border-0 text-sm"
+                  className="flex items-center justify-between gap-4 py-2 border-b border-[var(--stage-edge-subtle)] last:border-0 text-sm"
                 >
-                  <span className="text-ink truncate">{item.name}</span>
-                  <span className="text-ink-muted tabular-nums shrink-0">
+                  <span className="text-[var(--stage-text-primary)] truncate">{item.name}</span>
+                  <span className="text-[var(--stage-text-secondary)] tabular-nums shrink-0">
                     {item.quantity} × ${effectiveUnitPrice(item).toLocaleString()} = $
                     {(item.quantity * effectiveUnitPrice(item)).toLocaleString()}
                   </span>
@@ -460,28 +503,28 @@ export function ProposalBuilder({
               ))}
             </ul>
           )}
-          <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-white/10">
-            <span className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Total</span>
-            <span className="text-xl font-semibold text-ink tabular-nums">${total.toLocaleString()}</span>
+          <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-[var(--stage-edge-subtle)]">
+            <span className="text-sm font-medium uppercase tracking-wide text-[var(--stage-text-secondary)]">Total</span>
+            <span className="text-xl font-semibold text-[var(--stage-text-primary)] tabular-nums">${total.toLocaleString()}</span>
           </div>
-        </LiquidPanel>
+        </StagePanel>
       </div>
     );
   }
 
   const hasVariableUnits = lineItems.some((i) => i.unitType === 'hour' || i.unitType === 'day');
   const receiptRowClass = hasVariableUnits
-    ? 'grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 items-center py-3 px-4 rounded-xl bg-white/[0.03] border border-white/10 min-w-0'
-    : 'grid grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 items-center py-3 px-4 rounded-xl bg-white/[0.03] border border-white/10 min-w-0';
+    ? 'grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 items-center py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] min-w-0 transition-colors duration-[80ms] ease-out'
+    : 'grid grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 items-center py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] min-w-0 transition-colors duration-[80ms] ease-out';
   const receiptHeaderClass = hasVariableUnits
-    ? 'grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 items-center py-2 px-4 mb-3 text-xs font-semibold uppercase tracking-widest text-ink-muted border-b border-white/10'
-    : 'grid grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 items-center py-2 px-4 mb-3 text-xs font-semibold uppercase tracking-widest text-ink-muted border-b border-white/10';
+    ? 'grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 items-center py-2 px-4 mb-3 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] border-b border-[var(--stage-edge-subtle)]'
+    : 'grid grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 items-center py-2 px-4 mb-3 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] border-b border-[var(--stage-edge-subtle)]';
   const qtyStepperClass =
-    'flex flex-col items-center shrink-0 w-10 rounded-lg border border-white/10 bg-white/[0.04]';
+    'flex flex-col items-center shrink-0 w-10 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-transparent';
   const qtyBtnClass =
-    'p-1 w-full flex items-center justify-center text-ink-muted hover:text-ink hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-inset';
+    'p-1 w-full flex items-center justify-center text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] disabled:opacity-40 disabled:pointer-events-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset';
   const qtyInputClass =
-    'w-full py-0.5 px-0 text-center text-sm font-medium tabular-nums bg-transparent border-0 text-ink focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
+    'w-full py-0.5 px-0 text-center text-sm font-medium tabular-nums bg-transparent border-0 text-[var(--stage-text-primary)] focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
   const renderReceiptRow = (index: number, showIncludedWhenZero: boolean) => {
     const item = lineItems[index];
@@ -490,11 +533,11 @@ export function ProposalBuilder({
       <motion.li
         key={item.id ?? `row-${index}`}
         layout
-        transition={spring}
+        transition={STAGE_MEDIUM}
         className={cn(
           receiptRowClass,
           'cursor-pointer transition-colors',
-          selectedLineIndex === index && 'ring-2 ring-[var(--color-neon-amber)]/40 ring-offset-2 ring-offset-obsidian'
+          selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
         )}
         onClick={() => {
           const next = selectedLineIndex === index ? null : index;
@@ -502,24 +545,37 @@ export function ProposalBuilder({
           setSubRentalCostUnlocked(false);
         }}
       >
-        <div className="min-w-0 pr-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-          <p className="font-medium text-ink truncate text-sm leading-snug">
+        <div className="min-w-0 pr-2 overflow-hidden">
+          <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm leading-snug">
             {item.name || 'Custom item'}
           </p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <select
               value={item.unitType ?? 'flat'}
+              onClick={(e) => e.stopPropagation()}
               onChange={(e) => updateUnitType(index, e.target.value as UnitType)}
-              className="text-xs bg-white/[0.06] border border-white/10 rounded-md px-1.5 py-0.5 text-ink-muted focus:outline-none focus:ring-1 focus:ring-[var(--ring)]"
+              className="text-xs bg-[var(--stage-surface-elevated)] border border-[var(--stage-edge-subtle)] rounded-[var(--stage-radius-input)] px-1.5 py-0.5 text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
               aria-label="Billing unit type"
             >
               <option value="flat">Flat</option>
               <option value="hour">Hourly</option>
               <option value="day">Daily</option>
             </select>
-            <span className="text-xs text-ink-muted tabular-nums">
+            <span className="text-xs text-[var(--stage-text-secondary)] tabular-nums">
               {isIncluded ? 'Included' : `$${effectiveUnitPrice(item).toLocaleString()}${item.unitType === 'hour' ? '/hr' : item.unitType === 'day' ? '/day' : ' each'}`}
             </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleToggleOptional(index); }}
+              className={cn(
+                'text-xs px-2 py-1 rounded-[var(--stage-radius-input)] border transition-colors',
+                item.isOptional
+                  ? 'border-[var(--color-unusonic-info)]/50 text-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/10'
+                  : 'border-[var(--stage-border)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
+              )}
+            >
+              {item.isOptional ? 'Optional' : 'Required'}
+            </button>
           </div>
         </div>
         <div className={qtyStepperClass} onClick={(e) => e.stopPropagation()}>
@@ -564,15 +620,15 @@ export function ProposalBuilder({
                 step={0.25}
                 value={item.unitMultiplier ?? 1}
                 onChange={(e) => updateUnitMultiplier(index, e.target.valueAsNumber)}
-                className="w-full text-center text-sm font-medium tabular-nums bg-white/[0.04] border border-white/10 rounded-lg py-1 px-1 text-ink [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full text-center text-sm font-medium tabular-nums bg-[var(--ctx-well)] border border-[var(--stage-border)] rounded-[var(--stage-radius-input)] py-1 px-1 text-[var(--stage-text-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 aria-label={item.unitType === 'hour' ? 'Hours' : 'Days'}
               />
             ) : (
-              <span className="text-xs text-ink-muted">—</span>
+              <span className="text-xs text-[var(--stage-text-secondary)]">—</span>
             )}
           </div>
         )}
-        <span className="text-sm font-semibold text-ink tabular-nums w-14 shrink-0 text-right">
+        <span className="text-sm font-medium text-[var(--stage-text-primary)] tabular-nums w-14 shrink-0 text-right">
           {isIncluded ? 'Included' : `$${lineTotal(item).toLocaleString()}`}
         </span>
         <button
@@ -582,7 +638,7 @@ export function ProposalBuilder({
             removeItem(index);
             if (selectedLineIndex === index) setSelectedLineIndex(null);
           }}
-          className="p-1.5 rounded-lg text-ink-muted hover:text-rose-400 hover:bg-rose-500/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] w-9 h-9 flex items-center justify-center shrink-0"
+          className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] w-9 h-9 flex items-center justify-center shrink-0"
           aria-label={`Remove ${item.name || 'item'}`}
         >
           <X className="w-4 h-4" />
@@ -602,14 +658,14 @@ export function ProposalBuilder({
           <span className="w-9 shrink-0" aria-hidden />
         </div>
       )}
-      <ul className="space-y-3 mt-1">
+      <ul className="space-y-3 mt-1 pb-1 mx-px">
         {lineItems.length === 0 ? (
           <li
             className={cn(
-              'text-sm text-ink-muted py-12 px-6 text-center rounded-2xl border-2 border-dashed min-h-[160px] flex flex-col items-center justify-center gap-2 transition-colors duration-150',
+              'text-sm text-[var(--stage-text-secondary)] py-12 px-6 text-center rounded-[var(--stage-radius-panel)] border-2 border-dashed min-h-[160px] flex flex-col items-center justify-center gap-2 transition-colors duration-150',
               isDragOver
-                ? 'border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10'
-                : 'border-white/15 bg-white/[0.02]'
+                ? 'border-[var(--color-unusonic-warning)]/50 bg-[var(--color-unusonic-warning)]/10'
+                : 'border-[var(--stage-border-hover)] bg-[var(--ctx-well)]'
             )}
           >
             <span>{emptyDropHint ?? 'Add items from the catalog or create a custom line item.'}</span>
@@ -634,12 +690,12 @@ export function ProposalBuilder({
                       return (
                         <motion.div
                           layout
-                          transition={spring}
+                          transition={STAGE_MEDIUM}
                           role="row"
                           className={cn(
                             receiptRowClass,
                             'cursor-pointer transition-colors',
-                            selectedLineIndex === index && 'ring-2 ring-[var(--color-neon-amber)]/40 ring-offset-2 ring-offset-obsidian'
+                            selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
                           )}
                           onClick={() => {
                             setSelectedLineIndex(selectedLineIndex === index ? null : index);
@@ -647,24 +703,24 @@ export function ProposalBuilder({
                           }}
                         >
                           <div className="min-w-0 pr-2 overflow-hidden">
-                            <p className="font-semibold text-ceramic truncate text-sm leading-snug">
+                            <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm leading-snug">
                               {item.name || 'Package'}
                             </p>
-                            <p className="text-xs text-ink-muted mt-0.5">Bundle price</p>
+                            <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">Bundle price</p>
                           </div>
                           <div className={qtyStepperClass} onClick={(e) => e.stopPropagation()}>
-                            <span className="text-sm font-medium text-ink-muted py-2">1</span>
+                            <span className="text-sm font-medium text-[var(--stage-text-secondary)] py-2">1</span>
                           </div>
                           {hasVariableUnits && (
                             <div className="w-12 shrink-0 flex justify-center">
-                              <span className="text-xs text-ink-muted">—</span>
+                              <span className="text-xs text-[var(--stage-text-secondary)]">—</span>
                             </div>
                           )}
                           <div className="w-14 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
                             <CurrencyInput
                               value={String(effectiveUnitPrice(item))}
                               onChange={(v) => updateLineItemUnitPrice(index, Number(v) || 0)}
-                              className="text-sm font-semibold text-ink text-right w-full min-w-0 rounded-lg border border-white/10 bg-white/[0.04] px-1.5 py-1"
+                              className="text-sm font-medium text-[var(--stage-text-primary)] text-right w-full min-w-0 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-1.5 py-1"
                             />
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
@@ -674,7 +730,7 @@ export function ProposalBuilder({
                                 e.stopPropagation();
                                 handleUnpack(group.packageInstanceId!);
                               }}
-                              className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/[0.06] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                              className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                               title="Unpack to line items: break the package into individual items at their standard catalog price."
                               aria-label="Unpack to line items"
                             >
@@ -687,7 +743,7 @@ export function ProposalBuilder({
                                 removeGroup(group.packageInstanceId!);
                                 if (selectedLineIndex === index) setSelectedLineIndex(null);
                               }}
-                              className="p-1.5 rounded-lg text-ink-muted hover:text-rose-400 hover:bg-rose-500/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                              className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                               aria-label={`Remove ${item.name || 'package'}`}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -697,21 +753,21 @@ export function ProposalBuilder({
                       );
                     })()}
                     {/* Child rows: indented, show "Included" when $0 */}
-                    <ul className="pl-5 ml-1 border-l-2 border-white/10 space-y-3 list-none p-0 m-0">
+                    <ul className="pl-5 ml-1 border-l-2 border-[var(--stage-border)] space-y-3 list-none p-0 m-0">
                       {childIndices.map((index) => renderReceiptRow(index, true))}
                     </ul>
                   </>
                 ) : (
                   <>
                     {group.displayGroupName && group.packageInstanceId && (
-                      <div className="flex items-center justify-between gap-2 py-1.5 px-4 rounded-xl bg-white/[0.04] border border-white/10">
-                        <span className="text-sm font-medium text-ceramic truncate">
+                      <div className="flex items-center justify-between gap-2 py-1.5 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)]">
+                        <span className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
                           {group.displayGroupName}
                         </span>
                         <button
                           type="button"
                           onClick={() => removeGroup(group.packageInstanceId!)}
-                          className="p-1.5 rounded-lg text-ink-muted hover:text-rose-400 hover:bg-rose-500/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] shrink-0"
+                          className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] shrink-0"
                           aria-label={`Remove ${group.displayGroupName}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -721,7 +777,7 @@ export function ProposalBuilder({
                     <ul
                       className={cn(
                         'space-y-3 list-none p-0 m-0',
-                        group.displayGroupName && group.packageInstanceId && 'pl-5 ml-1 border-l-2 border-white/10'
+                        group.displayGroupName && group.packageInstanceId && 'pl-5 ml-1 border-l-2 border-[var(--stage-border)]'
                       )}
                     >
                       {group.indices.map((index) => renderReceiptRow(index, false))}
@@ -742,33 +798,15 @@ export function ProposalBuilder({
   const costRentalRetail = inspectorCategory === 'rental' || inspectorCategory === 'retail_sale';
   const costEditable = costFullyEditable || (costRentalRetail && subRentalCostUnlocked) || inspectorCategory == null;
   const costHidden = inspectorCategory === 'package' || inspectorCategory === 'fee';
-  const inspectorOverridePrice = selectedItem
-    ? (selectedItem.overridePrice != null && Number.isFinite(selectedItem.overridePrice)
-        ? selectedItem.overridePrice
-        : selectedItem.unitPrice)
-    : 0;
-  const inspectorActualCost =
-    selectedItem?.actualCost != null && Number.isFinite(selectedItem.actualCost)
-      ? selectedItem.actualCost
-      : 0;
-  const inspectorMarginPercent =
-    inspectorOverridePrice > 0
-      ? ((inspectorOverridePrice - inspectorActualCost) / inspectorOverridePrice) * 100
-      : 0;
 
   return (
     <div className={cn('flex flex-col gap-4', className)} style={{ overflow: 'visible' }}>
-      <div
-        className={cn(
-          'grid gap-6 min-h-0 flex-1 w-full grid-rows-[minmax(0,1fr)]',
-          selectedLineIndex != null ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
-        )}
-      >
-        {/* Receipt: card has max-height; inner div scrolls (liquid-card uses overflow-hidden so we need a separate scroll container) */}
-        <div className="min-w-0 flex flex-col min-h-0 flex-1">
-          <div className="liquid-card flex flex-col min-h-0 max-h-[calc(100vh-7rem)] overflow-hidden rounded-[28px] border border-white/10">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 sm:p-8">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-5">
+      <div className="grid gap-6 flex-1 w-full grid-cols-1 lg:grid-cols-[1fr_minmax(280px,340px)]">
+        {/* Left: Receipt */}
+        <div className="min-w-0 flex flex-col">
+          <div data-surface="elevated" className="flex flex-col min-h-0 max-h-[calc(100vh-7rem)] overflow-hidden rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-8">
+              <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-5">
                 Receipt
               </h2>
               <div className="min-w-0">
@@ -776,7 +814,7 @@ export function ProposalBuilder({
               </div>
 
             {/* + Add from Catalog — opens palette */}
-            <div className="shrink-0 pt-4 mt-2 border-t border-white/10">
+            <div className="shrink-0 pt-4 mt-2 border-t border-[var(--stage-edge-subtle)]">
               {workspaceId && dealId && (
                 <PackageSelectorPalette
                   workspaceId={workspaceId}
@@ -788,7 +826,7 @@ export function ProposalBuilder({
                   trigger={
                     <button
                       type="button"
-                      className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-dashed border-white/15 text-ink-muted hover:text-ink hover:border-white/25 hover:bg-white/[0.04] text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                      className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[var(--stage-border-hover)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] hover:bg-[var(--ctx-well)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-void)]"
                     >
                       <Plus className="w-4 h-4" aria-hidden />
                       Add from catalog
@@ -799,8 +837,8 @@ export function ProposalBuilder({
             </div>
 
             {/* Send for signature — always visible, replaces old "Send to" + signing prompt */}
-            <div className="shrink-0 pt-4 mt-2 border-t border-white/10 space-y-3">
-              <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+            <div className="shrink-0 pt-4 mt-2 border-t border-[var(--stage-edge-subtle)] space-y-3">
+              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
                 Send for signature
               </p>
 
@@ -823,10 +861,10 @@ export function ProposalBuilder({
                       }
                     }}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                      'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                       selectedSignerContactId === c.id
-                        ? 'border-[var(--color-neon-amber)]/60 bg-[var(--color-neon-amber)]/10 text-ceramic'
-                        : 'border-white/10 hover:bg-white/5 text-ink-muted'
+                        ? 'border-[var(--stage-accent)]/60 bg-[var(--stage-accent)]/10 text-[var(--stage-text-primary)]'
+                        : 'border-[var(--stage-border)] hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
                     )}
                   >
                     <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden />
@@ -845,10 +883,10 @@ export function ProposalBuilder({
                     }
                   }}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                    'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                     showCustomEmailForm
-                      ? 'border-white/20 bg-white/[0.06] text-ceramic'
-                      : 'border-white/10 hover:bg-white/5 text-ink-muted'
+                      ? 'border-[var(--stage-border-focus)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)]'
+                      : 'border-[var(--stage-border)] hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
                   )}
                 >
                   <Plus className="w-3.5 h-3.5 shrink-0" aria-hidden />
@@ -864,14 +902,14 @@ export function ProposalBuilder({
                     value={signingName}
                     onChange={(e) => { setSelectedSignerContactId(null); setSigningName(e.target.value); }}
                     placeholder="Name"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                    className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
                   />
                   <input
                     type="email"
                     value={signingEmail}
                     onChange={(e) => { setSelectedSignerContactId(null); setSigningEmail(e.target.value); }}
                     placeholder="Email"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                    className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
                   />
                 </div>
               )}
@@ -879,7 +917,7 @@ export function ProposalBuilder({
               {/* Send button */}
               <div className="flex items-center justify-between gap-3">
                 {!signingEmail.trim() && (
-                  <p className="text-xs text-ink-muted">
+                  <p className="text-xs text-[var(--stage-text-secondary)]">
                     {contacts.length > 0 ? 'Select a contact or add a custom email' : 'Enter an email to send'}
                   </p>
                 )}
@@ -887,7 +925,7 @@ export function ProposalBuilder({
                   type="button"
                   onClick={() => handleSendSubmit(signingEmail, signingName)}
                   disabled={!signingEmail.trim() || lineItems.length === 0 || sending || isPending || clientAttached === false}
-                  className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-ink text-obsidian font-medium text-sm hover:brightness-110 disabled:opacity-40 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                  className="ml-auto stage-btn stage-btn-primary inline-flex items-center gap-2"
                 >
                   <Send className="w-4 h-4" />
                   {sending ? 'Sending…' : 'Send for signature'}
@@ -899,12 +937,12 @@ export function ProposalBuilder({
             </div>
 
             {/* Total + actions */}
-            <div className="shrink-0 pt-6 mt-6 border-t border-white/10">
+            <div className="shrink-0 pt-6 mt-6 border-t border-[var(--stage-edge-subtle)]">
               <div className="flex items-center justify-between gap-4 mb-4">
-                <span className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
+                <span className="text-sm font-medium uppercase tracking-wide text-[var(--stage-text-secondary)]">
                   Total
                 </span>
-                <span className="text-xl font-semibold text-ink tabular-nums">
+                <span className="text-xl font-semibold text-[var(--stage-text-primary)] tabular-nums">
                   ${total.toLocaleString()}
                 </span>
               </div>
@@ -914,28 +952,28 @@ export function ProposalBuilder({
                     type="button"
                     onClick={handleSaveToCatalog}
                     disabled={lineItems.length === 0 || saveToCatalogPending}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-[var(--color-neon-amber)]/40 bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)] font-medium text-sm hover:brightness-110 hover:bg-[var(--color-neon-amber)]/15 disabled:opacity-50 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                    className="stage-btn stage-btn-secondary inline-flex items-center gap-2 disabled:opacity-45 disabled:pointer-events-none"
                   >
                     <BookMarked className="w-4 h-4" />
-                    {saveToCatalogPending ? 'Saving…' : 'Save to Catalog'}
+                    {saveToCatalogPending ? 'Saving…' : 'Save to catalog'}
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveDraft}
                     disabled={lineItems.length === 0 || saving || isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/10 bg-white/[0.04] text-ceramic font-medium text-sm hover:bg-white/[0.08] disabled:opacity-50 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+                    className="stage-btn stage-btn-secondary inline-flex items-center gap-2 disabled:opacity-45 disabled:pointer-events-none"
                   >
                     <FileText className="w-4 h-4" />
-                    Save Draft
+                    Save draft
                   </button>
                 </div>
                 {saveToCatalogMessage && (
-                  <p className="mt-2 text-sm text-ink-muted" role="status">
+                  <p className="mt-2 text-sm text-[var(--stage-text-secondary)]" role="status">
                     {saveToCatalogMessage}
                   </p>
                 )}
                 {showDraftSaved && (
-                  <p className="mt-2 text-sm text-[var(--color-neon)]" role="status">
+                  <p className="mt-2 text-sm text-[var(--stage-accent)]" role="status">
                     Draft saved
                   </p>
                 )}
@@ -946,100 +984,90 @@ export function ProposalBuilder({
                 )}
                 {sentUrl && (
                   <div className="mt-4 space-y-2">
-                    <p className="text-sm text-[var(--color-neon)]" role="status">
+                    <p className="text-sm text-[var(--stage-accent)]" role="status">
                       Sent to {signingName || signingEmail}.
                     </p>
                     <a
                       href={sentUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-ink-muted underline hover:text-ceramic"
+                      className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] underline hover:text-[var(--stage-text-primary)]"
                     >
                       View proposal link
                     </a>
                   </div>
                 )}
                 </div>
-              </div>
+
             </div>
           </div>
+        </div>
 
-        {/* Financial Inspector — when a line item is selected */}
-        {selectedLineIndex != null && selectedItem && (
-          <div className="min-w-0 flex flex-col overflow-visible">
-            <LiquidPanel className="flex flex-col p-6 min-h-[280px] flex-1 min-w-0 overflow-visible rounded-[28px] border border-white/10">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-4 shrink-0 flex items-center gap-2">
-                <Calculator className="w-4 h-4" />
-                Financial Inspector
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="inspector-line-name" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
-                    Line item name
-                  </label>
-                  <input
-                    id="inspector-line-name"
-                    type="text"
-                    value={selectedItem.name ?? ''}
-                    onChange={(e) => updateLineItemName(selectedLineIndex, e.target.value)}
-                    placeholder="e.g. Special confetti cannon"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-obsidian"
+        {/* Right: Sidebar — always visible on desktop, stacks below on mobile */}
+        <div className="min-w-0 flex flex-col gap-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:sticky lg:top-0 lg:self-start">
+          {/* Financial Inspector — slides in when a line item is selected */}
+          {!isMobile && (
+            <AnimatePresence>
+              {selectedLineIndex != null && selectedItem && (
+                <ProposalLineInspector
+                  item={selectedItem}
+                  lineIndex={selectedLineIndex}
+                  onUpdateName={updateLineItemName}
+                  onUpdateOverridePrice={updateLineItemOverridePrice}
+                  onUpdateActualCost={updateLineItemActualCost}
+                  onUpdateUnitPrice={updateLineItemUnitPrice}
+                  costEditable={costEditable}
+                  costHidden={costHidden}
+                  costRentalRetail={costRentalRetail}
+                  subRentalCostUnlocked={subRentalCostUnlocked}
+                  onToggleSubRental={setSubRentalCostUnlocked}
+                />
+              )}
+            </AnimatePresence>
+          )}
+
+          {/* Production team — always visible when roles exist */}
+          <ProposalProductionTeam
+            lineItems={lineItems}
+            sourceOrgId={sourceOrgId}
+            onUpdateRoleAssignment={updateRoleAssignment}
+            onUpdateTimeStart={updateTimeStart}
+            onUpdateTimeEnd={updateTimeEnd}
+            onUpdateShowTimes={updateShowTimesOnProposal}
+          />
+        </div>
+
+        {/* Mobile: sheet inspector */}
+        {isMobile && (
+          <Sheet
+            open={selectedLineIndex != null && selectedItem != null}
+            onOpenChange={(open) => { if (!open) setSelectedLineIndex(null); }}
+          >
+            <SheetContent side="right" className="w-[min(340px,85vw)]">
+              <SheetHeader>
+                <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                  Line item details
+                </span>
+              </SheetHeader>
+              <SheetBody>
+                {selectedItem && selectedLineIndex != null && (
+                  <ProposalLineInspector
+                    item={selectedItem}
+                    lineIndex={selectedLineIndex}
+                    onUpdateName={updateLineItemName}
+                    onUpdateOverridePrice={updateLineItemOverridePrice}
+                    onUpdateActualCost={updateLineItemActualCost}
+                    onUpdateUnitPrice={updateLineItemUnitPrice}
+                    costEditable={costEditable}
+                    costHidden={costHidden}
+                    costRentalRetail={costRentalRetail}
+                    subRentalCostUnlocked={subRentalCostUnlocked}
+                    onToggleSubRental={setSubRentalCostUnlocked}
                   />
-                </div>
-                <div>
-                  <label htmlFor="inspector-override-price" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
-                    Price (what client pays)
-                  </label>
-                  <CurrencyInput
-                    id="inspector-override-price"
-                    value={selectedItem.overridePrice != null ? String(selectedItem.overridePrice) : selectedItem.unitPrice != null ? String(selectedItem.unitPrice) : ''}
-                    onChange={(v) => {
-                      const n = v.trim() === '' ? null : Number(v);
-                      updateLineItemOverridePrice(selectedLineIndex, Number.isFinite(n) ? n : null);
-                    }}
-                    placeholder="0.00"
-                  />
-                </div>
-                {costHidden ? (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs text-ink-muted">
-                    {inspectorCategory === 'package'
-                      ? 'Cost is the sum of ingredients. Adjust costs inside the package.'
-                      : 'Cost is set by third party (e.g. processor, permit).'}
-                  </div>
-                ) : (
-                  <div>
-                    <label htmlFor="inspector-actual-cost" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
-                      Actual cost (what you pay)
-                    </label>
-                    <CurrencyInput
-                      id="inspector-actual-cost"
-                      value={inspectorActualCost != null ? String(inspectorActualCost) : ''}
-                      onChange={(v) => {
-                        if (!costEditable) return;
-                        const n = v.trim() === '' ? null : Number(v);
-                        updateLineItemActualCost(selectedLineIndex, Number.isFinite(n) ? n : null);
-                      }}
-                      placeholder="0.00"
-                      disabled={!costEditable}
-                      className={cn(!costEditable && 'opacity-80')}
-                    />
-                    {costRentalRetail && (
-                      <label className="mt-2 flex items-center gap-2 cursor-pointer text-xs text-ink-muted">
-                        <input
-                          type="checkbox"
-                          checked={subRentalCostUnlocked}
-                          onChange={(e) => setSubRentalCostUnlocked(e.target.checked)}
-                          className="rounded border-white/20 bg-white/[0.04] text-[var(--color-neon-amber)] focus:ring-[var(--ring)]"
-                        />
-                        Is this a Sub-Rental / Custom Order?
-                      </label>
-                    )}
-                  </div>
                 )}
-                <MarginProgressBar marginPercent={inspectorMarginPercent} />
-              </div>
-            </LiquidPanel>
-          </div>
+              </SheetBody>
+            </SheetContent>
+          </Sheet>
         )}
       </div>
     </div>

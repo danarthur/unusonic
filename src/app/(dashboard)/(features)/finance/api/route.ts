@@ -24,7 +24,7 @@ export async function GET() {
   try {
     const session = await getSession();
     const workspaceId = session.workspace.id;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not in generated types
+     
     const sys = getSystemClient() as any;
 
     try {

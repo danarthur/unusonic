@@ -1,5 +1,5 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import { createClient } from '@/shared/api/supabase/server';
 import { sendGuardianInviteEmail } from '@/shared/api/email/send';
@@ -76,7 +76,7 @@ export async function inviteGuardian(
   const ownerDisplayName =
     (user.user_metadata?.full_name as string) ||
     user.email?.split('@')[0] ||
-    'A Signal user';
+    'An Unusonic user';
   const emailResult = await sendGuardianInviteEmail(guardianEmail, ownerDisplayName);
 
   if (!emailResult.ok) {

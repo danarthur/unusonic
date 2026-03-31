@@ -34,16 +34,16 @@ export function GhostBadge({ status, data, onClick, className }: GhostBadgeProps
       transition={{ type: 'spring', stiffness: 300, damping: 28 }}
       onClick={onClick}
       className={cn(
-        'group relative flex w-full flex-col rounded-3xl border transition-all duration-300',
-        'bg-[var(--color-glass-surface)] backdrop-blur-xl border-[var(--color-mercury)]',
-        'shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2),inset_0_1px_0_0_var(--color-glass-highlight)]',
-        'hover:border-white/15 hover:shadow-[0_20px_40px_-4px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-silk)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-canvas)]',
-        isEmpty && 'min-h-[120px] items-center justify-center cursor-pointer text-[var(--color-ink-muted)] hover:bg-[var(--glass-bg-hover)] hover:border-[var(--color-silk)]/30',
+        'group relative flex w-full flex-col rounded-[var(--stage-radius-panel)] border transition-all duration-300',
+        'bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]',
+        'shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2)]',
+        'hover:border-[oklch(1_0_0_/_0.15)] hover:shadow-[0_20px_40px_-4px_oklch(0_0_0/0.25)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[oklch(0.10_0_0)]',
+        isEmpty && 'min-h-[120px] items-center justify-center cursor-pointer text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:border-[var(--stage-accent)]/30',
         !isEmpty && 'min-h-[160px] p-4 sm:p-5 items-center justify-center text-center sm:text-left sm:items-start sm:justify-start',
-        isCaptain && 'cursor-pointer border-[var(--color-silk)]/50 bg-[var(--color-silk)]/10 text-[var(--color-ink)] shadow-[0_0_0_1px_var(--color-silk)/25] hover:border-[var(--color-silk)]/60',
-        isGhost && 'cursor-pointer bg-[var(--color-surface-100)] text-[var(--color-ink-muted)] hover:bg-white/10 hover:border-white/15',
-        (status === 'invited' || status === 'active') && 'cursor-pointer text-[var(--color-ink)] hover:bg-[var(--glass-bg-hover)]',
+        isCaptain && 'cursor-pointer border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/10 text-[var(--stage-text-primary)] shadow-[0_0_0_1px_var(--stage-accent)/25] hover:border-[var(--stage-accent)]/60',
+        isGhost && 'cursor-pointer bg-[var(--color-surface-100)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.15)]',
+        (status === 'invited' || status === 'active') && 'cursor-pointer text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]',
         className
       )}
     >
@@ -57,11 +57,11 @@ export function GhostBadge({ status, data, onClick, className }: GhostBadgeProps
           <div
             className={cn(
               'flex shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-              'border-[var(--color-mercury)] shadow-[inset_0_1px_0_0_var(--color-glass-highlight)]',
+              'border-[oklch(1_0_0_/_0.08)]',
               hasPhoto ? 'size-16 sm:size-20' : 'size-12 sm:size-14',
-              isCaptain && 'border-[var(--color-silk)]/50 bg-[var(--color-silk)]/20 text-[var(--color-silk)]',
-              isGhost && !hasPhoto && 'bg-white/10 text-[var(--color-ink-muted)]',
-              (status === 'invited' || status === 'active') && !hasPhoto && 'border-[var(--color-silk)]/40 bg-[var(--color-silk)]/10 text-[var(--color-silk)]'
+              isCaptain && 'border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]',
+              isGhost && !hasPhoto && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
+              (status === 'invited' || status === 'active') && !hasPhoto && 'border-[var(--stage-accent)]/40 bg-[var(--stage-accent)]/10 text-[var(--stage-accent)]'
             )}
           >
             {isCaptain ? (
@@ -73,16 +73,16 @@ export function GhostBadge({ status, data, onClick, className }: GhostBadgeProps
             )}
           </div>
           <div className="min-w-0 flex-1 flex flex-col items-center sm:items-start gap-0.5">
-            <p className="w-full truncate font-medium tracking-tight text-[var(--color-ink)] text-sm sm:text-base">
+            <p className="w-full truncate font-medium tracking-tight text-[var(--stage-text-primary)] text-sm sm:text-base">
               {data?.name ?? 'Unnamed'}
             </p>
             {(roleLabel || data?.job_title) && (
-              <p className="w-full truncate text-[11px] sm:text-xs text-[var(--color-ink-muted)]">
+              <p className="w-full truncate text-[11px] sm:text-xs text-[var(--stage-text-secondary)]">
                 {[roleLabel, data?.job_title].filter(Boolean).join(' · ')}
               </p>
             )}
             {data?.email && status !== 'captain' && (
-              <p className="w-full truncate text-[10px] text-[var(--color-ink-muted)]/80 mt-0.5">{data.email}</p>
+              <p className="w-full truncate text-[10px] text-[var(--stage-text-secondary)]/80 mt-0.5">{data.email}</p>
             )}
           </div>
         </div>

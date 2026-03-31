@@ -12,7 +12,6 @@ const BLADE_PARAM = 'blade'; // day blade open for this date (view anchor stays 
 const EVENT_PARAM = 'event';
 const DRAWER_WIDTH = 400;
 const springConfig = { type: 'spring' as const, stiffness: 300, damping: 30 };
-const KEYCAP_SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 export interface DayBladeProps {
   /** Current date from URL (YYYY-MM-DD). */
@@ -94,71 +93,59 @@ export function DayBlade({ date, events, eventId, onDateChange }: DayBladeProps)
       animate={{ x: 0 }}
       exit={{ x: DRAWER_WIDTH }}
       transition={springConfig}
-      className="fixed top-0 right-0 z-50 h-screen w-[400px] max-w-[100vw] flex flex-col border-l border-[var(--glass-border)] bg-[var(--glass-bg)]/95 backdrop-blur-2xl shadow-[var(--glass-shadow)] overflow-hidden antialiased"
+      className="fixed top-0 right-0 z-50 h-screen w-[400px] max-w-[100vw] flex flex-col border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/95 shadow-lg overflow-hidden antialiased"
       role="dialog"
       aria-label="Day details"
     >
       {/* Sticky header: Date Stripper */}
-      <div className="shrink-0 flex flex-col border-b border-[var(--glass-border)] bg-[var(--glass-bg)]/50 backdrop-blur-md">
+      <div className="shrink-0 flex flex-col border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50">
         <div className="flex items-start justify-between gap-4 p-4">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight text-ink" style={{ letterSpacing: '-0.02em' }}>
+            <h2 className="text-xl font-semibold tracking-tight text-[var(--stage-text-primary)]" style={{ letterSpacing: '-0.02em' }}>
               {parsedDate ? format(parsedDate, 'EEEE, MMM d') : 'Day'}
             </h2>
             {parsedDate && (
-              <p className="text-sm text-ink-muted mt-0.5">{format(parsedDate, 'yyyy')}</p>
+              <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">{format(parsedDate, 'yyyy')}</p>
             )}
           </div>
-          <motion.button
+          <button
             type="button"
             onClick={close}
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.04 }}
-            transition={KEYCAP_SPRING}
-            className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
-          </motion.button>
+            <X className="w-5 h-5" strokeWidth={1.5} />
+          </button>
         </div>
         {/* < Prev [Today] Next > */}
         <div className="flex items-center justify-center gap-2 px-4 pb-4">
-          <motion.button
+          <button
             type="button"
             onClick={goPrev}
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.04 }}
-            transition={KEYCAP_SPRING}
-            className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
             aria-label="Previous day"
           >
             <span className="text-sm font-medium">&lt;</span>
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             type="button"
             onClick={goToday}
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.02 }}
-            transition={KEYCAP_SPRING}
-            className={`px-3 py-1.5 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ring)] ${
+            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] ${
               isToday
-                ? 'bg-ink text-canvas'
-                : 'text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)]'
+                ? 'bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]'
+                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.03]'
             }`}
           >
             Today
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             type="button"
             onClick={goNext}
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.04 }}
-            transition={KEYCAP_SPRING}
-            className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
             aria-label="Next day"
           >
             <span className="text-sm font-medium">&gt;</span>
-          </motion.button>
+          </button>
         </div>
       </div>
 
@@ -169,9 +156,9 @@ export function DayBlade({ date, events, eventId, onDateChange }: DayBladeProps)
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={springConfig}
-            className="text-sm text-ink-muted py-8 text-center"
+            className="text-sm text-[var(--stage-text-secondary)]/50 py-16 text-center tracking-wide"
           >
-            No events this day
+            No events scheduled
           </motion.p>
         ) : (
           dayEvents.map((event, i) => (

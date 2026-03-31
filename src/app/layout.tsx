@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { CommandPaletteProvider } from "@/shared/ui/providers/CommandPaletteContext";
 import { SessionProvider } from "@/shared/ui/providers/SessionContext";
@@ -15,6 +15,29 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Portal theme fonts — loaded globally so public pages can reference them via CSS vars.
+// Only the preset's active font is used; the others are idle (no layout cost).
+const playfairDisplay = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -65,7 +88,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen h-screen overflow-x-hidden overflow-y-auto bg-canvas text-ink`}
+        className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased min-h-screen h-screen overflow-x-hidden overflow-y-auto bg-canvas text-ink`}
       >
         <div className="h-full min-h-screen min-w-0 w-full flex flex-col">
           <ThemeProvider

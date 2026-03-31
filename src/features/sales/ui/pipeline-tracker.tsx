@@ -33,19 +33,19 @@ export function PipelineTracker({ currentStage, stages, className }: PipelineTra
                   className={cn(
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-xs font-medium tabular-nums',
                     isCompleted &&
-                      'border-emerald-500/80 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+                      'border-[oklch(0.65_0.18_145_/_0.8)] bg-[oklch(0.45_0.05_145_/_0.15)] text-[var(--color-unusonic-success)]',
                     isCurrent &&
-                      'border-amber-500/90 bg-amber-500/20 text-amber-800 dark:text-amber-200 shadow-[0_0_0_0_rgba(245,158,11,0.4)]',
+                      'border-[oklch(0.65_0.15_70_/_0.9)] bg-[oklch(0.45_0.05_70_/_0.2)] text-[var(--color-unusonic-warning)] shadow-[0_0_0_0_oklch(0.7_0.15_70_/_0.4)]',
                     isPending &&
-                      'border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ink-muted'
+                      'border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-secondary)]'
                   )}
                   animate={
                     isCurrent
                       ? {
                           boxShadow: [
-                            '0 0 0 0 rgba(245, 158, 11, 0)',
-                            '0 0 0 8px rgba(245, 158, 11, 0.15)',
-                            '0 0 0 0 rgba(245, 158, 11, 0)',
+                            '0 0 0 0 oklch(0.7 0.15 70 / 0)',
+                            '0 0 0 8px oklch(0.7 0.15 70 / 0.15)',
+                            '0 0 0 0 oklch(0.7 0.15 70 / 0)',
                           ],
                         }
                       : undefined
@@ -58,7 +58,7 @@ export function PipelineTracker({ currentStage, stages, className }: PipelineTra
                 >
                   {isCompleted ? (
                     <svg
-                      className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                      className="h-4 w-4 text-[var(--color-unusonic-success)]"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -77,9 +77,9 @@ export function PipelineTracker({ currentStage, stages, className }: PipelineTra
                 <span
                   className={cn(
                     'mt-1.5 truncate text-center text-xs font-medium max-w-full',
-                    isCurrent && 'text-amber-700 dark:text-amber-300',
-                    isCompleted && 'text-emerald-700 dark:text-emerald-300',
-                    isPending && 'text-ink-muted'
+                    isCurrent && 'text-[var(--color-unusonic-warning)]',
+                    isCompleted && 'text-[var(--color-unusonic-success)]',
+                    isPending && 'text-[var(--stage-text-secondary)]'
                   )}
                   title={label}
                 >
@@ -92,7 +92,7 @@ export function PipelineTracker({ currentStage, stages, className }: PipelineTra
                   className="h-0.5 flex-1 min-w-[8px] max-w-[24px] rounded-full mx-0.5"
                   initial={false}
                   animate={{
-                    backgroundColor: index < currentStage ? 'rgb(16, 185, 129)' : 'var(--glass-border)',
+                    backgroundColor: index < currentStage ? 'oklch(0.65 0.17 162)' : 'oklch(1 0 0 / 0.08)',
                   }}
                   transition={spring}
                 />

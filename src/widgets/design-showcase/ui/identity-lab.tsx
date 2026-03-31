@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { LivingLogo, type LivingLogoStatus } from "@/shared/ui/branding/living-logo";
 import { cn } from "@/shared/lib/utils";
+import { STAGE_LIGHT } from "@/shared/lib/motion-constants";
 
 const STATUS_OPTIONS: { value: LivingLogoStatus; label: string }[] = [
   { value: "idle", label: "Idle" },
@@ -16,8 +17,8 @@ export function IdentityLab() {
   const [status, setStatus] = useState<LivingLogoStatus>("idle");
 
   return (
-    <div className="liquid-card p-6 flex flex-col gap-6">
-      <h3 className="text-ceramic font-medium tracking-tight text-lg">
+    <div className="stage-panel p-6 flex flex-col gap-6 border border-[oklch(1_0_0_/_0.10)]">
+      <h3 className="text-[var(--stage-text-primary)] font-medium tracking-tight text-lg">
         Identity Lab
       </h3>
 
@@ -31,21 +32,15 @@ export function IdentityLab() {
             key={value}
             type="button"
             onClick={() => setStatus(value)}
-            whileTap={{ scale: 0.98 }}
-            transition={{
-              type: "spring",
-              stiffness: 180,
-              damping: 24,
-              mass: 1.2,
-            }}
+            transition={STAGE_LIGHT}
             className={cn(
-              "px-4 py-2 rounded-xl text-sm font-medium tracking-tight transition-all duration-300",
-              "border border-[var(--color-mercury)]",
-              "bg-obsidian/40 backdrop-blur-sm",
-              "text-ink-muted hover:text-ceramic hover:border-[var(--color-mercury)] hover:bg-[var(--color-glass-surface)]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-neon-blue)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian",
+              "px-4 py-2 rounded-xl text-sm font-medium tracking-tight transition-[filter,background-color,border-color] duration-300",
+              "border border-[oklch(1_0_0_/_0.10)]",
+              "bg-[var(--stage-surface)]",
+              "text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.14)] hover:bg-[var(--stage-surface-hover)]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]",
               status === value &&
-                "text-ceramic border-ceramic/30 bg-[var(--color-glass-surface)]"
+                "text-[var(--stage-text-primary)] border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-raised)]"
             )}
           >
             {label}

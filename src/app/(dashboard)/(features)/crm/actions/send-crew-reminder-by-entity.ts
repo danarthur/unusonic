@@ -23,7 +23,7 @@ export async function sendCrewReminderByEntity(
   if (!workspaceId) return { success: false, error: 'No active workspace.' };
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const db = supabase as any;
 
   // RLS-scoped: only returns rows in caller's workspace

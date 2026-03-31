@@ -38,9 +38,7 @@ export async function updateFlightCheckStatus(
   const current = (event as { run_of_show_data: RunOfShowData | null }).run_of_show_data ?? {};
   const merged: RunOfShowData = {
     ...current,
-    crew_items: update.crew_items !== undefined ? update.crew_items : current.crew_items ?? null,
-    gear_items: update.gear_items !== undefined ? update.gear_items : current.gear_items ?? null,
-    logistics: update.logistics !== undefined ? update.logistics : current.logistics ?? null,
+    ...update,
   };
 
   const { error: updateErr } = await supabase

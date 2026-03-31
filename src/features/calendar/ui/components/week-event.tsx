@@ -4,16 +4,13 @@ import { format } from 'date-fns';
 import type { CalendarEvent } from '@/features/calendar/model/types';
 import type { EventPosition, CollapsedSummary } from '@/features/calendar/lib/smart-stack';
 
-/** Full-tile color (left bar + bg tint + border) to match EventCard. */
+/** Left accent stripe (status color) + neutral glass border + subtle fill.
+ *  Hold (amber): dashed left border. Cancelled (rose): reduced opacity. Planned (blue): slightly muted. */
 const COLOR_CLASSES: Record<CalendarEvent['color'], string> = {
-  emerald:
-    'border-l-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-400/10 dark:border-emerald-400/20',
-  amber:
-    'border-l-amber-500 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-400/10 dark:border-amber-400/20',
-  rose:
-    'border-l-rose-500 bg-rose-500/10 dark:bg-rose-500/20 border border-rose-400/10 dark:border-rose-400/20',
-  blue:
-    'border-l-blue-500 bg-blue-500/10 dark:bg-blue-500/20 border border-blue-400/10 dark:border-blue-400/20',
+  emerald: 'border-l-[3px] border-l-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/12 border border-[oklch(1_0_0_/_0.08)]/10',
+  amber: 'border-l-[3px] border-l-[var(--color-unusonic-warning)] bg-[var(--color-unusonic-warning)]/12 border border-[oklch(1_0_0_/_0.08)]/10 border-l-dashed',
+  rose: 'border-l-[3px] border-l-[var(--color-unusonic-error)] bg-[var(--color-unusonic-error)]/12 border border-[oklch(1_0_0_/_0.08)]/10 opacity-60',
+  blue: 'border-l-[3px] border-l-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/12 border border-[oklch(1_0_0_/_0.08)]/10 opacity-80',
 };
 
 /** Time range: earliest to latest (e.g. "2:00p – 4:30p"). */
@@ -37,25 +34,24 @@ export interface WeekEventProps {
 export function WeekEvent({ position, onClick, variant = 'absolute' }: WeekEventProps & { variant?: 'absolute' | 'inline' }) {
   const { event, top, height, left, width } = position;
   const colorClass = COLOR_CLASSES[event.color] ?? COLOR_CLASSES.blue;
-  const isGhost = event.status === 'planned';
+  const isCancelled = event.status === 'cancelled';
   const isInline = variant === 'inline';
   const timeRange = timeRangeLabel(event.start, event.end);
 
   const baseClass = `
     group rounded-lg border-l-4 text-left overflow-hidden
-    shadow-[var(--glass-shadow-nested)] hover:shadow-[var(--glass-shadow-nested-hover)]
-    hover:border-[var(--glass-border-hover)] hover:brightness-[1.02]
+    shadow-md hover:shadow-lg
+    hover:brightness-[1.02]
     transition-all duration-300
     focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-1 focus:ring-offset-transparent
     ${colorClass}
-    ${isGhost ? 'opacity-90' : ''}
   `.trim().replace(/\s+/g, ' ');
 
   /** Name first, time below (earliest–latest). Title prioritized; time in smaller muted text. */
   const pillContent = (
     <span className="flex flex-col min-w-0 text-left px-2.5 py-2 gap-1">
-      <span className="text-xs font-medium text-ink truncate">{event.title}</span>
-      <span className="text-[10px] font-normal text-ink/80 tabular-nums truncate">{timeRange}</span>
+      <span className="text-xs font-medium text-[var(--stage-text-primary)] truncate">{event.title}</span>
+      <span className="text-[10px] font-normal text-[var(--stage-text-primary)]/80 tabular-nums truncate">{timeRange}</span>
     </span>
   );
 
@@ -106,14 +102,14 @@ export function CollapsedBar({ summary }: CollapsedBarProps) {
 
   return (
     <div
-      className="absolute left-[3px] right-[3px] rounded-xl border border-[var(--glass-border)] liquid-panel-nested flex items-center px-3 z-0 overflow-hidden shadow-[var(--glass-shadow-nested)] hover:border-[var(--glass-border-hover)] hover:shadow-[var(--glass-shadow-nested-hover)] hover:bg-[var(--glass-bg-hover)] transition-all duration-300"
+      className="absolute left-[3px] right-[3px] rounded-xl border border-[oklch(1_0_0_/_0.08)] stage-panel-nested flex items-center px-3 z-0 overflow-hidden shadow-md hover:shadow-lg hover:bg-[var(--stage-surface-hover)] transition-all duration-300"
       style={{
         top: `${top}%`,
         height: `${height}%`,
         minHeight: 24,
       }}
     >
-      <span className="text-[10px] font-medium text-ink/80 truncate tracking-tight">
+      <span className="text-[10px] font-medium text-[var(--stage-text-primary)]/80 truncate tracking-tight">
         {label}
       </span>
     </div>

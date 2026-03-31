@@ -11,8 +11,7 @@ import {
   SheetClose,
   SheetBody,
 } from '@/shared/ui/sheet';
-import { Button } from '@/shared/ui/button';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { updateClientAddress } from '../actions/update-client-address';
@@ -43,21 +42,20 @@ export function ClientSummaryCard({ client, compact }: ClientSummaryCardProps) {
     return (
       <div
         className={cn(
-          'w-full rounded-2xl border border-white/10 border-dashed backdrop-blur-xl',
-          compact ? 'liquid-card p-3' : 'liquid-card p-4'
+          'w-full rounded-2xl border border-dashed border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)]',
+          compact ? 'p-3' : 'p-4'
         )}
-        style={{ background: 'var(--color-glass-surface)' }}
       >
         <div className="flex items-center gap-3">
           <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-ink-muted font-medium text-sm tracking-tight"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--stage-void)] text-[var(--stage-text-secondary)] font-medium text-sm tracking-tight"
             aria-hidden
           >
             —
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-ink-muted tracking-tight">No client linked</p>
-            <p className="text-xs text-ink-muted/70 truncate mt-0.5">
+            <p className="font-medium text-[var(--stage-text-secondary)] tracking-tight">No client linked</p>
+            <p className="text-xs text-[var(--stage-text-tertiary)] truncate mt-0.5">
               Link a client when creating a deal to see contact and billing here
             </p>
           </div>
@@ -74,43 +72,40 @@ export function ClientSummaryCard({ client, compact }: ClientSummaryCardProps) {
       <motion.button
         type="button"
         onClick={() => setDrawerOpen(true)}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        transition={UNUSONIC_PHYSICS}
+        transition={STAGE_LIGHT}
         className={cn(
-          'w-full text-left rounded-2xl border border-white/10 backdrop-blur-xl overflow-hidden',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',
-          compact ? 'liquid-card p-3' : 'liquid-card p-4'
+          'w-full text-left rounded-2xl border border-[var(--stage-edge-subtle)] overflow-hidden bg-[var(--stage-surface)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
+          compact ? 'p-3' : 'p-4'
         )}
-        style={{ background: 'var(--color-glass-surface)' }}
         aria-label={`Client: ${displayName}. Open client details`}
       >
         <div className="flex items-center gap-3">
           <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-ceramic font-medium text-sm tracking-tight"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm tracking-tight border border-[var(--stage-edge-subtle)]"
             aria-hidden
           >
             {initials(displayName)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-ceramic tracking-tight truncate">{displayName}</p>
+            <p className="font-medium text-[var(--stage-text-primary)] tracking-tight truncate">{displayName}</p>
             {organization.category && !compact && (
-              <p className="text-xs text-ink-muted truncate mt-0.5 capitalize">
+              <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5 capitalize">
                 {String(organization.category).replace(/_/g, ' ')}
               </p>
             )}
           </div>
-          <ChevronRight className="size-4 text-ink-muted shrink-0" aria-hidden />
+          <ChevronRight className="size-4 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} aria-hidden />
         </div>
         {!compact && (mainContact?.phone || mainContact?.email) && (
-          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/10">
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[var(--stage-edge-subtle)]">
             {mainContact.phone && (
               <a
                 href={`tel:${mainContact.phone}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1.5 text-xs text-ink-muted hover:text-ceramic transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
               >
-                <Phone size={12} aria-hidden />
+                <Phone size={12} strokeWidth={1.5} aria-hidden />
                 {mainContact.phone}
               </a>
             )}
@@ -118,9 +113,9 @@ export function ClientSummaryCard({ client, compact }: ClientSummaryCardProps) {
               <a
                 href={`mailto:${mainContact.email}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1.5 text-xs text-ink-muted hover:text-ceramic transition-colors truncate"
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors truncate"
               >
-                <Mail size={12} aria-hidden />
+                <Mail size={12} strokeWidth={1.5} aria-hidden />
                 {mainContact.email}
               </a>
             )}
@@ -180,43 +175,43 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col w-full max-w-md">
-        <SheetHeader className="border-b border-white/10 px-6 py-5">
+        <SheetHeader className="border-b border-[var(--stage-edge-subtle)] px-6 py-5">
           <SheetTitle>
             Client
           </SheetTitle>
-          <SheetClose className="text-ink-muted hover:text-ceramic" />
+          <SheetClose className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]" />
         </SheetHeader>
         <SheetBody className="flex flex-col gap-6 px-6 py-5 overflow-y-auto">
           {/* Vitals */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-3">
+            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
               Contact
             </h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <Building2 size={14} className="text-ink-muted shrink-0" />
-                <span className="text-ceramic font-medium">{organization.name}</span>
+                <Building2 size={14} className="text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} />
+                <span className="text-[var(--stage-text-primary)] font-medium">{organization.name}</span>
               </div>
               {mainContact && (
                 <>
-                  <p className="text-ink-muted">
+                  <p className="text-[var(--stage-text-secondary)]">
                     {[mainContact.first_name, mainContact.last_name].filter(Boolean).join(' ')}
                   </p>
                   {mainContact.phone && (
                     <a
                       href={`tel:${mainContact.phone}`}
-                      className="flex items-center gap-2 text-ink-muted hover:text-ceramic transition-colors"
+                      className="flex items-center gap-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                     >
-                      <Phone size={14} />
+                      <Phone size={14} strokeWidth={1.5} />
                       {mainContact.phone}
                     </a>
                   )}
                   {mainContact.email && (
                     <a
                       href={`mailto:${mainContact.email}`}
-                      className="flex items-center gap-2 text-ink-muted hover:text-ceramic transition-colors truncate"
+                      className="flex items-center gap-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors truncate"
                     >
-                      <Mail size={14} />
+                      <Mail size={14} strokeWidth={1.5} />
                       {mainContact.email}
                     </a>
                   )}
@@ -225,9 +220,9 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
               {organization.support_email && !mainContact?.email && (
                 <a
                   href={`mailto:${organization.support_email}`}
-                  className="flex items-center gap-2 text-ink-muted hover:text-ceramic transition-colors"
+                  className="flex items-center gap-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                 >
-                  <Mail size={14} />
+                  <Mail size={14} strokeWidth={1.5} />
                   {organization.support_email}
                 </a>
               )}
@@ -236,7 +231,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
 
           {/* Financials / Billing */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-3">
+            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
               Billing address
             </h3>
             <textarea
@@ -244,28 +239,28 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
               onChange={(e) => setAddressDraft(e.target.value)}
               onBlur={handleSaveAddress}
               rows={3}
-              className="w-full rounded-xl border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5 text-sm text-ceramic placeholder:text-ink-muted/60 focus:outline-none focus:border-[var(--color-silk)]/60"
+              className="w-full rounded-md border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               placeholder="Street, City, State, Postal code, Country"
             />
             {savingAddress && (
-              <p className="text-xs text-ink-muted mt-1">Saving…</p>
+              <p className="text-xs text-[var(--stage-text-secondary)] mt-1">Saving…</p>
             )}
           </section>
 
           {/* History */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-3">
+            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
               Past gigs
             </h3>
-            <div className="flex items-center gap-2 text-sm text-ink-muted">
-              <FileText size={14} />
+            <div className="flex items-center gap-2 text-sm text-[var(--stage-text-secondary)]">
+              <FileText size={14} strokeWidth={1.5} />
               {pastDealsCount} {pastDealsCount === 1 ? 'deal' : 'deals'} with this client
             </div>
           </section>
 
           {/* Notes */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted mb-3">
+            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
               Client notes
             </h3>
             <textarea
@@ -273,11 +268,11 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
               onChange={(e) => setNotesDraft(e.target.value)}
               onBlur={handleSaveNotes}
               rows={4}
-              className="w-full rounded-xl border border-[var(--color-mercury)] bg-white/5 px-3 py-2.5 text-sm text-ceramic placeholder:text-ink-muted/60 focus:outline-none focus:border-[var(--color-silk)]/60"
+              className="w-full rounded-md border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               placeholder="e.g. Prefers texts over calls. Always wants premium lighting."
             />
             {savingNotes && (
-              <p className="text-xs text-ink-muted mt-1">Saving…</p>
+              <p className="text-xs text-[var(--stage-text-secondary)] mt-1">Saving…</p>
             )}
           </section>
         </SheetBody>

@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import stageEngineering from "./eslint-plugins/stage-engineering.js";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -52,6 +53,51 @@ const eslintConfig = defineConfig([
             "Use readEntityAttrs() from @/shared/lib/entity-attrs instead of direct attrs access. See attribute-keys.ts for key constants.",
         },
       ],
+    },
+  },
+  // ─── Stage Engineering design-system guardrails ─────────────────────────────
+  // Enforces the Stage Engineering design system across all UI code. Catches
+  // legacy tokens, forbidden class names, raw colors, and legacy CSS vars.
+  // All rules are "warn" so they surface during development without blocking
+  // builds during migration.
+  {
+    files: [
+      "src/app/**/*.tsx",
+      "src/app/**/*.ts",
+      "src/widgets/**/*.tsx",
+      "src/widgets/**/*.ts",
+      "src/features/**/*.tsx",
+      "src/features/**/*.ts",
+      "src/shared/ui/**/*.tsx",
+      "src/shared/ui/**/*.ts",
+      "src/entities/**/*.tsx",
+      "src/entities/**/*.ts",
+    ],
+    plugins: {
+      "stage-engineering": stageEngineering,
+    },
+    rules: {
+      // Original rules (v1)
+      "stage-engineering/no-backdrop-blur-content": "warn",
+      "stage-engineering/no-glass-tokens": "warn",
+      "stage-engineering/no-neon-blue-accent": "warn",
+      "stage-engineering/no-hardcoded-panel-radius": "warn",
+      // Design system enforcement (v2)
+      "stage-engineering/no-forbidden-classnames": "warn",
+      "stage-engineering/no-legacy-css-vars": "warn",
+      "stage-engineering/no-raw-colors": "warn",
+    },
+  },
+  // ─── Legacy brand enforcement ───────────────────────────────────────────────
+  // Catches legacy brand strings (Signal Live, runsignal.live, signal_ prefixes)
+  // across all source code, not just UI files.
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    plugins: {
+      "stage-engineering": stageEngineering,
+    },
+    rules: {
+      "stage-engineering/no-legacy-brand": "warn",
     },
   },
 ]);

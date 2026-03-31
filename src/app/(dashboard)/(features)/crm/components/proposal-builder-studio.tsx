@@ -6,13 +6,12 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { GripVertical, Loader2, Lock, Package } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
 import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
 import { getPackages, getProposalForDeal, addPackageToProposal, revertProposalToDraft } from '@/features/sales/api/proposal-actions';
 import type { DealDetail } from '../actions/get-deal';
 import type { ProposalWithItems } from '@/features/sales/model/types';
 import type { Package as PackageType } from '@/types/supabase';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const CATALOG_DROPPABLE = 'catalog';
@@ -88,14 +87,16 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
 
   useEffect(() => {
     if (!deal.workspace_id) {
-      setPackages([]);
-      setLoading(false);
+      queueMicrotask(() => {
+        setPackages([]);
+        setLoading(false);
+      });
       return;
     }
     getPackages(deal.workspace_id).then((r) => {
       setPackages(r.packages ?? []);
     });
-    setLoading(false);
+    queueMicrotask(() => setLoading(false));
   }, [deal.workspace_id]);
 
   useEffect(() => {
@@ -160,7 +161,7 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex flex-col h-full min-h-0">
         {dropError && (
-          <div className="shrink-0 px-4 py-2 bg-[var(--color-unusonic-error)]/10 border-b border-[var(--color-unusonic-error)]/30 text-sm text-[var(--color-unusonic-error)]" role="alert">
+          <div className="shrink-0 px-4 py-2 stage-stripe-error bg-[var(--stage-surface)] text-sm text-[var(--color-unusonic-error)]" role="alert">
             {dropError}
           </div>
         )}
@@ -168,11 +169,11 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={UNUSONIC_PHYSICS}
-            className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 bg-[var(--color-neon-amber)]/5 text-ink-muted text-sm"
+            transition={STAGE_LIGHT}
+            className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 stage-stripe-warning bg-[var(--stage-surface)] text-[var(--stage-text-secondary)] text-sm"
           >
             <div className="flex items-center gap-3">
-              <Lock className="w-4 h-4 shrink-0 text-[var(--color-neon-amber)]" aria-hidden />
+              <Lock className="w-4 h-4 shrink-0 text-[var(--color-unusonic-warning)]" aria-hidden />
               <span>Proposal locked (signed). Additions require a change order.</span>
             </div>
             <button
@@ -188,25 +189,26 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
                 }
               }}
               disabled={reverting}
-              className="shrink-0 text-xs font-medium uppercase tracking-widest text-[var(--color-neon-amber)] hover:brightness-110 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian rounded px-2 py-1"
+              className="shrink-0 text-xs font-medium uppercase tracking-widest text-[var(--color-unusonic-warning)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] rounded px-2 py-1"
             >
-              {reverting ? 'Reverting…' : 'Unlock (revert to draft)'}
+              {reverting ? 'Reverting…' : 'Revert to draft'}
             </button>
           </motion.div>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,380px)_1fr] gap-6 flex-1 min-h-0 p-4 sm:p-6">
           {/* Left: Catalog — plain div (no transform) so drag preview isn't clipped; no overflow-hidden on outer */}
           <div
+            data-surface="elevated"
             className={cn(
-              'flex flex-col min-h-0 liquid-card rounded-[28px] overflow-visible',
-              isLocked && 'opacity-60 pointer-events-none'
+              'flex flex-col min-h-0 rounded-[var(--stage-radius-panel)] overflow-visible bg-[var(--stage-surface-elevated)] border border-[var(--stage-edge-subtle)]',
+              isLocked && 'opacity-45 pointer-events-none'
             )}
           >
-            <div className="shrink-0 px-5 py-4 border-b border-white/10 rounded-t-[28px]">
-              <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+            <div className="shrink-0 px-5 py-4 border-b border-[var(--stage-edge-subtle)] rounded-t-[var(--stage-radius-panel)]">
+              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
                 Catalog
               </p>
-              <p className="text-sm text-ink-muted mt-1 leading-relaxed">
+              <p className="text-sm text-[var(--stage-text-secondary)] mt-1 leading-relaxed">
                 {isLocked ? 'Locked. Use change orders to add.' : 'Drag items into the proposal'}
               </p>
             </div>
@@ -223,14 +225,14 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-[var(--color-glass-surface)] shadow-xl backdrop-blur-xl p-3 min-h-[56px] min-w-[200px] cursor-grabbing ring-1 ring-white/10"
+                    className="flex items-center gap-3 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--stage-surface-raised)] shadow-xl p-3 min-h-[56px] min-w-[200px] cursor-grabbing ring-1 ring-[var(--stage-border)]"
                   >
-                    <div className="shrink-0 p-1 text-ink-muted pointer-events-none">
+                    <div className="shrink-0 p-1 text-[var(--stage-text-secondary)] pointer-events-none">
                       <GripVertical className="w-4 h-4" aria-hidden />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-ink truncate text-sm">{pkg.name}</p>
-                      <p className="text-xs text-ink-muted tabular-nums mt-0.5">
+                      <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
+                      <p className="text-xs text-[var(--stage-text-secondary)] tabular-nums mt-0.5">
                         ${Number(pkg.price).toLocaleString()}
                       </p>
                     </div>
@@ -242,18 +244,18 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
                 <ul
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex-1 overflow-y-auto p-3 space-y-2 list-none min-h-[140px] rounded-b-[28px]"
+                  className="flex-1 overflow-y-auto p-3 space-y-2 list-none min-h-[140px] rounded-b-[var(--stage-radius-panel)]"
                 >
                   {loading ? (
-                    <li className="flex items-center gap-2 py-6 text-ink-muted text-sm min-h-[52px]">
+                    <li className="flex items-center gap-2 py-6 text-[var(--stage-text-secondary)] text-sm min-h-[52px]">
                       <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                       Loading…
                     </li>
                   ) : packages.length === 0 ? (
-                    <li className="py-8 flex flex-col items-center justify-center gap-2 text-center text-sm text-ink-muted min-h-[120px]">
-                      <Package className="w-8 h-8 text-ink-muted/60" aria-hidden />
+                    <li className="py-8 flex flex-col items-center justify-center gap-2 text-center text-sm text-[var(--stage-text-secondary)] min-h-[120px]">
+                      <Package className="w-8 h-8 text-[var(--stage-text-secondary)]/60" aria-hidden />
                       <span>No packages yet.</span>
-                      <Link href="/catalog" className="text-[var(--color-neon-amber)] hover:brightness-110 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian rounded">
+                      <Link href="/catalog" className="text-[var(--stage-accent)] text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] rounded">
                         Add in Catalog
                       </Link>
                     </li>
@@ -266,16 +268,16 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             className={cn(
-                              'flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 cursor-grab active:cursor-grabbing list-none min-h-[56px]',
-                              snapshot.isDragging && 'opacity-50 shadow-xl ring-2 ring-white/20'
+                              'flex items-center gap-3 p-3 cursor-grab active:cursor-grabbing list-none min-h-[56px] rounded-[var(--stage-radius-nested)] bg-[var(--ctx-card)] border border-[var(--stage-edge-subtle)] hover:bg-[var(--stage-surface-raised)] hover:border-[var(--stage-border)] transition-colors duration-[80ms] ease-out',
+                              snapshot.isDragging && 'opacity-45 shadow-xl ring-2 ring-[var(--stage-border-focus)]'
                             )}
                           >
-                            <div className="shrink-0 p-1 text-ink-muted pointer-events-none">
+                            <div className="shrink-0 p-1 text-[var(--stage-text-secondary)] pointer-events-none">
                               <GripVertical className="w-4 h-4" aria-hidden />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-ink truncate text-sm">{pkg.name}</p>
-                              <p className="text-xs text-ink-muted tabular-nums mt-0.5">
+                              <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
+                              <p className="text-xs text-[var(--stage-text-secondary)] tabular-nums mt-0.5">
                                 ${Number(pkg.price).toLocaleString()}
                               </p>
                             </div>
@@ -291,13 +293,13 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
           </div>
 
           {/* Right: Receipt — drop zone; placeholder Draggable so empty list still accepts drops */}
-          <div className="flex flex-col min-h-0 items-start w-full max-w-2xl">
+          <div className="flex flex-col min-h-0 w-full">
             <Droppable droppableId={RECEIPT_DROPPABLE} isDropDisabled={isLocked}>
               {(provided, snapshot) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="relative w-full min-h-[380px] flex flex-col rounded-[28px]"
+                  className="relative w-full min-h-[380px] flex flex-col rounded-[var(--stage-radius-panel)]"
                 >
                   {/* Placeholder sized and positioned like the first receipt row so clone doesn't jump */}
                   <Draggable draggableId="receipt-placeholder" index={0} isDragDisabled={true}>

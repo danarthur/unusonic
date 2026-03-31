@@ -6,6 +6,7 @@ export {
 export type {
   TalentSkillRow,
   TalentSkillDTO,
+  CrewSkillDTO,
   OrgMemberRow,
   OrgMemberWithSkillsDTO,
   EmploymentStatus,

@@ -41,11 +41,11 @@ export function PermissionRow({ definition }: PermissionRowProps) {
   };
 
   return (
-    <div className="flex items-center gap-4 py-2.5 border-b border-[var(--glass-border)] last:border-0">
+    <div className="flex items-center gap-4 py-2.5 border-b border-[var(--stage-border)] last:border-0">
       <div className="flex-1 min-w-0">
-        <p className="text-ceramic text-sm font-medium tracking-tight">{definition.label}</p>
+        <p className="text-[var(--stage-text-primary)] text-sm font-medium tracking-tight">{definition.label}</p>
         {definition.description && (
-          <p className="text-ink-muted text-xs leading-relaxed mt-0.5">{definition.description}</p>
+          <p className="text-[var(--stage-text-secondary)] text-xs leading-relaxed mt-0.5">{definition.description}</p>
         )}
       </div>
       <div className="flex items-center gap-3 shrink-0">
@@ -56,7 +56,7 @@ export function PermissionRow({ definition }: PermissionRowProps) {
         />
         {definition.supportsScope && enabled && (
           <Select value={scope} onValueChange={(v) => handleScopeChange(v as PermissionScope)}>
-            <SelectTrigger size="sm" className="w-[130px] border-[var(--glass-border)] bg-[var(--glass-bg)] text-ink-muted">
+            <SelectTrigger size="sm" className="w-[130px] border-[var(--stage-border)] bg-[var(--stage-surface)] text-[var(--stage-text-secondary)]">
               <SelectValue placeholder="Scope" />
             </SelectTrigger>
             <SelectContent>

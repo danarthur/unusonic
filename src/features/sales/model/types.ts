@@ -121,6 +121,14 @@ export interface ProposalBuilderLineItem {
   internalNotes?: string | null;
   /** Required crew roles locked at proposal-add time (from definition_snapshot.crew_meta.required_roles). */
   requiredRoles?: RequiredRole[] | null;
+  /** When true, client can toggle this item on/off in the proposal portal. */
+  isOptional?: boolean;
+  /** Start time in HH:MM 24h format (e.g., "12:00"). Only meaningful when unitType is hour/day. */
+  timeStart?: string | null;
+  /** End time in HH:MM 24h format (e.g., "16:00"). Only meaningful when unitType is hour/day. */
+  timeEnd?: string | null;
+  /** When true, time range is shown on client-facing proposal. Default true. */
+  showTimesOnProposal?: boolean | null;
 }
 
 /** Hardcoded suggestion: when user adds this package name, suggest the other. */

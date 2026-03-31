@@ -118,16 +118,16 @@ export function TeamRoster({
         }}
       />
       <div className="shrink-0 mb-3 sm:mb-4 lg:mb-4 text-center relative">
-        <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--color-silk)]/80">
+        <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--stage-accent)]/80">
           Assemble Core
         </span>
-        <h2 className="mt-0.5 lg:mt-1 text-lg sm:text-xl font-light tracking-tight text-[var(--color-ink)]">
+        <h2 className="mt-0.5 lg:mt-1 text-lg sm:text-xl font-light tracking-tight text-[var(--stage-text-primary)]">
           Team
         </h2>
-        <p className="mt-0.5 lg:mt-1 text-xs sm:text-sm text-[var(--color-ink-muted)]">
+        <p className="mt-0.5 lg:mt-1 text-xs sm:text-sm text-[var(--stage-text-secondary)]">
           Add members. Send invites when ready.
         </p>
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-24 h-px bg-gradient-to-r from-transparent via-[var(--color-silk)]/30 to-transparent" aria-hidden />
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-24 h-px bg-gradient-to-r from-transparent via-[var(--stage-accent)]/30 to-transparent" aria-hidden />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-0.5 sm:px-1">
@@ -160,7 +160,7 @@ export function TeamRoster({
             size="lg"
             onClick={handleDeploy}
             disabled={isDeploying}
-            className="bg-[var(--color-silk)]/90 text-[var(--color-canvas)] hover:bg-[var(--color-silk)] border-0 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.3),0_0_0_1px_var(--color-silk)/30] hover:shadow-[0_20px_40px_-4px_oklch(0.70_0.15_250/0.35)]"
+            className="bg-[var(--stage-accent)]/90 text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)] border-0 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.3),0_0_0_1px_var(--stage-accent)/30] hover:shadow-[0_20px_40px_-4px_oklch(0.70_0.15_250/0.35)]"
           >
             {isDeploying ? 'Sending…' : `Send ${unsentCount} invite${unsentCount === 1 ? '' : 's'}`}
           </Button>
@@ -198,18 +198,18 @@ export function TeamRoster({
         </SheetContent>
       </Sheet>
 
-      <div className="shrink-0 mt-4 sm:mt-6 lg:mt-6 flex items-center justify-between border-t border-[var(--color-mercury)] pt-4 lg:pt-5 pb-6 sm:pb-8" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+      <div className="shrink-0 mt-4 sm:mt-6 lg:mt-6 flex items-center justify-between border-t border-[oklch(1_0_0_/_0.08)] pt-4 lg:pt-5 pb-6 sm:pb-8" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <Button
           variant="ghost"
           onClick={handleSkip}
-          className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+          className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]"
         >
           Skip
         </Button>
         <Button
           variant="outline"
           onClick={() => router.push('/network')}
-          className="border-[var(--color-mercury)] hover:border-[var(--color-silk)]/50 hover:text-[var(--color-silk)]"
+          className="border-[oklch(1_0_0_/_0.08)] hover:border-[var(--stage-accent)]/50 hover:text-[var(--stage-accent)]"
         >
           Continue
         </Button>

@@ -3,9 +3,9 @@
 import * as React from 'react';
 import { cn } from '@/shared/lib/utils';
 
-/** Preset "Brand Signal" colors for team avatars and accents. */
+/** Preset brand colors for team avatars and accents. */
 export const BRAND_COLORS = [
-  { label: 'Signal Blue', value: 'oklch(0.70 0.15 250)' },
+  { label: 'Neon Blue', value: 'oklch(0.70 0.15 250)' },
   { label: 'Neon Green', value: 'oklch(0.75 0.18 145)' },
   { label: 'Warning Orange', value: 'oklch(0.75 0.16 85)' },
   { label: 'Walnut', value: 'oklch(0.55 0.02 60)' },
@@ -31,10 +31,10 @@ export function BrandColorPicker({ value, onChange, className }: BrandColorPicke
           title={label}
           onClick={() => onChange(colorValue)}
           className={cn(
-            'size-9 rounded-full border-2 transition-transform hover:scale-110',
+            'size-9 rounded-full border-2 transition-[border-color,filter] hover:brightness-[1.12]',
             value === colorValue
-              ? 'border-[var(--color-ink)] ring-2 ring-white/20'
-              : 'border-transparent hover:border-white/20'
+              ? 'border-[var(--stage-text-primary)] ring-2 ring-[oklch(1_0_0_/_0.20)]'
+              : 'border-transparent hover:border-[oklch(1_0_0_/_0.20)]'
           )}
           style={{ backgroundColor: colorValue }}
           aria-label={label}

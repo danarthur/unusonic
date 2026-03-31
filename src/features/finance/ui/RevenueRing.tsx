@@ -7,7 +7,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { formatCurrency } from '../model/types';
 import type { FinancialSummaryDTO } from '../model/types';
 
@@ -31,8 +31,8 @@ export function RevenueRing({ summary, className }: RevenueRingProps) {
   const unpaidLength = unpaidShare * circumference;
 
   return (
-    <LiquidPanel className={`flex flex-col items-center justify-center gap-4 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+    <StagePanel className={`flex flex-col items-center justify-center gap-4 ${className ?? ''}`}>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Revenue
       </h2>
       <div className="relative">
@@ -43,12 +43,12 @@ export function RevenueRing({ summary, className }: RevenueRingProps) {
         >
           <defs>
             <linearGradient id="revenue-paid" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgb(16, 185, 129)" />
-              <stop offset="100%" stopColor="rgb(5, 150, 105)" />
+              <stop offset="0%" stopColor="oklch(0.65 0.17 162)" />
+              <stop offset="100%" stopColor="oklch(0.56 0.15 162)" />
             </linearGradient>
             <linearGradient id="revenue-unpaid" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgb(120, 113, 108)" />
-              <stop offset="100%" stopColor="rgb(87, 83, 78)" />
+              <stop offset="0%" stopColor="oklch(0.55 0 0)" />
+              <stop offset="100%" stopColor="oklch(0.45 0 0)" />
             </linearGradient>
           </defs>
           {/* Background ring */}
@@ -57,7 +57,7 @@ export function RevenueRing({ summary, className }: RevenueRingProps) {
             cy="100"
             r={r}
             fill="none"
-            stroke="var(--glass-border)"
+            stroke="oklch(1 0 0 / 0.08)"
             strokeWidth={stroke}
           />
           {/* Paid segment (green) */}
@@ -101,12 +101,12 @@ export function RevenueRing({ summary, className }: RevenueRingProps) {
           )}
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-mono text-2xl font-medium text-ink tracking-tight">
+          <span className="font-mono text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight">
             {formatCurrency(outstanding)}
           </span>
         </div>
       </div>
-      <p className="text-xs text-ink-muted font-medium">Outstanding</p>
-    </LiquidPanel>
+      <p className="text-xs text-[var(--stage-text-secondary)] font-medium">Outstanding</p>
+    </StagePanel>
   );
 }

@@ -29,7 +29,7 @@ export interface InitializeOrganizationInput {
   type: OrganizationType;
   subscriptionTier: SubscriptionTier;
   pmsIntegrationEnabled?: boolean;
-  signalPayEnabled?: boolean;
+  unusonicPayEnabled?: boolean;
 }
 
 export interface InitializeOrganizationResult {
@@ -89,7 +89,7 @@ export async function initializeOrganization(
         type: input.type,
         subscription_tier: input.subscriptionTier,
         pms_integration_enabled: input.pmsIntegrationEnabled ?? false,
-        signalpay_enabled: input.signalPayEnabled ?? false,
+        signalpay_enabled: input.unusonicPayEnabled ?? false,
         workspace_id: workspace.id,
       })
       .select('id')

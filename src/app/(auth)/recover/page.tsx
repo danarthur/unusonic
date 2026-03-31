@@ -28,16 +28,16 @@ export default async function RecoverPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
       <div className="relative z-10 w-full max-w-md">
-        <h1 className="text-xl font-semibold tracking-tight text-ceramic mb-1 text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-[var(--stage-text-primary)] mb-1 text-center">
           Recover access
         </h1>
-        <p className="text-mercury text-sm text-center mb-8">
+        <p className="text-[var(--stage-text-secondary)] text-sm text-center mb-8">
           Enter the email for your account. We’ll send you a link to cancel if this wasn’t you, and
           your Safety Net guardians will be notified.
         </p>
         <RecoverRequestForm />
-        <p className="text-mercury/80 text-xs text-center mt-6">
-          <a href="/login" className="underline hover:text-ceramic">
+        <p className="text-[var(--stage-text-secondary)]/80 text-xs text-center mt-6">
+          <a href="/login" className="underline hover:text-[var(--stage-text-primary)]">
             Back to sign in
           </a>
         </p>

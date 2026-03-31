@@ -28,10 +28,8 @@ export function LiquidPill({
       className={cn(
         'liquid-pill relative overflow-hidden rounded-[2rem]',
         /* Match DayBlade: glass-bg + backdrop-blur = liquid see-through */
-        'bg-[var(--glass-bg)]',
-        'backdrop-blur-2xl backdrop-saturate-[160%]',
-        'border border-[var(--glass-border)]',
-        'shadow-[var(--glass-shadow)]',
+        'bg-[var(--stage-surface)]',
+        'border border-[oklch(1_0_0_/_0.08)]',
         className
       )}
       {...props}

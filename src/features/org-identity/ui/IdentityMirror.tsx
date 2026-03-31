@@ -79,9 +79,9 @@ export function IdentityMirror({ tempName, tempColor, tempLogo, tempBio, flash, 
       >
         <motion.div
           key={cureKey}
-          className="relative overflow-hidden rounded-3xl border bg-[var(--color-glass-surface)] shadow-[0_24px_48px_-12px_oklch(0_0_0/0.4),inset_0_1px_0_0_var(--color-glass-highlight)] backdrop-blur-xl"
+          className="relative overflow-hidden rounded-[var(--stage-radius-panel)] border bg-[var(--stage-surface-raised)] shadow-[0_24px_48px_-12px_oklch(0_0_0/0.4),inset_0_1px_0_0_oklch(1_0_0/0.10)]"
           style={{
-            borderColor: accentBorder ?? 'var(--color-mercury)',
+            borderColor: accentBorder ?? 'oklch(1 0 0 / 0.08)',
             transform: 'translateZ(20px)',
           }}
           initial={flash ? { opacity: 0.6, scale: 0.98 } : false}
@@ -93,8 +93,8 @@ export function IdentityMirror({ tempName, tempColor, tempLogo, tempBio, flash, 
             <div className="flex justify-center">
               {tempLogo ? (
                 <div
-                  className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-white/5"
-                  style={{ borderColor: accentBorderSubtle ?? 'var(--color-mercury)' }}
+                  className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-[oklch(1_0_0_/_0.05)]"
+                  style={{ borderColor: accentBorderSubtle ?? 'oklch(1 0 0 / 0.08)' }}
                 >
                   <img src={tempLogo} alt="" className="size-full object-cover" />
                 </div>
@@ -106,15 +106,15 @@ export function IdentityMirror({ tempName, tempColor, tempLogo, tempBio, flash, 
             </div>
 
             <div className="space-y-2 text-center">
-              <h2 className="text-xl font-medium tracking-tight text-[var(--color-ink)] sm:text-2xl">
+              <h2 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)] sm:text-2xl">
                 {displayName}
               </h2>
               {tempBio?.trim() ? (
-                <p className="text-sm font-light leading-relaxed text-[var(--color-ink-muted)] line-clamp-4">
+                <p className="text-sm font-light leading-relaxed text-[var(--stage-text-secondary)] line-clamp-4">
                   {tempBio.trim()}
                 </p>
               ) : (
-                <p className="text-sm font-light italic text-[var(--color-ink-muted)]/60">
+                <p className="text-sm font-light italic text-[var(--stage-text-secondary)]/60">
                   Add a public bio in the Forge
                 </p>
               )}

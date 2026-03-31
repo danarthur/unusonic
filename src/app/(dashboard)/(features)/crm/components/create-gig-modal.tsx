@@ -1,50 +1,48 @@
 'use client';
 
 import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { Command } from 'cmdk';
-import { Building2, User, MapPin, Plus, ChevronRight, ChevronDown, Heart } from 'lucide-react';
+import { Building2, User, MapPin, Plus, ChevronRight, ChevronDown, Heart, Loader2, X } from 'lucide-react';
 import { createDeal, type CreateDealInput } from '../actions/deal-actions';
+import { getWorkspaceLeadSources, type WorkspaceLeadSource } from '@/features/lead-sources';
 import { checkDateFeasibility, type FeasibilityStatus, type CheckDateFeasibilityResult } from '../actions/check-date-feasibility';
-import { searchOmni, getVenueSuggestions, type OmniResult, type VenueSuggestion } from '../actions/lookup';
+import { searchOmni, getVenueSuggestions, createGhostReferrerEntity, type OmniResult, type VenueSuggestion } from '../actions/lookup';
 import { CalendarPanel, parseLocalDateString } from './ceramic-date-picker';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { cn } from '@/shared/lib/utils';
-import { UNUSONIC_PHYSICS, M3_SHARED_AXIS_Y_VARIANTS } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
 import type { OptimisticUpdate } from './crm-production-queue';
+import { DEAL_ARCHETYPES, DEAL_ARCHETYPE_LABELS } from '../actions/deal-model';
 
-const EVENT_ARCHETYPES = [
-  { value: 'wedding', label: 'Wedding' },
-  { value: 'corporate_gala', label: 'Corporate Gala' },
-  { value: 'product_launch', label: 'Product Launch' },
-  { value: 'private_dinner', label: 'Private Dinner' },
-] as const;
+const EVENT_ARCHETYPES = DEAL_ARCHETYPES.map((value) => ({ value, label: DEAL_ARCHETYPE_LABELS[value] }));
 
 function FeasibilityBadge({ status, message }: { status: FeasibilityStatus; message: string }) {
   const styles: Record<FeasibilityStatus, string> = {
-    clear: 'border-[var(--color-signal-success)] bg-[var(--color-surface-success)]/20 text-[var(--color-signal-success)]',
-    caution: 'border-[var(--color-signal-warning)] bg-[var(--color-surface-warning)]/20 text-[var(--color-signal-warning)]',
-    critical: 'border-[var(--color-unusonic-error)] bg-[var(--color-surface-error)]/20 text-[var(--color-unusonic-error)]',
+    clear: 'border-[var(--color-unusonic-success)]/40 bg-[var(--color-unusonic-success)]/10 text-[var(--color-unusonic-success)]',
+    caution: 'border-[var(--color-unusonic-warning)]/40 bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)]',
+    critical: 'border-[var(--color-unusonic-error)]/40 bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)]',
   };
   const dots: Record<FeasibilityStatus, string> = {
-    clear: 'bg-[var(--color-signal-success)]',
-    caution: 'bg-[var(--color-signal-warning)]',
+    clear: 'bg-[var(--color-unusonic-success)]',
+    caution: 'bg-[var(--color-unusonic-warning)]',
     critical: 'bg-[var(--color-unusonic-error)]',
   };
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium',
+        'inline-flex items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 py-1.5 text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight',
         styles[status]
       )}
       role="status"
     >
-      <span className={cn('h-2 w-2 shrink-0 rounded-full', dots[status])} aria-hidden />
+      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dots[status])} aria-hidden />
       {message}
     </span>
   );
@@ -98,9 +96,9 @@ function TimeInput({
         onBlur={handleBlur}
         placeholder="9:00 or 14:30"
         maxLength={5}
-        className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        className="w-full min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] transition-colors duration-75 hover:border-[oklch(1_0_0_/_0.20)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[var(--stage-accent)]"
       />
-      <span className="text-[10px] text-ink-muted">24h (14:30 = 2:30 PM)</span>
+      <span className="text-[10px] text-[var(--stage-text-secondary)]">24h (14:30 = 2:30 PM)</span>
     </div>
   );
 }
@@ -121,6 +119,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   const [stage, setStage] = useState<1 | 2>(1);
   const [eventDate, setEventDate] = useState('');
   const [eventArchetype, setEventArchetype] = useState<string | null>(null);
+  const [archetypeOpen, setArchetypeOpen] = useState(false);
   const [feasibility, setFeasibility] = useState<CheckDateFeasibilityResult | null>(null);
   const [feasibilityLoading, setFeasibilityLoading] = useState(false);
   const [title, setTitle] = useState('');
@@ -130,6 +129,17 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
   const [budgetEstimated, setBudgetEstimated] = useState<number | undefined>(undefined);
+  const [leadSource, setLeadSource] = useState<'referral' | 'repeat_client' | 'website' | 'social' | 'direct' | null>(null);
+  // Structured lead source state
+  const [leadSources, setLeadSources] = useState<WorkspaceLeadSource[]>([]);
+  const [selectedLeadSourceId, setSelectedLeadSourceId] = useState<string | null>(null);
+  const [leadSourceDetail, setLeadSourceDetail] = useState('');
+  const [referrerEntityId, setReferrerEntityId] = useState<string | null>(null);
+  const [referrerName, setReferrerName] = useState('');
+  const [referrerQuery, setReferrerQuery] = useState('');
+  const [referrerResults, setReferrerResults] = useState<{ id: string; name: string; type: 'org' | 'contact' }[]>([]);
+  const [referrerSearching, setReferrerSearching] = useState(false);
+  const [referrerCreating, setReferrerCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const budgetEstimatedDisplay = budgetEstimated === undefined ? '' : String(budgetEstimated);
 
@@ -193,6 +203,9 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   const [calendarExpanded, setCalendarExpanded] = useState(false);
   const dateBlockRef = useRef<HTMLDivElement>(null);
   const modalContentRef = useRef<HTMLDivElement>(null);
+  const archetypeTriggerRef = useRef<HTMLButtonElement>(null);
+  const venueTriggerRef = useRef<HTMLInputElement>(null);
+  const referrerTriggerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) setCalendarExpanded(false);
@@ -278,6 +291,47 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
     };
   }, [eventDate, eventArchetype]);
 
+  // Fetch workspace lead sources on mount
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    getWorkspaceLeadSources().then((sources) => {
+      if (!cancelled) setLeadSources(sources);
+    });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  // Referrer search with debounce
+  useEffect(() => {
+    if (referrerQuery.length < 2) {
+      setReferrerResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setReferrerSearching(true);
+      try {
+        const res = await searchOmni(referrerQuery);
+        setReferrerResults(res.map((r) => ({
+          id: r.id,
+          name: r.type === 'org' ? r.name : [r.first_name, r.last_name].filter(Boolean).join(' '),
+          type: r.type,
+        })));
+      } catch {
+        setReferrerResults([]);
+      } finally {
+        setReferrerSearching(false);
+      }
+    }, 200);
+    return () => clearTimeout(t);
+  }, [referrerQuery]);
+
+  const selectedLeadSource = leadSources.find((s) => s.id === selectedLeadSourceId) ?? null;
+  // Show referrer picker for: (1) structured lead source with is_referral flag, OR (2) fallback "referral" pill, OR (3) any referral-category structured source
+  const showReferrerPicker =
+    selectedLeadSource?.is_referral === true ||
+    selectedLeadSource?.category === 'referral' ||
+    leadSource === 'referral';
+
   // Compute optimistic client name based on type
   const getOptimisticClientName = (): string => {
     if (clientType === 'couple') return coupleDisplayName || 'Couple';
@@ -333,6 +387,10 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
           notes: notesTrimmed || undefined,
           venueId: (selectedVenue?.id && selectedVenue.id.length > 0) ? selectedVenue.id : undefined,
           venueName: (!selectedVenue?.id && selectedVenue?.name) ? selectedVenue.name : undefined,
+          leadSource: leadSource ?? undefined,
+          leadSourceId: selectedLeadSourceId ?? undefined,
+          leadSourceDetail: leadSourceDetail.trim() || undefined,
+          referrerEntityId: referrerEntityId ?? undefined,
         };
       } else if (clientType === 'couple') {
         dealInput = {
@@ -352,6 +410,10 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
           notes: notesTrimmed || undefined,
           venueId: (selectedVenue?.id && selectedVenue.id.length > 0) ? selectedVenue.id : undefined,
           venueName: (!selectedVenue?.id && selectedVenue?.name) ? selectedVenue.name : undefined,
+          leadSource: leadSource ?? undefined,
+          leadSourceId: selectedLeadSourceId ?? undefined,
+          leadSourceDetail: leadSourceDetail.trim() || undefined,
+          referrerEntityId: referrerEntityId ?? undefined,
         };
       } else {
         // Company (default)
@@ -368,6 +430,10 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
           notes: notesTrimmed || undefined,
           venueId: (selectedVenue?.id && selectedVenue.id.length > 0) ? selectedVenue.id : undefined,
           venueName: (!selectedVenue?.id && selectedVenue?.name) ? selectedVenue.name : undefined,
+          leadSource: leadSource ?? undefined,
+          leadSourceId: selectedLeadSourceId ?? undefined,
+          leadSourceDetail: leadSourceDetail.trim() || undefined,
+          referrerEntityId: referrerEntityId ?? undefined,
         };
       }
 
@@ -404,6 +470,13 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
     setVenueQuery('');
     setNotes('');
     setBudgetEstimated(undefined);
+    setLeadSource(null);
+    setSelectedLeadSourceId(null);
+    setLeadSourceDetail('');
+    setReferrerEntityId(null);
+    setReferrerName('');
+    setReferrerQuery('');
+    setReferrerResults([]);
     setClientType('company');
     setIndividualForm({ firstName: '', lastName: '', email: '', phone: '' });
     setCoupleForm({ partnerAFirst: '', partnerALast: '', partnerAEmail: '', partnerBFirst: '', partnerBLast: '', partnerBEmail: '' });
@@ -424,20 +497,20 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
     }
   };
 
-  const pillBase = 'flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]';
-  const pillActive = 'bg-[var(--glass-bg-hover)] text-ink border border-[var(--glass-border)]';
-  const pillInactive = 'text-ink-muted hover:text-ink hover:bg-white/5 border border-transparent';
+  const pillBase = 'flex-1 rounded-[var(--stage-radius-input,6px)] px-3 py-1.5 text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]';
+  const pillActive = 'bg-[var(--ctx-well)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.12)]';
+  const pillInactive = 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] border border-transparent';
 
   return (
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto overflow-x-hidden">
           <motion.div
-            className="absolute inset-0 bg-obsidian/50 backdrop-blur-xl"
+            className="fixed inset-0 bg-[oklch(0.06_0_0_/_0.75)]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={UNUSONIC_PHYSICS}
+            transition={STAGE_MEDIUM}
             onMouseDown={onClose}
             onKeyDown={(e) => e.key === 'Escape' && onClose()}
             role="button"
@@ -450,16 +523,16 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            transition={UNUSONIC_PHYSICS}
+            transition={STAGE_MEDIUM}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-      <LiquidPanel className="flex flex-col overflow-hidden p-0 h-full">
+      <StagePanel surface="raised" className="flex flex-col overflow-hidden p-0 h-full rounded-[var(--stage-radius-panel,12px)] border border-[oklch(1_0_0_/_0.10)]">
         <div className="p-6 pb-4 shrink-0 min-w-0 overflow-hidden">
-          <h2 className="text-lg font-medium text-ink mb-1 truncate">
+          <h2 className="text-lg font-medium text-[var(--stage-text-primary)] mb-1 truncate">
             {stage === 1 ? 'Set the date' : 'New production'}
           </h2>
-          <p className="text-sm text-ink-muted break-words">
+          <p className="text-sm text-[var(--stage-text-secondary)] break-words">
             {stage === 1
               ? "Check availability for your date and event type. We'll show you demand at a glance."
               : 'Add client and details. This creates a deal in your pipeline (no event yet).'}
@@ -476,15 +549,15 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={UNUSONIC_PHYSICS}
-                className="space-y-4 min-w-0"
+                transition={STAGE_MEDIUM}
+                className="flex flex-col min-w-0" style={{ gap: 'var(--stage-gap-wide, 12px)' }}
               >
-                <div ref={dateBlockRef} className="space-y-4 min-w-0">
+                <div ref={dateBlockRef} className="flex flex-col min-w-0" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label
                         htmlFor="create-gig-proposed-date"
-                        className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5"
+                        className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5"
                       >
                         Proposed date
                       </label>
@@ -495,18 +568,20 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                         aria-expanded={calendarExpanded}
                         aria-haspopup="dialog"
                         className={cn(
-                          'flex w-full min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors duration-200',
-                          'border-[var(--glass-border)] bg-[var(--glass-bg)] text-left',
-                          'hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-inset'
+                          'flex w-full min-w-0 items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] text-left transition-colors duration-75',
+                          calendarExpanded
+                            ? 'border-[var(--stage-accent)] bg-[var(--ctx-well)] ring-1 ring-[var(--stage-accent)]'
+                            : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] hover:border-[oklch(1_0_0_/_0.20)]',
+                          'focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]'
                         )}
                       >
-                        <Calendar size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} aria-hidden />
-                        <span className={cn('flex-1 min-w-0 truncate', eventDate ? 'text-ink' : 'text-ink-muted/70')}>
+                        <Calendar size={14} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} aria-hidden />
+                        <span className={cn('flex-1 min-w-0 truncate tracking-tight', eventDate ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-tertiary)]')}>
                           {eventDate ? format(parseLocalDateString(eventDate), 'PPP') : 'Select date'}
                         </span>
                         <ChevronDown
-                          size={16}
-                          className={cn('shrink-0 text-ink-muted transition-transform duration-200', calendarExpanded && 'rotate-180')}
+                          size={14}
+                          className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-200', calendarExpanded && 'rotate-180')}
                           aria-hidden
                         />
                       </button>
@@ -514,31 +589,91 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                     <div>
                       <label
                         htmlFor="create-gig-event-archetype"
-                        className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5"
+                        className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5"
                       >
                         Event archetype
                       </label>
                       <div className="relative">
-                        <select
+                        <button
+                          ref={archetypeTriggerRef}
                           id="create-gig-event-archetype"
-                          value={eventArchetype ?? ''}
-                          onChange={(e) => setEventArchetype(e.target.value || null)}
+                          type="button"
+                          onClick={() => setArchetypeOpen((o) => !o)}
+                          onBlur={() => setTimeout(() => setArchetypeOpen(false), 180)}
+                          aria-expanded={archetypeOpen}
+                          aria-haspopup="listbox"
                           className={cn(
-                            'w-full rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] pl-3 pr-9 py-2.5 text-sm appearance-none cursor-pointer',
-                            'text-ink placeholder:text-ink-muted/70',
-                            'hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-inset'
+                            'flex w-full min-w-0 items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] text-left transition-colors duration-75',
+                            archetypeOpen
+                              ? 'border-[var(--stage-accent)] bg-[var(--ctx-well)] ring-1 ring-[var(--stage-accent)]'
+                              : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] hover:border-[oklch(1_0_0_/_0.20)]',
+                            'focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]'
                           )}
                         >
-                          <option value="">Select type</option>
-                          {EVENT_ARCHETYPES.map((a) => (
-                            <option key={a.value} value={a.value}>{a.label}</option>
-                          ))}
-                        </select>
-                        <ChevronDown
-                          size={16}
-                          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted"
-                          aria-hidden
-                        />
+                          <span className={cn('flex-1 min-w-0 truncate tracking-tight', eventArchetype ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-tertiary)]')}>
+                            {eventArchetype ? DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS] : 'Select type'}
+                          </span>
+                          <ChevronDown
+                            size={14}
+                            className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-200', archetypeOpen && 'rotate-180')}
+                            aria-hidden
+                          />
+                        </button>
+                        {archetypeOpen && createPortal(
+                          <div
+                            className="fixed inset-0 z-[60]"
+                            onMouseDown={() => setArchetypeOpen(false)}
+                          >
+                            <motion.div
+                              initial={{ opacity: 0, y: -4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -4 }}
+                              transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
+                              role="listbox"
+                              aria-label="Show archetype"
+                              data-surface="raised"
+                              onMouseDown={(e) => e.stopPropagation()}
+                              style={(() => {
+                                const rect = archetypeTriggerRef.current?.getBoundingClientRect();
+                                if (!rect) return {};
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                const dropUp = spaceBelow < 260;
+                                return {
+                                  position: 'fixed' as const,
+                                  left: rect.left,
+                                  width: rect.width,
+                                  ...(dropUp
+                                    ? { bottom: window.innerHeight - rect.top + 4 }
+                                    : { top: rect.bottom + 4 }),
+                                };
+                              })()}
+                              className="max-h-[240px] overflow-y-auto rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
+                            >
+                              {EVENT_ARCHETYPES.map((a) => (
+                                <button
+                                  key={a.value}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={eventArchetype === a.value}
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    setEventArchetype(a.value);
+                                    setArchetypeOpen(false);
+                                  }}
+                                  className={cn(
+                                    'flex w-full items-center px-3 py-2.5 text-left text-[length:var(--stage-input-font-size,13px)] tracking-tight transition-colors min-w-0',
+                                    eventArchetype === a.value
+                                      ? 'bg-[var(--ctx-well-hover)] text-[var(--stage-text-primary)] font-medium'
+                                      : 'text-[var(--stage-text-secondary)] hover:bg-[var(--ctx-well-hover)] hover:text-[var(--stage-text-primary)]'
+                                  )}
+                                >
+                                  {a.label}
+                                </button>
+                              ))}
+                            </motion.div>
+                          </div>,
+                          document.body
+                        )}
                       </div>
                     </div>
                   </div>
@@ -546,10 +681,10 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                     {calendarExpanded && (
                       <motion.div
                         key="calendar-row"
-                        initial={M3_SHARED_AXIS_Y_VARIANTS.hidden}
-                        animate={M3_SHARED_AXIS_Y_VARIANTS.visible}
-                        exit={{ opacity: 0, y: -12 }}
-                        transition={UNUSONIC_PHYSICS}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={STAGE_NAV_CROSSFADE}
                         className="w-full min-w-0"
                       >
                         <CalendarPanel
@@ -567,7 +702,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 {eventDate && eventArchetype && (
                   <div className="flex items-center gap-2 min-w-0">
                     {feasibilityLoading ? (
-                      <span className="text-sm text-ink-muted">Checking availability…</span>
+                      <span className="text-sm text-[var(--stage-text-secondary)]">Checking availability…</span>
                     ) : feasibility ? (
                       <FeasibilityBadge status={feasibility.status} message={feasibility.message} />
                     ) : null}
@@ -583,12 +718,12 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={UNUSONIC_PHYSICS}
-                className="space-y-4 min-w-0"
+                transition={STAGE_MEDIUM}
+                className="flex flex-col min-w-0" style={{ gap: 'var(--stage-gap-wide, 12px)' }}
               >
-            <div className="space-y-4 min-w-0">
+            <div className="flex flex-col min-w-0" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
               <div>
-                <label htmlFor="create-gig-title" className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5">
+                <label htmlFor="create-gig-title" className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5">
                   Title
                 </label>
                 <input
@@ -597,19 +732,19 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Summer Gala 2026"
-                  className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  className="w-full min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] transition-colors duration-75 hover:border-[oklch(1_0_0_/_0.20)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[var(--stage-accent)]"
                 />
               </div>
 
               {/* Client section */}
               <div>
-                <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5">
                   Client
                 </label>
 
                 {/* Client type toggle — only show when no existing client is selected (company mode) */}
                 {(clientType !== 'company' || !selectedClient) && (
-                  <div className="flex gap-1 p-1 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 mb-3">
+                  <div className="flex gap-1 p-1 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)]/50 mb-3">
                     <button
                       type="button"
                       onClick={() => handleClientTypeChange('company')}
@@ -639,7 +774,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
 
                 {clientType === 'company' && (
                   <Command
-                    className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] overflow-hidden min-w-0"
+                    className="rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] overflow-hidden min-w-0 transition-colors duration-75 focus-within:border-[var(--stage-accent)]"
                     loop
                   >
                     <Command.Input
@@ -651,10 +786,10 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                       onFocus={() => setClientOpen(true)}
                       onBlur={() => setTimeout(() => setClientOpen(false), 180)}
                       placeholder="Search org or contact…"
-                      className="w-full min-w-0 border-0 bg-transparent px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-0 truncate"
+                      className="w-full min-w-0 border-0 bg-transparent px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-0 truncate"
                     />
                     {clientOpen && (clientResults.length > 0 || (clientQuery.length >= 2 && !clientLoading)) && (
-                    <Command.List className="h-fit max-h-[200px] overflow-y-auto overflow-x-hidden border-t border-[var(--glass-border)]">
+                    <Command.List className="h-fit max-h-[200px] overflow-y-auto overflow-x-hidden border-t border-[oklch(1_0_0_/_0.04)] bg-[var(--ctx-dropdown)]">
                       <>
                           {clientResults.map((r) => (
                             <Command.Item
@@ -674,18 +809,18 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                                 setClientQuery('');
                                 setClientResults([]);
                               }}
-                              className="flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer hover:bg-[var(--glass-bg-hover)] data-[selected=true]:bg-[var(--glass-bg-hover)] min-w-0"
+                              className="flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer hover:bg-[var(--ctx-well-hover)] data-[selected=true]:bg-[var(--ctx-well-hover)] min-w-0"
                             >
                               {r.type === 'org' ? (
-                                <Building2 size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} />
+                                <Building2 size={16} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
                               ) : (
-                                <User size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} />
+                                <User size={16} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
                               )}
-                              <span className="text-ink truncate min-w-0">
+                              <span className="text-[var(--stage-text-primary)] truncate min-w-0">
                                 {r.type === 'org' ? r.name : `${r.first_name} ${r.last_name}`}
                               </span>
                               {r.type === 'contact' && r.email && (
-                                <span className="text-ink-muted text-xs truncate shrink-0 max-w-[120px]">{r.email}</span>
+                                <span className="text-[var(--stage-text-secondary)] text-xs truncate shrink-0 max-w-[120px]">{r.email}</span>
                               )}
                             </Command.Item>
                           ))}
@@ -697,7 +832,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                                 setClientQuery('');
                                 setClientResults([]);
                               }}
-                              className="flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer text-accent-sage hover:bg-[var(--glass-bg-hover)] data-[selected=true]:bg-[var(--glass-bg-hover)] min-w-0"
+                              className="flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well-hover)] data-[selected=true]:bg-[var(--ctx-well-hover)] min-w-0"
                             >
                               <Plus size={16} className="shrink-0" strokeWidth={1.5} />
                               <span className="truncate min-w-0">Add &quot;{clientQuery.trim()}&quot; as client</span>
@@ -716,13 +851,11 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                         label="First name"
                         value={individualForm.firstName}
                         onChange={(e) => setIndividualForm((p) => ({ ...p, firstName: e.target.value }))}
-                        className="bg-white/5 border-[var(--color-mercury)]"
                       />
                       <FloatingLabelInput
                         label="Last name"
                         value={individualForm.lastName}
                         onChange={(e) => setIndividualForm((p) => ({ ...p, lastName: e.target.value }))}
-                        className="bg-white/5 border-[var(--color-mercury)]"
                       />
                     </div>
                     <FloatingLabelInput
@@ -730,14 +863,14 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                       type="email"
                       value={individualForm.email}
                       onChange={(e) => setIndividualForm((p) => ({ ...p, email: e.target.value }))}
-                      className="bg-white/5 border-[var(--color-mercury)]"
+                      className="bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.20)] focus-within:border-[var(--stage-accent)] transition-colors duration-75"
                     />
                     <FloatingLabelInput
                       label="Phone (optional)"
                       type="tel"
                       value={individualForm.phone}
                       onChange={(e) => setIndividualForm((p) => ({ ...p, phone: e.target.value }))}
-                      className="bg-white/5 border-[var(--color-mercury)]"
+                      className="bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.20)] focus-within:border-[var(--stage-accent)] transition-colors duration-75"
                     />
                   </div>
                 )}
@@ -746,66 +879,60 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                   <div className="space-y-4">
                     {/* Partner A */}
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-2">Partner A</p>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-2">Partner A</p>
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
                           <FloatingLabelInput
                             label="First name"
                             value={coupleForm.partnerAFirst}
                             onChange={(e) => setCoupleForm((p) => ({ ...p, partnerAFirst: e.target.value }))}
-                            className="bg-white/5 border-[var(--color-mercury)]"
-                          />
+                              />
                           <FloatingLabelInput
                             label="Last name"
                             value={coupleForm.partnerALast}
                             onChange={(e) => setCoupleForm((p) => ({ ...p, partnerALast: e.target.value }))}
-                            className="bg-white/5 border-[var(--color-mercury)]"
-                          />
+                              />
                         </div>
                         <FloatingLabelInput
                           label="Email (optional)"
                           type="email"
                           value={coupleForm.partnerAEmail}
                           onChange={(e) => setCoupleForm((p) => ({ ...p, partnerAEmail: e.target.value }))}
-                          className="bg-white/5 border-[var(--color-mercury)]"
-                        />
+                          />
                       </div>
                     </div>
 
                     {/* Partner B */}
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted mb-2">Partner B</p>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-2">Partner B</p>
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
                           <FloatingLabelInput
                             label="First name"
                             value={coupleForm.partnerBFirst}
                             onChange={(e) => setCoupleForm((p) => ({ ...p, partnerBFirst: e.target.value }))}
-                            className="bg-white/5 border-[var(--color-mercury)]"
-                          />
+                              />
                           <FloatingLabelInput
                             label="Last name"
                             value={coupleForm.partnerBLast}
                             onChange={(e) => setCoupleForm((p) => ({ ...p, partnerBLast: e.target.value }))}
-                            className="bg-white/5 border-[var(--color-mercury)]"
-                          />
+                              />
                         </div>
                         <FloatingLabelInput
                           label="Email (optional)"
                           type="email"
                           value={coupleForm.partnerBEmail}
                           onChange={(e) => setCoupleForm((p) => ({ ...p, partnerBEmail: e.target.value }))}
-                          className="bg-white/5 border-[var(--color-mercury)]"
-                        />
+                          />
                       </div>
                     </div>
 
                     {/* Display name (auto/manual) */}
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted">Display name</p>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Display name</p>
                         {displayNameMode === 'auto' && (
-                          <span className="rounded-full border border-[var(--glass-border)] bg-white/5 px-2 py-0.5 text-[10px] text-ink-muted">
+                          <span className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-[10px] text-[var(--stage-text-secondary)]">
                             auto
                           </span>
                         )}
@@ -813,7 +940,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                           <button
                             type="button"
                             onClick={() => setDisplayNameMode('auto')}
-                            className="rounded-full border border-[var(--glass-border)] bg-white/5 px-2 py-0.5 text-[10px] text-ink-muted hover:text-ink transition-colors"
+                            className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-[10px] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                           >
                             reset to auto
                           </button>
@@ -827,7 +954,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                           setDisplayNameMode('manual');
                         }}
                         placeholder="e.g. Emma & James Johnson"
-                        className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                        className="w-full min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] transition-colors duration-75 hover:border-[oklch(1_0_0_/_0.20)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[var(--stage-accent)]"
                       />
                     </div>
                   </div>
@@ -836,11 +963,12 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
             </div>
 
             {/* Venue Selector */}
-            <div className="min-w-0 relative">
-              <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5">
+            <div className="min-w-0">
+              <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5">
                 Venue
               </label>
               <input
+                ref={venueTriggerRef}
                 type="text"
                 value={selectedVenue ? selectedVenue.name : venueQuery}
                 onChange={(e) => {
@@ -850,57 +978,85 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 onFocus={() => setVenueOpen(true)}
                 onBlur={() => setTimeout(() => setVenueOpen(false), 200)}
                 placeholder="Search venue or type to create…"
-                className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] truncate"
+                className="w-full min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] transition-colors duration-75 hover:border-[oklch(1_0_0_/_0.20)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[var(--stage-accent)] truncate"
               />
-              {venueOpen && venueQuery.length >= 1 && venueResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[180px] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] shadow-[var(--glass-shadow)]">
-                  {venueResults.map((r, i) =>
-                    r.type === 'venue' ? (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedVenue({
-                            id: r.id,
-                            name: r.name,
-                            address: r.address ?? undefined,
-                          });
-                          setVenueQuery('');
-                          setVenueResults([]);
-                        }}
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[var(--glass-bg-hover)] min-w-0"
-                      >
-                        <MapPin size={16} className="shrink-0 text-ink-muted" strokeWidth={1.5} />
-                        <span className="text-ink truncate min-w-0">{r.name}</span>
-                        {(r.address || r.city) && (
-                          <span className="text-ink-muted text-xs truncate shrink-0 max-w-[140px]">
-                            {[r.address, r.city, r.state].filter(Boolean).join(', ')}
-                          </span>
-                        )}
-                      </button>
-                    ) : (
-                      <button
-                        key={`create-${i}`}
-                        type="button"
-                        onClick={() => {
-                          setSelectedVenue({ id: '', name: r.query, address: null });
-                          setVenueQuery(r.query);
-                          setVenueResults([]);
-                        }}
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-accent-sage hover:bg-[var(--glass-bg-hover)] min-w-0"
-                      >
-                        <Plus size={16} className="shrink-0" strokeWidth={1.5} />
-                        <span className="truncate min-w-0">Create venue &quot;{r.query}&quot;</span>
-                      </button>
-                    )
-                  )}
-                </div>
+              {venueOpen && venueQuery.length >= 1 && venueResults.length > 0 && createPortal(
+                <div
+                  className="fixed inset-0 z-[60]"
+                  onMouseDown={() => setVenueOpen(false)}
+                >
+                  <div
+                    data-surface="raised"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={(() => {
+                      const rect = venueTriggerRef.current?.getBoundingClientRect();
+                      if (!rect) return {};
+                      const spaceBelow = window.innerHeight - rect.bottom;
+                      const dropUp = spaceBelow < 220;
+                      return {
+                        position: 'fixed' as const,
+                        left: rect.left,
+                        width: rect.width,
+                        ...(dropUp
+                          ? { bottom: window.innerHeight - rect.top + 4 }
+                          : { top: rect.bottom + 4 }),
+                      };
+                    })()}
+                    className="max-h-[180px] overflow-y-auto overflow-x-hidden rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
+                  >
+                    {venueResults.map((r, i) =>
+                      r.type === 'venue' ? (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            setSelectedVenue({
+                              id: r.id,
+                              name: r.name,
+                              address: r.address ?? undefined,
+                            });
+                            setVenueQuery('');
+                            setVenueResults([]);
+                            setVenueOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-[var(--ctx-well-hover)] min-w-0"
+                        >
+                          <MapPin size={16} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
+                          <span className="text-[var(--stage-text-primary)] truncate min-w-0">{r.name}</span>
+                          {(r.address || r.city) && (
+                            <span className="text-[var(--stage-text-secondary)] text-xs truncate shrink-0 max-w-[140px]">
+                              {[r.address, r.city, r.state].filter(Boolean).join(', ')}
+                            </span>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          key={`create-${i}`}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            setSelectedVenue({ id: '', name: r.query, address: null });
+                            setVenueQuery(r.query);
+                            setVenueResults([]);
+                            setVenueOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well-hover)] min-w-0"
+                        >
+                          <Plus size={16} className="shrink-0" strokeWidth={1.5} />
+                          <span className="truncate min-w-0">Create venue &quot;{r.query}&quot;</span>
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>,
+                document.body
               )}
             </div>
 
             {/* Optional: Rough Budget + Notes */}
             <div>
-              <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5">
                 Rough budget (optional)
               </label>
               <input
@@ -913,11 +1069,11 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                   setBudgetEstimated(v === '' ? undefined : Number(v));
                 }}
                 placeholder="e.g. 25000"
-                className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="w-full min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] transition-colors duration-75 hover:border-[oklch(1_0_0_/_0.20)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[var(--stage-accent)]"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5">
                 Notes (optional)
               </label>
               <textarea
@@ -925,8 +1081,210 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Internal notes…"
                 rows={2}
-                className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-none"
+                className="w-full min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 py-2.5 min-h-[calc(var(--stage-input-height,34px)*2)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] transition-colors duration-75 hover:border-[oklch(1_0_0_/_0.20)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[var(--stage-accent)] resize-none"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-1.5">
+                How did this come in? (optional)
+              </label>
+              {leadSources.length > 0 ? (
+                <div className="space-y-2.5">
+                  {/* Group by category */}
+                  {(['referral', 'digital', 'marketplace', 'offline', 'relationship', 'custom'] as const).map((cat) => {
+                    const group = leadSources.filter((s) => s.category === cat);
+                    if (group.length === 0) return null;
+                    return (
+                      <div key={cat}>
+                        <span className="block text-[9px] uppercase tracking-widest text-[var(--stage-text-secondary)]/30 mb-1">
+                          {cat}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.map((source) => (
+                            <button
+                              key={source.id}
+                              type="button"
+                              onClick={() => {
+                                if (selectedLeadSourceId === source.id) {
+                                  setSelectedLeadSourceId(null);
+                                  setLeadSource(null);
+                                  setReferrerEntityId(null);
+                                  setReferrerName('');
+                                  setReferrerQuery('');
+                                } else {
+                                  setSelectedLeadSourceId(source.id);
+                                  setLeadSource(null);
+                                  if (!source.is_referral) {
+                                    setReferrerEntityId(null);
+                                    setReferrerName('');
+                                    setReferrerQuery('');
+                                  }
+                                }
+                              }}
+                              className={cn(
+                                'rounded-[var(--stage-radius-input,6px)] border px-3 py-1.5 text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight transition-colors duration-75 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]',
+                                selectedLeadSourceId === source.id
+                                  ? 'border-[oklch(1_0_0_/_0.20)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)]'
+                                  : 'border-[oklch(1_0_0_/_0.08)] bg-transparent text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.16)] hover:bg-[var(--ctx-well)]'
+                              )}
+                            >
+                              {source.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                </div>
+              ) : (
+                /* Fallback: hardcoded pills if no workspace lead sources loaded */
+                <div className="flex flex-wrap gap-1.5">
+                  {([
+                    { value: 'referral', label: 'Referral' },
+                    { value: 'repeat_client', label: 'Repeat client' },
+                    { value: 'website', label: 'Website' },
+                    { value: 'social', label: 'Social' },
+                    { value: 'direct', label: 'Direct' },
+                  ] as const).map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setLeadSource(leadSource === value ? null : value)}
+                      className={cn(
+                        'rounded-[var(--stage-radius-input,6px)] border px-3 py-1.5 text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight transition-colors duration-75 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]',
+                        leadSource === value
+                          ? 'border-[oklch(1_0_0_/_0.20)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)]'
+                          : 'border-[oklch(1_0_0_/_0.08)] bg-transparent text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.16)] hover:bg-[var(--ctx-well)]'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Referrer picker — shown when any referral source is selected (structured or fallback) */}
+              <AnimatePresence>
+                {showReferrerPicker && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={STAGE_MEDIUM}
+                    className="overflow-hidden mt-2.5"
+                  >
+                    <label className="block text-[9px] uppercase tracking-widest text-[var(--stage-text-secondary)]/30 mb-1">
+                      Referred by
+                    </label>
+                    {referrerEntityId ? (
+                      <div className="flex items-center gap-2 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 py-2">
+                        <User className="size-3.5 text-[var(--stage-text-secondary)]/60 shrink-0" />
+                        <span className="text-sm text-[var(--stage-text-primary)] truncate flex-1">{referrerName}</span>
+                        <button
+                          type="button"
+                          onClick={() => { setReferrerEntityId(null); setReferrerName(''); setReferrerQuery(''); }}
+                          className="shrink-0 rounded-lg p-0.5 text-[var(--stage-text-secondary)]/40 hover:text-[var(--stage-text-secondary)] transition-colors"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          ref={referrerTriggerRef}
+                          value={referrerQuery}
+                          onChange={(e) => setReferrerQuery(e.target.value)}
+                          placeholder="Who referred this client?"
+                          className="w-full min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] transition-colors duration-75 hover:border-[oklch(1_0_0_/_0.20)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[var(--stage-accent)]"
+                        />
+                        {(referrerSearching || referrerCreating) && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 size-3.5 animate-spin text-[var(--stage-text-secondary)]/40" />
+                        )}
+                        {referrerQuery.length >= 2 && !referrerSearching && (referrerResults.length > 0 || !referrerCreating) && createPortal(
+                          <div
+                            className="fixed inset-0 z-[60]"
+                            onMouseDown={() => {
+                              setReferrerResults([]);
+                              setReferrerQuery('');
+                            }}
+                          >
+                            <div
+                              data-surface="raised"
+                              onMouseDown={(e) => e.stopPropagation()}
+                              style={(() => {
+                                const rect = referrerTriggerRef.current?.getBoundingClientRect();
+                                if (!rect) return {};
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                const dropUp = spaceBelow < 200;
+                                return {
+                                  position: 'fixed' as const,
+                                  left: rect.left,
+                                  width: rect.width,
+                                  ...(dropUp
+                                    ? { bottom: window.innerHeight - rect.top + 4 }
+                                    : { top: rect.bottom + 4 }),
+                                };
+                              })()}
+                              className="max-h-40 overflow-y-auto overflow-hidden rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
+                            >
+                              {referrerResults.map((r) => (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    setReferrerEntityId(r.id);
+                                    setReferrerName(r.name);
+                                    setReferrerQuery('');
+                                    setReferrerResults([]);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-[var(--stage-text-secondary)] hover:bg-[var(--ctx-well-hover)] hover:text-[var(--stage-text-primary)] transition-colors min-w-0"
+                                >
+                                  {r.type === 'org' ? (
+                                    <Building2 size={14} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
+                                  ) : (
+                                    <User size={14} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
+                                  )}
+                                  <span className="truncate min-w-0">{r.name}</span>
+                                </button>
+                              ))}
+                              {referrerResults.length === 0 && !referrerCreating && (
+                                <button
+                                  type="button"
+                                  onMouseDown={async (e) => {
+                                    e.stopPropagation();
+                                    const name = referrerQuery.trim();
+                                    if (!name) return;
+                                    setReferrerCreating(true);
+                                    try {
+                                      const result = await createGhostReferrerEntity(name);
+                                      if (result) {
+                                        setReferrerEntityId(result.id);
+                                        setReferrerName(result.name);
+                                        setReferrerQuery('');
+                                        setReferrerResults([]);
+                                      }
+                                    } finally {
+                                      setReferrerCreating(false);
+                                    }
+                                  }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well-hover)] transition-colors min-w-0"
+                                >
+                                  <Plus size={14} className="shrink-0" strokeWidth={1.5} />
+                                  <span className="truncate min-w-0">Add &quot;{referrerQuery.trim()}&quot; as referrer</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>,
+                          document.body
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
             </div>
             </motion.div>
             )}
@@ -934,14 +1292,14 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
 
           </div>
 
-          <div className="flex flex-col gap-2 p-6 pt-4 border-t border-[var(--glass-border)] shrink-0 bg-[var(--glass-bg)]/50 min-w-0 overflow-hidden">
+          <div className="flex flex-col gap-2 p-6 pt-4 border-t border-[oklch(1_0_0_/_0.04)] shrink-0 min-w-0 overflow-hidden">
             {!hasWorkspace && (
-              <p className="text-sm text-[var(--color-unusonic-error)] break-words">
+              <p className="text-[length:var(--stage-input-font-size,13px)] text-[var(--color-unusonic-error)] break-words">
                 No workspace selected. Complete onboarding first.
               </p>
             )}
             {hasWorkspace && error && (
-              <p className="text-sm text-[var(--color-unusonic-error)] break-words">{error}</p>
+              <p className="text-[length:var(--stage-input-font-size,13px)] text-[var(--color-unusonic-error)] break-words">{error}</p>
             )}
             <div className="flex gap-2 min-w-0">
             {stage === 1 ? (
@@ -949,7 +1307,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 rounded-xl border border-[var(--glass-border)] py-2.5 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+                  className="flex-1 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight text-[var(--stage-text-secondary)] transition-colors hover:bg-[var(--ctx-well-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   Cancel
                 </button>
@@ -961,9 +1319,9 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                       e.stopPropagation();
                       goToStage(2);
                     }}
-                    className="flex-1 m3-btn-tonal min-h-[44px] rounded-xl transition-[transform,filter] hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] flex items-center justify-center gap-2"
+                    className="flex-1 stage-btn stage-btn-primary h-[var(--stage-input-height,34px)] rounded-[var(--stage-radius-input,6px)] disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] flex items-center justify-center gap-2"
                   >
-                    Next <ChevronRight size={16} />
+                    Next <ChevronRight size={14} strokeWidth={1.5} />
                   </button>
               </>
             ) : (
@@ -975,23 +1333,23 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                     e.stopPropagation();
                     goToStage(1);
                   }}
-                  className="flex-1 rounded-xl border border-[var(--glass-border)] py-2.5 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className="flex-1 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight text-[var(--stage-text-secondary)] transition-colors hover:bg-[var(--ctx-well-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={!hasWorkspace || isPending}
-                  className="flex-1 m3-btn-tonal min-h-[44px] rounded-xl transition-[transform,filter] hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] flex items-center justify-center gap-2"
+                  className="flex-1 stage-btn stage-btn-primary h-[var(--stage-input-height,34px)] rounded-[var(--stage-radius-input,6px)] disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] flex items-center justify-center gap-2"
                 >
-                  {isPending ? 'Creating…' : 'Create deal'}
+                  {isPending ? 'Creating...' : 'Create deal'}
                 </button>
               </>
             )}
             </div>
           </div>
         </form>
-      </LiquidPanel>
+      </StagePanel>
           </motion.div>
         </div>
       )}

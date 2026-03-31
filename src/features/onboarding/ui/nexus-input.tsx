@@ -19,7 +19,10 @@ export function NexusInput({
 }: NexusInputProps) {
   const [localValue, setLocalValue] = useState(value);
   const onDebounceRef = useRef(onDebounce);
-  onDebounceRef.current = onDebounce;
+
+  useEffect(() => {
+    onDebounceRef.current = onDebounce;
+  }, [onDebounce]);
 
   useEffect(() => {
     setLocalValue(value);
@@ -40,14 +43,14 @@ export function NexusInput({
 
   return (
     <div className="relative flex w-full items-center">
-      <span className="text-4xl text-ceramic/30 mr-1 shrink-0 select-none font-light">@</span>
+      <span className="text-4xl text-[var(--stage-text-tertiary)] mr-1 shrink-0 select-none font-light">@</span>
       <input
         type="text"
         value={localValue}
         onChange={handleChange}
         disabled={disabled}
         placeholder={placeholder}
-        className="flex-1 min-w-0 bg-transparent text-left text-4xl font-light tracking-tight text-ceramic placeholder:text-ceramic/10 outline-none caret-neon-blue border-b border-ceramic/10 focus:border-neon-blue/50 transition-colors pb-2 disabled:opacity-50"
+        className="flex-1 min-w-0 bg-transparent text-left text-4xl font-light tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none caret-[var(--stage-accent)] border-b border-[oklch(1_0_0_/_0.10)] focus:border-[oklch(1_0_0_/_0.22)] transition-colors pb-2 disabled:opacity-50"
         autoComplete="off"
         autoFocus
       />

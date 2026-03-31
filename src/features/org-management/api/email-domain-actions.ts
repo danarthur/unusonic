@@ -18,6 +18,7 @@ import {
 const RESERVED_DOMAINS = [
   'signallive.io',
   'signal.live',
+  'unusonic.com',
   'resend.dev',
   'gmail.com',
   'outlook.com',

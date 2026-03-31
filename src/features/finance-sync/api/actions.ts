@@ -579,7 +579,7 @@ export async function getQuickBooksConnection(workspaceId: string) {
 // Transform Helpers
 // ============================================================================
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 function transformInvoice(data: any): Invoice {
   return {
     id: data.id,

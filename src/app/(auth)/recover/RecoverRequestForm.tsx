@@ -40,9 +40,9 @@ export function RecoverRequestForm() {
 
   if (status === 'done') {
     return (
-      <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center">
-        <p className="text-ceramic text-sm">{message}</p>
-        <p className="text-mercury text-xs mt-4">
+      <div className="rounded-2xl bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] p-6 text-center">
+        <p className="text-[var(--stage-text-primary)] text-sm">{message}</p>
+        <p className="text-[var(--stage-text-secondary)] text-xs mt-4">
           You can close this page. Check your email (and spam folder).
         </p>
       </div>
@@ -62,17 +62,17 @@ export function RecoverRequestForm() {
         data-lpignore="true"
         data-form-type="other"
         data-1p-ignore
-        className="w-full px-4 py-2.5 rounded-xl bg-obsidian/50 border border-white/10 text-ceramic placeholder:text-mercury/60 focus:outline-none focus:ring-2 focus:ring-neon/40"
+        className="w-full px-4 py-2.5 rounded-xl bg-[var(--stage-void)]/50 border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]/40"
       />
       <button
         type="submit"
         disabled={status === 'loading'}
-        className="w-full py-2.5 rounded-xl bg-neon/20 text-neon border border-neon/40 font-medium hover:bg-neon/30 disabled:opacity-50 transition-colors"
+        className="w-full py-2.5 rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] border border-[oklch(1_0_0_/_0.22)] font-medium hover:brightness-[1.06] disabled:opacity-50 transition-[filter]"
       >
         {status === 'loading' ? 'Sending…' : 'Continue'}
       </button>
       {status === 'error' && message && (
-        <p className="text-red-400 text-sm text-center">{message}</p>
+        <p className="text-[var(--color-unusonic-error)] text-sm text-center">{message}</p>
       )}
     </form>
   );

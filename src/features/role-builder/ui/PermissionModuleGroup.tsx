@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { FLUID_SPRING } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { PermissionRow } from './PermissionRow';
 import { MODULE_LABELS, type PermissionDefinition, type PermissionModuleId } from '../model/permission-metadata';
 
@@ -23,25 +23,25 @@ export function PermissionModuleGroup({
   const label = MODULE_LABELS[moduleId];
 
   return (
-    <div className="liquid-card overflow-hidden border border-[var(--glass-border)]">
+    <div className="stage-panel overflow-hidden border border-[var(--stage-border)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
           'flex w-full items-center justify-between gap-3 px-4 py-3 text-left',
-          'text-ceramic tracking-tight font-medium',
-          'border-b border-[var(--glass-border)]',
-          'hover:bg-[var(--glass-bg)] transition-colors'
+          'text-[var(--stage-text-primary)] tracking-tight font-medium',
+          'border-b border-[var(--stage-border)]',
+          'hover:bg-[var(--stage-surface)] transition-colors'
         )}
       >
         <span>{label}</span>
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
-          transition={FLUID_SPRING}
-          className="text-ink-muted"
+          transition={STAGE_LIGHT}
+          className="text-[var(--stage-text-secondary)]"
           aria-hidden
         >
-          <ChevronDown className="size-4" />
+          <ChevronDown className="size-4" strokeWidth={1.5} />
         </motion.span>
       </button>
       <AnimatePresence initial={false}>
@@ -50,7 +50,7 @@ export function PermissionModuleGroup({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={FLUID_SPRING}
+            transition={STAGE_MEDIUM}
             className="overflow-hidden"
           >
             <div className="px-4 py-2">

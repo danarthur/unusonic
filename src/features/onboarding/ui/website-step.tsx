@@ -143,7 +143,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                     onChange={(e) => setUrl(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAutoBuild()}
                     placeholder="yourcompany.com"
-                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-ceramic placeholder:text-mercury text-base font-sans caret-neon-blue"
+                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] text-base font-sans caret-[var(--stage-accent)]"
                     data-lpignore="true"
                     data-form-type="other"
                     data-1p-ignore
@@ -155,20 +155,17 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                 <motion.button
                   type="button"
                   onClick={() => url.trim() && handleAutoBuild()}
-                  whileTap={url.trim() ? { scale: 0.98 } : undefined}
                   transition={springConfig}
                   aria-disabled={!url.trim()}
-                  className={`btn-sheen-hover relative overflow-hidden flex-1 min-w-[140px] py-3 rounded-full font-medium text-sm tracking-tight text-ceramic border border-[oklch(1_0_0/0.1)] shadow-[0_4px_24px_-1px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)] bg-neon-blue flex items-center justify-center ${!url.trim() ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`btn-sheen-hover relative overflow-hidden flex-1 min-w-[140px] py-3 rounded-full font-medium text-sm tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0/0.1)] shadow-[0_4px_24px_-1px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)] bg-[var(--stage-accent)] flex items-center justify-center transition-[filter] ${!url.trim() ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-[1.04] active:brightness-[0.98]'}`}
                 >
                   <span className="relative z-10">Build with Aion</span>
                 </motion.button>
                 <motion.button
                   type="button"
                   onClick={onSkip}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                   transition={springConfig}
-                  className="py-3 px-5 rounded-full font-medium text-sm text-ceramic/90 border border-[var(--color-mercury)]/40 hover:bg-ink/10 hover:border-[var(--color-mercury)]/60"
+                  className="py-3 px-5 rounded-full font-medium text-sm text-[var(--stage-text-primary)]/90 border border-[oklch(1_0_0_/_0.08)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.08)]/60 hover:brightness-[1.03] transition-[background-color,border-color,filter]"
                 >
                   Configure manually
                 </motion.button>
@@ -188,9 +185,9 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
             transition={phaseTransition}
             className="w-full flex flex-col items-center justify-center gap-6 py-8"
           >
-            <div className="liquid-card liquid-levitation rounded-3xl border border-[var(--glass-border)] p-8 flex flex-col items-center gap-6 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2),inset_0_1px_0_0_var(--color-glass-highlight)]">
-              <LivingLogo status="loading" size="xl" className="text-ceramic" />
-              <p className="text-sm text-mercury min-h-[1.25rem] text-center max-w-xs">
+            <div className="stage-panel liquid-levitation rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] p-8 flex flex-col items-center gap-6 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2),inset_0_1px_0_0_oklch(1_0_0/0.06)]">
+              <LivingLogo status="loading" size="xl" className="text-[var(--stage-text-primary)]" />
+              <p className="text-sm text-[var(--stage-text-tertiary)] min-h-[1.25rem] text-center max-w-xs">
                 {THINKING_STATUSES[statusIndex]}
               </p>
             </div>
@@ -200,21 +197,21 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
               transition={springConfig}
               className="text-center w-full max-w-xs"
             >
-              <p className="text-xs text-ceramic/40 font-mono truncate">{url.trim()}</p>
+              <p className="text-xs text-[var(--stage-text-primary)]/40 font-mono truncate">{url.trim()}</p>
             </motion.div>
             {/* Skeleton preview — shape of the proposal card */}
-            <div className="w-full liquid-card rounded-3xl border border-[var(--glass-border)] p-6 opacity-50">
+            <div className="w-full stage-panel rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] p-6 opacity-50">
               <div className="flex items-center gap-4 mb-4">
-                <div className="size-14 rounded-xl bg-ink/10 animate-pulse shrink-0" />
+                <div className="size-14 rounded-xl bg-[oklch(1_0_0_/_0.10)] stage-skeleton shrink-0" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 rounded-md bg-ink/10 animate-pulse w-3/4" />
-                  <div className="h-3 rounded-md bg-ink/10 animate-pulse w-1/2" />
+                  <div className="h-4 rounded-md bg-[oklch(1_0_0_/_0.10)] stage-skeleton w-3/4" />
+                  <div className="h-3 rounded-md bg-[oklch(1_0_0_/_0.10)] stage-skeleton w-1/2" />
                 </div>
               </div>
               <div className="flex gap-2">
-                <div className="h-6 rounded-full bg-ink/10 animate-pulse w-20" />
-                <div className="h-6 rounded-full bg-ink/10 animate-pulse w-16" />
-                <div className="h-6 rounded-full bg-ink/10 animate-pulse w-24" />
+                <div className="h-6 rounded-full bg-[oklch(1_0_0_/_0.10)] stage-skeleton w-20" />
+                <div className="h-6 rounded-full bg-[oklch(1_0_0_/_0.10)] stage-skeleton w-16" />
+                <div className="h-6 rounded-full bg-[oklch(1_0_0_/_0.10)] stage-skeleton w-24" />
               </div>
             </div>
           </motion.div>
@@ -228,38 +225,38 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -slideX }}
             transition={phaseTransition}
-            className="w-full liquid-card liquid-levitation rounded-3xl border border-[var(--glass-border)] p-6 md:p-8 flex flex-col gap-6 md:gap-8"
+            className="w-full stage-panel liquid-levitation rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] p-6 md:p-8 flex flex-col gap-6 md:gap-8"
           >
-            <p className="text-xs uppercase tracking-widest text-mercury/60">
+            <p className="text-xs uppercase tracking-widest text-[var(--stage-text-tertiary)]/60">
               Aion prepared this from your site — review and confirm.
             </p>
 
             {/* Profile */}
             <section>
-              <span className="text-xs uppercase tracking-widest text-mercury/60">Profile</span>
+              <span className="text-xs uppercase tracking-widest text-[var(--stage-text-tertiary)]/60">Profile</span>
               <div className="mt-3 flex items-center gap-4">
                 {result.data.logoUrl ? (
                   <img
                     src={result.data.logoUrl}
                     alt=""
-                    className="size-14 rounded-xl object-cover bg-ink/10 shrink-0"
+                    className="size-14 rounded-xl object-cover bg-[oklch(1_0_0_/_0.10)] shrink-0"
                   />
                 ) : (
-                  <div className="size-14 rounded-xl bg-ink/10 flex items-center justify-center shrink-0">
-                    <Building2 className="size-7 text-ink-muted" />
+                  <div className="size-14 rounded-xl bg-[oklch(1_0_0_/_0.10)] flex items-center justify-center shrink-0">
+                    <Building2 className="size-7 text-[var(--stage-text-secondary)]" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-lg font-medium tracking-tight text-ceramic truncate">
+                  <p className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)] truncate">
                     {result.data.name?.trim() || 'Company'}
                   </p>
                   {result.data.website && (
-                    <p className="text-sm text-mercury truncate">{result.data.website}</p>
+                    <p className="text-sm text-[var(--stage-text-tertiary)] truncate">{result.data.website}</p>
                   )}
                 </div>
               </div>
-              <p className="mt-2 text-[11px] uppercase tracking-widest text-mercury/60">
-                Suggested for you: <span className="text-neon normal-case">{personaLabel} · {tierLabel}</span>
+              <p className="mt-2 text-[11px] uppercase tracking-widest text-[var(--stage-text-tertiary)]/60">
+                Suggested for you: <span className="text-[var(--stage-accent)] normal-case">{personaLabel} · {tierLabel}</span>
               </p>
             </section>
 
@@ -278,21 +275,17 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
               <motion.button
                 type="button"
                 onClick={handleConfirm}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 transition={springConfig}
-                className="flex-1 w-full py-3 rounded-full font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 flex items-center justify-center gap-2"
+                className="flex-1 w-full py-3 rounded-full font-medium text-sm bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] active:brightness-[0.98] transition-[filter] flex items-center justify-center gap-2"
               >
                 Confirm & Launch
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
               </motion.button>
               <motion.button
                 type="button"
                 onClick={handleTryAnother}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 transition={springConfig}
-                className="py-3 px-5 rounded-full font-medium text-sm text-ceramic/90 border border-[var(--color-mercury)]/40 hover:bg-ink/10 hover:border-[var(--color-mercury)]/60"
+                className="py-3 px-5 rounded-full font-medium text-sm text-[var(--stage-text-primary)]/90 border border-[oklch(1_0_0_/_0.08)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.08)]/60 hover:brightness-[1.03] transition-[background-color,border-color,filter]"
               >
                 Try another URL
               </motion.button>

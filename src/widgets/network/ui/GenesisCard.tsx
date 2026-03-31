@@ -54,12 +54,12 @@ export function GenesisCard() {
       className="w-full"
     >
       <form action={submitAction} className="flex flex-col gap-8">
-        {/* 1. Identity: Name + Signal frequency (slug) */}
+        {/* 1. Identity: Name + Unusonic frequency (slug) */}
         <section className="space-y-4">
           <div>
             <label
               htmlFor="genesis-name"
-              className="mb-2 block text-xs font-medium uppercase tracking-widest text-ink-muted"
+              className="mb-2 block text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
             >
               Organization name
             </label>
@@ -71,21 +71,21 @@ export function GenesisCard() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="h-11 border-mercury bg-obsidian/50 text-ceramic placeholder:text-ink-muted/60 text-base rounded-xl px-4"
+              className="h-11 border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 text-base rounded-xl px-4"
             />
           </div>
           <SlugInput
             nameValue={name}
             value={slugOverride || derivedSlug}
             onChange={(val) => setSlugOverride(val)}
-            label="Signal frequency (URL)"
-            prefix="signal.com/"
+            label="Your Unusonic URL"
+            prefix="unusonic.com/"
           />
         </section>
 
         {/* 2. Visuals: Brand color + logo (upload or link) */}
         <section className="space-y-5">
-          <span className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+          <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
             Brand
           </span>
           <ColorTuner value={brandColor} onChange={setBrandColor} />
@@ -99,7 +99,7 @@ export function GenesisCard() {
 
         {/* 3. Capacity: Commission level */}
         <section>
-          <TierSelector value={tier} onChange={setTier} label="Commission level" />
+          <TierSelector value={tier} onChange={setTier} label="Plan" />
         </section>
 
         {/* Hidden fields for form submission */}
@@ -115,17 +115,17 @@ export function GenesisCard() {
           type="submit"
           disabled={isPending || !name.trim()}
           className={cn(
-            'liquid-levitation mt-2 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-medium transition-all duration-300',
-            'border border-mercury h-12',
-            'bg-neon-blue/15 text-neon-blue',
-            'hover:bg-neon-blue/25 hover:border-neon-blue/40',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue/40 focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian',
+            'mt-2 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-medium transition-all duration-300',
+            'border border-[oklch(1_0_0_/_0.08)] h-12',
+            'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]',
+            'hover:bg-[var(--stage-accent)]/25 hover:border-[var(--stage-accent)]/40',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
             'disabled:pointer-events-none disabled:opacity-50',
-            'shadow-[0_0_0_1px_var(--color-mercury),inset_0_1px_0_0_var(--color-glass-highlight)]'
+            'shadow-[0_0_0_1px_var(--stage-edge-subtle),inset_0_1px_0_0_var(--stage-edge-top)]'
           )}
         >
           {isPending ? (
-            <span className="text-ink-muted">Launching…</span>
+            <span className="text-[var(--stage-text-secondary)]">Setting up…</span>
           ) : (
             <>
               <svg
@@ -140,7 +140,7 @@ export function GenesisCard() {
               >
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
-              <span>Launch organization</span>
+              <span>Create studio</span>
             </>
           )}
         </button>

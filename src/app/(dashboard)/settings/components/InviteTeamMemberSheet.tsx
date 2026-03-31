@@ -121,13 +121,13 @@ export function InviteTeamMemberSheet({
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild className={triggerClassName}>
-        <Button variant="outline" size="sm" className="gap-2 border-[var(--color-mercury)] text-ink hover:bg-ink/5">
+        <Button variant="outline" size="sm" className="gap-2 border-[var(--stage-border)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)]">
           <Plus className="h-4 w-4" />
           Invite team member
         </Button>
       </SheetTrigger>
       <SheetContent side="center" className="flex max-h-[90vh] flex-col overflow-hidden p-0">
-        <SheetHeader className="shrink-0 border-b border-[var(--color-mercury)] p-6 pb-4">
+        <SheetHeader className="shrink-0 border-b border-[var(--stage-border)] p-6 pb-4">
           <SheetTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
             Invite team member
@@ -138,62 +138,62 @@ export function InviteTeamMemberSheet({
           className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6 pt-4"
         >
           {rootError && (
-            <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            <div className="mb-4 rounded-xl border border-[var(--color-unusonic-error)]/20 bg-[var(--color-unusonic-error)]/10 px-3 py-2 text-sm text-[var(--color-unusonic-error)]">
               {rootError}
             </div>
           )}
 
           {/* Section A: Roster details (required) */}
           <div className="space-y-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+            <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight">
               Roster details
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="invite-first_name" className="block text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5">First name</label>
+                <label htmlFor="invite-first_name" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">First name</label>
                 <Input
                   id="invite-first_name"
                   {...form.register('first_name', { required: 'First name required' })}
-                  className="border-[var(--color-mercury)] bg-transparent"
+                  className="border-[var(--stage-border)] bg-[var(--stage-surface-elevated)]"
                   placeholder="Jane"
                 />
                 {form.formState.errors.first_name && (
-                  <p className="text-xs text-red-400">{form.formState.errors.first_name.message}</p>
+                  <p className="text-xs text-[var(--color-unusonic-error)]">{form.formState.errors.first_name.message}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <label htmlFor="invite-last_name" className="block text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5">Last name</label>
+                <label htmlFor="invite-last_name" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Last name</label>
                 <Input
                   id="invite-last_name"
                   {...form.register('last_name', { required: 'Last name required' })}
-                  className="border-[var(--color-mercury)] bg-transparent"
+                  className="border-[var(--stage-border)] bg-[var(--stage-surface-elevated)]"
                   placeholder="Doe"
                 />
                 {form.formState.errors.last_name && (
-                  <p className="text-xs text-red-400">{form.formState.errors.last_name.message}</p>
+                  <p className="text-xs text-[var(--color-unusonic-error)]">{form.formState.errors.last_name.message}</p>
                 )}
               </div>
             </div>
             <div className="space-y-2">
-              <label htmlFor="invite-email" className="block text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5">Email</label>
+              <label htmlFor="invite-email" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Email</label>
               <Input
                 id="invite-email"
                 type="email"
                 {...form.register('email', { required: 'Email required' })}
-                className="border-[var(--color-mercury)] bg-transparent"
+                className="border-[var(--stage-border)] bg-[var(--stage-surface-elevated)]"
                 placeholder="jane@company.com"
               />
               {form.formState.errors.email && (
-                <p className="text-xs text-red-400">{form.formState.errors.email.message}</p>
+                <p className="text-xs text-[var(--color-unusonic-error)]">{form.formState.errors.email.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <label className="block text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5">Internal team role</label>
+              <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Internal team role</label>
               <Select
                 value={form.watch('internal_role')}
                 onValueChange={(v) => form.setValue('internal_role', v as InviteInternalRole)}
               >
-                <SelectTrigger className="border-[var(--color-mercury)] bg-transparent">
+                <SelectTrigger className="border-[var(--stage-border)] bg-[var(--stage-surface-elevated)]">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent className="max-h-64 overflow-y-auto">
@@ -204,30 +204,30 @@ export function InviteTeamMemberSheet({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-ink-muted">
+              <p className="text-xs text-[var(--stage-text-secondary)]">
                 Their rank on the org roster (scheduling, crew, etc.)
               </p>
             </div>
             <div className="space-y-2">
-              <label htmlFor="invite-job_title" className="block text-xs font-medium uppercase tracking-widest text-ink-muted mb-1.5">Job title (optional)</label>
+              <label htmlFor="invite-job_title" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Job title (optional)</label>
               <Input
                 id="invite-job_title"
                 {...form.register('job_title')}
-                className="border-[var(--color-mercury)] bg-transparent"
+                className="border-[var(--stage-border)] bg-[var(--stage-surface-elevated)]"
                 placeholder="e.g. Audio A1"
               />
             </div>
           </div>
 
-          {/* Section B: Grant Signal login access */}
-          <div className="mt-8 space-y-4 border-t border-[var(--color-mercury)] pt-6">
-            <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+          {/* Section B: Grant Unusonic login access */}
+          <div className="mt-8 space-y-4 border-t border-[var(--stage-border)] pt-6">
+            <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight">
               System access
             </p>
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--color-mercury)] bg-ink/[0.02] p-4">
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface)] p-4">
               <div>
-                <p className="font-medium text-ink">Grant Signal login access?</p>
-                <p className="text-xs text-ink-muted mt-0.5">
+                <p className="font-medium text-[var(--stage-text-primary)]">Grant Unusonic login access?</p>
+                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
                   If off, they are only on the roster (no invite email). Turn on to send an invite and assign a workspace role.
                 </p>
               </div>
@@ -237,7 +237,7 @@ export function InviteTeamMemberSheet({
                   form.setValue('grant_workspace_access', checked);
                   if (!checked) form.setValue('workspace_role_id', '');
                 }}
-                aria-label="Grant Signal login access"
+                aria-label="Grant Unusonic login access"
               />
             </div>
           </div>
@@ -245,18 +245,18 @@ export function InviteTeamMemberSheet({
           {/* Section C: Workspace role (only when grant access is on) */}
           {grantAccess && (
             <div className="mt-6 space-y-4">
-              <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+              <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight">
                 Workspace role
               </p>
               {rolesLoading ? (
-                <div className="h-10 w-48 animate-pulse rounded-xl border border-[var(--color-mercury)] bg-ink/5" />
+                <div className="h-10 w-48 stage-skeleton rounded-xl bg-[var(--stage-surface-elevated)]" />
               ) : (
                 <div className="space-y-2">
                   <Select
                     value={form.watch('workspace_role_id')}
                     onValueChange={(v) => form.setValue('workspace_role_id', v)}
                   >
-                    <SelectTrigger className="border-[var(--color-mercury)] bg-transparent">
+                    <SelectTrigger className="border-[var(--stage-border)] bg-[var(--stage-surface-elevated)]">
                       <SelectValue placeholder="Select role (required)" />
                     </SelectTrigger>
                     <SelectContent className="max-h-64 overflow-y-auto">
@@ -268,9 +268,9 @@ export function InviteTeamMemberSheet({
                     </SelectContent>
                   </Select>
                   {form.formState.errors.workspace_role_id && (
-                    <p className="text-xs text-red-400">{form.formState.errors.workspace_role_id.message}</p>
+                    <p className="text-xs text-[var(--color-unusonic-error)]">{form.formState.errors.workspace_role_id.message}</p>
                   )}
-                  <p className="text-xs text-ink-muted">
+                  <p className="text-xs text-[var(--stage-text-secondary)]">
                     What they can do in the app (permissions bundle).
                   </p>
                 </div>
@@ -278,7 +278,7 @@ export function InviteTeamMemberSheet({
             </div>
           )}
 
-          <div className="mt-8 flex shrink-0 justify-end gap-2 border-t border-[var(--color-mercury)] pt-6">
+          <div className="mt-8 flex shrink-0 justify-end gap-2 border-t border-[var(--stage-border)] pt-6">
             <Button
               type="button"
               variant="ghost"

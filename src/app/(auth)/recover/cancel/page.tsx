@@ -38,31 +38,31 @@ export default async function RecoverCancelPage({ searchParams }: PageProps) {
       <div className="relative z-10 w-full max-w-md text-center">
         {cancelled ? (
           <>
-            <h1 className="text-xl font-semibold tracking-tight text-ceramic mb-2">
+            <h1 className="text-xl font-semibold tracking-tight text-[var(--stage-text-primary)] mb-2">
               Recovery cancelled
             </h1>
-            <p className="text-mercury text-sm mb-6">
+            <p className="text-[var(--stage-text-secondary)] text-sm mb-6">
               The recovery process has been stopped. Your account is secure.
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center rounded-xl bg-neon/20 text-neon border border-neon/40 px-4 py-2.5 text-sm font-medium hover:bg-neon/30 transition-colors"
+              className="inline-flex items-center justify-center rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] border border-[oklch(1_0_0_/_0.22)] px-4 py-2.5 text-sm font-medium hover:brightness-[1.06] transition-[filter]"
             >
               Sign in
             </Link>
           </>
         ) : (
           <>
-            <h1 className="text-xl font-semibold tracking-tight text-ceramic mb-2">
+            <h1 className="text-xl font-semibold tracking-tight text-[var(--stage-text-primary)] mb-2">
               Link invalid or already used
             </h1>
-            <p className="text-mercury text-sm mb-6">
+            <p className="text-[var(--stage-text-secondary)] text-sm mb-6">
               This cancel link has expired or was already used. If you didn’t request a recovery,
               sign in and cancel from Security settings.
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center rounded-xl bg-white/10 text-ceramic border border-white/10 px-4 py-2.5 text-sm font-medium hover:bg-white/15 transition-colors"
+              className="inline-flex items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] px-4 py-2.5 text-sm font-medium hover:brightness-[1.06] transition-[filter]"
             >
               Sign in
             </Link>

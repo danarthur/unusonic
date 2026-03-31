@@ -45,7 +45,7 @@ export function RoleEditorForm({
     <form onSubmit={handleSubmit(onValidSubmit)} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="role-name" className="text-xs uppercase tracking-widest text-ink-muted block mb-1.5">
+          <label htmlFor="role-name" className="text-xs uppercase tracking-widest text-[var(--stage-text-secondary)] block mb-1.5">
             Role name
           </label>
           <Input
@@ -54,14 +54,14 @@ export function RoleEditorForm({
             onChange={handleNameChange}
             disabled={isSystemRole}
             placeholder="e.g. Warehouse Manager"
-            className="bg-[var(--glass-bg)] border-[var(--glass-border)] text-ceramic placeholder:text-ink-muted/70"
+            className="bg-[var(--stage-surface-elevated)] border-[var(--stage-border)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/70"
           />
           {errors?.name?.message && (
             <p className="text-[var(--color-unusonic-error)] text-xs leading-relaxed mt-1">{String(errors.name.message)}</p>
           )}
         </div>
         <div>
-          <label htmlFor="role-slug" className="text-xs uppercase tracking-widest text-ink-muted block mb-1.5">
+          <label htmlFor="role-slug" className="text-xs uppercase tracking-widest text-[var(--stage-text-secondary)] block mb-1.5">
             Slug
           </label>
           <Input
@@ -69,7 +69,7 @@ export function RoleEditorForm({
             {...register('slug')}
             disabled={isSystemRole}
             placeholder="e.g. warehouse-manager"
-            className="bg-[var(--glass-bg)] border-[var(--glass-border)] text-ceramic placeholder:text-ink-muted/70 font-mono text-sm"
+            className="bg-[var(--stage-surface-elevated)] border-[var(--stage-border)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/70 font-mono text-sm"
           />
           {errors?.slug?.message && (
             <p className="text-[var(--color-unusonic-error)] text-xs leading-relaxed mt-1">{String(errors.slug.message)}</p>
@@ -78,7 +78,7 @@ export function RoleEditorForm({
       </div>
 
       <div>
-        <h3 className="text-ceramic tracking-tight font-medium mb-3">Permissions</h3>
+        <h3 className="text-[var(--stage-text-primary)] tracking-tight font-medium mb-3">Permissions</h3>
         <div className="space-y-3">
           {MODULE_ORDER.map((moduleId, i) => {
             const perms = definitionsByModule[moduleId];
@@ -101,7 +101,7 @@ export function RoleEditorForm({
             type="submit"
             variant="outline"
             size="default"
-            className="rounded-xl border border-[var(--color-neon-blue)]/50 bg-[var(--color-neon-blue)]/10 text-[var(--color-neon-blue)] font-medium tracking-tight hover:bg-[var(--color-neon-blue)]/20 hover:border-[var(--color-neon-blue)]/60 hover:text-[var(--color-neon-blue)] transition-colors shadow-[var(--glass-shadow)]"
+            className="rounded-xl border border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/10 text-[var(--stage-accent)] font-medium tracking-tight hover:bg-[var(--stage-accent)]/20 hover:border-[var(--stage-accent)]/60 hover:text-[var(--stage-accent)] transition-colors"
           >
             {submitLabel}
           </Button>

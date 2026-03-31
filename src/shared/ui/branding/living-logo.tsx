@@ -1,56 +1,69 @@
 'use client';
 
-import { useId } from 'react';
-import { motion } from 'framer-motion';
+import { useId, useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
-// --- DESIGN SYSTEM: Liquid Glass on Void ---
-// One orb. Ceramic/neon tokens. No flat gray, no literal white ring.
+/**
+ * Phase Mark — The Unusonic Living Logo
+ *
+ * Two identical pills offset along a shallow diagonal.
+ * Surface read: a precision production tool mark.
+ * Deep read: coniunctio oppositorum — two aspects of one reality
+ * held in productive tension, drifting toward synchronicity.
+ *
+ * The gap between them is the product. The shared form is the unus mundus.
+ * The moment of alignment is synchronicity — brief, earned, then life continues.
+ */
+
+// ─── Geometry ───────────────────────────────────────────────────────────────
+// ViewBox: 40x40. Two pills, each 14x6 with rx=3 (machined radius).
+// Resting offset: left pill higher by 4 units, creating the phase relationship.
+// 180° rotational symmetry — the mark reads the same upside down.
+
+const PILL_WIDTH = 14;
+const PILL_HEIGHT = 6;
+const PILL_RX = 3;
+const GAP = 2;            // horizontal gap between pills at closest point
+const PHASE_OFFSET = 4;   // vertical offset (the tension of opposites)
+
+// Center the composition in the 40x40 viewBox
+const CENTER_X = 20;
+const CENTER_Y = 20;
+const HALF_SPAN = (PILL_WIDTH + GAP + PILL_WIDTH) / 2; // total horizontal span / 2
+
+// Left pill: higher
+const L_X = CENTER_X - HALF_SPAN;
+const L_Y = CENTER_Y - PILL_HEIGHT / 2 - PHASE_OFFSET / 2;
+
+// Right pill: lower
+const R_X = CENTER_X - HALF_SPAN + PILL_WIDTH + GAP;
+const R_Y = CENTER_Y - PILL_HEIGHT / 2 + PHASE_OFFSET / 2;
+
+// ─── Sizes ──────────────────────────────────────────────────────────────────
 const SIZE_MAP = { sm: 24, md: 40, lg: 56, xl: 80 } as const;
 
-// Gradient stop colors per status (OKLCH-backed via CSS vars for luxury feel)
-const STATUS_GRADIENTS: Record<
-  string,
-  { specular: string; body: string; rim: string }
-> = {
-  idle: {
-    specular: 'var(--color-ceramic)',
-    body: 'oklch(0.96 0.005 95)', // warm ceramic body
-    rim: 'oklch(0.75 0.02 95)', // darker warm rim
-  },
-  loading: {
-    specular: 'var(--color-ceramic)',
-    body: 'oklch(0.85 0.08 250)',
-    rim: 'oklch(0.55 0.15 250)',
-  },
-  thinking: {
-    specular: 'var(--color-ceramic)',
-    body: 'oklch(0.85 0.08 250)',
-    rim: 'oklch(0.55 0.15 250)',
-  },
-  success: {
-    specular: 'oklch(0.98 0.02 145)',
-    body: 'var(--color-signal-success)',
-    rim: 'oklch(0.50 0.15 145)',
-  },
-  error: {
-    specular: 'oklch(0.95 0.05 20)',
-    body: 'var(--color-unusonic-error)',
-    rim: 'oklch(0.45 0.18 20)',
-  },
-  ambient: {
-    specular: 'oklch(0.92 0 0)',
-    body: 'oklch(0.82 0.01 0)',
-    rim: 'oklch(0.55 0.02 0)',
-  },
+// ─── Status colors (flat fill, no gradients — Stage Engineering) ────────────
+const STATUS_FILLS: Record<string, string> = {
+  idle:     'var(--stage-accent, oklch(1 0 0))',
+  loading:  'var(--stage-accent, oklch(1 0 0))',
+  thinking: 'var(--stage-accent, oklch(1 0 0))',
+  success:  'var(--color-unusonic-success, oklch(0.75 0.18 145))',
+  error:    'var(--color-unusonic-error, oklch(0.70 0.18 20))',
+  ambient:  'var(--stage-text-secondary, oklch(0.60 0 0))',
 };
 
-// Organic "Bouba" — soft squircle, not a default circle
-const ORGANIC_PATH =
-  'M 20 5.5 C 30 5.5 34.5 10 34.5 20 C 34.5 30 30 34.5 20 34.5 C 10 34.5 5.5 30 5.5 20 C 5.5 10 10 5.5 20 5.5 Z';
+// ─── Animation configs ──────────────────────────────────────────────────────
 
-const FLUX_PATH =
-  'M 20 4 C 32 4 36 12 36 20 C 36 28 32 36 20 36 C 8 36 4 28 4 20 C 4 12 8 4 20 4 Z';
+// Tidal drift: pills oscillate closer/further during loading
+const TIDAL_SPRING = { stiffness: 20, damping: 8, mass: 1.5 };
 
+// Impulse snap: brief deflect on success/error
+const IMPULSE_SPRING = { type: 'spring' as const, stiffness: 450, damping: 28, mass: 0.5 };
+
+// Aion rotation: slow, constant, cyclical
+const AION_ROTATION = { duration: 12, repeat: Infinity, ease: 'linear' as const };
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 export type LivingLogoStatus =
   | 'idle'
   | 'loading'
@@ -65,18 +78,40 @@ interface LivingLogoProps {
   className?: string;
 }
 
+// ─── Component ──────────────────────────────────────────────────────────────
 export function LivingLogo({
   status = 'idle',
   size = 'md',
   className,
 }: LivingLogoProps) {
   const id = useId().replace(/:/g, '');
-  const gradId = `logo-grad-${id}`;
-  const glowId = `logo-glow-${id}`;
-
+  const prefersReducedMotion = useReducedMotion();
   const px = typeof size === 'number' ? size : SIZE_MAP[size];
-  const colors = STATUS_GRADIENTS[status] ?? STATUS_GRADIENTS.idle;
-  const isThinking = status === 'thinking' || status === 'loading';
+  const fill = STATUS_FILLS[status] ?? STATUS_FILLS.idle;
+
+  const isLoading = status === 'loading';
+  const isThinking = status === 'thinking';
+  const isSuccess = status === 'success';
+  const isError = status === 'error';
+  const isIdle = status === 'idle' || status === 'ambient';
+
+  // Compute the dynamic offset for the tidal drift
+  // Loading: oscillate between close (1) and far (7)
+  // Success: converge to near-alignment (0.5)
+  // Error: diverge to max (7)
+  // Idle: resting offset (4)
+  const targetOffset = isLoading
+    ? PHASE_OFFSET // animated via keyframes below
+    : isSuccess
+      ? 0.5
+      : isError
+        ? 7
+        : PHASE_OFFSET;
+
+  // For the tidal loading animation, we use keyframes
+  const loadingKeyframes = isLoading && !prefersReducedMotion
+    ? [PHASE_OFFSET, 1, PHASE_OFFSET]
+    : undefined;
 
   return (
     <div
@@ -86,79 +121,71 @@ export function LivingLogo({
       className={`relative inline-flex items-center justify-center shrink-0 ${className ?? ''}`.trim()}
       style={{ width: px, height: px }}
     >
-      <svg
+      <motion.svg
         width={px}
         height={px}
         viewBox="0 0 40 40"
-        className="overflow-visible block"
+        className="block"
         aria-hidden="true"
+        style={{ transformOrigin: '20px 20px' }}
+        // Aion thinking: slow rotation of the entire mark
+        animate={{
+          rotate: isThinking && !prefersReducedMotion ? 360 : 0,
+        }}
+        transition={isThinking ? AION_ROTATION : IMPULSE_SPRING}
       >
-        <defs>
-          {/* Single orb: lit top-left, body, darker rim (spherical volume) */}
-          <radialGradient
-            id={gradId}
-            cx="28%"
-            cy="28%"
-            r="72%"
-            fx="28%"
-            fy="28%"
-          >
-            <stop offset="0%" stopColor={colors.specular} stopOpacity={1} />
-            <stop offset="45%" stopColor={colors.body} stopOpacity={1} />
-            <stop offset="100%" stopColor={colors.rim} stopOpacity={1} />
-          </radialGradient>
-
-          {/* Soft glow only — no displacement, no boxy artifact */}
-          <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur
-              in="SourceGraphic"
-              stdDeviation="2"
-              result="blur"
-            />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* One shape: the liquid glass orb — guard d so it is never undefined */}
-        <motion.path
-          d={ORGANIC_PATH ?? 'M 20 20 L 20 20 Z'}
-          fill={`url(#${gradId})`}
-          filter={`url(#${glowId})`}
-          stroke="oklch(1 0 0 / 0.12)"
-          strokeWidth="0.6"
-          strokeLinejoin="round"
-          style={{ transformOrigin: '20px 20px' }}
+        {/* Left pill (higher) */}
+        <motion.rect
+          x={L_X}
+          width={PILL_WIDTH}
+          height={PILL_HEIGHT}
+          rx={PILL_RX}
+          fill={fill}
           animate={{
-            d: (isThinking ? FLUX_PATH : ORGANIC_PATH) ?? ORGANIC_PATH,
-            rotate: isThinking ? 360 : 0,
-            scale: status === 'idle' || status === 'ambient' ? [1, 1.04, 1] : 1,
+            y: loadingKeyframes
+              ? loadingKeyframes.map(o => CENTER_Y - PILL_HEIGHT / 2 - o / 2)
+              : CENTER_Y - PILL_HEIGHT / 2 - targetOffset / 2,
           }}
-          transition={{
-            d: {
-              duration: 1.2,
-              repeat: isThinking ? Infinity : 0,
-              repeatType: 'reverse',
-              type: 'spring',
-              stiffness: 80,
-              damping: 18,
-            },
-            rotate: {
-              duration: 4,
-              repeat: isThinking ? Infinity : 0,
-              ease: 'linear',
-            },
-            scale: {
-              duration: 3.5,
-              repeat: Infinity,
-              repeatType: 'mirror',
-              ease: 'easeInOut',
-            },
-          }}
+          transition={
+            isLoading && !prefersReducedMotion
+              ? {
+                  y: {
+                    duration: 5,
+                    repeat: Infinity,
+                    repeatType: 'mirror' as const,
+                    ease: 'easeInOut',
+                  },
+                }
+              : IMPULSE_SPRING
+          }
         />
-      </svg>
+
+        {/* Right pill (lower) */}
+        <motion.rect
+          x={R_X}
+          width={PILL_WIDTH}
+          height={PILL_HEIGHT}
+          rx={PILL_RX}
+          fill={fill}
+          animate={{
+            y: loadingKeyframes
+              ? loadingKeyframes.map(o => CENTER_Y - PILL_HEIGHT / 2 + o / 2)
+              : CENTER_Y - PILL_HEIGHT / 2 + targetOffset / 2,
+          }}
+          transition={
+            isLoading && !prefersReducedMotion
+              ? {
+                  y: {
+                    duration: 5,
+                    repeat: Infinity,
+                    repeatType: 'mirror' as const,
+                    ease: 'easeInOut',
+                  },
+                }
+              : IMPULSE_SPRING
+          }
+        />
+      </motion.svg>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
@@ -188,6 +188,213 @@ export async function createGhostVenueEntity(name: string): Promise<string | nul
 }
 
 // -----------------------------------------------------------------------------
+// createGhostPlannerEntity: create a ghost planner/agency in directory.entities + PARTNER edge.
+// -----------------------------------------------------------------------------
+export async function createGhostPlannerEntity(name: string): Promise<string | null> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  try {
+    const supabase = await createClient();
+
+    const { data: entity, error } = await supabase
+      .schema('directory')
+      .from('entities')
+      .insert({
+        type: 'company',
+        display_name: trimmed,
+        owner_workspace_id: workspaceId,
+        attributes: {},
+      })
+      .select('id')
+      .single();
+
+    if (error || !entity) return null;
+    const entityId = (entity as { id: string }).id;
+
+    const { data: workspaceOrgEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('owner_workspace_id', workspaceId)
+      .eq('type', 'company')
+      .neq('attributes->>is_ghost', 'true')
+      .maybeSingle();
+
+    if (workspaceOrgEntity?.id) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: workspaceOrgEntity.id,
+        p_target_entity_id: entityId,
+        p_type: 'PARTNER',
+        p_context_data: { deleted_at: null, lifecycle_status: 'active' },
+      });
+    }
+
+    return entityId;
+  } catch {
+    return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// createGhostReferrerEntity: create a ghost person (referrer) + PARTNER edge.
+// Referrers are typically planners, coordinators, or individuals who referred a client.
+// Returns { id, name } or null on failure.
+// -----------------------------------------------------------------------------
+export async function createGhostReferrerEntity(name: string): Promise<{ id: string; name: string } | null> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  try {
+    const supabase = await createClient();
+
+    const { data: entity, error } = await supabase
+      .schema('directory')
+      .from('entities')
+      .insert({
+        type: 'person',
+        display_name: trimmed,
+        owner_workspace_id: workspaceId,
+        claimed_by_user_id: null,
+        attributes: { is_ghost: true },
+      })
+      .select('id')
+      .single();
+
+    if (error || !entity) return null;
+    const entityId = (entity as { id: string }).id;
+
+    const { data: workspaceOrgEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('owner_workspace_id', workspaceId)
+      .eq('type', 'company')
+      .neq('attributes->>is_ghost', 'true')
+      .maybeSingle();
+
+    if (workspaceOrgEntity?.id) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: workspaceOrgEntity.id,
+        p_target_entity_id: entityId,
+        p_type: 'PARTNER',
+        p_context_data: { deleted_at: null, lifecycle_status: 'active', tier: 'preferred' },
+      });
+    }
+
+    return { id: entityId, name: trimmed };
+  } catch {
+    return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// createGhostClientEntity: create a ghost client in directory.entities + CLIENT edge.
+// -----------------------------------------------------------------------------
+export async function createGhostClientEntity(name: string): Promise<string | null> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  try {
+    const supabase = await createClient();
+
+    const { data: entity, error } = await supabase
+      .schema('directory')
+      .from('entities')
+      .insert({
+        type: 'company',
+        display_name: trimmed,
+        owner_workspace_id: workspaceId,
+        attributes: {},
+      })
+      .select('id')
+      .single();
+
+    if (error || !entity) return null;
+    const entityId = (entity as { id: string }).id;
+
+    const { data: workspaceOrgEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('owner_workspace_id', workspaceId)
+      .eq('type', 'company')
+      .neq('attributes->>is_ghost', 'true')
+      .maybeSingle();
+
+    if (workspaceOrgEntity?.id) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: workspaceOrgEntity.id,
+        p_target_entity_id: entityId,
+        p_type: 'CLIENT',
+        p_context_data: { deleted_at: null, lifecycle_status: 'active' },
+      });
+    }
+
+    return entityId;
+  } catch {
+    return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// createGhostVendorEntity: create a ghost vendor in directory.entities + VENDOR edge.
+// -----------------------------------------------------------------------------
+export async function createGhostVendorEntity(name: string): Promise<string | null> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  try {
+    const supabase = await createClient();
+
+    const { data: entity, error } = await supabase
+      .schema('directory')
+      .from('entities')
+      .insert({
+        type: 'company',
+        display_name: trimmed,
+        owner_workspace_id: workspaceId,
+        attributes: {},
+      })
+      .select('id')
+      .single();
+
+    if (error || !entity) return null;
+    const entityId = (entity as { id: string }).id;
+
+    const { data: workspaceOrgEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('owner_workspace_id', workspaceId)
+      .eq('type', 'company')
+      .neq('attributes->>is_ghost', 'true')
+      .maybeSingle();
+
+    if (workspaceOrgEntity?.id) {
+      await supabase.rpc('upsert_relationship', {
+        p_source_entity_id: workspaceOrgEntity.id,
+        p_target_entity_id: entityId,
+        p_type: 'VENDOR',
+        p_context_data: { deleted_at: null, lifecycle_status: 'active' },
+      });
+    }
+
+    return entityId;
+  } catch {
+    return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // getVenueSuggestions: "Liquid Memory" venue lookup from directory.entities
 // Filter by type = 'venue'. Name/address from display_name and attributes.
 // Heuristic 3: Return "Create new venue" signal when no match.
@@ -259,3 +466,4 @@ export async function getVenueSuggestions(
     return [];
   }
 }
+

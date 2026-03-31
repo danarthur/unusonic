@@ -8,7 +8,7 @@ import { Suspense } from 'react';
 import { cookies } from 'next/headers';
 import { FinancialOverview } from '@/widgets/financial-dashboard';
 import { createClient } from '@/shared/api/supabase/server';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 
 // Force dynamic rendering for real-time data
 export const dynamic = 'force-dynamic';
@@ -60,18 +60,18 @@ async function FinanceDashboard() {
   
   if (!workspaceId) {
     return (
-      <LiquidPanel className="p-8 text-center">
-        <h2 className="text-xl font-light text-ink mb-2">Welcome to Finance</h2>
-        <p className="text-ink-muted text-sm mb-4">
+      <StagePanel className="p-8 text-center">
+        <h2 className="text-xl font-light text-[var(--stage-text-primary)] mb-2">Welcome to Finance</h2>
+        <p className="text-[var(--stage-text-secondary)] text-sm mb-4">
           Please log in or set up your workspace to view financial data.
         </p>
-        <a 
-          href="/login" 
-          className="inline-block px-4 py-2 rounded-xl bg-ink text-canvas text-sm font-medium hover:opacity-90 transition-opacity"
+        <a
+          href="/login"
+          className="inline-block px-4 py-2 rounded-xl bg-[var(--stage-accent)] text-[oklch(0.10_0_0)] text-sm font-medium hover:opacity-90 transition-opacity"
         >
           Sign In
         </a>
-      </LiquidPanel>
+      </StagePanel>
     );
   }
   
@@ -79,12 +79,12 @@ async function FinanceDashboard() {
   
   if (!data) {
     return (
-      <LiquidPanel className="p-8 text-center">
-        <h2 className="text-xl font-light text-ink mb-2">Finance</h2>
-        <p className="text-ink-muted text-sm">
+      <StagePanel className="p-8 text-center">
+        <h2 className="text-xl font-light text-[var(--stage-text-primary)] mb-2">Finance</h2>
+        <p className="text-[var(--stage-text-secondary)] text-sm">
           Unable to load financial data. Please check your database connection.
         </p>
-      </LiquidPanel>
+      </StagePanel>
     );
   }
   
@@ -106,28 +106,28 @@ async function FinanceDashboard() {
 
 function FinanceLoadingSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6 stage-skeleton">
       {/* Header skeleton */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="h-8 w-48 bg-ink/5 rounded-lg" />
-          <div className="h-4 w-32 bg-ink/5 rounded-lg mt-2" />
+          <div className="h-8 w-48 bg-[var(--stage-text-primary)]/5 rounded-lg" />
+          <div className="h-4 w-32 bg-[var(--stage-text-primary)]/5 rounded-lg mt-2" />
         </div>
-        <div className="h-10 w-10 bg-ink/5 rounded-xl" />
+        <div className="h-10 w-10 bg-[var(--stage-text-primary)]/5 rounded-xl" />
       </div>
       
       {/* Metrics grid skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[1, 2].map((i) => (
-          <div key={i} className="liquid-panel p-6">
+          <div key={i} className="stage-panel p-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-ink/5 rounded-xl" />
-              <div className="h-5 w-16 bg-ink/5 rounded-full" />
+              <div className="w-10 h-10 bg-[var(--stage-text-primary)]/5 rounded-xl" />
+              <div className="h-5 w-16 bg-[var(--stage-text-primary)]/5 rounded-full" />
             </div>
-            <div className="h-3 w-24 bg-ink/5 rounded mb-2" />
-            <div className="h-10 w-32 bg-ink/5 rounded-lg" />
-            <div className="mt-4 pt-4 border-t border-[var(--glass-border)]">
-              <div className="h-16 bg-ink/5 rounded-lg" />
+            <div className="h-3 w-24 bg-[var(--stage-text-primary)]/5 rounded mb-2" />
+            <div className="h-10 w-32 bg-[var(--stage-text-primary)]/5 rounded-lg" />
+            <div className="mt-4 pt-4 border-t border-[oklch(1_0_0_/_0.08)]">
+              <div className="h-16 bg-[var(--stage-text-primary)]/5 rounded-lg" />
             </div>
           </div>
         ))}
@@ -135,13 +135,13 @@ function FinanceLoadingSkeleton() {
       
       {/* QuickBooks section skeleton */}
       <div>
-        <div className="h-4 w-36 bg-ink/5 rounded mb-3" />
-        <div className="liquid-panel p-5">
+        <div className="h-4 w-36 bg-[var(--stage-text-primary)]/5 rounded mb-3" />
+        <div className="stage-panel p-5">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-ink/5 rounded-2xl" />
+            <div className="w-12 h-12 bg-[var(--stage-text-primary)]/5 rounded-2xl" />
             <div className="flex-1">
-              <div className="h-4 w-32 bg-ink/5 rounded mb-2" />
-              <div className="h-3 w-48 bg-ink/5 rounded" />
+              <div className="h-4 w-32 bg-[var(--stage-text-primary)]/5 rounded mb-2" />
+              <div className="h-3 w-48 bg-[var(--stage-text-primary)]/5 rounded" />
             </div>
           </div>
         </div>

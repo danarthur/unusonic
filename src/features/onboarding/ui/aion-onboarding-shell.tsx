@@ -13,7 +13,8 @@ import { LivingLogo, type LivingLogoStatus } from '@/shared/ui/branding/living-l
 import { LogOut } from 'lucide-react';
 import { signOutAction } from '@/features/auth/smart-login';
 import {
-  UNUSONIC_PHYSICS,
+  STAGE_LIGHT,
+  STAGE_MEDIUM,
   GPU_STABILIZE,
   M3_DURATION_S,
   M3_EASING_ENTER,
@@ -90,7 +91,7 @@ export function AionOnboardingShell({
   }, [isWelcome, onWelcomeComplete, skipWelcomeHold]);
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-unusonic-void text-ceramic font-sans">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-unusonic-void text-[var(--stage-text-primary)] font-sans">
       <div className="fixed inset-0 pointer-events-none grain-overlay z-0" aria-hidden />
 
       <div className={contentMaxWidth === '2xl' ? 'z-10 w-full max-w-2xl flex flex-col items-center gap-8 relative px-4' : 'z-10 w-full max-w-lg flex flex-col items-center gap-8 relative px-4'}>
@@ -99,36 +100,36 @@ export function AionOnboardingShell({
           <motion.div
             layoutId={logoLayoutId}
             layout
-            transition={UNUSONIC_PHYSICS}
+            transition={STAGE_MEDIUM}
             animate={{ scale: 1, opacity: 1 }}
             onAnimationStart={() => setIsMorphing(true)}
             onAnimationComplete={() => setIsMorphing(false)}
             style={{ ...GPU_STABILIZE, viewTransitionName: 'auth-logo', zIndex: 50 } as React.CSSProperties}
             className="flex items-center justify-center isolate relative"
           >
-            <LivingLogo status={effectiveLogoStatus} size="xl" className="text-ceramic" />
+            <LivingLogo status={effectiveLogoStatus} size="xl" className="text-[var(--stage-text-primary)]" />
           </motion.div>
         ) : (
           <motion.div
             animate={{ scale: 1, opacity: 1 }}
-            transition={UNUSONIC_PHYSICS}
+            transition={STAGE_MEDIUM}
             style={{ ...GPU_STABILIZE, viewTransitionName: 'auth-logo', zIndex: 50 } as React.CSSProperties}
             className="flex items-center justify-center isolate relative"
           >
-            <LivingLogo status={logoStatus} size="xl" className="text-ceramic" />
+            <LivingLogo status={logoStatus} size="xl" className="text-[var(--stage-text-primary)]" />
           </motion.div>
         )}
 
         {/* Aion prompt — optional welcomeTitle (merged Welcome + Name); cross-fade for prompt text */}
         <div className="relative w-full max-w-lg text-center space-y-1 min-h-[1.25rem]">
           {welcomeTitle ? (
-            <p className="text-sm font-medium tracking-tight text-ceramic">
+            <p className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)]">
               {welcomeTitle}
             </p>
           ) : null}
           {isWelcome && onWelcomeComplete && !skipWelcomeHold ? (
             <motion.h1
-              className="text-xs font-medium uppercase tracking-widest text-ink-muted"
+              className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
               initial={{ y: 0, opacity: 1 }}
               animate={{ y: -10, opacity: 1 }}
               transition={{
@@ -140,7 +141,7 @@ export function AionOnboardingShell({
               {prompt}
             </motion.h1>
           ) : isWelcome && skipWelcomeHold ? (
-            <h1 className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+            <h1 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               {prompt}
             </h1>
           ) : (
@@ -155,7 +156,7 @@ export function AionOnboardingShell({
                   ease: M3_EASING_ENTER,
                   filter: { duration: M3_DURATION_S * 0.6, ease: M3_EASING_ENTER },
                 }}
-                className="text-xs font-medium uppercase tracking-widest text-ink-muted gpu-accelerated"
+                className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] gpu-accelerated"
               >
                 {prompt}
               </motion.h1>
@@ -172,7 +173,7 @@ export function AionOnboardingShell({
             layout
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={UNUSONIC_PHYSICS}
+            transition={STAGE_LIGHT}
             className="relative z-20 w-full max-w-lg"
           >
             {footer}
@@ -183,26 +184,22 @@ export function AionOnboardingShell({
         <div className="flex items-center justify-start w-full max-w-lg mt-4">
           <div className="flex items-center gap-4">
             {onBack ? (
-              <motion.button
+              <button
                 type="button"
                 onClick={onBack}
-                whileHover={{ x: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className="text-xs text-ceramic/40 hover:text-ceramic/70 transition-colors"
+                className="text-xs text-[var(--stage-text-secondary)]/70 hover:text-[var(--stage-text-secondary)] transition-colors"
               >
                 {backLabel}
-              </motion.button>
+              </button>
             ) : null}
             {onSignIn ? (
-              <motion.button
+              <button
                 type="button"
                 onClick={onSignIn}
-                whileHover={{ x: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className="text-xs text-ceramic/40 hover:text-ceramic/70 transition-colors"
+                className="text-xs text-[var(--stage-text-secondary)]/70 hover:text-[var(--stage-text-secondary)] transition-colors"
               >
                 Sign in
-              </motion.button>
+              </button>
             ) : null}
           </div>
           {!hideStepIndicator ? (
@@ -210,12 +207,12 @@ export function AionOnboardingShell({
               {Array.from({ length: stepTotal }).map((_, i) => (
                 <motion.div
                   key={i}
-                  animate={i === stepIndex ? { scale: 1.25 } : { scale: 1 }}
-                  transition={UNUSONIC_PHYSICS}
-                  className={`rounded-full transition-colors duration-300 ${
+                  layout
+                  transition={STAGE_LIGHT}
+                  className={`rounded-full ${
                     i === stepIndex
-                      ? 'w-1.5 h-1.5 bg-neon-blue'
-                      : 'w-1.5 h-1.5 bg-ink/30'
+                      ? 'w-2 h-2 bg-[var(--stage-accent)]'
+                      : 'w-1.5 h-1.5 bg-[oklch(1_0_0_/_0.22)]'
                   }`}
                 />
               ))}
@@ -231,9 +228,9 @@ export function AionOnboardingShell({
         <form action={signOutAction} className="pointer-events-auto w-fit">
           <button
             type="submit"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-ceramic/40 hover:text-ceramic/60 hover:bg-ink/5 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--stage-text-secondary)]/70 hover:text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
           >
-            <LogOut className="w-3 h-3" />
+            <LogOut className="w-3 h-3" strokeWidth={1.5} />
             <span>Sign out</span>
           </button>
         </form>

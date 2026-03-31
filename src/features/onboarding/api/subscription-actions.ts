@@ -1,6 +1,6 @@
 /**
  * Unusonic Onboarding – Persona & Subscription Actions
- * Progressive Disclosure: persona → tier → SignalPay
+ * Progressive Disclosure: persona → tier → UnusonicPay
  * @module features/onboarding/api/subscription-actions
  */
 
@@ -69,7 +69,7 @@ export async function saveTier(
 ): Promise<TierResult> {
   const raw = {
     tier: formData.get('tier'),
-    enableSignalPay: formData.get('enableSignalPay') === 'true',
+    enableUnusonicPay: formData.get('enableUnusonicPay') === 'true',
   };
   const parsed = selectTierSchema.safeParse(raw);
   if (!parsed.success) {
@@ -97,7 +97,7 @@ export async function saveTier(
     .from('workspaces')
     .update({
       subscription_tier: tier,
-      signalpay_enabled: tier === 'autonomous' ? true : (parsed.data.enableSignalPay ?? false),
+      signalpay_enabled: tier === 'autonomous' ? true : (parsed.data.enableUnusonicPay ?? false),
     })
     .eq('id', workspaceId);
 
@@ -138,9 +138,9 @@ export async function saveTier(
 }
 
 /**
- * Mark SignalPay prompt as shown (for Autonomous tier eligibility).
+ * Mark UnusonicPay prompt as shown (for Autonomous tier eligibility).
  */
-export async function markSignalPayPrompted(): Promise<{ success: boolean; error?: string }> {
+export async function markUnusonicPayPrompted(): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: 'Not authenticated' };

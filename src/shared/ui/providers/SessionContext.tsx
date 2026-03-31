@@ -39,9 +39,9 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const storage = useMemo(
     () => ({
-      currentSessionKey: 'signal.currentSessionId',
-      sessionsKey: 'signal.sessions',
-      messagesKey: (id: string) => `signal.messages.${id}`,
+      currentSessionKey: 'unusonic.currentSessionId',
+      sessionsKey: 'unusonic.sessions',
+      messagesKey: (id: string) => `unusonic.messages.${id}`,
     }),
     []
   );
@@ -189,9 +189,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      const WEBHOOK_URL = process.env.NEXT_PUBLIC_ION_VOICE_WEBHOOK || '';
+      const WEBHOOK_URL = process.env.NEXT_PUBLIC_AION_VOICE_WEBHOOK || '';
       if (!WEBHOOK_URL) {
-        addMessage('assistant', 'Voice assistant is not configured. Set NEXT_PUBLIC_ION_VOICE_WEBHOOK.');
+        addMessage('assistant', 'Voice assistant is not configured. Set NEXT_PUBLIC_AION_VOICE_WEBHOOK.');
         setIsLoading(false);
         return;
       }

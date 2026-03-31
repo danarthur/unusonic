@@ -18,7 +18,7 @@ export interface PaymentWidgetProps {
 }
 
 const MOCK_BANK = {
-  bankName: 'Signal Mock Bank',
+  bankName: 'Unusonic Mock Bank',
   routing: '021000021',
   account: '****4521',
 };
@@ -29,7 +29,7 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Success state: balance is 0 (e.g. after payment or already paid)
+  // Success state
   if (balanceDue <= 0 || success) {
     return (
       <motion.div
@@ -37,22 +37,30 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
         animate={{ opacity: 1, scale: 1 }}
         transition={spring}
         className={cn(
-          'flex flex-col items-center justify-center rounded-3xl border border-emerald-200/60 bg-emerald-50/80 py-12 shadow-[var(--glass-shadow)] backdrop-blur-xl dark:border-emerald-800/50 dark:bg-emerald-950/60 sm:py-16',
+          'flex flex-col items-center justify-center rounded-[var(--portal-radius)] py-12 sm:py-16',
           className
         )}
+        style={{
+          border: '1px solid oklch(0.40 0.12 145 / 0.3)',
+          backgroundColor: 'oklch(0.95 0.04 145 / 0.15)',
+        }}
       >
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-          className="mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-500/20 dark:bg-emerald-500/30"
+          className="mb-4 flex size-16 items-center justify-center rounded-full"
+          style={{ backgroundColor: 'oklch(0.95 0.04 145 / 0.3)' }}
         >
-          <CheckCircle2 className="size-9 text-emerald-600 dark:text-emerald-400" />
+          <CheckCircle2 className="size-9" style={{ color: 'oklch(0.40 0.12 145)' }} />
         </motion.div>
-        <p className="font-serif text-2xl font-light tracking-tight text-emerald-800 dark:text-emerald-200 sm:text-3xl">
+        <p
+          className="text-2xl font-light tracking-tight sm:text-3xl"
+          style={{ color: 'oklch(0.35 0.12 145)' }}
+        >
           Paid in Full
         </p>
-        <p className="mt-1.5 text-sm text-emerald-700/90 dark:text-emerald-300/90">
+        <p className="mt-1.5 text-sm" style={{ color: 'oklch(0.40 0.12 145)' }}>
           Thank you for your payment.
         </p>
       </motion.div>
@@ -77,12 +85,15 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
       animate={{ opacity: 1 }}
       transition={{ ...spring, delay: 0.1 }}
       className={cn(
-        'w-full overflow-hidden rounded-3xl border border-[var(--glass-border)] bg-[var(--glass-bg)] shadow-[var(--glass-shadow)] backdrop-blur-xl',
-        'liquid-panel liquid-panel-hover',
+        'w-full overflow-hidden rounded-[var(--portal-radius)]',
         className
       )}
+      style={{
+        backgroundColor: 'var(--portal-surface)',
+        border: 'var(--portal-border-width) solid var(--portal-border)',
+      }}
     >
-      <div className="border-b border-[var(--glass-border)]">
+      <div style={{ borderBottom: 'var(--portal-border-width) solid var(--portal-border-subtle)' }}>
         <div className="flex">
           <button
             type="button"
@@ -90,9 +101,13 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
             className={cn(
               'flex flex-1 items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition-colors',
               tab === 'credit_card'
-                ? 'border-b-2 border-ink text-ink'
-                : 'text-ink-muted hover:text-ink'
+                ? 'border-b-2'
+                : ''
             )}
+            style={tab === 'credit_card'
+              ? { borderColor: 'var(--portal-accent)', color: 'var(--portal-text)' }
+              : { color: 'var(--portal-text-secondary)' }
+            }
           >
             <CreditCard className="size-4" />
             Credit Card
@@ -103,9 +118,13 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
             className={cn(
               'flex flex-1 items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition-colors',
               tab === 'wire'
-                ? 'border-b-2 border-ink text-ink'
-                : 'text-ink-muted hover:text-ink'
+                ? 'border-b-2'
+                : ''
             )}
+            style={tab === 'wire'
+              ? { borderColor: 'var(--portal-accent)', color: 'var(--portal-text)' }
+              : { color: 'var(--portal-text-secondary)' }
+            }
           >
             <Building2 className="size-4" />
             Wire Transfer
@@ -124,7 +143,10 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
               transition={spring}
               className="space-y-4"
             >
-              <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+              <p
+                className="text-xs font-medium uppercase tracking-widest"
+                style={{ color: 'var(--portal-text-secondary)' }}
+              >
                 Mock payment form
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -152,14 +174,23 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
               transition={spring}
               className="space-y-4"
             >
-              <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+              <p
+                className="text-xs font-medium uppercase tracking-widest"
+                style={{ color: 'var(--portal-text-secondary)' }}
+              >
                 Bank details
               </p>
-              <div className="rounded-2xl border border-[var(--glass-border)] bg-[var(--muted)]/50 p-4 font-mono text-sm">
-                <p><span className="text-ink-muted">Bank:</span> {MOCK_BANK.bankName}</p>
-                <p className="mt-1"><span className="text-ink-muted">Routing:</span> {MOCK_BANK.routing}</p>
-                <p className="mt-1"><span className="text-ink-muted">Account:</span> {MOCK_BANK.account}</p>
-                <p className="mt-2 font-semibold text-ink">
+              <div
+                className="rounded-lg p-4 font-mono text-sm"
+                style={{
+                  backgroundColor: 'var(--portal-accent-subtle)',
+                  border: 'var(--portal-border-width) solid var(--portal-border-subtle)',
+                }}
+              >
+                <p><span style={{ color: 'var(--portal-text-secondary)' }}>Bank:</span> {MOCK_BANK.bankName}</p>
+                <p className="mt-1"><span style={{ color: 'var(--portal-text-secondary)' }}>Routing:</span> {MOCK_BANK.routing}</p>
+                <p className="mt-1"><span style={{ color: 'var(--portal-text-secondary)' }}>Account:</span> {MOCK_BANK.account}</p>
+                <p className="mt-2 font-semibold" style={{ color: 'var(--portal-text)' }}>
                   Amount: {formatCurrency(balanceDue)}
                 </p>
               </div>
@@ -177,7 +208,7 @@ export function PaymentWidget({ token, balanceDue, className }: PaymentWidgetPro
         </AnimatePresence>
 
         {error && (
-          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-3 text-sm text-[var(--color-unusonic-error)]">{error}</p>
         )}
       </div>
     </motion.section>

@@ -48,7 +48,7 @@ export async function GET() {
 
     // 2. Ghost Data: events in workspaces we're NOT a member of
     const system = getSystemClient();
-    const { data: eventsByWorkspace } = await system.schema('ops').from('events').select('workspace_id');
+    const { data: eventsByWorkspace } = await (system as any).schema('ops').from('events').select('workspace_id') as { data: { workspace_id: string }[] | null };
 
     const eventWorkspaceCounts: Record<string, number> = {};
     for (const e of eventsByWorkspace ?? []) {

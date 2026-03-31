@@ -1,6 +1,6 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
- * Signal Scout v3 — Sub-Agent Architecture (One-Way Mirror)
+ * Aion Scout v3 — Sub-Agent Architecture (One-Way Mirror)
  * Fetches HTML, runs focused sub-agents (Contact, Identity, Classification),
  * Master validates/merges and presents. Fixes context overload and missed extractions.
  *
@@ -127,7 +127,7 @@ async function getTeamPageHtml(
     try {
       const res = await fetch(top.url, {
         signal,
-        headers: { 'User-Agent': 'SignalOS/1.0 (B2B Operating System; +https://signal.com)' },
+        headers: { 'User-Agent': 'UnusonicOS/1.0 (B2B Operating System; +https://unusonic.com)' },
       });
       if (res.ok) {
         const html = await res.text();
@@ -157,7 +157,7 @@ async function getTeamPageHtml(
           if (teamSubLinks.length > 0) {
             const subRes = await fetch(teamSubLinks[0].url, {
               signal,
-              headers: { 'User-Agent': 'SignalOS/1.0 (B2B Operating System; +https://signal.com)' },
+              headers: { 'User-Agent': 'UnusonicOS/1.0 (B2B Operating System; +https://unusonic.com)' },
             });
             if (subRes.ok) return { html: await subRes.text(), url: teamSubLinks[0].url };
           }
@@ -667,7 +667,7 @@ async function runScoutPipeline(
 
     const response = await fetch(targetUrl, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'SignalOS/1.0 (B2B Operating System; +https://signal.com)' },
+      headers: { 'User-Agent': 'UnusonicOS/1.0 (B2B Operating System; +https://unusonic.com)' },
     });
     if (!response.ok) return { error: 'Could not access site.' };
     const html = await response.text();
@@ -867,7 +867,7 @@ async function runScoutPipeline(
 
     const rosterDebug = rosterResult && '_debug' in rosterResult ? rosterResult._debug : undefined;
     if (debug && rosterDebug) {
-      // eslint-disable-next-line no-console
+       
       console.log('[Scout Debug]', JSON.stringify(rosterDebug, null, 2));
     }
 
@@ -896,7 +896,7 @@ async function runScoutPipeline(
       ...(rosterDebug && { _debug: rosterDebug }),
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Signal lost. Target scrambled.';
+    const msg = err instanceof Error ? err.message : 'Connection lost. Target scrambled.';
     return { error: msg };
   }
 }

@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Radio, ArrowUpRight, Cloud, Users } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { cn } from '@/shared/lib/utils';
+import { Radio, Cloud, Users } from 'lucide-react';
+import { WidgetShell } from '@/widgets/shared';
 import { useNextGig, minutesUntil, formatCountdown } from '../lib/use-next-gig';
 import {
   M3_FADE_THROUGH_ENTER,
@@ -21,72 +22,38 @@ interface LiveGigMonitorWidgetProps {
 /**
  * State B hero: Live Gig Monitor — countdown, Run-of-Show link, crew check-in (stub).
  */
-export function LiveGigMonitorWidget({ levitate = false }: LiveGigMonitorWidgetProps) {
+// levitate reserved for future urgency presentation
+export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMonitorWidgetProps) {
+  void _levitate;
   const { gig, loading, error } = useNextGig();
   const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     if (!gig?.starts_at) {
-      setCountdown(null);
+      queueMicrotask(() => setCountdown(null));
       return;
     }
     const tick = () => setCountdown(minutesUntil(gig.starts_at));
-    tick();
+    queueMicrotask(tick);
     const id = setInterval(tick, 60 * 1000);
     return () => clearInterval(id);
   }, [gig?.starts_at]);
 
-  if (loading) {
-    return (
-      <LiquidPanel hoverEffect levitate={levitate} className="h-full min-h-[280px] flex flex-col justify-between">
-        <div className="flex justify-between items-start mb-4">
-          <h2 className="text-xs font-medium text-muted uppercase tracking-widest tracking-tight">
-            Live Gig Monitor
-          </h2>
-        </div>
-        <div className="flex-1 flex flex-col gap-4 justify-center">
-          <div className="h-12 liquid-card-nested animate-pulse rounded-xl" />
-          <div className="h-8 liquid-card-nested animate-pulse rounded-xl w-2/3" />
-        </div>
-      </LiquidPanel>
-    );
-  }
-
-  if (error || !gig) {
-    return (
-      <LiquidPanel hoverEffect levitate={levitate} className="h-full min-h-[280px] flex flex-col justify-between">
-        <div className="flex justify-between items-start mb-4">
-          <h2 className="text-xs font-medium text-muted uppercase tracking-widest tracking-tight">
-            Live Gig Monitor
-          </h2>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
-          <Radio className="w-10 h-10 text-muted mb-3" />
-          <p className="text-sm text-muted leading-relaxed">
-            No gigs in the next 72 hours
-          </p>
-          <Link href="/crm" className="mt-4 text-xs font-medium text-neon hover:underline">
-            View Production Queue
-          </Link>
-        </div>
-      </LiquidPanel>
-    );
-  }
-
   const countdownLabel = countdown !== null ? formatCountdown(countdown) : '—';
 
   return (
-    <LiquidPanel hoverEffect levitate={levitate} className="h-full min-h-[280px] flex flex-col justify-between">
-      <div className="flex justify-between items-start mb-4">
-        <h2 className="text-xs font-medium text-muted uppercase tracking-widest tracking-tight">
-          Live Gig Monitor
-        </h2>
-        <Link href={`/crm/${gig.id}`} className="text-muted hover:text-ceramic transition-colors" aria-label="Run of Show">
-          <ArrowUpRight className="w-4 h-4" />
-        </Link>
-      </div>
-
-      <motion.div
+    <WidgetShell
+      icon={Radio}
+      label="Live Gig Monitor"
+      href={gig ? `/crm/${gig.id}` : undefined}
+      hrefLabel="View gig"
+      loading={loading}
+      skeletonRows={2}
+      empty={!loading && (!!error || !gig)}
+      emptyMessage="No gigs in the next 72 hours"
+      className="min-h-[280px]"
+    >
+      {!gig ? null : <motion.div
         className="flex-1 flex flex-col justify-center space-y-4"
         initial="hidden"
         animate="visible"
@@ -104,12 +71,12 @@ export function LiveGigMonitorWidget({ levitate = false }: LiveGigMonitorWidgetP
         <motion.div
           variants={M3_SHARED_AXIS_Y_VARIANTS}
           transition={M3_FADE_THROUGH_ENTER}
-          className="liquid-card-nested p-4 flex flex-col gap-1"
+          className="stage-panel-nested p-4 flex flex-col gap-1"
         >
-          <span className="text-[10px] font-medium uppercase tracking-widest text-muted">
+          <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
             Countdown
           </span>
-          <span className="text-3xl font-medium text-ceramic tracking-tighter tabular-nums leading-none">
+          <span className="text-3xl font-medium text-[var(--stage-text-primary)] tracking-tighter tabular-nums leading-none">
             {countdownLabel}
           </span>
         </motion.div>
@@ -117,7 +84,7 @@ export function LiveGigMonitorWidget({ levitate = false }: LiveGigMonitorWidgetP
           variants={M3_SHARED_AXIS_Y_VARIANTS}
           transition={M3_FADE_THROUGH_ENTER}
         >
-          <span className="text-sm font-medium text-ceramic tracking-tight block">
+          <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight block">
             {gig.title ?? 'Untitled'}
           </span>
         </motion.div>
@@ -127,13 +94,13 @@ export function LiveGigMonitorWidget({ levitate = false }: LiveGigMonitorWidgetP
           transition={M3_FADE_THROUGH_ENTER}
           className="flex flex-wrap gap-2"
         >
-          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--glass-border)] px-3 py-1.5 liquid-card-nested !rounded-full">
-            <Cloud className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden />
-            <span className="text-xs font-medium text-ceramic tracking-tight">Clear, 72°F</span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 stage-panel-nested !rounded-full">
+            <Cloud className="w-3.5 h-3.5 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} aria-hidden />
+            <span className="text-xs font-medium text-[var(--stage-text-primary)] tracking-tight">Clear, 72°F</span>
           </span>
           {gig.location_name && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--glass-border)] px-3 py-1.5 liquid-card-nested !rounded-full">
-              <span className="text-xs font-medium text-muted tracking-tight">{gig.location_name}</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 stage-panel-nested !rounded-full">
+              <span className="text-xs font-medium text-[var(--stage-text-secondary)] tracking-tight">{gig.location_name}</span>
             </span>
           )}
         </motion.div>
@@ -143,11 +110,11 @@ export function LiveGigMonitorWidget({ levitate = false }: LiveGigMonitorWidgetP
           transition={M3_FADE_THROUGH_ENTER}
           className="flex items-center gap-2"
         >
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-signal-success/50 bg-signal-success/20 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-ceramic">
-            <span className="h-1.5 w-1.5 rounded-full bg-signal-success" aria-hidden />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-unusonic-success)]/50 bg-[var(--color-unusonic-success)]/20 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-primary)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-unusonic-success)]" aria-hidden />
             On time
           </span>
-          <span className="text-[10px] text-muted">Crew arrival</span>
+          <span className="text-[10px] text-[var(--stage-text-secondary)]">Crew arrival</span>
         </motion.div>
         {/* Crew Status — per-role detail */}
         <motion.div
@@ -155,53 +122,51 @@ export function LiveGigMonitorWidget({ levitate = false }: LiveGigMonitorWidgetP
           transition={M3_FADE_THROUGH_ENTER}
           className="space-y-2"
         >
-          <span className="text-[10px] font-medium uppercase tracking-widest text-muted flex items-center gap-2">
-            <Users className="w-3.5 h-3.5" aria-hidden />
+          <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] flex items-center gap-2">
+            <Users className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
             Crew Status
           </span>
           <div className="flex flex-col gap-1.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-muted">DJ</span>
-              <span className="text-ceramic font-medium flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-signal-success" aria-hidden />
+              <span className="text-[var(--stage-text-secondary)]">DJ</span>
+              <span className="text-[var(--stage-text-primary)] font-medium flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-unusonic-success)]" aria-hidden />
                 Checked In
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted">Lighting</span>
-              <span className="text-muted font-medium flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-signal-warning animate-pulse" aria-hidden />
+              <span className="text-[var(--stage-text-secondary)]">Lighting</span>
+              <span className="text-[var(--stage-text-secondary)] font-medium flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-unusonic-warning)]" aria-hidden />
                 En Route
               </span>
             </div>
           </div>
         </motion.div>
-      </motion.div>
+      </motion.div>}
 
-      <div className="flex gap-2 mt-4">
-        <Link href={`/crm/${gig.id}`} className="flex-1">
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={M3_FADE_THROUGH_ENTER}
-            className="w-full m3-btn-outlined text-[10px] uppercase tracking-wider"
+      {gig && (
+        <div className="flex gap-2 mt-4">
+          <Link
+            href={`/crm/${gig.id}`}
+            className={cn(
+              'flex-1 inline-flex items-center justify-center w-full m3-btn-outlined text-[10px] uppercase tracking-wider',
+              'transition-colors hover:brightness-[1.04]'
+            )}
           >
             Run of Show
-          </motion.button>
-        </Link>
-        <Link href={`/events/${gig.id}`} className="flex-1">
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={M3_FADE_THROUGH_ENTER}
-            className="w-full m3-btn-outlined text-[10px] uppercase tracking-wider"
+          </Link>
+          <Link
+            href={`/events/${gig.id}`}
+            className={cn(
+              'flex-1 inline-flex items-center justify-center w-full m3-btn-outlined text-[10px] uppercase tracking-wider',
+              'transition-colors hover:brightness-[1.04]'
+            )}
           >
             Event
-          </motion.button>
-        </Link>
-      </div>
-    </LiquidPanel>
+          </Link>
+        </div>
+      )}
+    </WidgetShell>
   );
 }

@@ -3,8 +3,8 @@ const path = require('path');
 
 const TYPES_PATH = path.join(process.cwd(), 'src/types/supabase.ts');
 
-function scanSignalArchitecture() {
-  console.log("\x1b[36m%s\x1b[0m", "🛡️  Signal Guardian: Auditing V2 Architecture...\n");
+function scanUnusonicArchitecture() {
+  console.log("\x1b[36m%s\x1b[0m", "🛡️  Supabase Guardian: Auditing Architecture...\n");
 
   if (!fs.existsSync(TYPES_PATH)) {
     console.error(`❌ Types file not found at: ${TYPES_PATH}`);
@@ -35,8 +35,8 @@ function scanSignalArchitecture() {
   }
 
   // 3. Entity-centric resolution
-  if (content.includes('get_my_entity_id') || content.includes('signal_current_entity_id')) {
-    console.log("✅ Entity resolution helper detected (get_my_entity_id / signal_current_entity_id).");
+  if (content.includes('get_my_entity_id') || content.includes('unusonic_current_entity_id')) {
+    console.log("✅ Entity resolution helper detected (get_my_entity_id / unusonic_current_entity_id).");
     passed++;
   } else if (content.includes('entities') && content.includes('affiliations')) {
     console.warn("⚠️  WARNING: Entity-centric tables exist but no entity resolution helper in types.");
@@ -85,4 +85,4 @@ function scanSignalArchitecture() {
   }
 }
 
-scanSignalArchitecture();
+scanUnusonicArchitecture();

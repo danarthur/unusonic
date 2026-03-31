@@ -6,6 +6,7 @@ import { ScanSearch, Loader2, Sparkles } from 'lucide-react';
 import { scoutEntity } from '@/features/intelligence';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
+import { cn } from '@/shared/lib/utils';
 import { ScoutFindingsDialog } from './ScoutFindingsDialog';
 
 interface ScoutTriggerProps {
@@ -59,40 +60,37 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
       type="button"
       onClick={handleScan}
       disabled={!canScan}
-      whileHover={canScan ? { scale: 1.02 } : undefined}
-      whileTap={canScan ? { scale: 0.98 } : undefined}
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-      className={`
-        group relative flex items-center gap-2.5 rounded-xl px-4 py-2.5
-        border transition-all duration-200
-        ${canScan
-          ? 'border-[var(--color-silk)]/50 bg-[var(--color-silk)]/5 hover:bg-[var(--color-silk)]/10 hover:border-[var(--color-silk)]/60 text-[var(--color-silk)] cursor-pointer'
-          : 'border-[var(--color-mercury)]/50 bg-[oklch(0.20_0_0/0.05)] text-[var(--color-ink-muted)]/60 cursor-not-allowed'
-        }
-      `}
+      className={cn(
+        'group relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 border transition-[border-color,background-color,filter] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+        canScan && 'hover:brightness-[1.02] active:brightness-[0.98]',
+        canScan
+          ? 'border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/5 hover:bg-[var(--stage-accent)]/10 hover:border-[var(--stage-accent)]/60 text-[var(--stage-accent)] cursor-pointer'
+          : 'border-[oklch(1_0_0_/_0.08)]/50 bg-[oklch(0.20_0_0/0.05)] text-[var(--stage-text-secondary)]/60 cursor-not-allowed',
+      )}
     >
       <span
-        className={`
-          flex shrink-0 items-center justify-center rounded-lg p-1.5
-          ${canScan ? 'bg-[var(--color-silk)]/15' : 'bg-[var(--color-glass-surface)]'}
-        `}
+        className={cn(
+          'flex shrink-0 items-center justify-center rounded-lg p-1.5',
+          canScan ? 'bg-[var(--stage-accent)]/15' : 'bg-[var(--stage-surface-raised)]',
+        )}
       >
         {scanning ? (
-          <Loader2 className={`size-4 animate-spin ${canScan ? 'text-[var(--color-silk)]' : 'text-[var(--color-ink-muted)]'}`} />
+          <Loader2 className={cn('size-4 animate-spin', canScan ? 'text-[var(--stage-accent)]' : 'text-[var(--stage-text-secondary)]')} />
         ) : (
-          <ScanSearch className={`size-4 ${canScan ? 'text-[var(--color-silk)]' : 'text-[var(--color-ink-muted)]'}`} />
+          <ScanSearch className={cn('size-4', canScan ? 'text-[var(--stage-accent)]' : 'text-[var(--stage-text-secondary)]')} />
         )}
       </span>
       <div className="flex flex-col items-start min-w-0">
         <span className="text-[11px] font-semibold uppercase tracking-widest leading-none">
           {scanning ? 'Scanning' : 'Aion'}
         </span>
-        <span className="text-[10px] text-[var(--color-ink-muted)] mt-0.5 truncate max-w-[140px]">
+        <span className="text-[10px] text-[var(--stage-text-secondary)] mt-0.5 truncate max-w-[140px]">
           {scanning ? 'Acquiring intelligence…' : 'Auto-fill from website'}
         </span>
       </div>
       {canScan && (
-        <Sparkles className="size-3.5 shrink-0 text-[var(--color-silk)]/60 group-hover:text-[var(--color-silk)]/90 transition-colors" />
+        <Sparkles className="size-3.5 shrink-0 text-[var(--stage-accent)]/60 group-hover:text-[var(--stage-accent)]/90 transition-colors" />
       )}
     </motion.button>
     </div>

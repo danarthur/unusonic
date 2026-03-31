@@ -47,7 +47,7 @@ export async function sendCrewReminder(
   }
 
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const db = supabase as any;
 
   // Fetch assignment

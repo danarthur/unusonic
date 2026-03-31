@@ -32,7 +32,8 @@ export function PublicInvoiceView({ data, token, className }: PublicInvoiceViewP
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ ...spring, delay: 0.04 }}
-        className="mb-4 text-xs font-semibold uppercase tracking-widest text-ink-muted sm:mb-5"
+        className="mb-4 text-xs font-semibold uppercase tracking-widest sm:mb-5"
+        style={{ color: 'var(--portal-text-secondary)' }}
       >
         Line items
       </motion.div>
@@ -42,7 +43,8 @@ export function PublicInvoiceView({ data, token, className }: PublicInvoiceViewP
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ ...spring, delay: 0.08 }}
-        className="mb-2 text-xs font-semibold uppercase tracking-widest text-ink-muted sm:mb-3"
+        className="mb-2 text-xs font-semibold uppercase tracking-widest sm:mb-3"
+        style={{ color: 'var(--portal-text-secondary)' }}
       >
         Payment
       </motion.div>
@@ -51,6 +53,14 @@ export function PublicInvoiceView({ data, token, className }: PublicInvoiceViewP
         balanceDue={data.balanceDue}
         className="w-full"
       />
+
+      {/* Attribution */}
+      <p
+        className="text-center text-[12px] mt-12 pb-4 tracking-[0.08em] uppercase"
+        style={{ color: 'var(--portal-text-secondary)', opacity: 0.5 }}
+      >
+        Powered by Unusonic
+      </p>
     </div>
   );
 }

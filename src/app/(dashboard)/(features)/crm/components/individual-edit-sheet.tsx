@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody, SheetFooter } from '@/shared/ui/sheet';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { Button } from '@/shared/ui/button';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { updateIndividualEntity } from '../actions/update-individual-entity';
+import { cn } from '@/shared/lib/utils';
 
 type IndividualEditSheetProps = {
   open: boolean;
@@ -19,15 +21,17 @@ type IndividualEditSheetProps = {
     displayName: string;
   };
   onSaved?: () => void;
+  onChangeType?: (newType: 'company' | 'couple') => Promise<void>;
 };
 
-export function IndividualEditSheet({ open, onOpenChange, entityId, initialValues, onSaved }: IndividualEditSheetProps) {
+export function IndividualEditSheet({ open, onOpenChange, entityId, initialValues, onSaved, onChangeType }: IndividualEditSheetProps) {
   const [firstName, setFirstName] = useState(initialValues.firstName);
   const [lastName, setLastName] = useState(initialValues.lastName);
   const [email, setEmail] = useState(initialValues.email ?? '');
   const [phone, setPhone] = useState(initialValues.phone ?? '');
   const [displayName, setDisplayName] = useState(initialValues.displayName);
   const [saving, setSaving] = useState(false);
+  const [changingType, setChangingType] = useState<string | null>(null);
 
   // Sync state when sheet opens with new values
   useEffect(() => {
@@ -38,7 +42,7 @@ export function IndividualEditSheet({ open, onOpenChange, entityId, initialValue
       setPhone(initialValues.phone ?? '');
       setDisplayName(initialValues.displayName);
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);  
 
   const handleSave = async () => {
     if (!displayName.trim()) {
@@ -73,28 +77,57 @@ export function IndividualEditSheet({ open, onOpenChange, entityId, initialValue
         </SheetHeader>
         <SheetBody className="flex flex-col gap-5">
           <div className="space-y-3">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-ink-muted">Name</p>
+            <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Name</p>
             <div className="grid grid-cols-2 gap-3">
               <FloatingLabelInput label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               <FloatingLabelInput label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </div>
           </div>
           <div className="space-y-3">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-ink-muted">Contact</p>
+            <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Contact</p>
             <FloatingLabelInput label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <FloatingLabelInput label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
           <div className="space-y-3">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-ink-muted">Display name</p>
+            <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Display name</p>
             <FloatingLabelInput
               label="How they appear in the app"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
           </div>
+
+          {onChangeType && (
+            <div className="pt-4 border-t border-[oklch(1_0_0_/_0.10)] space-y-2">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Client type</p>
+              <p className="text-xs text-[var(--stage-text-secondary)]/70">Switch if this client was entered as the wrong type.</p>
+              <div className="flex gap-2">
+                {([['company', 'Company'], ['couple', 'Couple']] as const).map(([type, label]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    disabled={!!changingType || saving}
+                    onClick={async () => {
+                      setChangingType(type);
+                      await onChangeType(type);
+                      setChangingType(null);
+                      onOpenChange(false);
+                    }}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                      'border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] disabled:opacity-40'
+                    )}
+                  >
+                    {changingType === type ? <Loader2 className="size-3 animate-spin inline mr-1" /> : null}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </SheetBody>
         <SheetFooter>
-          <Button variant="silk" onClick={handleSave} disabled={saving} className="h-11 w-full rounded-xl">
+          <Button variant="silk" onClick={handleSave} disabled={saving || !!changingType} className="h-11 w-full rounded-xl">
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </SheetFooter>

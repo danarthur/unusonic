@@ -22,8 +22,8 @@ export function GlassShell({
     <div 
       className={cn(
         "flex flex-col relative overflow-hidden",
-        "rounded-[2.5rem] border border-[var(--glass-border)]",
-        "bg-[var(--glass-bg)]/30 backdrop-blur-3xl",
+        "rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))]",
+        "bg-[var(--stage-surface)]",
         "h-full w-full", 
         className
       )} 
@@ -31,7 +31,7 @@ export function GlassShell({
     >
       {/* HEADER SLOT: Anchored to top, separate glass layer */}
       {header && (
-        <div className="shrink-0 z-10 border-b border-[var(--glass-border)] bg-[var(--glass-bg)]/50 backdrop-blur-md">
+        <div className="shrink-0 z-10 border-b border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)]">
           {header}
         </div>
       )}

@@ -11,6 +11,8 @@ import { timingSafeEqual, createHmac } from 'crypto';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { revalidatePath } from 'next/cache';
 import { sendProposalAcceptedEmail, sendProposalSignedNotificationEmail } from '@/shared/api/email/send';
+import { getPublicProposal } from '@/features/sales/api/get-public-proposal';
+import { formatCurrency } from '@/shared/lib/format-currency';
 
 export const runtime = 'nodejs';
 
@@ -80,7 +82,7 @@ function verifyWebhookSignature(rawBody: string, headers: Headers): boolean {
 
 async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<void> {
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const db = supabase as any;
 
   const submitter = payload.submitters?.[0];
@@ -176,6 +178,22 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     revalidatePath(`/p/${p.public_token}`);
   }
 
+  // Fetch rich proposal data for enriched emails
+  // Called after the update so getPublicProposal's status check passes for 'accepted'
+  const proposalData = p.public_token
+    ? await getPublicProposal(p.public_token).catch(() => null)
+    : null;
+
+  const enrichedTotal = proposalData?.total ?? null;
+  const totalFormatted = enrichedTotal && enrichedTotal > 0 ? formatCurrency(enrichedTotal) : null;
+  const depositPercent = (proposalData?.proposal as { deposit_percent?: number | null } | undefined)?.deposit_percent ?? null;
+  const depositDueDays = (proposalData?.proposal as { payment_due_days?: number | null } | undefined)?.payment_due_days ?? null;
+  const depositAmount = enrichedTotal && depositPercent && depositPercent > 0
+    ? formatCurrency((enrichedTotal * depositPercent) / 100)
+    : null;
+  const eventDate = proposalData?.event?.startsAt ?? null;
+  const signerEmail = submitter.email ?? null;
+
   // Resolve workspace name + admin email for notifications
   const { data: workspaceRow } = await supabase
     .from('workspaces')
@@ -186,10 +204,9 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
   const portalUrl = p.public_token ? `${baseUrl}/p/${p.public_token}` : baseUrl;
-  const crmUrl = `${baseUrl}/crm`;
+  const crmUrl = p.deal_id ? `${baseUrl}/crm/deals/${p.deal_id}` : `${baseUrl}/crm`;
 
   const signerName = submitter.name?.trim() || submitter.email;
-  const dealTitle = p.deal_id; // resolved below
 
   // Fetch deal title for notification emails
   const { data: dealRow } = await supabase
@@ -200,15 +217,19 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
   const resolvedDealTitle = (dealRow as { title?: string | null } | null)?.title ?? 'your event';
 
   // Send client confirmation email (best-effort — non-fatal)
-  await sendProposalAcceptedEmail(
-    submitter.email,
+  await sendProposalAcceptedEmail({
+    to: submitter.email,
     signerName,
-    resolvedDealTitle,
-    completedAt,
+    dealTitle: resolvedDealTitle,
+    signedAt: completedAt,
     portalUrl,
     workspaceName,
-    p.workspace_id
-  ).catch((e) => console.error('[docuseal-webhook] Client confirmation email failed:', e));
+    workspaceId: p.workspace_id,
+    eventDate,
+    totalFormatted,
+    depositAmount,
+    depositDueDays,
+  }).catch((e) => console.error('[docuseal-webhook] Client confirmation email failed:', e));
 
   // Send internal notification to workspace admin (best-effort — look up admin email)
   const { data: adminRows } = await supabase
@@ -229,20 +250,21 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     for (const profile of adminProfiles ?? []) {
       const adminEmail = (profile as { email?: string | null }).email ?? null;
       if (adminEmail) {
-        await sendProposalSignedNotificationEmail(
-          adminEmail,
+        await sendProposalSignedNotificationEmail({
+          to: adminEmail,
           signerName,
-          resolvedDealTitle,
-          completedAt,
+          dealTitle: resolvedDealTitle,
+          signedAt: completedAt,
           crmUrl,
           workspaceName,
-          p.workspace_id
-        ).catch((e) => console.error('[docuseal-webhook] Admin notification email failed:', e));
+          workspaceId: p.workspace_id,
+          totalFormatted,
+          signerEmail,
+          eventDate,
+        }).catch((e) => console.error('[docuseal-webhook] Admin notification email failed:', e));
       }
     }
   }
-
-  void dealTitle; // suppress unused warning — was superseded by resolvedDealTitle
 
   console.log('[docuseal-webhook] Submission completed for proposal:', proposalId);
 }

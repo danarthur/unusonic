@@ -38,7 +38,7 @@ function resolveCallTimeDisplay(
 /** Reads token details for the confirmation page. No auth required. */
 export async function getCrewTokenDetails(token: string): Promise<TokenDetails | null> {
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const db = supabase as any;
 
   const { data: row, error } = await db
@@ -131,7 +131,7 @@ export async function getCrewTokenDetails(token: string): Promise<TokenDetails |
     venueName: e.venue_name,
     venueAddress: e.venue_address,
     callTime: resolveCallTimeDisplay(callTimeSlotId, callTimeOverride, slots, e.starts_at),
-    workspaceName: e.project?.workspaces?.name ?? 'Signal',
+    workspaceName: e.project?.workspaces?.name ?? 'Unusonic',
     recipientName,
     alreadyUsed: !!r.used_at,
     actionTaken: r.action_taken,
@@ -144,7 +144,7 @@ export async function consumeCrewToken(
   action: 'confirmed' | 'declined'
 ): Promise<ConsumeTokenResult> {
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const db = supabase as any;
 
   const { data: row, error: fetchErr } = await db
@@ -213,7 +213,7 @@ export async function consumeCrewToken(
       await db
         .schema('ops')
         .from('events')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         .update({ run_of_show_data: { ...ros, crew_items: crewItems } as any })
         .eq('id', r.event_id);
     }

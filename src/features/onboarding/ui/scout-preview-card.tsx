@@ -1,6 +1,6 @@
 /**
  * ScoutPreviewCard – Network-style card that loads with scout result.
- * Matches NetworkCard design (liquid-card, avatar, name, label, tags).
+ * Matches NetworkCard design (stage panel surfaces, avatar, name, label, tags).
  * M3 shared axis: skeleton → filled content with staggered reveal.
  * @see https://m3.material.io/styles/motion/transitions/transition-patterns
  * @module features/onboarding/ui/scout-preview-card
@@ -45,10 +45,10 @@ export function ScoutPreviewCard({
       layout
       initial={false}
       className={cn(
-        'liquid-card liquid-levitation relative flex w-full flex-col rounded-3xl p-4 sm:p-5 text-left transition-all duration-300',
+        'stage-panel liquid-levitation relative flex w-full flex-col rounded-[var(--stage-radius-panel,12px)] p-4 sm:p-5 text-left transition-all duration-300',
         hero && 'sm:p-6',
-        'border border-[var(--glass-border)] hover:border-[var(--color-silk)]/50',
-        'bg-[var(--color-glass-surface)]',
+        'border border-[oklch(1_0_0_/_0.08)] hover:border-[var(--stage-accent)]/50',
+        'bg-[var(--stage-surface-raised)]',
         className
       )}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
@@ -61,7 +61,7 @@ export function ScoutPreviewCard({
             initial={false}
             transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER }}
             className={cn(
-              'flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--color-mercury)]/20',
+              'flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[oklch(1_0_0_/_0.08)]/20',
               avatarSize
             )}
           >
@@ -69,7 +69,7 @@ export function ScoutPreviewCard({
               <motion.div
                 animate={{ opacity: [0.4, 0.8, 0.4] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                className="size-full rounded-xl bg-ink/20"
+                className="size-full rounded-xl bg-[oklch(1_0_0_/_0.20)]"
               />
             ) : logoUrl ? (
               <motion.img
@@ -81,7 +81,7 @@ export function ScoutPreviewCard({
                 className="size-full object-cover"
               />
             ) : (
-              <Building2 className={cn(hero ? 'size-7' : 'size-5', 'text-[var(--color-ink-muted)]')} />
+              <Building2 className={cn(hero ? 'size-7' : 'size-5', 'text-[var(--stage-text-secondary)]')} />
             )}
           </motion.div>
           <div className="min-w-0 flex-1 space-y-1.5">
@@ -90,7 +90,7 @@ export function ScoutPreviewCard({
               <motion.div
                 animate={{ opacity: [0.3, 0.6, 0.3] }}
                 transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-                className={cn('rounded bg-ink/20', hero ? 'h-5 w-40' : 'h-4 w-32')}
+                className={cn('rounded bg-[oklch(1_0_0_/_0.20)]', hero ? 'h-5 w-40' : 'h-4 w-32')}
               />
             ) : (
               <motion.p
@@ -98,7 +98,7 @@ export function ScoutPreviewCard({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER, delay: 0 }}
                 className={cn(
-                  'truncate font-medium tracking-tight text-[var(--color-ink)]',
+                  'truncate font-medium tracking-tight text-[var(--stage-text-primary)]',
                   hero && 'text-base sm:text-lg'
                 )}
               >
@@ -110,14 +110,14 @@ export function ScoutPreviewCard({
               <motion.div
                 animate={{ opacity: [0.2, 0.5, 0.2] }}
                 transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                className="h-3 w-24 rounded bg-ink/15"
+                className="h-3 w-24 rounded bg-[oklch(1_0_0_/_0.15)]"
               />
             ) : (
               <motion.p
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER, delay: STAGGER }}
-                className="text-xs text-[var(--color-ink-muted)] truncate"
+                className="text-xs text-[var(--stage-text-secondary)] truncate"
               >
                 {label}
               </motion.p>
@@ -134,7 +134,7 @@ export function ScoutPreviewCard({
                       repeat: Infinity,
                       ease: 'easeInOut',
                     }}
-                    className="h-4 w-12 rounded bg-ink/15"
+                    className="h-4 w-12 rounded bg-[oklch(1_0_0_/_0.15)]"
                   />
                 ))}
               </div>
@@ -148,7 +148,7 @@ export function ScoutPreviewCard({
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded bg-ink/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                    className="rounded bg-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                   >
                     {tag}
                   </span>
@@ -161,7 +161,7 @@ export function ScoutPreviewCard({
           initial={loading ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER, delay: STAGGER * 3 }}
-          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium bg-ink/10 text-[var(--color-ink-muted)]"
+          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]"
         >
           {loading ? '…' : 'Scout'}
         </motion.span>

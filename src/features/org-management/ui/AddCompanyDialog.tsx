@@ -86,7 +86,7 @@ export function AddCompanyDialog({
   return (
     <>
       <div
-        className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[60] bg-[oklch(0_0_0_/_0.5)]"
         aria-hidden
         onClick={() => onOpenChange(false)}
       />
@@ -96,28 +96,28 @@ export function AddCompanyDialog({
         aria-label="Add company"
         className={cn(
           'fixed left-1/2 top-1/2 z-[60] w-full max-w-md -translate-x-1/2 -translate-y-1/2',
-          'rounded-2xl border border-white/10 bg-[var(--color-canvas)] p-6 shadow-2xl'
+          'rounded-2xl border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-void)] p-6 shadow-2xl'
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
-          <h3 className="flex items-center gap-2 text-lg font-medium text-[var(--color-ink)]">
-            <Building2 className="size-5 text-[var(--color-ink-muted)]" />
+        <div className="flex items-center justify-between gap-4 border-b border-[oklch(1_0_0_/_0.10)] pb-4">
+          <h3 className="flex items-center gap-2 text-lg font-medium text-[var(--stage-text-primary)]">
+            <Building2 className="size-5 text-[var(--stage-text-secondary)]" />
             Add connection
           </h3>
           <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} aria-label="Close">
             <X className="size-5" />
           </Button>
         </div>
-        <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-          Create a new company (vendor/venue) — it becomes a Ghost Org until they join Signal.
+        <p className="mt-2 text-sm text-[var(--stage-text-secondary)]">
+          Create a new company (vendor/venue) — it becomes a Ghost Org until they join Unusonic.
         </p>
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <FloatingLabelInput
             label="Company name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-lg border-white/10 bg-white/5"
+            className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
             required
           />
           <div className="grid grid-cols-2 gap-3">
@@ -125,24 +125,24 @@ export function AddCompanyDialog({
               label="City"
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              className="rounded-lg border-white/10 bg-white/5"
+              className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
               required
             />
             <FloatingLabelInput
               label="State / Region"
               value={state}
               onChange={(e) => setState(e.target.value)}
-              className="rounded-lg border-white/10 bg-white/5"
+              className="rounded-lg border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+            <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
               Type
             </label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as RelationshipType)}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[var(--color-ink)]"
+              className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2 text-sm text-[var(--stage-text-primary)]"
             >
               {RELATIONSHIP_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>

@@ -29,7 +29,7 @@ export function AionLens({ insight = 'Aion insight will appear here once connect
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`inline-flex items-center justify-center rounded-lg p-1.5 text-muted hover:text-neon transition-colors focus:outline-none focus:ring-2 focus:ring-neon/30 ${className ?? ''}`}
+          className={`inline-flex items-center justify-center rounded-lg p-1.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-accent)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]/30 ${className ?? ''}`}
           aria-label="Aion predictive insight"
         >
           <Sparkles className="w-4 h-4" />
@@ -38,7 +38,7 @@ export function AionLens({ insight = 'Aion insight will appear here once connect
       <PopoverContent
         side="top"
         align="end"
-        className="liquid-card p-4 max-w-[280px] border-[var(--glass-border)]"
+        className="stage-panel p-4 max-w-[280px] border-[oklch(1_0_0_/_0.08)]"
         sideOffset={8}
       >
         <AnimatePresence>
@@ -47,7 +47,7 @@ export function AionLens({ insight = 'Aion insight will appear here once connect
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER }}
-            className="text-xs text-muted leading-relaxed"
+            className="text-xs text-[var(--stage-text-secondary)] leading-relaxed"
           >
             {insight}
           </motion.p>

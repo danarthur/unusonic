@@ -8,7 +8,7 @@ import { GhostClaimCard } from './ghost-claim-card';
 import { GenesisCreateCard } from './genesis-create-card';
 import { checkNexusAvailability } from '@/features/onboarding/api/actions';
 import type { NexusResult, OnboardingGenesisContext } from '@/features/onboarding/model/types';
-import { UNUSONIC_PHYSICS, M3_EASING_ENTER } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM, M3_EASING_ENTER } from '@/shared/lib/motion-constants';
 
 function nameToSlug(raw: string): string {
   return raw
@@ -96,7 +96,7 @@ export function GenesisOrchestrator({
       {!showCreateForm && (
         <div className="w-full max-w-lg text-center relative">
           {!contentOnly && (
-            <h1 className="text-sm font-medium uppercase tracking-widest text-ceramic/50 mb-4">
+            <h1 className="text-sm font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
               Name your workspace
             </h1>
           )}
@@ -119,11 +119,11 @@ export function GenesisOrchestrator({
                   exit={{ opacity: 0 }}
                   className="flex flex-wrap justify-center items-center gap-2"
                 >
-                  <span className="rounded bg-neon-blue/5 px-2 py-1 font-mono text-sm text-neon-blue/80">
+                  <span className="rounded bg-[oklch(1_0_0_/_0.06)] px-2 py-1 font-mono text-sm text-[var(--stage-text-secondary)]">
                     unusonic.events/{slug}
                   </span>
                   {logoStatus === 'thinking' && (
-                    <span className="animate-pulse text-sm text-ceramic/40">Checking…</span>
+                    <span className="stage-skeleton text-sm text-[var(--stage-text-secondary)]/60">Checking…</span>
                   )}
                   {result?.type === 'TAKEN' && (
                     <span className="text-xs text-unusonic-error">Taken</span>
@@ -136,7 +136,7 @@ export function GenesisOrchestrator({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="text-sm text-ceramic/30"
+                  className="text-sm text-[var(--stage-text-secondary)]/50"
                 >
                   We&apos;ll create a handle from your name.
                 </motion.p>
@@ -187,8 +187,8 @@ export function GenesisOrchestrator({
     <div
       className={
         isEmbedded
-          ? 'relative w-full flex flex-col items-center justify-center text-ceramic font-sans'
-          : 'relative min-h-screen w-full flex flex-col items-center justify-center bg-obsidian text-ceramic font-sans overflow-hidden'
+          ? 'relative w-full flex flex-col items-center justify-center text-[var(--stage-text-primary)] font-sans'
+          : 'relative min-h-screen w-full flex flex-col items-center justify-center bg-[var(--stage-void)] text-[var(--stage-text-primary)] font-sans overflow-hidden'
       }
     >
       {!isEmbedded && (
@@ -201,8 +201,8 @@ export function GenesisOrchestrator({
             : 'z-10 w-full max-w-lg flex flex-col items-center gap-10 relative px-4'
         }
       >
-        <motion.div animate={{ scale: 1, opacity: 1 }} transition={UNUSONIC_PHYSICS}>
-          <LivingLogo status={logoStatus} size="xl" className="text-ceramic" />
+        <motion.div animate={{ scale: 1, opacity: 1 }} transition={STAGE_MEDIUM}>
+          <LivingLogo status={logoStatus} size="xl" className="text-[var(--stage-text-primary)]" />
         </motion.div>
         {content}
       </div>

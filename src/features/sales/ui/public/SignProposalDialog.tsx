@@ -76,7 +76,8 @@ export function SignProposalDialog({
           <button
             type="button"
             onClick={onClose}
-            className="absolute inset-0 bg-ink/20 backdrop-blur-sm"
+            className="absolute inset-0"
+            style={{ backgroundColor: 'oklch(0 0 0 / 0.3)' }}
             aria-label="Close"
           />
           <motion.div
@@ -85,17 +86,21 @@ export function SignProposalDialog({
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={spring}
             className={cn(
-              'relative z-10 w-full max-w-md rounded-3xl p-6 sm:p-8',
-              'bg-[var(--glass-bg)] backdrop-blur-2xl border border-[var(--glass-border)]',
-              'liquid-levitation-strong',
+              'relative z-10 w-full max-w-md rounded-[var(--portal-radius)] p-6 sm:p-8',
+              'portal-levitation-strong',
               className
             )}
+            style={{
+              backgroundColor: 'var(--portal-surface)',
+              border: 'var(--portal-border-width) solid var(--portal-border)',
+            }}
           >
             <div className="absolute right-4 top-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors"
+                className="p-2 rounded-lg transition-colors"
+                style={{ color: 'var(--portal-text-secondary)' }}
                 aria-label="Close"
               >
                 <X className="size-5" />
@@ -104,11 +109,20 @@ export function SignProposalDialog({
 
             <h2
               id="sign-dialog-title"
-              className="font-serif text-xl font-light text-ink tracking-tight pr-10"
+              className="text-xl pr-10"
+              style={{
+                color: 'var(--portal-text)',
+                fontFamily: 'var(--portal-font-heading)',
+                fontWeight: 'var(--portal-heading-weight)',
+                letterSpacing: 'var(--portal-heading-tracking)',
+              }}
             >
               Review & Sign
             </h2>
-            <p className="text-sm text-ink-muted mt-1.5">
+            <p
+              className="text-sm mt-1.5"
+              style={{ color: 'var(--portal-text-secondary)' }}
+            >
               Type your full legal name below to accept this proposal.
             </p>
 
@@ -123,17 +137,17 @@ export function SignProposalDialog({
                 onChange={(e) => setSignatureName(e.target.value)}
                 placeholder="Your full name"
                 disabled={isPending}
-                className={cn(
-                  'w-full rounded-2xl h-11 px-4 text-base text-ink placeholder:text-ink-muted',
-                  'bg-[var(--muted)]/50 border border-[var(--glass-border)]',
-                  'focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:border-[var(--ring)]',
-                  'disabled:opacity-60 transition-colors'
-                )}
+                className="w-full rounded-lg h-11 px-4 text-base focus:outline-none focus:ring-2 focus:ring-[var(--portal-accent)] disabled:opacity-60 transition-colors"
+                style={{
+                  color: 'var(--portal-text)',
+                  backgroundColor: 'var(--portal-accent-subtle)',
+                  border: 'var(--portal-border-width) solid var(--portal-border)',
+                }}
                 autoFocus
                 required
               />
               {error ? (
-                <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                <p className="text-sm text-[var(--color-unusonic-error)]" role="alert">
                   {error}
                 </p>
               ) : null}
@@ -142,22 +156,25 @@ export function SignProposalDialog({
                   type="button"
                   onClick={onClose}
                   disabled={isPending}
-                  className={cn(
-                    'flex-1 rounded-2xl h-10 font-medium text-ink',
-                    'border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] transition-colors',
-                    'disabled:opacity-50'
-                  )}
+                  className="flex-1 h-10 font-medium transition-colors disabled:opacity-50"
+                  style={{
+                    color: 'var(--portal-text)',
+                    border: 'var(--portal-border-width) solid var(--portal-border)',
+                    backgroundColor: 'var(--portal-surface)',
+                    borderRadius: 'var(--portal-btn-radius)',
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending || !signatureName.trim()}
-                  className={cn(
-                    'flex-1 rounded-2xl h-10 font-medium text-canvas bg-ink',
-                    'hover:bg-walnut shadow-[var(--glass-shadow)] transition-all',
-                    'disabled:opacity-50 disabled:pointer-events-none'
-                  )}
+                  className="flex-1 h-10 font-medium shadow-lg transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  style={{
+                    backgroundColor: 'var(--portal-accent)',
+                    color: 'var(--portal-accent-text)',
+                    borderRadius: 'var(--portal-btn-radius)',
+                  }}
                 >
                   {isPending ? (
                     <Loader2 className="size-5 animate-spin mx-auto" aria-hidden />

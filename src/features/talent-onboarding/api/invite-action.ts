@@ -38,7 +38,7 @@ export async function inviteTalent(
     return { ok: false, error: first?.message ?? 'Invalid input.' };
   }
 
-  const { email, first_name, last_name, phone, job_title, employment_status, role, skill_tags } =
+  const { email, first_name, last_name, phone, job_title, employment_status, role, skill_tags, capabilities } =
     parsed.data;
   const supabase = await createClient();
 
@@ -136,17 +136,25 @@ export async function inviteTalent(
       return { ok: false, error: relErr?.message ?? 'Failed to add member to organization.' };
     }
 
-    const relId = newRel as string;
-
     if (skill_tags.length > 0) {
       const skillRows = skill_tags.map((skill_tag) => ({
-        org_member_id: relId,
+        entity_id: inviteeDirEnt.id,
+        workspace_id: orgDirEnt.owner_workspace_id,
         skill_tag: skill_tag.trim(),
       }));
-      const { error: skillsError } = await supabase.from('talent_skills').insert(skillRows);
+      const { error: skillsError } = await supabase.schema('ops').from('crew_skills').insert(skillRows);
       if (skillsError) {
         return { ok: false, error: skillsError.message ?? 'Failed to add skills; member was not added.' };
       }
+    }
+
+    if (capabilities.length > 0) {
+      const capRows = capabilities.map((capability) => ({
+        entity_id: inviteeDirEnt.id,
+        workspace_id: orgDirEnt.owner_workspace_id,
+        capability: capability.trim(),
+      }));
+      await supabase.schema('ops').from('entity_capabilities').insert(capRows);
     }
 
     const statusLabel = employment_status === 'external_contractor' ? 'Contractor' : 'Employee';
@@ -208,17 +216,25 @@ export async function inviteTalent(
     return { ok: false, error: ghostRelErr?.message ?? 'Failed to add member to organization.' };
   }
 
-  const ghostRelId = newGhostRel as string;
-
   if (skill_tags.length > 0) {
     const skillRows = skill_tags.map((skill_tag) => ({
-      org_member_id: ghostRelId,
+      entity_id: ghostDirEnt.id,
+      workspace_id: orgDirEnt.owner_workspace_id,
       skill_tag: skill_tag.trim(),
     }));
-    const { error: skillsError } = await supabase.from('talent_skills').insert(skillRows);
+    const { error: skillsError } = await supabase.schema('ops').from('crew_skills').insert(skillRows);
     if (skillsError) {
       return { ok: false, error: skillsError.message ?? 'Failed to add skills; member was not added.' };
     }
+  }
+
+  if (capabilities.length > 0) {
+    const capRows = capabilities.map((capability) => ({
+      entity_id: ghostDirEnt.id,
+      workspace_id: orgDirEnt.owner_workspace_id,
+      capability: capability.trim(),
+    }));
+    await supabase.schema('ops').from('entity_capabilities').insert(capRows);
   }
 
   const statusLabel = employment_status === 'external_contractor' ? 'Contractor' : 'Employee';

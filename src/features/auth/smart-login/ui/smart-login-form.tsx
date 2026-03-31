@@ -3,7 +3,7 @@
  * Unified authentication - Sign In / Create Account toggle
  * Conditional mediation: passkeys appear in autofill when focusing email field
  * Password form hidden by default ("Use password instead")
- * Liquid Japandi design matching Signal aesthetic
+ * Liquid Japandi design matching Unusonic aesthetic
  * @module features/auth/smart-login/ui/smart-login-form
  */
 
@@ -26,7 +26,7 @@ import { setTrustedDeviceCookie } from '@/shared/lib/trusted-device';
 import type { AuthState, AuthMode } from '../model/types';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import {
-  UNUSONIC_PHYSICS,
+  STAGE_HEAVY,
   GPU_STABILIZE,
   M3_CONTENT_EXIT_TRANSITION,
   M3_FADE_THROUGH_ENTER,
@@ -55,7 +55,7 @@ function AuthErrorBlock({ error }: { error: string }) {
         <button
           type="button"
           onClick={() => setShowTechnical((s) => !s)}
-          className="text-xs text-ceramic/50 hover:text-ceramic/70 transition-colors flex items-center justify-center gap-1 mx-auto"
+          className="text-[11px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors flex items-center justify-center gap-1 mx-auto"
         >
           {showTechnical ? 'Hide technical details' : 'See what went wrong'}
           <ChevronDown
@@ -65,7 +65,7 @@ function AuthErrorBlock({ error }: { error: string }) {
         </button>
       )}
       {showToggle && showTechnical && (
-        <p className="text-[11px] text-ink-muted font-mono break-all text-left px-2 py-1.5 rounded-lg bg-ink/10">
+        <p className="text-[11px] text-[var(--stage-text-secondary)] font-mono break-all text-left px-2 py-1.5 rounded-lg bg-[oklch(1_0_0_/_0.10)]">
           {display.technical}
         </p>
       )}
@@ -81,12 +81,15 @@ interface SmartLoginFormProps {
   defaultMode?: AuthMode;
   /** Show a brief message when user was signed out due to inactivity. */
   showInactivityMessage?: boolean;
+  /** Show a brief message when the session expired naturally. */
+  showSessionExpiredMessage?: boolean;
 }
 
 export function SmartLoginForm({
   redirectTo,
   defaultMode = 'signin',
   showInactivityMessage = false,
+  showSessionExpiredMessage = false,
 }: SmartLoginFormProps) {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>(defaultMode);
@@ -380,8 +383,8 @@ export function SmartLoginForm({
           signupExiting
             ? prefersReducedMotion
               ? { duration: exitDuration, ease: M3_EASING_EXIT }
-              : UNUSONIC_PHYSICS
-            : UNUSONIC_PHYSICS
+              : STAGE_HEAVY
+            : STAGE_HEAVY
         }
         onAnimationComplete={
           signupExiting
@@ -444,7 +447,7 @@ export function SmartLoginForm({
                     isTransitionName && !prefersReducedMotion
                       ? {
                           opacity: { duration: 0.15 },
-                          y: UNUSONIC_PHYSICS,
+                          y: STAGE_HEAVY,
                           filter: { duration: 0.2, ease: M3_EASING_ENTER },
                         }
                       : { duration: 0.15, ease: M3_EASING_EXIT }
@@ -457,10 +460,8 @@ export function SmartLoginForm({
                         type="button"
                         onClick={handleSignupStepSubmit}
                         disabled={isSignupPending}
-                        whileHover={!isSignupPending ? { scale: 1.02 } : undefined}
-                        whileTap={!isSignupPending ? { scale: 0.98 } : undefined}
-                        transition={UNUSONIC_PHYSICS}
-                        className="w-full py-3.5 rounded-full font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 transition-colors disabled:opacity-70 disabled:pointer-events-none flex items-center justify-center gap-2"
+                        transition={STAGE_HEAVY}
+                        className="stage-btn stage-btn-primary w-full py-3.5 rounded-full font-medium text-sm transition-colors disabled:opacity-70 disabled:pointer-events-none flex items-center justify-center gap-2"
                       >
                         {isSignupPending ? (
                           <>
@@ -554,14 +555,14 @@ export function SmartLoginForm({
                 left: 0,
                 width: '100%',
                 zIndex: 0,
-                transition: UNUSONIC_PHYSICS,
+                transition: STAGE_HEAVY,
               }
         }
-        transition={UNUSONIC_PHYSICS}
+        transition={STAGE_HEAVY}
         className={`w-full max-w-md mx-auto ${signinExiting || anticipating ? 'pointer-events-none' : ''}`}
       >
         <div
-          className="liquid-panel p-8 md:p-10 relative overflow-hidden"
+          className="stage-panel p-8 md:p-10 relative overflow-hidden"
           style={{ viewTransitionName: 'auth-card' } as React.CSSProperties}
         >
           <div
@@ -577,7 +578,7 @@ export function SmartLoginForm({
                 layoutId="auth-logo"
                 layout
                 animate={anticipating ? { scale: 0.95 } : { scale: 1 }}
-                transition={UNUSONIC_PHYSICS}
+                transition={STAGE_HEAVY}
                 style={{ ...GPU_STABILIZE, viewTransitionName: 'auth-logo' } as React.CSSProperties}
                 className="mx-auto flex items-center justify-center overflow-visible isolate relative z-10"
               >
@@ -589,8 +590,8 @@ export function SmartLoginForm({
                 </motion.div>
               </motion.div>
               <div className="mt-3 mb-5 text-center">
-                <p className="text-sm font-medium text-ceramic tracking-tight">Unusonic</p>
-                <p className="text-[11px] text-ink-muted/50 tracking-widest uppercase mt-1">Sign in to your workspace</p>
+                <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">Unusonic</p>
+                <p className="text-[11px] text-[var(--stage-text-tertiary)] tracking-widest uppercase mt-1">Sign in to your workspace</p>
               </div>
 
             {/* M3 Container transform: outgoing content fades in 90ms so container (card) is the focus. */}
@@ -602,8 +603,13 @@ export function SmartLoginForm({
               className="gpu-accelerated"
             >
             {showInactivityMessage && (
-              <p className="text-sm text-ink-muted text-center mb-4 rounded-xl bg-ink/5 border border-[var(--glass-border)] px-4 py-2.5">
+              <p className="text-sm text-[var(--stage-text-secondary)] text-center mb-4 rounded-xl bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-4 py-2.5">
                 You were signed out after a period of inactivity.
+              </p>
+            )}
+            {showSessionExpiredMessage && !showInactivityMessage && (
+              <p className="text-sm text-[var(--stage-text-secondary)] text-center mb-4 rounded-xl bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-4 py-2.5">
+                Your session expired. Sign in to continue.
               </p>
             )}
 
@@ -623,10 +629,10 @@ export function SmartLoginForm({
                 data-lpignore="true"
                 data-form-type="other"
                 data-1p-ignore
-                className="w-full h-12 px-4 rounded-xl bg-canvas/50 border border-[var(--glass-border)]
-                  text-ink placeholder:text-ink-muted
-                  focus:outline-none focus:border-[var(--glass-border-hover)] focus:ring-2 focus:ring-ring/30
-                  hover:border-[var(--glass-border-hover)]
+                className="w-full h-12 px-4 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)]
+                  text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]
+                  focus:outline-none focus:border-[oklch(1_0_0_/_0.12)] focus:ring-2 focus:ring-ring/30
+                  hover:border-[oklch(1_0_0_/_0.12)]
                   disabled:opacity-50 disabled:cursor-not-allowed
                   transition-all duration-200"
                 placeholder="your@email.com"
@@ -640,16 +646,14 @@ export function SmartLoginForm({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={UNUSONIC_PHYSICS}
+                    transition={STAGE_HEAVY}
                   >
                     <motion.button
                       type="button"
                       onClick={handleContinueWithPasskey}
                       disabled={!signInEmailValid || isPending}
-                      whileHover={signInEmailValid && !isPending ? { scale: 1.02 } : undefined}
-                      whileTap={signInEmailValid && !isPending ? { scale: 0.98 } : undefined}
-                      transition={UNUSONIC_PHYSICS}
-                      className="w-full h-12 rounded-xl font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-25 disabled:cursor-not-allowed transition-all duration-200"
+                      transition={STAGE_HEAVY}
+                      className="stage-btn stage-btn-primary w-full h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-25 disabled:cursor-not-allowed transition-all duration-200"
                     >
                       {isPasskeyPending ? (
                         <>
@@ -673,7 +677,7 @@ export function SmartLoginForm({
                     initial={{ opacity: 0, y: -8, height: 0 }}
                     animate={{ opacity: 1, y: 0, height: 'auto' }}
                     exit={{ opacity: 0, y: -8, height: 0 }}
-                    transition={UNUSONIC_PHYSICS}
+                    transition={STAGE_HEAVY}
                     className="overflow-hidden"
                   >
                     <div className="p-3 rounded-xl bg-surface-error border border-unusonic-error/40">
@@ -690,7 +694,7 @@ export function SmartLoginForm({
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ ...UNUSONIC_PHYSICS, opacity: { duration: 0.2 } }}
+                  transition={{ ...STAGE_HEAVY, opacity: { duration: 0.2 } }}
                   className="overflow-hidden pt-2 pb-3 px-1"
                 >
                   <form action={signInFormAction} className="space-y-5">
@@ -702,7 +706,7 @@ export function SmartLoginForm({
                     <div>
                       <label
                         htmlFor="password"
-                        className="block text-xs font-medium text-ink-muted uppercase tracking-widest mb-2"
+                        className="block text-[11px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-2"
                       >
                         Password
                       </label>
@@ -716,14 +720,14 @@ export function SmartLoginForm({
                           disabled={isPending}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full h-11 px-4 pr-11 rounded-xl bg-canvas/50 border border-[var(--glass-border)] text-ink placeholder:text-ink-muted focus:outline-none focus:border-[var(--glass-border-hover)] focus:ring-2 focus:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto cursor-text transition-all duration-200"
+                          className="w-full h-11 px-4 pr-11 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:border-[oklch(1_0_0_/_0.12)] focus:ring-2 focus:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto cursor-text transition-all duration-200"
                           placeholder="Password"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           disabled={isPending}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-ink/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? (
@@ -740,7 +744,7 @@ export function SmartLoginForm({
                           initial={{ opacity: 0, y: -8, height: 0 }}
                           animate={{ opacity: 1, y: 0, height: 'auto' }}
                           exit={{ opacity: 0, y: -8, height: 0 }}
-                          transition={UNUSONIC_PHYSICS}
+                          transition={STAGE_HEAVY}
                           className="overflow-hidden"
                         >
                           <div className="p-3 rounded-xl bg-surface-error border border-unusonic-error/40">
@@ -752,9 +756,7 @@ export function SmartLoginForm({
                     <motion.button
                       type="submit"
                       disabled={isPending}
-                      whileHover={{ scale: isPending ? 1 : 1.02 }}
-                      whileTap={{ scale: isPending ? 1 : 0.98 }}
-                      className="w-full h-12 rounded-xl font-medium text-sm bg-ink/80 text-canvas hover:bg-ink disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 transition-all duration-300"
+                      className="w-full h-12 rounded-xl font-medium text-sm bg-[var(--stage-accent)]/80 text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 transition-all duration-300"
                     >
                       {isPending ? (
                         <>
@@ -776,7 +778,7 @@ export function SmartLoginForm({
                   type="button"
                   onClick={() => setShowPasswordForm(true)}
                   disabled={isPending}
-                  className="w-full text-sm text-ink-muted/70 hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center"
+                  className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -790,7 +792,7 @@ export function SmartLoginForm({
               <p className="text-center">
                 <a
                   href="/recover"
-                  className="text-sm text-ink-muted hover:text-ink transition-colors"
+                  className="text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                 >
                   Lost access?
                 </a>
@@ -800,10 +802,10 @@ export function SmartLoginForm({
                   type="button"
                   onClick={() => handleModeSwitch('signup')}
                   disabled={isPending}
-                  className="text-sm text-ink-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-sm text-[var(--stage-text-tertiary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   New here?{' '}
-                  <span className="text-ink-muted hover:text-ceramic transition-colors">Create account</span>
+                  <span className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors">Create account</span>
                 </button>
               </p>
             </div>
@@ -822,7 +824,7 @@ export function SmartLoginForm({
     <LayoutGroup>
       <motion.div
         layout
-        transition={UNUSONIC_PHYSICS}
+        transition={STAGE_HEAVY}
         className="relative w-full min-h-screen flex items-center justify-center"
       >
         {createAccountView}

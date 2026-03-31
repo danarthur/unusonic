@@ -25,15 +25,15 @@ export function Header() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 pt-12 md:pt-16 pb-12 md:pb-16">
       <div className="space-y-3">
-        <h1 className="text-3xl md:text-4xl font-light text-primary">
-          {getGreeting()}, Daniel
+        <h1 className="text-3xl md:text-4xl font-light text-[var(--stage-text-primary)]">
+          {getGreeting()}
         </h1>
-        
+
         <div className="flex items-center gap-4 flex-wrap">
-          <p className="text-muted text-sm">
+          <p className="text-[var(--stage-text-secondary)] text-sm">
             {getFormattedDate()}
           </p>
-          <span className="text-cream/80 text-xs font-light">
+          <span className="text-[var(--stage-text-tertiary)] text-xs font-light">
             System Status: Online
           </span>
         </div>

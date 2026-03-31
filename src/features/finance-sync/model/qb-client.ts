@@ -266,7 +266,7 @@ class QuickBooksClient {
       TxnDate: invoice.createdAt.toISOString().split('T')[0],
       DueDate: invoice.dueDate?.toISOString().split('T')[0],
       // Store our internal UUID as a private note for reference
-      PrivateNote: `Signal Invoice ID: ${invoice.id}`,
+      PrivateNote: `Unusonic Invoice ID: ${invoice.id}`,
     };
     
     return this.request<{ Invoice: { Id: string } }>(workspaceId, '/invoice', {

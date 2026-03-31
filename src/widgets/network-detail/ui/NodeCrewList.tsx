@@ -15,7 +15,7 @@ const listVariants = {
 };
 
 const itemVariants = {
-  hidden: { y: 8, opacity: 1 },
+  hidden: { y: 8, opacity: 0 },
   visible: { y: 0, opacity: 1, transition: { type: 'spring' as const, stiffness: 300, damping: 30 } },
 };
 import type { NodeDetailCrewMember } from '@/features/network-data';
@@ -68,7 +68,7 @@ export function NodeCrewList({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)]">
+      <h3 className="text-sm font-medium tracking-wide text-[var(--stage-text-secondary)]">
         Crew
       </h3>
       <motion.ul
@@ -78,7 +78,7 @@ export function NodeCrewList({
         animate="visible"
       >
         {crew.length === 0 && !showForm && (
-          <li className="text-sm text-[var(--color-ink-muted)]">
+          <li className="text-sm text-[var(--stage-text-secondary)]">
             No members.
           </li>
         )}
@@ -88,21 +88,21 @@ export function NodeCrewList({
             variants={itemVariants}
             initial="hidden"
             animate="visible"
-            className="flex items-center gap-3 rounded-xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] px-4 py-3 shadow-sm"
+            className="flex items-center gap-3 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-4 py-3 shadow-sm"
           >
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-glass-surface)] border border-[var(--color-mercury)]">
-              <User className="size-5 text-[var(--color-ink-muted)]" />
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface-raised)] border border-[oklch(1_0_0_/_0.08)]">
+              <User className="size-5 text-[var(--stage-text-secondary)]" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--color-ink)]">{m.name?.trim() || 'Contact'}</p>
+              <p className="text-sm font-medium text-[var(--stage-text-primary)]">{m.name?.trim() || 'Contact'}</p>
               {(m.email?.trim() || null) && (
-                <p className="flex items-center gap-1.5 text-xs text-[var(--color-ink-muted)] mt-0.5">
+                <p className="flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] mt-0.5">
                   <Mail className="size-3" />
                   {m.email}
                 </p>
               )}
               {m.role && (
-                <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">{m.role}</p>
+                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{m.role}</p>
               )}
             </div>
           </motion.li>
@@ -125,7 +125,7 @@ export function NodeCrewList({
               variant="outline"
               size="sm"
               onClick={() => setShowForm(true)}
-              className="gap-2 border-[var(--color-silk)]/40 text-[var(--color-silk)]"
+              className="gap-2 border-[var(--stage-accent)]/40 text-[var(--stage-accent)]"
             >
               <UserPlus className="size-4" />
               Add contact
@@ -139,26 +139,26 @@ export function NodeCrewList({
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               onSubmit={handleSubmit}
-              className="overflow-hidden liquid-card rounded-2xl p-4 space-y-3"
+              className="overflow-hidden stage-panel rounded-2xl p-4 space-y-3"
             >
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   name="firstName"
                   placeholder={getContactFieldLabel('first_name')}
-                  className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
+                  className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
                   required
                 />
                 <Input
                   name="lastName"
                   placeholder={getContactFieldLabel('last_name')}
-                  className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
+                  className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
                 />
               </div>
               <Input
                 name="email"
                 type="email"
                 placeholder={`${getContactFieldLabel('email')} (optional)`}
-                className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
+                className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
               />
               {error && (
                 <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
@@ -168,7 +168,7 @@ export function NodeCrewList({
                   type="submit"
                   size="sm"
                   disabled={status === 'loading'}
-                  className="bg-[var(--color-silk)]/20 text-[var(--color-silk)] border-[var(--color-silk)]/40"
+                  className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40"
                 >
                   {status === 'loading' ? 'Adding…' : 'Add contact'}
                 </Button>

@@ -19,6 +19,8 @@ export type NetworkNode = {
     /** Entity type from directory.entities.type — used to pick correct avatar icon */
     entityType?: 'person' | 'company' | 'venue' | 'couple';
   };
+  /** Grouping key for the Crew zone — derived from job_title or first skill tag. Null renders under "Other". */
+  roleGroup?: string | null;
   meta: {
     email?: string;
     phone?: string;
@@ -29,6 +31,18 @@ export type NetworkNode = {
     outstanding_balance?: number;
     /** ISO date string from cortex.relationships.created_at — when this connection was established. */
     connectedSince?: string;
+    /** W-9 on file — populated for person (roster member) nodes. */
+    w9_status?: boolean | null;
+    /** COI expiry ISO date string — populated for person (roster member) nodes. */
+    coi_expiry?: string | null;
+    /** City/metro market — populated for person (roster member) nodes. */
+    market?: string | null;
+    /** Union affiliation string — populated for person (roster member) nodes. */
+    union_status?: string | null;
+    /** Number of deals this entity has referred to the workspace. Only set when > 0. */
+    referral_count?: number;
+    /** Business function capabilities from ops.entity_capabilities. */
+    capabilities?: string[];
   };
 };
 

@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
  * Finance feature – Fetch gig financials (invoices, items, payments)
  * Computes collected vs total on the server to avoid client-side math errors.
@@ -30,6 +30,7 @@ export async function getFinancials(
 
   // 1. Event title (and verify access via RLS)
   const { data: event, error: eventError } = await supabase
+    .schema('ops')
     .from('events')
     .select('id, title')
     .eq('id', eventId)
@@ -56,7 +57,7 @@ export async function getFinancials(
 
   // 3. All invoice items for these invoices
   const invoiceIds = invoices.map((i) => i.id);
-  let itemsByInvoice: Record<string, InvoiceItemDTO[]> = {};
+  const itemsByInvoice: Record<string, InvoiceItemDTO[]> = {};
   if (invoiceIds.length > 0) {
     const { data: itemRows } = await supabase
       .from('invoice_items')
@@ -82,7 +83,7 @@ export async function getFinancials(
   }
 
   // 4. All payments for these invoices (to compute amountPaid per invoice)
-  let paymentsByInvoice: Record<string, number> = {};
+  const paymentsByInvoice: Record<string, number> = {};
   if (invoiceIds.length > 0) {
     const { data: paymentRows } = await supabase
       .from('payments')

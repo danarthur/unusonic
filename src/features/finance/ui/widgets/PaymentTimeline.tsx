@@ -8,10 +8,8 @@
 
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import type { PaymentTimelineDTO } from '../../model/types';
-
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 export interface PaymentTimelineProps {
   timeline: PaymentTimelineDTO | null;
@@ -60,36 +58,36 @@ export function PaymentTimeline({ timeline, className }: PaymentTimelineProps) {
 
   if (!timeline) {
     return (
-      <LiquidPanel className={`flex flex-col gap-5 p-6 min-h-[200px] ${className ?? ''}`}>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted shrink-0">
+      <StagePanel className={`flex flex-col gap-5 p-6 min-h-[200px] ${className ?? ''}`}>
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] shrink-0">
           Payment Timeline
         </h2>
-        <p className="text-sm text-ink-muted mt-1">No invoice dates yet</p>
-      </LiquidPanel>
+        <p className="text-sm text-[var(--stage-text-secondary)] mt-1">No invoice dates yet</p>
+      </StagePanel>
     );
   }
 
   return (
-    <LiquidPanel className={`flex flex-col gap-6 p-6 min-h-[200px] min-w-0 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted shrink-0">
+    <StagePanel className={`flex flex-col gap-6 p-6 min-h-[200px] min-w-0 ${className ?? ''}`}>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] shrink-0">
         Cash Horizon
       </h2>
 
       {/* Labels row: Issue | Now | Due */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-ink-muted mb-0.5">Issue</p>
-          <p className="text-sm font-medium text-ink leading-tight">
+          <p className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)] mb-0.5">Issue</p>
+          <p className="text-sm font-medium text-[var(--stage-text-primary)] leading-tight">
             {formatShortDate(timeline.issueDate)}
           </p>
         </div>
         <div className="flex flex-col items-center justify-end">
-          <p className="text-[10px] uppercase tracking-wider text-ink-muted mb-0.5">Now</p>
-          <span className="text-sm font-medium text-ink">Today</span>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)] mb-0.5">Now</p>
+          <span className="text-sm font-medium text-[var(--stage-text-primary)]">Today</span>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wider text-ink-muted mb-0.5">Due</p>
-          <p className="text-sm font-medium text-ink leading-tight">
+          <p className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)] mb-0.5">Due</p>
+          <p className="text-sm font-medium text-[var(--stage-text-primary)] leading-tight">
             {formatShortDate(timeline.dueDate)}
           </p>
         </div>
@@ -99,35 +97,33 @@ export function PaymentTimeline({ timeline, className }: PaymentTimelineProps) {
       <div className="relative w-full h-2 flex items-center px-0">
         <div
           className={`absolute inset-x-0 h-1.5 rounded-full transition-colors ${
-            isOverdue ? 'bg-rose-500 dark:bg-rose-600' : 'bg-[var(--glass-border)]'
+            isOverdue ? 'bg-[var(--color-unusonic-error)]' : 'bg-[oklch(1_0_0_/_0.08)]'
           }`}
           aria-hidden
         />
         <motion.div
-          className="absolute w-4 h-4 rounded-full bg-[var(--walnut)] dark:bg-stone-400 -translate-x-1/2 z-10 border-2 border-[var(--background)]"
+          className="absolute w-4 h-4 rounded-full bg-[var(--walnut)] -translate-x-1/2 z-10 border-2 border-[var(--stage-surface)]"
           style={{ left: `${positionPct}%` }}
-          initial={{ scale: 0, opacity: 0 }}
+          initial={{ opacity: 0 }}
           animate={{
-            scale: [1, 1.15, 1],
-            opacity: 1,
+            opacity: [0.82, 1, 0.82],
           }}
           transition={{
-            scale: {
+            opacity: {
               duration: 1.5,
               repeat: Infinity,
               ease: 'easeInOut',
             },
-            opacity: spring,
           }}
           aria-hidden
         />
       </div>
 
       {(isPastDue || isFuture) && (
-        <p className="text-xs text-ink-muted shrink-0 mt-1">
+        <p className="text-xs text-[var(--stage-text-secondary)] shrink-0 mt-1">
           {isOverdue ? 'Overdue — balance due' : isPastDue ? 'Due date passed' : 'Before issue date'}
         </p>
       )}
-    </LiquidPanel>
+    </StagePanel>
   );
 }

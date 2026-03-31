@@ -31,8 +31,8 @@ export function SlugInput({
   onChange,
   excludeOrgId,
   className,
-  label = 'Signal frequency (URL)',
-  prefix = 'signal.com/',
+  label = 'URL slug',
+  prefix = 'unusonic.com/',
 }: SlugInputProps) {
   const [isChecking, setIsChecking] = React.useState(false);
   const [isAvailable, setIsAvailable] = React.useState<boolean | null>(null);
@@ -68,15 +68,15 @@ export function SlugInput({
     onChange(next);
   };
 
-  const prefixWidth = '6.5rem'; // signal.com/ in monospace
+  const prefixWidth = '6.5rem'; // unusonic.com/ in monospace
   return (
     <div className={cn('space-y-2', className)}>
-      <label className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+      <label className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         {label}
       </label>
       <div className="relative">
         <span
-          className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-ink-muted pointer-events-none"
+          className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--stage-text-secondary)] pointer-events-none"
           style={{ width: prefixWidth }}
           aria-hidden
         >
@@ -86,17 +86,17 @@ export function SlugInput({
           value={value}
           onChange={handleChange}
           className={cn(
-            'w-full h-11 font-mono text-sm rounded-xl border-mercury bg-obsidian/50 text-ceramic pl-[calc(0.75rem+6.5rem)] pr-10',
-            'placeholder:text-ink-muted/60'
+            'w-full h-11 font-mono text-sm rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-well)]/50 text-[var(--stage-text-primary)] pl-[calc(0.75rem+6.5rem)] pr-10',
+            'placeholder:text-[var(--stage-text-secondary)]/60'
           )}
           placeholder="luxe"
           aria-invalid={isAvailable === false}
           aria-describedby={isAvailable === false ? 'slug-unavailable' : undefined}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 pointer-events-none">
-          {isChecking && <Loader2 className="size-4 animate-spin text-ink-muted" />}
+          {isChecking && <Loader2 className="size-4 animate-spin text-[var(--stage-text-secondary)]" />}
           {!isChecking && isAvailable === true && (
-            <Check className="size-4 text-signal-success" aria-hidden />
+            <Check className="size-4 text-[var(--color-unusonic-success)]" aria-hidden />
           )}
           {!isChecking && isAvailable === false && (
             <span className="text-[10px] text-unusonic-error font-medium" id="slug-unavailable">

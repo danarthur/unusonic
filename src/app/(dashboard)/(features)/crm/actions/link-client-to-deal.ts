@@ -51,9 +51,9 @@ export async function linkClientToNetwork(
 }
 
 /**
- * Creates an INDUSTRY_PARTNER edge between a venue entity and a client entity
- * in cortex, with industry_tags: ["venue"]. Non-fatal — callers should
- * catch errors rather than blocking the deal flow.
+ * Creates a VENUE_PARTNER edge between a venue entity and a client entity
+ * in cortex. Non-fatal — callers should catch errors rather than blocking
+ * the deal flow.
  */
 export async function linkVenueToClient(
   venueEntityId: string,
@@ -65,7 +65,7 @@ export async function linkVenueToClient(
     const { error: rpcErr } = await supabase.rpc('upsert_relationship', {
       p_source_entity_id: clientEntityId,
       p_target_entity_id: venueEntityId,
-      p_type: 'INDUSTRY_PARTNER',
+      p_type: 'VENUE_PARTNER',
       p_context_data: {
         industry_tags: ['venue'],
         deleted_at: null,

@@ -7,6 +7,8 @@ import {
   endOfWeek,
   eachDayOfInterval,
   isSameMonth,
+  isBefore,
+  startOfDay,
   format,
   type Locale,
 } from 'date-fns';
@@ -60,47 +62,51 @@ export function MonthGrid({ events, viewDate, onEventClick, onDayClick, locale }
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
   return (
-    <div className="h-full min-h-0 flex flex-col rounded-2xl overflow-hidden liquid-panel border border-[var(--glass-border)]">
+    <div className="h-full min-h-0 flex flex-col rounded-2xl overflow-hidden stage-panel border border-[oklch(1_0_0_/_0.08)]">
       {/* Weekday headers — Liquid Japandi: semantic tokens, tight tracking */}
-      <div className="grid grid-cols-7 gap-px border-b border-[var(--glass-border)] rounded-t-2xl overflow-hidden shrink-0 bg-[var(--glass-bg)]/30 backdrop-blur-sm">
+      <div className="grid grid-cols-7 gap-px border-b border-[oklch(1_0_0_/_0.08)] rounded-t-2xl overflow-hidden shrink-0 bg-[var(--stage-surface)]/30">
         {weekdays.map((label) => (
           <div
             key={label}
-            className="px-2 py-3 text-center text-sm font-semibold text-ink/80 tracking-tight"
+            className="px-2 py-3 text-center text-sm font-semibold text-[var(--stage-text-primary)]/80 tracking-tight"
           >
             {label}
           </div>
         ))}
       </div>
       {/* Days grid — fixed min row height so boxes stay consistent size */}
-      <div className="grid grid-cols-7 gap-px rounded-b-2xl overflow-hidden flex-1 min-h-0 grid-auto-rows-[minmax(100px,1fr)] bg-[var(--glass-bg)]/10">
+      <div className="grid grid-cols-7 gap-px rounded-b-2xl overflow-hidden flex-1 min-h-0 grid-auto-rows-[minmax(100px,1fr)] bg-[var(--stage-surface)]/10">
         {days.map((day) => {
           const key = dayKey(day);
           const dayEvents = eventsByDay.get(key) ?? [];
           const inMonth = isSameMonth(day, viewDate);
           const isToday = key === todayKey;
+          const isPast = !isToday && isBefore(day, startOfDay(new Date()));
+          const eventCount = dayEvents.length;
+          // Density heat: busier days get a warm tint
+          const densityClass = eventCount === 0 ? '' : eventCount <= 1 ? 'bg-[var(--color-unusonic-info)]/[0.02]' : eventCount <= 3 ? 'bg-[var(--color-unusonic-info)]/[0.04]' : 'bg-[var(--color-unusonic-info)]/[0.06]';
 
           return (
             <div
               key={key}
-              className={`min-h-[100px] flex flex-col gap-1.5 p-2.5 overflow-hidden border-r border-b border-[var(--glass-border)]/50 last:border-r-0 ${
-                inMonth ? 'bg-[var(--glass-bg)]/40' : 'bg-ink/[0.02]'
-              } ${isToday ? 'ring-2 ring-inset ring-[var(--today-ring)] bg-[var(--today-bg)]' : ''}`}
+              className={`min-h-[100px] flex flex-col gap-1.5 p-2.5 overflow-hidden border-r border-b border-[oklch(1_0_0_/_0.08)]/20 last:border-r-0 transition-colors duration-200 hover:bg-[var(--stage-surface)]/60 ${densityClass} ${
+                inMonth ? (isPast ? 'bg-[var(--stage-surface)]/40 opacity-60 saturate-[0.7]' : 'bg-[var(--stage-surface)]/40') : 'bg-[var(--stage-accent)]/[0.01] opacity-50'
+              } ${isToday ? 'ring-2 ring-inset ring-[var(--today-ring)] bg-[var(--today-bg)] !opacity-100 !saturate-100' : ''}`}
             >
               {onDayClick ? (
                 <button
                   type="button"
                   onClick={() => onDayClick(key)}
-                  className={`text-sm md:text-base font-semibold tabular-nums shrink-0 hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--ring)] rounded ${
-                    inMonth ? 'text-ink' : 'text-ink/70'
+                  className={`text-base md:text-lg tabular-nums shrink-0 hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded ${
+                    isToday ? 'font-medium text-[var(--stage-text-primary)]' : inMonth ? 'font-light text-[var(--stage-text-primary)]' : 'font-light text-[var(--stage-text-primary)]/40'
                   }`}
                 >
                   {format(day, 'd')}
                 </button>
               ) : (
                 <span
-                  className={`text-sm md:text-base font-semibold tabular-nums shrink-0 ${
-                    inMonth ? 'text-ink' : 'text-ink/70'
+                  className={`text-base md:text-lg tabular-nums shrink-0 ${
+                    isToday ? 'font-medium text-[var(--stage-text-primary)]' : inMonth ? 'font-light text-[var(--stage-text-primary)]' : 'font-light text-[var(--stage-text-primary)]/40'
                   }`}
                 >
                   {format(day, 'd')}
@@ -111,7 +117,7 @@ export function MonthGrid({ events, viewDate, onEventClick, onDayClick, locale }
                   <button
                     type="button"
                     onClick={() => onEventClick?.(dayEvents[0])}
-                    className="text-left w-full rounded-lg transition-all duration-300 hover:bg-ceramic/10 focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-inset"
+                    className="text-left w-full rounded-lg transition-all duration-300 hover:bg-[var(--stage-text-primary)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset"
                   >
                     <EventPill event={dayEvents[0]} />
                   </button>

@@ -1,5 +1,5 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
@@ -203,7 +203,7 @@ export async function getCrewRolesFromProposalDiagnostic(dealId: string): Promis
     }
   }
 
-  let ingredientSummary: { name: string; category: string; staffRole?: string | null }[] = [];
+  const ingredientSummary: { name: string; category: string; staffRole?: string | null }[] = [];
   if (ingredientIds.size > 0) {
     const { data: ingredientPackages } = await supabase
       .from('packages')

@@ -22,7 +22,7 @@ interface OmniSearchProps {
 }
 
 /**
- * The Signal Tuner – Spotlight Artifact.
+ * The Aion Tuner – Spotlight Artifact.
  * Search First, Summon Second. Vignette + levitating lens over the dashboard; Deep Liquid glass.
  */
 export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSelectExisting }: OmniSearchProps) {
@@ -175,21 +175,21 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
             onClick={(e) => e.stopPropagation()}
           >
             <div
-          className="relative overflow-hidden rounded-3xl border border-[var(--color-mercury)] backdrop-blur-2xl"
+          className="relative overflow-hidden rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)]"
               style={{
                 background: 'oklch(0.18 0 0 / 0.85)',
                 boxShadow:
-                  '0 0 50px -10px oklch(0.70 0.15 250 / 0.18), 0 20px 40px -10px oklch(0 0 0 / 0.5), inset 0 1px 0 0 var(--color-glass-highlight)',
+                  '0 0 50px -10px oklch(0.88 0 0 / 0.18), 0 20px 40px -10px oklch(0 0 0 / 0.5), inset 0 1px 0 0 oklch(1_0_0_/_0.10)',
               }}
             >
               <Command className="w-full" loop>
             {/* INPUT HEADER – text floats on the glass */}
-            <div className="relative flex h-20 items-center border-b border-[var(--color-mercury)] px-6">
+            <div className="relative flex h-20 items-center border-b border-[oklch(1_0_0_/_0.08)] px-6">
               <Search
                 className={`mr-3 h-6 w-6 shrink-0 transition-colors duration-300 ${
                   query.trim()
-                    ? 'text-[var(--color-silk)] drop-shadow-[0_0_8px_oklch(0.70_0.15_250_/_0.4)]'
-                    : 'text-[var(--color-ink-muted)]'
+                    ? 'text-[var(--stage-accent)] drop-shadow-[0_0_8px_oklch(0.88_0_0_/_0.4)]'
+                    : 'text-[var(--stage-text-secondary)]'
                 }`}
               />
               <Command.Input
@@ -197,14 +197,14 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                 onValueChange={setQuery}
                 onKeyDown={handleEnterInSearch}
                 placeholder="Search…"
-                className="h-full flex-1 bg-transparent px-4 text-xl font-light text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-muted)]"
+                className="h-full flex-1 bg-transparent px-4 text-xl font-light text-[var(--stage-text-primary)] outline-none placeholder:text-[var(--stage-text-secondary)]"
                 autoFocus
               />
               <div className="flex items-center gap-3">
                 {isSearching && (
-                  <Loader2 className="h-5 w-5 animate-spin text-[var(--color-silk)]" />
+                  <Loader2 className="h-5 w-5 animate-spin text-[var(--stage-accent)]" />
                 )}
-                <span className="hidden rounded border border-[var(--color-mercury)] px-2 py-1 font-medium uppercase tracking-wider text-[var(--color-ink-muted)] md:inline-block text-[10px]">
+                <span className="hidden rounded border border-[oklch(1_0_0_/_0.08)] px-2 py-1 font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] md:inline-block text-[10px]">
                   ESC
                 </span>
               </div>
@@ -212,7 +212,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
 
             {/* RESULTS BODY — staggered entrance */}
             <Command.List className="max-h-[60vh] overflow-y-auto p-3 scroll-py-3">
-              {/* GHOST CREATE – Initialize Protocol */}
+              {/* GHOST CREATE – company / partner org */}
               {showGhostOption && (
                 <Command.Item
                   value={`Add "${query.trim()}"`}
@@ -229,25 +229,25 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                     }
                   }}
                   disabled={pendingGhost}
-                  className="group flex cursor-pointer items-center gap-4 rounded-xl border border-dashed border-[var(--color-mercury)] p-4 text-left transition-all hover:border-[var(--color-silk)]/50 hover:bg-[var(--color-silk)]/5 data-[selected=true]:border-[var(--color-silk)]/50 data-[selected=true]:bg-[var(--color-silk)]/5"
+                  className="group flex cursor-pointer items-center gap-4 rounded-xl border border-dashed border-[oklch(1_0_0_/_0.08)] p-4 text-left transition-all hover:border-[var(--stage-accent)]/50 hover:bg-[var(--stage-accent)]/5 data-[selected=true]:border-[var(--stage-accent)]/50 data-[selected=true]:bg-[var(--stage-accent)]/5"
                 >
                   {pendingGhost ? (
-                    <Loader2 className="h-12 w-12 shrink-0 animate-spin text-[var(--color-silk)]" />
+                    <Loader2 className="h-12 w-12 shrink-0 animate-spin text-[var(--stage-accent)]" />
                   ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-100)] text-[var(--color-ink-muted)] transition-transform group-hover:scale-110 group-hover:text-[var(--color-silk)]">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] transition-[color,filter] group-hover:brightness-[1.08] group-hover:text-[var(--stage-accent)]">
                       <Ghost className="h-5 w-5" />
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="text-base font-medium text-[var(--color-ink)] group-hover:text-[var(--color-silk)] group-data-[selected=true]:text-[var(--color-silk)]">
+                    <div className="text-base font-medium text-[var(--stage-text-primary)] group-hover:text-[var(--stage-accent)] group-data-[selected=true]:text-[var(--stage-accent)]">
                       Add &quot;{query.trim()}&quot;
                     </div>
-                    <div className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-                      Internal record.
+                    <div className="mt-0.5 text-xs text-[var(--stage-text-secondary)]">
+                      Add as a company or partner org
                     </div>
                   </div>
                   <div className="pr-2 opacity-0 transition-opacity group-hover:opacity-100 group-data-[selected=true]:opacity-100">
-                    <ArrowRight className="h-4 w-4 text-[var(--color-silk)]" />
+                    <ArrowRight className="h-4 w-4 text-[var(--stage-accent)]" />
                   </div>
                 </Command.Item>
               )}
@@ -261,7 +261,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                 >
                 <Command.Group
                   heading={connectionResults.length === 1 ? 'Connection' : 'Connections'}
-                  className="mb-1 px-3 py-2 text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]"
+                  className="mb-1 px-3 py-2 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
                 >
                   {connectionResults.map((org) => (
                     <Command.Item
@@ -269,39 +269,39 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                       value={`${org.name} ${org.id}`}
                       onSelect={() => handleSelectExisting(org)}
                       disabled={pendingId === org.id}
-                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[var(--glass-bg-hover)] data-[selected=true]:text-[var(--color-ink)] data-[selected=true]:shadow-lg"
+                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[var(--stage-surface-hover)] data-[selected=true]:text-[var(--stage-text-primary)] data-[selected=true]:shadow-lg"
                     >
                       <div className="relative shrink-0">
                         {pendingId === org.id ? (
-                          <Loader2 className="h-10 w-10 animate-spin text-[var(--color-ink-muted)]" />
+                          <Loader2 className="h-10 w-10 animate-spin text-[var(--stage-text-secondary)]" />
                         ) : org.logo_url ? (
                           <img
                             src={org.logo_url}
                             alt=""
-                            className="h-10 w-10 rounded-full bg-[var(--color-surface-100)] object-cover ring-2 ring-transparent group-data-[selected=true]:ring-[var(--color-mercury)]"
+                            className="h-10 w-10 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface-elevated)] object-cover ring-2 ring-transparent group-data-[selected=true]:ring-[oklch(1_0_0_/_0.08)]"
                           />
                         ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-surface-100)] text-[var(--color-ink-muted)] ring-2 ring-transparent group-data-[selected=true]:ring-[var(--color-mercury)]">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] ring-2 ring-transparent group-data-[selected=true]:ring-[oklch(1_0_0_/_0.08)]">
                             <Globe className="h-5 w-5" />
                           </div>
                         )}
                         {!org.is_ghost && (
                           <span
-                            className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[var(--color-canvas)] bg-[var(--color-silk)]"
+                            className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[var(--stage-void)] bg-[var(--stage-accent)]"
                             title="Verified"
                           />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="block truncate text-base font-medium text-[var(--color-ink)] group-data-[selected=true]:text-[var(--color-ink)]">
+                        <span className="block truncate text-base font-medium text-[var(--stage-text-primary)] group-data-[selected=true]:text-[var(--stage-text-primary)]">
                           {org.name}
                         </span>
-                        <span className="text-xs text-[var(--color-ink-muted)] group-data-[selected=true]:text-[var(--color-ink-muted)]">
+                        <span className="text-xs text-[var(--stage-text-secondary)] group-data-[selected=true]:text-[var(--stage-text-secondary)]">
                           {org.is_ghost ? 'Internal' : 'Verified'}
                         </span>
                       </div>
                       <div className="opacity-0 transition-opacity group-data-[selected=true]:opacity-100">
-                        <span className="rounded bg-white/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">
+                        <span className="rounded bg-[oklch(1_0_0_/_0.10)] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                           Connect
                         </span>
                       </div>
@@ -311,7 +311,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                 </motion.div>
               )}
 
-              {/* SIGNAL DIRECTORY (global) */}
+              {/* DIRECTORY (global) */}
               {hasGlobal && (
                 <motion.div
                   initial={{ opacity: 0, y: 4 }}
@@ -320,7 +320,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                 >
                 <Command.Group
                   heading="Directory"
-                  className="mb-1 px-3 py-2 text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]"
+                  className="mb-1 px-3 py-2 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
                 >
                   {globalResults.map((org) => (
                     <Command.Item
@@ -328,37 +328,37 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                       value={`${org.name} ${org.id}`}
                       onSelect={() => handleSelectExisting(org)}
                       disabled={pendingId === org.id}
-                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[var(--glass-bg-hover)] data-[selected=true]:text-[var(--color-ink)] data-[selected=true]:shadow-lg"
+                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[var(--stage-surface-hover)] data-[selected=true]:text-[var(--stage-text-primary)] data-[selected=true]:shadow-lg"
                     >
                       <div className="relative shrink-0">
                         {pendingId === org.id ? (
-                          <Loader2 className="h-10 w-10 animate-spin text-[var(--color-ink-muted)]" />
+                          <Loader2 className="h-10 w-10 animate-spin text-[var(--stage-text-secondary)]" />
                         ) : org.logo_url ? (
                           <img
                             src={org.logo_url}
                             alt=""
-                            className="h-10 w-10 rounded-full bg-[var(--color-surface-100)] object-cover ring-2 ring-transparent group-data-[selected=true]:ring-[var(--color-mercury)]"
+                            className="h-10 w-10 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface-elevated)] object-cover ring-2 ring-transparent group-data-[selected=true]:ring-[oklch(1_0_0_/_0.08)]"
                           />
                         ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-surface-100)] text-[var(--color-ink-muted)] ring-2 ring-transparent group-data-[selected=true]:ring-[var(--color-mercury)]">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] ring-2 ring-transparent group-data-[selected=true]:ring-[oklch(1_0_0_/_0.08)]">
                             <Globe className="h-5 w-5" />
                           </div>
                         )}
                         <span
-                          className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[var(--color-canvas)] bg-[var(--color-silk)]"
+                          className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[var(--stage-void)] bg-[var(--stage-accent)]"
                           title="Verified"
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="block truncate text-base font-medium text-[var(--color-ink)] group-data-[selected=true]:text-[var(--color-ink)]">
+                        <span className="block truncate text-base font-medium text-[var(--stage-text-primary)] group-data-[selected=true]:text-[var(--stage-text-primary)]">
                           {org.name}
                         </span>
-                        <span className="text-xs text-[var(--color-silk)] group-data-[selected=true]:text-[var(--color-silk)]">
+                        <span className="text-xs text-[var(--stage-accent)] group-data-[selected=true]:text-[var(--stage-accent)]">
                           Verified
                         </span>
                       </div>
                       <div className="opacity-0 transition-opacity group-data-[selected=true]:opacity-100">
-                        <span className="rounded bg-white/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">
+                        <span className="rounded bg-[oklch(1_0_0_/_0.10)] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                           Connect
                         </span>
                       </div>
@@ -370,18 +370,18 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
             </Command.List>
 
             {/* FOOTER – shortcuts + branding (matches artifact pill style) */}
-            <div className="flex h-12 items-center justify-between gap-4 border-t border-[var(--color-mercury)] bg-[var(--color-canvas)]/30 px-6">
+            <div className="flex h-12 items-center justify-between gap-4 border-t border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/30 px-6">
               <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-mercury)] bg-white/5 px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">
-                  <ChevronsUpDown className="size-3.5 shrink-0 text-[var(--color-ink)]/80" aria-hidden />
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
+                  <ChevronsUpDown className="size-3.5 shrink-0 text-[var(--stage-text-primary)]/80" aria-hidden />
                   Navigate
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-mercury)] bg-white/5 px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">
-                  <CornerDownLeft className="size-3.5 shrink-0 text-[var(--color-ink)]/80" aria-hidden />
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
+                  <CornerDownLeft className="size-3.5 shrink-0 text-[var(--stage-text-primary)]/80" aria-hidden />
                   Select
                 </span>
               </div>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]/80">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/80">
                 Unusonic
               </span>
             </div>

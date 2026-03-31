@@ -2,14 +2,15 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { Activity } from 'lucide-react';
+import { WidgetShell } from '@/widgets/shared';
 import {
   M3_FADE_THROUGH_ENTER,
   M3_STAGGER_CHILDREN,
   M3_STAGGER_DELAY,
 } from '@/shared/lib/motion-constants';
 
-/** Micro-chart stub: client emotional trends (Ceramic neutral, Neon positive, Muted at risk). */
+/** Micro-chart stub: client emotional trends (neutral / accent positive / warning at risk). */
 const STUB_POINTS = [
   { label: 'Mon', value: 0.6, status: 'neutral' as const },
   { label: 'Tue', value: 0.7, status: 'positive' as const },
@@ -25,10 +26,7 @@ export function SentimentPulseWidget() {
   const maxVal = Math.max(...STUB_POINTS.map((p) => p.value));
 
   return (
-    <LiquidPanel className="h-full flex flex-col min-h-0">
-      <h2 className="text-xs font-medium text-muted uppercase tracking-widest tracking-tight mb-4">
-        Sentiment Pulse
-      </h2>
+    <WidgetShell icon={Activity} label="Sentiment Pulse">
       <motion.div
         className="flex items-end gap-2 flex-1 min-h-[80px] h-20"
         initial="hidden"
@@ -51,22 +49,22 @@ export function SentimentPulseWidget() {
             className="flex-1 flex flex-col items-center justify-end gap-1 h-full"
           >
             <div
-              className="w-full rounded-t liquid-card-nested min-h-[6px] max-h-full"
+              className="w-full rounded-t min-h-[6px] max-h-full border border-[oklch(1_0_0_/_0.08)]"
               style={{
                 height: maxVal ? `${(p.value / maxVal) * 100}%` : '0%',
                 backgroundColor:
                   p.status === 'positive'
-                    ? 'var(--color-neon-blue)'
+                    ? 'var(--stage-accent)'
                     : p.status === 'at_risk'
-                      ? 'var(--color-muted)'
-                      : 'var(--color-ceramic)',
-                opacity: p.status === 'positive' ? 0.9 : p.status === 'at_risk' ? 0.6 : 0.7,
+                      ? 'var(--color-unusonic-warning)'
+                      : 'oklch(0.55 0 0)',
+                opacity: p.status === 'positive' ? 0.85 : p.status === 'at_risk' ? 0.55 : 0.65,
               }}
             />
-            <span className="text-[10px] text-muted font-medium shrink-0">{p.label}</span>
+            <span className="text-[10px] text-[var(--stage-text-secondary)] font-medium shrink-0">{p.label}</span>
           </motion.div>
         ))}
       </motion.div>
-    </LiquidPanel>
+    </WidgetShell>
   );
 }

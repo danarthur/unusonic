@@ -1,10 +1,10 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import { getCrewRolesFromProposalForDeal } from './get-crew-roles-from-proposal';
+// getCrewRolesFromProposalForDeal removed — crew is managed via deal_crew table (Phase B)
 
 export type HandoverResult =
   | { success: true; eventId: string }
@@ -19,15 +19,10 @@ export type HandoverVitals = {
   client_entity_id?: string | null;
 };
 
-/** Single crew item in run_of_show_data.crew_items. */
-export type HandoverCrewItem = { role: string; status?: string };
-
-/** Gear/Inventory and Crew requirements saved into ops.events.run_of_show_data. */
+/** Gear/logistics data saved into ops.events.run_of_show_data (crew managed via deal_crew table). */
 export type HandoverRunOfShowData = {
   gear_requirements?: string | null;
   venue_restrictions?: string | null;
-  crew_roles?: string[] | null;
-  crew_items?: HandoverCrewItem[] | null;
   [key: string]: unknown;
 };
 
@@ -72,11 +67,11 @@ export async function handoverDeal(
   }
 
   const status = (r.status as string) ?? '';
-  if (!['inquiry', 'proposal', 'contract_sent', 'contract_signed'].includes(status as string)) {
-    return { success: false, error: 'Deal is not ready for handover.' };
+  if (!['contract_signed', 'deposit_received'].includes(status as string)) {
+    return { success: false, error: 'Contract must be signed before handover.' };
   }
 
-  let { data: projects, error: projErr } = await supabase
+  const { data: projects, error: projErr } = await supabase
     .schema('ops')
     .from('projects')
     .select('id')
@@ -133,25 +128,12 @@ export async function handoverDeal(
     eventName = title;
   }
 
-  // Derive crew roles from proposal: service packages with staff_role (e.g. DJ) become crew needs on the event
-  const proposalCrewRoles = await getCrewRolesFromProposalForDeal(dealId);
-  const wizardCrewRoles = runOfShowData?.crew_roles ?? [];
-  const wizardCrewItems: HandoverCrewItem[] = Array.isArray(runOfShowData?.crew_items)
-    ? runOfShowData.crew_items.filter((c): c is HandoverCrewItem => c != null && typeof (c as HandoverCrewItem).role === 'string')
-    : [];
-  const combinedCrewRoles = [...new Set([...wizardCrewRoles, ...proposalCrewRoles])].filter(
-    (r) => typeof r === 'string' && r.trim()
-  );
-  if (combinedCrewRoles.length > 0) {
-    const existingRoles = new Set(wizardCrewItems.map((c) => c.role));
-    const newItems = combinedCrewRoles
-      .filter((role) => !existingRoles.has(role))
-      .map((role) => ({ role, status: 'requested' as const }));
-    runOfShowData = {
-      ...runOfShowData,
-      crew_roles: combinedCrewRoles,
-      crew_items: [...wizardCrewItems, ...newItems],
-    };
+  // Crew is managed via deal_crew table — Plan tab reads from it directly.
+  // No need to copy crew into run_of_show_data JSONB during handoff.
+  // Strip any wizard-supplied crew_items/crew_roles from runOfShowData to avoid stale JSONB.
+  if (runOfShowData) {
+    const { crew_items: _ci, crew_roles: _cr, ...nonCrewData } = runOfShowData;
+    runOfShowData = nonCrewData;
   }
 
   const { data: event, error: eventErr } = await supabase
@@ -159,6 +141,8 @@ export async function handoverDeal(
     .from('events')
     .insert({
       project_id: projectId,
+      workspace_id: workspaceId,
+      deal_id: dealId,
       title: eventName,
       starts_at: startAt,
       ends_at: endAt,
@@ -186,7 +170,7 @@ export async function handoverDeal(
 
   const { error: updateErr } = await supabase
     .from('deals')
-    .update({ status: 'won', event_id: eventId, updated_at: new Date().toISOString() })
+    .update({ status: 'won', event_id: eventId, won_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', dealId)
     .eq('workspace_id', workspaceId);
 

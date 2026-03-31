@@ -41,6 +41,31 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
   const project = (r.project as { workspace_id?: string } | null) ?? null;
   const wsId = project?.workspace_id ?? workspaceId;
 
+  // Resolve display names for linked entities
+  const entityIdsToResolve = [
+    r.client_entity_id as string | null,
+    r.venue_entity_id as string | null,
+    r.producer_id as string | null,
+    r.pm_id as string | null,
+  ].filter((id): id is string => !!id);
+
+  const entityNameMap = new Map<string, string>();
+  if (entityIdsToResolve.length > 0) {
+    const { data: entities } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id, display_name')
+      .in('id', entityIdsToResolve);
+    for (const e of entities ?? []) {
+      if (e.display_name) entityNameMap.set(e.id, e.display_name);
+    }
+  }
+
+  const clientEntityId = (r.client_entity_id as string) ?? null;
+  const venueEntityId = (r.venue_entity_id as string) ?? null;
+  const producerId = (r.producer_id as string) ?? null;
+  const pmId = (r.pm_id as string) ?? null;
+
   const dto: EventCommandDTO = {
     id: r.id as string,
     workspace_id: wsId,
@@ -54,17 +79,17 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
     ends_at: (r.ends_at as string) ?? '',
     dates_load_in: null,
     dates_load_out: null,
-    venue_entity_id: (r.venue_entity_id as string) ?? null,
-    venue_name: null,
+    venue_entity_id: venueEntityId,
+    venue_name: venueEntityId ? entityNameMap.get(venueEntityId) ?? null : null,
     venue_address: null,
     venue_google_maps_id: null,
     location_name: (r.location_name as string) ?? null,
     location_address: null,
     logistics_dock_info: null,
     logistics_power_info: null,
-    client_entity_id: (r.client_entity_id as string) ?? null,
-    producer_id: (r.producer_id as string) ?? null,
-    pm_id: (r.pm_id as string) ?? null,
+    client_entity_id: clientEntityId,
+    producer_id: producerId,
+    pm_id: pmId,
     guest_count_expected: null,
     guest_count_actual: null,
     tech_requirements: null,
@@ -76,9 +101,9 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
     notes: (r.notes as string) ?? null,
     created_at: (r.created_at as string) ?? '',
     updated_at: (r.updated_at as string) ?? (r.created_at as string) ?? '',
-    client_name: null,
-    producer_name: null,
-    pm_name: null,
+    client_name: clientEntityId ? entityNameMap.get(clientEntityId) ?? null : null,
+    producer_name: producerId ? entityNameMap.get(producerId) ?? null : null,
+    pm_name: pmId ? entityNameMap.get(pmId) ?? null : null,
   };
 
   return dto;

@@ -1,13 +1,13 @@
 /**
- * Signal Strategy Phase 1: Five high-value role archetypes.
+ * Unusonic Strategy Phase 1: Five high-value role archetypes.
  * Phase 2 (Role Architect) will allow custom roles; DB stores org_member_role.
  */
 
 /** DB value for org_members.role. Observer = restricted (read-only client). */
-export type SignalRoleId = 'owner' | 'admin' | 'manager' | 'member' | 'restricted';
+export type UnusonicRoleId = 'owner' | 'admin' | 'manager' | 'member' | 'restricted';
 
-export interface SignalRolePreset {
-  id: SignalRoleId;
+export interface UnusonicRolePreset {
+  id: UnusonicRoleId;
   label: string;
   description: string;
   /** Shown in Role Select; owner is not assignable in forge. */
@@ -17,7 +17,7 @@ export interface SignalRolePreset {
 }
 
 /** The 5 archetypes for Role Select (rich descriptions). */
-export const SIGNAL_ROLE_PRESETS: SignalRolePreset[] = [
+export const UNUSONIC_ROLE_PRESETS: UnusonicRolePreset[] = [
   {
     id: 'owner',
     label: 'Owner',
@@ -56,10 +56,10 @@ export const SIGNAL_ROLE_PRESETS: SignalRolePreset[] = [
 ];
 
 /** Roles that can be chosen in Member Forge (excludes owner). */
-export const ASSIGNABLE_ROLE_IDS: SignalRoleId[] = ['admin', 'manager', 'member', 'restricted'];
+export const ASSIGNABLE_ROLE_IDS: UnusonicRoleId[] = ['admin', 'manager', 'member', 'restricted'];
 
 /** Display label for badge/list (Observer = restricted). */
 export function getRoleLabel(roleId: string): string {
-  const preset = SIGNAL_ROLE_PRESETS.find((p) => p.id === roleId);
+  const preset = UNUSONIC_ROLE_PRESETS.find((p) => p.id === roleId);
   return preset?.label ?? roleId;
 }

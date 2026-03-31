@@ -54,13 +54,13 @@ export function OrgLogoUpload({ orgId, logoUrl, onSuccess, onError, className }:
 
   return (
     <div className={cn('flex flex-col items-start gap-2', className)}>
-      <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)]">
         {logoUrl ? (
           <>
             <div
               className="pointer-events-none absolute inset-0"
               style={{
-                background: 'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(248,250,252,0.7) 0%, rgba(226,232,240,0.4) 50%, transparent 100%)',
+                background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.98 0 0 / 0.7) 0%, oklch(0.90 0 0 / 0.4) 50%, transparent 100%)',
               }}
               aria-hidden
             />
@@ -71,11 +71,11 @@ export function OrgLogoUpload({ orgId, logoUrl, onSuccess, onError, className }:
             />
           </>
         ) : (
-          <Building2 className="size-10 text-[var(--color-ink-muted)]" />
+          <Building2 className="size-10 text-[var(--stage-text-secondary)]" />
         )}
         {uploading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <span className="text-xs text-white">Uploading…</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-[oklch(0_0_0_/_0.5)]">
+            <span className="text-xs text-[oklch(1_0_0)]">Uploading…</span>
           </div>
         )}
       </div>
@@ -91,7 +91,7 @@ export function OrgLogoUpload({ orgId, logoUrl, onSuccess, onError, className }:
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[var(--color-ink)] transition-colors hover:bg-white/10 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2 text-sm font-medium text-[var(--stage-text-primary)] transition-colors hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-50"
       >
         <Upload className="size-4" />
         {logoUrl ? 'Replace logo' : 'Upload logo'}

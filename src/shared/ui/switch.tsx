@@ -3,17 +3,12 @@
 import * as React from 'react';
 import { cn } from '@/shared/lib/utils';
 
-/**
- * Liquid Ceramic branded switch: mercury rim, glass track when off,
- * silk (neon signal) when on. Use for Set by time, Show load-in/out, and Settings preferences.
- */
 export interface CeramicSwitchProps {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
   id?: string;
   className?: string;
-  /** Accessible label (used for aria-label if no associated label). */
   'aria-label'?: string;
 }
 
@@ -35,20 +30,30 @@ export function CeramicSwitch({
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-200',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian',
+        'relative inline-flex shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-200',
+        'focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--stage-accent)] focus-visible:outline-offset-2',
         'disabled:pointer-events-none disabled:opacity-50',
         checked
-          ? 'border-mercury bg-silk/25 shadow-[inset_0_0_0_1px_var(--color-glass-highlight)]'
-          : 'border-mercury bg-[var(--color-glass-surface)]',
+          ? 'border-transparent bg-[var(--stage-accent)]'
+          : 'border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]',
         className
       )}
+      style={{
+        width: 'var(--stage-switch-width, 40px)',
+        height: 'var(--stage-switch-height, 22px)',
+      }}
     >
       <span
-        className={cn(
-          'pointer-events-none inline-block h-5 w-5 rounded-full transition-transform duration-200 translate-y-0.5',
-          checked ? 'translate-x-5 bg-silk shadow-[0_0_12px_oklch(0.70_0.15_250_/_0.4)]' : 'translate-x-0.5 bg-ceramic/20'
-        )}
+        className="pointer-events-none inline-block rounded-full transition-transform duration-200"
+        style={{
+          width: 'calc(var(--stage-switch-height, 22px) - 4px)',
+          height: 'calc(var(--stage-switch-height, 22px) - 4px)',
+          marginTop: '2px',
+          transform: checked
+            ? 'translateX(calc(var(--stage-switch-width, 40px) - var(--stage-switch-height, 22px)))'
+            : 'translateX(2px)',
+          backgroundColor: checked ? 'oklch(0.10 0 0)' : 'var(--stage-surface-raised)',
+        }}
       />
     </button>
   );

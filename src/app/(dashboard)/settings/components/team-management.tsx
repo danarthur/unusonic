@@ -102,10 +102,10 @@ const DEPARTMENTS = [
 ];
 
 const ROLE_COLORS = {
-  owner: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  admin: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-  member: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  viewer: 'bg-stone-500/10 text-stone-600 dark:text-stone-400 border-stone-500/20',
+  owner: 'bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)] border-[var(--color-unusonic-warning)]/20',
+  admin: 'bg-[oklch(0.55_0.15_250)]/10 text-[oklch(0.65_0.15_250)] border-[oklch(0.55_0.15_250)]/20',
+  member: 'bg-[var(--color-unusonic-success)]/10 text-[var(--color-unusonic-success)] border-[var(--color-unusonic-success)]/20',
+  viewer: 'bg-[var(--stage-surface)]/10 text-[var(--stage-text-tertiary)] border-[var(--stage-surface)]/20',
 };
 
 // ============================================================================
@@ -172,20 +172,20 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center">
-            <Users className="w-5 h-5 text-ink-muted" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+            <Users className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-ink">Team Members</h2>
-            <p className="text-xs text-ink-muted">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+            <h2 className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">Team Members</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)]">{members.length} member{members.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
           {canManage && <InviteTeamMemberSheet workspaceId={workspaceId} canManage={canManage} />}
           {!canManage && (
-            <div className="px-3 py-1.5 rounded-lg bg-ink/5 border border-[var(--glass-border)]">
-              <span className="text-xs text-ink-muted">View only</span>
+            <div className="px-3 py-1.5 rounded-lg bg-[var(--stage-surface-nested)] border border-[var(--stage-border)]">
+              <span className="text-xs text-[var(--stage-text-secondary)]">View only</span>
             </div>
           )}
         </div>
@@ -199,9 +199,9 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={springConfig}
-            className="p-3 rounded-xl bg-red-500/5 border border-red-500/15"
+            className="p-3 rounded-xl bg-[var(--color-unusonic-error)]/5 border border-[var(--color-unusonic-error)]/15"
           >
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -219,31 +219,32 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
             <motion.div
               key={member.id}
               layout
-              className="rounded-xl border border-[var(--glass-border)] overflow-hidden bg-ink/[0.02]"
+              className="rounded-xl border border-[var(--stage-border)] overflow-hidden bg-[var(--stage-surface-elevated)]"
             >
               {/* Member Header */}
               <button
                 onClick={() => toggleExpand(member.id)}
                 disabled={isOwner || !canManage}
-                className="w-full p-4 flex items-center gap-4 hover:bg-ink/[0.02] transition-colors disabled:cursor-default"
+                className="w-full p-4 flex items-center gap-4 hover:bg-[var(--stage-surface-raised)] transition-colors disabled:cursor-default"
               >
                 {/* Avatar */}
-                <div className="w-10 h-10 rounded-xl overflow-hidden bg-ink/10 flex items-center justify-center shrink-0 ring-2 ring-[var(--glass-border)]">
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-[var(--stage-surface-nested)] flex items-center justify-center shrink-0 ring-2 ring-[var(--stage-border)]">
                   {member.avatarUrl ? (
-                    <img 
-                      src={member.avatarUrl} 
-                      alt={member.fullName || 'Member'} 
+                    <img
+                      src={member.avatarUrl}
+                      alt={member.fullName || 'Member'}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                   ) : (
-                    <span className="text-sm font-medium text-ink">{initials}</span>
+                    <span className="text-sm font-medium text-[var(--stage-text-primary)]">{initials}</span>
                   )}
                 </div>
                 
                 {/* Info */}
                 <div className="flex-1 text-left min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-ink truncate">
+                    <p className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
                       {member.fullName || member.email}
                     </p>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider border ${ROLE_COLORS[member.role]}`}>
@@ -252,12 +253,12 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     {member.fullName && (
-                      <p className="text-xs text-ink-muted truncate">{member.email}</p>
+                      <p className="text-xs text-[var(--stage-text-secondary)] truncate">{member.email}</p>
                     )}
                     {member.department && (
                       <>
-                        <span className="text-ink-muted/30">•</span>
-                        <span className="text-xs text-ink-muted">{member.department}</span>
+                        <span className="text-[var(--stage-text-secondary)]/30">•</span>
+                        <span className="text-xs text-[var(--stage-text-secondary)]">{member.department}</span>
                       </>
                     )}
                   </div>
@@ -269,12 +270,12 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                     animate={{ rotate: isExpanded ? 180 : 0 }}
                     transition={springConfig}
                   >
-                    <ChevronDown className="w-5 h-5 text-ink-muted" />
+                    <ChevronDown className="w-5 h-5 text-[var(--stage-text-secondary)]" />
                   </motion.div>
                 )}
                 
                 {isOwner && (
-                  <Shield className="w-5 h-5 text-amber-500" />
+                  <Shield className="w-5 h-5 text-[var(--color-unusonic-warning)]" />
                 )}
               </button>
               
@@ -288,7 +289,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                     transition={springConfig}
                     className="overflow-hidden"
                   >
-                    <div className="px-4 pb-4 pt-2 border-t border-[var(--glass-border)] space-y-4">
+                    <div className="px-4 pb-4 pt-2 border-t border-[var(--stage-border)] space-y-4">
                       {/* Role Select (workspace_roles: system + custom) */}
                       <WorkspaceRoleSelect
                         workspaceId={workspaceId}
@@ -299,7 +300,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                       />
                       {/* Department Select */}
                       <div>
-                        <label className="block text-[10px] font-medium text-ink-muted uppercase tracking-[0.15em] mb-2">
+                        <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-2">
                           Department
                         </label>
                         <div className="relative">
@@ -308,9 +309,9 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                             onChange={(e) => handleDepartmentChange(member.id, e.target.value)}
                             disabled={isPending && savingId === `${member.id}-department`}
                             className="w-full px-3 py-2.5 rounded-xl appearance-none
-                              bg-ink/[0.03] border border-[var(--glass-border)]
-                              text-ink text-sm
-                              focus:outline-none focus:border-walnut/40 focus:ring-2 focus:ring-walnut/10
+                              bg-[var(--stage-surface-raised)] border border-[var(--stage-border)]
+                              text-[var(--stage-text-primary)] text-sm
+                              focus:outline-none focus:border-[var(--stage-accent)] focus:ring-2 focus:ring-[var(--stage-accent-muted)]
                               disabled:opacity-50 disabled:cursor-not-allowed
                               transition-all duration-300"
                           >
@@ -319,16 +320,16 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                               <option key={dept} value={dept}>{dept}</option>
                             ))}
                           </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" />
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--stage-text-secondary)] pointer-events-none" />
                           {isPending && savingId === `${member.id}-department` && (
-                            <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-walnut animate-spin" />
+                            <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--stage-text-secondary)] animate-spin" />
                           )}
                         </div>
                       </div>
                       
                       {/* Permissions Grid */}
                       <div>
-                        <label className="block text-[10px] font-medium text-ink-muted uppercase tracking-[0.15em] mb-3">
+                        <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-3">
                           Permissions
                         </label>
                         <div className="space-y-2">
@@ -343,32 +344,32 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                                 onClick={() => handleTogglePermission(member.id, perm.key, isEnabled)}
                                 disabled={isSaving}
                                 className={`w-full p-3 rounded-xl border flex items-center gap-3 transition-all duration-200
-                                  ${isEnabled 
-                                    ? 'bg-emerald-500/5 border-emerald-500/20' 
-                                    : 'bg-ink/[0.02] border-[var(--glass-border)] hover:border-[var(--glass-border-hover)]'
+                                  ${isEnabled
+                                    ? 'bg-[var(--color-unusonic-success)]/5 border-[var(--color-unusonic-success)]/20'
+                                    : 'bg-[var(--stage-surface)] border-[var(--stage-border)] hover:border-[var(--stage-surface-hover)]'
                                   }
                                   disabled:opacity-50 disabled:cursor-not-allowed`}
                               >
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center
-                                  ${isEnabled ? 'bg-emerald-500/10' : 'bg-ink/5'}`}>
-                                  <Icon className={`w-4 h-4 ${isEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-muted'}`} />
+                                  ${isEnabled ? 'bg-[var(--color-unusonic-success)]/10' : 'bg-[var(--stage-surface)]'}`}>
+                                  <Icon className={`w-4 h-4 ${isEnabled ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--stage-text-secondary)]'}`} />
                                 </div>
                                 
                                 <div className="flex-1 text-left">
-                                  <p className={`text-sm font-medium ${isEnabled ? 'text-ink' : 'text-ink-muted'}`}>
+                                  <p className={`text-sm font-medium ${isEnabled ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]'}`}>
                                     {perm.label}
                                   </p>
-                                  <p className="text-[11px] text-ink-muted/70">{perm.description}</p>
+                                  <p className="text-[11px] text-[var(--stage-text-secondary)]/70">{perm.description}</p>
                                 </div>
                                 
                                 {isSaving ? (
-                                  <Loader2 className="w-5 h-5 text-walnut animate-spin" />
+                                  <Loader2 className="w-5 h-5 text-[var(--stage-text-secondary)] animate-spin" />
                                 ) : isEnabled ? (
-                                  <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                                  <div className="w-6 h-6 rounded-full bg-[var(--color-unusonic-success)] flex items-center justify-center">
                                     <Check className="w-3.5 h-3.5 text-white" />
                                   </div>
                                 ) : (
-                                  <div className="w-6 h-6 rounded-full border-2 border-ink/20" />
+                                  <div className="w-6 h-6 rounded-full border-2 border-[var(--stage-border-hover)]" />
                                 )}
                               </button>
                             );
@@ -386,10 +387,10 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
       
       {/* Empty State */}
       {members.length === 0 && (
-        <div className="p-8 text-center rounded-xl border-2 border-dashed border-[var(--glass-border)]">
-          <Users className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
-          <p className="text-sm text-ink-muted">No team members yet</p>
-          <p className="mt-1 text-xs text-ink-muted">Use Invite team member to add someone to the roster and optionally grant Signal login.</p>
+        <div className="p-8 text-center rounded-xl border-2 border-dashed border-[var(--stage-border)]">
+          <Users className="w-10 h-10 text-[var(--stage-text-secondary)]/40 mx-auto mb-3" />
+          <p className="text-sm text-[var(--stage-text-secondary)]">No team members yet</p>
+          <p className="mt-1 text-xs text-[var(--stage-text-secondary)]">Use Invite team member to add someone to the roster and optionally grant Unusonic login.</p>
         </div>
       )}
     </div>

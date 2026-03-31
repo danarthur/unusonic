@@ -33,8 +33,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState }) => {
               animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center h-full opacity-30 select-none"
             >
-              <Sparkles size={28} className="mb-4 text-ink" />
-              <p className="font-serif text-2xl text-ink">Aion is listening.</p>
+              <Sparkles size={28} className="mb-4 text-[var(--stage-text-primary)]" />
+              <p className="font-serif text-2xl text-[var(--stage-text-primary)]">Aion is listening.</p>
             </motion.div>
           )}
 
@@ -49,7 +49,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState }) => {
               )}
             >
               {msg.role !== 'user' && (
-                <div className="liquid-panel !rounded-full w-8 h-8 flex items-center justify-center mr-4 mt-1 shrink-0 text-xs font-serif font-bold text-ink">
+                <div className="stage-panel !rounded-full w-8 h-8 flex items-center justify-center mr-4 mt-1 shrink-0 text-xs font-serif font-bold text-[var(--stage-text-primary)]">
                   A
                 </div>
               )}
@@ -58,8 +58,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState }) => {
                 className={cn(
                   'max-w-[80%] p-5 rounded-2xl text-[15px] leading-relaxed font-sans relative overflow-hidden border border-transparent',
                   msg.role === 'user'
-                    ? 'bg-ink text-[var(--background)]'
-                    : 'liquid-panel !rounded-2xl text-ink'
+                    ? 'bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)]'
+                    : 'stage-panel !rounded-2xl text-[var(--stage-text-primary)]'
                 )}
               >
                 <p className="whitespace-pre-wrap font-normal">{msg.content}</p>
@@ -69,10 +69,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState }) => {
 
           {isLoading && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start w-full pl-12">
-              <div className="liquid-panel !rounded-xl !p-4 flex gap-1.5">
-                <span className="w-1.5 h-1.5 bg-ink/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-1.5 h-1.5 bg-ink/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-1.5 h-1.5 bg-ink/40 rounded-full animate-bounce" />
+              <div className="stage-panel !rounded-xl !p-4 flex gap-1.5">
+                <span className="w-1.5 h-1.5 bg-[oklch(1_0_0_/_0.40)] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 bg-[oklch(1_0_0_/_0.40)] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 bg-[oklch(1_0_0_/_0.40)] rounded-full animate-bounce" />
               </div>
             </motion.div>
           )}

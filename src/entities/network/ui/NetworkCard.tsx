@@ -1,8 +1,10 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Building2, User, Star } from 'lucide-react';
+import { Building2, User, Star, MapPin } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { crewCompleteness, type CrewCompletenessLevel } from '@/shared/lib/crew-profile';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type { NetworkNode } from '../model/types';
 
 interface NetworkCardProps {
@@ -18,11 +20,44 @@ function formatSince(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+const COMPLETENESS_PILL_CLASS: Record<CrewCompletenessLevel, string | null> = {
+  incomplete: null,
+  core: 'text-[var(--stage-text-secondary)] text-[10px] font-medium',
+  ready:
+    'text-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/10 border border-[var(--color-unusonic-info)]/20 rounded-full px-2 py-0.5 text-[10px] font-medium',
+  compliant:
+    'text-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/10 border border-[var(--color-unusonic-success)]/20 rounded-full px-2 py-0.5 text-[10px] font-medium',
+};
+
+const COMPLETENESS_LABEL: Record<CrewCompletenessLevel, string | null> = {
+  incomplete: null,
+  core: 'Core',
+  ready: 'Ready',
+  compliant: 'Compliant',
+};
+
 /** Core (employee): solid ceramic. Partner: frosted glass. Preferred (inner_circle): silk star marker. */
 export function NetworkCard({ node, onClick, onTogglePreferred, className, layoutId }: NetworkCardProps) {
-  const isCore = node.gravity === 'core';
-  const isPartner = node.kind === 'external_partner';
+  // Freelancer persons (external_partner + person + inner_circle) render as crew, not partners
+  const isFreelancerPerson = node.kind === 'external_partner' && node.identity.entityType === 'person' && node.gravity === 'inner_circle';
+  const isCore = node.gravity === 'core' || isFreelancerPerson;
+  const isPartner = node.kind === 'external_partner' && !isFreelancerPerson;
   const isPreferred = node.gravity === 'inner_circle';
+
+  // Completeness pill: only for person nodes (team members)
+  const completenessLevel =
+    node.identity.entityType === 'person'
+      ? crewCompleteness({
+          first_name: node.identity.name.split(' ')[0] || null,
+          phone: node.meta.phone ?? null,
+          job_title: node.identity.label,
+          skills: node.meta.tags,
+          market: node.meta.market ?? null,
+          union_status: node.meta.union_status ?? null,
+          w9_status: node.meta.w9_status ?? null,
+          coi_expiry: node.meta.coi_expiry ?? null,
+        })
+      : null;
 
   const handleTogglePreferred = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -45,8 +80,8 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
           onClick={handleTogglePreferred}
           className={`absolute top-2.5 left-2.5 z-10 rounded p-1 transition-all duration-150 ${
             isPreferred
-              ? 'text-[var(--color-silk)]'
-              : 'text-[var(--color-ink-muted)]/30 hover:text-[var(--color-silk)]/70'
+              ? 'text-[var(--stage-accent)]'
+              : 'text-[var(--stage-text-secondary)]/30 hover:text-[var(--stage-accent)]/70'
           }`}
           title={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
           aria-label={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
@@ -54,27 +89,30 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
         >
           <Star
             size={13}
-            className={isPreferred ? 'fill-[var(--color-silk)]' : ''}
+            className={isPreferred ? 'fill-[var(--stage-accent)]' : ''}
           />
         </button>
       ) : isPartner && isPreferred ? (
-        <span className="absolute top-2.5 left-2.5 text-[var(--color-silk)]" aria-label="Preferred partner">
-          <Star size={13} className="fill-[var(--color-silk)]" />
+        <span className="absolute top-2.5 left-2.5 text-[var(--stage-accent)]" aria-label="Preferred partner">
+          <Star size={13} className="fill-[var(--stage-accent)]" />
         </span>
       ) : null}
       {isCore && node.meta.doNotRebook && (
         <span
-          className="absolute top-3 right-3 size-2 rounded-full bg-[var(--color-signal-warning)]"
+          className="absolute top-3 right-3 size-2 rounded-full bg-[var(--color-unusonic-warning)]"
           aria-label="Do not rebook"
         />
       )}
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <motion.div
             layoutId={layoutId ? `${layoutId}-avatar` : undefined}
             className={cn(
-              'flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--color-mercury)]/20',
-              'size-10'
+              'flex shrink-0 items-center justify-center overflow-hidden bg-[oklch(1_0_0_/_0.06)] mt-0.5',
+              'size-10',
+              node.identity.entityType === 'person' || node.identity.entityType === 'couple'
+                ? 'rounded-full'
+                : 'rounded-[var(--stage-radius-nested)]',
             )}
           >
             {node.identity.avatarUrl ? (
@@ -83,55 +121,96 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
                 alt=""
                 className="size-full object-cover"
               />
+            ) : isPartner && node.identity.entityType === 'venue' ? (
+              <MapPin className="size-5 text-[var(--stage-text-secondary)]" />
             ) : isPartner && node.identity.entityType !== 'person' && node.identity.entityType !== 'couple' ? (
-              <Building2 className="size-5 text-[var(--color-ink-muted)]" />
+              <Building2 className="size-5 text-[var(--stage-text-secondary)]" />
             ) : (
-              <User className="size-5 text-[var(--color-ink-muted)]" />
+              <User className="size-5 text-[var(--stage-text-secondary)]" />
             )}
           </motion.div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-medium tracking-tight text-[var(--color-ink)]">
+            <p className="truncate font-medium tracking-tight text-[var(--stage-text-primary)]">
               {node.identity.name}
             </p>
             {isPartner ? (
               node.meta.email ? (
-                <p className="truncate text-xs text-[var(--color-ink-muted)]">{node.meta.email}</p>
+                <p className="truncate text-xs text-[var(--stage-text-secondary)]">{node.meta.email}</p>
               ) : null
             ) : (
-              <p className="text-xs text-[var(--color-ink-muted)]">{node.identity.label}</p>
+              <p className="text-xs text-[var(--stage-text-secondary)]">
+                {node.identity.label}
+                {node.kind === 'extended_team' && (
+                  <span className="ml-1.5 text-[var(--color-unusonic-warning)]/70">· 1099</span>
+                )}
+              </p>
             )}
-            {node.meta.tags?.length ? (
+            {(() => {
+              // For crew nodes, filter out skills that duplicate the title label
+              const tags = node.meta.tags ?? [];
+              const label = node.identity.label?.toLowerCase() ?? '';
+              const filtered = isCore
+                ? tags.filter((t) => t.toLowerCase() !== label)
+                : tags;
+              return filtered.length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {filtered.slice(0, 3).map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded bg-[var(--stage-text-primary)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null;
+            })()}
+            {/* Business function badges */}
+            {(node.meta.capabilities ?? []).length > 0 && (
               <div className="mt-1 flex flex-wrap gap-1">
-                {node.meta.tags.slice(0, 3).map((tag) => (
+                {node.meta.capabilities!.slice(0, 2).map((cap) => (
                   <span
-                    key={tag}
-                    className="rounded bg-[var(--color-ink)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                    key={cap}
+                    className="rounded bg-[var(--stage-accent)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                   >
-                    {tag}
+                    {cap}
                   </span>
                 ))}
               </div>
-            ) : null}
-            {isPartner && (node.meta.outstanding_balance ?? 0) > 0 ? (
-              <p className="mt-1.5 text-xs font-medium text-[var(--color-signal-warning)]">
+            )}
+            {completenessLevel && completenessLevel !== 'incomplete' && (
+              <div className="mt-1">
+                <span className={cn(COMPLETENESS_PILL_CLASS[completenessLevel])}>
+                  {COMPLETENESS_LABEL[completenessLevel]}
+                </span>
+              </div>
+            )}
+            {isPartner && (node.meta.outstanding_balance ?? 0) > 0 && (
+              <p className="mt-1.5 text-xs font-medium text-[var(--color-unusonic-warning)]">
                 ${(node.meta.outstanding_balance!).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} outstanding
               </p>
-            ) : node.meta.connectedSince ? (
-              <p className="mt-1 text-[10px] text-[var(--color-ink-muted)]/50 tabular-nums">
+            )}
+            {(node.meta.referral_count ?? 0) > 0 && (
+              <p className="mt-1 text-[10px] font-medium text-[var(--color-unusonic-warning)]/70">
+                {node.meta.referral_count} referral{node.meta.referral_count! > 1 ? 's' : ''}
+              </p>
+            )}
+            {!(node.meta.outstanding_balance ?? 0) && !(node.meta.referral_count ?? 0) && node.meta.connectedSince && (
+              <p className="mt-1 text-[10px] text-[var(--stage-text-secondary)]/50 tabular-nums">
                 since {formatSince(node.meta.connectedSince)}
               </p>
-            ) : null}
+            )}
           </div>
         </div>
         <span
           className={cn(
             'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
             isPartner
-              ? 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]'
-              : 'bg-[var(--color-ink)]/10 text-[var(--color-ink-muted)]'
+              ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]'
+              : 'bg-[var(--stage-text-primary)]/10 text-[var(--stage-text-secondary)]'
           )}
         >
-          {isPartner ? (node.identity.label || 'Partner') : 'Team'}
+          {isPartner ? (node.identity.label || 'Partner') : isFreelancerPerson ? 'Freelancer' : 'Team'}
         </span>
       </div>
     </>
@@ -147,15 +226,13 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
       onClick={onClick}
       onKeyDown={handleCardKeyDown}
       className={cn(
-        'group liquid-levitation relative flex h-full w-full flex-col rounded-3xl p-4 sm:p-5 text-left transition-all duration-300 cursor-pointer',
-        'liquid-card text-[var(--color-ink)] hover:border-[var(--color-silk)]/50',
+        'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left transition-all duration-300 cursor-pointer',
+        'stage-panel text-[var(--stage-text-primary)] hover:border-[var(--stage-accent)]/50',
         isArchived && 'opacity-40',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-silk)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
         className
       )}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      transition={STAGE_LIGHT}
     >
       {content}
     </motion.div>

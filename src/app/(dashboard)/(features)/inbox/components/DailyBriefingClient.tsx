@@ -17,7 +17,7 @@ export function DailyBriefingClient({ items }: DailyBriefingClientProps) {
   if (!items || items.length === 0) {
     return (
       <motion.div
-        className="h-full flex flex-col items-center justify-center text-muted opacity-80"
+        className="h-full flex flex-col items-center justify-center text-[var(--stage-text-secondary)] opacity-80"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.8 }}
         transition={{ ...M3_FADE_THROUGH_ENTER, delay: 0.15 }}
@@ -30,7 +30,7 @@ export function DailyBriefingClient({ items }: DailyBriefingClientProps) {
   return (
     <div className="w-full h-full overflow-y-auto pr-2 custom-scrollbar">
       <motion.div
-        className="relative space-y-4 liquid-panel liquid-panel-nested !p-4"
+        className="relative space-y-4 stage-panel !p-4"
         initial="hidden"
         animate="visible"
         variants={{
@@ -43,7 +43,7 @@ export function DailyBriefingClient({ items }: DailyBriefingClientProps) {
           hidden: {},
         }}
       >
-        <div className="absolute left-4 top-4 bottom-4 w-px bg-[var(--glass-border)]" />
+        <div className="absolute left-4 top-4 bottom-4 w-px bg-[oklch(1_0_0_/_0.08)]" />
         {items.map((item, index) => (
           <motion.div
             key={item.id || index}
@@ -51,7 +51,7 @@ export function DailyBriefingClient({ items }: DailyBriefingClientProps) {
             variants={M3_SHARED_AXIS_Y_VARIANTS}
             transition={M3_FADE_THROUGH_ENTER}
           >
-            <div className="absolute left-3 top-1.5 liquid-panel liquid-panel-nested !rounded-full !p-0 w-2.5 h-2.5 !bg-stone/50" />
+            <div className="absolute left-3 top-1.5 stage-panel !rounded-full !p-0 w-2.5 h-2.5 !bg-[oklch(1_0_0/0.5)]" />
             <TimelineItem
               item={{ ...item, text: item.content || item.text || 'Entry' }}
               isLast={index === items.length - 1}

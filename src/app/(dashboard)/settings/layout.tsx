@@ -11,7 +11,7 @@ export default function SettingsLayout({
 }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="shrink-0 px-6 pt-6 pb-4 border-b border-[var(--glass-border)]">
+      <div className="shrink-0 px-6 pt-6 pb-4 border-b border-[var(--stage-border)]">
         <SettingsNav />
       </div>
       <div className="flex-1 min-h-0 overflow-auto">

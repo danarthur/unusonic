@@ -18,13 +18,13 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/shared/ui/popover';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { updateFlightCheckStatus } from '../actions/update-flight-check-status';
 import { updateCallTimeSlots } from '../actions/update-call-time-slots';
 import { updateEventDates } from '../actions/update-event-dates';
@@ -89,49 +89,49 @@ const TRANSPORT_STATUS_STYLES: Record<
   { bg: string; border: string; text: string }
 > = {
   pending: {
-    bg: 'bg-white/5',
-    border: 'border-white/10',
-    text: 'text-ink-muted',
+    bg: 'bg-[oklch(1_0_0_/_0.05)]',
+    border: 'border-[oklch(1_0_0_/_0.10)]',
+    text: 'text-[var(--stage-text-secondary)]',
   },
   pending_rental: {
-    bg: 'bg-white/5',
-    border: 'border-white/10',
-    text: 'text-ink-muted',
+    bg: 'bg-[oklch(1_0_0_/_0.05)]',
+    border: 'border-[oklch(1_0_0_/_0.10)]',
+    text: 'text-[var(--stage-text-secondary)]',
   },
   truck_picked_up: {
-    bg: 'bg-[var(--color-neon-amber)]/10',
-    border: 'border-[var(--color-neon-amber)]/40',
-    text: 'text-[var(--color-neon-amber)]',
+    bg: 'bg-[var(--color-unusonic-warning)]/10',
+    border: 'border-[var(--color-unusonic-warning)]/40',
+    text: 'text-[var(--color-unusonic-warning)]',
   },
   loading: {
-    bg: 'bg-[var(--color-signal-warning)]/10',
-    border: 'border-[var(--color-signal-warning)]/40',
-    text: 'text-[var(--color-signal-warning)]',
+    bg: 'bg-[var(--color-unusonic-warning)]/10',
+    border: 'border-[var(--color-unusonic-warning)]/40',
+    text: 'text-[var(--color-unusonic-warning)]',
   },
   dispatched: {
-    bg: 'bg-[var(--color-signal-info)]/10',
-    border: 'border-[var(--color-signal-info)]/40',
-    text: 'text-[var(--color-signal-info)]',
+    bg: 'bg-[var(--color-unusonic-info)]/10',
+    border: 'border-[var(--color-unusonic-info)]/40',
+    text: 'text-[var(--color-unusonic-info)]',
   },
   on_site: {
-    bg: 'bg-[var(--color-signal-success)]/10',
-    border: 'border-[var(--color-signal-success)]/40',
-    text: 'text-[var(--color-signal-success)]',
+    bg: 'bg-[var(--color-unusonic-success)]/10',
+    border: 'border-[var(--color-unusonic-success)]/40',
+    text: 'text-[var(--color-unusonic-success)]',
   },
   returning: {
-    bg: 'bg-[var(--color-neon-blue)]/10',
-    border: 'border-[var(--color-neon-blue)]/40',
-    text: 'text-[var(--color-neon-blue)]',
+    bg: 'bg-[var(--color-unusonic-info)]/10',
+    border: 'border-[var(--color-unusonic-info)]/40',
+    text: 'text-[var(--color-unusonic-info)]',
   },
   complete: {
-    bg: 'bg-[var(--color-signal-success)]/10',
-    border: 'border-[var(--color-signal-success)]/40',
-    text: 'text-[var(--color-signal-success)]',
+    bg: 'bg-[var(--color-unusonic-success)]/10',
+    border: 'border-[var(--color-unusonic-success)]/40',
+    text: 'text-[var(--color-unusonic-success)]',
   },
   truck_returned: {
-    bg: 'bg-[var(--color-signal-success)]/10',
-    border: 'border-[var(--color-signal-success)]/40',
-    text: 'text-[var(--color-signal-success)]',
+    bg: 'bg-[var(--color-unusonic-success)]/10',
+    border: 'border-[var(--color-unusonic-success)]/40',
+    text: 'text-[var(--color-unusonic-success)]',
   },
 };
 
@@ -330,10 +330,10 @@ function TransportLogisticsCard({
   return (
     <motion.div
       layout
-      transition={UNUSONIC_PHYSICS}
-      className={`rounded-[28px] border ${style.border} ${style.bg} transition-colors`}
+      transition={STAGE_LIGHT}
+      className={`rounded-[var(--stage-radius-panel)] border ${style.border} ${style.bg} transition-colors`}
     >
-      <LiquidPanel className="p-6 sm:p-7 rounded-[28px] flex flex-col gap-5 min-h-[130px]">
+      <StagePanel elevated className="p-6 sm:p-7 rounded-[var(--stage-radius-panel)] flex flex-col gap-5 min-h-[130px]">
         <div className="flex items-center gap-4">
           <ModeIcon
             size={22}
@@ -341,7 +341,7 @@ function TransportLogisticsCard({
             aria-hidden
           />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-ink-muted/80 mb-2">
+            <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)] mb-2">
               Transport
             </p>
             <Popover open={modeOpen} onOpenChange={setModeOpen}>
@@ -349,10 +349,10 @@ function TransportLogisticsCard({
                 <button
                   type="button"
                   disabled={updating}
-                  className="inline-flex items-center gap-1.5 text-ceramic font-medium tracking-tight leading-snug hover:text-[var(--color-neon-blue)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug hover:text-[var(--stage-accent)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded disabled:opacity-60"
                 >
                   {TRANSPORT_MODE_OPTIONS.find((o) => o.value === displayMode)?.label ?? displayMode}
-                  <ChevronDown size={14} className="opacity-70" aria-hidden />
+                  <ChevronDown size={14} className="text-[var(--stage-text-tertiary)]" aria-hidden />
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-48 p-1">
@@ -361,7 +361,7 @@ function TransportLogisticsCard({
                     key={opt.value}
                     type="button"
                     onClick={() => setMode(opt.value)}
-                    className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-ceramic hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   >
                     {opt.label}
                   </button>
@@ -374,20 +374,20 @@ function TransportLogisticsCard({
           type="button"
           onClick={updating ? undefined : cycleStatus}
           disabled={updating}
-          className="mt-3 flex items-center justify-between gap-3 w-full rounded-xl border border-white/10 bg-white/5 py-3 px-4 hover:bg-white/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60 text-left"
+          className="mt-3 flex items-center justify-between gap-3 w-full rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] py-3 px-4 hover:bg-[oklch(1_0_0_/_0.10)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 text-left"
         >
           <motion.span
             key={displayStatus}
             initial={{ opacity: 0, y: 2 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={UNUSONIC_PHYSICS}
+            transition={STAGE_LIGHT}
             className={`font-medium tracking-tight text-base truncate ${style.text}`}
           >
             {updating ? '…' : TRANSPORT_STATUS_LABELS[displayStatus]}
           </motion.span>
-          <span className="text-xs text-ink-muted/70 shrink-0">Next</span>
+          <span className="text-xs text-[var(--stage-text-tertiary)] shrink-0">Next</span>
         </button>
-      </LiquidPanel>
+      </StagePanel>
     </motion.div>
   );
 }
@@ -428,7 +428,7 @@ function DateFieldRow({
       onBlur={isEditing ? handleBlur : undefined}
     >
       {prefix && (
-        <span className="text-[10px] font-mono text-ink-muted/50 uppercase tracking-wider shrink-0 leading-none mt-px select-none">
+        <span className="text-[10px] font-mono text-[var(--stage-text-secondary)]/50 uppercase tracking-wider shrink-0 leading-none mt-px select-none">
           {prefix}
         </span>
       )}
@@ -443,7 +443,7 @@ function DateFieldRow({
               if (e.key === 'Escape') onCancel();
             }}
             autoFocus
-            className="min-w-0 flex-1 bg-white/5 border border-white/15 rounded-md px-1.5 py-0.5 text-ceramic text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="min-w-0 flex-1 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.15)] rounded-md px-1.5 py-0.5 text-[var(--stage-text-primary)] text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           />
           {/* onMouseDown prevent keeps input focused so the click event fires */}
           <button
@@ -452,7 +452,7 @@ function DateFieldRow({
             onClick={onSave}
             disabled={saving}
             aria-label="Save"
-            className="shrink-0 p-0.5 rounded text-[var(--color-signal-success)] hover:bg-[var(--color-signal-success)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50 transition-colors"
+            className="shrink-0 p-0.5 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors"
           >
             <Check size={13} />
           </button>
@@ -461,7 +461,7 @@ function DateFieldRow({
             onMouseDown={(e) => e.preventDefault()}
             onClick={onCancel}
             aria-label="Cancel"
-            className="shrink-0 p-0.5 rounded text-ink-muted hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] transition-colors"
+            className="shrink-0 p-0.5 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
           >
             <XIcon size={13} />
           </button>
@@ -470,14 +470,14 @@ function DateFieldRow({
         <button
           type="button"
           onClick={onOpen}
-          className={`flex items-center gap-1.5 min-w-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded ${className}`}
+          className={`flex items-center gap-1.5 min-w-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded ${className}`}
         >
-          <span className="text-sm text-ceramic group-hover:text-[var(--color-neon-blue)] transition-colors truncate">
+          <span className="text-sm text-[var(--stage-text-primary)] group-hover:text-[var(--stage-accent)] transition-colors truncate">
             {display}
           </span>
           <Pencil
             size={11}
-            className="shrink-0 text-ink-muted opacity-0 group-hover:opacity-50 transition-opacity"
+            className="shrink-0 text-transparent group-hover:text-[var(--stage-text-tertiary)] transition-colors"
             aria-hidden
           />
         </button>
@@ -561,8 +561,12 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
     let next: CallTimeSlot[];
     if (editingId === 'new') {
       const newId = editLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-      // Dedupe id
-      const id = slots.some((s) => s.id === newId) ? `${newId}_${Date.now()}` : newId;
+      let id = newId;
+      let n = 0;
+      while (slots.some((s) => s.id === id)) {
+        n += 1;
+        id = `${newId}_${n}`;
+      }
       next = [...slots, { id, label: editLabel.trim(), time: isoTime }];
     } else {
       next = slots.map((s) => s.id === editingId ? { ...s, label: editLabel.trim(), time: isoTime } : s);
@@ -604,15 +608,15 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
   const hasSlots = slots.length > 0;
 
   return (
-    <LiquidPanel className="p-6 sm:p-7 rounded-[28px] flex flex-col gap-5 min-h-[130px]">
+    <StagePanel elevated className="p-6 sm:p-7 rounded-[var(--stage-radius-panel)] flex flex-col gap-5 min-h-[130px]">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Clock size={14} className="shrink-0 text-ink-muted/70" aria-hidden />
-          <p className="text-xs font-medium uppercase tracking-wider text-ink-muted/80">
+          <Clock size={14} className="shrink-0 text-[var(--stage-text-secondary)]/70" aria-hidden />
+          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
             Call times
           </p>
           {saving && (
-            <span className="text-[10px] text-ink-muted/50">saving…</span>
+            <span className="text-[10px] text-[var(--stage-text-secondary)]/50">saving…</span>
           )}
         </div>
         {hasSlots && (
@@ -620,7 +624,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
             type="button"
             onClick={openNew}
             disabled={editingId !== null}
-            className="p-1 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40"
+            className="p-1 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-40"
             title="Add slot"
           >
             <Plus size={14} aria-hidden />
@@ -639,7 +643,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                   onChange={(e) => setEditLabel(e.target.value)}
                   placeholder="Slot label (e.g. Load-in)"
                   autoFocus
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-ceramic placeholder:text-ink-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 />
                 <div className="flex gap-1.5 items-center">
                   <input
@@ -647,12 +651,12 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                    className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-ceramic focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="flex-1 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   />
-                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-signal-success)] hover:bg-[var(--color-signal-success)]/10 focus:outline-none disabled:opacity-50 transition-colors">
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors">
                     <Check size={14} />
                   </button>
-                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-ink-muted hover:bg-white/5 focus:outline-none transition-colors">
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] transition-colors">
                     <XIcon size={14} />
                   </button>
                 </div>
@@ -660,15 +664,15 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
             ) : (
               <div key={slot.id} className="group flex items-center justify-between gap-2 py-1">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-mono text-ink-muted/60 uppercase tracking-wider leading-none">{slot.label}</p>
-                  <p className="text-sm text-ceramic font-medium tracking-tight mt-0.5">{formatSlotTime(slot.time)}</p>
+                  <p className="text-[10px] font-mono text-[var(--stage-text-secondary)]/60 uppercase tracking-wider leading-none">{slot.label}</p>
+                  <p className="text-sm text-[var(--stage-text-primary)] font-medium tracking-tight mt-0.5">{formatSlotTime(slot.time)}</p>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 invisible group-hover:visible transition-[visibility]">
                   <button
                     type="button"
                     onClick={() => openEdit(slot)}
                     disabled={editingId !== null}
-                    className="p-1 rounded text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none disabled:opacity-40 transition-colors"
+                    className="p-1 rounded text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none disabled:opacity-40 transition-colors"
                     title="Edit"
                   >
                     <Pencil size={11} aria-hidden />
@@ -677,7 +681,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                     type="button"
                     onClick={() => deleteSlot(slot.id)}
                     disabled={saving || editingId !== null}
-                    className="p-1 rounded text-ink-muted hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 focus:outline-none disabled:opacity-40 transition-colors"
+                    className="p-1 rounded text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 focus:outline-none disabled:opacity-40 transition-colors"
                     title="Remove"
                   >
                     <Trash2 size={11} aria-hidden />
@@ -694,7 +698,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                 onChange={(e) => setEditLabel(e.target.value)}
                 placeholder="Slot label (e.g. Soundcheck)"
                 autoFocus
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-ceramic placeholder:text-ink-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               />
               <div className="flex gap-1.5 items-center">
                 <input
@@ -702,12 +706,12 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-ceramic focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className="flex-1 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 />
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-signal-success)] hover:bg-[var(--color-signal-success)]/10 focus:outline-none disabled:opacity-50 transition-colors">
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors">
                   <Check size={14} />
                 </button>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-ink-muted hover:bg-white/5 focus:outline-none transition-colors">
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] transition-colors">
                   <XIcon size={14} />
                 </button>
               </div>
@@ -719,19 +723,19 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
         <div className="flex flex-col gap-3 flex-1">
           {legacyOverride ? (
             <div>
-              <p className="text-ceramic font-medium tracking-tight leading-snug">
+              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug">
                 {getCallTimeDisplay(startsAt, legacyOverride)}
               </p>
-              <p className="text-xs text-ink-muted/60 mt-0.5">
+              <p className="text-xs text-[var(--stage-text-secondary)]/60 mt-0.5">
                 {getCallTimeOffset(startsAt, legacyOverride) ?? 'Single call time'}
               </p>
             </div>
           ) : (
             <div>
-              <p className="text-ceramic font-medium tracking-tight leading-snug">
+              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug">
                 {getCallTimeDisplay(startsAt, null)}
               </p>
-              <p className="text-xs text-ink-muted/60 mt-0.5">
+              <p className="text-xs text-[var(--stage-text-secondary)]/60 mt-0.5">
                 Auto · {getCallTimeOffset(startsAt, null) ?? '—'}
               </p>
             </div>
@@ -742,7 +746,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                 type="button"
                 onClick={addDefaults}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-medium tracking-tight text-ceramic border border-white/10 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60 transition-colors"
+                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-medium tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
               >
                 <Plus size={12} aria-hidden />
                 Add slots
@@ -752,7 +756,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
               type="button"
               onClick={openNew}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-medium tracking-tight text-ink-muted border border-white/10 hover:bg-white/5 hover:text-ceramic focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60 transition-colors"
+              className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-medium tracking-tight text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
             >
               Custom slot
             </button>
@@ -765,7 +769,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                 onChange={(e) => setEditLabel(e.target.value)}
                 placeholder="Slot label (e.g. Load-in)"
                 autoFocus
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-ceramic placeholder:text-ink-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               />
               <div className="flex gap-1.5 items-center">
                 <input
@@ -773,12 +777,12 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-ceramic focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className="flex-1 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 />
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-signal-success)] hover:bg-[var(--color-signal-success)]/10 focus:outline-none disabled:opacity-50 transition-colors">
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors">
                   <Check size={14} />
                 </button>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-ink-muted hover:bg-white/5 focus:outline-none transition-colors">
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] transition-colors">
                   <XIcon size={14} />
                 </button>
               </div>
@@ -786,7 +790,7 @@ function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTime
           )}
         </div>
       )}
-    </LiquidPanel>
+    </StagePanel>
   );
 }
 
@@ -957,11 +961,11 @@ export function PlanVitalsRow({
   return (
     <>
       {/* Event Date/Time — each field independently editable */}
-      <LiquidPanel className="p-6 sm:p-7 rounded-[28px] flex flex-col gap-6 min-h-[200px]">
+      <StagePanel elevated className="p-6 sm:p-7 rounded-[var(--stage-radius-panel)] flex flex-col gap-6 min-h-[200px]">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <Calendar size={14} className="shrink-0 text-ink-muted/70" aria-hidden />
-          <p className="text-xs font-medium uppercase tracking-wider text-ink-muted/80">
+          <Calendar size={14} className="shrink-0 text-[var(--stage-text-secondary)]/70" aria-hidden />
+          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
             Event date / time
           </p>
         </div>
@@ -1004,14 +1008,14 @@ export function PlanVitalsRow({
             onCancel={cancelField}
           />
           {dateTime.multiDay && (
-            <span className="inline-block text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-signal-warning)]/15 text-[var(--color-signal-warning)]">
+            <span className="inline-block text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]">
               Multi-day
             </span>
           )}
           {fieldError && (
             <p className="text-[10px] text-[var(--color-unusonic-error)]">{fieldError}</p>
           )}
-          <div className="border-t border-white/5 pt-3 flex flex-col gap-3">
+          <div className="border-t border-[oklch(1_0_0_/_0.05)] pt-3 flex flex-col gap-3">
             {(['loadIn', 'loadOut'] as const).map((field) => {
               const iso = field === 'loadIn' ? datesLoadIn : datesLoadOut;
               const label = field === 'loadIn' ? 'Load-in' : 'Load-out';
@@ -1021,7 +1025,7 @@ export function PlanVitalsRow({
               const isEditing = editingLoadField === field;
               return (
                 <div key={field} className="group flex items-center gap-1.5 min-w-0">
-                  <span className="text-[10px] font-mono text-ink-muted/50 uppercase tracking-wider shrink-0 leading-none mt-px select-none">
+                  <span className="text-[10px] font-mono text-[var(--stage-text-secondary)]/50 uppercase tracking-wider shrink-0 leading-none mt-px select-none">
                     {label}
                   </span>
                   {isEditing ? (
@@ -1035,7 +1039,7 @@ export function PlanVitalsRow({
                           if (e.key === 'Escape') cancelLoadField();
                         }}
                         autoFocus
-                        className="min-w-0 flex-1 bg-white/5 border border-white/15 rounded-md px-1.5 py-0.5 text-ceramic text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        className="min-w-0 flex-1 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.15)] rounded-md px-1.5 py-0.5 text-[var(--stage-text-primary)] text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                       />
                       <button
                         type="button"
@@ -1043,7 +1047,7 @@ export function PlanVitalsRow({
                         onClick={saveLoadField}
                         disabled={savingLoadField}
                         aria-label="Save"
-                        className="shrink-0 p-0.5 rounded text-[var(--color-signal-success)] hover:bg-[var(--color-signal-success)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50 transition-colors"
+                        className="shrink-0 p-0.5 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors"
                       >
                         <Check size={13} />
                       </button>
@@ -1052,7 +1056,7 @@ export function PlanVitalsRow({
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={cancelLoadField}
                         aria-label="Cancel"
-                        className="shrink-0 p-0.5 rounded text-ink-muted hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] transition-colors"
+                        className="shrink-0 p-0.5 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
                       >
                         <XIcon size={13} />
                       </button>
@@ -1061,12 +1065,12 @@ export function PlanVitalsRow({
                     <button
                       type="button"
                       onClick={() => openLoadField(field)}
-                      className="flex items-center gap-1.5 min-w-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+                      className="flex items-center gap-1.5 min-w-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
                     >
-                      <span className="text-sm text-ceramic group-hover:text-[var(--color-neon-blue)] transition-colors truncate">
+                      <span className="text-sm text-[var(--stage-text-primary)] group-hover:text-[var(--stage-accent)] transition-colors truncate">
                         {display}
                       </span>
-                      <Pencil size={11} className="shrink-0 text-ink-muted opacity-0 group-hover:opacity-50 transition-opacity" aria-hidden />
+                      <Pencil size={11} className="shrink-0 text-transparent group-hover:text-[var(--stage-text-tertiary)] transition-colors" aria-hidden />
                     </button>
                   )}
                 </div>
@@ -1077,7 +1081,7 @@ export function PlanVitalsRow({
             )}
           </div>
         </div>
-      </LiquidPanel>
+      </StagePanel>
 
       {/* Location — linked to directory.entities venue */}
       <Popover open={locationOpen} onOpenChange={(o) => {
@@ -1087,48 +1091,49 @@ export function PlanVitalsRow({
         <PopoverTrigger asChild>
           {locationName ? (
             /* Venue set */
-            <LiquidPanel
-              hoverEffect
-              className="p-6 sm:p-7 rounded-[28px] flex flex-col gap-5 min-h-[130px] cursor-pointer group"
+            <StagePanel
+              interactive
+              elevated
+              className="p-6 sm:p-7 rounded-[var(--stage-radius-panel)] flex flex-col gap-5 min-h-[130px] cursor-pointer group"
             >
               <div className="flex items-center gap-2">
-                <MapPin size={14} className="shrink-0 text-ink-muted/70" aria-hidden />
-                <p className="text-xs font-medium uppercase tracking-wider text-ink-muted/80">
+                <MapPin size={14} className="shrink-0 text-[var(--stage-text-secondary)]/70" aria-hidden />
+                <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
                   Location
                 </p>
               </div>
               <div className="min-w-0">
-                <p className="text-ceramic font-medium tracking-tight leading-snug truncate group-hover:text-[var(--color-neon-blue)] transition-colors">
+                <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug truncate group-hover:text-[var(--stage-accent)] transition-colors">
                   {locationName}
                 </p>
                 {locationAddress && locationAddress !== locationName && (
-                  <p className="text-xs text-ink-muted mt-1 truncate leading-relaxed">
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1 truncate leading-relaxed">
                     {locationAddress}
                   </p>
                 )}
-                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-ink-muted/60 group-hover:text-[var(--color-neon-blue)]/60 transition-colors">
+                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--stage-text-secondary)]/60 group-hover:text-[var(--stage-text-secondary)] transition-colors">
                   <Pencil size={9} aria-hidden />
                   Edit
                 </span>
               </div>
-            </LiquidPanel>
+            </StagePanel>
           ) : (
             /* Empty state — dashed invite affordance */
             <button
               type="button"
-              className="w-full min-h-[130px] rounded-[28px] border-2 border-dashed border-[var(--glass-border)] hover:border-[var(--color-neon-blue)]/40 hover:bg-[var(--color-neon-blue)]/5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] flex flex-col gap-5 p-6 sm:p-7 group text-left"
+              className="w-full min-h-[130px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent-muted)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] flex flex-col gap-5 p-6 sm:p-7 group text-left"
             >
               <div className="flex items-center gap-2">
-                <MapPin size={14} className="shrink-0 text-ink-muted/50 group-hover:text-[var(--color-neon-blue)]/60 transition-colors" aria-hidden />
-                <p className="text-xs font-medium uppercase tracking-wider text-ink-muted/60 group-hover:text-[var(--color-neon-blue)]/50 transition-colors">
+                <MapPin size={14} className="shrink-0 text-[var(--stage-text-secondary)]/50 group-hover:text-[var(--stage-text-secondary)] transition-colors" aria-hidden />
+                <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/60 group-hover:text-[var(--stage-text-tertiary)] transition-colors">
                   Location
                 </p>
               </div>
               <div>
-                <p className="text-sm font-medium text-ink-muted group-hover:text-[var(--color-neon-blue)]/80 transition-colors">
+                <p className="text-sm font-medium text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] transition-colors">
                   Set venue
                 </p>
-                <p className="text-xs text-ink-muted/50 mt-0.5">
+                <p className="text-xs text-[var(--stage-text-secondary)]/50 mt-0.5">
                   Search your venue network
                 </p>
               </div>
@@ -1138,27 +1143,27 @@ export function PlanVitalsRow({
         <PopoverContent align="start" className="w-72 p-4">
           {locationMode === 'view' && locationName ? (
             <>
-              <p className="text-ceramic font-medium tracking-tight mb-1">{locationName}</p>
+              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight mb-1">{locationName}</p>
               {locationAddress && locationAddress !== locationName && (
-                <p className="text-sm text-ink-muted mb-3">{locationAddress}</p>
+                <p className="text-sm text-[var(--stage-text-secondary)] mb-3">{locationAddress}</p>
               )}
               <div className="flex flex-col gap-2">
                 <a
                   href={googleMapsUrl(locationAddress || locationName)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-neon-blue)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-[var(--stage-accent)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
                 >
                   Open in Google Maps
                   <ExternalLink size={14} aria-hidden />
                 </a>
-                <div className="flex gap-2 mt-2 pt-2 border-t border-white/10">
+                <div className="flex gap-2 mt-2 pt-2 border-t border-[oklch(1_0_0_/_0.10)]">
                   {venueEntityId && (
                     <a
                       href={`/network/entity/${venueEntityId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs py-1.5 px-2 rounded-lg border border-white/10 text-[var(--color-neon-blue)] hover:bg-[var(--color-neon-blue)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs py-1.5 px-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-accent)] hover:bg-[var(--stage-accent-muted)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     >
                       View in Network
                       <ExternalLink size={11} aria-hidden />
@@ -1167,7 +1172,7 @@ export function PlanVitalsRow({
                   <button
                     type="button"
                     onClick={openLocationSearch}
-                    className="flex-1 text-xs py-1.5 px-2 rounded-lg border border-white/10 text-ink-muted hover:bg-white/5 hover:text-ceramic transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="flex-1 text-xs py-1.5 px-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   >
                     Change venue
                   </button>
@@ -1176,7 +1181,7 @@ export function PlanVitalsRow({
                       type="button"
                       onClick={clearVenue}
                       disabled={savingVenue}
-                      className="text-xs py-1.5 px-2 rounded-lg border border-white/10 text-ink-muted hover:bg-white/5 hover:text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+                      className="text-xs py-1.5 px-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
                     >
                       {savingVenue ? '…' : 'Clear'}
                     </button>
@@ -1187,7 +1192,7 @@ export function PlanVitalsRow({
           ) : (
             /* Search mode */
             <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wider text-ink-muted/80 mb-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80 mb-3">
                 {locationMode === 'search' && locationName ? 'Change venue' : 'Set venue'}
               </p>
               <input
@@ -1196,13 +1201,13 @@ export function PlanVitalsRow({
                 value={venueQuery}
                 onChange={(e) => handleVenueQueryChange(e.target.value)}
                 placeholder="Search venues…"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-ceramic placeholder:text-ink-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               />
               {venueSearching && (
-                <p className="text-xs text-ink-muted px-1">Searching…</p>
+                <p className="text-xs text-[var(--stage-text-secondary)] px-1">Searching…</p>
               )}
               {venueResults.length > 0 && (
-                <ul className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-white/5">
+                <ul className="mt-1 max-h-48 overflow-y-auto stage-panel stage-panel-nested rounded-lg list-none">
                   {venueResults.map((r) =>
                     r.type === 'venue' ? (
                       <li key={r.id}>
@@ -1210,11 +1215,11 @@ export function PlanVitalsRow({
                           type="button"
                           disabled={savingVenue}
                           onClick={() => selectVenue(r.id)}
-                          className="w-full text-left px-3 py-2.5 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+                          className="w-full text-left px-3 py-2.5 hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
                         >
-                          <p className="text-sm text-ceramic font-medium truncate">{r.name}</p>
+                          <p className="text-sm text-[var(--stage-text-primary)] font-medium truncate">{r.name}</p>
                           {r.address && (
-                            <p className="text-xs text-ink-muted truncate mt-0.5">{r.address}</p>
+                            <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{r.address}</p>
                           )}
                         </button>
                       </li>
@@ -1224,7 +1229,7 @@ export function PlanVitalsRow({
                           href="/network"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--color-neon-blue)] hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                          className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--stage-accent)] hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                         >
                           Add &quot;{r.query}&quot; in Network
                           <ExternalLink size={12} aria-hidden />
@@ -1235,13 +1240,13 @@ export function PlanVitalsRow({
                 </ul>
               )}
               {!venueSearching && venueQuery.length >= 2 && venueResults.length === 0 && (
-                <p className="text-xs text-ink-muted px-1">
+                <p className="text-xs text-[var(--stage-text-secondary)] px-1">
                   No venues found.{' '}
                   <a
                     href="/network"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[var(--color-neon-blue)] hover:underline"
+                    className="text-[var(--stage-accent)] hover:underline"
                   >
                     Add one in Network →
                   </a>
@@ -1251,7 +1256,7 @@ export function PlanVitalsRow({
                 <button
                   type="button"
                   onClick={() => setLocationMode('view')}
-                  className="text-xs text-ink-muted hover:text-ceramic mt-1 ml-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+                  className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] mt-1 ml-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
                 >
                   Cancel
                 </button>

@@ -1,11 +1,15 @@
 /**
- * Post-Enterprise motion constants: "Liquid Ceramic" + M3 motion.
- * Single source of truth for auth/onboarding transitions (120fps target).
+ * Stage Engineering motion system + M3 transition patterns.
+ * Single source of truth for all motion constants (120fps target).
+ *
+ * NEW CODE: Use STAGE_HEAVY / STAGE_MEDIUM / STAGE_LIGHT (bottom of file).
+ * Legacy constants (UNUSONIC_PHYSICS, FLUID_SPRING) remain for unmigrated code.
+ *
+ * @see docs/reference/design/motion-and-interaction-system.md
  * @see https://m3.material.io/styles/motion/transitions/transition-patterns
- * @see https://m3.material.io/styles/motion/easing-and-duration/tokens-specs
  */
 
-/** Heavy ceramic spring: density, critically damped stop, no oscillation. */
+/** @deprecated Use STAGE_HEAVY, STAGE_MEDIUM, or STAGE_LIGHT instead. */
 export const UNUSONIC_PHYSICS = {
   type: 'spring' as const,
   stiffness: 280,
@@ -13,11 +17,7 @@ export const UNUSONIC_PHYSICS = {
   mass: 1.4,
 } as const;
 
-/**
- * Fluid spring for Liquid Glass–style controls (e.g. segmented pill).
- * Softer, more organic motion so the pill glides between segments;
- * slight overshoot feels responsive and human (per Apple’s segmented control).
- */
+/** @deprecated Use STAGE_LIGHT for new segmented controls / pill animations. */
 export const FLUID_SPRING = {
   type: 'spring' as const,
   stiffness: 200,
@@ -112,11 +112,49 @@ export const GPU_STABILIZE = {
   willChange: 'transform, opacity, filter' as const,
 } as const;
 
-/**
- * Approximate settling time (ms) for UNUSONIC_PHYSICS spring.
- * Used to derive logo "thinking" trigger delay so state switch hides in movement blur.
- */
+/** @deprecated Legacy settling time for UNUSONIC_PHYSICS spring. */
 export const SIGNAL_SPRING_DURATION_MS = 320;
 
 /** Delay (ms) before logo switches to "thinking" after transition starts (~0.25 * spring duration). */
 export const THINKING_TRIGGER_DELAY_MS = Math.round(SIGNAL_SPRING_DURATION_MS * 0.25);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STAGE ENGINEERING — Weight-based motion system
+   Heavier elements = stiffer spring, slower settle.
+   Lighter elements = snappier spring, faster settle.
+   Navigation = instant crossfade, no springs.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Heavy: full panels, sheets, drawers. Feels like sliding a flight case. */
+export const STAGE_HEAVY = {
+  type: 'spring' as const,
+  stiffness: 180,
+  damping: 28,
+  mass: 1.4,
+} as const;
+
+/** Medium: cards, list items, inline expansions. Responsive but grounded. */
+export const STAGE_MEDIUM = {
+  type: 'spring' as const,
+  stiffness: 300,
+  damping: 30,
+  mass: 0.8,
+} as const;
+
+/** Light: chips, badges, pills, toggles. Snappy, near-instant. */
+export const STAGE_LIGHT = {
+  type: 'spring' as const,
+  stiffness: 450,
+  damping: 28,
+  mass: 0.5,
+} as const;
+
+/** Navigation crossfade: 120ms opacity transition. No spring, no bounce. Decisive. */
+export const STAGE_NAV_CROSSFADE = {
+  duration: 0.12,
+  ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
+};
+
+/** Stage stagger: tighter than M3. 30ms between children, 0 delay. */
+export const STAGE_STAGGER_CHILDREN = 0.03;
+export const STAGE_STAGGER_DELAY = 0;

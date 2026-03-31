@@ -36,6 +36,7 @@ import { RoleBuilderShell } from '@/features/role-builder';
 import { usePreferences } from '@/shared/ui/providers/PreferencesContext';
 import { CeramicSwitch } from '@/shared/ui/switch';
 import type { WorkspaceMemberData, LocationData } from '@/app/actions/workspace';
+import { updateWorkspacePaymentDefaults, type WorkspacePaymentDefaults } from '@/features/org-management/api/payment-defaults-actions';
 
 interface SettingsData {
   user: {
@@ -59,6 +60,7 @@ interface SettingsData {
   };
   members: WorkspaceMemberData[];
   locations: LocationData[];
+  paymentDefaults: WorkspacePaymentDefaults | null;
 }
 
 interface SettingsContentProps {
@@ -105,8 +107,8 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springConfig, delay: 0.1 }}
       >
-        <h1 className="text-3xl font-light text-ink tracking-tight">Settings</h1>
-        <p className="text-sm text-ink-muted font-light mt-1">
+        <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">Settings</h1>
+        <p className="text-sm text-[var(--stage-text-secondary)] font-light mt-1">
           Tune your account and integrations
         </p>
 </motion.div>
@@ -116,21 +118,21 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springConfig, delay: 0.12 }}
-        className="liquid-panel p-6 space-y-6"
+        className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center">
-            <Clock className="w-5 h-5 text-ink-muted" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+            <Clock className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-ink">Preferences</h2>
-            <p className="text-xs text-ink-muted">Site-wide display and time options</p>
+            <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Preferences</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)]">Site-wide display and time options</p>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-ink/[0.02] border border-[var(--glass-border)]">
+        <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
           <div>
-            <p className="text-sm font-medium text-ink">Use 24-hour time</p>
-            <p className="text-xs text-ink-muted mt-0.5">Show times as 14:30 instead of 2:30 PM across the app</p>
+            <p className="text-sm font-medium text-[var(--stage-text-primary)]">Use 24-hour time</p>
+            <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">Show times as 14:30 instead of 2:30 PM across the app</p>
           </div>
           <CeramicSwitch
             checked={militaryTime}
@@ -145,15 +147,15 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springConfig, delay: 0.15 }}
-        className="liquid-panel p-6 space-y-6"
+        className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center">
-            <User className="w-5 h-5 text-ink-muted" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+            <User className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-ink">Profile</h2>
-            <p className="text-xs text-ink-muted">Your personal information</p>
+            <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Profile</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)]">Your personal information</p>
           </div>
         </div>
         
@@ -169,7 +171,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           {/* Profile Form */}
           <div className="space-y-4 flex-1">
             <div>
-              <label className="block text-[11px] font-medium text-ink-muted uppercase tracking-[0.15em] mb-2">
+              <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-2">
                 Full Name
               </label>
               <input
@@ -178,19 +180,19 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Enter your full name"
                 className="w-full px-4 py-3 rounded-xl
-                  bg-ink/[0.03] border border-[var(--glass-border)]
-                  text-ink placeholder:text-ink-muted/40
-                  focus:outline-none focus:border-walnut/40 focus:ring-2 focus:ring-walnut/10
+                  bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]
+                  text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/40
+                  focus:outline-none focus:border-[var(--stage-accent)] focus:ring-2 focus:ring-[var(--stage-accent-muted)]
                   transition-all duration-300"
               />
             </div>
             
             <div>
-              <label className="block text-[11px] font-medium text-ink-muted uppercase tracking-[0.15em] mb-2">
+              <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-2">
                 Email
               </label>
-              <div className="px-4 py-3 rounded-xl bg-ink/[0.02] border border-[var(--glass-border)] 
-                text-ink-muted text-sm">
+              <div className="px-4 py-3 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]
+                text-[var(--stage-text-secondary)] text-sm">
                 {data.user.email}
               </div>
             </div>
@@ -199,12 +201,10 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
               <motion.button
                 onClick={handleSaveProfile}
                 disabled={isPending || fullName === data.profile.fullName}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 transition={springConfig}
-                className="px-5 py-2.5 rounded-xl bg-ink text-canvas text-sm font-medium
-                  hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-all flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] text-sm font-medium
+                  hover:brightness-[1.06] disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-[filter] flex items-center gap-2"
               >
                 {isPending ? (
                   <>
@@ -222,11 +222,13 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
-                    className="flex items-center gap-1.5 text-emerald-600 text-sm"
+                    transition={springConfig}
+                    className="flex items-center gap-1.5 text-[var(--color-unusonic-success)] text-sm"
                   >
                     <Check className="w-4 h-4" />
                     Saved
                   </motion.span>
+
                 )}
               </AnimatePresence>
             </div>
@@ -239,23 +241,23 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springConfig, delay: 0.18 }}
-        className="liquid-panel p-6 space-y-6"
+        className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center">
-            <Palette className="w-5 h-5 text-ink-muted" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+            <Palette className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-ink">Establish Identity</h2>
-            <p className="text-xs text-ink-muted">Brand, logo, and how you appear to partners</p>
+            <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Establish Identity</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)]">Brand, logo, and how you appear to partners</p>
           </div>
         </div>
         <Link
           href="/settings/identity"
-          className="flex items-center justify-between w-full p-4 rounded-xl bg-ink/[0.02] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] hover:bg-ink/5 transition-colors text-left"
+          className="flex items-center justify-between w-full p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)] hover:border-[var(--stage-border-hover)] hover:bg-[var(--stage-surface-raised)] transition-colors text-left"
         >
-          <span className="text-sm font-medium text-ink">Open Identity Architect</span>
-          <ExternalLink className="w-4 h-4 text-ink-muted" />
+          <span className="text-sm font-medium text-[var(--stage-text-primary)]">Open Identity Architect</span>
+          <ExternalLink className="w-4 h-4 text-[var(--stage-text-secondary)]" />
         </Link>
       </motion.section>
 
@@ -265,28 +267,28 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springConfig, delay: 0.2 }}
-          className="liquid-panel p-6 space-y-6"
+          className="stage-panel p-6 space-y-6"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-ink-muted" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-[var(--stage-text-secondary)]" />
             </div>
             <div>
-              <h2 className="text-lg font-medium text-ink">Workspace</h2>
-              <p className="text-xs text-ink-muted">Your current workspace</p>
+              <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Workspace</h2>
+              <p className="text-xs text-[var(--stage-text-secondary)]">Your current workspace</p>
             </div>
           </div>
           
-          <div className="p-4 rounded-xl bg-ink/[0.02] border border-[var(--glass-border)]">
+          <div className="p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-ink font-medium">{data.workspace.name}</p>
-                <p className="text-xs text-ink-muted mt-0.5 capitalize">
+                <p className="text-[var(--stage-text-primary)] font-medium">{data.workspace.name}</p>
+                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5 capitalize">
                   Role: {data.workspace.role}
                 </p>
               </div>
-              <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              <div className="px-3 py-1 rounded-full bg-[var(--color-unusonic-success)]/10 border border-[var(--color-unusonic-success)]/20">
+                <span className="text-xs text-[var(--color-unusonic-success)] font-medium">
                   Active
                 </span>
               </div>
@@ -295,13 +297,13 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           
           {/* Invite Code - Owners/Admins Only */}
           {(data.workspace.role === 'owner' || data.workspace.role === 'admin') && data.workspace.inviteCode && (
-            <div className="p-4 rounded-xl bg-walnut/5 border border-walnut/10">
+            <div className="p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-medium text-ink-muted uppercase tracking-[0.15em] mb-1">
+                  <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1">
                     Invite Code
                   </p>
-                  <p className="text-lg font-mono font-medium text-walnut tracking-widest">
+                  <p className="text-lg font-mono font-medium text-[var(--stage-text-secondary)] tracking-widest">
                     {data.workspace.inviteCode}
                   </p>
                 </div>
@@ -309,13 +311,13 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                   onClick={() => {
                     navigator.clipboard.writeText(data.workspace!.inviteCode!);
                   }}
-                  className="p-2.5 rounded-xl bg-walnut/10 hover:bg-walnut/20 text-walnut transition-colors"
+                  className="p-2.5 rounded-xl bg-[var(--stage-surface-nested)] hover:bg-[var(--stage-surface-hover)] text-[var(--stage-text-secondary)] transition-colors"
                   title="Copy invite code"
                 >
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-xs text-ink-muted mt-2">
+              <p className="text-xs text-[var(--stage-text-secondary)] mt-2">
                 Share this code with team members to invite them
               </p>
             </div>
@@ -325,8 +327,8 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           {data.locations.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <MapPin className="w-4 h-4 text-ink-muted" />
-                <span className="text-xs font-medium text-ink-muted uppercase tracking-wider">
+                <MapPin className="w-4 h-4 text-[var(--stage-text-secondary)]" />
+                <span className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
                   Locations
                 </span>
               </div>
@@ -334,17 +336,17 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                 {data.locations.map((location) => (
                   <div 
                     key={location.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-ink/[0.02] border border-[var(--glass-border)]"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]"
                   >
-                    <div className={`w-2 h-2 rounded-full ${location.isPrimary ? 'bg-emerald-500' : 'bg-ink/20'}`} />
+                    <div className={`w-2 h-2 rounded-full ${location.isPrimary ? 'bg-[var(--color-unusonic-success)]' : 'bg-[var(--stage-border-hover)]'}`} />
                     <div className="flex-1">
-                      <p className="text-sm text-ink">{location.name}</p>
+                      <p className="text-sm text-[var(--stage-text-primary)]">{location.name}</p>
                       {location.address && (
-                        <p className="text-xs text-ink-muted">{location.address}</p>
+                        <p className="text-xs text-[var(--stage-text-secondary)]">{location.address}</p>
                       )}
                     </div>
                     {location.isPrimary && (
-                      <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                      <span className="text-[10px] font-medium text-[var(--color-unusonic-success)] uppercase tracking-wider">
                         Primary
                       </span>
                     )}
@@ -363,15 +365,15 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springConfig, delay: 0.21 }}
-          className="liquid-panel p-6 space-y-6"
+          className="stage-panel p-6 space-y-6"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-ink-muted" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+              <Shield className="w-5 h-5 text-[var(--stage-text-secondary)]" />
             </div>
             <div>
-              <h2 className="text-lg font-medium text-ink">Roles</h2>
-              <p className="text-xs text-ink-muted">Custom roles and permission bundles</p>
+              <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Roles</h2>
+              <p className="text-xs text-[var(--stage-text-secondary)]">Custom roles and permission bundles</p>
             </div>
           </div>
           <RoleBuilderShell
@@ -387,7 +389,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springConfig, delay: 0.22 }}
-          className="liquid-panel p-6"
+          className="stage-panel p-6"
         >
           <TeamManagement 
             workspaceId={data.workspace.id}
@@ -397,20 +399,25 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         </motion.section>
       )}
       
+      {/* Payment Terms Section — owner/admin only */}
+      {data.paymentDefaults && data.workspace && (data.workspace.role === 'owner' || data.workspace.role === 'admin') && (
+        <PaymentTermsSection defaults={data.paymentDefaults} />
+      )}
+
       {/* Integrations Section */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springConfig, delay: 0.25 }}
-        className="liquid-panel p-6 space-y-6"
+        className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center">
-            <Plug2 className="w-5 h-5 text-ink-muted" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+            <Plug2 className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-ink">Integrations</h2>
-            <p className="text-xs text-ink-muted">Connect external services</p>
+            <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Integrations</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)]">Connect external services</p>
           </div>
         </div>
         
@@ -418,7 +425,8 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-600 dark:text-emerald-400"
+            transition={springConfig}
+            className="flex items-center gap-2 p-3 rounded-xl bg-[var(--color-unusonic-success)]/10 border border-[var(--color-unusonic-success)]/20 text-sm text-[var(--color-unusonic-success)]"
           >
             <Check className="w-4 h-4" />
             QuickBooks connected successfully
@@ -433,22 +441,22 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
               realmId={data.integrations.qboRealmId ?? null}
             />
           ) : (
-            <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
-              <p className="text-sm text-amber-600 dark:text-amber-400">
+            <div className="p-4 rounded-xl bg-[var(--color-unusonic-warning)]/5 border border-[var(--color-unusonic-warning)]/20">
+              <p className="text-sm text-[var(--color-unusonic-warning)]">
                 Set up a workspace first to enable integrations
               </p>
             </div>
           )}
           
           {/* Placeholder for future integrations */}
-          <div className="p-4 rounded-xl bg-ink/[0.02] border border-dashed border-[var(--glass-border)]">
+          <div className="p-4 rounded-xl bg-[var(--stage-surface-nested)] border border-dashed border-[var(--stage-border)]">
             <div className="flex items-center gap-4 opacity-40">
-              <div className="w-10 h-10 rounded-lg bg-ink/5 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-ink-muted" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-[var(--stage-text-secondary)]" />
               </div>
               <div>
-                <p className="text-sm font-medium text-ink">More Integrations</p>
-                <p className="text-xs text-ink-muted">Coming soon</p>
+                <p className="text-sm font-medium text-[var(--stage-text-primary)]">More Integrations</p>
+                <p className="text-xs text-[var(--stage-text-secondary)]">Coming soon</p>
               </div>
             </div>
           </div>
@@ -463,14 +471,151 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={springConfig}
-            className="p-4 rounded-xl bg-red-500/5 border border-red-500/15"
+            className="p-4 rounded-xl bg-[var(--color-unusonic-error)]/5 border border-[var(--color-unusonic-error)]/15"
           >
-            <p className="text-sm text-red-600 dark:text-red-400 text-center font-light">
+            <p className="text-sm text-[var(--color-unusonic-error)] text-center font-light">
               {error}
             </p>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// =============================================================================
+// PaymentTermsSection
+// =============================================================================
+
+function PaymentTermsSection({ defaults }: { defaults: WorkspacePaymentDefaults }) {
+  const [depositPercent, setDepositPercent] = useState(defaults.default_deposit_percent);
+  const [depositDeadline, setDepositDeadline] = useState(defaults.default_deposit_deadline_days);
+  const [balanceDue, setBalanceDue] = useState(defaults.default_balance_due_days_before_event);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const hasChanges =
+    depositPercent !== defaults.default_deposit_percent ||
+    depositDeadline !== defaults.default_deposit_deadline_days ||
+    balanceDue !== defaults.default_balance_due_days_before_event;
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    const result = await updateWorkspacePaymentDefaults({
+      default_deposit_percent: depositPercent,
+      default_deposit_deadline_days: depositDeadline,
+      default_balance_due_days_before_event: balanceDue,
+    });
+    setSaving(false);
+    if (result.success) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
+
+  const fieldLabel = 'text-sm text-[var(--stage-text-secondary)] tracking-tight';
+  const fieldHint = 'text-xs text-[var(--stage-text-secondary)]/40 mt-0.5';
+  const inputClass =
+    'w-20 bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)] rounded-[var(--stage-radius-input)] px-3 py-2 text-sm text-[var(--stage-text-primary)] text-right focus:outline-none focus:border-[var(--stage-border-focus)] tabular-nums';
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.2 }}
+      className="stage-panel p-6 space-y-6"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+          <Clock className="w-5 h-5 text-[var(--stage-text-secondary)]" />
+        </div>
+        <div>
+          <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Payment terms</h2>
+          <p className="text-xs text-[var(--stage-text-secondary)]">Default terms applied to new proposals</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {/* Deposit % */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className={fieldLabel}>Default deposit</p>
+            <p className={fieldHint}>Percentage of total due at signing</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={depositPercent}
+              onChange={(e) => setDepositPercent(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+              className={inputClass}
+            />
+            <span className="text-sm text-[var(--stage-text-secondary)]">%</span>
+          </div>
+        </div>
+
+        {/* Deposit deadline */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className={fieldLabel}>Deposit deadline</p>
+            <p className={fieldHint}>Days after contract acceptance</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min={0}
+              max={90}
+              value={depositDeadline}
+              onChange={(e) => setDepositDeadline(Math.max(0, Math.min(90, Number(e.target.value) || 0)))}
+              className={inputClass}
+            />
+            <span className="text-sm text-[var(--stage-text-secondary)]">days</span>
+          </div>
+        </div>
+
+        {/* Balance due before event */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className={fieldLabel}>Balance due</p>
+            <p className={fieldHint}>Days before event date</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min={0}
+              max={180}
+              value={balanceDue}
+              onChange={(e) => setBalanceDue(Math.max(0, Math.min(180, Number(e.target.value) || 0)))}
+              className={inputClass}
+            />
+            <span className="text-sm text-[var(--stage-text-secondary)]">days</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Save */}
+      <AnimatePresence>
+        {hasChanges && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="overflow-hidden"
+          >
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-primary)] border border-[var(--stage-border)] bg-[var(--stage-surface)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none disabled:opacity-40"
+            >
+              {saving ? 'Saving…' : saved ? 'Saved' : 'Save defaults'}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.section>
   );
 }

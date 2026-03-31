@@ -73,7 +73,7 @@ export function SummonPartnerModal({
         >
           <motion.div
             role="presentation"
-            className="absolute inset-0 bg-[oklch(0.12_0_0/0.6)] backdrop-blur-sm"
+            className="absolute inset-0 bg-[oklch(0.12_0_0/0.6)]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -89,22 +89,22 @@ export function SummonPartnerModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: -10 }}
             transition={spring}
-            className="relative z-10 w-full max-w-md rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-6 shadow-2xl backdrop-blur-xl"
+            className="relative z-10 w-full max-w-md rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-2xl"
           >
         <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 id="summon-modal-title" className="text-lg font-medium tracking-tight text-[var(--color-ink)]">
-            Invite to Signal
+          <h2 id="summon-modal-title" className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
+            Invite to Unusonic
           </h2>
           <Button variant="ghost" size="icon" onClick={handleClose} aria-label="Close">
             <X className="size-5" />
           </Button>
         </div>
-        <p className="text-sm text-[var(--color-ink-muted)] mb-4">
+        <p className="text-sm text-[var(--stage-text-secondary)] mb-4">
           Send an invite to claim this organization. Enter their email.
         </p>
         {status === 'success' ? (
           <div className="py-4">
-            <p className="text-sm text-[var(--color-signal-success)]">{message}</p>
+            <p className="text-sm text-[var(--color-unusonic-success)]">{message}</p>
             <Button type="button" onClick={handleClose} className="mt-4 w-full">
               Done
             </Button>
@@ -112,7 +112,7 @@ export function SummonPartnerModal({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Email
               </label>
               <Input
@@ -121,7 +121,7 @@ export function SummonPartnerModal({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="booking@example.com"
                 required
-                className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+                className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             {status === 'error' && message && (

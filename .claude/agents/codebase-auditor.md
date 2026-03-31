@@ -109,10 +109,11 @@ All colors must use OKLCH design tokens from globals.css. Hardcoded hex values i
 
 Grep `src/` in `.tsx` files for `\[#[0-9a-fA-F]` (bracket notation with hex).
 
-Report each match with the hex value and the nearest semantic token equivalent:
-- Whites/near-whites → `text-ceramic` / `bg-obsidian`
-- Grays → `text-mercury`
-- Blues → `text-neon`
+Report each match with the hex value and the nearest Stage Engineering token:
+- Whites/near-whites → `text-[var(--stage-text-primary)]` or `var(--stage-accent)`
+- Grays → `text-[var(--stage-text-secondary)]` or `text-[var(--stage-text-tertiary)]`
+- Blues → `var(--color-unusonic-info)` (if semantic) or `var(--stage-accent)` (if interactive)
+- Legacy aliases (`text-ceramic`, `bg-obsidian`, `text-mercury`, `text-neon`) are migration-path only — new code uses `--stage-*` tokens
 
 ---
 
@@ -198,11 +199,11 @@ Write the completed report to `docs/audits/audit-YYYY-MM-DD.md` using this exact
 ## P2 — Medium (address in next cleanup pass)
 
 ### Raw Hex Colors
-- `src/path/to/file.tsx:88` — `[#2CA01C]` → use `text-neon` or define a semantic token
+- `src/path/to/file.tsx:88` — `[#2CA01C]` → use a `--stage-*` or `--color-unusonic-*` semantic token
 - ...
 
 ### bg-white / bg-black
-- `src/path/to/file.tsx:44` — `bg-white` → use `bg-obsidian` or `liquid-card`
+- `src/path/to/file.tsx:44` — `bg-white` → use `bg-stage-void` or `stage-panel`
 - ...
 
 ### StreamingTextResponse

@@ -72,69 +72,69 @@ export function CreateClientDialog({
       <SheetContent
         side="center"
         className={cn(
-          'flex w-full max-w-md flex-col border-l border-[var(--color-mercury)]',
-          'bg-[var(--color-glass-surface)] backdrop-blur-xl p-0'
+          'flex w-full max-w-md flex-col border-l border-[oklch(1_0_0_/_0.08)]',
+          'bg-[var(--stage-surface-raised)] p-0'
         )}
       >
-        <SheetHeader className="flex-col items-stretch gap-2 border-b border-[var(--color-mercury)] px-6 py-6">
+        <SheetHeader className="flex-col items-stretch gap-2 border-b border-[oklch(1_0_0_/_0.08)] px-6 py-6">
           <div className="flex items-center justify-between gap-4">
             <SheetTitle>Create client</SheetTitle>
             <SheetClose />
           </div>
-          <p className="text-sm text-[var(--color-ink-muted)]">
+          <p className="text-sm text-[var(--stage-text-secondary)]">
             Add this organization to your Network and link it to this deal.
           </p>
         </SheetHeader>
 
         <SheetBody className="flex flex-col gap-5 px-6 py-6 overflow-y-auto">
           <div className="space-y-2">
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               Organization name
             </label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+              <Building2 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Red Bull North America"
-                className="h-12 rounded-xl border-[var(--color-mercury)] bg-white/5 pl-10 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
+                className="h-12 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] pl-10 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               Main contact name
             </label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+              <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
               <Input
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
                 placeholder="e.g. Sarah Jenkins"
-                className="h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 pl-10 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
+                className="h-11 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] pl-10 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               Contact email
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+              <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="sarah@example.com"
-                className="h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 pl-10 text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]"
+                className="h-11 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] pl-10 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]"
               />
             </div>
           </div>
         </SheetBody>
 
-        <div className="shrink-0 border-t border-[var(--color-mercury)] bg-[var(--color-obsidian)]/20 px-6 py-5">
+        <div className="shrink-0 border-t border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 px-6 py-5">
           <Button
             variant="silk"
             className="h-12 w-full rounded-xl"

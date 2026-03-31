@@ -24,7 +24,7 @@ export function NetworkInviteTrigger({ orgId, className }: NetworkInviteTriggerP
         size="sm"
         onClick={() => setOpen(true)}
         className={cn(
-          'gap-2 rounded-2xl border-[var(--color-mercury)] bg-white/5 text-[var(--color-ink-muted)] hover:border-[var(--color-silk)]/40 hover:bg-white/10 hover:text-[var(--color-ink)]',
+          'gap-2 rounded-2xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]',
           className
         )}
       >

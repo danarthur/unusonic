@@ -21,17 +21,17 @@ export function ClaimError({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
-      className="w-full max-w-md rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-6 sm:p-8 shadow-xl backdrop-blur-xl text-center"
+      className="w-full max-w-md rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 sm:p-8 shadow-xl text-center"
     >
       <div className="flex justify-center mb-4">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--color-surface-error)] border border-[var(--color-unusonic-error)]/30">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--color-unusonic-error)/10] border border-[var(--color-unusonic-error)]/30">
           <AlertCircle className="size-7 text-[var(--color-unusonic-error)]" />
         </div>
       </div>
-      <h1 className="text-xl font-medium tracking-tight text-[var(--color-ink)]">
+      <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
         {title}
       </h1>
-      <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+      <p className="mt-2 text-sm text-[var(--stage-text-secondary)]">
         {message}
       </p>
       <Button asChild className="mt-6 w-full" size="lg">

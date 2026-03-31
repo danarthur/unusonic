@@ -62,7 +62,7 @@ export function SkillPresetManager({ workspaceId, initialPresets }: SkillPresetM
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="text-sm text-ink-muted leading-relaxed">
+        <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
           These tags appear as quick-picks when adding skills to a roster member. Any member can still type a custom skill — these are curated suggestions only.
         </p>
       </div>
@@ -73,7 +73,7 @@ export function SkillPresetManager({ workspaceId, initialPresets }: SkillPresetM
           onChange={(e) => setNewTag(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="e.g. FOH Engineer"
-          className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)]"
+          className="border-[var(--stage-border)] text-[var(--stage-text-primary)]"
           maxLength={120}
         />
         <Button
@@ -89,21 +89,21 @@ export function SkillPresetManager({ workspaceId, initialPresets }: SkillPresetM
       </div>
 
       {presets.length === 0 ? (
-        <p className="text-sm text-ink-muted">No skill presets configured.</p>
+        <p className="text-sm text-[var(--stage-text-secondary)]">No skill presets configured.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {presets.map((preset) => (
             <li
               key={preset.id}
-              className="flex items-center justify-between rounded-lg border border-[var(--color-mercury)]/50 bg-[var(--color-obsidian)]/30 px-3 py-2.5"
+              className="flex items-center justify-between rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--stage-surface-nested)] px-3 py-2.5"
             >
-              <span className="text-sm text-[var(--color-ink)]">{preset.skill_tag}</span>
+              <span className="text-sm text-[var(--stage-text-primary)]">{preset.skill_tag}</span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => handleRemove(preset)}
-                className="text-[var(--color-ink-muted)] hover:text-[var(--color-unusonic-error)]"
+                className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)]"
               >
                 <Trash2 className="size-4" />
               </Button>

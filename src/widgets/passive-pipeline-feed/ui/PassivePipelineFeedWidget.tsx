@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Mail, Music2, Loader2 } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { M3_DURATION_S, M3_EASING_ENTER } from '@/shared/lib/motion-constants';
 
 const M3_ENTER = { duration: M3_DURATION_S, ease: M3_EASING_ENTER };
@@ -19,8 +19,8 @@ const SOURCES = [
  */
 export function PassivePipelineFeedWidget() {
   return (
-    <LiquidPanel className="h-full flex flex-col min-h-0">
-      <h2 className="text-xs font-medium text-muted uppercase tracking-widest tracking-tight mb-4">
+    <StagePanel className="h-full flex flex-col min-h-0">
+      <h2 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest tracking-tight mb-4">
         Passive Pipeline
       </h2>
       <motion.div
@@ -37,18 +37,18 @@ export function PassivePipelineFeedWidget() {
             key={s.id}
             variants={{ hidden: { opacity: 0, y: 6 }, visible: { opacity: 1, y: 0 } }}
             transition={M3_ENTER}
-            className="liquid-card-nested p-3 flex items-center gap-3"
+            className="stage-panel-nested p-3 flex items-center gap-3"
           >
-            <s.icon className="w-4 h-4 text-muted shrink-0" />
-            <span className="text-sm text-ceramic tracking-tight flex-1">{s.label}</span>
+            <s.icon className="w-4 h-4 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} />
+            <span className="text-sm text-[var(--stage-text-primary)] tracking-tight flex-1">{s.label}</span>
             {s.syncing ? (
-              <Loader2 className="w-4 h-4 text-neon animate-spin shrink-0" aria-hidden />
+              <Loader2 className="w-4 h-4 text-[var(--stage-accent)] animate-spin shrink-0" strokeWidth={1.5} aria-hidden />
             ) : (
-              <span className="inline-flex h-2 w-2 rounded-full bg-signal-success shrink-0" aria-hidden />
+              <span className="inline-flex h-2 w-2 rounded-full bg-[var(--color-unusonic-success)] shrink-0" aria-hidden />
             )}
           </motion.div>
         ))}
       </motion.div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

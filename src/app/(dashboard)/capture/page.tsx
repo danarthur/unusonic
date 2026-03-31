@@ -57,37 +57,37 @@ export default function CapturePage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 dark flex items-center justify-center p-4">
-      <Card className="liquid-card bg-zinc-900/80 border-mercury w-full max-w-2xl">
+    <div className="min-h-screen bg-[var(--stage-void)] text-[var(--stage-text-primary)] flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl stage-panel border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface-raised)]">
         <CardHeader>
-          <CardTitle className="text-zinc-100 text-2xl font-light">
+          <CardTitle className="text-[var(--stage-text-primary)] text-2xl font-light tracking-tight">
             Capture
           </CardTitle>
-          <CardDescription className="text-zinc-400">
+          <CardDescription className="text-[var(--stage-text-secondary)]">
             Record a task, note, or project
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label htmlFor="type" className="text-sm font-medium text-zinc-300">
+              <label htmlFor="type" className="text-sm font-medium text-[var(--stage-text-secondary)]">
                 Type
               </label>
               <Select value={type} onValueChange={setType}>
                 <SelectTrigger 
                   id="type"
-                  className="w-full bg-zinc-800 border-zinc-700 text-zinc-100"
+                  className="w-full bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)]"
                 >
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="Task" className="text-zinc-100 focus:bg-zinc-700">
+                <SelectContent className="bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.10)]">
+                  <SelectItem value="Task" className="text-[var(--stage-text-primary)] focus:bg-[var(--stage-surface-hover)]">
                     Task
                   </SelectItem>
-                  <SelectItem value="Note" className="text-zinc-100 focus:bg-zinc-700">
+                  <SelectItem value="Note" className="text-[var(--stage-text-primary)] focus:bg-[var(--stage-surface-hover)]">
                     Note
                   </SelectItem>
-                  <SelectItem value="Project" className="text-zinc-100 focus:bg-zinc-700">
+                  <SelectItem value="Project" className="text-[var(--stage-text-primary)] focus:bg-[var(--stage-surface-hover)]">
                     Project
                   </SelectItem>
                 </SelectContent>
@@ -95,7 +95,7 @@ export default function CapturePage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="title" className="text-sm font-medium text-zinc-300">
+              <label htmlFor="title" className="text-sm font-medium text-[var(--stage-text-secondary)]">
                 Title
               </label>
               <Input
@@ -104,13 +104,13 @@ export default function CapturePage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Enter title"
-                className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
+                className="bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)]"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="details" className="text-sm font-medium text-zinc-300">
+              <label htmlFor="details" className="text-sm font-medium text-[var(--stage-text-secondary)]">
                 Details
               </label>
               <Textarea
@@ -119,16 +119,16 @@ export default function CapturePage() {
                 onChange={(e) => setDetails(e.target.value)}
                 placeholder="Enter details or notes"
                 rows={6}
-                className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
+                className="bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)]"
               />
             </div>
 
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700"
+              className="w-full border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] transition-[filter] disabled:opacity-60"
             >
-              {isSubmitting ? 'Locking...' : 'Lock'}
+              {isSubmitting ? 'Saving…' : 'Save'}
             </Button>
           </form>
         </CardContent>

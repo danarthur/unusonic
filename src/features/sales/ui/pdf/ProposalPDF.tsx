@@ -8,6 +8,8 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import type { PublicProposalDTO } from '../../model/public-proposal';
 
+/* eslint-disable stage-engineering/no-raw-colors -- react-pdf: PDF renderer does not support OKLCH or CSS custom properties */
+
 // =============================================================================
 // Styles
 // =============================================================================
@@ -342,7 +344,7 @@ export function ProposalPDF({ data }: ProposalPDFProps) {
       <Page size="LETTER" style={styles.page}>
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <Text style={styles.wordmark}>SIGNAL</Text>
+          <Text style={styles.wordmark}>UNUSONIC</Text>
           <View style={styles.headerRight}>
             <Text style={styles.workspaceName}>{workspace.name}</Text>
             <Text style={styles.proposalLabel}>Proposal</Text>
@@ -495,7 +497,7 @@ export function ProposalPDF({ data }: ProposalPDFProps) {
 
         {/* ── Footer ───────────────────────────────────────────────────────── */}
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>Prepared by Signal</Text>
+          <Text style={styles.footerText}>Prepared by Unusonic</Text>
           <Text
             style={styles.footerText}
             render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}

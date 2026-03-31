@@ -43,7 +43,7 @@ export async function getPullSheetData(eventId: string): Promise<PullSheetData |
   if (!workspaceId) return null;
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const db = supabase as any;
 
   const [gearResult, crewResult, eventResult] = await Promise.all([

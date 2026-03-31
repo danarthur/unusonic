@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/shared/api/supabase/client';
-import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
+import { useMemo } from 'react';
+import { useLobbyEvents } from '@/widgets/global-pulse/lib/use-lobby-events';
 
 export type NextGig = {
   id: string;
@@ -14,49 +13,25 @@ export type NextGig = {
 
 /**
  * Next upcoming gig in the next 72h (confirmed, production, or live) for State B hero.
+ * Derives from the shared lobby events query — no independent fetch.
  */
 export function useNextGig(): { gig: NextGig | null; loading: boolean; error: string | null } {
-  const { workspaceId } = useWorkspace();
-  const supabase = useMemo(() => createClient(), []);
-  const [gig, setGig] = useState<NextGig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { events, loading, error } = useLobbyEvents();
 
-  useEffect(() => {
-    let active = true;
-    const now = new Date().toISOString();
-    const in72h = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+  const gig = useMemo<NextGig | null>(() => {
+    const now = Date.now();
+    const in72h = now + 72 * 60 * 60 * 1000;
 
-    let query = supabase
-      .from('events')
-      .select('id, title, starts_at, location_name, lifecycle_status')
-      .in('lifecycle_status', ['confirmed', 'production', 'live'])
-      .gte('starts_at', now)
-      .lte('starts_at', in72h)
-      .order('starts_at', { ascending: true })
-      .limit(1);
-
-    if (workspaceId) query = query.eq('workspace_id', workspaceId);
-
-    void Promise.resolve(query)
-      .then(({ data, error: err }) => {
-        if (!active) return;
-        if (err) {
-          setError(err.message);
-          setGig(null);
-          return;
-        }
-        const row = Array.isArray(data) && data[0] ? (data[0] as NextGig) : null;
-        setGig(row);
+    const upcoming = events
+      .filter((e) => {
+        if (!['confirmed', 'production', 'live'].includes(e.lifecycle_status)) return false;
+        const t = new Date(e.starts_at).getTime();
+        return t >= now && t <= in72h;
       })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
 
-    return () => {
-      active = false;
-    };
-  }, [supabase, workspaceId]);
+    return upcoming[0] ?? null;
+  }, [events]);
 
   return { gig, loading, error };
 }

@@ -1,8 +1,9 @@
 ---
-description: Enforces "Industrial Luxury" tone and "Anti-Jarvis" vocabulary.
+description: Enforces "Industrial Luxury" tone and "Anti-Jarvis" vocabulary. Full guide: docs/reference/design/copy-and-voice-guide.md
 globs: ["src/**/*.tsx", "src/config/navigation.ts", "content/**/*.md"]
 ---
-# 🗣️ UNUSONIC | INDUSTRIAL LUXURY VOICE
+# UNUSONIC | INDUSTRIAL LUXURY VOICE
+**Full reference:** `docs/reference/design/copy-and-voice-guide.md`
 
 ## 1. THE VIBE: "HIGH-FIDELITY UTILITY"
 We sound like a high-end instrument (Teenage Engineering, Leica, Linear).

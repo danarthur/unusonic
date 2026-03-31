@@ -32,6 +32,14 @@ const createDealSchema = z.object({
   venueId: z.string().uuid().nullable().optional(),
   /** Freetext venue name — used to create a ghost venue when no venueId is provided */
   venueName: z.string().max(300).nullable().optional(),
+  /** How this inquiry arrived (legacy text enum). */
+  leadSource: z.enum(['referral', 'repeat_client', 'website', 'social', 'direct']).nullable().optional(),
+  /** Structured lead source — references ops.workspace_lead_sources */
+  leadSourceId: z.string().uuid().nullable().optional(),
+  /** Freetext detail / context about the lead source */
+  leadSourceDetail: z.string().max(500).nullable().optional(),
+  /** Entity who referred this client (for referral sources) */
+  referrerEntityId: z.string().uuid().nullable().optional(),
 });
 
 export type CreateDealInput = z.infer<typeof createDealSchema>;
@@ -80,6 +88,10 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       notes,
       venueId,
       venueName,
+      leadSource,
+      leadSourceId,
+      leadSourceDetail,
+      referrerEntityId,
     } = parsed.data;
 
     const supabase = await createClient();
@@ -229,6 +241,18 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       }
     }
 
+    // Resolve lead source label for backwards compat (denormalized lead_source text)
+    let resolvedLeadSourceText: string | null = leadSource ?? null;
+    if (leadSourceId) {
+      const { data: lsRow } = await supabase
+        .schema('ops')
+        .from('workspace_lead_sources')
+        .select('label')
+        .eq('id', leadSourceId)
+        .maybeSingle();
+      if (lsRow?.label) resolvedLeadSourceText = lsRow.label;
+    }
+
     const { data: deal, error } = await supabase
       .from('deals')
       .insert({
@@ -242,6 +266,10 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
         budget_estimated: budgetEstimated ?? null,
         notes: notes?.trim() ?? null,
         venue_id: resolvedVenueId,
+        lead_source: resolvedLeadSourceText,
+        lead_source_id: leadSourceId ?? null,
+        lead_source_detail: leadSourceDetail?.trim() ?? null,
+        referrer_entity_id: referrerEntityId ?? null,
       })
       .select('id')
       .single();
@@ -270,6 +298,25 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       // silent — deal is already saved; stakeholder insert failure is non-fatal
     }
 
+    // If notes were provided, seed them as the first diary entry
+    if (notes?.trim()) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await (supabase as any)
+          .schema('ops')
+          .from('deal_notes')
+          .insert({
+            deal_id: deal.id,
+            workspace_id: workspaceId,
+            author_user_id: user.id,
+            content: notes.trim(),
+            attachments: [],
+            phase_tag: 'general',
+          });
+        // Non-fatal — deal is already saved
+      }
+    }
+
     revalidatePath('/crm');
     revalidatePath('/');
 
@@ -278,5 +325,44 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
     const message = err instanceof Error ? err.message : 'Failed to create deal';
     console.error('[CRM] createDeal unexpected:', err);
     return { success: false, error: message };
+  }
+}
+
+export type UpdateDealNotesResult = { success: true } | { success: false; error: string };
+
+/**
+ * Saves the narrative/notes field on a deal.
+ * Workspace ownership is verified before write.
+ */
+export async function updateDealNotes(
+  dealId: string,
+  notes: string | null
+): Promise<UpdateDealNotesResult> {
+  try {
+    const workspaceId = await getActiveWorkspaceId();
+    if (!workspaceId) return { success: false, error: 'No active workspace.' };
+
+    const supabase = await createClient();
+
+    const { data: deal } = await supabase
+      .from('deals')
+      .select('id')
+      .eq('id', dealId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+
+    if (!deal) return { success: false, error: 'Not authorised' };
+
+    const { error } = await supabase
+      .from('deals')
+      .update({ notes: notes?.trim() ?? null })
+      .eq('id', dealId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/crm');
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to save notes.' };
   }
 }

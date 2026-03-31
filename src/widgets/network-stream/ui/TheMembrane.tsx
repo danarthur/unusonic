@@ -25,11 +25,11 @@ export function TheMembrane({ label = 'Network' }: MembraneProps) {
         transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.15 }}
         style={{
           background:
-            'linear-gradient(90deg, transparent 0%, oklch(0.70 0.15 250 / 0.4) 50%, transparent 100%)',
-          boxShadow: '0 0 12px oklch(0.70 0.15 250 / 0.3)',
+            'linear-gradient(90deg, transparent 0%, oklch(0.88 0 0 / 0.4) 50%, transparent 100%)',
+          boxShadow: '0 0 12px oklch(0.88 0 0 / 0.3)',
         }}
       />
-      <span className="rounded-full border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] px-4 py-1.5 text-xs font-medium tracking-wide text-[var(--color-ink-muted)] backdrop-blur-sm">
+      <span className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-4 py-1.5 text-xs font-medium tracking-wide text-[var(--stage-text-secondary)]">
         {label}
       </span>
     </motion.div>

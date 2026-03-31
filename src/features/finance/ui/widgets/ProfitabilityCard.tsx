@@ -33,26 +33,26 @@ export function ProfitabilityCard({
 
   return (
     <div
-      className={`liquid-card p-6 flex flex-col gap-4 border-mercury ${className ?? ''}`}
+      className={`stage-panel p-6 flex flex-col gap-4 border-[oklch(1_0_0_/_0.08)] ${className ?? ''}`}
     >
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Gross Profit
       </h2>
-      <div className="font-mono text-2xl font-medium text-ink tracking-tight">
+      <div className="font-mono text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight">
         {formatCurrency(grossProfit)}
       </div>
 
       {/* Segmented progress bar: Cost (rose-100) | Profit (emerald-500) */}
-      <div className="w-full h-3 rounded-full overflow-hidden bg-[var(--glass-border)] flex">
+      <div className="w-full h-3 rounded-full overflow-hidden bg-[oklch(1_0_0_/_0.08)] flex">
         <motion.div
-          className="h-full bg-rose-100 dark:bg-rose-900/40"
+          className="h-full bg-[oklch(0.35_0.08_20_/_0.25)]"
           style={{ width: `${Math.min(100, costShare * 100)}%` }}
           initial={{ width: 0 }}
           animate={{ width: `${Math.min(100, costShare * 100)}%` }}
           transition={spring}
         />
         <motion.div
-          className="h-full bg-emerald-500 dark:bg-emerald-600"
+          className="h-full bg-[var(--color-unusonic-success)]"
           style={{ width: `${Math.min(100, profitShare * 100)}%` }}
           initial={{ width: 0 }}
           animate={{ width: `${Math.min(100, profitShare * 100)}%` }}
@@ -65,8 +65,8 @@ export function ProfitabilityCard({
         <span
           className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
             marginHealthy
-              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+              ? 'bg-[oklch(0.45_0.08_145_/_0.25)] text-[var(--color-unusonic-success)]'
+              : 'bg-[oklch(0.45_0.08_70_/_0.25)] text-[var(--color-unusonic-warning)]'
           }`}
         >
           {marginRounded}% Margin

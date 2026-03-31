@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   startOfWeek,
   endOfWeek,
   addDays,
   addHours,
   format,
+  isBefore,
+  startOfDay,
   type Locale,
 } from 'date-fns';
 import type { CalendarEvent } from '@/features/calendar/model/types';
@@ -134,6 +136,25 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
   const rowHeight = 48;
   const todayKey = format(new Date(), 'yyyy-MM-dd');
 
+  // Now line: tracks current time position, updates every 60s
+  const [nowPct, setNowPct] = useState<number | null>(null);
+  useEffect(() => {
+    const compute = () => {
+      const now = new Date();
+      const winStartMs = winStart.getTime();
+      const winEndMs = winEnd.getTime();
+      const nowMs = now.getTime();
+      if (nowMs >= winStartMs && nowMs <= winEndMs) {
+        setNowPct(((nowMs - winStartMs) / (winEndMs - winStartMs)) * 100);
+      } else {
+        setNowPct(null);
+      }
+    };
+    compute();
+    const interval = setInterval(compute, 60_000);
+    return () => clearInterval(interval);
+  }, [winStart, winEnd]);
+
   const hourLabel = (hour: number) => {
     if (hour === 0) return '12 AM';
     if (hour === 12) return '12 PM';
@@ -141,35 +162,43 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 rounded-2xl overflow-hidden liquid-panel border border-[var(--glass-border)]">
+    <div className="flex flex-col flex-1 min-h-0 rounded-2xl overflow-hidden stage-panel border border-[oklch(1_0_0_/_0.08)]">
       {/* Day headers — clickable to open day blade */}
       <div
-        className="grid shrink-0 border-b border-[var(--glass-border)] bg-[var(--glass-bg)]/30 backdrop-blur-sm"
+        className="grid shrink-0 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/30"
         style={{ gridTemplateColumns: 'auto repeat(7, 1fr)' }}
       >
         <div className="w-14 min-w-[3.5rem] p-2" />
         {days.map((d) => {
           const dayKey = format(d, 'yyyy-MM-dd');
           const isToday = dayKey === todayKey;
+          const headerContent = (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-[10px] font-medium text-[var(--stage-text-secondary)]/60 uppercase tracking-widest">{format(d, 'EEE')}</span>
+              <span className={`text-lg tabular-nums ${
+                isToday ? 'font-medium w-8 h-8 flex items-center justify-center rounded-full bg-[var(--color-unusonic-error)] text-[oklch(0.10_0_0)]' : 'font-light text-[var(--stage-text-primary)]'
+              }`}>{format(d, 'd')}</span>
+            </div>
+          );
           return onDayClick ? (
             <button
               key={dayKey}
               type="button"
               onClick={() => onDayClick(dayKey)}
-              className={`p-2 text-center text-sm font-semibold tracking-tight hover:text-ink hover:bg-[var(--glass-bg-hover)] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-inset ${
-                isToday ? 'text-ink ring-2 ring-inset ring-[var(--today-ring)] bg-[var(--today-bg)]' : 'text-ink/80'
+              className={`p-2 text-center tracking-tight hover:bg-[var(--stage-surface-hover)] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset ${
+                isToday ? 'bg-[var(--today-bg)]' : ''
               }`}
             >
-              {format(d, 'EEE d')}
+              {headerContent}
             </button>
           ) : (
             <div
               key={dayKey}
-              className={`p-2 text-center text-sm font-semibold tracking-tight rounded-lg ${
-                isToday ? 'text-ink ring-2 ring-inset ring-[var(--today-ring)] bg-[var(--today-bg)]' : 'text-ink/80'
+              className={`p-2 text-center tracking-tight rounded-lg ${
+                isToday ? 'bg-[var(--today-bg)]' : ''
               }`}
             >
-              {format(d, 'EEE d')}
+              {headerContent}
             </div>
           );
         })}
@@ -187,7 +216,7 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
         >
           {/* Time axis: behind day content (z-0); compact labels, design-system tokens */}
           <div
-            className="sticky left-0 z-0 flex flex-col border-r border-[var(--glass-border)] bg-[var(--glass-bg)]/50 backdrop-blur-sm"
+            className="sticky left-0 z-0 flex flex-col border-r border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50"
             style={{ gridRow: '1 / -1' }}
           >
             {Array.from({ length: totalRows }).map((_, i) => {
@@ -196,7 +225,7 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
               return (
                 <div
                   key={i}
-                  className="flex items-center justify-end pr-3 pl-1 text-xs font-medium text-ink/80 tracking-tight tabular-nums border-b border-[var(--glass-border)]/30"
+                  className="flex items-center justify-end pr-3 pl-1 text-xs font-medium text-[var(--stage-text-primary)]/80 tracking-tight tabular-nums border-b border-[oklch(1_0_0_/_0.08)]/15"
                   style={{ height: rowHeight }}
                 >
                   {hourLabel(hour)}
@@ -221,7 +250,9 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
             return (
               <div
                 key={dayColumnKey}
-                className={`relative border-r border-[var(--glass-border)]/50 last:border-r-0 bg-canvas/20 ${isToday ? 'bg-[var(--today-bg)]' : ''}`}
+                className={`relative border-r border-[oklch(1_0_0_/_0.08)]/20 last:border-r-0 bg-[oklch(0.10_0_0)]/20 ${
+                  isToday ? 'bg-[var(--today-bg)]' : isBefore(day, startOfDay(new Date())) ? 'opacity-60 saturate-[0.7]' : ''
+                }`}
                 style={{
                   gridRow: '1 / -1',
                   minHeight: `${totalRows * rowHeight}px`,
@@ -232,11 +263,22 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
                   {Array.from({ length: totalRows }).map((_, i) => (
                     <div
                       key={i}
-                      className="border-b border-[var(--glass-border)]/30"
+                      className="border-b border-[oklch(1_0_0_/_0.08)]/15"
                       style={{ height: rowHeight }}
                     />
                   ))}
                 </div>
+
+                {/* Now line — current time indicator in today's column */}
+                {isToday && nowPct !== null && (
+                  <div
+                    className="absolute left-0 right-0 z-30 pointer-events-none flex items-center"
+                    style={{ top: `${nowPct}%` }}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-[var(--color-unusonic-error)] shadow-[0_0_8px_var(--color-unusonic-error)/40] -ml-1 shrink-0" />
+                    <div className="flex-1 h-[2px] bg-[var(--color-unusonic-error)] shadow-[0_0_6px_var(--color-unusonic-error)/30]" />
+                  </div>
+                )}
 
                 {/* Event tiles: key forces remount when stack↔standard so no stale stack when filter leaves 1 */}
                 <div className="absolute inset-0 z-10 pointer-events-none">

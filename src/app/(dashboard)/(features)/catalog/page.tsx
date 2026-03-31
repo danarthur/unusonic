@@ -15,7 +15,7 @@ import { Plus, Pencil, Archive, ArchiveRestore, LayoutGrid, LayoutList, HelpCirc
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import { createPackageWithION } from '@/features/ai/tools/package-generator';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { getCatalogPackagesWithTags, createPackage, updatePackage } from '@/features/sales/api/package-actions';
 import type { PackageWithTags } from '@/features/sales/api/package-actions';
 import type { PackageCategory } from '@/features/sales/api/package-actions';
@@ -26,7 +26,7 @@ import {
 } from '@/features/sales/api/workspace-tag-actions';
 import { SmartTagInput } from '@/shared/ui/smart-tag-input';
 import { CurrencyInput } from '@/shared/ui/currency-input';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/shared/ui/dialog';
+import { CeramicSwitch } from '@/shared/ui/switch';
 import { cn } from '@/shared/lib/utils';
 
 const CATEGORIES: { value: PackageCategory; label: string }[] = [
@@ -147,22 +148,28 @@ export default function CatalogPage() {
   }, [workspaceId]);
 
   useEffect(() => {
-    loadPackages();
+    queueMicrotask(() => {
+      void loadPackages();
+    });
   }, [loadPackages]);
 
   // Smart defaults: Brochure (grid) for All/Packages, Ledger (table) for ingredients
   useEffect(() => {
-    if (activeCategoryTab === 'all' || activeCategoryTab === 'package') {
-      setViewMode('grid');
-    } else {
-      setViewMode('table');
-    }
+    queueMicrotask(() => {
+      if (activeCategoryTab === 'all' || activeCategoryTab === 'package') {
+        setViewMode('grid');
+      } else {
+        setViewMode('table');
+      }
+    });
   }, [activeCategoryTab]);
 
   // Auto-set taxable default when category changes during create (not edit)
   useEffect(() => {
     if (!modalOpen || editingId) return;
-    setIsTaxable(category !== 'service' && category !== 'fee');
+    queueMicrotask(() => {
+      setIsTaxable(category !== 'service' && category !== 'fee');
+    });
   }, [category, modalOpen, editingId]);
 
   const openCreate = () => {
@@ -179,34 +186,6 @@ export default function CatalogPage() {
     setReplacementCost('');
     setBufferDays('');
     setIsTaxable(true);
-    setFormError(null);
-    setModalOpen(true);
-  };
-
-  const openEdit = (pkg: PackageWithTags) => {
-    setEditingId(pkg.id);
-    setName(pkg.name);
-    setDescription(pkg.description ?? '');
-    setCategory((pkg.category as PackageCategory) ?? 'package');
-    setPrice(String(Number(pkg.price)));
-    setFloorPrice(pkg.floor_price != null ? String(Number(pkg.floor_price)) : '');
-    setTargetCost(pkg.target_cost != null ? String(Number(pkg.target_cost)) : '');
-    setSelectedTags(
-      (pkg.tags ?? []).map((t) => ({ ...t, workspace_id: pkg.workspace_id }))
-    );
-    setIsTaxable((pkg as typeof pkg & { is_taxable?: boolean | null }).is_taxable !== false);
-    const row = pkg as PackageWithTags & { stock_quantity?: number; is_sub_rental?: boolean; replacement_cost?: number | null; buffer_days?: number };
-    if ((pkg.category as string) === 'rental') {
-      setStockQuantity(row.stock_quantity != null ? String(row.stock_quantity) : '');
-      setIsSubRental(row.is_sub_rental === true);
-      setReplacementCost(row.replacement_cost != null ? String(Number(row.replacement_cost)) : '');
-      setBufferDays(row.buffer_days != null ? String(row.buffer_days) : '');
-    } else {
-      setStockQuantity('');
-      setIsSubRental(false);
-      setReplacementCost('');
-      setBufferDays('');
-    }
     setFormError(null);
     setModalOpen(true);
   };
@@ -335,7 +314,7 @@ export default function CatalogPage() {
 
   if (!hasWorkspace || !workspaceId) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Select a workspace to manage your catalog.</p>
       </div>
     );
@@ -345,36 +324,30 @@ export default function CatalogPage() {
     <div className="flex flex-col gap-8 p-6 max-w-6xl mx-auto">
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-medium text-ceramic tracking-tight">
+          <h1 className="text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight">
             Master menu
           </h1>
-          <p className="text-sm text-ink-muted mt-1">
+          <p className="text-sm text-[var(--stage-text-secondary)] mt-1">
             Define your standard offerings. Use in proposals via Add from Catalog.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <motion.button
+          <button
             type="button"
             onClick={() => { setIonError(null); setIonModalOpen(true); }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={UNUSONIC_PHYSICS}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-neon/40 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.15)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             <LivingLogo size="sm" status="idle" />
             Ask Aion
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             type="button"
             onClick={openCreate}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={UNUSONIC_PHYSICS}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[var(--glass-border)] text-ceramic font-medium text-sm hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
-            <Plus size={18} aria-hidden />
+            <Plus size={18} strokeWidth={1.5} aria-hidden />
             New Item
-          </motion.button>
+          </button>
         </div>
       </header>
 
@@ -382,78 +355,69 @@ export default function CatalogPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Ask Aion</DialogTitle>
-            <DialogClose className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5" />
+            <DialogClose className="p-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]" />
           </DialogHeader>
           <div className="px-6 pb-6 flex flex-col gap-4">
-            <p className="text-sm text-ink-muted">
+            <p className="text-sm text-[var(--stage-text-secondary)]">
               Describe the package you want. Aion will create it and open the builder so you can tweak it.
             </p>
             <textarea
               value={ionPrompt}
               onChange={(e) => setIonPrompt(e.target.value)}
               placeholder="e.g. Luxury wedding package for 150 guests. Full-day photography, 3-piece band, champagne toast. Around $12k."
-              className="w-full min-h-[120px] px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-y"
+              className="w-full min-h-[120px] px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] resize-y"
               disabled={ionLoading}
             />
             {ionError && (
               <p className="text-sm text-[var(--color-unusonic-error)]">{ionError}</p>
             )}
-            <motion.button
+            <button
               type="button"
               onClick={handleIonCreate}
               disabled={ionLoading || !ionPrompt.trim()}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={UNUSONIC_PHYSICS}
-              className="w-full py-2.5 rounded-xl border border-neon/50 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20 disabled:opacity-50"
+              className="w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               {ionLoading ? 'Creating…' : 'Create with Aion'}
-            </motion.button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
       {loading ? (
-        <div className="text-sm text-ink-muted py-12 text-center">Loading…</div>
+        <div className="text-sm text-[var(--stage-text-secondary)] py-12 text-center">Loading…</div>
       ) : error ? (
         <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>
       ) : packages.length === 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <LiquidPanel className="p-12 rounded-[28px] text-center flex flex-col items-center justify-center">
-            <p className="text-ink-muted mb-4">No catalog items yet.</p>
-            <p className="text-sm text-ink-muted mb-6">
+          <StagePanel className="p-12 rounded-[var(--stage-radius-panel)] text-center flex flex-col items-center justify-center">
+            <p className="text-[var(--stage-text-secondary)] mb-4">No catalog items yet.</p>
+            <p className="text-sm text-[var(--stage-text-secondary)] mb-6">
               Add services, rentals, and talent (ingredients), then bundle them into packages.
             </p>
-            <motion.button
+            <button
               type="button"
               onClick={openCreate}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={UNUSONIC_PHYSICS}
-              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[var(--glass-border)] text-ceramic font-medium text-sm hover:bg-[var(--glass-bg-hover)]"
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
-              <Plus size={18} /> New Item
-            </motion.button>
-          </LiquidPanel>
-          <LiquidPanel className="p-8 rounded-[28px] border border-neon/30 bg-neon/5 flex flex-col">
+              <Plus size={18} strokeWidth={1.5} /> New Item
+            </button>
+          </StagePanel>
+          <StagePanel className="p-8 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-void)] flex flex-col">
             <div className="flex items-center gap-3 mb-3">
               <LivingLogo size="md" status="idle" className="shrink-0" />
-              <h3 className="text-lg font-medium text-ceramic tracking-tight">Ask Aion</h3>
+              <h3 className="text-lg font-medium text-[var(--stage-text-primary)] tracking-tight">Ask Aion</h3>
             </div>
-            <p className="text-sm text-ink-muted mb-4 flex-1">
+            <p className="text-sm text-[var(--stage-text-secondary)] mb-4 flex-1">
               Describe the package you want in plain language. Aion will create it from your catalog and open the builder.
             </p>
-            <motion.button
+            <button
               type="button"
               onClick={() => { setIonError(null); setIonModalOpen(true); }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={UNUSONIC_PHYSICS}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-neon/50 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20"
+              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.15)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               <LivingLogo size="sm" status="idle" /> Describe & create
-            </motion.button>
-          </LiquidPanel>
+            </button>
+          </StagePanel>
         </div>
       ) : (
         <>
@@ -461,7 +425,7 @@ export default function CatalogPage() {
           <div
             role="tablist"
             aria-label="Catalog category"
-            className="flex flex-wrap gap-1 border-b border-[var(--glass-border)] pb-2"
+            className="flex flex-wrap gap-1 border-b border-[oklch(1_0_0_/_0.08)] pb-2"
           >
             {CATALOG_TABS.map((tab) => (
               <button
@@ -471,10 +435,10 @@ export default function CatalogPage() {
                 aria-selected={activeCategoryTab === tab.value}
                 onClick={() => setActiveCategoryTab(tab.value)}
                 className={cn(
-                  'px-4 py-2.5 rounded-t-xl text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                  'px-4 py-2.5 rounded-t-[var(--stage-radius-nested)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                   activeCategoryTab === tab.value
-                    ? 'bg-[var(--glass-bg)] border border-[var(--glass-border)] border-b-transparent -mb-0.5 text-ceramic'
-                    : 'border border-transparent text-ink-muted hover:text-ceramic hover:bg-white/5'
+                    ? 'bg-[var(--stage-surface)] border border-[oklch(1_0_0_/_0.08)] border-b-transparent -mb-0.5 text-[var(--stage-text-primary)]'
+                    : 'border border-transparent text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]'
                 )}
               >
                 {tab.label}
@@ -489,12 +453,12 @@ export default function CatalogPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search name or description…"
-              className="flex-1 min-w-[200px] max-w-sm px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="flex-1 min-w-[200px] max-w-sm px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
               aria-label="Search catalog"
             />
             {allTags.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wider text-ink-muted">
+                <span className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                   Tag
                 </span>
                 <button
@@ -503,8 +467,8 @@ export default function CatalogPage() {
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                     tagFilterId === null
-                      ? 'bg-neon/20 text-neon border border-neon/40'
-                      : 'border border-[var(--glass-border)] text-ink-muted hover:text-ceramic hover:bg-white/5'
+                      ? 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.24)]'
+                      : 'border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]'
                   )}
                 >
                   All
@@ -517,8 +481,8 @@ export default function CatalogPage() {
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                       tagFilterId === tag.id
-                        ? 'bg-neon/20 text-neon border border-neon/40'
-                        : 'border border-[var(--glass-border)] text-ink-muted hover:text-ceramic hover:bg-white/5'
+                        ? 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.24)]'
+                        : 'border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]'
                     )}
                   >
                     {tag.label}
@@ -527,40 +491,34 @@ export default function CatalogPage() {
               </div>
             )}
             <div className="flex items-center gap-0.5 ml-auto" role="group" aria-label="View mode">
-              <motion.button
+              <button
                 type="button"
                 onClick={() => setViewMode('grid')}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={UNUSONIC_PHYSICS}
                 className={cn(
-                  'p-2.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                  'p-2.5 rounded-[var(--stage-radius-nested)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                   viewMode === 'grid'
-                    ? 'bg-neon/20 text-neon border border-neon/40'
-                    : 'border border-transparent text-ink-muted hover:text-ceramic hover:bg-white/5'
+                    ? 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.24)]'
+                    : 'border border-transparent text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]'
                 )}
                 aria-label="Card grid view"
                 aria-pressed={viewMode === 'grid'}
               >
-                <LayoutGrid size={18} aria-hidden />
-              </motion.button>
-              <motion.button
+                <LayoutGrid size={18} strokeWidth={1.5} aria-hidden />
+              </button>
+              <button
                 type="button"
                 onClick={() => setViewMode('table')}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={UNUSONIC_PHYSICS}
                 className={cn(
-                  'p-2.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                  'p-2.5 rounded-[var(--stage-radius-nested)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                   viewMode === 'table'
-                    ? 'bg-neon/20 text-neon border border-neon/40'
-                    : 'border border-transparent text-ink-muted hover:text-ceramic hover:bg-white/5'
+                    ? 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.24)]'
+                    : 'border border-transparent text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]'
                 )}
                 aria-label="Table view"
                 aria-pressed={viewMode === 'table'}
               >
-                <LayoutList size={18} aria-hidden />
-              </motion.button>
+                <LayoutList size={18} strokeWidth={1.5} aria-hidden />
+              </button>
             </div>
           </div>
 
@@ -571,7 +529,7 @@ export default function CatalogPage() {
               role="list"
             >
               {filteredPackages.length === 0 ? (
-                <p className="col-span-full text-sm text-ink-muted py-12 text-center">
+                <p className="col-span-full text-sm text-[var(--stage-text-secondary)] py-12 text-center">
                   No items match this tab and filter.
                 </p>
               ) : (
@@ -585,16 +543,14 @@ export default function CatalogPage() {
                       layout
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      whileHover={{ scale: 1.02, filter: 'brightness(1.1)' }}
-                      whileTap={{ scale: 0.98 }}
-                      transition={UNUSONIC_PHYSICS}
+                      transition={STAGE_LIGHT}
                       className={cn(
-                        'liquid-card p-6 rounded-[28px] flex flex-col gap-4',
+                        'stage-panel p-6 rounded-[var(--stage-radius-panel)] flex flex-col gap-4',
                         !pkg.is_active && 'opacity-70 border-dashed'
                       )}
                     >
                       {heroImage && (
-                        <div className="aspect-video rounded-xl overflow-hidden bg-white/5 -mx-2 mt-2">
+                        <div className="aspect-video rounded-[var(--stage-radius-nested)] overflow-hidden bg-[oklch(1_0_0_/_0.05)] -mx-2 mt-2">
                           <img
                             src={heroImage}
                             alt=""
@@ -604,24 +560,24 @@ export default function CatalogPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <h2 className="text-ceramic font-medium tracking-tight truncate">
+                          <h2 className="text-[var(--stage-text-primary)] font-medium tracking-tight truncate">
                             {pkg.name}
                           </h2>
                           {!pkg.is_active && (
-                            <span className="shrink-0 text-xs uppercase tracking-wider text-ink-muted">
+                            <span className="shrink-0 text-xs uppercase tracking-wider text-[var(--stage-text-secondary)]">
                               Archived
                             </span>
                           )}
                         </div>
-                        <p className="text-xl font-semibold text-ceramic tracking-tight tabular-nums">
+                        <p className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums">
                           ${Number(pkg.price).toLocaleString()}
                         </p>
                         {pkg.description && (
-                          <p className="text-sm text-ink-muted mt-2 line-clamp-3">
+                          <p className="text-sm text-[var(--stage-text-secondary)] mt-2 line-clamp-3">
                             {pkg.description}
                           </p>
                         )}
-                        <p className="text-xs text-ink-muted mt-2 capitalize">
+                        <p className="text-xs text-[var(--stage-text-secondary)] mt-2 capitalize">
                           {String(pkg.category).replace(/_/g, ' ')}
                         </p>
                         {(pkg.tags ?? []).length > 0 && (
@@ -629,7 +585,7 @@ export default function CatalogPage() {
                             {(pkg.tags ?? []).slice(0, 3).map((t) => (
                               <span
                                 key={t.id}
-                                className="px-2 py-0.5 rounded-md bg-white/5 text-xs text-ink-muted"
+                                className="px-2 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.05)] text-xs text-[var(--stage-text-secondary)]"
                               >
                                 {t.label}
                               </span>
@@ -637,37 +593,44 @@ export default function CatalogPage() {
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 pt-2 border-t border-[var(--glass-border)]">
+                      <div className="flex items-center gap-2 shrink-0 pt-2 border-t border-[oklch(1_0_0_/_0.08)]">
                         {pkg.category === 'package' ? (
-                          <Link
-                            href={`/catalog/${pkg.id}/builder`}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                            aria-label={`Build ${pkg.name}`}
-                          >
-                            <LayoutGrid size={16} aria-hidden />
-                            Build
-                          </Link>
+                          <>
+                            <Link
+                              href={`/catalog/${pkg.id}/builder`}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                              aria-label={`Build ${pkg.name}`}
+                            >
+                              <LayoutGrid size={16} strokeWidth={1.5} aria-hidden />
+                              Build
+                            </Link>
+                            <Link
+                              href={`/catalog/${pkg.id}/edit`}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                              aria-label={`Edit ${pkg.name}`}
+                            >
+                              <Pencil size={16} strokeWidth={1.5} aria-hidden />
+                              Edit
+                            </Link>
+                          </>
                         ) : (
                           <Link
                             href={`/catalog/${pkg.id}/edit`}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                             aria-label={`Edit ${pkg.name}`}
                           >
-                            <Pencil size={16} aria-hidden />
+                            <Pencil size={16} strokeWidth={1.5} aria-hidden />
                             Edit
                           </Link>
                         )}
-                        <motion.button
+                        <button
                           type="button"
                           onClick={() => handleArchive(pkg)}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          transition={UNUSONIC_PHYSICS}
-                          className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                          className="p-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                           aria-label={pkg.is_active ? 'Archive' : 'Restore'}
                         >
-                          {pkg.is_active ? <Archive size={16} /> : <ArchiveRestore size={16} />}
-                        </motion.button>
+                          {pkg.is_active ? <Archive size={16} strokeWidth={1.5} /> : <ArchiveRestore size={16} strokeWidth={1.5} />}
+                        </button>
                       </div>
                     </motion.article>
                   );
@@ -675,31 +638,31 @@ export default function CatalogPage() {
               )}
             </div>
           ) : (
-          <div className="liquid-card rounded-[28px] border border-[var(--glass-border)] overflow-hidden">
+          <div className="stage-panel rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[var(--glass-border)] bg-white/[0.02]">
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  <tr className="border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]">
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                       Name
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-ink-muted tabular-nums">
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] tabular-nums">
                       Base price
                     </th>
                     {(activeCategoryTab === 'rental' || activeCategoryTab === 'retail_sale') && (
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-ink-muted tabular-nums">
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] tabular-nums">
                         Stock
                       </th>
                     )}
                     {(activeCategoryTab === 'service' || activeCategoryTab === 'talent') && (
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-ink-muted tabular-nums">
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] tabular-nums">
                         Est. cost
                       </th>
                     )}
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                       Tags
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-ink-muted w-32">
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] w-32">
                       Actions
                     </th>
                   </tr>
@@ -713,7 +676,7 @@ export default function CatalogPage() {
                           (activeCategoryTab === 'rental' || activeCategoryTab === 'retail_sale' ? 1 : 0) +
                           (activeCategoryTab === 'service' || activeCategoryTab === 'talent' ? 1 : 0)
                         }
-                        className="px-4 py-12 text-center text-sm text-ink-muted"
+                        className="px-4 py-12 text-center text-sm text-[var(--stage-text-secondary)]"
                       >
                         No items match this tab and filter.
                       </td>
@@ -725,30 +688,30 @@ export default function CatalogPage() {
                         layout
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={UNUSONIC_PHYSICS}
+                        transition={STAGE_LIGHT}
                         className={cn(
-                          'border-b border-[var(--glass-border)] last:border-b-0 hover:bg-white/[0.02]',
+                          'border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 hover:bg-[var(--stage-surface-nested)]',
                           !pkg.is_active && 'opacity-70'
                         )}
                       >
                         <td className="px-4 py-3">
-                          <span className="font-medium text-ceramic truncate block max-w-[240px]" title={pkg.name}>
+                          <span className="font-medium text-[var(--stage-text-primary)] truncate block max-w-[240px]" title={pkg.name}>
                             {pkg.name}
                           </span>
                           {!pkg.is_active && (
-                            <span className="text-xs uppercase tracking-wider text-ink-muted">Archived</span>
+                            <span className="text-xs uppercase tracking-wider text-[var(--stage-text-secondary)]">Archived</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 tabular-nums text-ceramic">
+                        <td className="px-4 py-3 tabular-nums text-[var(--stage-text-primary)]">
                           ${Number(pkg.price).toLocaleString()}
                         </td>
                         {(activeCategoryTab === 'rental' || activeCategoryTab === 'retail_sale') && (
-                          <td className="px-4 py-3 tabular-nums text-ink-muted">
+                          <td className="px-4 py-3 tabular-nums text-[var(--stage-text-secondary)]">
                             {String((pkg as PackageWithTags & { stock_quantity?: number }).stock_quantity ?? '—')}
                           </td>
                         )}
                         {(activeCategoryTab === 'service' || activeCategoryTab === 'talent') && (
-                          <td className="px-4 py-3 tabular-nums text-ink-muted">
+                          <td className="px-4 py-3 tabular-nums text-[var(--stage-text-secondary)]">
                             {pkg.target_cost != null ? `$${Number(pkg.target_cost).toLocaleString()}` : '—'}
                           </td>
                         )}
@@ -757,7 +720,7 @@ export default function CatalogPage() {
                             {(pkg.tags ?? []).slice(0, 3).map((t) => (
                               <span
                                 key={t.id}
-                                className="px-2 py-0.5 rounded-md bg-white/5 text-xs text-ink-muted"
+                                className="px-2 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.05)] text-xs text-[var(--stage-text-secondary)]"
                               >
                                 {t.label}
                               </span>
@@ -767,35 +730,42 @@ export default function CatalogPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {pkg.category === 'package' ? (
-                              <Link
-                                href={`/catalog/${pkg.id}/builder`}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                                aria-label={`Build ${pkg.name}`}
-                              >
-                                <LayoutGrid size={16} aria-hidden />
-                                Build
-                              </Link>
+                              <>
+                                <Link
+                                  href={`/catalog/${pkg.id}/builder`}
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                                  aria-label={`Build ${pkg.name}`}
+                                >
+                                  <LayoutGrid size={16} strokeWidth={1.5} aria-hidden />
+                                  Build
+                                </Link>
+                                <Link
+                                  href={`/catalog/${pkg.id}/edit`}
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                                  aria-label={`Edit ${pkg.name}`}
+                                >
+                                  <Pencil size={16} strokeWidth={1.5} aria-hidden />
+                                  Edit
+                                </Link>
+                              </>
                             ) : (
                               <Link
                                 href={`/catalog/${pkg.id}/edit`}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                                 aria-label={`Edit ${pkg.name}`}
                               >
-                                <Pencil size={16} aria-hidden />
+                                <Pencil size={16} strokeWidth={1.5} aria-hidden />
                                 Edit
                               </Link>
                             )}
-                            <motion.button
+                            <button
                               type="button"
                               onClick={() => handleArchive(pkg)}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              transition={UNUSONIC_PHYSICS}
-                              className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                              className="p-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                               aria-label={pkg.is_active ? 'Archive' : 'Restore'}
                             >
-                              {pkg.is_active ? <Archive size={16} /> : <ArchiveRestore size={16} />}
-                            </motion.button>
+                              {pkg.is_active ? <Archive size={16} strokeWidth={1.5} /> : <ArchiveRestore size={16} strokeWidth={1.5} />}
+                            </button>
                           </div>
                         </td>
                       </motion.tr>
@@ -813,7 +783,7 @@ export default function CatalogPage() {
         <DialogContent className="max-w-md flex flex-col max-h-[90vh] min-h-0">
           <DialogHeader className="shrink-0">
             <DialogTitle>{editingId ? 'Edit catalog item' : 'New catalog item'}</DialogTitle>
-            <DialogClose className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5" />
+            <DialogClose className="p-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]" />
           </DialogHeader>
           <div className="overflow-y-auto overflow-x-hidden overscroll-contain py-2" style={{ maxHeight: 'calc(90vh - 5.5rem)' }}>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 pt-4 pb-10">
@@ -821,7 +791,7 @@ export default function CatalogPage() {
               <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
             )}
             <div>
-              <label htmlFor="cat-name" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+              <label htmlFor="cat-name" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                 Name
               </label>
               <input
@@ -829,13 +799,13 @@ export default function CatalogPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
                 placeholder="e.g. Gold Wedding Package"
                 required
               />
             </div>
             <div>
-              <label htmlFor="cat-desc" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+              <label htmlFor="cat-desc" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                 Description (optional)
               </label>
               <textarea
@@ -843,19 +813,19 @@ export default function CatalogPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-none"
+                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] resize-none"
                 placeholder="Included items or notes"
               />
             </div>
             <div>
-              <label htmlFor="cat-category" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+              <label htmlFor="cat-category" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                 Category
               </label>
               <select
                 id="cat-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as PackageCategory)}
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -865,7 +835,7 @@ export default function CatalogPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="cat-tags" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+              <label htmlFor="cat-tags" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                 Tags (optional)
               </label>
               <SmartTagInput
@@ -888,7 +858,7 @@ export default function CatalogPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className={cn(category === 'package' && 'col-span-2')}>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <label htmlFor="cat-price" className="block text-xs font-medium uppercase tracking-wider text-ink-muted">
+                  <label htmlFor="cat-price" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                     {category === 'package' ? 'Starting price' : category === 'service' ? 'Rate' : category === 'rental' ? 'Rental price' : 'Price'}
                   </label>
                   <button
@@ -925,7 +895,7 @@ export default function CatalogPage() {
                         }
                       }
                     }}
-                    className="inline-flex text-ink-muted hover:text-ceramic cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] p-0.5"
+                    className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
                     aria-label="Price help"
                     aria-expanded={showPriceHelp}
                   >
@@ -937,7 +907,7 @@ export default function CatalogPage() {
                   priceHelpPosition &&
                   createPortal(
                     <div
-                      className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-ink-muted leading-relaxed rounded-xl border border-[var(--glass-border)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] backdrop-blur-xl bg-[var(--color-glass-surface)]"
+                      className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
                       style={{ top: priceHelpPosition.top, left: priceHelpPosition.left }}
                       role="tooltip"
                       onMouseEnter={() => {
@@ -971,7 +941,7 @@ export default function CatalogPage() {
                 <>
                   <div>
                     <div className="flex items-center gap-1.5 mb-1">
-                      <label htmlFor="cat-floor-price" className="block text-xs font-medium uppercase tracking-wider text-ink-muted">
+                      <label htmlFor="cat-floor-price" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                         Floor price (optional)
                       </label>
                       <button
@@ -1008,7 +978,7 @@ export default function CatalogPage() {
                             }
                           }
                         }}
-                        className="inline-flex text-ink-muted hover:text-ceramic cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] p-0.5"
+                        className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
                         aria-label="Floor price help"
                         aria-expanded={showFloorHelp}
                       >
@@ -1020,7 +990,7 @@ export default function CatalogPage() {
                       floorHelpPosition &&
                       createPortal(
                         <div
-                          className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-ink-muted leading-relaxed rounded-xl border border-[var(--glass-border)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] backdrop-blur-xl bg-[var(--color-glass-surface)]"
+                          className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
                           style={{ top: floorHelpPosition.top, left: floorHelpPosition.left }}
                           role="tooltip"
                           onMouseEnter={() => {
@@ -1032,7 +1002,7 @@ export default function CatalogPage() {
                           }}
                           onMouseLeave={() => setShowFloorHelp(false)}
                         >
-                          The lowest price you're willing to accept. The system can warn or block quotes below this so you don't sell at a loss. Should be at or above your Target cost.
+                          The lowest price you&rsquo;re willing to accept. The system can warn or block quotes below this so you don&rsquo;t sell at a loss. Should be at or above your Target cost.
                         </div>,
                         document.body
                       )}
@@ -1045,7 +1015,7 @@ export default function CatalogPage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 mb-1">
-                      <label htmlFor="cat-target-cost" className="block text-xs font-medium uppercase tracking-wider text-ink-muted">
+                      <label htmlFor="cat-target-cost" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                         {category === 'rental' && isSubRental ? 'Vendor Rental Cost' : 'Target cost'}
                       </label>
                       <button
@@ -1083,7 +1053,7 @@ export default function CatalogPage() {
                             }
                           }
                         }}
-                        className="inline-flex text-ink-muted hover:text-ceramic cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] p-0.5"
+                        className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
                         aria-label="Target cost help"
                         aria-expanded={showCostHelp}
                       >
@@ -1095,7 +1065,7 @@ export default function CatalogPage() {
                       costHelpPosition &&
                       createPortal(
                         <div
-                          className="fixed z-[9999] w-56 px-3 py-2.5 text-xs font-normal text-ink-muted leading-relaxed rounded-xl border border-[var(--glass-border)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] backdrop-blur-xl bg-[var(--color-glass-surface)]"
+                          className="fixed z-[9999] w-56 px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
                           style={{ top: costHelpPosition.top, left: costHelpPosition.left }}
                           role="tooltip"
                           onMouseEnter={() => {
@@ -1128,13 +1098,13 @@ export default function CatalogPage() {
               )}
             </div>
             {category === 'rental' && (
-              <div className="space-y-4 rounded-xl border border-[var(--glass-border)] p-4 bg-white/[0.02]">
-                <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+                <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                   Inventory & Fulfillment
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="cat-stock" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+                    <label htmlFor="cat-stock" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                       Total stock quantity <span className="text-[var(--color-unusonic-error)]">*</span>
                     </label>
                     <input
@@ -1143,11 +1113,11 @@ export default function CatalogPage() {
                       min={0}
                       value={stockQuantity}
                       onChange={(e) => setStockQuantity(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
                       placeholder="e.g. 100"
                       required
                     />
-                    <p className="text-xs text-ink-muted mt-1">How many units you own or can fulfill. Use 0 if you sub-rent only.</p>
+                    <p className="text-xs text-[var(--stage-text-secondary)] mt-1">How many units you own or can fulfill. Use 0 if you sub-rent only.</p>
                   </div>
                   <div className="sm:col-span-2">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -1155,29 +1125,29 @@ export default function CatalogPage() {
                         type="checkbox"
                         checked={isSubRental}
                         onChange={(e) => setIsSubRental(e.target.checked)}
-                        className="rounded border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-neon focus:ring-[var(--ring)]"
+                        className="rounded border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] accent-[var(--stage-accent)] focus:ring-[var(--stage-accent)]"
                       />
-                      <span className="text-sm text-ceramic">We sub-rent this item from another vendor</span>
+                      <span className="text-sm text-[var(--stage-text-primary)]">We sub-rent this item from another vendor</span>
                     </label>
-                    <p className="text-xs text-ink-muted mt-1">When checked, Target Cost is the vendor rental cost.</p>
+                    <p className="text-xs text-[var(--stage-text-secondary)] mt-1">When checked, Target Cost is the vendor rental cost.</p>
                   </div>
                   <div>
-                    <label htmlFor="cat-replacement-cost" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">Replacement cost</label>
+                    <label htmlFor="cat-replacement-cost" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">Replacement cost</label>
                     <CurrencyInput
                       id="cat-replacement-cost"
                       value={replacementCost}
                       onChange={setReplacementCost}
                       placeholder="0.00"
                     />
-                    <p className="text-xs text-ink-muted mt-1">What you charge the client if this item is destroyed or lost.</p>
+                    <p className="text-xs text-[var(--stage-text-secondary)] mt-1">What you charge the client if this item is destroyed or lost.</p>
                   </div>
                   <div>
-                    <label htmlFor="cat-buffer-days" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">Prep / buffer days</label>
+                    <label htmlFor="cat-buffer-days" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">Prep / buffer days</label>
                     <select
                       id="cat-buffer-days"
                       value={bufferDays}
                       onChange={(e) => setBufferDays(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
                     >
                       <option value="">—</option>
                       <option value="0">0 days</option>
@@ -1185,40 +1155,36 @@ export default function CatalogPage() {
                       <option value="2">2 days</option>
                       <option value="3">3 days</option>
                     </select>
-                    <p className="text-xs text-ink-muted mt-1">Days needed for cleaning/prep before it can be rented again.</p>
+                    <p className="text-xs text-[var(--stage-text-secondary)] mt-1">Days needed for cleaning/prep before it can be rented again.</p>
                   </div>
                 </div>
               </div>
             )}
             {category !== 'package' && (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-4 py-3 bg-white/[0.02]">
+              <div className="flex items-center justify-between gap-3 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.10)] px-4 py-3 bg-[var(--stage-surface-nested)]">
                 <div>
-                  <p className="text-sm font-medium text-ceramic">Taxable</p>
-                  <p className="text-xs text-ink-muted mt-0.5">Include sales tax on this item when added to a proposal.</p>
+                  <p className="text-sm font-medium text-[var(--stage-text-primary)]">Taxable</p>
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">Include sales tax on this item when added to a proposal.</p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isTaxable}
-                    onChange={(e) => setIsTaxable(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:bg-[var(--color-neon)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-obsidian after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
-                </label>
+                <CeramicSwitch
+                  checked={isTaxable}
+                  onCheckedChange={(checked) => setIsTaxable(checked)}
+                  aria-label="Taxable"
+                />
               </div>
             )}
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={closeModal}
-                className="flex-1 px-4 py-3 rounded-xl border border-[var(--glass-border)] text-ceramic font-medium text-sm hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)] font-medium text-sm hover:bg-[var(--color-neon-amber)]/20 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:brightness-[1.06] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 {saving ? 'Saving…' : editingId ? 'Save' : 'Create'}
               </button>

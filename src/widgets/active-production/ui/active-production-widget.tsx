@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { createClient } from '@/shared/api/supabase/client';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { M3_DURATION_S, M3_EASING_ENTER } from '@/shared/lib/motion-constants';
@@ -28,6 +28,7 @@ export function ActiveProductionWidget() {
 
     // Include events with lifecycle_status in (confirmed, production, live) OR status=confirmed when lifecycle_status is null
     let query = supabase
+      .schema('ops')
       .from('events')
       .select('id, title, starts_at')
       .or('lifecycle_status.in.(confirmed,production,live),and(lifecycle_status.is.null,status.eq.confirmed)')
@@ -63,17 +64,17 @@ export function ActiveProductionWidget() {
 
   return (
     <div className="h-64">
-      <LiquidPanel hoverEffect className="h-full flex flex-col justify-between">
+      <StagePanel interactive className="h-full flex flex-col justify-between">
         <div className="flex justify-between items-start mb-4">
-          <h2 className="text-xs font-medium text-muted uppercase tracking-widest">Active Production</h2>
-          <ArrowUpRight className="w-4 h-4 text-muted" />
+          <h2 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">Active Production</h2>
+          <ArrowUpRight className="w-4 h-4 text-[var(--stage-text-secondary)]" />
         </div>
 
         <div className="flex flex-col gap-2">
           {loading ? (
-            <LiquidPanel className="h-12 w-full animate-pulse !p-0 liquid-panel-nested" />
+            <StagePanel nested className="h-12 w-full stage-skeleton" padding="none" />
           ) : !hasGigs ? (
-            <div className="py-6 text-center text-xs text-muted italic leading-relaxed">No active productions</div>
+            <div className="py-6 text-center text-xs text-[var(--stage-text-secondary)] italic leading-relaxed">No active productions</div>
           ) : (
             <motion.div
               className="flex flex-col gap-2"
@@ -91,20 +92,20 @@ export function ActiveProductionWidget() {
                   transition={M3_ENTER}
                 >
                   <Link href={`/events/g/${gig.id}`} className="block">
-                    <LiquidPanel hoverEffect className="group flex items-center justify-between !p-3 liquid-panel-nested">
+                    <StagePanel interactive nested className="group flex items-center justify-between" padding="sm">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-6 w-6 items-center justify-center liquid-panel liquid-panel-nested !rounded-full !p-0">
-                          <div className="h-2 w-2 rounded-full bg-signal-success" />
+                        <div className="flex h-6 w-6 items-center justify-center stage-panel-nested rounded-full">
+                          <div className="h-2 w-2 rounded-full bg-[var(--color-unusonic-success)]" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-ceramic">{gig.title ?? 'Untitled Production'}</span>
-                          <span className="text-[10px] text-muted uppercase tracking-wider leading-relaxed">run of show</span>
+                          <span className="text-sm font-medium text-[var(--stage-text-primary)]">{gig.title ?? 'Untitled Production'}</span>
+                          <span className="text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider leading-relaxed">run of show</span>
                         </div>
                       </div>
-                      <span className="text-[10px] text-muted">
+                      <span className="text-[10px] text-[var(--stage-text-secondary)]">
                         {gig.event_date ? new Date(gig.event_date).toLocaleDateString() : 'TBD'}
                       </span>
-                    </LiquidPanel>
+                    </StagePanel>
                   </Link>
                 </motion.div>
               ))}
@@ -115,15 +116,13 @@ export function ActiveProductionWidget() {
         <Link href="/crm" className="block w-full mt-4">
           <motion.button
             type="button"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             transition={M3_ENTER}
-            className="w-full rounded-xl border border-[var(--glass-border)] py-2.5 text-[10px] font-medium uppercase tracking-wider text-muted transition-colors hover:bg-ceramic hover:text-obsidian"
+            className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] py-2.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] transition-[color,background-color,filter] hover:bg-[var(--stage-text-primary)] hover:text-[var(--stage-text-on-accent)] hover:brightness-[1.02]"
           >
             View Production Queue
           </motion.button>
         </Link>
-      </LiquidPanel>
+      </StagePanel>
     </div>
   );
 }

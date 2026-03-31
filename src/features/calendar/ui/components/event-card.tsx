@@ -1,17 +1,14 @@
 'use client';
 
 import { format } from 'date-fns';
+import { User, MapPin, Folder, Users } from 'lucide-react';
 import type { CalendarEvent } from '@/features/calendar/model/types';
 
 const COLOR_CLASSES: Record<CalendarEvent['color'], string> = {
-  emerald:
-    'border-l-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-400/10 dark:border-emerald-400/20',
-  amber:
-    'border-l-amber-500 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-400/10 dark:border-amber-400/20',
-  rose:
-    'border-l-rose-500 bg-rose-500/10 dark:bg-rose-500/20 border border-rose-400/10 dark:border-rose-400/20',
-  blue:
-    'border-l-blue-500 bg-blue-500/10 dark:bg-blue-500/20 border border-blue-400/10 dark:border-blue-400/20',
+  emerald: 'border-l-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/10 border border-[var(--color-unusonic-success)]/10',
+  amber: 'border-l-[var(--color-unusonic-warning)] bg-[var(--color-unusonic-warning)]/10 border border-[var(--color-unusonic-warning)]/10',
+  rose: 'border-l-[var(--color-unusonic-error)] bg-[var(--color-unusonic-error)]/10 border border-[var(--color-unusonic-error)]/10',
+  blue: 'border-l-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/10 border border-[var(--color-unusonic-info)]/10',
 };
 
 export interface EventCardProps {
@@ -28,33 +25,33 @@ export function EventCard({ event, crewCount, className = '' }: EventCardProps) 
 
   return (
     <div
-      className={`liquid-panel-nested rounded-xl border-l-4 p-4 backdrop-blur-sm transition-all duration-300 antialiased ${colorClass} ${className}`}
+      className={`stage-panel-nested rounded-xl border-l-4 p-4 transition-all duration-300 antialiased ${colorClass} ${className}`}
     >
-      <div className="text-xs font-medium text-ink-muted tabular-nums">
+      <div className="text-xs font-medium text-[var(--stage-text-secondary)] tabular-nums">
         {format(startDate, 'h:mm a')} – {format(endDate, 'h:mm a')}
       </div>
-      <h3 className="text-base font-semibold text-ink mt-1 tracking-tight">{event.title}</h3>
+      <h3 className="text-base font-semibold text-[var(--stage-text-primary)] mt-1 tracking-tight">{event.title}</h3>
       {event.clientName && (
-        <p className="text-sm text-ink-muted mt-0.5 flex items-center gap-1.5">
-          <span className="opacity-70">👤</span>
+        <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5 flex items-center gap-1.5">
+          <User size={14} strokeWidth={1.5} className="shrink-0 opacity-70" />
           {event.clientName}
         </p>
       )}
       {event.location && (
-        <p className="text-sm text-ink-muted mt-1 flex items-center gap-1.5">
-          <span className="opacity-70">📍</span>
+        <p className="text-sm text-[var(--stage-text-secondary)] mt-1 flex items-center gap-1.5">
+          <MapPin size={14} strokeWidth={1.5} className="shrink-0 opacity-70" />
           {event.location}
         </p>
       )}
       {event.projectTitle && (
-        <p className="text-sm text-ink-muted mt-0.5 flex items-center gap-1.5">
-          <span className="opacity-70">📁</span>
+        <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5 flex items-center gap-1.5">
+          <Folder size={14} strokeWidth={1.5} className="shrink-0 opacity-70" />
           {event.projectTitle}
         </p>
       )}
       {crewCount != null && (
-        <p className="text-sm text-ink-muted mt-0.5 flex items-center gap-1.5">
-          <span className="opacity-70">👥</span>
+        <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5 flex items-center gap-1.5">
+          <Users size={14} strokeWidth={1.5} className="shrink-0 opacity-70" />
           {crewCount} crew
         </p>
       )}

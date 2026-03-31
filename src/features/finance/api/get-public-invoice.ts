@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 /**
  * Finance feature – Fetch public invoice by token (client payment portal)
  * Uses system client to bypass RLS; only returns data for matching token.
@@ -54,17 +54,18 @@ export async function getPublicInvoice(token: string): Promise<PublicInvoiceDTO 
     sort_order: row.sort_order ?? 0,
   }));
 
-  // 3. Workspace (name, logo)
+  // 3. Workspace (name, logo, portal theme)
   const { data: workspace, error: workspaceError } = await db
     .from('workspaces')
-    .select('id, name, logo_url')
+    .select('id, name, logo_url, portal_theme_preset, portal_theme_config')
     .eq('id', workspaceId)
     .single();
 
   if (workspaceError || !workspace) return null;
 
-  // 4. Event (title, starts_at) — legacy public.events
+  // 4. Event (title, starts_at) — ops.events
   const { data: event, error: eventError } = await db
+    .schema('ops')
     .from('events')
     .select('id, title, starts_at')
     .eq('id', eventId)
@@ -98,6 +99,8 @@ export async function getPublicInvoice(token: string): Promise<PublicInvoiceDTO 
       id: workspace.id,
       name: workspace.name ?? '',
       logo_url: workspace.logo_url ?? null,
+      portal_theme_preset: workspace.portal_theme_preset ?? null,
+      portal_theme_config: workspace.portal_theme_config ?? null,
     },
     event: {
       id: event.id,

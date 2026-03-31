@@ -7,7 +7,7 @@ import { Button } from '@/shared/ui/button';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { TitleSelector } from './TitleSelector';
 import { RoleSelect } from './RoleSelect';
-import type { SignalRoleId } from '../model/role-presets';
+import type { UnusonicRoleId } from '../model/role-presets';
 import { AvatarUpload } from './AvatarUpload';
 import { cn } from '@/shared/lib/utils';
 import { upsertGhostMember } from '../api/actions';
@@ -44,13 +44,13 @@ export function MemberForge({
   const [firstName, setFirstName] = React.useState(defaultValues?.first_name ?? '');
   const [lastName, setLastName] = React.useState(defaultValues?.last_name ?? '');
   const [email, setEmail] = React.useState(defaultValues?.email ?? '');
-  const [role, setRole] = React.useState<SignalRoleId>(
-    (defaultValues?.role as SignalRoleId) ?? 'member'
+  const [role, setRole] = React.useState<UnusonicRoleId>(
+    (defaultValues?.role as UnusonicRoleId) ?? 'member'
   );
   const [jobTitle, setJobTitle] = React.useState(defaultValues?.job_title ?? '');
   const [formError, setFormError] = React.useState<string | null>(null);
 
-  const effectiveRole: SignalRoleId =
+  const effectiveRole: UnusonicRoleId =
     !canAssignAdmin && (role === 'admin' || role === 'manager') ? 'member' : role;
 
   const clearError = React.useCallback(() => {
@@ -118,14 +118,14 @@ export function MemberForge({
       {formError && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-xl border border-[var(--color-silk)]/30 bg-[var(--color-silk)]/10 px-4 py-3 text-sm text-[var(--color-ink)]"
+          className="flex items-start gap-3 rounded-xl border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/10 px-4 py-3 text-sm text-[var(--stage-text-primary)]"
         >
-          <span className="shrink-0 mt-0.5 size-5 rounded-full border border-[var(--color-silk)]/50 bg-[var(--color-silk)]/20 flex items-center justify-center text-[10px] font-medium text-[var(--color-silk)]">!</span>
+          <span className="shrink-0 mt-0.5 size-5 rounded-full border border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/20 flex items-center justify-center text-[10px] font-medium text-[var(--stage-accent)]">!</span>
           <p className="flex-1">{formError}</p>
           <button
             type="button"
             onClick={clearError}
-            className="shrink-0 p-1 -m-1 rounded-md text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-white/10 transition-colors"
+            className="shrink-0 p-1 -m-1 rounded-md text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] transition-colors"
             aria-label="Dismiss"
           >
             <X className="size-4" />
@@ -140,14 +140,14 @@ export function MemberForge({
           value={firstName}
           onChange={(e) => { setFirstName(e.target.value); clearError(); }}
           required
-          className="bg-white/5 border-[var(--color-mercury)]"
+          className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
         />
         <FloatingLabelInput
           label="Last name"
           value={lastName}
           onChange={(e) => { setLastName(e.target.value); clearError(); }}
           required
-          className="bg-white/5 border-[var(--color-mercury)]"
+          className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
         />
       </div>
 
@@ -157,7 +157,7 @@ export function MemberForge({
         value={email}
         onChange={(e) => { setEmail(e.target.value); clearError(); }}
         required
-        className="bg-white/5 border-[var(--color-mercury)]"
+        className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
       />
 
       <TitleSelector
@@ -175,14 +175,14 @@ export function MemberForge({
 
       <div className="flex flex-wrap items-center justify-end gap-2 pt-4">
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel} className="text-[var(--color-ink-muted)]">
+          <Button type="button" variant="ghost" onClick={onCancel} className="text-[var(--stage-text-secondary)]">
             Cancel
           </Button>
         )}
         <Button
           type="submit"
           disabled={isPending}
-          className="min-w-[140px] bg-[var(--color-silk)]/90 text-[var(--color-canvas)] hover:bg-[var(--color-silk)] border-0 shadow-[0_0_0_1px_var(--color-silk)/30]"
+          className="min-w-[140px] bg-[var(--stage-accent)]/90 text-[var(--stage-bg)] hover:bg-[var(--stage-accent)] border-0 shadow-[0_0_0_1px_var(--stage-accent)/30]"
         >
           {isPending ? (
             <>

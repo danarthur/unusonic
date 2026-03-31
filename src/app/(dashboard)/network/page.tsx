@@ -32,11 +32,11 @@ function NetworkPageSkeleton() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
       <div className="shrink-0">
-        <div className="h-8 w-48 animate-pulse rounded bg-[var(--color-glass-surface)]" />
-        <div className="mt-2 h-4 w-64 animate-pulse rounded bg-[oklch(0.20_0_0/0.25)]" />
+        <div className="h-8 w-48 stage-skeleton rounded bg-[var(--stage-surface-raised)]" />
+        <div className="mt-2 h-4 w-64 stage-skeleton rounded bg-[oklch(0.20_0_0/0.25)]" />
       </div>
       <div className="flex flex-1 min-h-0 items-center justify-center">
-        <div className="h-32 w-32 animate-pulse rounded-full bg-[oklch(0.20_0_0/0.25)]" />
+        <div className="h-32 w-32 stage-skeleton rounded-full bg-[oklch(0.20_0_0/0.25)]" />
       </div>
     </div>
   );
@@ -76,8 +76,12 @@ async function NetworkPageInner({ searchParams }: PageProps) {
   }
 
   const hasIdentity = !!(org?.name?.trim());
-  const coreNodes = nodes.filter((n) => n.kind === 'internal_employee');
-  const hasTeam = coreNodes.length > 1;
+  const crewNodes = nodes.filter((n) =>
+    n.kind === 'internal_employee' ||
+    n.kind === 'extended_team' ||
+    (n.kind === 'external_partner' && n.identity.entityType === 'person' && n.gravity === 'inner_circle')
+  );
+  const hasTeam = crewNodes.length > 1;
   const brandColor = org?.brand_color ?? null;
   const orgName = org?.name ?? null;
 

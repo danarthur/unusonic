@@ -4,28 +4,28 @@ const path = require('path');
 const ROOT_DIR = process.cwd();
 const SRC_DIR = path.join(ROOT_DIR, 'src');
 
-// The "Admin Panel" Anti-Patterns
-// We flag these because they break the "Liquid Ceramic" immersion.
+// Anti-patterns that violate the Stage Engineering design system.
+// See docs/reference/design/design-philosophy-and-styling.md
 const FORBIDDEN_TOKENS = [
     { 
         pattern: /bg-white(?![a-zA-Z0-9-])/g, 
-        message: "❌ Found 'bg-white'. Use 'bg-obsidian' (Page) or '.liquid-card' (Card)." 
+        message: "❌ Found 'bg-white'. Use page canvas tokens: 'bg-stage-void' or `bg-[var(--stage-void)]`. For cards/panels use `stage-panel` / `--stage-surface` (see docs/reference/design/design-philosophy-and-styling.md)." 
     },
     { 
         pattern: /bg-gray-[1-9]00/g, 
-        message: "❌ Found 'bg-gray-*'. Use semantic 'bg-sidebar', 'bg-stone', or '.liquid-panel'." 
+        message: "❌ Found 'bg-gray-*'. Use Stage surfaces: `bg-stage-void`, `bg-[var(--stage-surface)]`, or `stage-panel` — not raw Tailwind grays." 
     },
     { 
         pattern: /text-gray-[1-9]00/g, 
-        message: "❌ Found 'text-gray-*'. Use 'text-ink' (Primary) or 'text-ink-muted' (Secondary)." 
+        message: "❌ Found 'text-gray-*'. Use text tiers: `text-[var(--stage-text-primary)]`, `text-[var(--stage-text-secondary)]`, or `text-[var(--stage-text-tertiary)]`." 
     },
     { 
         pattern: /shadow-(sm|md|lg|xl)/g, 
-        message: "❌ Found default Tailwind shadow. Use '.liquid-card' or '.liquid-panel' (shadow is baked in)." 
+        message: "❌ Found default Tailwind shadow. Use Stage elevation (inset highlights on `stage-panel`) — see docs/reference/design/surface-hierarchy-and-depth-perception.md." 
     },
     { 
         pattern: /border-gray-[1-9]00/g, 
-        message: "❌ Found 'border-gray-*'. Use 'border-white/10' or semantic borders." 
+        message: "❌ Found 'border-gray-*'. Use edge tokens: `border-[var(--stage-edge-subtle)]` or density-aware stage borders from globals.css." 
     }
 ];
 
@@ -73,12 +73,12 @@ function traverseDirectory(dir) {
     return allViolations;
 }
 
-console.log("\x1b[36m%s\x1b[0m", "🎨 DanielOS Design Architect: Scanning for Aesthetic Violations...");
+console.log("\x1b[36m%s\x1b[0m", "Stage Engineering: Scanning for design violations...");
 
 const results = traverseDirectory(SRC_DIR);
 
 if (results.length === 0) {
-    console.log("\x1b[32m%s\x1b[0m", "✅ Liquid Design Compliant. No 'Admin Panel' artifacts found.");
+    console.log("\x1b[32m%s\x1b[0m", "Stage Engineering compliant. No violations found.");
     process.exit(0);
 } else {
     console.log("\x1b[31m%s\x1b[0m", "🛑 Aesthetic Violations Detected:");
@@ -86,7 +86,7 @@ if (results.length === 0) {
         console.log(`\n📄 ${item.file}`);
         item.violations.forEach(v => console.log(`   ${v}`));
     });
-    console.log("\n💡 Action: Replace generic tokens with 'liquid-*' classes or semantic colors.");
+    console.log("\n Action: Replace generic tokens with Stage Engineering tokens (`stage-panel`, `--stage-surface`, `--stage-text-*`). See docs/reference/design/.");
     // We exit with error to fail the build/commit if you use this in CI
     process.exit(1);
 }

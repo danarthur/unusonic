@@ -5,21 +5,21 @@
      We define these as CSS variables so they can be animated 
      and used in the alpha-channel syntax (e.g., bg-obsidian/50).
   */
-  --color-obsidian: oklch(0.12 0 0);       /* The Void — matte charcoal for premium contrast */
-  --color-ceramic: oklch(0.98 0 0);        /* The Ink (Not White) */
+  --color-obsidian: oklch(0.13 0.004 50);  /* The Void — warm dark, perceptibly not black */
+  --color-ceramic: oklch(0.88 0 0);        /* The Ink — below accent ceiling */
   --color-mercury: oklch(1 0 0 / 0.05);    /* The Edge (Reflective) — subtle, not frame-like */
   
   --color-neon-blue: oklch(0.70 0.15 250); /* The "Kiki" Signal */
   --color-neon-rose: oklch(0.65 0.20 350); /* Alert Signal */
-  --color-neon-amber: oklch(0.78 0.15 70); /* Industrial accent */
+  --color-neon-amber: oklch(0.78 0.15 70); /* Legacy — being phased out. Use --stage-accent or semantic status colors. */
   
   --color-glass-surface: oklch(0.20 0 0 / 0.5); /* Adjusted for darker void */
   --color-glass-highlight: oklch(1 0 0 / 0.1);  /* Sharp refractive edge */
 
   /* Semantic aliases (OKLCH) */
-  --color-ink: oklch(0.98 0 0);            /* Primary text = Ceramic */
-  --color-ink-muted: oklch(0.98 0 0 / 0.6);
-  --color-muted: oklch(0.98 0 0 / 0.6);    /* Body / secondary (design: text-mercury) */
+  --color-ink: oklch(0.88 0 0);            /* Primary text — below accent ceiling */
+  --color-ink-muted: oklch(0.64 0 0);      /* Secondary text — labels, metadata (WCAG AA compliant) */
+  --color-muted: oklch(0.64 0 0);          /* Body / secondary */
   --color-canvas: var(--color-obsidian);
   --color-silk: oklch(0.70 0.15 250);      /* Accent = Neon Blue */
   --color-walnut: oklch(0.55 0.02 60);     /* Warm secondary */
@@ -28,10 +28,12 @@
      L (0.75) and C (~0.18) locked; only H (Hue) rotates.
      Same optical weight = no painful vibration on dark.
   */
-  --color-unusonic-success: oklch(0.75 0.18 145); /* Emerald Laser */
-  --color-unusonic-warning: oklch(0.75 0.16 85);  /* Molten Gold */
-  --color-unusonic-error: oklch(0.70 0.18 20);    /* Infrared Ruby */
-  --color-unusonic-info: oklch(0.75 0.15 240);   /* Hologram Blue */
+  --color-qb-green: oklch(0.55 0.18 142); /* QuickBooks brand green */
+
+  --color-unusonic-success: oklch(0.75 0.18 145); /* Emerald Laser — L=0.75 */
+  --color-unusonic-warning: oklch(0.80 0.16 85);  /* Molten Gold — L=0.80 (brightest: CVD-safe) */
+  --color-unusonic-error: oklch(0.65 0.18 20);    /* Infrared Ruby — L=0.65 (dimmest: CVD-safe) */
+  --color-unusonic-info: oklch(0.75 0.15 240);   /* Hologram Blue — L=0.75 */
 
   /* SURFACE VARIANTS (Tinted Glass for badges / soft backgrounds) */
   --color-surface-100: oklch(0.22 0 0); /* Solid Ceramic (claimed cards) */
@@ -46,25 +48,26 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-/* Legacy variables for components still using var(--…) — OKLCH-backed */
+/* Legacy variables — warmed to match Stage Engineering color temperature.
+   These cascade into 100+ files. Updating here propagates warmth everywhere. */
 :root {
-  --background: oklch(0.12 0 0);
-  --foreground: oklch(0.98 0 0);
-  --sidebar-bg: oklch(0.15 0 0 / 0.92);
-  --glass-border: oklch(1 0 0 / 0.05);
-  --glass-border-hover: oklch(1 0 0 / 0.15);
-  --glass-bg: oklch(0.20 0 0 / 0.5);
-  --glass-bg-hover: oklch(0.22 0 0 / 0.55);
-  --glass-shadow: 0 4px 24px -1px oklch(0 0 0 / 0.2);
-  --glass-shadow-hover: 0 20px 40px -4px oklch(0 0 0 / 0.4);
-  --ring: oklch(0.70 0.15 250 / 0.4);
-  --surface-100: oklch(0.22 0 0);
-  /* Calendar: today cell highlight */
-  --today-ring: oklch(0.70 0.15 250 / 0.35);
-  --today-bg: oklch(0.70 0.15 250 / 0.06);
-  /* Nested glass (event tiles, month cards) */
-  --glass-shadow-nested: 0 6px 16px -10px oklch(0 0 0 / 0.25), inset 0 1px 0 0 oklch(1 0 0 / 0.04);
-  --glass-shadow-nested-hover: 0 8px 20px -8px oklch(0 0 0 / 0.35), inset 0 1px 0 0 oklch(1 0 0 / 0.06);
+  --background: var(--stage-void, oklch(0.13 0.004 50));
+  --foreground: oklch(0.88 0 0);
+  --sidebar-bg: var(--stage-surface, oklch(0.18 0.004 50));
+  --glass-border: var(--stage-edge-subtle, oklch(1 0 0 / 0.03));
+  --glass-border-hover: oklch(1 0 0 / 0.08);
+  --glass-bg: var(--stage-surface, oklch(0.18 0.004 50));
+  --glass-bg-hover: var(--stage-surface-hover, oklch(0.22 0.004 50));
+  --glass-shadow: 0 1px 3px -1px oklch(0 0 0 / 0.4), 0 4px 12px -4px oklch(0 0 0 / 0.3);
+  --glass-shadow-hover: 0 2px 8px -2px oklch(0 0 0 / 0.5), 0 8px 24px -8px oklch(0 0 0 / 0.35);
+  --ring: oklch(1 0 0 / 0.4);
+  --surface-100: oklch(0.22 0.004 50);
+  /* Calendar: today cell highlight — achromatic accent */
+  --today-ring: oklch(1 0 0 / 0.35);
+  --today-bg: oklch(1 0 0 / 0.06);
+  /* Nested glass — Stage Engineering shadow pattern */
+  --glass-shadow-nested: inset 0 1px 0 0 oklch(1 0 0 / 0.04), 0 1px 2px -1px oklch(0 0 0 / 0.3);
+  --glass-shadow-nested-hover: inset 0 1px 0 0 oklch(1 0 0 / 0.06), 0 2px 4px -1px oklch(0 0 0 / 0.35);
 }
 
 /* 3. BASE LAYER 
@@ -121,79 +124,92 @@
     -webkit-backface-visibility: hidden;
   }
   
-  /* The "Liquid Card" - The atom of your UI. M3 extra-large corner (28dp). */
+  /* The "Liquid Card" — bridged to Stage Engineering tokens.
+     Same class names, new visual system. Density-aware via --stage-* vars. */
+  /* liquid-card / glass-panel: elevated level — these are cards sitting ON panels.
+     They must be lighter than --stage-surface so they pop off their parent. */
   .liquid-card {
-    @apply relative overflow-hidden transition-all duration-300 rounded-[28px];
-    
-    /* Material */
-    background: var(--color-glass-surface);
-    backdrop-filter: blur(24px) saturate(140%);
-    
-    /* Border (The Mercury Rim) */
-    border: 1px solid var(--color-mercury);
-    
-    /* Shadow (Depth) */
-    box-shadow: 
-      0 4px 24px -1px oklch(0 0 0 / 0.2), 
-      inset 0 1px 0 0 var(--color-glass-highlight);
+    @apply relative overflow-hidden;
+    transition: background 0.12s ease-out, box-shadow 0.12s ease-out, border-radius 0.35s ease;
+    border-radius: var(--stage-radius-panel, 12px);
+    background: var(--stage-surface-elevated, oklch(0.22 0.004 50));
+    border: none;
+    box-shadow:
+      inset 0 1px 0 0 var(--stage-edge-top, oklch(1 0 0 / 0.08)),
+      inset 1px 0 0 0 var(--stage-edge-left, oklch(1 0 0 / 0.04)),
+      0 1px 3px -1px oklch(0 0 0 / 0.4),
+      0 4px 12px -4px oklch(0 0 0 / 0.3);
   }
 
-  /* Alias: same physics as liquid-card for panels/blades */
+  /* Alias: same as liquid-card */
   .glass-panel {
-    @apply relative overflow-hidden rounded-3xl transition-all duration-300;
-    background: var(--color-glass-surface);
-    backdrop-filter: blur(24px) saturate(140%);
-    border: 1px solid var(--color-mercury);
-    box-shadow: 
-      0 4px 24px -1px oklch(0 0 0 / 0.2), 
-      inset 0 1px 0 0 var(--color-glass-highlight);
+    @apply relative overflow-hidden;
+    transition: background 0.12s ease-out, box-shadow 0.12s ease-out, border-radius 0.35s ease;
+    border-radius: var(--stage-radius-panel, 12px);
+    background: var(--stage-surface-elevated, oklch(0.22 0.004 50));
+    border: none;
+    box-shadow:
+      inset 0 1px 0 0 var(--stage-edge-top, oklch(1 0 0 / 0.08)),
+      inset 1px 0 0 0 var(--stage-edge-left, oklch(1 0 0 / 0.04)),
+      0 1px 3px -1px oklch(0 0 0 / 0.4),
+      0 4px 12px -4px oklch(0 0 0 / 0.3);
   }
   .glass-panel:hover {
-    background: oklch(0.22 0 0 / 0.5);
-    border-color: oklch(1 0 0 / 0.15);
-    transform: translateY(-2px) scale(1.002);
-    box-shadow: 
-      0 20px 40px -4px oklch(0 0 0 / 0.4),
-      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+    background: var(--stage-surface-raised, oklch(0.26 0.004 50));
+    box-shadow:
+      inset 0 1px 0 0 oklch(1 0 0 / 0.14),
+      inset 1px 0 0 0 oklch(1 0 0 / 0.07),
+      0 2px 6px -1px oklch(0 0 0 / 0.5),
+      0 8px 20px -4px oklch(0 0 0 / 0.4);
   }
 
-  /* Hover State for Interactive Cards */
+  /* Static card — container for interactive children, no hover state.
+     Stronger resting edge (border) compensates for the absence of hover light-catch. */
+  .liquid-card-static {
+    @apply relative overflow-hidden;
+    transition: border-radius 0.35s ease;
+    border-radius: var(--stage-radius-panel, 12px);
+    background: var(--stage-surface-elevated, oklch(0.22 0.004 50));
+    border: 1px solid oklch(1 0 0 / 0.06);
+    box-shadow:
+      inset 0 1px 0 0 var(--stage-edge-top, oklch(1 0 0 / 0.08)),
+      inset 1px 0 0 0 var(--stage-edge-left, oklch(1 0 0 / 0.04)),
+      0 1px 3px -1px oklch(0 0 0 / 0.4),
+      0 4px 12px -4px oklch(0 0 0 / 0.3);
+  }
+
+  /* Hover State for Interactive Cards — light catch + shadow deepen */
   .liquid-card:hover {
-    background: oklch(0.22 0 0 / 0.5);
-    border-color: oklch(1 0 0 / 0.15);
-    transform: translateY(-2px) scale(1.002);
-    box-shadow: 
-      0 20px 40px -4px oklch(0 0 0 / 0.4),
-      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+    background: var(--stage-surface-raised, oklch(0.26 0.004 50));
+    box-shadow:
+      inset 0 1px 0 0 oklch(1 0 0 / 0.14),
+      inset 1px 0 0 0 oklch(1 0 0 / 0.07),
+      0 2px 6px -1px oklch(0 0 0 / 0.5),
+      0 8px 20px -4px oklch(0 0 0 / 0.4);
   }
 
-  /* The "Neon Text" - For key metrics or active states */
+  /* The "Neon Text" - For key metrics or active states — Stage Engineering accent */
   .text-neon {
-    color: var(--color-neon-blue);
-    text-shadow: 0 0 20px oklch(0.70 0.15 250 / 0.5);
+    color: var(--stage-accent);
+    text-shadow: 0 0 20px oklch(1 0 0 / 0.3);
   }
 
-  /* Primary avatar (workspace profile) - Signal brand glow, separates from page */
+  /* Primary avatar — Stage Engineering: subtle edge, no glow */
   .avatar-primary {
-    @apply rounded-xl overflow-hidden;
-    border: 1px solid var(--glass-border);
-    box-shadow:
-      0 0 0 1px oklch(1 0 0 / 0.05),
-      0 0 16px oklch(0.70 0.15 250 / 0.15);
+    @apply overflow-hidden;
+    border-radius: var(--stage-radius-nested, var(--stage-radius-panel, 8px));
+    border: 1px solid var(--stage-edge-subtle, oklch(1 0 0 / 0.03));
+    box-shadow: 0 1px 3px -1px oklch(0 0 0 / 0.3);
   }
 
-  /* Sidebar panel - pops from background, Signal brand glow */
+  /* Sidebar panel — Stage Engineering matte surface */
   .sidebar-panel {
-    @apply relative overflow-hidden transition-all duration-500;
-    background: var(--sidebar-bg);
-    backdrop-filter: blur(24px) saturate(150%);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
-    border-right: 1px solid oklch(1 0 0 / 0.12);
+    @apply relative overflow-hidden transition-all duration-300;
+    background: var(--stage-surface, oklch(0.18 0.004 50));
+    border-right: 1px solid var(--stage-edge-subtle, oklch(1 0 0 / 0.03));
     box-shadow:
-      0 0 0 1px oklch(1 0 0 / 0.04) inset,
-      4px 0 24px -4px oklch(0 0 0 / 0.35),
-      8px 0 32px -8px oklch(0 0 0 / 0.2),
-      0 0 40px -8px oklch(0.70 0.15 250 / 0.08);
+      inset -1px 0 0 0 var(--stage-edge-left, oklch(1 0 0 / 0.04)),
+      4px 0 16px -4px oklch(0 0 0 / 0.3);
   }
   
   /* Utility to center content in a Bento Cell */
@@ -201,56 +217,46 @@
     @apply flex flex-col items-center justify-center h-full w-full;
   }
 
-  /* Legacy aliases: liquid-panel = same physics as liquid-card. M3 extra-large corner. */
+  /* liquid-panel — bridged to Stage Engineering */
   .liquid-panel {
-    @apply relative overflow-hidden transition-all duration-300 rounded-[28px];
-    background: var(--color-glass-surface);
-    backdrop-filter: blur(24px) saturate(140%);
-    border: 1px solid var(--color-mercury);
+    @apply relative overflow-hidden transition-all duration-200;
+    border-radius: var(--stage-radius-panel, 12px);
+    background: var(--stage-surface, oklch(0.18 0.004 50));
+    border: none;
     box-shadow:
-      0 4px 24px -1px oklch(0 0 0 / 0.2),
-      inset 0 1px 0 0 var(--color-glass-highlight);
+      inset 0 1px 0 0 var(--stage-edge-top, oklch(1 0 0 / 0.08)),
+      inset 1px 0 0 0 var(--stage-edge-left, oklch(1 0 0 / 0.04)),
+      0 1px 3px -1px oklch(0 0 0 / 0.4),
+      0 4px 12px -4px oklch(0 0 0 / 0.3);
   }
   .liquid-panel:hover {
-    background: oklch(0.22 0 0 / 0.5);
-    border-color: oklch(1 0 0 / 0.15);
-    transform: translateY(-2px) scale(1.002);
-    box-shadow:
-      0 20px 40px -4px oklch(0 0 0 / 0.4),
-      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+    background: var(--stage-surface-hover, oklch(0.22 0.004 50));
   }
   .liquid-panel-nested {
-    box-shadow: 0 6px 16px -10px oklch(0 0 0 / 0.25), inset 0 1px 0 0 oklch(1 0 0 / 0.04);
+    box-shadow: inset 0 1px 0 0 oklch(1 0 0 / 0.04), 0 1px 2px -1px oklch(0 0 0 / 0.3);
   }
-  /* Softer nested cards (e.g. status cells on lobby) — less visual weight. M3 large corner (16dp). */
+  /* Nested cards — bridged to Stage Engineering nested */
   .liquid-card-nested {
-    @apply relative overflow-hidden transition-all duration-300 rounded-2xl;
-    background: oklch(0.18 0 0 / 0.4);
-    backdrop-filter: blur(16px) saturate(120%);
-    border: 1px solid oklch(1 0 0 / 0.06);
-    box-shadow: 0 4px 16px -8px oklch(0 0 0 / 0.2), inset 0 1px 0 0 oklch(1 0 0 / 0.03);
+    @apply relative overflow-hidden transition-all duration-200;
+    border-radius: var(--stage-radius-nested, var(--stage-radius-panel, 8px));
+    background: var(--stage-surface-nested, oklch(0.09 0.004 50));
+    border: none;
+    box-shadow: inset 0 1px 0 0 oklch(1 0 0 / 0.04), 0 1px 2px -1px oklch(0 0 0 / 0.3);
   }
   .liquid-card-nested:hover {
-    background: oklch(0.20 0 0 / 0.45);
-    border-color: oklch(1 0 0 / 0.08);
+    background: var(--stage-surface-hover, oklch(0.22 0.004 50));
   }
   .liquid-panel-hover:hover {
-    background: oklch(0.22 0 0 / 0.5);
-    border-color: oklch(1 0 0 / 0.15);
-    transform: translateY(-2px) scale(1.002);
-    box-shadow:
-      0 20px 40px -4px oklch(0 0 0 / 0.4),
-      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+    background: var(--stage-surface-hover, oklch(0.22 0.004 50));
   }
   .active-glass {
-    background: oklch(0.22 0 0 / 0.5);
-    border-color: oklch(1 0 0 / 0.15);
+    background: var(--stage-surface-raised, oklch(0.26 0.004 50));
     box-shadow:
-      0 4px 24px -1px oklch(0 0 0 / 0.2),
-      inset 0 1px 0 0 oklch(1 0 0 / 0.1);
+      inset 0 1px 0 0 var(--stage-edge-top, oklch(1 0 0 / 0.08)),
+      0 2px 8px -2px oklch(0 0 0 / 0.4);
   }
 
-  /* M3 Button variants (m3.material.io/components/buttons): Stadium shape, 40dp, Signal tokens */
+  /* M3 Button variants (m3.material.io/components/buttons): Stadium shape, 40dp, Unusonic tokens */
   .m3-btn-outlined {
     @apply inline-flex items-center justify-center gap-2 min-h-[40px] px-6 rounded-full text-sm font-medium transition-colors duration-200;
     border: 1px solid var(--glass-border);
@@ -263,12 +269,12 @@
   }
   .m3-btn-tonal {
     @apply inline-flex items-center justify-center gap-2 min-h-[40px] px-6 rounded-full text-sm font-medium transition-colors duration-200;
-    background: oklch(0.70 0.15 250 / 0.2);
-    color: var(--color-neon-blue);
+    background: oklch(1 0 0 / 0.12);
+    color: var(--stage-accent);
     border: none;
   }
   .m3-btn-tonal:hover {
-    background: oklch(0.70 0.15 250 / 0.3);
+    background: oklch(1 0 0 / 0.18);
   }
   .m3-btn-text {
     @apply inline-flex items-center justify-center gap-2 min-h-[40px] px-4 rounded-full text-sm font-medium transition-colors duration-200;
@@ -287,7 +293,7 @@
     border: none;
   }
   .m3-btn-icon:hover {
-    color: var(--color-neon-blue);
+    color: var(--stage-text-primary);
     background: oklch(1 0 0 / 0.04);
   }
   .m3-btn-icon:focus-visible {
@@ -299,20 +305,20 @@
   .m3-card-corner-large { border-radius: 16px; }
   .m3-card-corner-extra-large { border-radius: 28px; }
 
-  /* Pulse strip bar — same glass as liquid-card but softer, shallower shadow so it doesn’t cut into content below */
+  /* Pulse strip bar — same surface as liquid-card, shallower shadow */
   .liquid-card-pulse {
-    @apply relative overflow-hidden transition-all duration-300 rounded-[28px];
-    background: var(--color-glass-surface);
-    backdrop-filter: blur(24px) saturate(140%);
-    border: 1px solid var(--color-mercury);
+    @apply relative overflow-hidden transition-all duration-200;
+    border-radius: var(--stage-radius-panel, 12px);
+    background: var(--stage-surface, oklch(0.18 0.004 50));
+    border: none;
     box-shadow:
-      0 4px 24px -1px oklch(0 0 0 / 0.2),
-      inset 0 1px 0 0 var(--color-glass-highlight);
+      inset 0 1px 0 0 var(--stage-edge-top, oklch(1 0 0 / 0.08)),
+      0 1px 3px -1px oklch(0 0 0 / 0.3);
   }
 
   /* Liquid PWA: tactile feedback on touch (heavy, premium feel) */
   .touch-tactile {
-    @apply active:scale-95 touch-manipulation;
+    @apply active:brightness-[0.97] touch-manipulation transition-[filter];
   }
 
   /* Spotlight / Cove Light — single light source from top, no colored orbs.
@@ -358,23 +364,24 @@
     pointer-events: none;
   }
 
-  /* Levitation: card floats above grid (scale, deeper shadow) — medium urgency */
+  /* Levitation: card floats above grid (lift + shadow + light-catch — no scale) */
   .liquid-card-levitation {
-    transform: translateY(-4px) scale(1.02);
+    transform: translateY(-4px);
+    filter: brightness(1.02);
     box-shadow:
       0 8px 32px -4px oklch(0 0 0 / 0.35),
       0 24px 48px -8px oklch(0 0 0 / 0.25),
       inset 0 1px 0 0 oklch(1 0 0 / 0.1);
   }
 
-  /* Subsurface ION glow: edge glows from within, light bleeds into content (no badge) */
+  /* Subsurface Aion glow: edge glows from within, light bleeds into content (no badge) */
   .liquid-card-ion-glow {
-    border-color: oklch(0.70 0.15 250 / 0.35);
+    border-color: oklch(1 0 0 / 0.35);
     box-shadow:
       0 4px 24px -1px oklch(0 0 0 / 0.2),
       inset 0 1px 0 0 oklch(1 0 0 / 0.1),
-      inset 0 0 24px -4px oklch(0.70 0.15 250 / 0.12),
-      0 0 0 1px oklch(0.70 0.15 250 / 0.15);
+      inset 0 0 24px -4px oklch(1 0 0 / 0.12),
+      0 0 0 1px oklch(1 0 0 / 0.15);
   }
 
   /* Cockpit approach: luminance depth — no blur. Full situational awareness. */
@@ -432,40 +439,41 @@
   position: relative;
   border-radius: 9999px;
   padding: 1px;
-  /* Gradient rim: subtle mercury → blue tint, not a solid line */
+  /* Gradient rim: subtle mercury → accent tint, not a solid line */
   background: linear-gradient(
     135deg,
     oklch(1 0 0 / 0.06) 0%,
-    oklch(0.70 0.15 250 / 0.12) 25%,
+    oklch(1 0 0 / 0.12) 25%,
     oklch(1 0 0 / 0.06) 50%,
-    oklch(0.70 0.15 250 / 0.12) 75%,
+    oklch(1 0 0 / 0.12) 75%,
     oklch(1 0 0 / 0.06) 100%
   );
   background-size: 200% 200%;
   background-position: 0% 0%;
-  transition: box-shadow 0.35s ease, background 0.35s ease, transform 0.35s ease;
+  transition: box-shadow 0.35s ease, background 0.35s ease, transform 0.35s ease, filter 0.35s ease;
 }
-/* Hover: slight rim brightening + subtle lift (box grows a touch and rises) */
+/* Hover: slight rim brightening + subtle lift (no scale) */
 .liquid-glass-input:hover {
-  transform: translateY(-2px) scale(1.008);
+  transform: translateY(-2px);
+  filter: brightness(1.02);
   background: linear-gradient(
     135deg,
     oklch(1 0 0 / 0.08) 0%,
-    oklch(0.70 0.15 250 / 0.18) 25%,
+    oklch(1 0 0 / 0.18) 25%,
     oklch(1 0 0 / 0.08) 50%,
-    oklch(0.70 0.15 250 / 0.18) 75%,
+    oklch(1 0 0 / 0.18) 75%,
     oklch(1 0 0 / 0.08) 100%
   );
   box-shadow: 0 0 0 1px oklch(1 0 0 / 0.06);
 }
-/* Focused: thin rim highlight + very tight glow so it doesn’t fill the parent and read as a blue rectangle */
+/* Focused: thin rim highlight + very tight glow so it doesn’t fill the parent and read as a colored rectangle */
 .liquid-glass-input:focus-within {
-  box-shadow: 0 0 0 1px oklch(0.70 0.15 250 / 0.3), 0 0 8px oklch(0.70 0.15 250 / 0.1);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.3), 0 0 8px oklch(1 0 0 / 0.1);
   background: linear-gradient(
     135deg,
     oklch(1 0 0 / 0.05) 0%,
     oklch(1 0 0 / 0.22) 15%,
-    oklch(0.70 0.15 250 / 0.3) 50%,
+    oklch(1 0 0 / 0.3) 50%,
     oklch(1 0 0 / 0.22) 85%,
     oklch(1 0 0 / 0.05) 100%
   );
@@ -498,11 +506,11 @@
 .btn-sheen-hover {
   position: relative;
   transition:
-    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.42s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .btn-sheen-hover:hover {
-  transform: scale(1.012);
+  filter: brightness(1.04);
   box-shadow:
     0 6px 28px -2px oklch(0 0 0 / 0.22),
     0 0 0 1px oklch(1 0 0 / 0.08),
@@ -535,4 +543,719 @@
   opacity: 0.035;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STAGE ENGINEERING — Progressive Materiality Design System
+   Three density tiers: Spacious → Balanced → Dense
+   Density controls presentation, never permission. All features always accessible.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Stage Engineering: Static tokens (shared across all tiers) */
+:root {
+  /* Accent: workspace-configurable warm hue. Default: amber-copper. */
+  /* Achromatic accent — brightness IS the accent. No hue.
+     The accent is the absolute luminance ceiling. Text sits below it.
+     Only semantic status colors (success/warning/error/info) carry chroma. */
+  --stage-accent: oklch(1 0 0);
+  --stage-accent-muted: oklch(1 0 0 / 0.10);
+  --stage-accent-dim: oklch(0.50 0 0);
+
+  /* Text tiers — all below accent (1.0) so interactive elements always win the luminance race
+     Scale: accent 1.0 → primary 0.88 (↕0.12) → secondary 0.64 (↕0.24) → tertiary 0.45 (↕0.19)
+     Secondary passes WCAG AA (4.5:1) on all surfaces including raised (L=0.26).
+     Tertiary is reserved for disabled/decorative — exempt from WCAG 1.4.3. */
+  --stage-text-primary: oklch(0.88 0 0);   /* Headings, data values — bright but not white */
+  --stage-text-secondary: oklch(0.64 0 0); /* Labels, metadata — receding but WCAG AA compliant */
+  --stage-text-tertiary: oklch(0.45 0 0);  /* Disabled states, decorative timestamps — WCAG-exempt only */
+  --stage-text-on-accent: oklch(0.13 0.004 50); /* Dark text on bright accent surfaces — matches void lightness */
+
+  /* Pill radius (constant across tiers) */
+  --stage-radius-pill: 9999px;
+
+  /* ── DEFAULT VALUES (before data-density is set by client hydration) ──
+     Matches "balanced" tier so the page renders correctly on first paint.
+     Density-specific selectors below override these once DensitySync hydrates. */
+  --stage-void: oklch(0.13 0.004 50);
+  --stage-surface: oklch(0.18 0.004 50);
+  --stage-surface-hover: oklch(0.22 0.004 50);
+  --stage-surface-nested: oklch(0.09 0.004 50);
+  --stage-surface-raised: oklch(0.26 0.004 50);
+  --stage-surface-elevated: oklch(0.22 0.004 50);
+  /* Input surfaces use semi-transparent overlays — always relative to their container.
+     Resting = visible well (noticeably darker), Hover = lifts halfway, Focus = at container level + ring.
+     On dark themes you need aggressive overlays for visible contrast. */
+  --stage-input-bg: oklch(0 0 0 / 0.35);
+  --stage-input-bg-hover: oklch(0 0 0 / 0.15);
+  --stage-input-bg-focus: oklch(1 0 0 / 0.04);
+  --stage-edge-top: oklch(1 0 0 / 0.08);
+  --stage-edge-left: oklch(1 0 0 / 0.04);
+  --stage-edge-subtle: oklch(1 0 0 / 0.03);
+  --stage-border: oklch(1 0 0 / 0.08);
+  --stage-border-hover: oklch(1 0 0 / 0.15);
+  --stage-border-focus: oklch(1 0 0 / 0.20);
+  --stage-gap: 6px;
+  --stage-gap-wide: 10px;
+  --stage-radius-panel: 12px;
+  --stage-radius-nested: 8px;
+  --stage-radius-button: 8px;
+  --stage-radius-input: 6px;
+  --stage-padding: 16px;
+  --stage-padding-sm: 12px;
+  --stage-label-size: 11px;
+  --stage-label-tracking: 0.05em;
+  --stage-label-transform: none;
+  --stage-label-weight: 500;
+  --stage-data-font: var(--font-mono);
+  --stage-data-size: 14px;
+  --stage-readout-hero-size: 2.5rem;
+  --stage-readout-lg-size: 1.5rem;
+  --stage-readout-sm-size: 0.8125rem;
+
+  /* Input tokens (defaults = balanced) */
+  --stage-input-height: 34px;
+  --stage-input-padding-x: 12px;
+  --stage-input-font-size: 13px;
+
+  /* Table tokens (defaults = balanced) */
+  --stage-row-height: 40px;
+  --stage-cell-padding-x: 12px;
+  --stage-cell-padding-y: 10px;
+  --stage-row-border-opacity: 0.06;
+}
+
+/* ── DENSITY TIER: SPACIOUS ── Warm, generous, inviting. The first impression. */
+[data-density="spacious"] {
+  --stage-void: oklch(0.14 0.008 45);            /* Warm dark — amber whisper */
+  --stage-surface: oklch(0.19 0.006 45);          /* Warm panel fill */
+  --stage-surface-hover: oklch(0.23 0.006 45);
+  --stage-surface-nested: oklch(0.10 0.006 45);   /* Well — recessed shadow (0.04 below void) */
+  --stage-surface-raised: oklch(0.27 0.006 45);
+  --stage-surface-elevated: oklch(0.23 0.006 45); /* Cards inside panels */
+  --stage-input-bg: oklch(0 0 0 / 0.30);           /* Input well — relative to container */
+  --stage-input-bg-hover: oklch(0 0 0 / 0.12);    /* Hover — lifts toward container */
+  --stage-input-bg-focus: oklch(1 0 0 / 0.05);    /* Focus — above container level */
+
+  --stage-edge-top: oklch(0.95 0.01 55 / 0.10);  /* Warm-tinted highlight — candlelight */
+  --stage-edge-left: oklch(0.95 0.01 55 / 0.05);
+  --stage-edge-subtle: oklch(1 0 0 / 0.04);
+  --stage-border: oklch(0.95 0.01 55 / 0.10);
+  --stage-border-hover: oklch(0.95 0.01 55 / 0.18);
+  --stage-border-focus: oklch(0.95 0.01 55 / 0.25);
+
+  --stage-gap: 8px;
+  --stage-gap-wide: 16px;            /* 2:1 ratio — strong Gestalt grouping for newer users */
+  --stage-radius-panel: 16px;
+  --stage-radius-nested: 12px;
+  --stage-radius-button: 10px;
+  --stage-radius-input: 8px;
+  --stage-padding: 20px;
+  --stage-padding-sm: 14px;
+
+  /* Typography: conversational, sans-serif dominant */
+  --stage-label-size: 12px;
+  --stage-label-tracking: 0.03em;
+  --stage-label-transform: none;                  /* Sentence case, not uppercase */
+  --stage-label-weight: 500;
+  --stage-data-font: var(--font-sans);            /* Sans for data at spacious tier */
+  --stage-data-size: 15px;
+  --stage-readout-hero-size: 2.5rem;  /* Hero is the anchor — never smaller than other tiers */
+  --stage-readout-lg-size: 1.375rem;
+  --stage-readout-sm-size: 0.8125rem;
+
+  /* Input: generous at spacious */
+  --stage-input-height: 40px;
+  --stage-input-padding-x: 14px;
+  --stage-input-font-size: 14px;
+
+  /* Table: generous at spacious */
+  --stage-row-height: 48px;
+  --stage-cell-padding-x: 16px;
+  --stage-cell-padding-y: 14px;
+  --stage-row-border-opacity: 0.04;
+
+  /* Switch: generous at spacious */
+  --stage-switch-width: 44px;
+  --stage-switch-height: 24px;
+}
+
+/* ── DENSITY TIER: BALANCED ── The default. Warm precision. Approachable power. */
+[data-density="balanced"] {
+  --stage-void: oklch(0.13 0.004 50);            /* Neutral-warm dark */
+  --stage-surface: oklch(0.18 0.004 50);
+  --stage-surface-hover: oklch(0.22 0.004 50);
+  --stage-surface-nested: oklch(0.09 0.004 50);   /* Well — recessed shadow */
+  --stage-surface-raised: oklch(0.26 0.004 50);
+  --stage-surface-elevated: oklch(0.22 0.004 50); /* Cards inside panels */
+  --stage-input-bg: oklch(0 0 0 / 0.35);           /* Input well — relative to container */
+  --stage-input-bg-hover: oklch(0 0 0 / 0.15);    /* Hover — lifts toward container */
+  --stage-input-bg-focus: oklch(1 0 0 / 0.04);    /* Focus — above container level */
+
+  --stage-edge-top: oklch(1 0 0 / 0.08);         /* Neutral highlight */
+  --stage-edge-left: oklch(1 0 0 / 0.04);
+  --stage-edge-subtle: oklch(1 0 0 / 0.03);
+  --stage-border: oklch(1 0 0 / 0.08);
+  --stage-border-hover: oklch(1 0 0 / 0.15);
+  --stage-border-focus: oklch(1 0 0 / 0.20);
+
+  --stage-gap: 6px;
+  --stage-gap-wide: 10px;
+  --stage-radius-panel: 12px;
+  --stage-radius-nested: 8px;
+  --stage-radius-button: 8px;
+  --stage-radius-input: 6px;
+  --stage-padding: 16px;
+  --stage-padding-sm: 12px;
+
+  /* Typography: mixed — sans labels, mono for data values */
+  --stage-label-size: 11px;
+  --stage-label-tracking: 0.05em;
+  --stage-label-transform: none;
+  --stage-label-weight: 500;
+  --stage-data-font: var(--font-mono);
+  --stage-data-size: 14px;
+  --stage-readout-hero-size: 2.5rem;
+  --stage-readout-lg-size: 1.5rem;
+  --stage-readout-sm-size: 0.8125rem;
+
+  /* Input: standard at balanced */
+  --stage-input-height: 34px;
+  --stage-input-padding-x: 12px;
+  --stage-input-font-size: 13px;
+
+  /* Table: standard at balanced */
+  --stage-row-height: 40px;
+  --stage-cell-padding-x: 12px;
+  --stage-cell-padding-y: 10px;
+  --stage-row-border-opacity: 0.06;
+
+  /* Switch: standard at balanced */
+  --stage-switch-width: 40px;
+  --stage-switch-height: 22px;
+}
+
+/* ── DENSITY TIER: DENSE ── Full instrument. Machined precision. */
+[data-density="dense"] {
+  --stage-void: oklch(0.11 0.005 260);           /* Cool dark — studio monitor */
+  --stage-surface: oklch(0.16 0.005 260);
+  --stage-surface-hover: oklch(0.20 0.005 260);
+  --stage-surface-nested: oklch(0.07 0.005 260);  /* Well — deep recess (0.04 below void) */
+  --stage-surface-raised: oklch(0.24 0.005 260);
+  --stage-surface-elevated: oklch(0.20 0.005 260); /* Cards inside panels */
+  --stage-input-bg: oklch(0 0 0 / 0.40);           /* Input well — deep recess for dense */
+  --stage-input-bg-hover: oklch(0 0 0 / 0.18);    /* Hover — lifts toward container */
+  --stage-input-bg-focus: oklch(1 0 0 / 0.04);    /* Focus — above container level */
+
+  --stage-edge-top: oklch(1 0 0 / 0.08);
+  --stage-edge-left: oklch(1 0 0 / 0.04);
+  --stage-edge-subtle: oklch(1 0 0 / 0.03);
+  --stage-border: oklch(1 0 0 / 0.08);
+  --stage-border-hover: oklch(1 0 0 / 0.15);
+  --stage-border-focus: oklch(1 0 0 / 0.20);
+
+  --stage-gap: 4px;
+  --stage-gap-wide: 8px;
+  --stage-radius-panel: 6px;
+  --stage-radius-nested: 4px;
+  --stage-radius-button: 4px;
+  --stage-radius-input: 4px;
+  --stage-padding: 12px;
+  --stage-padding-sm: 8px;
+
+  /* Typography: silkscreen labels, monospace data, tight */
+  --stage-label-size: 10px;
+  --stage-label-tracking: 0.1em;
+  --stage-label-transform: uppercase;
+  --stage-label-weight: 500;
+  --stage-data-font: var(--font-mono);
+  --stage-data-size: 13px;
+  --stage-readout-hero-size: 2.5rem;
+  --stage-readout-lg-size: 1.5rem;
+  --stage-readout-sm-size: 0.8125rem;
+
+  /* Input: tight at dense */
+  --stage-input-height: 28px;
+  --stage-input-padding-x: 8px;
+  --stage-input-font-size: 12px;
+
+  /* Table: tight at dense */
+  --stage-row-height: 32px;
+  --stage-cell-padding-x: 8px;
+  --stage-cell-padding-y: 6px;
+  --stage-row-border-opacity: 0.08;
+
+  /* Switch: tight at dense */
+  --stage-switch-width: 36px;
+  --stage-switch-height: 20px;
+}
+
+/* ── Stage Panel ── Opaque matte surface with single-light-source highlights */
+.stage-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--stage-radius-panel);
+  background: var(--stage-surface);
+  box-shadow:
+    inset 0 1px 0 0 var(--stage-edge-top),
+    inset 1px 0 0 0 var(--stage-edge-left),
+    0 1px 3px -1px oklch(0 0 0 / 0.4),
+    0 4px 12px -4px oklch(0 0 0 / 0.3);
+  transition: background 0.2s ease, border-radius 0.35s ease, box-shadow 0.2s ease;
+}
+.stage-panel:hover {
+  background: var(--stage-surface-hover);
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.12),
+    inset 1px 0 0 0 oklch(1 0 0 / 0.06),
+    0 1px 3px -1px oklch(0 0 0 / 0.45),
+    0 4px 12px -4px oklch(0 0 0 / 0.35);
+}
+
+/* ── Stage Panel Nested ── Recessed into parent */
+.stage-panel-nested {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--stage-radius-nested, var(--stage-radius-panel));
+  background: var(--stage-surface-nested);
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.04),
+    0 1px 2px -1px oklch(0 0 0 / 0.3);
+  transition: background 0.2s ease, border-radius 0.35s ease;
+}
+.stage-panel-nested:hover {
+  background: var(--stage-surface-hover);
+}
+
+/* ── Stage Panel Interactive ── Clickable panel with accent glow on hover */
+.stage-panel-interactive {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--stage-radius-panel);
+  background: var(--stage-surface);
+  box-shadow:
+    inset 0 1px 0 0 var(--stage-edge-top),
+    inset 1px 0 0 0 var(--stage-edge-left),
+    0 1px 3px -1px oklch(0 0 0 / 0.4),
+    0 4px 12px -4px oklch(0 0 0 / 0.3);
+  transition: background 0.2s ease, box-shadow 0.2s ease, border-radius 0.35s ease;
+  cursor: pointer;
+}
+.stage-panel-interactive:hover {
+  background: var(--stage-surface-hover);
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.12),
+    inset 1px 0 0 0 oklch(1 0 0 / 0.06),
+    0 2px 8px -2px oklch(0 0 0 / 0.5),
+    0 8px 24px -8px oklch(0 0 0 / 0.35);
+}
+
+/* ── Stage Panel Elevated ── Cards sitting on panels, catching overhead light */
+.stage-panel-elevated {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--stage-radius-panel);
+  background: var(--stage-surface-elevated, var(--stage-surface-hover));
+  box-shadow:
+    inset 0 1px 0 0 var(--stage-edge-top),
+    inset 1px 0 0 0 var(--stage-edge-left),
+    0 1px 3px -1px oklch(0 0 0 / 0.4),
+    0 4px 12px -4px oklch(0 0 0 / 0.3);
+  transition: background 0.2s ease, border-radius 0.35s ease, box-shadow 0.2s ease;
+}
+.stage-panel-elevated:hover {
+  background: var(--stage-surface-raised);
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.14),
+    inset 1px 0 0 0 oklch(1 0 0 / 0.07),
+    0 2px 6px -1px oklch(0 0 0 / 0.5),
+    0 8px 20px -4px oklch(0 0 0 / 0.4);
+}
+
+/* ── Surface Context ── Contextual tokens that cascade from parent surface level.
+   Components use --ctx-well (input bg), --ctx-card (child card bg), --ctx-dropdown (popover bg)
+   instead of absolute tokens. The data-surface attribute is set by StagePanel.
+
+   Rules (validated against Linear, Figma, Stripe, Material 3):
+   - well  = parent minus 1 level (subtle recess, 0.04-0.05 gap)
+   - card  = parent plus 1 level
+   - dropdown = always raised
+   - Input backgrounds do NOT change on hover or focus — only border changes.
+   See design-philosophy-and-styling.md "Surface Context System". */
+
+[data-surface="void"] {
+  --ctx-well: var(--stage-surface-nested);       /* 0.09 — one below void. Input bg. */
+  --ctx-well-hover: var(--stage-void);            /* 0.13 — for list item hover, NOT input bg hover */
+  --ctx-card: var(--stage-surface);               /* 0.18 — one above void */
+  --ctx-dropdown: var(--stage-surface-raised);    /* 0.26 — always raised */
+}
+
+[data-surface="surface"] {
+  --ctx-well: var(--stage-void);                  /* 0.13 — one below surface. Input bg. */
+  --ctx-well-hover: var(--stage-surface);         /* 0.18 — for list item hover, NOT input bg hover */
+  --ctx-card: var(--stage-surface-elevated);      /* 0.22 — one above surface */
+  --ctx-dropdown: var(--stage-surface-raised);    /* 0.26 — always raised */
+}
+
+[data-surface="elevated"] {
+  --ctx-well: var(--stage-surface);               /* 0.18 — one below elevated. Input bg. */
+  --ctx-well-hover: var(--stage-surface-elevated); /* 0.22 — for list item hover, NOT input bg hover */
+  --ctx-card: var(--stage-surface-raised);        /* 0.26 — one above elevated */
+  --ctx-dropdown: var(--stage-surface-raised);    /* 0.26 — always raised */
+}
+
+[data-surface="raised"] {
+  --ctx-well: var(--stage-surface-elevated);      /* 0.22 — one below raised. Input bg. */
+  --ctx-well-hover: var(--stage-surface-raised);  /* 0.26 — for list item hover, NOT input bg hover */
+  --ctx-card: var(--stage-surface-raised);        /* 0.26 — at max */
+  --ctx-dropdown: var(--stage-surface-raised);    /* 0.26 — always raised */
+}
+
+[data-surface="nested"] {
+  --ctx-well: var(--stage-surface-nested);        /* 0.09 — already at bottom. Input bg. */
+  --ctx-well-hover: var(--stage-surface-nested);  /* 0.09 — can't go lower */
+  --ctx-card: var(--stage-void);                  /* 0.13 — one above nested */
+  --ctx-dropdown: var(--stage-surface-raised);    /* 0.26 — always raised */
+}
+
+/* Default context (no data-surface ancestor yet — page body is void) */
+:root {
+  --ctx-well: var(--stage-surface-nested);
+  --ctx-well-hover: var(--stage-void);            /* for list item hover, NOT input bg hover */
+  --ctx-card: var(--stage-surface);
+  --ctx-dropdown: var(--stage-surface-raised);
+}
+
+/* ── Stage Readout ── Data display (density-aware font) */
+.stage-readout {
+  font-family: var(--stage-data-font, var(--font-mono));
+  font-variant-numeric: tabular-nums;
+  font-size: var(--stage-data-size, 14px);
+  letter-spacing: -0.02em;
+  color: var(--stage-text-primary);
+  transition: font-size 0.3s ease;
+}
+
+/* ── Stage Label ── Density-aware label (conversational → silkscreen) */
+.stage-label {
+  font-family: var(--font-sans);
+  font-size: var(--stage-label-size, 11px);
+  font-weight: var(--stage-label-weight, 500);
+  text-transform: var(--stage-label-transform, none);
+  letter-spacing: var(--stage-label-tracking, 0.05em);
+  color: var(--stage-text-secondary);
+  transition: font-size 0.3s ease, letter-spacing 0.3s ease;
+}
+
+/* ── Stage Readout Sizes ── */
+.stage-readout-hero {
+  font-family: var(--stage-data-font, var(--font-mono));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--stage-text-primary);
+  font-size: var(--stage-readout-hero-size, 2.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+}
+.stage-readout-lg {
+  font-family: var(--stage-data-font, var(--font-mono));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--stage-text-primary);
+  font-size: var(--stage-readout-lg-size, 1.5rem);
+  font-weight: 500;
+  line-height: 1.2;
+}
+.stage-readout-sm {
+  font-family: var(--stage-data-font, var(--font-mono));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--stage-text-primary);
+  font-size: var(--stage-readout-sm-size, 0.8125rem);
+  font-weight: 400;
+}
+
+/* ── Status Stripes ── 3px left-edge color (replaces filled badges) */
+.stage-stripe-success {
+  border-left: 3px solid var(--color-unusonic-success);
+}
+.stage-stripe-warning {
+  border-left: 3px solid var(--color-unusonic-warning);
+}
+.stage-stripe-error {
+  border-left: 3px solid var(--color-unusonic-error);
+}
+.stage-stripe-info {
+  border-left: 3px solid var(--color-unusonic-info);
+}
+.stage-stripe-accent {
+  border-left: 3px solid var(--stage-accent);
+}
+.stage-stripe-neutral {
+  border-left: 3px solid oklch(0.35 0 0);
+}
+
+/* ── Stage Input ── Recessed display, machined cutout in the panel surface.
+   Border is the sole state indicator. Fill stays constant. */
+.stage-input {
+  width: 100%;
+  height: var(--stage-input-height, 34px);
+  padding: 0 var(--stage-input-padding-x, 12px);
+  font-family: var(--font-sans);
+  font-size: var(--stage-input-font-size, 13px);
+  color: var(--stage-text-primary);
+  background: var(--stage-surface-nested);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: var(--stage-radius-input, 6px);
+  box-shadow: inset 0 1px 2px oklch(0 0 0 / 0.2);
+  outline: none;
+  transition: border-color 0.1s ease-out;
+}
+.stage-input::placeholder {
+  color: var(--stage-text-tertiary);
+}
+.stage-input:hover {
+  border-color: oklch(1 0 0 / 0.15);
+}
+.stage-input:focus {
+  border-color: var(--stage-accent);
+}
+.stage-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Stage Button ── Density-aware */
+.stage-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--stage-input-height, 34px);
+  padding: 0 16px;
+  border-radius: var(--stage-radius-input, 6px);
+  font-size: var(--stage-input-font-size, 13px);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: background 0.12s ease, color 0.12s ease, border-radius 0.35s ease;
+  cursor: pointer;
+  border: none;
+}
+.stage-btn-primary {
+  background: var(--stage-accent);
+  color: oklch(0.10 0 0);
+}
+.stage-btn-primary:hover {
+  background: oklch(0.90 0 0);
+}
+.stage-btn-secondary {
+  background: oklch(1 0 0 / 0.06);
+  color: var(--stage-text-primary);
+}
+.stage-btn-secondary:hover {
+  background: oklch(1 0 0 / 0.10);
+}
+.stage-btn-ghost {
+  background: transparent;
+  color: var(--stage-text-secondary);
+}
+.stage-btn-ghost:hover {
+  color: var(--stage-text-primary);
+  background: oklch(1 0 0 / 0.04);
+}
+.stage-btn:focus-visible {
+  outline: 2px solid var(--stage-accent);
+  outline-offset: 2px;
+}
+.stage-btn:disabled {
+  opacity: 0.50;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* ── Stage Grid ── Channel-gap layout with void showing through */
+.stage-grid {
+  display: grid;
+  gap: var(--stage-gap, 6px);
+  transition: gap 0.35s ease;
+}
+
+/* ── Stage Divider ── Horizontal section break */
+.stage-divider {
+  height: 1px;
+  background: oklch(1 0 0 / 0.06);
+  margin: 0;
+}
+
+/* ── Stage Indicator ── Small dot for status (8px) */
+.stage-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.stage-dot-success { background: var(--color-unusonic-success); }
+.stage-dot-warning { background: var(--color-unusonic-warning); }
+.stage-dot-error { background: var(--color-unusonic-error); }
+.stage-dot-neutral { background: oklch(0.35 0 0); }
+.stage-dot-accent { background: var(--stage-accent); }
+
+/* ── Stage Void Background ── The base layer (density-aware) */
+.bg-stage-void {
+  background-color: var(--stage-void, oklch(0.13 0.004 50));
+  transition: background-color 0.5s ease;
+}
+/* Cove light — adapts warmth to tier via the void color */
+[data-density="spacious"] .bg-stage-void {
+  background-image: radial-gradient(
+    ellipse 90% 50% at 50% -5%,
+    oklch(0.19 0.010 45 / 1) 0%,
+    transparent 60%
+  );
+}
+[data-density="balanced"] .bg-stage-void {
+  background-image: radial-gradient(
+    ellipse 85% 45% at 50% -5%,
+    oklch(0.17 0.006 50 / 1) 0%,
+    transparent 65%
+  );
+}
+[data-density="dense"] .bg-stage-void {
+  background-image: radial-gradient(
+    ellipse 80% 40% at 50% -5%,
+    oklch(0.15 0.005 260 / 1) 0%,
+    transparent 70%
+  );
+}
+
+/* ── Stage Now Marker ── The accent "now" line on timelines */
+.stage-now-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--stage-accent);
+  box-shadow: 0 0 8px var(--stage-accent-muted);
+  z-index: 10;
+}
+
+/* ── Stage Skeleton ── Loading placeholder block.
+   One surface level above parent. Subtle pulse animation.
+   Delay appearance by 150ms to prevent flash on fast loads. */
+.stage-skeleton {
+  background: var(--stage-surface-elevated);
+  border-radius: var(--stage-radius-input);
+  animation: stage-skeleton-shimmer 2s ease-in-out infinite;
+}
+.stage-skeleton-text {
+  height: 0.875rem;
+  border-radius: 4px;
+}
+.stage-skeleton-title {
+  height: 1.125rem;
+  width: 65%;
+  border-radius: 4px;
+}
+.stage-skeleton-avatar {
+  border-radius: 50%;
+}
+
+@keyframes stage-skeleton-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-skeleton { animation: none; }
+}
+
+/* ── Stage Empty ── Empty state container (instrument at idle) */
+.stage-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: var(--stage-padding) 0;
+  text-align: center;
+  gap: 4px;
+}
+.stage-empty-text {
+  font-family: var(--font-sans);
+  font-size: var(--stage-data-size);
+  color: var(--stage-text-secondary);
+  letter-spacing: -0.01em;
+}
+.stage-empty-hint {
+  font-family: var(--font-sans);
+  font-size: var(--stage-label-size);
+  color: var(--stage-text-tertiary);
+  letter-spacing: var(--stage-label-tracking);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PORTAL THEME — Client-facing pages (proposals, invoices, crew confirm)
+   Light default. Production company's brand dominates. Unusonic recedes.
+   Phase 1: hardcoded Default preset. Phase 2+: workspace-configurable.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Default preset — warm white paper, near-black accent, high-end print document feel.
+     These are CSS-level fallbacks. PortalThemeShell overrides them per-workspace. */
+  --portal-bg: oklch(0.985 0.003 80);
+  --portal-surface: oklch(0.97 0.003 80);
+  --portal-surface-subtle: oklch(0.94 0.003 80);
+  --portal-text: oklch(0.13 0.004 50);
+  --portal-text-secondary: oklch(0.45 0 0);
+  --portal-accent: oklch(0.20 0 0);
+  --portal-accent-subtle: oklch(0.95 0.003 80);
+  --portal-border: oklch(0.90 0.003 80);
+  --portal-border-subtle: oklch(0.93 0.003 80);
+  --portal-font-heading: var(--font-geist-sans), sans-serif;
+  --portal-font-body: var(--font-geist-sans), sans-serif;
+  --portal-heading-weight: 300;
+  --portal-heading-tracking: -0.02em;
+  --portal-radius: 10px;
+  --portal-border-width: 1px;
+  --portal-shadow: 0 1px 2px oklch(0 0 0 / 0.04), 0 4px 16px -4px oklch(0 0 0 / 0.06);
+  --portal-shadow-strong: 0 1px 3px oklch(0 0 0 / 0.06), 0 8px 24px -6px oklch(0 0 0 / 0.10);
+  --portal-accent-text: oklch(0.98 0 0);
+  --portal-hero-align: center;
+  --portal-btn-radius: 9999px;
+  --portal-label-size: 11px;
+  --portal-label-transform: uppercase;
+  --portal-label-tracking: 0.08em;
+  --portal-label-weight: 600;
+  --portal-card-padding: 20px;
+  --portal-gap: 20px;
+  --portal-divider: none;
+}
+
+/* Portal shadows — driven by theme variables for per-preset character */
+.portal-levitation {
+  box-shadow: var(--portal-shadow);
+}
+.portal-levitation-strong {
+  box-shadow: var(--portal-shadow-strong);
+}
+.portal-levitation-bar {
+  box-shadow: var(--portal-shadow);
+}
+
+/* ── Stage Scrim ── Backdrop for modals and sheets.
+   Near-black at 75% opacity. No blur. The console dims, not blurs. */
+.stage-scrim {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.06 0 0 / 0.75);
+  z-index: 40;
+}
+
+/* ── Stage Overlay ── Surface for modals, sheets, command palettes.
+   Brightest surface — a backlit display on the console. */
+.stage-overlay {
+  background: var(--stage-surface-raised);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: var(--stage-radius-panel);
+  box-shadow:
+    0 24px 64px -12px oklch(0 0 0 / 0.6),
+    0 8px 24px -4px oklch(0 0 0 / 0.4);
 }

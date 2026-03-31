@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'danielos_prefs';
+const STORAGE_KEY = 'unusonic_prefs';
 
 interface PreferencesState {
   /** Use 24-hour time site-wide (default: false = 12h). */

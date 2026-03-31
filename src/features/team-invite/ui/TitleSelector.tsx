@@ -44,7 +44,7 @@ export function TitleSelector({
 
   return (
     <div className={cn('space-y-2', className)}>
-      <label className="block text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+      <label className="block text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Job title
       </label>
       <Popover open={open} onOpenChange={setOpen}>
@@ -55,33 +55,33 @@ export function TitleSelector({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              'w-full justify-between rounded-xl border border-[var(--color-mercury)] bg-[var(--color-obsidian)]/50 px-3 py-2.5 text-left font-normal text-[var(--color-ink)]',
-              'hover:bg-[var(--color-obsidian)]/70 hover:border-[var(--color-mercury)]'
+              'w-full justify-between rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/50 px-3 py-2.5 text-left font-normal text-[var(--stage-text-primary)]',
+              'hover:bg-[var(--stage-void)]/70 hover:border-[oklch(1_0_0_/_0.08)]'
             )}
           >
-            <span className={value ? undefined : 'text-[var(--color-ink-muted)]'}>{value || placeholder}</span>
+            <span className={value ? undefined : 'text-[var(--stage-text-secondary)]'}>{value || placeholder}</span>
             <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[var(--radix-popover-trigger-width)] p-0 overflow-hidden rounded-xl border border-[var(--color-mercury)] bg-[var(--color-surface-100)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] backdrop-blur-xl" align="end">
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[var(--radix-popover-trigger-width)] p-0 overflow-hidden rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)]" align="end">
           <div className="rounded-xl overflow-hidden">
             <input
               placeholder="Search title…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={cn(
-                'flex h-10 w-full border-0 border-b border-[var(--color-mercury)] bg-[var(--color-obsidian)]/30 px-3 py-2 text-sm',
-                'text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] outline-none'
+                'flex h-10 w-full border-0 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/30 px-3 py-2 text-sm',
+                'text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none'
               )}
             />
-            <div className="max-h-[200px] overflow-y-auto p-1.5 bg-[var(--color-surface-100)]">
+            <div className="max-h-[200px] overflow-y-auto p-1.5 bg-[var(--stage-surface)]">
               {canCreate && (
                 <button
                   type="button"
                   onClick={handleCreate}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm',
-                    'hover:bg-[var(--color-silk)]/20 text-[var(--color-silk)]'
+                    'hover:bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
                   )}
                 >
                   <Plus className="size-4" />
@@ -89,7 +89,7 @@ export function TitleSelector({
                 </button>
               )}
               {filtered.length === 0 && !canCreate && (
-                <p className="px-2 py-3 text-sm text-[var(--color-ink-muted)]">No titles yet. Type to create.</p>
+                <p className="px-2 py-3 text-sm text-[var(--stage-text-secondary)]">No titles yet. Type to create.</p>
               )}
               {filtered.map((title) => (
                 <button
@@ -100,9 +100,9 @@ export function TitleSelector({
                     setOpen(false);
                   }}
                   className={cn(
-                    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--color-ink)]',
-                    'hover:bg-[var(--color-silk)]/15',
-                    value === title && 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]'
+                    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--stage-text-primary)]',
+                    'hover:bg-[var(--stage-accent)]/15',
+                    value === title && 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]'
                   )}
                 >
                   <Check className={cn('size-4 shrink-0', value === title ? 'opacity-100' : 'opacity-0')} />

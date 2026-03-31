@@ -97,14 +97,14 @@ export function PercentageChange({ current, previous, className = '' }: Percenta
         initial={{ y: isPositive ? 4 : -4 }}
         animate={{ y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-        className={isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}
+        className={isPositive ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--color-unusonic-error)]'}
       >
         {isPositive ? '↑' : '↓'}
       </motion.span>
-      <span className={isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
+      <span className={isPositive ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--color-unusonic-error)]'}>
         {displayValue}%
       </span>
-      <span className="text-ink-muted text-xs">vs last month</span>
+      <span className="text-[var(--stage-text-secondary)] text-xs">vs last month</span>
     </motion.div>
   );
 }

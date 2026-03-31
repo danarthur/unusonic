@@ -28,7 +28,7 @@ export function GuardianInviteEmail({
     <Html>
       <Head />
       <Preview>
-        {ownerDisplayName} has invited you to be their Safety Net guardian on Signal.
+        {ownerDisplayName} has invited you to be their Safety Net guardian on Unusonic.
       </Preview>
       <Body style={main}>
         <Container style={container}>
@@ -36,7 +36,7 @@ export function GuardianInviteEmail({
             <Text style={heading}>Safety Net invitation</Text>
             <Text style={body}>
               {ownerDisplayName} has invited you to be a <strong>Safety Net</strong> guardian on
-              Signal. If they ever lose access to their account, you may be asked to help them
+              Unusonic. If they ever lose access to their account, you may be asked to help them
               recover it.
             </Text>
             <Button href={acceptUrl} style={button}>

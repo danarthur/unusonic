@@ -1,6 +1,6 @@
 /**
  * Permission Utilities
- * Centralized permission checking for Signal.
+ * Centralized permission checking for Unusonic.
  * Capabilities-based path: use hasCapability(workspaceId, capabilityKey) and the
  * Permission Registry (permission-registry.ts). Legacy path: hasPermission(..., PermissionKey).
  *

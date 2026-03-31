@@ -157,16 +157,16 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
     (searchResults.events.length > 0 || searchResults.invoices.length > 0);
 
   const itemClass =
-    "flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-ink text-sm transition-all duration-200 data-[selected=true]:bg-[var(--glass-bg-hover)] data-[selected=true]:text-ink [&[data-selected=true]_svg]:text-ink";
+    'flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[var(--stage-text-primary)] text-sm transition-colors duration-200 data-[selected=true]:bg-[var(--stage-surface-hover)] data-[selected=true]:text-[var(--stage-text-primary)] [&[data-selected=true]_svg]:text-[var(--stage-text-primary)]';
   const groupHeadingClass =
-    "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-ink-muted/70";
+    '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-[var(--stage-text-secondary)]/80';
 
   return (
     <Command.Dialog
       open={open}
       onOpenChange={setOpen}
       label="Command palette"
-      className="command-spine-dialog fixed left-1/2 top-[8%] z-[9999] w-[640px] -translate-x-1/2 overflow-hidden rounded-[2rem]"
+      className="command-spine-dialog fixed left-1/2 top-[8%] z-[9999] w-[640px] -translate-x-1/2 overflow-hidden rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface-raised)] shadow-[0_24px_48px_-12px_oklch(0_0_0/0.4)]"
     >
       <Dialog.Title className="sr-only">Command palette</Dialog.Title>
       {/* Grain overlay for Liquid Ceramic texture */}
@@ -180,11 +180,11 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
         value={search}
         onValueChange={setSearch}
         placeholder="What do you need?"
-        className="relative z-10 w-full shrink-0 border-0 bg-transparent px-5 py-3 text-lg font-light leading-relaxed tracking-tight text-ink placeholder:text-ink-muted focus:outline-none focus:ring-0"
+        className="relative z-10 w-full shrink-0 border-0 bg-transparent px-5 py-3 text-lg font-light leading-relaxed tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-0"
         autoFocus
       />
-      <Command.List className="smart-group-scroll relative z-10 flex-1 min-h-0 overflow-y-auto border-t border-[var(--glass-border)] px-2 py-2">
-        <Command.Empty className="py-10 text-center text-sm text-ink-muted">
+      <Command.List className="smart-group-scroll relative z-10 flex-1 min-h-0 overflow-y-auto border-t border-[oklch(1_0_0_/_0.08)] px-2 py-2">
+        <Command.Empty className="py-10 text-center text-sm text-[var(--stage-text-secondary)]">
           No results found.
         </Command.Empty>
 
@@ -199,7 +199,7 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
                 onSelect={() => handleSelect(item.href)}
                 className={itemClass}
               >
-                <Icon size={18} className="shrink-0 text-ink-muted transition-colors" strokeWidth={1.5} />
+                <Icon size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
                 {item.label}
               </Command.Item>
             );
@@ -210,8 +210,8 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
         {network && isOnNetwork && currentOrgId && (
           <Command.Group heading="Network" forceMount className={groupHeadingClass}>
             {networkLoading && search.trim().length >= 1 && (
-              <div className="px-3 py-2 text-sm text-ink-muted flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" /> Searching organizations…
+              <div className="px-3 py-2 text-sm text-[var(--stage-text-secondary)] flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin" strokeWidth={1.5} /> Searching organizations…
               </div>
             )}
             {!networkLoading && networkOrgs.length > 0 && networkOrgs.map((org) => (
@@ -223,16 +223,16 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
                 className={itemClass}
               >
                 {networkPendingId === org.id ? (
-                  <Loader2 size={18} className="shrink-0 animate-spin text-ink-muted" />
+                  <Loader2 size={18} className="shrink-0 animate-spin text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
                 ) : (
-                  <Building2 size={18} className="shrink-0 text-ink-muted transition-colors" strokeWidth={1.5} />
+                  <Building2 size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
                 )}
                 <span className="truncate">{org.name}</span>
-                <span className="text-ink-muted text-xs">Add to Inner Circle</span>
+                <span className="text-[var(--stage-text-secondary)] text-xs">Add to Inner Circle</span>
               </Command.Item>
             ))}
             {!networkLoading && search.trim().length >= 1 && networkOrgs.length === 0 && (
-              <div className="px-3 py-2 text-sm text-ink-muted">No organizations found</div>
+              <div className="px-3 py-2 text-sm text-[var(--stage-text-secondary)]">No organizations found</div>
             )}
           </Command.Group>
         )}
@@ -245,7 +245,7 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
               onSelect={() => handleSelect(`/crm/${gigId}`)}
               className={itemClass}
             >
-              <LayoutList size={18} className="shrink-0 text-ink-muted transition-colors" strokeWidth={1.5} />
+              <LayoutList size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
               Go to Run of Show
             </Command.Item>
             <Command.Item
@@ -253,7 +253,7 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
               onSelect={() => handleSelect(`/events/${gigId}/deal`)}
               className={itemClass}
             >
-              <FileText size={18} className="shrink-0 text-ink-muted transition-colors" strokeWidth={1.5} />
+              <FileText size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
               Go to Deal Room
             </Command.Item>
             <Command.Item
@@ -261,7 +261,7 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
               onSelect={() => handleSelect(`/events/${gigId}/finance`)}
               className={itemClass}
             >
-              <Wallet size={18} className="shrink-0 text-ink-muted transition-colors" strokeWidth={1.5} />
+              <Wallet size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
               Go to Finance
             </Command.Item>
           </Command.Group>
@@ -271,7 +271,7 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
         {search.length >= 2 && (
           <Command.Group heading="Search Results" forceMount className={groupHeadingClass}>
             {searchLoading && (
-              <div className="px-3 py-4 text-sm text-ink-muted">Searching…</div>
+              <div className="px-3 py-4 text-sm text-[var(--stage-text-secondary)]">Searching…</div>
             )}
             {!searchLoading && hasSearchResults && (
               <>
@@ -282,10 +282,10 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
                     onSelect={() => handleSelect(`/crm/${ev.id}`)}
                     className={itemClass}
                   >
-                    <FolderKanban size={18} className="shrink-0 text-ink-muted transition-colors" strokeWidth={1.5} />
+                    <FolderKanban size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
                     <span className="truncate">{ev.title ?? 'Untitled'}</span>
                     {ev.client_name && (
-                      <span className="truncate text-ink-muted">· {ev.client_name}</span>
+                      <span className="truncate text-[var(--stage-text-secondary)]">· {ev.client_name}</span>
                     )}
                   </Command.Item>
                 ))}
@@ -296,17 +296,17 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
                     onSelect={() => handleSelect(`/events/${inv.event_id}/finance`)}
                     className={itemClass}
                   >
-                    <Receipt size={18} className="shrink-0 text-ink-muted transition-colors" strokeWidth={1.5} />
+                    <Receipt size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
                     <span className="truncate">
                       {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
                     </span>
-                    <span className="text-ink-muted">· {inv.status}</span>
+                    <span className="text-[var(--stage-text-secondary)]">· {inv.status}</span>
                   </Command.Item>
                 ))}
               </>
             )}
             {!searchLoading && search.length >= 2 && !hasSearchResults && (
-              <div className="px-3 py-4 text-sm text-ink-muted">
+              <div className="px-3 py-4 text-sm text-[var(--stage-text-secondary)]">
                 No events or invoices match
               </div>
             )}

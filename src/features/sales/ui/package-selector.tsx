@@ -12,7 +12,7 @@ import { Plus } from 'lucide-react';
 import { getPackages } from '../api/proposal-actions';
 import type { Package } from '../api/package-actions';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
 export type PackageSelectorProps = {
   workspaceId: string;
@@ -45,7 +45,10 @@ export function PackageSelector({
   }, [workspaceId]);
 
   useEffect(() => {
-    if (open && workspaceId) loadPackages();
+    if (!open || !workspaceId) return;
+    queueMicrotask(() => {
+      loadPackages();
+    });
   }, [open, workspaceId, loadPackages]);
 
   const handleSelect = (pkg: Package) => {
@@ -58,18 +61,18 @@ export function PackageSelector({
       <SheetContent side="right" className="max-w-md">
         <SheetHeader>
           <SheetTitle>Add from catalog</SheetTitle>
-          <SheetClose className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5" />
+          <SheetClose className="p-2 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]" />
         </SheetHeader>
         <SheetBody>
-          <p className="text-xs text-ink-muted mb-4">
+          <p className="text-xs text-[var(--stage-text-secondary)] mb-4">
             Select a master package. Its data is copied into this proposal (changes here do not affect the catalog).
           </p>
           {loading ? (
-            <p className="text-sm text-ink-muted">Loading…</p>
+            <p className="text-sm text-[var(--stage-text-secondary)]">Loading…</p>
           ) : error ? (
             <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>
           ) : packages.length === 0 ? (
-            <p className="text-sm text-ink-muted">
+            <p className="text-sm text-[var(--stage-text-secondary)]">
               No packages yet. Add master packages in Catalog.
             </p>
           ) : (
@@ -78,28 +81,26 @@ export function PackageSelector({
                 <motion.li
                   key={pkg.id}
                   layout
-                  transition={UNUSONIC_PHYSICS}
-                  className="flex items-center gap-4 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/40 p-4 hover:border-[var(--glass-border-hover)] transition-colors"
+                  transition={STAGE_LIGHT}
+                  className="flex items-center gap-4 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-4 hover:border-[oklch(1_0_0_/_0.12)] transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-ceramic truncate text-sm">{pkg.name}</p>
+                    <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
                     {pkg.description && (
-                      <p className="text-xs text-ink-muted truncate mt-0.5">{pkg.description}</p>
+                      <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{pkg.description}</p>
                     )}
-                    <p className="text-sm font-semibold text-ceramic mt-1">
+                    <p className="text-sm font-semibold text-[var(--stage-text-primary)] mt-1">
                       ${Number(pkg.price).toLocaleString()}
                     </p>
                   </div>
                   <motion.button
                     type="button"
                     onClick={() => handleSelect(pkg)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={UNUSONIC_PHYSICS}
-                    className="shrink-0 p-2.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    transition={STAGE_LIGHT}
+                    className="shrink-0 p-2.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     aria-label={`Add ${pkg.name} to proposal`}
                   >
-                    <Plus size={18} />
+                    <Plus size={18} strokeWidth={1.5} />
                   </motion.button>
                 </motion.li>
               ))}

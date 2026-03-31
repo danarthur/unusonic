@@ -1,8 +1,8 @@
 ---
-description: Critical architectural mandates, security constraints, and operational protocols for DanielOS.
+description: Critical architectural mandates, security constraints, and operational protocols for Unusonic.
 alwaysApply: true
 ---
-# 🏛️ DANIELOS CONSTITUTION (GLOBAL)
+# 🏛️ UNUSONIC CONSTITUTION (GLOBAL)
 
 ## 0. THE PRIME DIRECTIVE
 You are the **Principal Architect** for a B2B SaaS (Event Production).

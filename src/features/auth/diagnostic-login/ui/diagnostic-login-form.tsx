@@ -41,11 +41,11 @@ export function DiagnosticLoginForm() {
   const getStatusIcon = (status: QueryDiagnostic['status']) => {
     switch (status) {
       case 'success':
-        return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+        return <CheckCircle2 className="w-4 h-4 text-[var(--color-unusonic-success)]" />;
       case 'error':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-[var(--color-unusonic-error)]" />;
       case 'skipped':
-        return <AlertTriangle className="w-4 h-4 text-amber-500" />;
+        return <AlertTriangle className="w-4 h-4 text-[var(--color-unusonic-warning)]" />;
     }
   };
   
@@ -56,17 +56,17 @@ export function DiagnosticLoginForm() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={springConfig}
-        className="liquid-panel p-8"
+        className="stage-panel p-8"
       >
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-ink/5 flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-7 h-7 text-ink" />
+          <div className="w-14 h-14 rounded-2xl bg-[var(--stage-text-primary)]/5 flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-7 h-7 text-[var(--stage-text-primary)]" />
           </div>
-          <h1 className="text-2xl font-light text-ink tracking-tight">
+          <h1 className="text-2xl font-light text-[var(--stage-text-primary)]tracking-tight">
             Diagnostic Login
           </h1>
-          <p className="text-sm text-ink-muted mt-2">
+          <p className="text-sm text-[var(--stage-text-secondary)] mt-2">
             Authenticate and verify workspace resolution
           </p>
         </div>
@@ -75,7 +75,7 @@ export function DiagnosticLoginForm() {
         <form action={action} className="space-y-4">
           {/* Email Field */}
           <div>
-            <label htmlFor="email" className="block text-xs font-medium text-ink-muted uppercase tracking-widest mb-2">
+            <label htmlFor="email" className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-2">
               Email
             </label>
             <input
@@ -86,9 +86,9 @@ export function DiagnosticLoginForm() {
               required
               disabled={isPending}
               className="w-full px-4 py-3 rounded-xl
-                bg-ink/5 border border-[var(--glass-border)]
-                text-ink placeholder:text-ink-muted/50
-                focus:outline-none focus:border-[var(--glass-border-hover)] focus:ring-2 focus:ring-ink/5
+                bg-[var(--stage-text-primary)]/5 border border-[oklch(1_0_0_/_0.08)]
+                text-[var(--stage-text-primary)]placeholder:text-[var(--stage-text-secondary)]/50
+                focus:outline-none focus:border-[oklch(1_0_0_/_0.15)] focus:ring-2 focus:ring-[var(--stage-text-primary)]/5
                 disabled:opacity-50 disabled:cursor-not-allowed
                 transition-all duration-200"
               placeholder="you@example.com"
@@ -97,7 +97,7 @@ export function DiagnosticLoginForm() {
           
           {/* Password Field */}
           <div>
-            <label htmlFor="password" className="block text-xs font-medium text-ink-muted uppercase tracking-widest mb-2">
+            <label htmlFor="password" className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-2">
               Password
             </label>
             <div className="relative">
@@ -109,9 +109,9 @@ export function DiagnosticLoginForm() {
                 required
                 disabled={isPending}
                 className="w-full px-4 py-3 pr-12 rounded-xl
-                  bg-ink/5 border border-[var(--glass-border)]
-                  text-ink placeholder:text-ink-muted/50
-                  focus:outline-none focus:border-[var(--glass-border-hover)] focus:ring-2 focus:ring-ink/5
+                  bg-[var(--stage-text-primary)]/5 border border-[oklch(1_0_0_/_0.08)]
+                  text-[var(--stage-text-primary)]placeholder:text-[var(--stage-text-secondary)]/50
+                  focus:outline-none focus:border-[oklch(1_0_0_/_0.15)] focus:ring-2 focus:ring-[var(--stage-text-primary)]/5
                   disabled:opacity-50 disabled:cursor-not-allowed
                   transition-all duration-200"
                 placeholder="••••••••"
@@ -121,7 +121,7 @@ export function DiagnosticLoginForm() {
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={isPending}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg
-                  text-ink-muted hover:text-ink hover:bg-ink/5
+                  text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-text-primary)]/5
                   disabled:opacity-50 disabled:cursor-not-allowed
                   transition-all duration-200"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
@@ -143,10 +143,10 @@ export function DiagnosticLoginForm() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={springConfig}
-                className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20"
+                className="flex items-center gap-2 p-3 rounded-xl bg-[oklch(0.35_0.05_20_/_0.15)] border border-[oklch(0.65_0.18_20_/_0.2)]"
               >
-                <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-                <p className="text-sm text-red-600 dark:text-red-400">
+                <XCircle className="w-4 h-4 text-[var(--color-unusonic-error)] shrink-0" />
+                <p className="text-sm text-[var(--color-unusonic-error)]">
                   {state.result.error}
                 </p>
               </motion.div>
@@ -157,15 +157,13 @@ export function DiagnosticLoginForm() {
           <motion.button
             type="submit"
             disabled={isPending}
-            whileHover={{ scale: isPending ? 1 : 1.01 }}
-            whileTap={{ scale: isPending ? 1 : 0.99 }}
             transition={springConfig}
             className="w-full py-3.5 rounded-xl
-              bg-ink text-canvas
+              bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]
               font-medium text-sm
-              hover:opacity-90
+              enabled:hover:brightness-[1.06]
               disabled:opacity-50 disabled:cursor-not-allowed
-              transition-all duration-200
+              transition-[filter] duration-200
               flex items-center justify-center gap-2"
           >
             {isPending ? (
@@ -194,16 +192,16 @@ export function DiagnosticLoginForm() {
             className="space-y-4"
           >
             {/* Success Banner */}
-            <div className="liquid-panel p-4 border-emerald-500/30 bg-emerald-500/5">
+            <div className="stage-panel p-4 border-[oklch(0.65_0.18_145_/_0.3)] bg-[oklch(0.45_0.05_145_/_0.15)]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <div className="w-10 h-10 rounded-xl bg-[oklch(0.45_0.05_145_/_0.15)] flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-[var(--color-unusonic-success)]" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  <h3 className="text-sm font-medium text-[var(--color-unusonic-success)]">
                     Diagnostic Login Successful
                   </h3>
-                  <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                  <p className="text-xs text-[var(--color-unusonic-success)]/70">
                     Authentication and workspace resolution complete
                   </p>
                 </div>
@@ -211,22 +209,22 @@ export function DiagnosticLoginForm() {
             </div>
             
             {/* User Info Card */}
-            <div className="liquid-panel p-5">
+            <div className="stage-panel p-5">
               <div className="flex items-center gap-3 mb-4">
-                <User className="w-4 h-4 text-ink-muted" />
-                <h3 className="text-xs font-medium text-ink-muted uppercase tracking-widest">
+                <User className="w-4 h-4 text-[var(--stage-text-secondary)]" />
+                <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
                   Authenticated User
                 </h3>
               </div>
               
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-ink-muted">Email</span>
-                  <span className="text-sm font-mono text-ink">{state.result.user?.email}</span>
+                  <span className="text-sm text-[var(--stage-text-secondary)]">Email</span>
+                  <span className="text-sm font-mono text-[var(--stage-text-primary)]">{state.result.user?.email}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-ink-muted">User ID</span>
-                  <span className="text-xs font-mono text-ink bg-ink/5 px-2 py-1 rounded">
+                  <span className="text-sm text-[var(--stage-text-secondary)]">User ID</span>
+                  <span className="text-xs font-mono text-[var(--stage-text-primary)]bg-[var(--stage-text-primary)]/5 px-2 py-1 rounded">
                     {state.result.user?.id}
                   </span>
                 </div>
@@ -234,13 +232,13 @@ export function DiagnosticLoginForm() {
             </div>
             
             {/* Workspaces Card */}
-            <div className="liquid-panel p-5">
+            <div className="stage-panel p-5">
               <div className="flex items-center gap-3 mb-4">
-                <Building2 className="w-4 h-4 text-ink-muted" />
-                <h3 className="text-xs font-medium text-ink-muted uppercase tracking-widest">
+                <Building2 className="w-4 h-4 text-[var(--stage-text-secondary)]" />
+                <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
                   Detected Workspaces
                 </h3>
-                <span className="ml-auto text-xs font-mono bg-ink/5 px-2 py-0.5 rounded-full">
+                <span className="ml-auto text-xs font-mono bg-[var(--stage-text-primary)]/5 px-2 py-0.5 rounded-full">
                   {state.result.workspaces.length} found
                 </span>
               </div>
@@ -253,10 +251,10 @@ export function DiagnosticLoginForm() {
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ ...springConfig, delay: 0.2 + i * 0.05 }}
-                      className="p-3 rounded-xl bg-ink/5 border border-[var(--glass-border)]"
+                      className="p-3 rounded-xl bg-[var(--stage-text-primary)]/5 border border-[oklch(1_0_0_/_0.08)]"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-ink">
+                        <span className="text-sm font-medium text-[var(--stage-text-primary)]">
                           {ws.name || 'Unnamed Workspace'}
                         </span>
                         {ws.role && (
@@ -265,19 +263,19 @@ export function DiagnosticLoginForm() {
                           </span>
                         )}
                       </div>
-                      <span className="text-xs font-mono text-ink-muted">
+                      <span className="text-xs font-mono text-[var(--stage-text-secondary)]">
                         {ws.id}
                       </span>
                     </motion.div>
                   ))}
                 </div>
               ) : (
-                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center">
-                  <AlertTriangle className="w-5 h-5 text-amber-500 mx-auto mb-2" />
-                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                <div className="p-4 rounded-xl bg-[oklch(0.45_0.05_70_/_0.15)] border border-[oklch(0.65_0.15_70_/_0.2)] text-center">
+                  <AlertTriangle className="w-5 h-5 text-[var(--color-unusonic-warning)] mx-auto mb-2" />
+                  <p className="text-sm text-[var(--color-unusonic-warning)]">
                     No workspaces found for this user
                   </p>
-                  <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">
+                  <p className="text-xs text-[var(--color-unusonic-warning)]/70 mt-1">
                     User may not have been assigned to any workspaces yet
                   </p>
                 </div>
@@ -285,10 +283,10 @@ export function DiagnosticLoginForm() {
             </div>
             
             {/* Diagnostics Card */}
-            <div className="liquid-panel p-5">
+            <div className="stage-panel p-5">
               <div className="flex items-center gap-3 mb-4">
-                <Database className="w-4 h-4 text-ink-muted" />
-                <h3 className="text-xs font-medium text-ink-muted uppercase tracking-widest">
+                <Database className="w-4 h-4 text-[var(--stage-text-secondary)]" />
+                <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
                   Schema Diagnostics
                 </h3>
               </div>
@@ -297,49 +295,49 @@ export function DiagnosticLoginForm() {
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="flex items-center gap-2">
                   {state.result.diagnostics.workspaceMembersTableExists ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--color-unusonic-success)]" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-red-500" />
+                    <XCircle className="w-4 h-4 text-[var(--color-unusonic-error)]" />
                   )}
-                  <span className="text-xs text-ink-muted">workspace_members</span>
+                  <span className="text-xs text-[var(--stage-text-secondary)]">workspace_members</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {state.result.diagnostics.workspacesTableExists ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--color-unusonic-success)]" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-red-500" />
+                    <XCircle className="w-4 h-4 text-[var(--color-unusonic-error)]" />
                   )}
-                  <span className="text-xs text-ink-muted">workspaces</span>
+                  <span className="text-xs text-[var(--stage-text-secondary)]">workspaces</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {state.result.diagnostics.profilesTableExists ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--color-unusonic-success)]" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-red-500" />
+                    <XCircle className="w-4 h-4 text-[var(--color-unusonic-error)]" />
                   )}
-                  <span className="text-xs text-ink-muted">profiles</span>
+                  <span className="text-xs text-[var(--stage-text-secondary)]">profiles</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {state.result.diagnostics.rlsWorking === true ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--color-unusonic-success)]" />
                   ) : state.result.diagnostics.rlsWorking === false ? (
-                    <XCircle className="w-4 h-4 text-red-500" />
+                    <XCircle className="w-4 h-4 text-[var(--color-unusonic-error)]" />
                   ) : (
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <AlertTriangle className="w-4 h-4 text-[var(--color-unusonic-warning)]" />
                   )}
-                  <span className="text-xs text-ink-muted">RLS Working</span>
+                  <span className="text-xs text-[var(--stage-text-secondary)]">RLS Working</span>
                 </div>
               </div>
               
               {/* Query Details Accordion */}
               <button
                 onClick={() => setShowQueries(!showQueries)}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-ink/5 hover:bg-ink/10 transition-colors"
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-[var(--stage-text-primary)]/5 hover:bg-[var(--stage-text-primary)]/10 transition-colors"
               >
-                <span className="text-xs font-medium text-ink-muted">
+                <span className="text-xs font-medium text-[var(--stage-text-secondary)]">
                   Query Details ({state.result.diagnostics.queries.length})
                 </span>
-                <ChevronDown className={`w-4 h-4 text-ink-muted transition-transform ${showQueries ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-[var(--stage-text-secondary)] transition-transform ${showQueries ? 'rotate-180' : ''}`} />
               </button>
               
               <AnimatePresence>
@@ -355,21 +353,21 @@ export function DiagnosticLoginForm() {
                       {state.result.diagnostics.queries.map((query, i) => (
                         <div
                           key={i}
-                          className="flex items-start gap-2 p-2 rounded-lg bg-ink/5"
+                          className="flex items-start gap-2 p-2 rounded-lg bg-[var(--stage-text-primary)]/5"
                         >
                           {getStatusIcon(query.status)}
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-ink truncate">
+                            <p className="text-xs font-medium text-[var(--stage-text-primary)]truncate">
                               {query.name}
                             </p>
                             {query.message && (
-                              <p className="text-[10px] text-ink-muted truncate">
+                              <p className="text-[10px] text-[var(--stage-text-secondary)] truncate">
                                 {query.message}
                               </p>
                             )}
                           </div>
                           {query.rowCount !== undefined && (
-                            <span className="text-[10px] font-mono text-ink-muted">
+                            <span className="text-[10px] font-mono text-[var(--stage-text-secondary)]">
                               {query.rowCount} rows
                             </span>
                           )}

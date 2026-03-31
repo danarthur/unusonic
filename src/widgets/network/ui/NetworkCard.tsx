@@ -4,6 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Building2, User } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type {
   NetworkBadgeKind,
   NetworkOrganization,
@@ -27,14 +28,14 @@ function OrgAvatars({ names }: { names: string[] }) {
       {names.slice(0, 3).map((name, i) => (
         <div
           key={i}
-          className="flex size-6 items-center justify-center rounded-full border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] text-[10px] font-medium text-[var(--color-ink-muted)]"
+          className="flex size-6 items-center justify-center rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] text-[10px] font-medium text-[var(--stage-text-secondary)]"
           title={name}
         >
           {name.charAt(0).toUpperCase()}
         </div>
       ))}
       {names.length > 3 && (
-        <div className="flex size-6 items-center justify-center rounded-full border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] text-[10px] text-[var(--color-ink-muted)]">
+        <div className="flex size-6 items-center justify-center rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] text-[10px] text-[var(--stage-text-secondary)]">
           +{names.length - 3}
         </div>
       )}
@@ -49,20 +50,20 @@ const badgeLabel: Record<NetworkBadgeKind, string> = {
   coordinator: 'Coordinator',
 };
 
-/** Badge variant classes (Signal tokens: --color-signal-* and --color-silk). */
+/** Badge variant classes (Unusonic tokens: --color-unusonic-* and --stage-accent). */
 function getBadgeVariant(category: NetworkBadgeKind | null | undefined): string {
-  if (!category) return 'bg-ink/10 text-[var(--color-ink-muted)]';
+  if (!category) return 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]';
   switch (category) {
     case 'coordinator':
-      return 'bg-[var(--color-signal-info)]/15 text-[var(--color-signal-info)]';
+      return 'bg-[var(--color-unusonic-info)]/15 text-[var(--color-unusonic-info)]';
     case 'venue':
-      return 'bg-[var(--color-signal-success)]/15 text-[var(--color-signal-success)]';
+      return 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]';
     case 'vendor':
-      return 'bg-[var(--color-silk)]/15 text-[var(--color-silk)]';
+      return 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]';
     case 'client':
-      return 'bg-[var(--color-walnut)]/15 text-[var(--color-walnut)]';
+      return 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)]';
     default:
-      return 'bg-ink/10 text-[var(--color-ink-muted)]';
+      return 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]';
   }
 }
 
@@ -76,15 +77,15 @@ export function NetworkCard({ item, badge, onClick, className }: NetworkCardProp
   const content = isOrg ? (
     <>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-mercury)]/20">
-            <Building2 className="size-5 text-[var(--color-ink-muted)]" />
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[var(--stage-radius-nested)] bg-[oklch(1_0_0_/_0.06)] mt-0.5">
+            <Building2 className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-medium tracking-tight text-[var(--color-ink)]">
+            <p className="truncate font-medium tracking-tight text-[var(--stage-text-primary)]">
               {(data as NetworkOrganization).name}
             </p>
-            <p className="text-xs text-[var(--color-ink-muted)]">
+            <p className="text-xs text-[var(--stage-text-secondary)]">
               {(data as NetworkOrganization).roster?.length ?? 0} people
             </p>
           </div>
@@ -99,12 +100,12 @@ export function NetworkCard({ item, badge, onClick, className }: NetworkCardProp
   ) : (
     <>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-mercury)]/20">
-            <User className="size-5 text-[var(--color-ink-muted)]" />
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[oklch(1_0_0_/_0.06)] mt-0.5">
+            <User className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-medium tracking-tight text-[var(--color-ink)]">
+            <p className="truncate font-medium tracking-tight text-[var(--stage-text-primary)]">
               {(data as NetworkEntity).email}
             </p>
             {(data as NetworkEntity & { skill_tags?: string[] }).skill_tags?.length ? (
@@ -112,13 +113,13 @@ export function NetworkCard({ item, badge, onClick, className }: NetworkCardProp
                 {(data as NetworkEntity & { skill_tags?: string[] }).skill_tags!.slice(0, 3).map((tag) => (
                   <span
                     key={tag}
-                    className="rounded bg-ink/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                    className="rounded bg-[oklch(1_0_0_/_0.06)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                   >
                     {tag}
                   </span>
                 ))}
                 {(data as NetworkEntity & { skill_tags?: string[] }).skill_tags!.length > 3 && (
-                  <span className="text-[10px] text-[var(--color-ink-muted)]">
+                  <span className="text-[10px] text-[var(--stage-text-secondary)]">
                     +{(data as NetworkEntity & { skill_tags?: string[] }).skill_tags!.length - 3}
                   </span>
                 )}
@@ -144,15 +145,14 @@ export function NetworkCard({ item, badge, onClick, className }: NetworkCardProp
       type="button"
       onClick={onClick}
       className={cn(
-        'liquid-levitation flex w-full flex-col rounded-3xl p-4 text-left transition-all duration-300',
+        'stage-panel-interactive flex w-full flex-col rounded-[var(--stage-radius-panel)] p-4 text-left transition-all duration-300',
         isGhost
-          ? 'backdrop-blur-md bg-white/10 border border-[var(--color-mercury)]'
-          : 'bg-[var(--surface-100)] border border-[var(--color-mercury)]',
-        'hover:border-[var(--glass-border-hover)]',
+          ? 'bg-[oklch(1_0_0_/_0.10)] border border-[oklch(1_0_0_/_0.08)]'
+          : 'bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0_/_0.08)]',
+        'hover:border-[oklch(1_0_0_/_0.12)]',
         className
       )}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      transition={STAGE_LIGHT}
     >
       {content}
     </motion.button>

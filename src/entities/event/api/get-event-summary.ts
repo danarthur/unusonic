@@ -57,6 +57,7 @@ export type EventSummary = {
   location_name: string | null;
   location_address: string | null;
   venue_entity_id: string | null;
+  deal_id: string | null;
   run_of_show_data: RunOfShowData | null;
 };
 
@@ -81,7 +82,7 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     const res = await supabase
       .schema('ops')
       .from('events')
-      .select('title, starts_at, ends_at, location_name, location_address, venue_entity_id, run_of_show_data, client_entity_id, project:projects!inner(workspace_id)')
+      .select('title, starts_at, ends_at, location_name, location_address, venue_entity_id, deal_id, run_of_show_data, client_entity_id, project:projects!inner(workspace_id)')
       .eq('id', eventId)
       .eq('projects.workspace_id', workspaceId)
       .maybeSingle();
@@ -120,6 +121,7 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     location_name: (r.location_name as string) ?? null,
     location_address: (r.location_address as string) ?? null,
     venue_entity_id: (r.venue_entity_id as string) ?? null,
+    deal_id: (r.deal_id as string) ?? null,
     run_of_show_data: (r.run_of_show_data as RunOfShowData) ?? null,
   };
 }

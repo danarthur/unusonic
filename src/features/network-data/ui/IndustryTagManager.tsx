@@ -134,7 +134,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-sm text-ink-muted leading-relaxed">
+      <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
         These categories appear as selectable tags on vendor, partner, and venue cards in the Network tab. Admin or above can add new categories — members cannot type free-text tags.
       </p>
 
@@ -147,11 +147,11 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
               onChange={(e) => setLabelInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="e.g. Fire Dancer"
-              className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)]"
+              className="bg-transparent border-[var(--stage-border)] text-[var(--stage-text-primary)]"
               maxLength={80}
             />
             {labelInput.trim() && (
-              <p className="text-[10px] text-[var(--color-ink-muted)]/70 pl-1">
+              <p className="text-[10px] text-[var(--stage-text-secondary)]/70 pl-1">
                 Key: <code className="font-mono">{derivedKey}</code>
               </p>
             )}
@@ -174,7 +174,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
         <div className="rounded-xl border border-[var(--color-unusonic-error)]/30 bg-[var(--color-unusonic-error)]/5 p-4 space-y-3">
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="size-4 text-[var(--color-unusonic-error)] mt-0.5 shrink-0" />
-            <p className="text-sm text-[var(--color-ink)]">
+            <p className="text-sm text-[var(--stage-text-primary)]">
               <strong>&ldquo;{deleteState.tag.label}&rdquo;</strong> is applied to{' '}
               <strong>{deleteState.usageCount}</strong>{' '}
               {deleteState.usageCount === 1 ? 'contact' : 'contacts'}. Deleting it will remove it from all of them.
@@ -198,9 +198,9 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
 
       {/* Merge panel — shown when mergeFrom is set */}
       {mergeFrom && (
-        <div className="rounded-xl border border-[var(--color-silk)]/30 bg-[var(--color-silk)]/5 p-4 space-y-3 transition-all">
+        <div className="rounded-xl border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/5 p-4 space-y-3 transition-all">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-[var(--color-ink)]">
+            <p className="text-sm text-[var(--stage-text-primary)]">
               Merge <strong>&ldquo;{mergeFrom.label}&rdquo;</strong> into:
             </p>
             <Button
@@ -209,7 +209,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
               variant="ghost"
               onClick={() => { setMergeFrom(null); setMergeError(null); }}
               disabled={merging}
-              className="text-[var(--color-ink-muted)]"
+              className="text-[var(--stage-text-secondary)]"
             >
               Cancel
             </Button>
@@ -226,10 +226,10 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
                     type="button"
                     onClick={() => handleMerge(entry)}
                     disabled={merging}
-                    className="w-full flex items-center gap-2 rounded-lg border border-[var(--color-mercury)]/50 bg-[var(--color-obsidian)]/30 px-3 py-2 text-left hover:bg-[var(--color-silk)]/10 transition-colors disabled:opacity-40"
+                    className="w-full flex items-center gap-2 rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--stage-surface-nested)] px-3 py-2 text-left hover:bg-[var(--stage-accent)]/10 transition-colors disabled:opacity-40"
                   >
-                    <span className="text-sm text-[var(--color-ink)]">{entry.label}</span>
-                    <span className="ml-1 font-mono text-[10px] text-[var(--color-ink-muted)]/60">
+                    <span className="text-sm text-[var(--stage-text-primary)]">{entry.label}</span>
+                    <span className="ml-1 font-mono text-[10px] text-[var(--stage-text-secondary)]/60">
                       {entry.tag}
                     </span>
                   </button>
@@ -241,7 +241,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
 
       {/* Tag list */}
       {tags.length === 0 ? (
-        <p className="text-sm text-ink-muted">No industry tags configured.</p>
+        <p className="text-sm text-[var(--stage-text-secondary)]">No industry tags configured.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {tags.map((entry) => {
@@ -250,11 +250,11 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
             return (
               <li
                 key={entry.id}
-                className="flex items-center justify-between rounded-lg border border-[var(--color-mercury)]/50 bg-[var(--color-obsidian)]/30 px-3 py-2.5"
+                className="flex items-center justify-between rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--stage-surface-nested)] px-3 py-2.5"
               >
                 <div className="min-w-0">
-                  <span className="text-sm text-[var(--color-ink)]">{entry.label}</span>
-                  <span className="ml-2 font-mono text-[10px] text-[var(--color-ink-muted)]/60">
+                  <span className="text-sm text-[var(--stage-text-primary)]">{entry.label}</span>
+                  <span className="ml-2 font-mono text-[10px] text-[var(--stage-text-secondary)]/60">
                     {entry.tag}
                   </span>
                 </div>
@@ -266,7 +266,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
                       size="icon-sm"
                       onClick={() => setMergeFrom(entry)}
                       disabled={merging || isBusy}
-                      className="text-[var(--color-ink-muted)] hover:text-[var(--color-silk)]"
+                      className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-accent)]"
                       title={`Merge "${entry.label}" into another tag`}
                     >
                       <GitMerge size={14} />
@@ -278,7 +278,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
                     size="icon-sm"
                     onClick={() => handleDeleteClick(entry)}
                     disabled={isBusy || isCounting || isDeleting || merging || !!mergeFrom}
-                    className="text-[var(--color-ink-muted)] hover:text-[var(--color-unusonic-error)]"
+                    className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)]"
                   >
                     {isBusy && (isCounting || isDeleting) ? (
                       <span className="size-3 rounded-full border-2 border-current border-t-transparent animate-spin" />

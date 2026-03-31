@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, Truck, MapPin, Users } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { StagePanel } from '@/shared/ui/stage-panel';
+import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { updateFlightCheckStatus } from '../../actions/update-flight-check-status';
 import { normalizeLogistics } from './types';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
@@ -42,15 +42,15 @@ export function LogisticsFlightCheck({
   };
 
   return (
-    <LiquidPanel className="p-5 rounded-[28px] border border-white/10">
+    <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-xl"
+        className="w-full flex items-center justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-xl"
       >
-        <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted">Logistics</h3>
-        <span className="text-ink-muted">
-          {collapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+        <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Logistics</h3>
+        <span className="text-[var(--stage-text-secondary)]">
+          {collapsed ? <ChevronDown size={18} strokeWidth={1.5} /> : <ChevronUp size={18} strokeWidth={1.5} />}
         </span>
       </button>
       {!collapsed && (
@@ -58,45 +58,42 @@ export function LogisticsFlightCheck({
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
-          transition={UNUSONIC_PHYSICS}
+          transition={STAGE_MEDIUM}
           className="mt-4 space-y-3"
         >
           {LOGISTICS_ITEMS.map(({ key, label, icon: Icon }) => (
             <li
               key={key}
-              className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0"
+              className="flex items-center justify-between gap-4 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <Icon size={18} className="shrink-0 text-ink-muted" aria-hidden />
-                <span className="text-ceramic font-medium tracking-tight text-sm">{label}</span>
+                <Icon size={18} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+                <span className="text-[var(--stage-text-primary)] font-medium tracking-tight text-sm">{label}</span>
               </div>
-              <motion.button
+              <button
                 type="button"
                 role="switch"
                 aria-checked={state[key]}
                 onClick={() => toggle(key)}
                 disabled={updating === key}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                transition={UNUSONIC_PHYSICS}
                 className={`
                   shrink-0 relative w-11 h-6 rounded-full border transition-colors
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]
                   disabled:opacity-60
-                  ${state[key] ? 'bg-[var(--color-signal-success)]/30 border-[var(--color-signal-success)]/50' : 'bg-white/5 border-white/10'}
+                  ${state[key] ? 'bg-[var(--color-unusonic-success)]/30 border-[var(--color-unusonic-success)]/50' : 'bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.10)]'}
                 `}
               >
                 <motion.span
                   layout
-                  transition={UNUSONIC_PHYSICS}
-                  className="absolute top-1 left-1 w-4 h-4 rounded-full bg-ceramic shadow-sm"
+                  transition={STAGE_LIGHT}
+                  className="absolute top-1 left-1 w-4 h-4 rounded-full bg-[var(--stage-text-primary)] shadow-sm"
                   animate={{ x: state[key] ? 20 : 0 }}
                 />
-              </motion.button>
+              </button>
             </li>
           ))}
         </motion.ul>
       )}
-    </LiquidPanel>
+    </StagePanel>
   );
 }

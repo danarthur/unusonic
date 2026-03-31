@@ -27,7 +27,7 @@ export interface IdentityFormProps {
     brand_color: string | null;
     logo_url: string | null;
   }) => void;
-  /** Submit button label (e.g. "Initialize System" vs "Save changes" when re-editing). */
+  /** Submit button label (e.g. "Create studio" vs "Save changes" when re-editing). */
   submitLabel?: string;
   className?: string;
 }
@@ -41,7 +41,7 @@ function slugFromName(name: string): string {
     || 'organization';
 }
 
-export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel = 'Initialize System', className }: IdentityFormProps) {
+export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel = 'Create studio', className }: IdentityFormProps) {
   const [name, setName] = React.useState(defaultValues.name || '');
   const [description, setDescription] = React.useState(defaultValues.description ?? '');
   const [brandColor, setBrandColor] = React.useState<string | null>(defaultValues.brand_color ?? null);
@@ -114,14 +114,14 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
     >
       {/* Logo: circular dropzone, same border as Mirror card (border + mercury or accent) */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-[var(--color-ink-muted)]">Logo</label>
+        <label className="text-sm font-medium text-[var(--stage-text-secondary)]">Logo</label>
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className={cn(
-            'relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-white/5 transition-colors hover:bg-white/10 disabled:opacity-50',
-            !brandColor && 'border-[var(--color-mercury)]'
+            'relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-[oklch(1_0_0_/_0.05)] transition-colors hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-50',
+            !brandColor && 'border-[oklch(1_0_0_/_0.08)]'
           )}
           style={brandColor ? { borderColor: colorWithAlpha(brandColor, 0.25) ?? brandColor } : undefined}
         >
@@ -130,7 +130,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
               <div
                 className="pointer-events-none absolute inset-0"
                 style={{
-                  background: 'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(248,250,252,0.7) 0%, rgba(226,232,240,0.4) 50%, transparent 100%)',
+                  background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.98 0 0 / 0.7) 0%, oklch(0.90 0 0 / 0.4) 50%, transparent 100%)',
                 }}
                 aria-hidden
               />
@@ -141,11 +141,11 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
               />
             </>
           ) : (
-            <Building2 className="size-10 text-[var(--color-ink-muted)]" />
+            <Building2 className="size-10 text-[var(--stage-text-secondary)]" />
           )}
           {uploading && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-sm">
-              <span className="text-xs text-white">Uploading…</span>
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-[oklch(0_0_0_/_0.5)]">
+              <span className="text-xs text-[oklch(1_0_0)]">Uploading…</span>
             </div>
           )}
         </button>
@@ -157,7 +157,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
           onChange={handleLogoFile}
           disabled={uploading}
         />
-        <p className="text-xs text-[var(--color-ink-muted)]">Click to upload. PNG, JPEG, WebP.</p>
+        <p className="text-xs text-[var(--stage-text-secondary)]">Click to upload. PNG, JPEG, WebP.</p>
       </div>
 
       {/* Brand Color – Chromatic Tuner (precision HEX + Oklch readout) */}
@@ -172,18 +172,18 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
           name="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full bg-white/5 border-[var(--color-mercury)]"
+          className="w-full bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
         />
         {name.trim() && (
-          <p className="text-xs text-[var(--color-ink-muted)]">
-            Slug: <span className="font-mono text-[var(--color-ink-muted)]">{slug}</span>
+          <p className="text-xs text-[var(--stage-text-secondary)]">
+            Slug: <span className="font-mono text-[var(--stage-text-secondary)]">{slug}</span>
           </p>
         )}
       </div>
 
       {/* Public Bio (auto-resizing via field-sizing: content) */}
       <div className="space-y-2">
-        <label htmlFor="identity-bio" className="text-sm font-medium text-[var(--color-ink-muted)]">
+        <label htmlFor="identity-bio" className="text-sm font-medium text-[var(--stage-text-secondary)]">
           Public bio
         </label>
         <Textarea
@@ -193,7 +193,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
           onChange={(e) => setDescription(e.target.value)}
           placeholder="How you appear to partners and clients."
           rows={4}
-          className="min-h-24 w-full resize-y bg-white/5 border-[var(--color-mercury)] placeholder:text-[var(--color-ink-muted)]/50"
+          className="min-h-24 w-full resize-y bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] placeholder:text-[var(--stage-text-secondary)/0.5]"
         />
       </div>
 
@@ -206,7 +206,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
           type="submit"
           disabled={isPending}
           className={cn(
-            'relative w-full overflow-hidden rounded-xl border border-[var(--color-mercury)] bg-white/10 px-6 py-4 text-sm font-medium text-[var(--color-ink)] transition-colors hover:bg-white/15 hover:border-white/20 disabled:opacity-50'
+            'relative w-full overflow-hidden rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.10)] px-6 py-4 text-sm font-medium text-[var(--stage-text-primary)] transition-colors hover:bg-[oklch(1_0_0_/_0.15)] hover:border-[oklch(1_0_0_/_0.20)] disabled:opacity-50'
           )}
         >
           {isPending ? (
@@ -218,7 +218,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
             submitLabel
           )}
           {isPending && (
-            <div className="absolute inset-0 bg-white/10 animate-pulse pointer-events-none" />
+            <div className="absolute inset-0 bg-[oklch(1_0_0_/_0.10)] stage-skeleton pointer-events-none" />
           )}
         </button>
       </div>

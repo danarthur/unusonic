@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import { Plus, Pencil } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +14,6 @@ import { createPackage, updatePackage } from '../api/package-actions';
 import type { Package } from '@/types/supabase';
 import type { PackageCategory } from '../api/package-actions';
 import { CurrencyInput } from '@/shared/ui/currency-input';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const CATEGORIES: { value: PackageCategory; label: string }[] = [
@@ -68,7 +65,9 @@ export function PackageManager({
   }, [workspaceId]);
 
   useEffect(() => {
-    loadPackages();
+    queueMicrotask(() => {
+      void loadPackages();
+    });
   }, [loadPackages]);
 
   const openCreate = () => {
@@ -155,71 +154,65 @@ export function PackageManager({
 
   return (
     <>
-      <LiquidPanel className={cn('p-6 rounded-[28px]', className)}>
+      <div className={cn('stage-panel p-6 rounded-[var(--stage-radius-panel)]', className)}>
         <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
             Packages
           </h2>
-          <motion.button
+          <button
             type="button"
             onClick={openCreate}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={UNUSONIC_PHYSICS}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--glass-border)] text-sm font-medium text-ceramic hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[oklch(1_0_0_/_0.12)] text-sm font-medium text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
-            <Plus size={16} aria-hidden />
+            <Plus size={16} strokeWidth={1.5} aria-hidden />
             Add package
-          </motion.button>
+          </button>
         </div>
         {loading ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <p className="text-sm text-[var(--stage-text-secondary)]">Loading…</p>
         ) : error ? (
           <p className="text-sm text-[var(--color-unusonic-error)]">{error}</p>
         ) : packages.length === 0 ? (
-          <p className="text-sm text-ink-muted">No packages yet. Add one to use in proposals.</p>
+          <p className="text-sm text-[var(--stage-text-secondary)]">No packages yet. Add one to use in proposals.</p>
         ) : (
           <ul className="space-y-2">
             {packages.map((pkg) => (
               <li
                 key={pkg.id}
-                className="flex items-center justify-between gap-3 py-2 border-b border-[var(--glass-border)] last:border-0"
+                className="flex items-center justify-between gap-3 py-2 border-b border-[oklch(1_0_0_/_0.08)] last:border-0"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-ceramic truncate">{pkg.name}</p>
-                  <p className="text-xs text-ink-muted">
+                  <p className="text-sm font-medium text-[var(--stage-text-primary)] truncate">{pkg.name}</p>
+                  <p className="text-xs text-[var(--stage-text-secondary)]">
                     {pkg.category} · ${Number(pkg.price).toLocaleString()}
                   </p>
                 </div>
-                <motion.button
+                <button
                   type="button"
                   onClick={() => openEdit(pkg)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={UNUSONIC_PHYSICS}
-                  className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className="p-2 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   aria-label={`Edit ${pkg.name}`}
                 >
-                  <Pencil size={16} aria-hidden />
-                </motion.button>
+                  <Pencil size={16} strokeWidth={1.5} aria-hidden />
+                </button>
               </li>
             ))}
           </ul>
         )}
-      </LiquidPanel>
+      </div>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Edit package' : 'New package'}</DialogTitle>
-            <DialogClose className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5" />
+            <DialogClose className="p-2 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]" />
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 pb-6">
             {formError && (
               <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
             )}
             <div>
-              <label htmlFor="pkg-name" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+              <label htmlFor="pkg-name" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                 Name
               </label>
               <input
@@ -227,13 +220,13 @@ export function PackageManager({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
                 placeholder="e.g. Full Production Package"
                 required
               />
             </div>
             <div>
-              <label htmlFor="pkg-desc" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+              <label htmlFor="pkg-desc" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                 Description (optional)
               </label>
               <textarea
@@ -241,19 +234,19 @@ export function PackageManager({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] resize-none"
+                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] resize-none"
                 placeholder="Brief description"
               />
             </div>
             <div>
-              <label htmlFor="pkg-category" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+              <label htmlFor="pkg-category" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                 Category
               </label>
               <select
                 id="pkg-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as PackageCategory)}
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -264,7 +257,7 @@ export function PackageManager({
             </div>
             <div className={cn('grid gap-4', category === 'package' ? 'grid-cols-1' : 'grid-cols-2')}>
               <div className={cn(category === 'package' && 'col-span-2')}>
-                <label htmlFor="pkg-price" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+                <label htmlFor="pkg-price" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                   Price
                 </label>
                 <CurrencyInput
@@ -278,7 +271,7 @@ export function PackageManager({
               {category !== 'package' && (
                 <>
                   <div>
-                    <label htmlFor="pkg-floor-price" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+                    <label htmlFor="pkg-floor-price" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                       Floor price (optional)
                     </label>
                     <CurrencyInput
@@ -289,7 +282,7 @@ export function PackageManager({
                     />
                   </div>
                   <div>
-                    <label htmlFor="pkg-target-cost" className="block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1">
+                    <label htmlFor="pkg-target-cost" className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
                       Target cost (optional)
                     </label>
                     <CurrencyInput
@@ -306,14 +299,14 @@ export function PackageManager({
               <button
                 type="button"
                 onClick={closeModal}
-                className="flex-1 px-4 py-3 rounded-xl border border-[var(--glass-border)] text-ceramic font-medium text-sm hover:bg-[var(--glass-bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="flex-1 px-4 py-3 rounded-xl border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)] font-medium text-sm hover:bg-[var(--color-neon-amber)]/20 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="flex-1 px-4 py-3 rounded-xl border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:brightness-[1.06] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 {saving ? 'Saving…' : editingId ? 'Save' : 'Create'}
               </button>

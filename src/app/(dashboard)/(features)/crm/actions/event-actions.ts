@@ -55,6 +55,7 @@ export async function createEvent(input: CreateEventInput): Promise<CreateEventR
 
     if (parentEventId) {
       const { data: parent, error: parentError } = await supabase
+        .schema('ops')
         .from('events')
         .select('id, workspace_id')
         .eq('id', parentEventId)
@@ -79,6 +80,7 @@ export async function createEvent(input: CreateEventInput): Promise<CreateEventR
     }
 
     const { data: event, error } = await supabase
+      .schema('ops')
       .from('events')
       .insert({
         workspace_id: workspaceId,

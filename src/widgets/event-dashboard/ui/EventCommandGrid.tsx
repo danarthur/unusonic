@@ -11,7 +11,7 @@ import {
   updateEventCommand,
 } from '@/features/event-dashboard';
 import type { EventCommandDTO, EventLifecycleStatus } from '@/entities/event';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { SaveBar } from '@/shared/ui/surfaces';
 import { Textarea } from '@/shared/ui/textarea';
 import { CurrencyInput } from '@/shared/ui/currency-input';
@@ -137,7 +137,7 @@ function eventToDefaultValues(event: EventCommandDTO): EventCommandFormValues {
 }
 
 const inputBase =
-  'w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-ceramic/5 px-3 py-2 text-ink placeholder:text-ink-muted outline-none transition-[box-shadow,border-color] focus:ring-2 focus:ring-[var(--ring)] focus:border-[var(--glass-border-hover)]';
+  'w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none transition-[box-shadow,border-color] focus:ring-2 focus:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.15)]';
 
 interface EventCommandGridProps {
   event: EventCommandDTO;
@@ -262,21 +262,21 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
       >
         {/* Zone A: Hero – Title, Internal Code, Lifecycle Status */}
         <div className="md:col-span-12">
-          <LiquidPanel className="relative min-h-[140px] flex flex-col justify-end p-6 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-silk/6 via-transparent to-transparent pointer-events-none rounded-[inherit]" aria-hidden />
+          <StagePanel className="relative min-h-[140px] flex flex-col justify-end p-6 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-[var(--stage-accent)]/6 via-transparent to-transparent pointer-events-none rounded-[inherit]" aria-hidden />
             <div className="relative z-10 flex flex-wrap items-end gap-3">
               <div className="min-w-0 flex-1">
                 <input
                   {...register('title')}
                   placeholder="Event title"
                   className={cn(
-                    'w-full min-w-0 rounded-xl border border-mercury bg-transparent py-2 px-3 text-2xl md:text-3xl font-light text-ink tracking-tight placeholder:text-ink-muted outline-none transition-[border-color,box-shadow]',
-                    'ring-1 ring-silk/15 focus:ring-2 focus:ring-neon-blue/30 focus:border-silk/30'
+                    'w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-transparent py-2 px-3 text-2xl md:text-3xl font-light text-[var(--stage-text-primary)] tracking-tight placeholder:text-[var(--stage-text-secondary)] outline-none transition-[border-color,box-shadow]',
+                    'ring-1 ring-[var(--stage-accent)]/15 focus:ring-2 focus:ring-[var(--stage-accent)]/30 focus:border-[var(--stage-accent)]/30'
                   )}
                 />
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span
-                    className="text-sm font-mono text-ink-muted bg-ceramic/5 px-2 py-0.5 rounded-md border border-[var(--glass-border)]"
+                    className="text-sm font-mono text-[var(--stage-text-secondary)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 rounded-md border border-[oklch(1_0_0_/_0.08)]"
                     title="Internal code (read-only)"
                   >
                     {defaultValues.internal_code || '—'}
@@ -297,7 +297,7 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
                 </div>
               </div>
             </div>
-          </LiquidPanel>
+          </StagePanel>
         </div>
 
         {/* Zone B: TimeCapsule (Dates, Times, Load-In/Out + Elastic features) */}
@@ -309,8 +309,8 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
           />
         </div>
         <div className="md:col-span-6">
-          <LiquidPanel className="h-full flex flex-col">
-            <h3 className="text-sm font-medium text-ink-muted uppercase tracking-wider mb-3">
+          <StagePanel className="h-full flex flex-col">
+            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-3">
               Venue
             </h3>
             <div className="space-y-3">
@@ -326,18 +326,18 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
                 className={cn(inputBase, 'resize-y')}
               />
             </div>
-          </LiquidPanel>
+          </StagePanel>
         </div>
 
         {/* Zone C: CRM & Context */}
         <div className="md:col-span-6">
-          <LiquidPanel className="h-full flex flex-col">
-            <h3 className="text-sm font-medium text-ink-muted uppercase tracking-wider mb-3">
+          <StagePanel className="h-full flex flex-col">
+            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-3">
               CRM & context
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-ink-muted uppercase tracking-wider block mb-1">
+                <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider block mb-1">
                   Probability ({watch('crm_probability')}%)
                 </label>
                 <Controller
@@ -350,13 +350,13 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
                       max={100}
                       value={field.value}
                       onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="w-full h-2 rounded-full appearance-none bg-ceramic/10 accent-ink"
+                      className="w-full h-2 rounded-full appearance-none bg-[oklch(1_0_0_/_0.10)] accent-[var(--stage-accent)]"
                     />
                   )}
                 />
               </div>
               <div>
-                <label htmlFor="event-crm-estimated-value" className="text-xs font-medium text-ink-muted uppercase tracking-wider block mb-1">
+                <label htmlFor="event-crm-estimated-value" className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider block mb-1">
                   Est. value
                 </label>
                 <Controller
@@ -374,7 +374,7 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <label className="text-xs font-medium text-ink-muted uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider block mb-1">
                     Guest count (expected)
                   </label>
                   <input
@@ -386,7 +386,7 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs font-medium text-ink-muted uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider block mb-1">
                     Guest count (actual)
                   </label>
                   <input
@@ -399,13 +399,13 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
                 </div>
               </div>
             </div>
-          </LiquidPanel>
+          </StagePanel>
         </div>
 
         {/* Zone D: Notes + Tech */}
         <div className="md:col-span-6">
-          <LiquidPanel className="h-full flex flex-col">
-            <h3 className="text-sm font-medium text-ink-muted uppercase tracking-wider mb-3">
+          <StagePanel className="h-full flex flex-col">
+            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-3">
               Notes
             </h3>
             <Textarea
@@ -414,11 +414,11 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
               rows={4}
               className={cn(inputBase, 'resize-y')}
             />
-          </LiquidPanel>
+          </StagePanel>
         </div>
         <div className="md:col-span-6">
-          <LiquidPanel className="h-full flex flex-col">
-            <h3 className="text-sm font-medium text-ink-muted uppercase tracking-wider mb-3">
+          <StagePanel className="h-full flex flex-col">
+            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-3">
               Tech requirements
             </h3>
             <Textarea
@@ -427,47 +427,47 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
               rows={4}
               className={cn(inputBase, 'resize-y font-mono text-sm')}
             />
-          </LiquidPanel>
+          </StagePanel>
         </div>
 
         {/* Team + Launchpad */}
         <div className="md:col-span-6">
-          <LiquidPanel className="h-full flex flex-col">
-            <h3 className="text-sm font-medium text-ink-muted uppercase tracking-wider mb-3">
+          <StagePanel className="h-full flex flex-col">
+            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-3">
               Team
             </h3>
             <TeamPile members={teamMembers} size="md" />
-          </LiquidPanel>
+          </StagePanel>
         </div>
         <div className="md:col-span-6">
-          <LiquidPanel className="h-full flex flex-col" hoverEffect>
-            <h3 className="text-sm font-medium text-ink-muted uppercase tracking-wider mb-3">
+          <StagePanel className="h-full flex flex-col" interactive>
+            <h3 className="text-sm font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-3">
               Launchpad
             </h3>
             <div className="flex flex-wrap gap-3">
               <Link
                 href={`/events/${initialEvent.id}/finance`}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-ink bg-silk/30 hover:bg-silk/50 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-primary)] bg-[var(--stage-accent)]/30 hover:bg-[var(--stage-accent)]/50 transition-colors"
               >
                 <DollarSign className="size-4" />
                 Finance
               </Link>
               <Link
                 href={`/events/${initialEvent.id}/deal`}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-ceramic/5 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors"
               >
                 <FileText className="size-4" />
                 Deal room
               </Link>
               <Link
                 href="/calendar"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-ink-muted hover:text-ink hover:bg-ceramic/5 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors"
               >
                 <Calendar className="size-4" />
                 Calendar
               </Link>
             </div>
-          </LiquidPanel>
+          </StagePanel>
         </div>
       </form>
     </div>

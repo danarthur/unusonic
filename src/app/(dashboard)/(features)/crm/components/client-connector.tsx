@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import { Plus, Building2, ChevronRight, ExternalLink } from 'lucide-react';
 import { OmniSearch } from '@/widgets/network-stream';
 import { linkDealToClient } from '../actions/link-deal-client';
@@ -11,7 +10,6 @@ import { CreateClientDialog } from './create-client-dialog';
 import { ClientSummaryCard } from './client-identity-card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { toast } from 'sonner';
@@ -91,55 +89,51 @@ export function ClientConnector({
 
     return (
       <>
-        <motion.button
+        <button
           type="button"
           onClick={handleAddClientClick}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          transition={UNUSONIC_PHYSICS}
           className={cn(
-            'w-full rounded-2xl border-2 border-dashed border-white/15 backdrop-blur-xl',
+            'w-full rounded-2xl border-2 border-dashed border-[oklch(1_0_0_/_0.15)]',
             'flex items-center gap-3 text-left transition-colors',
-            'hover:border-[var(--color-neon-amber)]/40 hover:bg-[var(--color-neon-amber)]/5',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',
-            compact ? 'liquid-card p-3' : 'liquid-card p-4'
+            'hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/5',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
+            compact ? 'stage-panel-nested p-3' : 'stage-panel-nested p-4'
           )}
-          style={{ background: 'var(--color-glass-surface)' }}
           aria-label="Add client"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)]">
-            <Plus className="size-5" aria-hidden />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--stage-accent)]/10 text-[var(--stage-accent)]">
+            <Plus className="size-5" strokeWidth={1.5} aria-hidden />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-ceramic tracking-tight">Add client</p>
-            <p className="text-xs text-ink-muted truncate mt-0.5">
+            <p className="font-medium text-[var(--stage-text-primary)] tracking-tight">Add client</p>
+            <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
               {sourceOrgId
                 ? 'Search your Network or create a new client'
                 : 'Set up your Network to add or link a client'}
             </p>
           </div>
-        </motion.button>
+        </button>
 
         {!sourceOrgId && (
           <Sheet open={setupHintOpen} onOpenChange={setSetupHintOpen}>
             <SheetContent
               side="center"
-              className="flex w-full max-w-sm flex-col border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0"
+              className="flex w-full max-w-sm flex-col border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0"
             >
-              <SheetHeader className="border-b border-white/10 px-6 py-5">
+              <SheetHeader className="border-b border-[oklch(1_0_0_/_0.10)] px-6 py-5">
                 <SheetTitle>
                   Add client
                 </SheetTitle>
                 <SheetClose />
               </SheetHeader>
               <SheetBody className="flex flex-col gap-4 px-6 py-5">
-                <p className="text-sm text-ink-muted leading-relaxed">
+                <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
                   To add or link a client to this deal, set up your organization in Network first. Then you can search your rolodex or create new clients from here.
                 </p>
-                <Button asChild className="w-full rounded-xl bg-[var(--color-neon-amber)]/20 text-[var(--color-neon-amber)] hover:bg-[var(--color-neon-amber)]/30">
+                <Button asChild className="w-full rounded-xl bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/30">
                   <Link href="/network" className="inline-flex items-center justify-center gap-2">
                     Go to Network
-                    <ExternalLink className="size-4" />
+                    <ExternalLink className="size-4" strokeWidth={1.5} />
                   </Link>
                 </Button>
               </SheetBody>
@@ -178,49 +172,46 @@ export function ClientConnector({
     const sheetHref = `/crm?${params.toString()}`;
 
     return (
-      <motion.a
+      <a
         href={sheetHref}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        transition={UNUSONIC_PHYSICS}
         className={cn(
-          'w-full text-left rounded-2xl border border-white/10 backdrop-blur-xl overflow-hidden',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',
-          compact ? 'liquid-card p-3' : 'liquid-card p-4'
+          'w-full text-left rounded-2xl border border-[oklch(1_0_0_/_0.10)] overflow-hidden transition-colors',
+          'hover:bg-[var(--stage-surface-hover)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
+          compact ? 'stage-panel p-3' : 'stage-panel p-4'
         )}
-        style={{ background: 'var(--color-glass-surface)' }}
         aria-label={`Client: ${client.organization.name}. Open in Network`}
       >
         <div className="flex items-center gap-3">
           {client.organization.name ? (
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-ceramic font-medium text-sm tracking-tight"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] font-medium text-sm tracking-tight"
               aria-hidden
             >
               {initials(client.organization.name)}
             </div>
           ) : (
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-ink-muted"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)]"
               aria-hidden
             >
-              <Building2 className="size-5" />
+              <Building2 className="size-5" strokeWidth={1.5} />
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-ceramic tracking-tight truncate">
+            <p className="font-medium text-[var(--stage-text-primary)] tracking-tight truncate">
               {client.organization.name || 'Client'}
             </p>
             {client.mainContact && !compact && (
-              <p className="text-xs text-ink-muted truncate mt-0.5">
+              <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
                 {[client.mainContact.first_name, client.mainContact.last_name].filter(Boolean).join(' ')}
                 {client.mainContact.email ? ` · ${client.mainContact.email}` : ''}
               </p>
             )}
           </div>
-          <ChevronRight className="size-4 text-ink-muted shrink-0" aria-hidden />
+          <ChevronRight className="size-4 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} aria-hidden />
         </div>
-      </motion.a>
+      </a>
     );
   }
 

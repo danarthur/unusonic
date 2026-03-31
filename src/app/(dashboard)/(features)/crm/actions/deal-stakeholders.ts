@@ -1,5 +1,5 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
@@ -321,6 +321,14 @@ export async function addDealStakeholder(
     if (error.code === '23505') return { success: false, error: 'This connection is already on the deal.' };
     return { success: false, error: error.message };
   }
+
+  // Sync denormalized columns on deals so stream cards stay current
+  if (role === 'venue_contact' && organizationId) {
+    await supabase.from('deals').update({ venue_id: organizationId }).eq('id', dealId);
+  } else if (role === 'bill_to' && organizationId) {
+    await supabase.from('deals').update({ organization_id: organizationId }).eq('id', dealId);
+  }
+
   return { success: true, id: inserted.id };
 }
 
@@ -341,6 +349,14 @@ export async function removeDealStakeholder(dealId: string, stakeholderId: strin
     .maybeSingle();
   if (!deal) return { success: false, error: 'Deal not found.' };
 
+  // Read the row before deleting so we can sync denormalized columns
+  const { data: row } = await supabase
+    .schema('ops').from('deal_stakeholders')
+    .select('role, organization_id')
+    .eq('id', stakeholderId)
+    .eq('deal_id', dealId)
+    .maybeSingle();
+
   const { error } = await supabase
     .schema('ops').from('deal_stakeholders')
     .delete()
@@ -348,6 +364,14 @@ export async function removeDealStakeholder(dealId: string, stakeholderId: strin
     .eq('deal_id', dealId);
 
   if (error) return { success: false, error: error.message };
+
+  // Null out denormalized columns on deals so stream cards stay current
+  if (row?.role === 'venue_contact') {
+    await supabase.from('deals').update({ venue_id: null }).eq('id', dealId);
+  } else if (row?.role === 'bill_to') {
+    await supabase.from('deals').update({ organization_id: null }).eq('id', dealId);
+  }
+
   return { success: true };
 }
 
@@ -361,9 +385,18 @@ export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRost
   try {
     const supabase = await createClient();
 
-    const { data: orgDirEnt } = await supabase
+    // orgId may be a legacy_org_id (UUID from old orgs table) or a direct directory entity UUID.
+    // Try legacy_org_id first; fall back to direct id lookup.
+    let { data: orgDirEnt } = await supabase
       .schema('directory').from('entities').select('id')
       .eq('legacy_org_id', orgId).eq('owner_workspace_id', workspaceId).maybeSingle();
+
+    if (!orgDirEnt) {
+      const { data: direct } = await supabase
+        .schema('directory').from('entities').select('id')
+        .eq('id', orgId).eq('owner_workspace_id', workspaceId).maybeSingle();
+      orgDirEnt = direct ?? null;
+    }
 
     if (orgDirEnt?.id) {
       const { data: cortexEdges } = await supabase.schema('cortex').from('relationships')
@@ -390,11 +423,13 @@ export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRost
 
       return (dirPeople ?? []).map((de) => {
         const attrs = (de.attributes as Record<string, unknown>) ?? {};
-        const email = (attrs.email as string | null) ?? emailByLegacyId.get(de.legacy_entity_id ?? '') ?? null;
+        const rawEmail = (attrs.email as string | null) ?? emailByLegacyId.get(de.legacy_entity_id ?? '') ?? null;
+        // Never expose ghost placeholder emails in the UI
+        const email = rawEmail && !rawEmail.startsWith('ghost-') && !rawEmail.endsWith('.local') ? rawEmail : null;
         const ctx = rosterCtxByDirId.get(de.id) ?? {};
         const display =
           [(ctx.first_name as string) ?? '', (ctx.last_name as string) ?? ''].filter(Boolean).join(' ').trim() ||
-          email || de.display_name || 'Unknown';
+          de.display_name || 'Unknown';
         const legacyId = de.legacy_entity_id ?? de.id;
         return { id: legacyId, entity_id: legacyId, display_name: display, email };
       });

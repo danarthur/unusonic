@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { User, UserCircle } from 'lucide-react';
 import {
@@ -16,6 +15,7 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { cn } from '@/shared/lib/utils';
 import { inviteTalent, checkEmailExists } from '../api/invite-action';
+import { listWorkspaceCapabilityPresets } from '@/features/talent-management/api/capability-actions';
 import type { InviteTalentInput } from '../model/schema';
 
 const PRESET_SKILL_TAGS = [
@@ -38,34 +38,14 @@ interface InviteTalentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgId: string;
+  /**
+   * Pre-sets the employment status and hides the toggle.
+   * Use 'internal_employee' for "Add staff member" and 'external_contractor' for "Add contractor".
+   * When omitted, the toggle is shown and defaults to internal_employee.
+   */
+  initialStatus?: EmploymentStatus;
   /** Callback after successful invite (e.g. refresh graph). */
   onSuccess?: () => void;
-}
-
-type InviteTalentResult = Awaited<ReturnType<typeof inviteTalent>>;
-
-function buildInviteAction(orgId: string) {
-  return async (_prev: InviteTalentResult | null, formData: FormData): Promise<InviteTalentResult> => {
-    const email = formData.get('email') as string;
-    const first_name = (formData.get('first_name') as string)?.trim() ?? '';
-    const last_name = (formData.get('last_name') as string)?.trim() ?? '';
-    const phone = (formData.get('phone') as string)?.trim() || null;
-    const job_title = (formData.get('job_title') as string)?.trim() || null;
-    const employment_status = formData.get('employment_status') as EmploymentStatus;
-    const role = formData.get('role') as InviteRole;
-    const skill_tags_raw = formData.get('skill_tags') as string;
-    const skill_tags = skill_tags_raw ? (JSON.parse(skill_tags_raw) as string[]) : [];
-    return inviteTalent(orgId, {
-      email,
-      first_name,
-      last_name,
-      phone,
-      job_title,
-      employment_status,
-      role,
-      skill_tags,
-    });
-  };
 }
 
 type EmailStatus = 'idle' | 'checking' | 'found' | 'ghost';
@@ -74,16 +54,22 @@ export function InviteTalentDialog({
   open,
   onOpenChange,
   orgId,
+  initialStatus,
   onSuccess,
 }: InviteTalentDialogProps) {
-  const [employmentStatus, setEmploymentStatus] = React.useState<EmploymentStatus>('internal_employee');
+  const [employmentStatus, setEmploymentStatus] = React.useState<EmploymentStatus>(initialStatus ?? 'internal_employee');
+
+  // Sync if the prop changes (e.g. user opens different menu item while dialog is mounted)
+  React.useEffect(() => {
+    if (initialStatus) setEmploymentStatus(initialStatus);
+  }, [initialStatus]);
   const [role, setRole] = React.useState<InviteRole>('member');
   const [skillTags, setSkillTags] = React.useState<string[]>([]);
+  const [selectedCaps, setSelectedCaps] = React.useState<string[]>([]);
+  const [capPresets, setCapPresets] = React.useState<string[]>([]);
   const [emailStatus, setEmailStatus] = React.useState<EmailStatus>('idle');
+  const [isPending, setIsPending] = React.useState(false);
   const emailCheckRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const inviteAction = React.useMemo(() => buildInviteAction(orgId), [orgId]);
-  const [state, action, isPending] = useActionState(inviteAction, null);
 
   const handleEmailBlur = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     const email = (e.target.value as string)?.trim();
@@ -105,23 +91,55 @@ export function InviteTalentDialog({
   }, []);
 
   React.useEffect(() => {
-    if (!open) setEmailStatus('idle');
+    if (!open) {
+      setEmailStatus('idle');
+      setSelectedCaps([]);
+    } else {
+      listWorkspaceCapabilityPresets().then(setCapPresets);
+    }
   }, [open]);
 
-  React.useEffect(() => {
-    if (!state) return;
-    if (state.ok) {
-      toast.success(state.message);
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const first_name = (formData.get('first_name') as string)?.trim() ?? '';
+    const last_name = (formData.get('last_name') as string)?.trim() ?? '';
+    const phone = (formData.get('phone') as string)?.trim() || null;
+    const job_title = (formData.get('job_title') as string)?.trim() || null;
+
+    setIsPending(true);
+    const result = await inviteTalent(orgId, {
+      email,
+      first_name,
+      last_name,
+      phone,
+      job_title,
+      employment_status: employmentStatus,
+      role,
+      skill_tags: skillTags,
+      capabilities: selectedCaps,
+    });
+    setIsPending(false);
+
+    if (result.ok) {
+      toast.success(result.message);
       onOpenChange(false);
       onSuccess?.();
     } else {
-      toast.error(state.error);
+      toast.error(result.error);
     }
-  }, [state, onOpenChange, onSuccess]);
+  };
 
   const toggleSkill = (tag: string) => {
     setSkillTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const toggleCap = (cap: string) => {
+    setSelectedCaps((prev) =>
+      prev.includes(cap) ? prev.filter((c) => c !== cap) : [...prev, cap]
     );
   };
 
@@ -136,26 +154,26 @@ export function InviteTalentDialog({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex max-w-md flex-col">
         <SheetHeader>
-          <SheetTitle>Create talent</SheetTitle>
+          <SheetTitle>
+            {initialStatus === 'internal_employee' ? 'Add staff member'
+              : initialStatus === 'external_contractor' ? 'Add contractor'
+              : 'Add to roster'}
+          </SheetTitle>
           <SheetClose />
         </SheetHeader>
-        <SheetBody className="flex flex-col gap-6">
+        <SheetBody>
           <form
-            action={action}
+            onSubmit={handleSubmit}
             className={cn(
-              'flex flex-col gap-6 rounded-2xl border bg-[var(--color-glass-surface)]/50 p-5 transition-all duration-200',
+              'stage-panel flex flex-col gap-6 p-5 transition-all duration-200',
               isContractor
-                ? 'border-dashed border-[var(--color-signal-warning)]/60 shadow-[0_0_20px_-4px_var(--color-signal-warning)/0.15]'
-                : 'border-[var(--color-mercury)] shadow-[0_0_20px_-4px_var(--color-silk)/0.12]'
+                ? 'border border-dashed border-[var(--color-unusonic-warning)]/60 shadow-[0_0_20px_-4px_var(--color-unusonic-warning)/0.15]'
+                : 'shadow-[0_0_20px_-4px_var(--stage-accent)/0.12]'
             )}
           >
-            <input type="hidden" name="employment_status" value={employmentStatus} />
-            <input type="hidden" name="role" value={role} />
-            <input type="hidden" name="skill_tags" value={JSON.stringify(skillTags)} />
-
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+                <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                   First name
                 </label>
                 <Input
@@ -163,11 +181,11 @@ export function InviteTalentDialog({
                   type="text"
                   placeholder="First"
                   required
-                  className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/60"
+                  className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+                <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                   Last name
                 </label>
                 <Input
@@ -175,13 +193,13 @@ export function InviteTalentDialog({
                   type="text"
                   placeholder="Last"
                   required
-                  className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/60"
+                  className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
                 />
               </div>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Email
               </label>
               <Input
@@ -190,136 +208,162 @@ export function InviteTalentDialog({
                 placeholder="name@company.com"
                 required
                 onBlur={handleEmailBlur}
-                className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/60"
+                className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
               />
               {emailStatus === 'checking' && (
-                <p className="mt-1 text-[10px] text-[var(--color-ink-muted)]">Checking…</p>
+                <p className="mt-1 text-[10px] text-[var(--stage-text-secondary)]">Checking…</p>
               )}
               {emailStatus === 'found' && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--color-silk)]/30 bg-[var(--color-silk)]/10 px-2 py-1.5">
-                  <User className="size-4 text-[var(--color-silk)]" />
-                  <span className="text-xs font-medium text-[var(--color-silk)]">User found</span>
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/10 px-2 py-1.5">
+                  <User className="size-4 text-[var(--stage-accent)]" />
+                  <span className="text-xs font-medium text-[var(--stage-accent)]">User found</span>
                 </div>
               )}
               {emailStatus === 'ghost' && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--color-signal-warning)]/30 bg-[var(--color-signal-warning)]/10 px-2 py-1.5">
-                  <UserCircle className="size-4 text-[var(--color-signal-warning)]" />
-                  <span className="text-xs font-medium text-[var(--color-signal-warning)]">Creating new profile</span>
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/10 px-2 py-1.5">
+                  <UserCircle className="size-4 text-[var(--color-unusonic-warning)]" />
+                  <span className="text-xs font-medium text-[var(--color-unusonic-warning)]">Creating new profile</span>
                 </div>
               )}
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Phone
               </label>
               <Input
                 name="phone"
                 type="tel"
                 placeholder="+1 555 000 0000"
-                className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/60"
+                className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Job title
               </label>
               <Input
                 name="job_title"
                 type="text"
                 placeholder="e.g. Audio A1"
-                className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/60"
+                className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
               />
             </div>
 
-            <div>
-              <span className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
-                Status
-              </span>
-              <div
-                role="group"
-                className="inline-flex rounded-lg border border-[var(--color-mercury)] bg-[var(--color-obsidian)]/40 p-0.5"
-              >
-                <button
-                  type="button"
-                  onClick={() => setEmploymentStatus('internal_employee')}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                    employmentStatus === 'internal_employee'
-                      ? 'bg-[var(--color-silk)]/20 text-[var(--color-silk)]'
-                      : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
-                  )}
+            {/* Status toggle — only shown when not pre-configured via initialStatus */}
+            {!initialStatus && (
+              <div>
+                <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                  Status
+                </span>
+                <div
+                  role="group"
+                  className="inline-flex rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-well)]/40 p-0.5"
                 >
-                  Employee
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEmploymentStatus('external_contractor')}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                    employmentStatus === 'external_contractor'
-                      ? 'bg-[var(--color-signal-warning)]/20 text-[var(--color-signal-warning)]'
-                      : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
-                  )}
-                >
-                  Contractor
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setEmploymentStatus('internal_employee')}
+                    className={cn(
+                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                      employmentStatus === 'internal_employee'
+                        ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
+                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
+                    )}
+                  >
+                    Employee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEmploymentStatus('external_contractor')}
+                    className={cn(
+                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                      employmentStatus === 'external_contractor'
+                        ? 'bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)]'
+                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
+                    )}
+                  >
+                    Contractor
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <span className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+            <div className="border-t border-[oklch(1_0_0_/_0.08)]/50 pt-5">
+              <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Role
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {roleOptions.map((opt) => {
                   const roleActive = role === opt.value;
                   const roleClass = roleActive
-                    ? 'border-[var(--color-mercury)] bg-[var(--color-mercury)]/20 text-[var(--color-ink)]'
-                    : 'border-[var(--color-mercury)]/50 text-[var(--color-ink-muted)] hover:border-[var(--color-mercury)] hover:text-[var(--color-ink)]';
+                    ? 'border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.08)]/20 text-[var(--stage-text-primary)]'
+                    : 'border-[oklch(1_0_0_/_0.08)]/50 text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.08)] hover:text-[var(--stage-text-primary)]';
                   return (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => setRole(opt.value)}
                       className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', roleClass)}
-                    ></button>
+                    >{opt.label}</button>
                   );
                 })}
               </div>
             </div>
 
-            <div>
-              <span className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
-                Skills {isContractor && <span className="text-[var(--color-signal-warning)]">(at least one)</span>}
+            <div className="border-t border-[oklch(1_0_0_/_0.08)]/50 pt-5">
+              <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                Skills {isContractor && <span className="text-[var(--color-unusonic-warning)]">(at least one)</span>}
               </span>
               <div className="flex flex-wrap gap-2">
                 {PRESET_SKILL_TAGS.map((tag) => {
                   const tagActive = skillTags.includes(tag);
                   const tagClass = tagActive
-                    ? 'border-[var(--color-silk)] bg-[var(--color-silk)]/15 text-[var(--color-silk)]'
-                    : 'border-[var(--color-mercury)]/50 text-[var(--color-ink-muted)] hover:border-[var(--color-mercury)] hover:text-[var(--color-ink)]';
+                    ? 'border-[var(--stage-accent)] bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]'
+                    : 'border-[oklch(1_0_0_/_0.08)]/50 text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.08)] hover:text-[var(--stage-text-primary)]';
                   return (
                     <button
                       key={tag}
                       type="button"
                       onClick={() => toggleSkill(tag)}
                       className={cn('rounded-full border px-3 py-1 text-xs font-medium transition-colors', tagClass)}
-                    ></button>
+                    >{tag}</button>
                   );
                 })}
               </div>
             </div>
 
+            {capPresets.length > 0 && (
+              <div className="border-t border-[oklch(1_0_0_/_0.08)]/50 pt-5">
+                <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                  Business functions
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {capPresets.map((cap) => {
+                    const capActive = selectedCaps.includes(cap);
+                    const capClass = capActive
+                      ? 'border-[var(--stage-accent)] bg-[var(--stage-accent)]/15 text-[var(--stage-text-primary)]'
+                      : 'border-[oklch(1_0_0_/_0.08)]/50 text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.08)] hover:text-[var(--stage-text-primary)]';
+                    return (
+                      <button
+                        key={cap}
+                        type="button"
+                        onClick={() => toggleCap(cap)}
+                        className={cn('rounded-full border px-3 py-1 text-xs font-medium transition-colors', capClass)}
+                      >{cap}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <Button
               type="submit"
+              variant={isContractor ? 'default' : 'silk'}
               disabled={isPending || (isContractor && skillTags.length === 0)}
               className={cn(
                 'w-full font-medium transition-all',
-                isContractor
-                  ? 'bg-[var(--color-signal-warning)]/90 text-[var(--color-obsidian)] hover:bg-[var(--color-signal-warning)]'
-                  : 'bg-[var(--color-silk)]/90 text-[var(--color-obsidian)] hover:bg-[var(--color-silk)]'
+                isContractor && 'bg-[var(--color-unusonic-warning)]/90 text-[var(--stage-text-on-accent)] hover:bg-[var(--color-unusonic-warning)] border-none'
               )}
             >
               {isPending ? 'Adding…' : 'Add to roster'}

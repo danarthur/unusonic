@@ -16,7 +16,7 @@ export function GenesisRadar() {
       aria-hidden
     >
       <div
-        className="absolute -z-10 rounded-full border border-white/5"
+        className="absolute -z-10 rounded-full border border-[oklch(1_0_0_/_0.05)]"
         style={{
           width: size,
           height: size,
@@ -24,8 +24,8 @@ export function GenesisRadar() {
             radial-gradient(
               circle at 50% 50%,
               transparent 0%,
-              oklch(0.70 0.15 250 / 0.03) 35%,
-              oklch(0.70 0.15 250 / 0.06) 50%,
+              oklch(0.88 0 0 / 0.03) 35%,
+              oklch(0.88 0 0 / 0.06) 50%,
               transparent 70%
             )
           `,
@@ -37,7 +37,7 @@ export function GenesisRadar() {
         style={{
           width: 2,
           height: size / 2,
-          background: 'linear-gradient(to bottom, transparent, oklch(0.70 0.15 250 / 0.25) 20%, oklch(0.70 0.15 250 / 0.5) 50%, transparent 80%)',
+          background: 'linear-gradient(to bottom, transparent, oklch(0.88 0 0 / 0.25) 20%, oklch(0.88 0 0 / 0.5) 50%, transparent 80%)',
           borderRadius: 1,
         }}
         animate={{ rotate: 360 }}

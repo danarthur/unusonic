@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Plus, Building2, ChevronRight, X, User, Pencil, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, Building2, ChevronRight, X, User, Pencil, Loader2, MapPin, Network } from 'lucide-react';
 import { OmniSearch } from '@/widgets/network-stream';
 import { NetworkDetailSheet } from '@/widgets/network-detail';
 import type { NetworkSearchOrg, NodeDetail } from '@/features/network-data';
@@ -26,7 +26,7 @@ import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { CoupleEditSheet } from './couple-edit-sheet';
 import { IndividualEditSheet } from './individual-edit-sheet';
 import { reclassifyClientEntity, type ClientEntityType } from '../actions/reclassify-client-entity';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
 
@@ -40,6 +40,16 @@ function initials(name: string): string {
     .map((w) => w[0])
     .join('')
     .toUpperCase() || '?';
+}
+
+function EntityIcon({ entityType }: { entityType: string | null }) {
+  if (entityType === 'person' || entityType === 'couple') {
+    return <User className="size-5" />;
+  }
+  if (entityType === 'venue') {
+    return <MapPin className="size-5" />;
+  }
+  return <Building2 className="size-5" />;
 }
 
 type StakeholderGridProps = {
@@ -166,12 +176,22 @@ export function StakeholderGrid({
     setPendingOrg(org);
     setOmniOpen(false);
     setSelectedContact(null);
-    setContactSheetOpen(true);
-    setRosterLoading(true);
-    getOrgRosterForStakeholder(org.id).then((list) => {
-      setRoster(list);
-      setRosterLoading(false);
-    });
+
+    // Only ask "who's your contact?" for company-type entities.
+    // Individuals, couples, and venues are a single node — no contact picker needed.
+    const isCompany = !org.entity_type || org.entity_type === 'company' || org.entity_type === 'venue_company';
+    if (isCompany) {
+      setContactSheetOpen(true);
+      setRosterLoading(true);
+      // Prefer entity_uuid for roster lookup (avoids legacy_org_id mismatch)
+      getOrgRosterForStakeholder(org.entity_uuid ?? org.id).then((list) => {
+        setRoster(list);
+        setRosterLoading(false);
+      });
+    } else {
+      // Person / couple — go straight to role picker
+      setRoleSheetOpen(true);
+    }
   };
 
   const handleSelectContact = (entityId: string) => {
@@ -249,9 +269,9 @@ export function StakeholderGrid({
   };
 
   const cardClass = cn(
-    'w-full text-left rounded-2xl border border-white/10 backdrop-blur-xl overflow-hidden',
-    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',
-    compact ? 'liquid-card p-3' : 'liquid-card p-4'
+    'w-full text-left rounded-2xl border border-[oklch(1_0_0_/_0.10)] overflow-hidden',
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
+    compact ? 'stage-panel p-3' : 'stage-panel p-4',
   );
 
   /** Render edit button for a stakeholder — handles cortex-linked orgs, individual, and couple entities */
@@ -271,7 +291,7 @@ export function StakeholderGrid({
           type="button"
           disabled={isLoadingThis}
           onClick={() => handleCoupleEditClick(entityId)}
-          className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] transition-colors disabled:opacity-45"
           aria-label={`Edit ${s.contact_name ?? s.name}`}
         >
           {isLoadingThis
@@ -287,7 +307,7 @@ export function StakeholderGrid({
           type="button"
           disabled={isLoadingThis}
           onClick={() => handleIndividualEditClick(entityId)}
-          className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] transition-colors disabled:opacity-45"
           aria-label={`Edit ${s.name}`}
         >
           {isLoadingThis
@@ -303,7 +323,7 @@ export function StakeholderGrid({
           type="button"
           disabled={!!loadingRelId}
           onClick={() => handleEditClick(s.relationship_id!)}
-          className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] transition-colors disabled:opacity-45"
           aria-label={`Edit ${s.contact_name ?? s.name}`}
         >
           {loadingRelId === s.relationship_id
@@ -313,12 +333,26 @@ export function StakeholderGrid({
       );
     }
 
+    // Ghost company — pencil opens the type-change sheet (edit + switch type)
+    if (entityId) {
+      return (
+        <button
+          type="button"
+          onClick={() => setReclassifySheet({ entityId, currentType: s.entity_type ?? 'company' })}
+          className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] transition-colors"
+          aria-label={`Edit ${s.name}`}
+        >
+          <Pencil className="size-4" />
+        </button>
+      );
+    }
+
     return null;
   };
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-1">
+      <p className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1">
         Stakeholders
       </p>
 
@@ -327,46 +361,39 @@ export function StakeholderGrid({
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={UNUSONIC_PHYSICS}
+          transition={STAGE_LIGHT}
           className="space-y-1"
         >
-          <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted/80">
-            Bill-To
+          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
+            Client
           </p>
           {billTo ? (
-            <div className={cn('flex items-center gap-3', cardClass)} style={{ background: 'var(--color-glass-surface)' }}>
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-ceramic font-medium text-sm tracking-tight">
+            <div className={cn('flex items-center gap-3', cardClass)}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] font-medium text-sm tracking-tight">
                 {initials(billTo.contact_name ?? billTo.name)}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-ceramic tracking-tight truncate">
-                  {billTo.contact_name ?? billTo.name}
-                </p>
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="font-medium text-[var(--stage-text-primary)] tracking-tight truncate">
+                    {billTo.contact_name ?? billTo.name}
+                  </p>
+                  {billTo.relationship_id && (
+                    <Network className="size-3 shrink-0 text-[var(--stage-text-secondary)]/50" aria-label="Linked network entity" />
+                  )}
+                </div>
                 {billTo.organization_name && (
-                  <p className="text-xs text-ink-muted truncate mt-0.5">{billTo.organization_name}</p>
+                  <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{billTo.organization_name}</p>
                 )}
                 {billTo.email && !billTo.organization_name && (
-                  <p className="text-xs text-ink-muted truncate mt-0.5">{billTo.email}</p>
+                  <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{billTo.email}</p>
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {renderEditButton(billTo)}
-                {/* Reclassify — only shown on ghost client entities */}
-                {billTo.organization_id && (
-                  <button
-                    type="button"
-                    title="Change client type"
-                    onClick={() => setReclassifySheet({ entityId: billTo.organization_id!, currentType: billTo.entity_type ?? 'company' })}
-                    className="p-1.5 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/10 transition-colors"
-                    aria-label="Change client type"
-                  >
-                    <RefreshCw className="size-4" />
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => handleRemove(billTo.id)}
-                  className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] transition-colors"
                   aria-label="Remove"
                 >
                   <X className="size-4" />
@@ -378,35 +405,34 @@ export function StakeholderGrid({
               <Link
                 href={`/crm?nodeId=${client.relationshipId}&kind=external_partner`}
                 className={cn('flex items-center gap-3', cardClass)}
-                style={{ background: 'var(--color-glass-surface)' }}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-ceramic font-medium text-sm tracking-tight">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] font-medium text-sm tracking-tight">
                   {initials(client.organization.name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-ceramic tracking-tight truncate">
+                  <p className="font-medium text-[var(--stage-text-primary)] tracking-tight truncate">
                     {client.organization.name || 'Client'}
                   </p>
                   {client.mainContact && (
-                    <p className="text-xs text-ink-muted truncate mt-0.5">
+                    <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
                       {[client.mainContact.first_name, client.mainContact.last_name].filter(Boolean).join(' ')}
                       {client.mainContact.email ? ` · ${client.mainContact.email}` : ''}
                     </p>
                   )}
                 </div>
-                <ChevronRight className="size-4 text-ink-muted shrink-0" />
+                <ChevronRight className="size-4 text-[var(--stage-text-secondary)] shrink-0" />
               </Link>
             ) : (
-              <div className={cn('flex items-center gap-3', cardClass)} style={{ background: 'var(--color-glass-surface)' }}>
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-ceramic font-medium text-sm tracking-tight">
+              <div className={cn('flex items-center gap-3', cardClass)}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] font-medium text-sm tracking-tight">
                   {initials(client.organization.name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-ceramic tracking-tight truncate">
+                  <p className="font-medium text-[var(--stage-text-primary)] tracking-tight truncate">
                     {client.organization.name || 'Client'}
                   </p>
                   {client.mainContact && (
-                    <p className="text-xs text-ink-muted truncate mt-0.5">
+                    <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
                       {[client.mainContact.first_name, client.mainContact.last_name].filter(Boolean).join(' ')}
                       {client.mainContact.email ? ` · ${client.mainContact.email}` : ''}
                     </p>
@@ -418,88 +444,79 @@ export function StakeholderGrid({
         </motion.div>
       )}
 
-      {/* Partners / Planner / Venue / Vendor */}
-      {others.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-ink-muted/80">
-            Partners
-          </p>
-          <div className="flex flex-col gap-2">
-            {others.map((s) => (
-              <motion.div
-                key={s.id}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={UNUSONIC_PHYSICS}
-                className={cn('flex items-center gap-3', cardClass)}
-                style={{ background: 'var(--color-glass-surface)' }}
-              >
-                {s.logo_url ? (
-                  <img
-                    src={s.logo_url}
-                    alt=""
-                    className="size-10 shrink-0 rounded-xl object-cover bg-white/5"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-ceramic">
-                    <Building2 className="size-5" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-ceramic tracking-tight truncate">
-                    {s.contact_name ?? s.name}
-                  </p>
-                  {s.organization_name && (
-                    <p className="text-xs text-ink-muted truncate mt-0.5">{s.organization_name}</p>
-                  )}
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-ink-muted">
-                    {getStakeholderRoleLabel(s.role)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {renderEditButton(s)}
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(s.id)}
-                    className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
-                    aria-label="Remove"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+      {/* Connections — Planner / Venue / Vendor (no group header; role shown per card) */}
+      {others.map((s) => (
+        <motion.div
+          key={s.id}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={STAGE_LIGHT}
+          className={cn('flex items-center gap-3', cardClass)}
+        >
+          {s.logo_url ? (
+            <img
+              src={s.logo_url}
+              alt=""
+              className="size-10 shrink-0 rounded-xl object-cover bg-[oklch(1_0_0_/_0.05)]"
+            />
+          ) : (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)]">
+              <EntityIcon entityType={s.entity_type} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="font-medium text-[var(--stage-text-primary)] tracking-tight truncate">
+                {s.contact_name ?? s.name}
+              </p>
+              {s.relationship_id && (
+                <Network className="size-3 shrink-0 text-[var(--stage-text-secondary)]/50" aria-label="Linked network entity" />
+              )}
+            </div>
+            {s.organization_name && (
+              <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{s.organization_name}</p>
+            )}
+            <span className="inline-block mt-1 text-[11px] font-medium text-[var(--stage-text-secondary)]/80 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] rounded-md px-1.5 py-0.5 leading-none">
+              {getStakeholderRoleLabel(s.role)}
+            </span>
           </div>
-        </div>
-      )}
+          <div className="flex items-center gap-1 shrink-0">
+            {renderEditButton(s)}
+            <button
+              type="button"
+              onClick={() => handleRemove(s.id)}
+              className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] transition-colors"
+              aria-label="Remove"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </motion.div>
+      ))}
 
       {/* Add Connection */}
-      <motion.button
+      <button
         type="button"
         onClick={handleAddConnection}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        transition={UNUSONIC_PHYSICS}
         className={cn(
-          'w-full rounded-2xl border-2 border-dashed border-white/15 backdrop-blur-xl',
+          'w-full rounded-2xl border-2 border-dashed border-[oklch(1_0_0_/_0.15)]',
           'flex items-center gap-3 text-left transition-colors',
-          'hover:border-[var(--color-neon-amber)]/40 hover:bg-[var(--color-neon-amber)]/5',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]',
-          compact ? 'liquid-card p-3' : 'liquid-card p-4'
+          'hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent-muted)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
+          compact ? 'stage-panel-nested p-3' : 'stage-panel-nested p-4'
         )}
-        style={{ background: 'var(--color-glass-surface)' }}
         aria-label="Add connection"
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)]">
-          <Plus className="size-5" aria-hidden />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--stage-accent-muted)] text-[var(--stage-accent)]">
+          <Plus className="size-5" strokeWidth={1.5} aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-ceramic tracking-tight">Add connection</p>
-          <p className="text-xs text-ink-muted truncate mt-0.5">
+          <p className="font-medium text-[var(--stage-text-primary)] tracking-tight">Add connection</p>
+          <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
             {sourceOrgId ? 'Search Network and assign role' : 'Set up Network to add connections'}
           </p>
         </div>
-      </motion.button>
+      </button>
 
       {sourceOrgId && (
         <OmniSearch
@@ -511,16 +528,16 @@ export function StakeholderGrid({
       )}
 
       <Sheet open={setupHintOpen} onOpenChange={setSetupHintOpen}>
-        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
-          <SheetHeader className="border-b border-white/10 px-6 py-5">
+        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0">
+          <SheetHeader className="border-b border-[oklch(1_0_0_/_0.10)] px-6 py-5">
             <SheetTitle>Add connection</SheetTitle>
             <SheetClose />
           </SheetHeader>
           <SheetBody className="flex flex-col gap-4 px-6 py-5">
-            <p className="text-sm text-ink-muted leading-relaxed">
+            <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
               Set up your organization in Network first. Then you can search your rolodex and assign roles (Bill-To, Planner, Venue, Vendor) to this deal.
             </p>
-            <Button asChild className="w-full rounded-xl bg-[var(--color-neon-amber)]/20 text-[var(--color-neon-amber)] hover:bg-[var(--color-neon-amber)]/30">
+            <Button asChild className="w-full rounded-xl bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/30">
               <Link href="/network" className="inline-flex items-center justify-center gap-2">
                 Go to Network
                 <ChevronRight className="size-4" />
@@ -530,23 +547,23 @@ export function StakeholderGrid({
         </SheetContent>
       </Sheet>
 
-      {/* Point of Contact: who is the lead on this deal? (Dual-Node) */}
+      {/* Point of Contact — company orgs only */}
       <Sheet open={contactSheetOpen} onOpenChange={setContactSheetOpen}>
-        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
-          <SheetHeader className="border-b border-white/10 px-6 py-5">
+        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0">
+          <SheetHeader className="border-b border-[oklch(1_0_0_/_0.10)] px-6 py-5">
             <SheetTitle>
-              Who is the lead on this deal?
+              Who&apos;s your contact at {pendingOrg?.name ?? 'this company'}?
             </SheetTitle>
             <SheetClose />
           </SheetHeader>
           <SheetBody className="flex flex-col gap-4 px-6 py-5">
-            {pendingOrg && (
-              <p className="text-sm text-ink-muted">
-                Adding <span className="font-medium text-ceramic">{pendingOrg.name}</span>. Select a contact or skip.
+            {pendingOrg && roster.length === 0 && !rosterLoading && (
+              <p className="text-sm text-[var(--stage-text-secondary)]">
+                No contacts on file yet. Add one or skip.
               </p>
             )}
             {rosterLoading ? (
-              <p className="text-sm text-ink-muted">Loading contacts…</p>
+              <p className="text-sm text-[var(--stage-text-secondary)]">Loading contacts…</p>
             ) : (
               <>
                 <div className="space-y-2 max-h-[240px] overflow-y-auto">
@@ -557,15 +574,15 @@ export function StakeholderGrid({
                       onClick={() => handleSelectContact(c.entity_id)}
                       className={cn(
                         'w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
-                        'border-white/10 hover:bg-white/5 hover:border-[var(--color-neon-amber)]/30'
+                        'border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:border-[var(--stage-accent)]/30'
                       )}
                     >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-ceramic">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)]">
                         <User className="size-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-ceramic tracking-tight truncate">{c.display_name}</p>
-                        {c.email && <p className="text-xs text-ink-muted truncate">{c.email}</p>}
+                        <p className="font-medium text-[var(--stage-text-primary)] tracking-tight truncate">{c.display_name}</p>
+                        {c.email && <p className="text-xs text-[var(--stage-text-secondary)] truncate">{c.email}</p>}
                       </div>
                     </button>
                   ))}
@@ -574,7 +591,7 @@ export function StakeholderGrid({
                   type="button"
                   variant="outline"
                   onClick={handleAddNewContactOpen}
-                  className="w-full rounded-xl border-dashed border-white/20 text-ink-muted hover:text-ceramic hover:border-[var(--color-neon-amber)]/40"
+                  className="w-full rounded-xl border-dashed border-[oklch(1_0_0_/_0.20)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-accent)]/40"
                 >
                   + Add New Contact to {pendingOrg?.name ?? 'Organization'}
                 </Button>
@@ -582,7 +599,7 @@ export function StakeholderGrid({
                   type="button"
                   variant="ghost"
                   onClick={handleSkipContact}
-                  className="w-full rounded-xl text-ink-muted"
+                  className="w-full rounded-xl text-[var(--stage-text-secondary)]"
                 >
                   Skip (no contact)
                 </Button>
@@ -594,8 +611,8 @@ export function StakeholderGrid({
 
       {/* Add New Contact to org (Ghost Forge lightweight) */}
       <Sheet open={addContactOpen} onOpenChange={setAddContactOpen}>
-        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
-          <SheetHeader className="border-b border-white/10 px-6 py-5">
+        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0">
+          <SheetHeader className="border-b border-[oklch(1_0_0_/_0.10)] px-6 py-5">
             <SheetTitle>
               Add contact to {pendingOrg?.name ?? 'organization'}
             </SheetTitle>
@@ -606,13 +623,13 @@ export function StakeholderGrid({
               label="First name"
               value={addContactForm.firstName}
               onChange={(e) => setAddContactForm((p) => ({ ...p, firstName: e.target.value }))}
-              className="bg-white/5 border-[var(--color-mercury)]"
+              className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
             <FloatingLabelInput
               label="Last name"
               value={addContactForm.lastName}
               onChange={(e) => setAddContactForm((p) => ({ ...p, lastName: e.target.value }))}
-              className="bg-white/5 border-[var(--color-mercury)]"
+              className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
             <FloatingLabelInput
               label="Email"
@@ -620,12 +637,12 @@ export function StakeholderGrid({
               value={addContactForm.email}
               onChange={(e) => setAddContactForm((p) => ({ ...p, email: e.target.value }))}
               required
-              className="bg-white/5 border-[var(--color-mercury)]"
+              className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
             <Button
               onClick={handleAddNewContactSubmit}
               disabled={addingContact || !addContactForm.email.trim().includes('@')}
-              className="w-full rounded-xl bg-[var(--color-neon-amber)]/20 text-[var(--color-neon-amber)] hover:bg-[var(--color-neon-amber)]/30"
+              className="w-full rounded-xl bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/30"
             >
               {addingContact ? 'Adding…' : 'Add contact'}
             </Button>
@@ -656,6 +673,16 @@ export function StakeholderGrid({
             onStakeholdersChange();
             router.refresh();
           }}
+          onChangeType={async (newType) => {
+            const result = await reclassifyClientEntity(coupleEdit.entityId, newType);
+            if (result.success) {
+              toast.success(`Client type changed to ${newType}.`);
+              onStakeholdersChange();
+              router.refresh();
+            } else {
+              toast.error(result.error);
+            }
+          }}
         />
       )}
 
@@ -673,19 +700,29 @@ export function StakeholderGrid({
             onStakeholdersChange();
             router.refresh();
           }}
+          onChangeType={async (newType) => {
+            const result = await reclassifyClientEntity(individualEdit.entityId, newType);
+            if (result.success) {
+              toast.success(`Client type changed to ${newType}.`);
+              onStakeholdersChange();
+              router.refresh();
+            } else {
+              toast.error(result.error);
+            }
+          }}
         />
       )}
 
       {/* Reclassify client type sheet */}
       <Sheet open={!!reclassifySheet} onOpenChange={(open) => { if (!open) setReclassifySheet(null); }}>
-        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
-          <SheetHeader className="border-b border-white/10 px-6 py-5">
-            <SheetTitle>Change client type</SheetTitle>
+        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0">
+          <SheetHeader className="border-b border-[oklch(1_0_0_/_0.10)] px-6 py-5">
+            <SheetTitle>Edit client</SheetTitle>
             <SheetClose />
           </SheetHeader>
           <SheetBody className="flex flex-col gap-3 px-6 py-5">
-            <p className="text-sm text-ink-muted mb-2">
-              Choose the type that best describes this client. Their name, deals, and proposals are unchanged.
+            <p className="text-xs text-[var(--stage-text-secondary)]/70">
+              Switch to the type that best describes this client. Their deals and proposals are unchanged.
             </p>
             {(['company', 'person', 'couple'] as ClientEntityType[]).map((t) => {
               const isCurrent = reclassifySheet?.currentType === t;
@@ -704,13 +741,13 @@ export function StakeholderGrid({
                   className={cn(
                     'w-full rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors',
                     isCurrent
-                      ? 'border-[var(--color-ceramic)] bg-white/10 text-ceramic cursor-default'
-                      : 'border-white/10 bg-white/5 text-ink-muted hover:bg-white/10 hover:text-ceramic'
+                      ? 'border-[var(--stage-text-primary)] bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] cursor-default'
+                      : 'border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]'
                   )}
                 >
                   {isLoading && !isCurrent ? <Loader2 className="size-4 animate-spin inline mr-2" /> : null}
                   {labels[t]}
-                  {isCurrent && <span className="ml-2 text-xs text-ink-muted">(current)</span>}
+                  {isCurrent && <span className="ml-2 text-xs text-[var(--stage-text-secondary)]">(current)</span>}
                 </button>
               );
             })}
@@ -719,8 +756,8 @@ export function StakeholderGrid({
       </Sheet>
 
       <Sheet open={roleSheetOpen} onOpenChange={setRoleSheetOpen}>
-        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[var(--color-mercury)] bg-[var(--color-glass-surface)] backdrop-blur-xl p-0">
-          <SheetHeader className="border-b border-white/10 px-6 py-5">
+        <SheetContent side="center" className="flex flex-col max-w-sm border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0">
+          <SheetHeader className="border-b border-[oklch(1_0_0_/_0.10)] px-6 py-5">
             <SheetTitle>
               What is their role?
             </SheetTitle>
@@ -728,10 +765,10 @@ export function StakeholderGrid({
           </SheetHeader>
           <SheetBody className="flex flex-col gap-4 px-6 py-5">
             {pendingOrg && (
-              <p className="text-sm text-ink-muted">
-                Adding <span className="font-medium text-ceramic">{pendingOrg.name}</span>
+              <p className="text-sm text-[var(--stage-text-secondary)]">
+                Adding <span className="font-medium text-[var(--stage-text-primary)]">{pendingOrg.name}</span>
                 {selectedContact && roster.find((r) => r.entity_id === selectedContact) && (
-                  <> · <span className="font-medium text-ceramic">{roster.find((r) => r.entity_id === selectedContact)?.display_name}</span></>
+                  <> · <span className="font-medium text-[var(--stage-text-primary)]">{roster.find((r) => r.entity_id === selectedContact)?.display_name}</span></>
                 )}{' '}
                 to this deal.
               </p>
@@ -743,8 +780,8 @@ export function StakeholderGrid({
                   className={cn(
                     'flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors',
                     selectedRole === role
-                      ? 'border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10'
-                      : 'border-white/10 hover:bg-white/5'
+                      ? 'border-[var(--stage-accent)]/50 bg-[var(--stage-accent-muted)]'
+                      : 'border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)]'
                   )}
                 >
                   <input
@@ -755,14 +792,14 @@ export function StakeholderGrid({
                     onChange={() => setSelectedRole(role)}
                     className="sr-only"
                   />
-                  <span className="text-sm font-medium text-ceramic">{getStakeholderRoleLabel(role)}</span>
+                  <span className="text-sm font-medium text-[var(--stage-text-primary)]">{getStakeholderRoleLabel(role)}</span>
                 </label>
               ))}
             </div>
             <Button
               onClick={handleConfirmRole}
               disabled={adding}
-              className="w-full rounded-xl bg-[var(--color-neon-amber)]/20 text-[var(--color-neon-amber)] hover:bg-[var(--color-neon-amber)]/30"
+              className="w-full rounded-xl bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/30"
             >
               {adding ? 'Adding…' : 'Add'}
             </Button>

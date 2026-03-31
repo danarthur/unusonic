@@ -40,8 +40,8 @@ export function FloatingLabelInput({
         value={value}
         defaultValue={defaultValue}
         className={cn(
-          'peer h-11 rounded-xl border-[var(--color-mercury)] bg-white/5 pt-5 text-ceramic placeholder:text-transparent',
-          'focus-visible:border-[var(--color-silk)]/60 focus-visible:ring-0',
+          'peer h-11 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] pt-5 text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-transparent transition-all duration-200',
+          'hover:bg-[var(--ctx-well-hover)] hover:border-[oklch(1_0_0_/_0.20)] focus-visible:bg-[var(--ctx-well-focus)] focus-visible:border-[var(--stage-accent)] focus-visible:ring-0',
           className
         )}
         onFocus={(e) => {
@@ -65,8 +65,8 @@ export function FloatingLabelInput({
         className={cn(
           'pointer-events-none absolute left-3 transition-all duration-200',
           floating
-            ? 'top-1.5 text-[10px] font-medium text-[var(--color-ink-muted)]'
-            : 'top-1/2 -translate-y-1/2 text-sm text-[var(--color-ink-muted)]'
+            ? 'top-1.5 text-[10px] font-medium text-[var(--stage-text-secondary)]'
+            : 'top-1/2 -translate-y-1/2 text-sm text-[var(--stage-text-secondary)]'
         )}
       >
         {label}

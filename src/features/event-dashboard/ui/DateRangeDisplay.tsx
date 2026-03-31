@@ -35,31 +35,31 @@ export function DateRangeDisplay({
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-silk/30 text-ink">
+        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--stage-accent)]/30 text-[var(--stage-text-primary)]">
           <Calendar className="size-3" />
         </span>
         <div className="min-w-0">
-          <p className="text-xs font-medium text-ink-muted uppercase tracking-wider">Event</p>
-          <p className="text-sm text-ink">{formatRange(startsAt, endsAt)}</p>
+          <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Event</p>
+          <p className="text-sm text-[var(--stage-text-primary)]">{formatRange(startsAt, endsAt)}</p>
         </div>
       </div>
       {(loadIn != null || loadOut != null) && (
-        <div className="flex items-start gap-2 border-l-2 border-amber-500/40 pl-3 ml-1">
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-200">
+        <div className="flex items-start gap-2 border-l-2 border-[var(--color-unusonic-warning)]/40 pl-3 ml-1">
+          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)]">
             <Package className="size-3" />
           </span>
           <div className="min-w-0 flex flex-col gap-1">
-            <p className="text-xs font-medium text-ink-muted uppercase tracking-wider">
+            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
               Load-in / Load-out
             </p>
             {loadIn != null && (
-              <p className="text-sm text-ink">
+              <p className="text-sm text-[var(--stage-text-primary)]">
                 In: {format(new Date(loadIn), 'EEE, MMM d, h:mm a')}
               </p>
             )}
             {loadOut != null && (
-              <p className="text-sm text-ink flex items-center gap-1">
-                {loadIn != null && <ArrowRight className="size-3 text-ink-muted" />}
+              <p className="text-sm text-[var(--stage-text-primary)] flex items-center gap-1">
+                {loadIn != null && <ArrowRight className="size-3 text-[var(--stage-text-secondary)]" />}
                 Out: {format(new Date(loadOut), 'EEE, MMM d, h:mm a')}
               </p>
             )}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/shared/api/supabase/client';
-import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
+import { useState, useMemo } from 'react';
+import { useFinanceData } from './use-finance-data';
+import { useLobbyEvents } from './use-lobby-events';
 
 export type PulseMetrics = {
   /** Current month revenue (from finance API or ledger). */
@@ -20,83 +20,32 @@ export type PulseMetrics = {
 const TARGET_PLACEHOLDER_CENTS = 30000_00; // $30k placeholder
 
 /**
- * Fetches pulse metrics for the 6-second strip and derives heartbeat state.
- * - Velocity: revenue vs target (from finance ledger or placeholder).
- * - Pulse: events with starts_at in [now, now+72h].
- * - Alerts: overdue count (placeholder; can later use invoices past due or sentiment).
+ * Pulse metrics for the 6-second strip and heartbeat state.
+ * Derives from shared lobby events + shared finance data — no independent fetches.
  */
 export function usePulseMetrics(): PulseMetrics & { isActiveMode: boolean } {
-  const { workspaceId } = useWorkspace();
-  const supabase = useMemo(() => createClient(), []);
-  const [revenueCents, setRevenueCents] = useState(0);
+  const { data: financeRows, loading: financeLoading } = useFinanceData();
+  const { events, loading: eventsLoading, error } = useLobbyEvents();
+
+  const revenueCents = useMemo(() => {
+    const total = financeRows.reduce(
+      (acc: number, r) => acc + ((r.amount ?? r.total_amount ?? r.balance_due ?? 0) as number),
+      0,
+    );
+    return Math.round(Number(total) * 100);
+  }, [financeRows]);
+
   const [targetCents] = useState(TARGET_PLACEHOLDER_CENTS);
-  const [activeGigsNext72h, setActiveGigsNext72h] = useState(0);
-  const [alertsCount, setAlertsCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-
-    async function run() {
-      setLoading(true);
-      setError(null);
-
-      const now = new Date();
-      const in72h = new Date(now.getTime() + 72 * 60 * 60 * 1000);
-      const isoNow = now.toISOString();
-      const iso72h = in72h.toISOString();
-
-      try {
-        // Events in next 72h (confirmed, production, live)
-        let query = supabase
-          .from('events')
-          .select('id', { count: 'exact', head: true })
-          .in('lifecycle_status', ['confirmed', 'production', 'live'])
-          .gte('starts_at', isoNow)
-          .lte('starts_at', iso72h);
-
-        if (workspaceId) query = query.eq('workspace_id', workspaceId);
-
-        const { count: gigCount, error: eventsError } = await query;
-
-        if (!active) return;
-        if (eventsError) {
-          console.warn('[Pulse] events error:', eventsError.message);
-          setActiveGigsNext72h(0);
-        } else {
-          setActiveGigsNext72h(typeof gigCount === 'number' ? gigCount : 0);
-        }
-
-        // Revenue: fetch finance API for current month total (simplified: sum first 5 from ledger as proxy)
-        const res = await fetch('/api/finance', { cache: 'no-store' });
-        const financeRows = res.ok ? await res.json() : [];
-        const total = Array.isArray(financeRows)
-          ? financeRows.reduce(
-              (acc: number, r: { amount?: number; total_amount?: number; balance_due?: number }) =>
-                acc + (r.amount ?? r.total_amount ?? r.balance_due ?? 0),
-              0
-            )
-          : 0;
-        setRevenueCents(Math.round(Number(total) * 100));
-
-        // Alerts: placeholder (overdue contracts / high-sentiment — no table yet)
-        setAlertsCount(0);
-      } catch (e) {
-        if (active) {
-          console.error('[Pulse]', e);
-          setError('Unable to load pulse');
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    run();
-    return () => {
-      active = false;
-    };
-  }, [supabase, workspaceId]);
+  const activeGigsNext72h = useMemo(() => {
+    const now = Date.now();
+    const in72h = now + 72 * 60 * 60 * 1000;
+    return events.filter((e) => {
+      if (!['confirmed', 'production', 'live'].includes(e.lifecycle_status)) return false;
+      const t = new Date(e.starts_at).getTime();
+      return t >= now && t <= in72h;
+    }).length;
+  }, [events]);
 
   const isActiveMode = activeGigsNext72h > 0;
 
@@ -104,8 +53,8 @@ export function usePulseMetrics(): PulseMetrics & { isActiveMode: boolean } {
     revenueCents,
     targetCents,
     activeGigsNext72h,
-    alertsCount,
-    loading,
+    alertsCount: 0,
+    loading: eventsLoading || financeLoading,
     error,
     isActiveMode,
   };

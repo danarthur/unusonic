@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
     case 'checkout.session.completed':
       return handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
 
+    case 'payment_intent.succeeded':
+      return handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+
     case 'payment_intent.payment_failed':
       return handlePaymentFailed(event.data.object as Stripe.PaymentIntent);
 
@@ -89,7 +92,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const from = (table: string) => (supabase as any).from(table);
 
   // Idempotency: skip if we already recorded this payment
@@ -169,12 +172,71 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 }
 
 // =============================================================================
+// payment_intent.succeeded — proposal deposit
+// =============================================================================
+
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  const { type, proposal_id } = paymentIntent.metadata ?? {};
+
+  // Only handle proposal deposit intents — other succeeded intents are ignored
+  if (type !== 'proposal_deposit' || !proposal_id) {
+    return json({ received: true });
+  }
+
+  const supabase = getSystemClient();
+   
+  const from = (table: string) => (supabase as any).from(table);
+
+  // Idempotency: skip if already marked paid
+  const { data: existing } = await supabase
+    .from('proposals')
+    .select('id, deposit_paid_at, deal_id')
+    .eq('id', proposal_id)
+    .maybeSingle();
+
+  if (!existing) {
+    console.error('[Stripe Webhook] Proposal not found for deposit intent:', proposal_id);
+    return json({ received: true });
+  }
+
+  const p = existing as { id: string; deposit_paid_at: string | null; deal_id: string | null };
+
+  if (!p.deposit_paid_at) {
+    // Mark the deposit as paid on the proposal
+    const { error: updateError } = await supabase
+      .from('proposals')
+      .update({ deposit_paid_at: new Date().toISOString() })
+      .eq('id', proposal_id);
+
+    if (updateError) {
+      console.error('[Stripe Webhook] Failed to update deposit_paid_at:', updateError.message);
+      return json({ error: 'Failed to record deposit' }, 500);
+    }
+
+    // Advance the deal status to 'deposit_received' only if not already further along
+    if (p.deal_id) {
+      const { error: dealError } = await from('deals')
+        .update({ status: 'deposit_received' })
+        .eq('id', p.deal_id)
+        .in('status', ['inquiry', 'proposal', 'contract_sent', 'contract_signed']);
+
+      if (dealError) {
+        // Non-fatal — log and continue; deposit_paid_at is the source of truth
+        console.error('[Stripe Webhook] Failed to update deal status:', dealError.message);
+      }
+    }
+  }
+
+  return json({ received: true });
+}
+
+// =============================================================================
 // payment_intent.payment_failed
 // =============================================================================
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const from = (table: string) => (supabase as any).from(table);
 
   // Update any pending payment rows for this payment intent to failed

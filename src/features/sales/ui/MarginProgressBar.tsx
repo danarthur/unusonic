@@ -24,26 +24,26 @@ export function MarginProgressBar({
   return (
     <div className={cn('space-y-1.5', className)}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wider text-ink-muted">
+        <span className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
           Margin
         </span>
         <span
           className={cn(
-            'text-sm font-semibold tabular-nums',
-            isGreen && 'text-[var(--color-signal-success)]',
-            isYellow && 'text-[var(--color-signal-warning)]',
+            'text-sm font-medium tabular-nums',
+            isGreen && 'text-[var(--color-unusonic-success)]',
+            isYellow && 'text-[var(--color-unusonic-warning)]',
             isRed && 'text-[var(--color-unusonic-error)]'
           )}
         >
           {Number.isFinite(marginPercent) ? `${marginPercent.toFixed(1)}%` : '—'}
         </span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[oklch(1_0_0_/_0.05)]">
         <div
           className={cn(
-            'h-full rounded-full transition-all duration-300',
-            isGreen && 'bg-[var(--color-signal-success)]',
-            isYellow && 'bg-[var(--color-signal-warning)]',
+            'h-full rounded-full transition-[width] duration-100',
+            isGreen && 'bg-[var(--color-unusonic-success)]',
+            isYellow && 'bg-[var(--color-unusonic-warning)]',
             isRed && 'bg-[var(--color-unusonic-error)]'
           )}
           style={{ width: `${clamped}%` }}
@@ -52,7 +52,7 @@ export function MarginProgressBar({
       {isRed && showWarningIcon && (
         <p className="flex items-center gap-1.5 text-xs text-[var(--color-unusonic-error)]">
           <AlertTriangle size={14} aria-hidden />
-          Margin below 20%. Consider raising price or lowering cost.
+          Margin below 20%
         </p>
       )}
     </div>

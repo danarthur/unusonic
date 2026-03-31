@@ -6,7 +6,7 @@ import { X, ChevronRight, ChevronLeft, Plus, Trash2, MapPin, Building2, User } f
 import { Command } from 'cmdk';
 import { handoverDeal, type HandoverPayload, type HandoverVitals } from '../actions/handover-deal';
 import { getVenueSuggestions, searchOmni, getEntityDisplayName, createGhostVenueEntity, type VenueSuggestion, type OmniResult } from '../actions/lookup';
-import { UNUSONIC_PHYSICS, M3_FADE_THROUGH_VARIANTS } from '@/shared/lib/motion-constants';
+import { STAGE_HEAVY, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
@@ -83,7 +83,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
       const entityId = billTo.entity_id ?? '';
       if (entityId) setClientEntityId(entityId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   // Resolve venue display name when deal already has a venue_id pre-populated
@@ -93,7 +93,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
         if (name) setSelectedVenueName(name);
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   // Venue search effect
@@ -210,27 +210,24 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
-      transition={UNUSONIC_PHYSICS}
-      className="fixed inset-y-0 right-0 z-50 w-full max-w-lg flex flex-col border-l border-white/10 shadow-2xl"
-      style={{ background: 'var(--color-glass-surface)', backdropFilter: 'blur(24px)' }}
+      transition={STAGE_HEAVY}
+      className="fixed inset-y-0 right-0 z-50 w-full max-w-lg flex flex-col border-l border-[oklch(1_0_0_/_0.10)] shadow-2xl"
+      style={{ background: 'var(--stage-surface-raised)' }}
       aria-modal="true"
       aria-labelledby="handoff-wizard-title"
     >
-      <div className="shrink-0 flex items-center justify-between p-4 border-b border-white/10">
-        <h2 id="handoff-wizard-title" className="text-ceramic font-medium tracking-tight">
+      <div className="shrink-0 flex items-center justify-between p-4 border-b border-[oklch(1_0_0_/_0.10)]">
+        <h2 id="handoff-wizard-title" className="text-[var(--stage-text-primary)] font-medium tracking-tight">
           Hand over to production
         </h2>
-        <motion.button
+        <button
           type="button"
           onClick={onDismiss}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.98 }}
-          transition={UNUSONIC_PHYSICS}
-          className="p-2 rounded-xl text-ink-muted hover:text-ceramic hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label="Close"
         >
-          <X size={20} aria-hidden />
-        </motion.button>
+          <X size={20} strokeWidth={1.5} aria-hidden />
+        </button>
       </div>
 
       <div className="shrink-0 px-4 pt-3 pb-2 flex gap-2">
@@ -239,7 +236,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
             key={label}
             className={cn(
               'text-xs font-medium uppercase tracking-widest',
-              i === stepIndex ? 'text-neon' : i < stepIndex ? 'text-mercury' : 'text-mercury/50'
+              i === stepIndex ? 'text-[var(--stage-text-primary)]' : i < stepIndex ? 'text-[var(--stage-text-secondary)]' : 'text-[var(--stage-text-secondary)]/50'
             )}
           >
             {i + 1}. {label}
@@ -252,43 +249,43 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
           {step === 'Vitals' && (
             <motion.div
               key="vitals"
-              initial={M3_FADE_THROUGH_VARIANTS.hidden}
-              animate={M3_FADE_THROUGH_VARIANTS.visible}
-              exit={M3_FADE_THROUGH_VARIANTS.hidden}
-              transition={UNUSONIC_PHYSICS}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={STAGE_NAV_CROSSFADE}
               className="flex flex-col gap-5"
             >
-              <div className="liquid-card rounded-[28px] p-5 border border-white/10 space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">Date & time</p>
+              <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
+                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Date & time</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="handoff-start" className="block text-sm text-mercury mb-1.5">Start</label>
+                    <label htmlFor="handoff-start" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Start</label>
                     <input
                       id="handoff-start"
                       type="datetime-local"
                       value={startAt}
                       onChange={(e) => setStartAt(e.target.value)}
-                      className="w-full rounded-xl bg-obsidian/80 border border-white/10 px-3 py-2 text-ceramic text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className="w-full rounded-xl bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                   </div>
                   <div>
-                    <label htmlFor="handoff-end" className="block text-sm text-mercury mb-1.5">End</label>
+                    <label htmlFor="handoff-end" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">End</label>
                     <input
                       id="handoff-end"
                       type="datetime-local"
                       value={endAt}
                       onChange={(e) => setEndAt(e.target.value)}
-                      className="w-full rounded-xl bg-obsidian/80 border border-white/10 px-3 py-2 text-ceramic text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className="w-full rounded-xl bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                   </div>
                 </div>
               </div>
-              <div className="liquid-card rounded-[28px] p-5 border border-white/10 space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">Venue & client</p>
+              <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
+                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Venue & client</p>
 
                 {/* Venue search */}
                 <div>
-                  <label htmlFor="handoff-venue" className="block text-sm text-mercury mb-1.5">Venue</label>
+                  <label htmlFor="handoff-venue" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Venue</label>
                   <div className="relative">
                     <input
                       id="handoff-venue"
@@ -302,10 +299,10 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                       }}
                       onFocus={() => setVenueOpen(true)}
                       onBlur={() => setTimeout(() => setVenueOpen(false), 200)}
-                      className="w-full rounded-xl bg-obsidian/80 border border-white/10 px-3 py-2 text-ceramic text-sm placeholder:text-mercury/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className="w-full rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                     {venueOpen && venueQuery.length >= 1 && venueResults.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[180px] overflow-y-auto rounded-xl border border-white/10 bg-obsidian/95 shadow-xl">
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[180px] overflow-y-auto rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-void)]/95 shadow-xl">
                         {venueResults.map((r, i) =>
                           r.type === 'venue' ? (
                             <button
@@ -319,12 +316,12 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                                 setVenueResults([]);
                                 setVenueOpen(false);
                               }}
-                              className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                              className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[oklch(1_0_0_/_0.05)]"
                             >
-                              <MapPin size={16} className="shrink-0 text-mercury/60" strokeWidth={1.5} aria-hidden />
-                              <span className="text-ceramic truncate">{r.name}</span>
+                              <MapPin size={16} className="shrink-0 text-[var(--stage-text-secondary)]/60" strokeWidth={1.5} aria-hidden />
+                              <span className="text-[var(--stage-text-primary)] truncate">{r.name}</span>
                               {(r.address || r.city) && (
-                                <span className="text-mercury/50 text-xs truncate shrink-0 max-w-[140px]">
+                                <span className="text-[var(--stage-text-secondary)]/50 text-xs truncate shrink-0 max-w-[140px]">
                                   {[r.address, r.city, r.state].filter(Boolean).join(', ')}
                                 </span>
                               )}
@@ -347,7 +344,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                                   setVenueResults([]);
                                 }
                               }}
-                              className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-neon hover:bg-white/5 disabled:opacity-50"
+                              className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-45"
                             >
                               <Plus size={16} className="shrink-0" strokeWidth={1.5} aria-hidden />
                               <span className="truncate">{venueCreating ? 'Creating…' : `Create "${r.query}"`}</span>
@@ -357,18 +354,18 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                       </div>
                     )}
                     {(venueLoading || venueCreating) && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-mercury/50">…</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--stage-text-secondary)]/50">…</span>
                     )}
                   </div>
                 </div>
 
                 {/* Client search */}
                 <div>
-                  <label className="block text-sm text-mercury mb-1.5">
+                  <label className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">
                     Client {billTo ? `— Bill-To: ${billTo.organization_name ?? billTo.name}` : ''}
                   </label>
                   <Command
-                    className="rounded-xl border border-white/10 bg-obsidian/80 overflow-hidden"
+                    className="rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-void)]/80 overflow-hidden"
                     loop
                   >
                     <Command.Input
@@ -381,10 +378,10 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                       onFocus={() => setClientOpen(true)}
                       onBlur={() => setTimeout(() => setClientOpen(false), 180)}
                       placeholder="Search org or contact…"
-                      className="w-full border-0 bg-transparent px-3 py-2 text-sm text-ceramic placeholder:text-mercury/50 focus:outline-none focus:ring-0"
+                      className="w-full border-0 bg-transparent px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-0"
                     />
                     {clientOpen && clientResults.length > 0 && (
-                      <Command.List className="h-fit max-h-[200px] overflow-y-auto border-t border-white/10">
+                      <Command.List className="h-fit max-h-[200px] overflow-y-auto border-t border-[oklch(1_0_0_/_0.10)]">
                         {clientResults.map((r) => (
                           <Command.Item
                             key={`${r.type}-${r.id}`}
@@ -400,25 +397,25 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                               setClientQuery('');
                               setClientResults([]);
                             }}
-                            className="flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer hover:bg-white/5 data-[selected=true]:bg-white/5"
+                            className="flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer hover:bg-[oklch(1_0_0_/_0.05)] data-[selected=true]:bg-[oklch(1_0_0_/_0.05)]"
                           >
                             {r.type === 'org' ? (
-                              <Building2 size={16} className="shrink-0 text-mercury/60" strokeWidth={1.5} aria-hidden />
+                              <Building2 size={16} className="shrink-0 text-[var(--stage-text-secondary)]/60" strokeWidth={1.5} aria-hidden />
                             ) : (
-                              <User size={16} className="shrink-0 text-mercury/60" strokeWidth={1.5} aria-hidden />
+                              <User size={16} className="shrink-0 text-[var(--stage-text-secondary)]/60" strokeWidth={1.5} aria-hidden />
                             )}
-                            <span className="text-ceramic truncate">
+                            <span className="text-[var(--stage-text-primary)] truncate">
                               {r.type === 'org' ? r.name : `${r.first_name} ${r.last_name}`}
                             </span>
                             {r.type === 'contact' && r.email && (
-                              <span className="text-mercury/50 text-xs truncate shrink-0 max-w-[120px]">{r.email}</span>
+                              <span className="text-[var(--stage-text-secondary)]/50 text-xs truncate shrink-0 max-w-[120px]">{r.email}</span>
                             )}
                           </Command.Item>
                         ))}
                       </Command.List>
                     )}
                     {clientLoading && clientQuery.length >= 2 && (
-                      <div className="px-3 py-2 text-xs text-mercury/50">Searching…</div>
+                      <div className="px-3 py-2 text-xs text-[var(--stage-text-secondary)]/50">Searching…</div>
                     )}
                   </Command>
                 </div>
@@ -429,34 +426,34 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
           {step === 'Gear & inventory' && (
             <motion.div
               key="gear"
-              initial={M3_FADE_THROUGH_VARIANTS.hidden}
-              animate={M3_FADE_THROUGH_VARIANTS.visible}
-              exit={M3_FADE_THROUGH_VARIANTS.hidden}
-              transition={UNUSONIC_PHYSICS}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={STAGE_NAV_CROSSFADE}
               className="flex flex-col gap-5"
             >
-              <div className="liquid-card rounded-[28px] p-5 border border-white/10 space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">Tech & gear</p>
+              <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
+                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Tech & gear</p>
                 <div>
-                  <label htmlFor="handoff-gear" className="block text-sm text-mercury mb-1.5">Tech specs / gear requirements</label>
+                  <label htmlFor="handoff-gear" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Tech specs / gear requirements</label>
                   <textarea
                     id="handoff-gear"
                     rows={3}
                     placeholder="e.g. backline, power drops, rigging"
                     value={gearRequirements}
                     onChange={(e) => setGearRequirements(e.target.value)}
-                    className="w-full rounded-xl bg-obsidian/80 border border-white/10 px-3 py-2 text-ceramic text-sm placeholder:text-mercury/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] resize-none"
+                    className="w-full rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
                   />
                 </div>
                 <div>
-                  <label htmlFor="handoff-restrictions" className="block text-sm text-mercury mb-1.5">Venue restrictions</label>
+                  <label htmlFor="handoff-restrictions" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Venue restrictions</label>
                   <textarea
                     id="handoff-restrictions"
                     rows={3}
                     placeholder="e.g. stairs only, load-in window, noise curfew"
                     value={venueRestrictions}
                     onChange={(e) => setVenueRestrictions(e.target.value)}
-                    className="w-full rounded-xl bg-obsidian/80 border border-white/10 px-3 py-2 text-ceramic text-sm placeholder:text-mercury/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] resize-none"
+                    className="w-full rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
                   />
                 </div>
               </div>
@@ -466,15 +463,15 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
           {step === 'Crew' && (
             <motion.div
               key="crew"
-              initial={M3_FADE_THROUGH_VARIANTS.hidden}
-              animate={M3_FADE_THROUGH_VARIANTS.visible}
-              exit={M3_FADE_THROUGH_VARIANTS.hidden}
-              transition={UNUSONIC_PHYSICS}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={STAGE_NAV_CROSSFADE}
               className="flex flex-col gap-5"
             >
-              <div className="liquid-card rounded-[28px] p-5 border border-white/10 space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-ink-muted">Required roles</p>
-                <p className="text-sm text-mercury">Specify roles (e.g. Lead DJ, Lighting Tech, FOH).</p>
+              <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
+                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Required roles</p>
+                <p className="text-sm text-[var(--stage-text-secondary)]">Specify roles (e.g. Lead DJ, Lighting Tech, FOH).</p>
                 <ul className="space-y-2">
                   {crewRoles.map((role, i) => (
                     <li key={i} className="flex gap-2">
@@ -483,33 +480,27 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                         value={role}
                         onChange={(e) => updateCrewRole(i, e.target.value)}
                         placeholder="Role name"
-                        className="flex-1 rounded-xl bg-obsidian/80 border border-white/10 px-3 py-2 text-ceramic text-sm placeholder:text-mercury/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        className="flex-1 rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                       />
-                      <motion.button
+                      <button
                         type="button"
                         onClick={() => removeCrewRole(i)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={UNUSONIC_PHYSICS}
-                        className="p-2 rounded-xl text-ink-muted hover:text-unusonic-error hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                         aria-label="Remove role"
                       >
-                        <Trash2 size={18} aria-hidden />
-                      </motion.button>
+                        <Trash2 size={18} strokeWidth={1.5} aria-hidden />
+                      </button>
                     </li>
                   ))}
                 </ul>
-                <motion.button
+                <button
                   type="button"
                   onClick={addCrewRole}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={UNUSONIC_PHYSICS}
-                  className="flex items-center gap-2 text-sm text-neon hover:text-neon/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-xl py-2"
+                  className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-xl py-2 px-1 -mx-1 transition-colors"
                 >
-                  <Plus size={18} aria-hidden />
+                  <Plus size={18} strokeWidth={1.5} aria-hidden />
                   Add role
-                </motion.button>
+                </button>
               </div>
             </motion.div>
           )}
@@ -522,35 +513,29 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
         )}
       </div>
 
-      <div className="shrink-0 flex items-center justify-between gap-4 p-4 border-t border-white/10">
+      <div className="shrink-0 flex items-center justify-between gap-4 p-4 border-t border-[oklch(1_0_0_/_0.10)]">
         <div>
           {!isFirst ? (
-            <motion.button
+            <button
               type="button"
               onClick={handleBack}
               disabled={submitting}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={UNUSONIC_PHYSICS}
-              className="flex items-center gap-2 text-mercury hover:text-ceramic focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-xl py-2 disabled:opacity-50"
+              className="flex items-center gap-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-xl py-2 disabled:opacity-45 transition-colors"
             >
-              <ChevronLeft size={18} aria-hidden />
+              <ChevronLeft size={18} strokeWidth={1.5} aria-hidden />
               Back
-            </motion.button>
+            </button>
           ) : null}
         </div>
-        <motion.button
+        <button
           type="button"
           onClick={handleNext}
           disabled={submitting}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          transition={UNUSONIC_PHYSICS}
-          className="bg-obsidian text-ceramic px-5 py-2.5 rounded-full liquid-levitation flex items-center gap-2 text-sm font-medium tracking-tight hover:brightness-110 disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="bg-[var(--stage-void)] text-[var(--stage-text-primary)] px-5 py-2.5 rounded-full stage-panel flex items-center gap-2 text-sm font-medium tracking-tight disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors hover:bg-[var(--stage-surface-hover)]"
         >
           {submitting ? 'Handing over…' : isLast ? 'Hand over' : 'Next'}
-          {!submitting && !isLast && <ChevronRight size={18} aria-hidden />}
-        </motion.button>
+          {!submitting && !isLast && <ChevronRight size={18} strokeWidth={1.5} aria-hidden />}
+        </button>
       </div>
     </motion.div>
   );

@@ -3,5 +3,5 @@ export { NetworkDetailSheetWithSuspense } from './ui/NetworkDetailSheetWithSuspe
 export { IdentityHeader } from './ui/IdentityHeader';
 export { TradeLedger } from './ui/TradeLedger';
 export { PrivateNotes } from './ui/PrivateNotes';
-export { SignalScoutInput } from './ui/SignalScoutInput';
-export { SignalScoutInput as SignalIONInput } from './ui/SignalScoutInput';
+export { AionScoutInput } from './ui/AionScoutInput';
+export { AionScoutInput as AionInput } from './ui/AionScoutInput';

@@ -44,7 +44,7 @@ export function TeamAssembler({ className }: TeamAssemblerProps) {
         toast.error(result.error);
         setInvites((prev) => prev.filter((e) => e.email !== trimmed));
       } else {
-        toast.success(`Signal sent to ${trimmed}`);
+        toast.success(`Invite sent to ${trimmed}`);
         setInvites((prev) =>
           prev.map((e) => (e.email === trimmed ? { ...e, status: 'filled' as const } : e))
         );
@@ -58,10 +58,10 @@ export function TeamAssembler({ className }: TeamAssemblerProps) {
   return (
     <div className={cn('max-w-2xl mx-auto w-full text-center', className)}>
       <div className="mb-12">
-        <h2 className="text-2xl font-light tracking-tight text-[var(--color-ink)]">
+        <h2 className="text-2xl font-light tracking-tight text-[var(--stage-text-primary)]">
           Assemble The Core
         </h2>
-        <p className="text-[var(--color-ink-muted)] mt-2">
+        <p className="text-[var(--stage-text-secondary)] mt-2">
           Who commands this vessel with you?
         </p>
       </div>
@@ -85,9 +85,9 @@ export function TeamAssembler({ className }: TeamAssemblerProps) {
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAdd())}
           placeholder="colleague@example.com"
           className={cn(
-            'w-full rounded-xl border bg-white/5 border-[var(--color-mercury)] py-4 px-4 text-center text-lg font-light',
-            'text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/50',
-            'focus:border-[var(--color-silk)]/50 focus:ring-2 focus:ring-[var(--color-silk)]/20 outline-none transition-colors'
+            'w-full rounded-xl border bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] py-4 px-4 text-center text-lg font-light',
+            'text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.5]',
+            'focus:border-[var(--stage-accent)]/50 focus:ring-2 focus:ring-[var(--stage-accent)]/20 outline-none transition-colors'
           )}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -96,18 +96,18 @@ export function TeamAssembler({ className }: TeamAssemblerProps) {
             variant="ghost"
             onClick={handleAdd}
             disabled={!email.trim() || isPending}
-            className="text-xs uppercase tracking-widest text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+            className="text-xs uppercase tracking-widest text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]"
           >
             Add
           </Button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/5 pt-8">
+      <div className="flex items-center justify-between border-t border-[oklch(1_0_0_/_0.05)] pt-8">
         <Button
           variant="ghost"
           onClick={handleSkip}
-          className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+          className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]"
         >
           I am flying solo for now
         </Button>

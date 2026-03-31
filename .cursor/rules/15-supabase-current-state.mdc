@@ -35,4 +35,4 @@ alwaysApply: false
 
 ## Reference only
 
-This rule is **memory/reference**. It does not instruct changing app code; it reflects the current state so Cursor and tools reason correctly about Supabase and Signal’s connection to it.
+This rule is **memory/reference**. It does not instruct changing app code; it reflects the current state so Cursor and tools reason correctly about Supabase and Unusonic’s connection to it.

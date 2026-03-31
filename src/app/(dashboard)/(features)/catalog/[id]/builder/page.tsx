@@ -10,10 +10,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ChevronLeft, Image, Type, List, PenLine } from 'lucide-react';
+import { ChevronLeft, Image, Type, List } from 'lucide-react';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { getPackage, updatePackage, getCatalogPackagesWithTags } from '@/features/sales/api/package-actions';
 import type { PackageWithTags } from '@/features/sales/api/package-actions';
 import { generatePackageDefinition } from '@/features/ai/tools/package-generator';
@@ -33,7 +33,7 @@ import type {
   LineItemPricingType,
 } from '@/features/sales/api/package-actions';
 import { CeramicSwitch } from '@/shared/ui/switch';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 const BLOCK_TYPES: { type: string; label: string; icon: typeof Image }[] = [
@@ -136,13 +136,13 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
     <div className="space-y-6">
       {/* 1. Header & Quantity */}
       <div>
-        <h3 className="text-sm font-medium text-ceramic tracking-tight mb-1">
+        <h3 className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight mb-1">
           {catalogItem?.name ?? block.catalogId}
         </h3>
         <span
           className={cn(
             'inline-block text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded-md',
-            'bg-white/10 text-ink-muted border border-[var(--glass-border)]'
+            'bg-[var(--stage-surface)] text-[var(--stage-text-secondary)] border border-[var(--stage-edge-subtle)]'
           )}
         >
           {(catalogItem?.category as string)?.replace(/_/g, ' ') ?? 'Item'}
@@ -156,10 +156,8 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
             type="button"
             aria-label="Decrease quantity"
             onClick={() => updateBlock(block.id, { quantity: Math.max(1, quantity - 1) })}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            transition={UNUSONIC_PHYSICS}
-            className="shrink-0 w-10 h-10 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic font-medium text-lg flex items-center justify-center hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            transition={STAGE_LIGHT}
+            className="shrink-0 w-10 h-10 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-lg flex items-center justify-center hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             −
           </motion.button>
@@ -177,10 +175,8 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
             type="button"
             aria-label="Increase quantity"
             onClick={() => updateBlock(block.id, { quantity: quantity + 1 })}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            transition={UNUSONIC_PHYSICS}
-            className="shrink-0 w-10 h-10 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic font-medium text-lg flex items-center justify-center hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            transition={STAGE_LIGHT}
+            className="shrink-0 w-10 h-10 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-lg flex items-center justify-center hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             +
           </motion.button>
@@ -188,10 +184,10 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
       </div>
 
       {/* 2. Pricing Strategy */}
-      <div className="space-y-3 rounded-xl border border-[var(--glass-border)] p-4 bg-white/[0.02]">
-        <p className="text-xs font-medium text-ceramic">Pricing</p>
+      <div className="space-y-3 rounded-[var(--stage-radius-nested)] border border-[var(--stage-edge-subtle)] p-4 bg-[var(--stage-void)]">
+        <p className="text-xs font-medium text-[var(--stage-text-primary)]">Pricing</p>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-ink-muted">
+          <span className="text-sm text-[var(--stage-text-secondary)]">
             Include in base package price
           </span>
           <CeramicSwitch
@@ -202,7 +198,7 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
             aria-label="Include in base package price"
           />
         </div>
-        <p className="text-xs text-ink-muted">
+        <p className="text-xs text-[var(--stage-text-secondary)]">
           {included
             ? 'Client sees this item with price "Included."'
             : 'This item adds its own price on top of the package.'}
@@ -210,15 +206,15 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
       </div>
 
       {/* 3. Financial Summary (read-only) */}
-      <div className="rounded-xl border border-[var(--glass-border)] p-4 bg-[var(--glass-bg)]/30 space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-ink-muted">Financial impact</p>
+      <div className="rounded-[var(--stage-radius-nested)] border border-[var(--stage-edge-subtle)] p-4 bg-[var(--stage-void)] space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Financial impact</p>
         <div className="flex justify-between text-sm">
-          <span className="text-ink-muted">Unit cost</span>
-          <span className="tabular-nums text-ceramic">{formatCurrency(targetCost)}</span>
+          <span className="text-[var(--stage-text-secondary)]">Unit cost</span>
+          <span className="tabular-nums text-[var(--stage-text-primary)]">{formatCurrency(targetCost)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-ink-muted">Total cost impact</span>
-          <span className="tabular-nums text-ceramic">
+          <span className="text-[var(--stage-text-secondary)]">Total cost impact</span>
+          <span className="tabular-nums text-[var(--stage-text-primary)]">
             {totalCostImpact != null ? `${formatCurrency(totalCostImpact)} (${quantity} × ${formatCurrency(targetCost)})` : '—'}
           </span>
         </div>
@@ -259,7 +255,9 @@ export default function CatalogBuilderPage() {
   }, [id]);
 
   useEffect(() => {
-    loadPackage();
+    queueMicrotask(() => {
+      loadPackage();
+    });
   }, [loadPackage]);
 
   const loadCatalog = useCallback(async () => {
@@ -270,7 +268,10 @@ export default function CatalogBuilderPage() {
   }, [workspaceId, id]);
 
   useEffect(() => {
-    if (workspaceId && id) loadCatalog();
+    if (!workspaceId || !id) return;
+    queueMicrotask(() => {
+      loadCatalog();
+    });
   }, [workspaceId, id, loadCatalog]);
 
   // Compute bundle target cost from ingredient target_costs in catalogPackages
@@ -424,14 +425,14 @@ export default function CatalogBuilderPage() {
   }, [workspaceId, ionPrompt]);
 
   const inputClass =
-    'w-full px-4 py-2.5 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-ceramic placeholder:text-ink-muted text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
-  const labelClass = 'block text-xs font-medium uppercase tracking-wider text-ink-muted mb-1';
+    'w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
+  const labelClass = 'block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1';
 
   if (!hasWorkspace || !workspaceId) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Select a workspace to edit packages.</p>
-        <Link href="/catalog" className="mt-4 text-sm text-neon hover:underline">
+        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
           Back to Master menu
         </Link>
       </div>
@@ -440,7 +441,7 @@ export default function CatalogBuilderPage() {
 
   if (!id) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Loading…</p>
       </div>
     );
@@ -448,7 +449,7 @@ export default function CatalogBuilderPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Loading package…</p>
       </div>
     );
@@ -456,9 +457,9 @@ export default function CatalogBuilderPage() {
 
   if (error || !pkg) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-ink-muted">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm text-[var(--color-unusonic-error)]">{error ?? 'Package not found.'}</p>
-        <Link href="/catalog" className="mt-4 text-sm text-neon hover:underline">
+        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
           Back to Master menu
         </Link>
       </div>
@@ -467,25 +468,23 @@ export default function CatalogBuilderPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-var(--sidebar-header-height,4rem))] max-h-[calc(100vh-4rem)]">
-      <header className="flex items-center gap-4 shrink-0 px-6 py-4 border-b border-[var(--glass-border)] bg-obsidian/80">
+      <header className="flex items-center gap-4 shrink-0 px-6 py-4 border-b border-[var(--stage-edge-subtle)] bg-[var(--stage-void)]">
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ceramic transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
         >
-          <ChevronLeft size={18} aria-hidden />
+          <ChevronLeft size={18} strokeWidth={1.5} aria-hidden />
           Master menu
         </Link>
-        <h1 className="text-lg font-medium text-ceramic tracking-tight truncate flex-1">
+        <h1 className="text-lg font-medium text-[var(--stage-text-primary)] tracking-tight truncate flex-1">
           {pkg.name}
         </h1>
         <div className="flex items-center gap-2">
           <motion.button
             type="button"
             onClick={() => { setIonError(null); setIonModalOpen(true); }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={UNUSONIC_PHYSICS}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--glass-border)] text-ink-muted hover:text-ceramic hover:bg-[var(--glass-bg-hover)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            transition={STAGE_LIGHT}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             title="Ask Aion to build this package"
           >
             <LivingLogo size="sm" status="idle" />
@@ -495,10 +494,8 @@ export default function CatalogBuilderPage() {
             type="button"
             onClick={saveDefinition}
             disabled={saving}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={UNUSONIC_PHYSICS}
-            className="px-4 py-2.5 rounded-xl border border-[var(--color-neon-amber)]/50 bg-[var(--color-neon-amber)]/10 text-[var(--color-neon-amber)] font-medium text-sm hover:bg-[var(--color-neon-amber)]/20 disabled:opacity-50"
+            transition={STAGE_LIGHT}
+            className="px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.2)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save Changes'}
           </motion.button>
@@ -509,10 +506,10 @@ export default function CatalogBuilderPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Ask Aion</DialogTitle>
-            <DialogClose className="p-2 rounded-lg text-ink-muted hover:text-ceramic hover:bg-white/5" />
+            <DialogClose className="p-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]" />
           </DialogHeader>
           <div className="px-6 pb-6 flex flex-col gap-4">
-            <p className="text-sm text-ink-muted">
+            <p className="text-sm text-[var(--stage-text-secondary)]">
               Describe the package you want. Aion will use your catalog and build the blocks for you.
             </p>
             <textarea
@@ -529,14 +526,12 @@ export default function CatalogBuilderPage() {
               type="button"
               onClick={handleIonSubmit}
               disabled={ionLoading || !ionPrompt.trim()}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={UNUSONIC_PHYSICS}
-              className="w-full py-2.5 rounded-xl border border-neon/50 bg-neon/10 text-neon font-medium text-sm hover:bg-neon/20 disabled:opacity-50"
+              transition={STAGE_LIGHT}
+              className="w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.2)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] disabled:opacity-50"
             >
               {ionLoading ? 'Building…' : 'Generate package'}
             </motion.button>
-            <p className="text-xs text-ink-muted border-t border-[var(--glass-border)] pt-4 mt-2">
+            <p className="text-xs text-[var(--stage-text-secondary)] border-t border-[var(--stage-edge-subtle)] pt-4 mt-2">
               Aion can make mistakes, please double check its work.
             </p>
           </div>
@@ -545,15 +540,15 @@ export default function CatalogBuilderPage() {
 
       <div className="flex flex-1 min-h-0">
         {/* Pane 1: Toolbox (left ~20%) */}
-        <aside className="w-[20%] min-w-[200px] max-w-[260px] shrink-0 border-r border-[var(--glass-border)] flex flex-col bg-obsidian/50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-[var(--glass-border)] shrink-0">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+        <aside className="w-[20%] min-w-[200px] max-w-[260px] shrink-0 border-r border-[var(--stage-edge-subtle)] flex flex-col bg-[var(--stage-void)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-[var(--stage-edge-subtle)] shrink-0">
+            <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               Presentation & Structure
             </h2>
           </div>
           <ul className="p-3 space-y-2 overflow-auto">
             {BLOCK_TYPES.map(({ type, label, icon: Icon }) => (
-              <motion.li key={type} transition={UNUSONIC_PHYSICS}>
+              <motion.li key={type} transition={STAGE_LIGHT}>
                 <div
                   role="button"
                   tabIndex={0}
@@ -573,13 +568,13 @@ export default function CatalogBuilderPage() {
                     }
                   }}
                   className={cn(
-                    'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm liquid-card border border-[var(--glass-border)] cursor-grab active:cursor-grabbing',
-                    'text-ink-muted hover:text-ceramic hover:border-white/20 transition-colors',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]'
+                    'w-full flex items-center gap-3 px-4 py-3 rounded-[var(--stage-radius-nested)] text-left text-sm stage-panel border border-[var(--stage-edge-subtle)] cursor-grab active:cursor-grabbing',
+                    'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.15)] transition-colors',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
                   )}
                 >
-                  <div className="shrink-0 w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center">
-                    <Icon size={18} className="text-ink-muted" aria-hidden />
+                  <div className="shrink-0 w-9 h-9 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface)] flex items-center justify-center">
+                    <Icon size={18} strokeWidth={1.5} className="text-[var(--stage-text-secondary)]" aria-hidden />
                   </div>
                   <span className="font-medium">{label}</span>
                 </div>
@@ -588,14 +583,14 @@ export default function CatalogBuilderPage() {
           </ul>
           {catalogPackages.length > 0 && (
             <>
-              <div className="px-4 py-2 border-t border-[var(--glass-border)] shrink-0">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <div className="px-4 py-2 border-t border-[var(--stage-edge-subtle)] shrink-0">
+                <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   From catalog
                 </h2>
               </div>
               <ul className="p-3 space-y-2 overflow-auto flex-1 min-h-0">
                 {catalogPackages.map((pkg) => (
-                  <motion.li key={pkg.id} transition={UNUSONIC_PHYSICS}>
+                  <motion.li key={pkg.id} transition={STAGE_LIGHT}>
                     <div
                       draggable
                       onDragStart={(e) => {
@@ -606,17 +601,17 @@ export default function CatalogBuilderPage() {
                         e.dataTransfer.effectAllowed = 'copy';
                       }}
                       className={cn(
-                        'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm liquid-card border border-[var(--glass-border)] cursor-grab active:cursor-grabbing',
-                        'text-ink-muted hover:text-ceramic hover:border-white/20 transition-colors',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]'
+                        'w-full flex items-center gap-3 px-4 py-3 rounded-[var(--stage-radius-nested)] text-left text-sm stage-panel border border-[var(--stage-edge-subtle)] cursor-grab active:cursor-grabbing',
+                        'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.15)] transition-colors',
+                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
                       )}
                     >
-                      <div className="shrink-0 w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center">
-                        <List size={18} className="text-ink-muted" aria-hidden />
+                      <div className="shrink-0 w-9 h-9 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface)] flex items-center justify-center">
+                        <List size={18} strokeWidth={1.5} className="text-[var(--stage-text-secondary)]" aria-hidden />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="font-medium block truncate text-ceramic">{pkg.name}</span>
-                        <span className="text-xs text-ink-muted capitalize">
+                        <span className="font-medium block truncate text-[var(--stage-text-primary)]">{pkg.name}</span>
+                        <span className="text-xs text-[var(--stage-text-secondary)] capitalize">
                           {(pkg.category as string)?.replace(/_/g, ' ') ?? 'Item'}
                         </span>
                       </div>
@@ -629,15 +624,15 @@ export default function CatalogBuilderPage() {
         </aside>
 
         {/* Pane 2: Canvas (center ~50%, scrollable) */}
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-unusonic-void">
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--stage-void)]">
           <div className="flex-1 min-h-0 overflow-auto p-6">
-            <LiquidPanel
-              className="min-h-[360px] p-6 rounded-[28px]"
+            <StagePanel
+              className="min-h-[360px] p-6 rounded-[var(--stage-radius-panel)]"
               onDragOver={handleCanvasDragOver}
               onDrop={(e) => handleCanvasDrop(e)}
             >
               {definition.blocks.length === 0 ? (
-                <p className="text-sm text-ink-muted py-12 text-center">
+                <p className="text-sm text-[var(--stage-text-secondary)] py-12 text-center">
                   Drag blocks here to build your package.
                 </p>
               ) : (
@@ -646,37 +641,37 @@ export default function CatalogBuilderPage() {
                     <motion.li
                       key={block.id}
                       layout
-                      transition={UNUSONIC_PHYSICS}
+                      transition={STAGE_LIGHT}
                       onDragOver={handleCanvasDragOver}
                       onDrop={(e) => handleCanvasDrop(e, index)}
                       className={cn(
-                        'rounded-xl border p-4 cursor-pointer transition-colors',
+                        'rounded-[var(--stage-radius-nested)] border p-4 cursor-pointer transition-colors',
                         selectedBlockId === block.id
-                          ? 'border-neon/50 bg-neon/10'
-                          : 'border-[var(--glass-border)] hover:border-white/20 hover:bg-white/5'
+                          ? 'border-[oklch(1_0_0_/_0.25)] bg-[oklch(1_0_0_/_0.06)]'
+                          : 'border-[var(--stage-edge-subtle)] hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[var(--stage-surface)]'
                       )}
                       onClick={() => setSelectedBlockId(block.id)}
                     >
-                      <span className="text-xs uppercase tracking-wider text-ink-muted">
+                      <span className="text-xs uppercase tracking-wider text-[var(--stage-text-secondary)]">
                         {block.type.replace(/_/g, ' ')}
                       </span>
                       {block.type === 'header_hero' && 'content' in block && (
-                        <p className="text-ceramic font-medium mt-1">
+                        <p className="text-[var(--stage-text-primary)] font-medium mt-1">
                           {(block.content as { title?: string }).title || 'Untitled'}
                         </p>
                       )}
                       {block.type === 'line_item' && 'catalogId' in block && (
-                        <p className="text-ceramic font-medium mt-1">
+                        <p className="text-[var(--stage-text-primary)] font-medium mt-1">
                           {catalogPackages.find((p) => p.id === (block as { catalogId: string }).catalogId)?.name ??
                             (block as { catalogId: string }).catalogId}{' '}
                           × {(block as { quantity: number }).quantity ?? 1}
                         </p>
                       )}
                       {block.type === 'line_item_group' && 'label' in block && (
-                        <p className="text-ceramic font-medium mt-1">{block.label}</p>
+                        <p className="text-[var(--stage-text-primary)] font-medium mt-1">{block.label}</p>
                       )}
                       {block.type === 'text_block' && 'content' in block && (
-                        <p className="text-sm text-ink-muted mt-1 line-clamp-2">
+                        <p className="text-sm text-[var(--stage-text-secondary)] mt-1 line-clamp-2">
                           {(block.content as string) || 'Empty'}
                         </p>
                       )}
@@ -684,14 +679,14 @@ export default function CatalogBuilderPage() {
                   ))}
                 </ul>
               )}
-            </LiquidPanel>
+            </StagePanel>
           </div>
         </main>
 
         {/* Pane 3: Inspector (right ~30%) */}
-        <aside className="w-[30%] min-w-[240px] max-w-[360px] shrink-0 border-l border-[var(--glass-border)] flex flex-col bg-obsidian/50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-[var(--glass-border)] shrink-0">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+        <aside className="w-[30%] min-w-[240px] max-w-[360px] shrink-0 border-l border-[var(--stage-edge-subtle)] flex flex-col bg-[var(--stage-void)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-[var(--stage-edge-subtle)] shrink-0">
+            <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
               Inspector
             </h2>
           </div>
@@ -699,18 +694,18 @@ export default function CatalogBuilderPage() {
             {!selectedBlock ? (
               <>
                 <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-3">
+                  <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
                     Package
                   </h3>
-                  <p className="text-sm text-ink-muted mb-4">
+                  <p className="text-sm text-[var(--stage-text-secondary)] mb-4">
                     Select a block in the canvas to edit its settings.
                   </p>
                   {isService && (
-                    <div className="space-y-4 rounded-xl border border-[var(--glass-border)] p-4 bg-white/[0.02]">
-                      <p className="text-xs font-medium text-ceramic">
+                    <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[var(--stage-edge-subtle)] p-4 bg-[var(--stage-void)]">
+                      <p className="text-xs font-medium text-[var(--stage-text-primary)]">
                         Staffing requirement
                       </p>
-                      <p className="text-xs text-ink-muted">
+                      <p className="text-xs text-[var(--stage-text-secondary)]">
                         When booked, the system will check for a staff member with the selected role (and optional default person).
                       </p>
                       <label className="flex items-center gap-3 cursor-pointer">
@@ -718,9 +713,9 @@ export default function CatalogBuilderPage() {
                           type="checkbox"
                           checked={staffing.required}
                           onChange={(e) => updateStaffing({ required: e.target.checked })}
-                          className="rounded border-[var(--glass-border)] bg-[var(--glass-bg)]/50 text-neon focus:ring-[var(--ring)]"
+                          className="rounded border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-nested)] text-[var(--stage-accent)] focus:ring-[var(--stage-accent)]"
                         />
-                        <span className="text-sm text-ceramic">Requires staff with role</span>
+                        <span className="text-sm text-[var(--stage-text-primary)]">Requires staff with role</span>
                       </label>
                       {staffing.required && (
                         <>
@@ -750,7 +745,7 @@ export default function CatalogBuilderPage() {
                               className={inputClass}
                               placeholder="e.g. DJ Allegra"
                             />
-                            <p className="text-xs text-ink-muted mt-1">
+                            <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
                               Optional. Assign a specific person as default for this package.
                             </p>
                           </div>
@@ -835,7 +830,7 @@ export default function CatalogBuilderPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-ink-muted">{selectedBlock.type} — no editor yet.</p>
+              <p className="text-sm text-[var(--stage-text-secondary)]">{selectedBlock.type} — no editor yet.</p>
             )}
           </div>
         </aside>

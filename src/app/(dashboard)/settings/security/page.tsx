@@ -30,8 +30,8 @@ export default async function SecuritySettingsPage() {
   const pendingRecovery = recoveryRes.data ?? null;
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto p-6 max-w-2xl">
-      <h1 className="text-xl font-semibold tracking-tight text-ceramic mb-6">
+    <div className="flex-1 min-h-0 overflow-auto p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)] mb-6">
         Security
       </h1>
       <SecuritySection

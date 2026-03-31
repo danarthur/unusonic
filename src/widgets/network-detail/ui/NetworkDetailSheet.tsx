@@ -10,7 +10,7 @@ import { TradeLedger } from './TradeLedger';
 import { PrivateNotes } from './PrivateNotes';
 import { NodeCrewList } from './NodeCrewList';
 import { RoleSelect } from '@/features/team-invite/ui/RoleSelect';
-import type { SignalRoleId } from '@/features/team-invite/model/role-presets';
+import { UNUSONIC_ROLE_PRESETS, getRoleLabel, type UnusonicRoleId } from '@/features/team-invite/model/role-presets';
 import {
   updateOrgMemberRole,
   removeRosterMember,
@@ -50,11 +50,11 @@ function InternalMemberRoleCard({
   const router = useRouter();
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const role = (details.memberRole ?? 'member') as SignalRoleId;
+  const role = (details.memberRole ?? 'member') as UnusonicRoleId;
   const canAssignElevated = details.canAssignElevatedRole ?? false;
 
   const handleRoleChange = React.useCallback(
-    async (newRole: SignalRoleId) => {
+    async (newRole: UnusonicRoleId) => {
       setError(null);
       setSaving(true);
       const result = await updateOrgMemberRole(details.id, sourceOrgId, newRole);
@@ -69,19 +69,38 @@ function InternalMemberRoleCard({
     [details.id, sourceOrgId, onSaved, router]
   );
 
+  const selectedPreset = UNUSONIC_ROLE_PRESETS.find((p) => p.id === role);
+
   return (
-    <div className="liquid-card rounded-2xl p-4 md:col-span-1">
-      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)] mb-3">
-        Role
-      </h3>
-      <RoleSelect
-        value={role}
-        onChange={handleRoleChange}
-        canAssignElevated={canAssignElevated}
-        disabled={saving}
-      />
+    <div className="stage-panel rounded-2xl p-4 md:col-span-1 space-y-3">
+      <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+        Access level
+      </p>
+
+      {canAssignElevated ? (
+        <RoleSelect
+          value={role}
+          onChange={handleRoleChange}
+          canAssignElevated
+          disabled={saving}
+          showLabel={false}
+        />
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-full border border-[oklch(1_0_0_/_0.06)] bg-[oklch(1_0_0_/_0.04)] px-2.5 py-0.5 text-xs font-medium text-[var(--stage-text-primary)]">
+            {getRoleLabel(role)}
+          </span>
+        </div>
+      )}
+
+      {selectedPreset?.description && (
+        <p className="text-xs text-[var(--stage-text-secondary)] leading-relaxed">
+          {selectedPreset.description}
+        </p>
+      )}
+
       {error && (
-        <p className="mt-2 text-xs text-[var(--color-unusonic-error)]">{error}</p>
+        <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
       )}
     </div>
   );
@@ -130,7 +149,7 @@ function InlineEditField({
   if (editing) {
     return (
       <div>
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           {label}
         </p>
         <input
@@ -143,7 +162,7 @@ function InlineEditField({
             if (e.key === 'Escape') { cancellingRef.current = true; setSaveError(null); setEditing(false); setTimeout(() => { cancellingRef.current = false; }, 0); }
           }}
           disabled={saving}
-          className="w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-2 py-1 text-sm text-[var(--color-ink)] outline-none focus:border-[var(--color-silk)]/50 disabled:opacity-50"
+          className="w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-sm text-[var(--stage-text-primary)] outline-none focus:border-[var(--stage-accent)]/50 disabled:opacity-50"
         />
         {saveError && (
           <p className="mt-1 text-xs text-[var(--color-unusonic-error)]">{saveError}</p>
@@ -154,7 +173,7 @@ function InlineEditField({
 
   return (
     <div>
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+      <p className="mb-1 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         {label}
       </p>
       <button
@@ -162,10 +181,10 @@ function InlineEditField({
         onClick={() => setEditing(true)}
         className="group flex w-full items-center gap-2 text-left"
       >
-        <span className="text-sm text-[var(--color-ink)]">
-          {value || <span className="text-[var(--color-ink-muted)]">—</span>}
+        <span className="text-sm text-[var(--stage-text-primary)]">
+          {value || <span className="text-[var(--stage-text-secondary)]">—</span>}
         </span>
-        <Pencil className="size-3 opacity-0 transition-opacity group-hover:opacity-50 text-[var(--color-ink-muted)]" />
+        <Pencil className="size-3 opacity-0 transition-opacity group-hover:opacity-50 text-[var(--stage-text-secondary)]" />
       </button>
     </div>
   );
@@ -197,8 +216,8 @@ function InternalMemberFieldsCard({
     : '';
 
   return (
-    <div className="liquid-card rounded-2xl p-4 md:col-span-2 space-y-4">
-      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)]">
+    <div className="stage-panel rounded-2xl p-4 md:col-span-2 space-y-4">
+      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Profile
       </h3>
       <InlineEditField label="Job title" value={jobTitle} onSave={makeFieldSaver('job_title')} />
@@ -282,8 +301,8 @@ function RosterStatusCard({
   };
 
   return (
-    <div className="liquid-card rounded-2xl p-4 md:col-span-3 space-y-3">
-      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)]">
+    <div className="stage-panel rounded-2xl p-4 md:col-span-3 space-y-3">
+      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Roster actions
       </h3>
 
@@ -291,8 +310,8 @@ function RosterStatusCard({
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1">
-            <p className="text-sm text-[var(--color-ink)]">Do not rebook</p>
-            <p className="text-xs text-[var(--color-ink-muted)]">
+            <p className="text-sm text-[var(--stage-text-primary)]">Do not rebook</p>
+            <p className="text-xs text-[var(--stage-text-secondary)]">
               Flags this person in scheduling suggestions.
             </p>
           </div>
@@ -305,7 +324,7 @@ function RosterStatusCard({
                 type="button"
                 onClick={handleDnrToggle}
                 disabled={dnrSaving}
-                className="rounded-lg px-2.5 py-1 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
+                className="rounded-lg px-2.5 py-1 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
               >
                 Clear
               </button>
@@ -315,14 +334,14 @@ function RosterStatusCard({
               type="button"
               onClick={handleDnrToggle}
               disabled={dnrSaving}
-              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors disabled:opacity-50"
+              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors disabled:opacity-50"
             >
               Flag do not rebook
             </button>
           )}
         </div>
         {doNotRebook && details.lastModifiedByName && (
-          <p className="text-xs text-[var(--color-ink-muted)]/70">
+          <p className="text-xs text-[var(--stage-text-secondary)]/70">
             Set by {details.lastModifiedByName}
             {details.lastModifiedAt ? ` · ${new Date(details.lastModifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
           </p>
@@ -331,13 +350,13 @@ function RosterStatusCard({
       </div>
 
       {/* Archive / Unarchive */}
-      <div className="space-y-1 pt-1 border-t border-[var(--color-mercury)]">
+      <div className="space-y-1 pt-1 border-t border-[oklch(1_0_0_/_0.08)]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1">
-            <p className="text-sm text-[var(--color-ink)]">
+            <p className="text-sm text-[var(--stage-text-primary)]">
               {isArchived ? 'Archived' : 'Archive'}
             </p>
-            <p className="text-xs text-[var(--color-ink-muted)]">
+            <p className="text-xs text-[var(--stage-text-secondary)]">
               {isArchived
                 ? 'Member is on record but excluded from active scheduling.'
                 : 'Keeps the member on record but removes from active scheduling.'}
@@ -348,7 +367,7 @@ function RosterStatusCard({
               type="button"
               onClick={() => handleArchive()}
               disabled={archiving}
-              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
+              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
             >
               {archiving ? 'Restoring…' : 'Unarchive'}
             </button>
@@ -365,7 +384,7 @@ function RosterStatusCard({
               <button
                 type="button"
                 onClick={() => setArchiveConfirm(false)}
-                className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors"
+                className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors"
               >
                 Cancel
               </button>
@@ -374,7 +393,7 @@ function RosterStatusCard({
             <button
               type="button"
               onClick={() => setArchiveConfirm(true)}
-              className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors"
+              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors"
             >
               Archive
             </button>
@@ -384,10 +403,10 @@ function RosterStatusCard({
       </div>
 
       {/* Remove from roster */}
-      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--color-mercury)]">
+      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[oklch(1_0_0_/_0.08)]">
         <div className="flex-1">
-          <p className="text-sm text-[var(--color-ink)]">Remove from roster</p>
-          <p className="text-xs text-[var(--color-ink-muted)]">
+          <p className="text-sm text-[var(--stage-text-primary)]">Remove from roster</p>
+          <p className="text-xs text-[var(--stage-text-secondary)]">
             Permanently removes this member. Cannot be undone.
           </p>
         </div>
@@ -408,7 +427,7 @@ function RosterStatusCard({
             <button
               type="button"
               onClick={() => { setRemoveConfirm(false); setForceCount(null); }}
-              className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[oklch(1_0_0/0.05)] transition-colors"
+              className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors"
             >
               Cancel
             </button>
@@ -421,7 +440,7 @@ function RosterStatusCard({
               setForceCount(null);
               setRemoveError(null);
             }}
-            className="rounded-lg border border-[var(--color-mercury)] px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:border-[var(--color-unusonic-error)]/50 hover:text-[var(--color-unusonic-error)] transition-colors"
+            className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-error)]/50 hover:text-[var(--color-unusonic-error)] transition-colors"
           >
             Remove from roster
           </button>
@@ -515,7 +534,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
       >
         <motion.div
           role="presentation"
-          className="absolute inset-0 bg-[oklch(0.12_0_0/0.5)] backdrop-blur-sm"
+          className="absolute inset-0 bg-[oklch(0.12_0_0/0.5)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -530,27 +549,39 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="
             fixed inset-y-0 right-0 z-10 flex flex-col h-dvh w-[85vw] max-w-[85vw] md:w-[600px] md:max-w-[600px]
-            bg-[var(--color-glass-surface)] backdrop-blur-xl
-            border-l border-[var(--color-mercury)] shadow-2xl
+            bg-[var(--stage-surface-raised)]            border-l border-[oklch(1_0_0_/_0.08)] shadow-2xl rounded-l-2xl
           "
         >
-          <header className="flex shrink-0 items-center gap-3 border-b border-[var(--color-mercury)] px-4 py-3 md:px-5 md:py-3">
-            <h1 id="network-detail-title" className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-[var(--color-ink)]">
+          <header className="flex shrink-0 items-center gap-3 border-b border-[oklch(1_0_0_/_0.08)] px-4 py-3 md:px-5 md:py-3">
+            <h1 id="network-detail-title" className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-[var(--stage-text-primary)]">
               {details.identity.name}
             </h1>
             <div className="flex shrink-0 items-center gap-1">
-              {details.isGhost && (
+              {/* Ghost partner — edit their external entity profile */}
+              {isPartner && details.isGhost && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push(`/network/entity/${details.id}?kind=external_partner${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
-                  className="h-8 gap-1.5 px-2 text-[var(--color-silk)] hover:bg-[var(--color-silk)]/10"
+                  className="h-8 gap-1.5 px-2 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/10"
                 >
                   <FileEdit className="size-4" />
                   Edit
                 </Button>
               )}
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--color-ink-muted)]" aria-label="View profile">
+              {/* Internal employee / contractor — navigate to their person entity studio */}
+              {!isPartner && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push(`/network/entity/${details.id}?kind=${details.kind}${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
+                  className="h-8 gap-1.5 px-2 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/10"
+                >
+                  <FileEdit className="size-4" />
+                  Edit
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--stage-text-secondary)]" aria-label="View profile">
                 <Globe className="size-4" />
               </Button>
               <Button
@@ -573,7 +604,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
             />
 
             {/* Tab strip with sliding indicator */}
-            <div className="shrink-0 border-b border-[var(--color-mercury)] px-4 md:px-5">
+            <div className="shrink-0 border-b border-[oklch(1_0_0_/_0.08)] px-4 md:px-5">
               <div className="relative flex h-12" role="tablist">
                 {getTabsForDetail(details).map((tab) => {
                   const displayLabel = tab.id === 'crew' && details.entityDirectoryType === 'venue'
@@ -590,9 +621,9 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       onClick={() => setActiveTab(tab.id)}
                       className={`
                         text-xs font-medium uppercase tracking-widest
-                        transition-colors text-[var(--color-ink-muted)]
-                        hover:text-[var(--color-ink)]
-                        ${activeTab === tab.id ? 'text-[var(--color-ink)]' : ''}
+                        transition-colors duration-200 text-[var(--stage-text-secondary)]
+                        hover:text-[var(--stage-text-primary)]
+                        ${activeTab === tab.id ? 'text-[var(--stage-text-primary)]' : ''}
                       `}
                     >
                       {displayLabel}
@@ -600,7 +631,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                     {activeTab === tab.id && (
                       <motion.div
                         layoutId="network-detail-tab-indicator"
-                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-silk)]"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--stage-accent)]"
                         initial={false}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                       />
@@ -626,12 +657,10 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                   className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(120px,auto)]"
                 >
-                  {/* Signal cell: Ledger — col-span-1 */}
-                  <div className="liquid-card rounded-2xl p-4 md:col-span-1">
-                    <TradeLedger details={details} />
-                  </div>
+                  {/* Ledger cell — col-span-1 */}
+                  <TradeLedger details={details} />
                   {/* Support cell: Notes — col-span-2 */}
-                  <div className="liquid-card rounded-2xl p-4 md:col-span-2">
+                  <div className="stage-panel rounded-2xl p-4 md:col-span-2">
                     <PrivateNotes
                       relationshipId={details.relationshipId}
                       initialNotes={details.notes}
@@ -664,33 +693,33 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   )}
                   {/* Contact info — person/couple entities */}
                   {isPartner && (details.entityDirectoryType === 'person' || details.entityDirectoryType === 'couple') && (details.personEmail || details.personPhone || details.couplePartnerBEmail) && (
-                    <div className="liquid-card rounded-2xl p-4 md:col-span-2">
-                      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)] mb-3">
+                    <div className="stage-panel rounded-2xl p-4 md:col-span-2">
+                      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-3">
                         Contact
                       </h3>
                       {details.entityDirectoryType === 'couple' ? (
                         <div className="space-y-2">
                           {details.personEmail && (
                             <div>
-                              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] mb-0.5">{details.couplePartnerAName ?? 'Partner A'}</p>
-                              <p className="text-sm text-[var(--color-ink)]">{details.personEmail}</p>
+                              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-0.5">{details.couplePartnerAName ?? 'Partner A'}</p>
+                              <p className="text-sm text-[var(--stage-text-primary)]">{details.personEmail}</p>
                             </div>
                           )}
                           {details.couplePartnerBEmail && (
                             <div>
-                              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] mb-0.5">{details.couplePartnerBName ?? 'Partner B'}</p>
-                              <p className="text-sm text-[var(--color-ink)]">{details.couplePartnerBEmail}</p>
+                              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-0.5">{details.couplePartnerBName ?? 'Partner B'}</p>
+                              <p className="text-sm text-[var(--stage-text-primary)]">{details.couplePartnerBEmail}</p>
                             </div>
                           )}
                         </div>
                       ) : (
                         <div className="space-y-2">
                           {details.personEmail && (
-                            <p className="text-sm text-[var(--color-ink)]">{details.personEmail}</p>
+                            <p className="text-sm text-[var(--stage-text-primary)]">{details.personEmail}</p>
                           )}
                           {details.personPhone && (
                             <a href={`tel:${details.personPhone}`}
-                              className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
+                              className="text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                               onClick={(e) => e.stopPropagation()}>
                               {details.personPhone}
                             </a>
@@ -701,15 +730,15 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   )}
                   {/* Website — org/venue entities only (not person/couple) */}
                   {isPartner && details.orgWebsite && details.entityDirectoryType !== 'person' && details.entityDirectoryType !== 'couple' && (
-                    <div className="liquid-card rounded-2xl p-4 md:col-span-2">
-                      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)] mb-2">
+                    <div className="stage-panel rounded-2xl p-4 md:col-span-2">
+                      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-2">
                         Website
                       </h3>
                       <a
                         href={details.orgWebsite.startsWith('http') ? details.orgWebsite : `https://${details.orgWebsite}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-[var(--color-silk)] hover:underline break-all"
+                        className="text-sm text-[var(--stage-accent)] hover:underline break-all"
                       >
                         {details.orgWebsite}
                       </a>
@@ -721,31 +750,31 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                     const hasAny = specs.capacity || specs.load_in_notes || specs.power_notes || specs.stage_notes;
                     if (!hasAny) return null;
                     return (
-                      <div className="liquid-card rounded-2xl p-4 space-y-3 md:col-span-2">
-                        <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Venue specs</h3>
+                      <div className="stage-panel rounded-2xl p-4 space-y-3 md:col-span-2">
+                        <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Venue specs</h3>
                         <dl className="space-y-2">
                           {specs.capacity && (
                             <div className="flex items-center justify-between text-sm">
-                              <dt className="text-[var(--color-ink-muted)]">Capacity</dt>
-                              <dd className="font-mono text-[var(--color-ink)]">{specs.capacity.toLocaleString()}</dd>
+                              <dt className="text-[var(--stage-text-secondary)]">Capacity</dt>
+                              <dd className="font-mono text-[var(--stage-text-primary)]">{specs.capacity.toLocaleString()}</dd>
                             </div>
                           )}
                           {specs.load_in_notes && (
                             <div className="space-y-0.5">
-                              <dt className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Load-in</dt>
-                              <dd className="text-sm text-[var(--color-ink)]">{specs.load_in_notes}</dd>
+                              <dt className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Load-in</dt>
+                              <dd className="text-sm text-[var(--stage-text-primary)]">{specs.load_in_notes}</dd>
                             </div>
                           )}
                           {specs.power_notes && (
                             <div className="space-y-0.5">
-                              <dt className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Power</dt>
-                              <dd className="text-sm text-[var(--color-ink)]">{specs.power_notes}</dd>
+                              <dt className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Power</dt>
+                              <dd className="text-sm text-[var(--stage-text-primary)]">{specs.power_notes}</dd>
                             </div>
                           )}
                           {specs.stage_notes && (
                             <div className="space-y-0.5">
-                              <dt className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Stage</dt>
-                              <dd className="text-sm text-[var(--color-ink)]">{specs.stage_notes}</dd>
+                              <dt className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Stage</dt>
+                              <dd className="text-sm text-[var(--stage-text-primary)]">{specs.stage_notes}</dd>
                             </div>
                           )}
                         </dl>
@@ -760,17 +789,17 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                     && (() => {
                       const addr = details.orgAddress as { street?: string; city?: string; state?: string; postal_code?: string } | null;
                       return (
-                        <div className="liquid-card rounded-2xl p-4 space-y-3 md:col-span-2">
-                          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">Contact</h3>
+                        <div className="stage-panel rounded-2xl p-4 space-y-3 md:col-span-2">
+                          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Contact</h3>
                           {details.orgSupportEmail && (
                             <a href={`mailto:${details.orgSupportEmail}`}
-                              className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
+                              className="flex items-center gap-2 text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                               onClick={(e) => e.stopPropagation()}>
                               {details.orgSupportEmail}
                             </a>
                           )}
                           {addr && (addr.street || addr.city) && (
-                            <address className="not-italic space-y-0.5 text-sm text-[var(--color-ink-muted)]">
+                            <address className="not-italic space-y-0.5 text-sm text-[var(--stage-text-secondary)]">
                               {addr.street && <p>{addr.street}</p>}
                               {(addr.city || addr.state) && <p>{[addr.city, addr.state].filter(Boolean).join(', ')}</p>}
                               {addr.postal_code && <p>{addr.postal_code}</p>}
@@ -782,11 +811,11 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   }
                   {/* Events — col-span-1 */}
                   {details.active_events.length > 0 && (
-                    <div className="liquid-card rounded-2xl p-4 md:col-span-1">
-                      <h3 className="text-sm font-medium tracking-wide text-[var(--color-ink-muted)] mb-2">
+                    <div className="stage-panel rounded-2xl p-4 md:col-span-1">
+                      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-2">
                         Events
                       </h3>
-                      <ul className="space-y-1 text-sm text-[var(--color-ink)]">
+                      <ul className="space-y-1 text-sm text-[var(--stage-text-primary)]">
                         {details.active_events.map((name, i) => (
                           <li key={`${name}-${i}`}>{name}</li>
                         ))}
@@ -817,7 +846,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       onAdded={handleCrewAdded}
                     />
                   ) : (
-                    <p className="text-sm text-[var(--color-ink-muted)]">
+                    <p className="text-sm text-[var(--stage-text-secondary)]">
                       Available for partners.
                     </p>
                   )}
@@ -834,12 +863,12 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -8 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  className="liquid-card flex flex-col items-center justify-center min-h-[180px] rounded-2xl p-6"
+                  className="stage-panel flex flex-col items-center justify-center min-h-[180px] rounded-2xl p-6"
                 >
-                  <p className="text-sm text-[var(--color-ink-muted)] text-center">
+                  <p className="text-sm text-[var(--stage-text-secondary)] text-center">
                     Coming soon.
                   </p>
-                  <p className="text-xs text-[var(--color-ink-muted)]/70 mt-1">
+                  <p className="text-xs text-[var(--stage-text-secondary)]/70 mt-1">
                     Trade ledger and balance tracking
                   </p>
                 </motion.div>

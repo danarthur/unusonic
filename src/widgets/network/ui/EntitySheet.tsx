@@ -33,13 +33,13 @@ interface EntitySheetProps {
 type TabId = 'profile' | 'private_notes' | 'roster';
 
 function StarRating({ value, max = 5 }: { value: number | null; max?: number }) {
-  if (value == null) return <span className="text-[var(--color-ink-muted)]">—</span>;
+  if (value == null) return <span className="text-[var(--stage-text-secondary)]">—</span>;
   return (
     <span className="flex gap-0.5">
       {Array.from({ length: max }, (_, i) => (
         <span
           key={i}
-          className={i < value ? 'text-[var(--color-walnut)]' : 'text-[var(--color-ink-muted)]/40'}
+          className={i < value ? 'text-[var(--stage-text-secondary)]' : 'text-[var(--stage-text-secondary)]/40'}
         >
           ★
         </span>
@@ -107,16 +107,18 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
               </SheetTitle>
               <SheetClose />
             </SheetHeader>
-            <div className="flex gap-1 border-b border-[var(--color-mercury)] px-6">
+            <div role="tablist" className="flex gap-1 border-b border-[oklch(1_0_0_/_0.08)] px-6">
               {tabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"
+                  role="tab"
+                  aria-selected={tab === t.id}
                   onClick={() => setTab(t.id)}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ${
                     tab === t.id
-                      ? 'text-[var(--color-ink)] border-b-2 border-[var(--color-silk)]'
-                      : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                      ? 'text-[var(--stage-text-primary)] border-b-2 border-[var(--stage-accent)]'
+                      : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
                   }`}
                 >
                   {t.label}
@@ -128,17 +130,17 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                 <div className="space-y-4">
                   {isOrg && (
                     <>
-                      <p className="text-sm text-[var(--color-ink-muted)]">
+                      <p className="text-sm text-[var(--stage-text-secondary)]">
                         {org!.is_claimed ? 'Claimed' : 'Ghost'} · {org!.roster?.length ?? 0} people
                       </p>
                       {org!.slug && (
-                        <p className="text-xs text-[var(--color-ink-muted)]">/{org!.slug}</p>
+                        <p className="text-xs text-[var(--stage-text-secondary)]">/{org!.slug}</p>
                       )}
                     </>
                   )}
                   {!isOrg && entity && (
                     <>
-                      {entity.email && <p className="text-sm text-[var(--color-ink-muted)]">{entity.email}</p>}
+                      {entity.email && <p className="text-sm text-[var(--stage-text-secondary)]">{entity.email}</p>}
                       {entity.organization_names?.length ? (
                         <div className="flex flex-wrap gap-1">
                           {entity.organization_names.map((name) => (
@@ -155,7 +157,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
 
               {tab === 'private_notes' && isOrg && org && (
                 <div className="space-y-4">
-                  <p className="rounded-lg bg-[var(--color-surface-warning)]/30 px-3 py-2 text-xs font-medium text-[var(--color-ink)]">
+                  <p className="rounded-lg bg-[var(--color-surface-warning)]/30 px-3 py-2 text-xs font-medium text-[var(--stage-text-primary)]">
                     Internal only — visible to your organization.
                   </p>
                   <form
@@ -171,19 +173,19 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                   >
                     <input type="hidden" name="subject_org_id" value={org.id} />
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--color-ink-muted)]">
+                      <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
                         Notes
                       </label>
                       <Textarea
                         name="private_notes"
                         defaultValue={org.private_notes ?? ''}
                         placeholder="Internal notes about this org…"
-                        className="min-h-[120px] resize-y bg-[var(--color-glass-surface)] border-[var(--color-mercury)]"
+                        className="min-h-[120px] resize-y bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
                         rows={4}
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--color-ink-muted)]">
+                      <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
                         Rating
                       </label>
                       <div className="flex items-center gap-2">
@@ -191,7 +193,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                         <select
                           name="internal_rating"
                           defaultValue={org.internal_rating ?? ''}
-                          className="rounded-lg border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] px-2 py-1 text-sm text-[var(--color-ink)]"
+                          className="rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-2 py-1 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                           onChange={(e) => {
                             const v = e.target.value ? Number(e.target.value) : null;
                             setOptimisticRating(v);
@@ -261,18 +263,18 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                             : undefined
                         }
                         className={cn(
-                          'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)]/50 px-4 py-3',
-                          hasMemberId && 'cursor-pointer hover:bg-[var(--color-glass-surface)]/70 transition-colors'
+                          'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)]/50 px-4 py-3',
+                          hasMemberId && 'cursor-pointer hover:bg-[var(--stage-surface-raised)]/70 transition-colors'
                         )}
                       >
                         <div className="min-w-0 flex-1">
-                          <span className="text-sm font-medium text-[var(--color-ink)]">
+                          <span className="text-sm font-medium text-[var(--stage-text-primary)]">
                             {person.email || 'Contact'}
                           </span>
                           {rosterPerson.skill_tags?.length ? (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {rosterPerson.skill_tags.map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-[10px] font-normal text-[var(--color-ink-muted)]">
+                                <Badge key={tag} variant="outline" className="text-[10px] font-normal text-[var(--stage-text-secondary)]">
                                   {tag}
                                 </Badge>
                               ))}
@@ -288,7 +290,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                     );
                   })}
                   {(!org.roster || org.roster.length === 0) && (
-                    <p className="py-4 text-center text-sm text-[var(--color-ink-muted)]">
+                    <p className="py-4 text-center text-sm text-[var(--stage-text-secondary)]">
                       No people linked yet.
                     </p>
                   )}

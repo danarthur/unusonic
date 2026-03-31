@@ -33,8 +33,8 @@ function parseDate(value: string | null): string {
 
 function CalendarLoading() {
   return (
-    <div className="flex-1 min-h-[480px] rounded-2xl liquid-panel border border-[var(--glass-border)] flex items-center justify-center">
-      <p className="text-ink-muted font-medium">Loading calendar…</p>
+    <div className="flex-1 min-h-[480px] rounded-2xl stage-panel border border-[oklch(1_0_0_/_0.08)] flex items-center justify-center">
+      <p className="text-[var(--stage-text-secondary)] font-medium">Loading calendar…</p>
     </div>
   );
 }
@@ -44,15 +44,25 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const params = await searchParams;
+  const viewParam = typeof params[VIEW_PARAM] === 'string' ? params[VIEW_PARAM] : null;
+  const dateParam = typeof params[DATE_PARAM] === 'string' ? params[DATE_PARAM] : null;
+
+  const view = parseView(viewParam);
+  const dateStr = parseDate(dateParam);
+
+  return (
+    <div className="flex-1 min-h-0 w-full p-4 md:p-6 flex flex-col">
+      <Suspense fallback={<CalendarLoading />}>
+        <CalendarData view={view} dateStr={dateStr} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function CalendarData({ view, dateStr }: { view: CalendarViewType; dateStr: string }) {
   try {
-    const params = await searchParams;
-    const viewParam = typeof params[VIEW_PARAM] === 'string' ? params[VIEW_PARAM] : null;
-    const dateParam = typeof params[DATE_PARAM] === 'string' ? params[DATE_PARAM] : null;
-
-    const view = parseView(viewParam);
-    const dateStr = parseDate(dateParam);
     const viewDate = new Date(dateStr + 'T12:00:00');
-
     const range = getRangeForView(viewDate, view);
     const workspaceId = (await getActiveWorkspaceId()) ?? (await getSession()).workspace.id;
     const events = workspaceId
@@ -60,26 +70,20 @@ export default async function CalendarPage({
       : [];
 
     return (
-      <div className="flex-1 min-h-0 w-full p-4 md:p-6 flex flex-col">
-        <Suspense fallback={<CalendarLoading />}>
-          <CalendarShell
-            events={events}
-            initialView={view}
-            initialDate={dateStr}
-          />
-        </Suspense>
-      </div>
+      <CalendarShell
+        events={events}
+        initialView={view}
+        initialDate={dateStr}
+      />
     );
   } catch (err) {
     console.error('[Calendar] Page error:', err);
     return (
-      <div className="flex-1 min-h-0 w-full p-4 md:p-6 flex flex-col">
-        <div className="liquid-panel rounded-2xl p-8 border border-[var(--glass-border)] max-w-lg border-l-4 border-l-rose-500">
-          <p className="text-ink font-medium">Something went wrong</p>
-          <p className="text-ink-muted text-sm mt-1">
-            {err instanceof Error ? err.message : 'Failed to load calendar'}
-          </p>
-        </div>
+      <div className="stage-panel rounded-2xl p-8 border border-[oklch(1_0_0_/_0.08)] max-w-lg border-l-4 border-l-[var(--color-unusonic-error)]">
+        <p className="text-[var(--stage-text-primary)] font-medium">Something went wrong</p>
+        <p className="text-[var(--stage-text-secondary)] text-sm mt-1">
+          {err instanceof Error ? err.message : 'Failed to load calendar'}
+        </p>
       </div>
     );
   }

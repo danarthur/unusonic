@@ -28,7 +28,7 @@ export function TeamPile({ members, max = 5, size = 'md', className }: TeamPileP
 
   if (visible.length === 0 && overflow === 0) {
     return (
-      <span className={cn('text-ink-muted text-sm', className)}>No one assigned</span>
+      <span className={cn('text-[var(--stage-text-secondary)] text-sm', className)}>No one assigned</span>
     );
   }
 
@@ -39,7 +39,7 @@ export function TeamPile({ members, max = 5, size = 'md', className }: TeamPileP
           key={m.id}
           title={m.name ?? m.role ?? 'Unknown'}
           className={cn(
-            'rounded-full border-2 border-[var(--glass-bg)] bg-stone/40 flex items-center justify-center font-medium text-ink overflow-hidden shrink-0',
+            'rounded-full border-2 border-[var(--stage-surface)] bg-[oklch(1_0_0_/_0.10)] flex items-center justify-center font-medium text-[var(--stage-text-primary)] overflow-hidden shrink-0',
             sizeClasses[size]
           )}
         >
@@ -59,7 +59,7 @@ export function TeamPile({ members, max = 5, size = 'md', className }: TeamPileP
       {overflow > 0 && (
         <div
           className={cn(
-            'rounded-full border-2 border-[var(--glass-bg)] bg-ink-muted/20 flex items-center justify-center text-ink-muted font-medium shrink-0',
+            'rounded-full border-2 border-[var(--stage-surface)] bg-[var(--stage-text-secondary)]/20 flex items-center justify-center text-[var(--stage-text-secondary)] font-medium shrink-0',
             sizeClasses[size]
           )}
         >

@@ -1,6 +1,6 @@
 /**
  * Invoice Card Component
- * Liquid Glass styled card for displaying invoice information
+ * Stage Engineering styled card for displaying invoice information
  * Aligned with existing finance.invoices schema
  * @module widgets/financial-dashboard/ui/invoice-card
  */
@@ -42,23 +42,23 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
   const urgencyConfig = {
     overdue: {
       icon: AlertCircle,
-      color: 'text-red-500 dark:text-red-400',
-      bg: 'bg-red-500/10',
-      border: 'border-red-500/20',
+      color: 'text-[var(--color-unusonic-error)]',
+      bg: 'bg-[var(--color-unusonic-error)]/10',
+      border: 'border-[var(--color-unusonic-error)]/20',
       label: 'Overdue',
     },
     due_soon: {
       icon: Clock,
-      color: 'text-amber-500 dark:text-amber-400',
-      bg: 'bg-amber-500/10',
-      border: 'border-amber-500/20',
+      color: 'text-[var(--color-unusonic-warning)]',
+      bg: 'bg-[var(--color-unusonic-warning)]/10',
+      border: 'border-[var(--color-unusonic-warning)]/20',
       label: 'Due Soon',
     },
     on_track: {
       icon: CheckCircle,
-      color: 'text-emerald-500 dark:text-emerald-400',
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/20',
+      color: 'text-[var(--color-unusonic-success)]',
+      bg: 'bg-[var(--color-unusonic-success)]/10',
+      border: 'border-[var(--color-unusonic-success)]/20',
       label: 'On Track',
     },
   };
@@ -76,14 +76,9 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springConfig, delay: index * 0.05 }}
-      whileHover={{ 
-        scale: 1.01,
-        y: -2,
-      }}
-      whileTap={{ scale: 0.995 }}
-      className="w-full text-left group"
+      className="w-full text-left group hover:brightness-[1.02] transition-[filter]"
     >
-      <div className="liquid-panel liquid-panel-nested liquid-panel-hover p-4 relative overflow-hidden">
+      <div className="stage-panel stage-panel-nested stage-panel-interactive p-4 relative overflow-hidden">
         {/* Subtle gradient on hover */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -95,8 +90,8 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
         {/* Content */}
         <div className="relative z-10 flex items-start gap-4">
           {/* Invoice Icon */}
-          <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5 text-ink-muted" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--stage-text-primary)]/5 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           
           {/* Main Content */}
@@ -104,21 +99,21 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
             {/* Header Row */}
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="min-w-0">
-                <h4 className="text-sm font-medium text-ink truncate group-hover:text-walnut transition-colors">
+                <h4 className="text-sm font-medium text-[var(--stage-text-primary)] truncate group-hover:text-walnut transition-colors">
                   {invoice.invoiceNumber}
                 </h4>
-                <p className="text-xs text-ink-muted truncate mt-0.5">
+                <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
                   {displayName}{contextName && displayName !== contextName ? ` • ${contextName}` : ''}
                 </p>
               </div>
               
               {/* Amount */}
               <div className="text-right shrink-0">
-                <p className="text-sm font-semibold text-ink tabular-nums">
+                <p className="text-sm font-semibold text-[var(--stage-text-primary)] tabular-nums">
                   {formatCurrency(invoice.balanceDue)}
                 </p>
                 {invoice.amountPaid > 0 && (
-                  <p className="text-[10px] text-ink-muted mt-0.5">
+                  <p className="text-[10px] text-[var(--stage-text-secondary)] mt-0.5">
                     of {formatCurrency(invoice.totalAmount)}
                   </p>
                 )}
@@ -128,7 +123,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
             {/* Footer Row */}
             <div className="flex items-center justify-between">
               {/* Invoice Type & Due Date */}
-              <div className="flex items-center gap-3 text-xs text-ink-muted">
+              <div className="flex items-center gap-3 text-xs text-[var(--stage-text-secondary)]">
                 {invoice.invoiceType && (
                   <span className="capitalize">{invoice.invoiceType}</span>
                 )}
@@ -139,7 +134,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
               <div className="flex items-center gap-2">
                 {/* QB Sync Status */}
                 {invoice.quickbooksSyncStatus === 'synced' && (
-                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#2CA01C]/10 text-[10px] font-medium text-[#2CA01C]">
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--color-qb-green)]/10 text-[10px] font-medium text-[var(--color-qb-green)]">
                     <CloudCheck className="w-3 h-3" />
                     <span>QB</span>
                   </div>
@@ -164,7 +159,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
             transition={springConfig}
             className="absolute right-3 top-1/2 -translate-y-1/2"
           >
-            <ArrowUpRight className="w-4 h-4 text-ink-muted group-hover:text-walnut transition-colors" />
+            <ArrowUpRight className="w-4 h-4 text-[var(--stage-text-secondary)] group-hover:text-walnut transition-colors" />
           </motion.div>
         </div>
       </div>
@@ -181,13 +176,13 @@ export function EmptyInvoiceState() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="liquid-panel liquid-panel-nested p-8 text-center"
+      className="stage-panel stage-panel-nested p-8 text-center"
     >
-      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-        <CheckCircle className="w-6 h-6 text-emerald-500" />
+      <div className="w-12 h-12 rounded-2xl bg-[var(--color-unusonic-success)]/10 flex items-center justify-center mx-auto mb-4">
+        <CheckCircle className="w-6 h-6 text-[var(--color-unusonic-success)]" />
       </div>
-      <h4 className="text-sm font-medium text-ink mb-1">All caught up!</h4>
-      <p className="text-xs text-ink-muted">No outstanding invoices at the moment.</p>
+      <h4 className="text-sm font-medium text-[var(--stage-text-primary)] mb-1">All caught up!</h4>
+      <p className="text-xs text-[var(--stage-text-secondary)]">No outstanding invoices at the moment.</p>
     </motion.div>
   );
 }

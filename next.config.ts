@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'wlhmgtnelqhzqyrphadd.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
   transpilePackages: ["lucide-react"],
   serverExternalPackages: ["@react-email/render", "@react-email/components", "resend"],
   experimental: {

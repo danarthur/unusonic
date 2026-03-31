@@ -10,7 +10,7 @@ export function Sparkline({
   values,
   width = 32,
   height = 16,
-  stroke = 'var(--color-neon-blue)',
+  stroke = 'var(--stage-accent)',
   opacity = 0.5,
   className = '',
 }: {
@@ -61,7 +61,7 @@ export function MiniBarStrip({
   values,
   width = 32,
   height = 16,
-  fill = 'var(--color-neon-blue)',
+  fill = 'var(--stage-accent)',
   opacity = 0.5,
   className = '',
 }: {

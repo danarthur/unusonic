@@ -25,14 +25,14 @@ export function GhostClaimCard({ data, isPending }: GhostClaimCardProps) {
       exit={{ opacity: 0 }}
       className="w-full"
     >
-      <div className="w-full rounded-2xl border border-ceramic/10 bg-ceramic/5 p-6 backdrop-blur-md">
+      <div className="w-full rounded-2xl border border-[var(--stage-text-primary)]/10 bg-[var(--stage-text-primary)]/5 p-6">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-neon-blue/20 font-bold text-neon-blue">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--stage-accent)]/20 font-bold text-[var(--stage-accent)]">
             {data.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="font-medium text-ceramic">Is this your team?</h3>
-            <p className="mt-1 text-sm text-ceramic/50">
+            <h3 className="font-medium text-[var(--stage-text-primary)]">Is this your team?</h3>
+            <p className="mt-1 text-sm text-[var(--stage-text-primary)]/50">
               We found a profile for <strong>{data.name}</strong> with {eventText}.
             </p>
           </div>
@@ -47,7 +47,7 @@ export function GhostClaimCard({ data, isPending }: GhostClaimCardProps) {
           <button
             type="submit"
             disabled={isPending}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-ceramic py-3 font-semibold text-obsidian transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--stage-text-primary)] py-3 font-semibold text-[var(--stage-text-on-accent)] transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? (
               <>

@@ -40,15 +40,15 @@ export function ClaimView({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={spring}
-        className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-8 text-center"
+        className="flex w-full max-w-md flex-col items-center gap-6 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] p-8 text-center"
       >
-        <CheckCircle2 className="size-14 text-[var(--color-signal-success)]" />
+        <CheckCircle2 className="size-14 text-[var(--color-unusonic-success)]" />
         <div>
-          <h1 className="text-xl font-medium tracking-tight text-[var(--color-ink)]">
+          <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
             You’re all set
           </h1>
-          <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            You now manage <strong className="text-[var(--color-ink)]">{orgName}</strong>. Sign in to get started.
+          <p className="mt-2 text-sm text-[var(--stage-text-secondary)]">
+            You now manage <strong className="text-[var(--stage-text-primary)]">{orgName}</strong>. Sign in to get started.
           </p>
         </div>
         <Button asChild variant="default" size="lg" className="w-full sm:w-auto">
@@ -64,13 +64,13 @@ export function ClaimView({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={spring}
-        className="flex w-full max-w-md flex-col gap-6 rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-6 sm:p-8 text-center"
+        className="flex w-full max-w-md flex-col gap-6 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] p-6 sm:p-8 text-center"
       >
-        <h1 className="text-xl font-medium tracking-tight text-[var(--color-ink)]">
+        <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
           Welcome, {email}
         </h1>
-        <p className="text-sm text-[var(--color-ink-muted)]">
-          <strong className="text-[var(--color-ink)]">{orgName}</strong> has invited you to manage their organization. Sign in or create an account with this email to accept.
+        <p className="text-sm text-[var(--stage-text-secondary)]">
+          <strong className="text-[var(--stage-text-primary)]">{orgName}</strong> has invited you to manage their organization. Sign in or create an account with this email to accept.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Button asChild variant="default" size="lg" className="w-full sm:w-auto">
@@ -93,13 +93,13 @@ export function ClaimView({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
-      className="flex w-full max-w-md flex-col gap-6 rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-6 sm:p-8 text-center"
+      className="flex w-full max-w-md flex-col gap-6 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] p-6 sm:p-8 text-center"
     >
-      <h1 className="text-xl font-medium tracking-tight text-[var(--color-ink)]">
+      <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
         Welcome, {email}
       </h1>
-      <p className="text-sm text-[var(--color-ink-muted)]">
-        <strong className="text-[var(--color-ink)]">{orgName}</strong> has invited you to manage their organization.
+      <p className="text-sm text-[var(--stage-text-secondary)]">
+        <strong className="text-[var(--stage-text-primary)]">{orgName}</strong> has invited you to manage their organization.
       </p>
       <form action={submitClaim} className="flex flex-col gap-4">
         <input type="hidden" name="token" value={token} />

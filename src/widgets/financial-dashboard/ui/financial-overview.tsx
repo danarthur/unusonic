@@ -1,6 +1,6 @@
 /**
  * Financial Overview Widget
- * Main dashboard component with Liquid Glass styling and spring animations
+ * Main dashboard component with Stage Engineering styling and spring animations
  * Workspace-scoped
  * @module widgets/financial-dashboard/ui/financial-overview
  */
@@ -17,7 +17,7 @@ import {
   Sparkles,
   CloudSync,
 } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { QuickBooksConnectButton, syncInvoiceToQuickBooks } from '@/features/finance-sync';
 import type { FinanceDashboardData, OutstandingInvoice } from '@/features/finance-sync';
 import { AnimatedCounter, PercentageChange } from './animated-counter';
@@ -125,8 +125,8 @@ export function FinancialOverview({
         className="flex items-center justify-between"
       >
         <div>
-          <h2 className="text-2xl font-light text-ink tracking-tight">Financial Overview</h2>
-          <p className="text-sm text-ink-muted mt-1">
+          <h2 className="text-2xl font-light text-[var(--stage-text-primary)] tracking-tight">Financial Overview</h2>
+          <p className="text-sm text-[var(--stage-text-secondary)] mt-1">
             {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </p>
         </div>
@@ -134,12 +134,10 @@ export function FinancialOverview({
         <motion.button
           onClick={handleRefresh}
           disabled={isPending}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
           transition={springConfig}
-          className="p-2.5 rounded-xl bg-ink/5 hover:bg-ink/10 
-            text-ink-muted hover:text-ink
-            transition-colors disabled:opacity-50"
+          className="p-2.5 rounded-xl bg-[var(--stage-text-primary)]/5 hover:bg-[var(--stage-text-primary)]/10
+            text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]
+            transition-[color,background-color,filter] hover:brightness-[1.04] disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
         </motion.button>
@@ -149,56 +147,56 @@ export function FinancialOverview({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Revenue Card */}
         <motion.div variants={itemVariants}>
-          <LiquidPanel className="h-full" hoverEffect>
+          <StagePanel className="h-full" interactive>
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--color-unusonic-success)]/10 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-[var(--color-unusonic-success)]" />
               </div>
-              <PercentageChange 
+              <PercentageChange
                 current={optimisticData.currentMonthRevenue}
                 previous={optimisticData.previousMonthRevenue}
               />
             </div>
-            
-            <p className="text-xs font-medium text-ink-muted uppercase tracking-widest mb-2">
+
+            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-2">
               Monthly Revenue
             </p>
-            
+
             <AnimatedCounter
               value={optimisticData.currentMonthRevenue}
-              className="text-3xl font-light text-ink tracking-tight"
+              className="text-3xl font-light text-[var(--stage-text-primary)] tracking-tight"
             />
-            
+
             {/* Mini Chart */}
-            <div className="mt-4 pt-4 border-t border-[var(--glass-border)]">
+            <div className="mt-4 pt-4 border-t border-[oklch(1_0_0_/_0.08)]">
               <RevenueChart data={optimisticData.monthlyTrend} />
             </div>
-          </LiquidPanel>
+          </StagePanel>
         </motion.div>
         
         {/* Outstanding Card */}
         <motion.div variants={itemVariants}>
-          <LiquidPanel className="h-full" hoverEffect>
+          <StagePanel className="h-full" interactive>
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--color-unusonic-warning)]/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-[var(--color-unusonic-warning)]" />
               </div>
-              <span className="px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium">
+              <span className="px-2 py-1 rounded-full bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)] text-xs font-medium">
                 {optimisticData.outstandingCount} pending
               </span>
             </div>
-            
-            <p className="text-xs font-medium text-ink-muted uppercase tracking-widest mb-2">
+
+            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-2">
               Outstanding
             </p>
-            
+
             <AnimatedCounter
               value={optimisticData.outstandingAmount}
-              className="text-3xl font-light text-ink tracking-tight"
+              className="text-3xl font-light text-[var(--stage-text-primary)] tracking-tight"
             />
-            
+
             {/* Outstanding breakdown */}
-            <div className="mt-4 pt-4 border-t border-[var(--glass-border)] space-y-2">
+            <div className="mt-4 pt-4 border-t border-[oklch(1_0_0_/_0.08)] space-y-2">
               {optimisticData.outstandingInvoices.slice(0, 3).map((invoice, i) => (
                 <motion.div
                   key={invoice.id}
@@ -207,24 +205,24 @@ export function FinancialOverview({
                   transition={{ ...springConfig, delay: 0.4 + i * 0.1 }}
                   className="flex items-center justify-between text-sm"
                 >
-                  <span className="text-ink-muted truncate max-w-[60%]">
+                  <span className="text-[var(--stage-text-secondary)] truncate max-w-[60%]">
                     {invoice.invoiceNumber}
                   </span>
-                  <span className="text-ink font-medium tabular-nums">
+                  <span className="text-[var(--stage-text-primary)] font-medium tabular-nums">
                     {formatCurrency(invoice.balanceDue)}
                   </span>
                 </motion.div>
               ))}
             </div>
-          </LiquidPanel>
+          </StagePanel>
         </motion.div>
       </div>
       
       {/* QuickBooks Connection */}
       <motion.div variants={itemVariants}>
         <div className="flex items-center gap-2 mb-3">
-          <Sparkles className="w-4 h-4 text-ink-muted" />
-          <h3 className="text-sm font-medium text-ink">QuickBooks Integration</h3>
+          <Sparkles className="w-4 h-4 text-[var(--stage-text-secondary)]" />
+          <h3 className="text-sm font-medium text-[var(--stage-text-primary)]">QuickBooks Integration</h3>
         </div>
         <QuickBooksConnectButton
           workspaceId={workspaceId}
@@ -236,11 +234,11 @@ export function FinancialOverview({
       {/* Outstanding Invoices List */}
       <motion.div variants={itemVariants}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-ink">Outstanding Invoices</h3>
+          <h3 className="text-sm font-medium text-[var(--stage-text-primary)]">Outstanding Invoices</h3>
           <motion.button
             whileHover={{ x: 2 }}
             transition={springConfig}
-            className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors"
+            className="flex items-center gap-1 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
           >
             View all <ChevronRight className="w-3 h-3" />
           </motion.button>
@@ -271,7 +269,7 @@ export function FinancialOverview({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-obsidian/40 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-[oklch(0.06_0_0_/_0.75)] z-50 flex items-center justify-center p-6"
             onClick={() => setSelectedInvoice(null)}
           >
             <motion.div
@@ -280,29 +278,29 @@ export function FinancialOverview({
               exit={{ scale: 0.95, y: 20 }}
               transition={springConfig}
               onClick={(e) => e.stopPropagation()}
-              className="liquid-panel p-6 max-w-md w-full"
+              className="stage-panel p-6 max-w-md w-full"
             >
-              <h3 className="text-lg font-medium text-ink mb-1">
+              <h3 className="text-lg font-medium text-[var(--stage-text-primary)] mb-1">
                 {selectedInvoice.invoiceNumber}
               </h3>
-              <p className="text-sm text-ink-muted mb-4">
+              <p className="text-sm text-[var(--stage-text-secondary)] mb-4">
                 {selectedInvoice.billToName || 'Client'} • {selectedInvoice.eventName || selectedInvoice.gigTitle}
               </p>
               
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
-                  <span className="text-ink-muted">Subtotal</span>
-                  <span className="text-ink">{formatCurrency(selectedInvoice.subtotalAmount)}</span>
+                  <span className="text-[var(--stage-text-secondary)]">Subtotal</span>
+                  <span className="text-[var(--stage-text-primary)]">{formatCurrency(selectedInvoice.subtotalAmount)}</span>
                 </div>
                 {selectedInvoice.taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-ink-muted">Tax</span>
-                    <span className="text-ink">{formatCurrency(selectedInvoice.taxAmount)}</span>
+                    <span className="text-[var(--stage-text-secondary)]">Tax</span>
+                    <span className="text-[var(--stage-text-primary)]">{formatCurrency(selectedInvoice.taxAmount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm border-t border-[var(--glass-border)] pt-3">
-                  <span className="text-ink font-medium">Balance Due</span>
-                  <span className="text-ink font-semibold text-lg">{formatCurrency(selectedInvoice.balanceDue)}</span>
+                <div className="flex justify-between text-sm border-t border-[oklch(1_0_0_/_0.08)] pt-3">
+                  <span className="text-[var(--stage-text-primary)] font-medium">Balance Due</span>
+                  <span className="text-[var(--stage-text-primary)] font-semibold text-lg">{formatCurrency(selectedInvoice.balanceDue)}</span>
                 </div>
               </div>
               
@@ -311,11 +309,9 @@ export function FinancialOverview({
                   <motion.button
                     onClick={() => handleSyncToQuickBooks(selectedInvoice)}
                     disabled={syncingInvoiceId === selectedInvoice.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
                     transition={springConfig}
-                    className="flex-1 py-2.5 rounded-xl bg-[#2CA01C]/10 hover:bg-[#2CA01C]/20 
-                      text-[#2CA01C] text-sm font-medium transition-colors
+                    className="flex-1 py-2.5 rounded-xl bg-[var(--color-qb-green)]/10 hover:bg-[var(--color-qb-green)]/20
+                      text-[var(--color-qb-green)] text-sm font-medium transition-[color,background-color,filter] hover:brightness-[1.03]
                       flex items-center justify-center gap-2
                       disabled:opacity-50"
                   >
@@ -325,7 +321,7 @@ export function FinancialOverview({
                 )}
                 <button
                   onClick={() => setSelectedInvoice(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-ink/5 hover:bg-ink/10 text-sm font-medium text-ink transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-[var(--stage-text-primary)]/5 hover:bg-[var(--stage-text-primary)]/10 text-sm font-medium text-[var(--stage-text-primary)] transition-colors"
                 >
                   Close
                 </button>

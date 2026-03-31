@@ -56,24 +56,24 @@ export function ScoutThoughtLog({ steps, suggestion, className }: ScoutThoughtLo
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER }}
-          className="rounded-xl bg-ink/5 border border-[var(--glass-border)] px-4 py-3 mb-4"
+          className="rounded-xl bg-[oklch(1_0_0_/_0.03)] border border-[oklch(1_0_0_/_0.10)] px-4 py-3 mb-4"
         >
-          <p className="text-[10px] uppercase tracking-widest text-mercury/60 mb-1.5">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/60 mb-1.5">
             Recommendation
           </p>
-          <p className="text-sm text-[var(--color-ink)] leading-relaxed">
-            Suggested for you: <span className="text-neon font-medium">{suggestion}</span>
+          <p className="text-sm text-[var(--stage-text-primary)] leading-relaxed">
+            Suggested for you: <span className="text-[var(--stage-accent)] font-medium">{suggestion}</span>
           </p>
         </motion.div>
       )}
       {steps.length > 0 && (
         <>
-          <p className="text-[10px] uppercase tracking-widest text-mercury/60 mb-2">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/60 mb-2">
             Thought log
           </p>
           <div
             tabIndex={0}
-            className="max-h-12 focus-within:max-h-24 transition-[max-height] duration-300 rounded-lg outline-none focus-within:ring-1 focus-within:ring-[var(--color-mercury)]/20 focus-within:ring-inset"
+            className="max-h-12 focus-within:max-h-24 transition-[max-height] duration-300 rounded-lg outline-none focus-within:ring-1 focus-within:ring-[oklch(1_0_0_/_0.12)] focus-within:ring-inset"
             style={{ transitionTimingFunction: `cubic-bezier(${M3_EASING_ENTER.join(', ')})` }}
           >
             <ul
@@ -92,9 +92,9 @@ export function ScoutThoughtLog({ steps, suggestion, className }: ScoutThoughtLo
                         ? stepTransition.transitionEnter
                         : { duration: 0.15 }
                     }
-                    className="text-xs text-mercury flex items-center gap-2 shrink-0"
+                    className="text-xs text-[var(--stage-text-secondary)] flex items-center gap-2 shrink-0"
                   >
-                    <span className="text-neon/70 shrink-0">→</span>
+                    <span className="text-[var(--stage-accent)]/80 shrink-0">→</span>
                     <span>{line}</span>
                   </motion.li>
                 ))}

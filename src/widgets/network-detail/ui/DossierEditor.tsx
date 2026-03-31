@@ -30,7 +30,7 @@ import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 
-const LABEL = 'text-[10px] font-medium text-[var(--color-ink-muted)] uppercase tracking-widest';
+const LABEL = 'text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest';
 
 interface DossierEditorProps {
   open: boolean;
@@ -54,18 +54,18 @@ function AccordionSection({
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div className="rounded-xl border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] overflow-hidden">
+    <div className="rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[oklch(1_0_0/0.05)] transition-colors"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[oklch(1_0_0/0.05)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
       >
-        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           <Icon className="size-3.5" />
           {label}
         </span>
         <ChevronDown
-          className={cn('size-4 text-[var(--color-ink-muted)] transition-transform', open && 'rotate-180')}
+          className={cn('size-4 text-[var(--stage-text-secondary)] transition-transform', open && 'rotate-180')}
         />
       </button>
       <AnimatePresence>
@@ -77,7 +77,7 @@ function AccordionSection({
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 pt-1 space-y-4 border-t border-[var(--color-mercury)]">{children}</div>
+            <div className="px-4 pb-4 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -253,13 +253,13 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
       exit={{ opacity: 0 }}
       className="flex flex-col flex-1 min-h-0 overflow-hidden"
     >
-      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[var(--color-mercury)]">
+      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[oklch(1_0_0_/_0.08)]">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={() => onOpenChange(false)}
-          className="gap-1.5 text-[var(--color-ink-muted)]"
+          className="gap-1.5 text-[var(--stage-text-secondary)]"
         >
           <ArrowLeft className="size-4" />
           Done
@@ -268,10 +268,10 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
 
       <form ref={formRef} onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
         {/* ID Card — always visible */}
-        <div className="liquid-card rounded-2xl p-4 space-y-4">
+        <div className="stage-panel rounded-2xl p-4 space-y-4">
           <div className="flex items-center gap-4">
             <div
-              className="relative size-14 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[var(--color-mercury)]"
+              className="relative size-14 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[oklch(1_0_0_/_0.08)]"
               style={brandColor ? ({
                 '--brand-color': brandColor,
                 background: 'color-mix(in oklch, var(--brand-color) 12%, transparent)',
@@ -293,7 +293,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                   />
                 </>
               ) : (
-                <span className="text-2xl font-light text-[var(--color-ink-muted)]">
+                <span className="text-2xl font-light text-[var(--stage-text-secondary)]">
                   {((enrichmentPreview?.name ?? details.identity.name)?.[0] ?? '?').toUpperCase()}
                 </span>
               )}
@@ -304,7 +304,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="name"
                   defaultValue={details.identity.name}
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
                   required
                 />
               </div>
@@ -322,8 +322,9 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                       />
                       <Input
                         value={brandColor}
+                        // eslint-disable-next-line stage-engineering/no-raw-colors -- color picker JS default
                         onChange={(e) => setBrandColor(e.target.value || '#000000')}
-                        className="flex-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] font-mono text-xs"
+                        className="flex-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] font-mono text-xs"
                       />
                     </div>
                   </div>
@@ -332,7 +333,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                     <Input
                       name="logoUrl"
                       defaultValue={details.orgLogoUrl ?? ''}
-                      className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+                      className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                       placeholder="https://..."
                     />
                   </div>
@@ -347,7 +348,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="doingBusinessAs"
                   defaultValue={doingBusinessAs}
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
                   placeholder="e.g. NV Productions LLC"
                 />
               </div>
@@ -356,7 +357,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <select
                   name="entityType"
                   defaultValue={entityType || 'organization'}
-                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <option value="organization">Organization</option>
                   <option value="single_operator">Single operator</option>
@@ -376,9 +377,9 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 name="website"
                 defaultValue={details.orgWebsite ?? ''}
                 placeholder="https://example.com"
-                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] font-mono text-xs"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] font-mono text-xs"
               />
-              <p className="text-[10px] text-[var(--color-ink-muted)] mt-1.5">
+              <p className="text-[10px] text-[var(--stage-text-secondary)] mt-1.5">
                 Paste a URL above, then use Aion to auto-fill identity and contact details.
               </p>
               <div className="mt-3">
@@ -395,7 +396,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 defaultValue={details.orgSupportEmail ?? ''}
                 type="email"
                 placeholder="booking@example.com"
-                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
@@ -404,7 +405,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 name="phone"
                 defaultValue={phone}
                 placeholder="Main office line"
-                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -413,7 +414,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_street"
                   defaultValue={(addr as { street?: string }).street ?? ''}
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -421,7 +422,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_city"
                   defaultValue={(addr as { city?: string }).city ?? ''}
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -429,7 +430,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_state"
                   defaultValue={(addr as { state?: string }).state ?? ''}
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -437,7 +438,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <Input
                   name="address_postal_code"
                   defaultValue={(addr as { postal_code?: string }).postal_code ?? ''}
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
             </div>
@@ -446,7 +447,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
               <Input
                 name="address_country"
                 defaultValue={(addr as { country?: string }).country ?? ''}
-                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+                className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
               />
             </div>
           </div>
@@ -459,7 +460,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
               <select
                 value={relType}
                 onChange={(e) => setRelType(e.target.value as 'vendor' | 'client' | 'partner')}
-                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 <option value="vendor">Vendor</option>
                 <option value="client">Client</option>
@@ -471,7 +472,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
               <select
                 value={lifecycle}
                 onChange={(e) => setLifecycle(e.target.value as typeof lifecycle)}
-                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 <option value="prospect">Prospect</option>
                 <option value="active">Active</option>
@@ -490,7 +491,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                   value={blacklistReason}
                   onChange={(e) => setBlacklistReason(e.target.value)}
                   placeholder="Reason for blacklisting"
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
                 />
               </motion.div>
             )}
@@ -500,7 +501,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 {localTags.map((t) => (
                   <span
                     key={t}
-                    className="inline-flex items-center gap-1 rounded-full bg-[var(--color-silk)]/15 text-[var(--color-silk)] px-2 py-0.5 text-xs"
+                    className="inline-flex items-center gap-1 rounded-full bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] px-2 py-0.5 text-xs"
                   >
                     {t}
                     <button type="button" onClick={() => removeTag(t)} className="hover:opacity-80" aria-label={`Remove ${t}`}>
@@ -514,7 +515,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                     placeholder="Add tag"
-                    className="w-24 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs h-7"
+                    className="w-24 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs h-7"
                   />
                   <Button type="button" variant="ghost" size="sm" onClick={addTag} className="h-7 px-2">
                     Add
@@ -534,7 +535,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                   name="taxId"
                   defaultValue={taxId}
                   placeholder="XX-XXXXXXX"
-                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] font-mono"
+                  className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] font-mono"
                 />
               </div>
               <div>
@@ -542,7 +543,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <select
                   name="defaultCurrency"
                   defaultValue={details.orgDefaultCurrency ?? 'USD'}
-                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
@@ -554,7 +555,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <select
                   name="paymentTerms"
                   defaultValue={paymentTerms}
-                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm text-[var(--color-ink)]"
+                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <option value="">—</option>
                   <option value="immediate">Immediate</option>
@@ -584,12 +585,12 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
 
         <AccordionSection id="notes" label="Private notes" icon={FileText}>
           <div>
-            <p className="text-[10px] text-[var(--color-ink-muted)] mb-2">Internal only. Auto-saves.</p>
+            <p className="text-[10px] text-[var(--stage-text-secondary)] mb-2">Internal only. Auto-saves.</p>
             <Textarea
               name="notes"
               defaultValue={details.notes ?? ''}
               placeholder="Notes about this partner…"
-              className="min-h-[100px] resize-y bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-[var(--color-ink)]"
+              className="min-h-[100px] resize-y bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
               rows={4}
             />
           </div>
@@ -599,7 +600,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           <Button
             type="submit"
             disabled={isPending}
-            className="bg-[var(--color-silk)]/20 text-[var(--color-silk)] border-[var(--color-silk)]/40 hover:bg-[var(--color-silk)]/30"
+            className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
           >
             {isPending ? 'Saving…' : 'Save'}
           </Button>
@@ -667,21 +668,21 @@ function DossierRosterSection({
         {crew.map((m) => (
           <li
             key={m.id}
-            className="flex items-center gap-3 rounded-lg border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] px-3 py-2"
+            className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-3 py-2"
           >
-            <div className="size-10 shrink-0 rounded-full bg-[var(--color-glass-surface)] border border-[var(--color-mercury)] flex items-center justify-center overflow-hidden">
+            <div className="size-10 shrink-0 rounded-full bg-[var(--stage-surface-raised)] border border-[oklch(1_0_0_/_0.08)] flex items-center justify-center overflow-hidden">
               {m.avatarUrl ? (
-                <img src={m.avatarUrl} alt="" className="size-full object-cover" />
+                <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" />
               ) : (
-                <span className="text-sm text-[var(--color-ink-muted)]">
+                <span className="text-sm text-[var(--stage-text-secondary)]">
                   {(m.name?.[0] ?? '?').toUpperCase()}
                 </span>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--color-ink)]">{m.name}</p>
+              <p className="text-sm font-medium text-[var(--stage-text-primary)]">{m.name}</p>
               {(m.email || m.role || m.jobTitle) && (
-                <p className="text-xs text-[var(--color-ink-muted)] truncate">
+                <p className="text-xs text-[var(--stage-text-secondary)] truncate">
                   {[m.jobTitle, m.role, m.email].filter(Boolean).join(' · ')}
                 </p>
               )}
@@ -691,7 +692,7 @@ function DossierRosterSection({
               variant="ghost"
               size="sm"
               onClick={() => setEditingMemberId(editingMemberId === m.id ? null : m.id)}
-              className="text-[var(--color-silk)]"
+              className="text-[var(--stage-accent)]"
             >
               Edit
             </Button>
@@ -717,7 +718,7 @@ function DossierRosterSection({
           variant="outline"
           size="sm"
           onClick={() => setShowAddCrew(true)}
-          className="gap-2 border-[var(--color-silk)]/40 text-[var(--color-silk)]"
+          className="gap-2 border-[var(--stage-accent)]/40 text-[var(--stage-accent)]"
         >
           <UserPlus className="size-4" />
           Add contact
@@ -727,24 +728,24 @@ function DossierRosterSection({
           ref={addCrewRef}
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          className="overflow-hidden rounded-xl border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] p-4 space-y-3"
+          className="overflow-hidden rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] p-4 space-y-3"
         >
           <div className="grid grid-cols-2 gap-3">
             <Input
               name="addCrew_firstName"
               placeholder="First name"
-              className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+              className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
             />
-            <Input name="addCrew_lastName" placeholder="Last name" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
+            <Input name="addCrew_lastName" placeholder="Last name" className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]" />
           </div>
-          <Input name="addCrew_email" type="email" placeholder="Email (optional)" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
+          <Input name="addCrew_email" type="email" placeholder="Email (optional)" className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]" />
           <div className="grid grid-cols-2 gap-3">
-            <Input name="addCrew_role" placeholder="Role (e.g. admin)" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
-            <Input name="addCrew_jobTitle" placeholder="Job title" className="bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]" />
+            <Input name="addCrew_role" placeholder="Role (e.g. admin)" className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]" />
+            <Input name="addCrew_jobTitle" placeholder="Job title" className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]" />
           </div>
           {error && <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
           <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={status === 'loading'} onClick={handleAddCrew} className="bg-[var(--color-silk)]/20 text-[var(--color-silk)]">
+            <Button type="button" size="sm" disabled={status === 'loading'} onClick={handleAddCrew} className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]">
               {status === 'loading' ? 'Adding…' : 'Add contact'}
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddCrew(false)}>
@@ -790,15 +791,15 @@ function CrewMemberEditor({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="rounded-xl border border-[var(--color-mercury)] bg-[oklch(1_0_0/0.05)] p-4 space-y-3"
+      className="rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] p-4 space-y-3"
     >
-      <p className="text-xs font-medium text-[var(--color-ink-muted)]">Edit {member.name}</p>
+      <p className="text-xs font-medium text-[var(--stage-text-secondary)]">Edit {member.name}</p>
       <div className="flex items-center gap-3">
-        <div className="size-12 rounded-full bg-[var(--color-glass-surface)] border border-[var(--color-mercury)] overflow-hidden flex items-center justify-center">
+        <div className="size-12 rounded-full bg-[var(--stage-surface-raised)] border border-[oklch(1_0_0_/_0.08)] overflow-hidden flex items-center justify-center">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="size-full object-cover" />
+            <img src={avatarUrl} alt="" className="size-full object-cover" loading="lazy" />
           ) : (
-            <span className="text-lg text-[var(--color-ink-muted)]">{(member.name?.[0] ?? '?').toUpperCase()}</span>
+            <span className="text-lg text-[var(--stage-text-secondary)]">{(member.name?.[0] ?? '?').toUpperCase()}</span>
           )}
         </div>
         <div className="flex-1">
@@ -807,7 +808,7 @@ function CrewMemberEditor({
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
             placeholder="https://..."
-            className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)] text-xs"
+            className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
           />
         </div>
       </div>
@@ -817,7 +818,7 @@ function CrewMemberEditor({
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[var(--color-mercury)] px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             <option value="owner">Owner</option>
             <option value="admin">Admin</option>
@@ -831,7 +832,7 @@ function CrewMemberEditor({
             value={jobTitle}
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="e.g. Production Manager"
-            className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+            className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
           />
         </div>
       </div>
@@ -841,11 +842,11 @@ function CrewMemberEditor({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="Direct line"
-          className="mt-1 bg-[oklch(1_0_0/0.05)] border-[var(--color-mercury)]"
+          className="mt-1 bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
         />
       </div>
       <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={pending} className="bg-[var(--color-silk)]/20 text-[var(--color-silk)]">
+        <Button size="sm" onClick={handleSave} disabled={pending} className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]">
           {pending ? 'Saving…' : 'Save'}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>

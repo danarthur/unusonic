@@ -6,7 +6,7 @@
 
 'use client';
 
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { formatCurrency } from '../../model/types';
 import type { TopRevenueItemDTO } from '../../model/types';
 
@@ -24,20 +24,20 @@ export function RevenueStream({
   const displayItems = topItems.slice(0, 3);
 
   return (
-    <LiquidPanel
+    <StagePanel
       className={`flex flex-col gap-5 p-6 min-h-[200px] min-w-0 overflow-visible ${className ?? ''}`}
     >
       <div className="shrink-0 space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
           Top Revenue Drivers
         </h2>
-        <p className="text-xs text-ink-muted">
+        <p className="text-xs text-[var(--stage-text-secondary)]">
           Where is the money coming from?
         </p>
       </div>
 
       {displayItems.length === 0 ? (
-        <p className="text-sm text-ink-muted shrink-0 pt-2">No line items yet</p>
+        <p className="text-sm text-[var(--stage-text-secondary)] shrink-0 pt-2">No line items yet</p>
       ) : (
         <ul className="space-y-5 shrink-0 pt-1">
           {displayItems.map((item) => (
@@ -46,18 +46,18 @@ export function RevenueStream({
               className="flex items-center justify-between gap-4 min-w-0"
             >
               <span
-                className="text-sm text-ink truncate min-w-0 flex-1 leading-snug"
+                className="text-sm text-[var(--stage-text-primary)] truncate min-w-0 flex-1 leading-snug"
                 title={item.description}
               >
                 {item.description || 'Line item'}
               </span>
-              <span className="font-mono text-sm font-medium text-ink shrink-0 tabular-nums">
+              <span className="font-mono text-sm font-medium text-[var(--stage-text-primary)] shrink-0 tabular-nums">
                 {formatCurrency(item.amount)}
               </span>
             </li>
           ))}
         </ul>
       )}
-    </LiquidPanel>
+    </StagePanel>
   );
 }

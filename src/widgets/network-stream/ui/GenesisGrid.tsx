@@ -86,7 +86,7 @@ export function GenesisGrid({ reaction, hasIdentity = false, hasTeam = false, br
       <motion.div
         className={cn(
           'min-h-0',
-          airlockActive && 'ring-2 ring-[var(--color-silk)]/50 ring-offset-2 ring-offset-[var(--color-canvas)] rounded-3xl shadow-[0_0_30px_-5px_var(--color-silk)]'
+          airlockActive && 'ring-2 ring-[var(--stage-accent)]/50 ring-offset-2 ring-offset-[var(--stage-void)] rounded-[var(--stage-radius-panel)] shadow-[0_0_30px_-5px_var(--stage-accent)]'
         )}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}

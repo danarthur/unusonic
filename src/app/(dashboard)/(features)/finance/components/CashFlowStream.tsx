@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { ArrowDownUp } from 'lucide-react';
+import { WidgetShell } from '@/widgets/shared';
 import { FinancialUpdates } from './FinancialUpdates';
 
 /**
@@ -10,13 +11,8 @@ import { FinancialUpdates } from './FinancialUpdates';
  */
 export function CashFlowStream() {
   return (
-    <LiquidPanel className="h-full flex flex-col min-h-0">
-      <h2 className="text-xs font-medium text-muted uppercase tracking-widest tracking-tight mb-4 shrink-0">
-        Cash Flow
-      </h2>
-      <div className="flex-1 min-h-0 overflow-auto">
-        <FinancialUpdates />
-      </div>
-    </LiquidPanel>
+    <WidgetShell icon={ArrowDownUp} label="Cash Flow">
+      <FinancialUpdates />
+    </WidgetShell>
   );
 }

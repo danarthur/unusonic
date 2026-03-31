@@ -10,10 +10,11 @@ import { redirect } from 'next/navigation';
 import { SettingsContent } from './components/settings-content';
 import { getWorkspaceMembers, getWorkspaceLocations } from '@/app/actions/workspace';
 import type { WorkspaceMemberData, LocationData, WorkspacePermissions } from '@/app/actions/workspace';
+import { getWorkspacePaymentDefaults, type WorkspacePaymentDefaults } from '@/features/org-management/api/payment-defaults-actions';
 
 export const metadata = {
   title: 'Settings | Unusonic',
-  description: 'Manage your Signal settings and integrations',
+  description: 'Manage your Unusonic settings and integrations',
 };
 
 export const dynamic = 'force-dynamic';
@@ -64,6 +65,7 @@ async function getSettingsData() {
   let qboRealmId: string | null = null;
   let members: WorkspaceMemberData[] = [];
   let locations: LocationData[] = [];
+  let paymentDefaults: WorkspacePaymentDefaults | null = null;
   
   if (workspaceId) {
     const { data: qboConfig } = await supabase
@@ -83,24 +85,24 @@ async function getSettingsData() {
         .maybeSingle();
       quickbooksConnected = financeData?.quickbooks_connected || false;
     }
-    
+
     // Fetch team members (if owner/admin or has manage_team permission)
     const canViewTeam =
       workspaceRole === 'owner' ||
       workspaceRole === 'admin' ||
       (workspaceMembership.permissions as WorkspacePermissions)?.manage_team;
-    
-    if (canViewTeam) {
-      const membersResult = await getWorkspaceMembers(workspaceId);
-      if (membersResult.success && membersResult.members) {
-        members = membersResult.members;
-      }
-      
-      const locationsResult = await getWorkspaceLocations(workspaceId);
-      if (locationsResult.success && locationsResult.locations) {
-        locations = locationsResult.locations;
-      }
-    }
+    const isAdmin = workspaceRole === 'owner' || workspaceRole === 'admin';
+
+    // Parallelize independent conditional fetches
+    const [membersResult, locationsResult, paymentDefaultsResult] = await Promise.all([
+      canViewTeam ? getWorkspaceMembers(workspaceId) : null,
+      canViewTeam ? getWorkspaceLocations(workspaceId) : null,
+      isAdmin ? getWorkspacePaymentDefaults() : null,
+    ]);
+
+    if (membersResult?.success && membersResult.members) members = membersResult.members;
+    if (locationsResult?.success && locationsResult.locations) locations = locationsResult.locations;
+    if (paymentDefaultsResult) paymentDefaults = paymentDefaultsResult;
   }
 
   return {
@@ -128,33 +130,38 @@ async function getSettingsData() {
     },
     members,
     locations,
+    paymentDefaults,
   };
 }
 
 export default async function SettingsPage(props: {
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
-  const data = await getSettingsData();
   const searchParams = await props.searchParams;
-  
+
   return (
     <div className="flex-1 min-h-0 overflow-auto">
       <Suspense fallback={<SettingsSkeleton />}>
-        <SettingsContent data={data} searchParams={searchParams} />
+        <SettingsData searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
+async function SettingsData({ searchParams }: { searchParams: { success?: string; error?: string } }) {
+  const data = await getSettingsData();
+  return <SettingsContent data={data} searchParams={searchParams} />;
+}
+
 function SettingsSkeleton() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-8">
-      <div className="h-10 w-48 bg-ink/5 rounded-lg animate-pulse" />
-      <div className="liquid-panel p-6 space-y-6">
-        <div className="h-6 w-32 bg-ink/5 rounded animate-pulse" />
+      <div className="h-10 w-48 bg-[var(--stage-surface)] rounded-[var(--stage-radius-input)] stage-skeleton" />
+      <div className="stage-panel p-6 space-y-6">
+        <div className="h-6 w-32 bg-[var(--stage-surface)] rounded stage-skeleton" />
         <div className="space-y-4">
-          <div className="h-12 bg-ink/5 rounded-xl animate-pulse" />
-          <div className="h-12 bg-ink/5 rounded-xl animate-pulse" />
+          <div className="h-12 bg-[var(--stage-surface)] rounded-xl stage-skeleton" />
+          <div className="h-12 bg-[var(--stage-surface)] rounded-xl stage-skeleton" />
         </div>
       </div>
     </div>

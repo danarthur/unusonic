@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { ArrowLeft, Clock, MapPin, Users, Plus, Timer, CalendarClock } from 'lucide-react';
 import { GlassShell } from '@/shared/ui/glass-shell';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
-import { RunOfShow } from '@/widgets/run-of-show';
+import dynamic from 'next/dynamic';
+
+const RunOfShow = dynamic(
+  () => import('@/widgets/run-of-show').then((m) => m.RunOfShow),
+  { ssr: false, loading: () => <div className="flex-1 flex items-center justify-center p-4"><div className="h-8 w-8 stage-skeleton rounded-lg" /></div> },
+);
 import { CueInspector } from '@/app/(dashboard)/(features)/crm/components/CueInspector';
 import type { Cue } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
 import { deleteCue, duplicateCue, updateCue, createCue, fetchCues } from '@/app/(dashboard)/(features)/crm/actions/ros';
@@ -179,21 +184,21 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
   };
 
   return (
-    <div className="h-full flex flex-col p-6 overflow-hidden bg-[var(--background)]">
+    <div className="h-full flex flex-col p-6 overflow-hidden bg-[var(--stage-surface)]">
       <header className="flex items-center justify-between mb-8 shrink-0">
         <div className="flex items-center gap-4">
           <Link
             href={`/events/g/${eventId}`}
-            className="p-3 rounded-full hover:bg-ceramic/10 text-ink-muted hover:text-ceramic transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+            className="p-3 rounded-full hover:bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
             aria-label="Back to Stream"
           >
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-[clamp(1.75rem,4vw,2.25rem)] font-light text-ceramic tracking-tight">
+            <h1 className="text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight">
               {initialEvent.title ?? 'Untitled Production'}
             </h1>
-            <div className="flex items-center gap-4 text-sm text-ink-muted mt-1">
+            <div className="flex items-center gap-4 text-sm text-[var(--stage-text-secondary)] mt-1">
               <span className="flex items-center gap-1">
                 <Users size={14} /> {initialEvent.client_name ?? '—'}
               </span>
@@ -210,9 +215,9 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
         <button
           type="button"
           onClick={handleCreateCue}
-          className="bg-obsidian text-ceramic px-5 py-2.5 rounded-full liquid-levitation flex items-center gap-2 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+          className="bg-[var(--stage-void)] text-[var(--stage-text-primary)] px-5 py-2.5 rounded-full stage-panel flex items-center gap-2 transition-colors hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
         >
-          <Plus size={16} /> Add Cue
+          <Plus size={16} /> Add cue
         </button>
       </header>
 
@@ -222,19 +227,19 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
             header={
               <div className="px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold uppercase tracking-widest text-ink-muted">Timeline</span>
-                  <span className="text-[10px] font-mono text-ink-muted bg-ink/5 px-2 py-1 rounded-full border border-[var(--glass-border)]">
+                  <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Timeline</span>
+                  <span className="text-[10px] font-mono text-[var(--stage-text-secondary)] bg-[oklch(1_0_0_/_0.05)] px-2 py-1 rounded-full border border-[oklch(1_0_0_/_0.08)]">
                     {cues.length} Cues
                   </span>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2 text-ink-muted" title="Total Run Time">
-                    <Timer size={14} className="text-ink-muted/50" />
+                  <div className="flex items-center gap-2 text-[var(--stage-text-secondary)]" title="Total Run Time">
+                    <Timer size={14} className="text-[var(--stage-text-secondary)]/50" />
                     <span className="text-xs font-mono font-medium tracking-tight">{totalDurationLabel}</span>
                   </div>
-                  <div className="h-3 w-px bg-[var(--glass-border)]" />
-                  <div className="flex items-center gap-2 text-ink" title="Projected End Time">
-                    <CalendarClock size={14} className="text-emerald-500/70" />
+                  <div className="h-3 w-px bg-[oklch(1_0_0_/_0.08)]" />
+                  <div className="flex items-center gap-2 text-[var(--stage-text-primary)]" title="Projected End Time">
+                    <CalendarClock size={14} className="text-[var(--color-unusonic-success)]/70" />
                     <span className="text-xs font-mono font-medium tracking-tight">
                       Ends {showEndTime ?? '--:--'}
                     </span>

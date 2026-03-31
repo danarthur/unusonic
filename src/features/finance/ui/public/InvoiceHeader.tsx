@@ -32,8 +32,8 @@ function StatusBadge({ status }: { status: string }) {
       className={cn(
         'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-widest',
         isPaid
-          ? 'border-emerald-200/80 bg-emerald-50/95 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/90 dark:text-emerald-200'
-          : 'border-amber-200/80 bg-amber-50/95 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/90 dark:text-amber-200'
+          ? 'border-[oklch(0.40_0.12_145_/_0.3)] bg-[oklch(0.95_0.04_145_/_0.3)] text-[oklch(0.35_0.12_145)]'
+          : 'border-[oklch(0.55_0.12_70_/_0.3)] bg-[oklch(0.95_0.04_70_/_0.3)] text-[oklch(0.45_0.12_70)]'
       )}
     >
       {isPaid ? 'Paid' : 'Due'}
@@ -64,10 +64,13 @@ export function InvoiceHeader({ data, className }: InvoiceHeaderProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
       className={cn(
-        'w-full rounded-3xl border border-[var(--glass-border)] bg-[var(--glass-bg)] p-6 shadow-[var(--glass-shadow)] backdrop-blur-xl sm:p-8',
-        'liquid-levitation-strong',
+        'w-full rounded-[var(--portal-radius)] p-6 sm:p-8 portal-levitation-strong',
         className
       )}
+      style={{
+        backgroundColor: 'var(--portal-surface)',
+        border: 'var(--portal-border-width) solid var(--portal-border)',
+      }}
     >
       <div className="flex flex-col gap-6 sm:gap-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -76,10 +79,13 @@ export function InvoiceHeader({ data, className }: InvoiceHeaderProps) {
               <img
                 src={workspace.logo_url}
                 alt={workspace.name}
-                className="h-9 w-auto object-contain opacity-90 sm:h-10"
+                className="h-9 w-auto object-contain sm:h-10"
               />
             ) : (
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-ink-muted">
+              <p
+                className="text-xs font-medium uppercase tracking-[0.2em]"
+                style={{ color: 'var(--portal-text-secondary)' }}
+              >
                 {workspace.name}
               </p>
             )}
@@ -88,35 +94,59 @@ export function InvoiceHeader({ data, className }: InvoiceHeaderProps) {
         </div>
 
         <div>
-          <p className="font-serif text-base text-ink-muted sm:text-lg">Invoice</p>
+          <p className="text-base sm:text-lg" style={{ color: 'var(--portal-text-secondary)' }}>
+            Invoice
+          </p>
           <h1
-            className="font-serif text-2xl font-light tracking-tight text-ink sm:text-3xl"
-            style={{ letterSpacing: '-0.02em' }}
+            className="text-2xl sm:text-3xl"
+            style={{
+              color: 'var(--portal-text)',
+              fontFamily: 'var(--portal-font-heading)',
+              fontWeight: 'var(--portal-heading-weight)',
+              letterSpacing: 'var(--portal-heading-tracking)',
+            }}
           >
             {event.title}
           </h1>
           {invoice.invoice_number && (
-            <p className="mt-1 font-mono text-sm text-ink-muted">{invoice.invoice_number}</p>
+            <p
+              className="mt-1 font-mono text-sm"
+              style={{ color: 'var(--portal-text-secondary)' }}
+            >
+              {invoice.invoice_number}
+            </p>
           )}
           {eventDate && (
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
+            <p
+              className="mt-1 flex items-center gap-1.5 text-sm"
+              style={{ color: 'var(--portal-text-secondary)' }}
+            >
               <Calendar className="size-4 shrink-0" />
               {eventDate}
             </p>
           )}
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-[var(--glass-border)] pt-6 sm:flex-row sm:items-end sm:justify-between sm:pt-8">
+        <div
+          className="flex flex-col gap-2 pt-6 sm:flex-row sm:items-end sm:justify-between sm:pt-8"
+          style={{ borderTop: 'var(--portal-border-width) solid var(--portal-border-subtle)' }}
+        >
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+            <p
+              className="text-xs font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--portal-text-secondary)' }}
+            >
               Total due
             </p>
-            <p className="font-mono text-2xl font-medium text-ink sm:text-3xl">
+            <p
+              className="font-mono text-2xl font-medium sm:text-3xl"
+              style={{ color: 'var(--portal-text)' }}
+            >
               {formatCurrency(Number(invoice.total_amount))}
             </p>
           </div>
-          <div className="text-sm text-ink-muted">
-            <p className="font-medium text-ink">{dueFormatted}</p>
+          <div className="text-sm" style={{ color: 'var(--portal-text-secondary)' }}>
+            <p className="font-medium" style={{ color: 'var(--portal-text)' }}>{dueFormatted}</p>
             <p className="mt-0.5">{getDueCountdown(invoice.due_date)}</p>
           </div>
         </div>

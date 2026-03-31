@@ -21,7 +21,10 @@ export function KineticNumber({ value, className }: { value: number; className?:
   return (
     <motion.span
       style={{ fontVariationSettings }}
-      className={className ?? 'text-4xl text-neon-blue font-sans tracking-tight tabular-nums'}
+      className={
+        className ??
+        'text-4xl text-[var(--stage-text-primary)] font-sans tracking-tight tabular-nums'
+      }
     >
       {value}
     </motion.span>

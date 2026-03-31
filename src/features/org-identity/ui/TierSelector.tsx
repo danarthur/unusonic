@@ -45,7 +45,7 @@ export function TierSelector({
 }: TierSelectorProps) {
   return (
     <div className={cn('space-y-3', className)}>
-      <label className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+      <label className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         {label}
       </label>
       <div className="grid grid-cols-3 gap-3">
@@ -59,27 +59,27 @@ export function TierSelector({
               onClick={() => onChange(tier.id)}
               className={cn(
                 'relative rounded-2xl p-4 border text-left transition-all duration-200',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue/50 focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
                 isSelected
-                  ? 'border-neon-blue/60 bg-neon-blue/10 shadow-[0_0_0_1px_var(--color-neon-blue)/40]'
-                  : 'border-mercury bg-obsidian/50 hover:border-mercury/80 hover:bg-obsidian/70'
+                  ? 'border-[oklch(1_0_0_/_0.20)] bg-[oklch(1_0_0_/_0.06)] shadow-[0_0_0_1px_oklch(1_0_0_/_0.14)]'
+                  : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)]/80 hover:border-[oklch(1_0_0_/_0.14)] hover:bg-[var(--stage-surface)]'
               )}
               aria-pressed={isSelected}
               aria-label={`${tier.name}: ${tier.desc}, ${tier.price}${isSuggested ? ' (Suggested)' : ''}`}
             >
               {isSuggested && (
-                <span className="absolute top-2 right-2 rounded-full bg-neon/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-neon">
+                <span className="absolute top-2 right-2 rounded-full bg-[oklch(1_0_0_/_0.08)] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-[var(--stage-accent)]">
                   Suggested
                 </span>
               )}
               {isSelected && !isSuggested && (
-                <div className="absolute top-2.5 right-2.5 text-neon-blue" aria-hidden>
-                  <CheckCircle2 className="size-4" />
+                <div className="absolute top-2.5 right-2.5 text-[var(--stage-accent)]" aria-hidden>
+                  <CheckCircle2 className="size-4" strokeWidth={1.5} />
                 </div>
               )}
-              <div className={cn('text-sm font-medium text-ceramic pr-6', isSuggested && 'pt-4')}>{tier.name}</div>
-              <div className="text-xs text-ink-muted mt-0.5">{tier.desc}</div>
-              <div className="text-xs font-semibold mt-2 text-neon-blue">{tier.price}</div>
+              <div className={cn('text-sm font-medium text-[var(--stage-text-primary)] pr-6', isSuggested && 'pt-4')}>{tier.name}</div>
+              <div className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{tier.desc}</div>
+              <div className="text-xs font-semibold mt-2 text-[var(--stage-accent)]">{tier.price}</div>
             </button>
           );
         })}

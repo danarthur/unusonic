@@ -1,6 +1,6 @@
 /**
  * Login Page
- * Post-Enterprise Materiality auth — obsidian void, liquid glass, grain overlay.
+ * Stage Engineering auth — void background, opaque matte surfaces, grain texture.
  * @module app/(auth)/login
  */
 
@@ -12,9 +12,9 @@ const SmartLoginForm = dynamic(
     ssr: true,
     loading: () => (
       <div className="w-full max-w-md mx-auto flex flex-col items-center gap-6 py-12" aria-hidden>
-        <div className="w-14 h-14 rounded-full bg-ink/10 animate-pulse" />
-        <div className="h-4 w-32 rounded-full bg-ink/10 animate-pulse" />
-        <div className="h-10 w-full max-w-[280px] rounded-xl bg-ink/10 animate-pulse" />
+        <div className="w-14 h-14 rounded-full bg-[var(--stage-text-primary)]/10 stage-skeleton" />
+        <div className="h-4 w-32 rounded-full bg-[var(--stage-text-primary)]/10 stage-skeleton" />
+        <div className="h-10 w-full max-w-[280px] rounded-xl bg-[var(--stage-text-primary)]/10 stage-skeleton" />
       </div>
     ),
   }
@@ -33,6 +33,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const redirectTo = params.next ?? params.redirect;
   const showInactivityMessage = params.reason === 'inactivity';
+  const showSessionExpiredMessage = params.reason === 'session_expired';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
@@ -42,7 +43,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </div>
 
       <div className="relative z-10 w-full">
-        <SmartLoginForm redirectTo={redirectTo} showInactivityMessage={showInactivityMessage} />
+        <SmartLoginForm redirectTo={redirectTo} showInactivityMessage={showInactivityMessage} showSessionExpiredMessage={showSessionExpiredMessage} />
       </div>
     </div>
   );

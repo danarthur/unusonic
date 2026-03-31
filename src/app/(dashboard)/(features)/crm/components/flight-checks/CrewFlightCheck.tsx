@@ -3,15 +3,32 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, Users, RefreshCw, Bell } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { StagePanel } from '@/shared/ui/stage-panel';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { updateFlightCheckStatus } from '../../actions/update-flight-check-status';
 import { syncCrewFromProposalToEvent } from '../../actions/sync-crew-from-proposal';
 import { sendCrewReminderByEntity } from '../../actions/send-crew-reminder-by-entity';
+import { confirmDealCrew, updateCrewDispatch, type DealCrewRow } from '../../actions/deal-crew';
 import type { CrewRolesDiagnostic } from '../../actions/get-crew-roles-from-proposal';
 import { normalizeCrewItems, type CrewItem, type CrewStatus } from './types';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
 import { AssignCrewSheet } from './AssignCrewSheet';
+import { CrewIdentityRow, OpenRoleRow } from '../crew-identity-row';
+
+type DispatchStatus = 'standby' | 'en_route' | 'on_site' | 'wrapped';
+const DISPATCH_ORDER: DispatchStatus[] = ['standby', 'en_route', 'on_site', 'wrapped'];
+const DISPATCH_LABELS: Record<DispatchStatus, string> = {
+  standby: 'Standby',
+  en_route: 'En Route',
+  on_site: 'On Site',
+  wrapped: 'Wrapped',
+};
+const DISPATCH_COLORS: Record<DispatchStatus, string> = {
+  standby: 'border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)]',
+  en_route: 'bg-[var(--color-unusonic-warning)]/15 text-[var(--stage-text-primary)] border-[var(--color-unusonic-warning)]/30',
+  on_site: 'bg-[var(--color-unusonic-info)]/15 text-[var(--stage-text-primary)] border-[var(--color-unusonic-info)]/30',
+  wrapped: 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40',
+};
 
 const CREW_STATUS_ORDER: CrewStatus[] = ['requested', 'confirmed', 'dispatched'];
 const CREW_LABELS: Record<CrewStatus, string> = {
@@ -22,6 +39,8 @@ const CREW_LABELS: Record<CrewStatus, string> = {
 
 type CrewFlightCheckProps = {
   eventId: string;
+  crewRows?: DealCrewRow[];
+  crewLoading?: boolean;
   runOfShowData: RunOfShowData | null;
   onUpdated?: () => void;
   defaultCollapsed?: boolean;
@@ -30,6 +49,8 @@ type CrewFlightCheckProps = {
 
 export function CrewFlightCheck({
   eventId,
+  crewRows = [],
+  crewLoading = false,
   runOfShowData,
   onUpdated,
   defaultCollapsed = false,
@@ -39,64 +60,75 @@ export function CrewFlightCheck({
   const [updating, setUpdating] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [assignSheetIndex, setAssignSheetIndex] = useState<number | null>(null);
-  const [reminderSending, setReminderSending] = useState<string | null>(null); // entity_id
-  const [reminderResults, setReminderResults] = useState<Record<string, 'sent' | 'error'>>({}); // entity_id → result
+  const [reminderSending, setReminderSending] = useState<string | null>(null);
+  const [reminderResults, setReminderResults] = useState<Record<string, 'sent' | 'error'>>({});
 
-  const items = normalizeCrewItems(runOfShowData);
-  const showCollapse = items.length > maxVisible;
-  const visibleItems = collapsed && showCollapse ? items.slice(0, maxVisible) : items;
-  const hasMore = collapsed && showCollapse && items.length > maxVisible;
+  const useDealCrew = crewRows.length > 0;
+  const legacyItems = normalizeCrewItems(runOfShowData);
+  const hasCrew = useDealCrew || legacyItems.length > 0;
+  const totalCount = useDealCrew ? crewRows.length : legacyItems.length;
+  const showCollapse = totalCount > maxVisible;
+  const visibleCount = collapsed && showCollapse ? maxVisible : totalCount;
 
-  const setStatus = async (index: number, status: CrewStatus) => {
-    const next: CrewItem[] = items.map((item, i) =>
-      i === index ? { ...item, status } : item
-    );
-    setUpdating(`${index}`);
-    const result = await updateFlightCheckStatus(eventId, { crew_items: next });
+  // ── Dispatch status cycling ──
+  const cycleDispatchStatus = async (row: DealCrewRow) => {
+    const current = row.dispatch_status as DispatchStatus | null ?? 'standby';
+    const idx = DISPATCH_ORDER.indexOf(current);
+    const next = DISPATCH_ORDER[(idx + 1) % DISPATCH_ORDER.length];
+    setUpdating(row.id);
+    const result = await updateCrewDispatch(row.id, { dispatch_status: next });
     setUpdating(null);
     if (result.success) onUpdated?.();
   };
 
-  const cycleStatus = (index: number) => {
-    const current = items[index]?.status ?? 'requested';
-    const idx = CREW_STATUS_ORDER.indexOf(current);
-    const next = CREW_STATUS_ORDER[(idx + 1) % CREW_STATUS_ORDER.length];
-    setStatus(index, next);
+  const handleConfirm = async (row: DealCrewRow) => {
+    setUpdating(row.id);
+    const result = await confirmDealCrew(row.id);
+    setUpdating(null);
+    if (result.success) onUpdated?.();
   };
 
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  // ── Legacy JSONB cycling ──
+  const legacyCycleStatus = async (index: number) => {
+    const current = legacyItems[index]?.status ?? 'requested';
+    const idx = CREW_STATUS_ORDER.indexOf(current);
+    const next = CREW_STATUS_ORDER[(idx + 1) % CREW_STATUS_ORDER.length];
+    const nextItems: CrewItem[] = legacyItems.map((item, i) =>
+      i === index ? { ...item, status: next } : item
+    );
+    setUpdating(`legacy-${index}`);
+    const result = await updateFlightCheckStatus(eventId, { crew_items: nextItems });
+    setUpdating(null);
+    if (result.success) onUpdated?.();
+  };
 
+  // ── Reminder ──
+  const handleSendReminder = async (entityId: string) => {
+    setReminderSending(entityId);
+    const result = await sendCrewReminderByEntity(eventId, entityId);
+    setReminderSending(null);
+    setReminderResults((prev) => ({ ...prev, [entityId]: result.success ? 'sent' : 'error' }));
+    setTimeout(() => {
+      setReminderResults((prev) => { const next = { ...prev }; delete next[entityId]; return next; });
+    }, 4000);
+  };
+
+  // ── Sync ──
   function formatDiagnostic(d: CrewRolesDiagnostic): string {
-    if (d.step === 'no_proposal') {
-      return 'No proposal found for this deal.';
-    }
-    if (d.step === 'no_items') {
-      return 'This proposal has no line items. Add packages from the catalog to the proposal.';
-    }
-    if (d.step === 'no_package_ids') {
-      return `Proposal has ${d.itemCount ?? 0} item(s) but none are catalog packages (they may be custom lines). Add a service or package from the catalog.`;
-    }
-    if (d.step === 'no_packages_found') {
-      return 'Proposal references packages that could not be loaded. Check workspace.';
-    }
+    if (d.step === 'no_proposal') return 'No proposal found for this deal.';
+    if (d.step === 'no_items') return 'This proposal has no line items.';
+    if (d.step === 'no_package_ids') return `Proposal has ${d.itemCount ?? 0} item(s) but none are catalog packages.`;
+    if (d.step === 'no_packages_found') return 'Proposal references packages that could not be loaded.';
     if (d.step === 'no_roles') {
       const parts: string[] = [];
-      if (d.packages?.length) {
-        const list = d.packages.map((p) => `${p.name} (${p.category}${p.staffRole ? `, staff role: ${p.staffRole}` : ''})`).join('; ');
-        parts.push(`On proposal: ${list}.`);
-      }
-      if (d.ingredients?.length) {
-        const list = d.ingredients.map((p) => `${p.name} (${p.category}${p.staffRole ? `, staff role: ${p.staffRole}` : ', no staff role'})`).join('; ');
-        parts.push(`Inside bundles: ${list}.`);
-      }
-      if (parts.length) {
-        parts.push('To get crew roles: in Catalog, open each service item, set "Staff role" (e.g. DJ), then save.');
-        return parts.join(' ');
-      }
-      return 'No crew roles found. In Catalog, set "Staff role" on service packages (e.g. DJ), then add them (or a package that contains them) to the proposal.';
+      if (d.packages?.length) parts.push(`On proposal: ${d.packages.map((p) => `${p.name} (${p.category})`).join('; ')}.`);
+      if (d.ingredients?.length) parts.push(`Inside bundles: ${d.ingredients.map((p) => `${p.name} (${p.category})`).join('; ')}.`);
+      if (parts.length) { parts.push('Set "Staff role" on service items in Catalog.'); return parts.join(' '); }
+      return 'No crew roles found. Set "Staff role" on service packages in Catalog.';
     }
-    return 'No crew roles found. Add service packages with a staff role in Catalog, then add them to the proposal.';
+    return 'No crew roles found.';
   }
 
   const handleSyncFromProposal = async () => {
@@ -107,174 +139,203 @@ export function CrewFlightCheck({
     setSyncing(false);
     if (result.success) {
       onUpdated?.();
-      if (result.added === 0 && result.diagnostic) {
-        setSyncMessage(formatDiagnostic(result.diagnostic));
-      } else if (result.added === 0) {
-        setSyncMessage('No crew roles found. Add service packages with a staff role in Catalog, then add them to the proposal.');
-      }
+      if (result.added === 0 && result.diagnostic) setSyncMessage(formatDiagnostic(result.diagnostic));
+      else if (result.added === 0) setSyncMessage('No crew roles found.');
     } else {
       setSyncError(result.error);
     }
   };
 
-  const handleSendReminder = async (entityId: string) => {
-    setReminderSending(entityId);
-    const result = await sendCrewReminderByEntity(eventId, entityId);
-    setReminderSending(null);
-    setReminderResults((prev) => ({
-      ...prev,
-      [entityId]: result.success ? 'sent' : 'error',
-    }));
-    // Clear the result badge after 4 seconds
-    setTimeout(() => {
-      setReminderResults((prev) => {
-        const next = { ...prev };
-        delete next[entityId];
-        return next;
-      });
-    }, 4000);
-  };
-
-  if (items.length === 0) {
+  // ── Reminder button helper ──
+  function ReminderButton({ entityId }: { entityId: string }) {
+    if (reminderResults[entityId]) {
+      return (
+        <span className={`text-[10px] font-medium px-2 py-1 rounded-lg border ${
+          reminderResults[entityId] === 'sent'
+            ? 'text-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/10 border-[var(--color-unusonic-success)]/20'
+            : 'text-[var(--color-unusonic-error)] bg-[var(--color-unusonic-error)]/10 border-[var(--color-unusonic-error)]/20'
+        }`}>
+          {reminderResults[entityId] === 'sent' ? 'Sent' : 'Error'}
+        </span>
+      );
+    }
     return (
-      <LiquidPanel className="p-5 rounded-[28px] border border-white/10">
+      <button
+        type="button"
+        onClick={() => handleSendReminder(entityId)}
+        disabled={reminderSending === entityId}
+        title="Send reminder email"
+        className="p-2 rounded-xl text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.04)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)] disabled:opacity-60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+      >
+        <Bell size={13} strokeWidth={1.5} className={reminderSending === entityId ? 'animate-ping' : ''} aria-hidden />
+      </button>
+    );
+  }
+
+  // ── Empty state ──
+  if (!hasCrew && !crewLoading) {
+    return (
+      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <Users size={20} className="shrink-0 text-ink-muted" aria-hidden />
+            <Users size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
             <div>
-              <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted">Crew</h3>
-              <p className="text-sm text-ink-muted mt-0.5">No roles requested yet</p>
+              <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Crew</h3>
+              <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">No roles requested yet</p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleSyncFromProposal}
             disabled={syncing}
-            className="inline-flex items-center gap-2 py-2 px-3 rounded-xl text-sm font-medium tracking-tight text-ceramic border border-white/10 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60 transition-colors"
+            className="inline-flex items-center gap-2 py-2 px-3 rounded-xl text-sm font-medium tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
           >
-            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} aria-hidden />
-            {syncing ? 'Syncing…' : 'Pull crew from proposal'}
+            <RefreshCw size={14} strokeWidth={1.5} className={syncing ? 'animate-spin' : ''} aria-hidden />
+            {syncing ? 'Syncing...' : 'Pull crew from proposal'}
           </button>
-          {syncError && (
-            <p className="text-xs text-[var(--color-unusonic-error)]">{syncError}</p>
-          )}
-          {syncMessage && (
-            <p className="text-xs text-ink-muted leading-relaxed">{syncMessage}</p>
-          )}
+          {syncError && <p className="text-xs text-[var(--color-unusonic-error)]">{syncError}</p>}
+          {syncMessage && <p className="text-xs text-[var(--stage-text-secondary)] leading-relaxed">{syncMessage}</p>}
         </div>
-      </LiquidPanel>
+      </StagePanel>
     );
   }
 
+  if (crewLoading) {
+    return (
+      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
+        <div className="flex items-center gap-3">
+          <Users size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Crew</h3>
+          <span className="text-xs text-[var(--stage-text-secondary)]">Loading...</span>
+        </div>
+      </StagePanel>
+    );
+  }
+
+  // ── Assign sheet helpers ──
+  const assignSheetRole = (() => {
+    if (assignSheetIndex === null) return '';
+    if (useDealCrew) return crewRows[assignSheetIndex]?.role_note ?? '';
+    return legacyItems[assignSheetIndex]?.role ?? '';
+  })();
+
+  const assignedEntityIds = useDealCrew
+    ? crewRows.map((r) => r.entity_id).filter((id): id is string => !!id)
+    : legacyItems.map((i) => i.entity_id).filter((id): id is string => !!id);
+
+  // ── Populated state ──
   return (
-    <LiquidPanel className="p-5 rounded-[28px] border border-white/10">
+    <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-xl"
+        className="w-full flex items-center justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-xl"
       >
         <div className="flex items-center gap-3">
-          <Users size={20} className="shrink-0 text-ink-muted" aria-hidden />
-          <h3 className="text-xs font-medium uppercase tracking-widest text-ink-muted">Crew</h3>
+          <Users size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Crew</h3>
         </div>
         {showCollapse && (
-          <span className="text-ink-muted">
-            {collapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          <span className="text-[var(--stage-text-secondary)]">
+            {collapsed ? <ChevronDown size={18} strokeWidth={1.5} /> : <ChevronUp size={18} strokeWidth={1.5} />}
           </span>
         )}
       </button>
-      <ul className="mt-4 space-y-3">
-        {visibleItems.map((item, index) => (
-          <motion.li
-            key={`${item.role}-${index}`}
-            layout
-            initial={false}
-            animate={{ opacity: 1 }}
-            transition={UNUSONIC_PHYSICS}
-            className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0"
-          >
-            <div className="min-w-0 flex-1">
-              <span className="text-ceramic font-medium tracking-tight text-sm truncate block">
-                {item.role}
-              </span>
-              {item.assignee_name && (
-                <span className="text-xs text-ink-muted truncate block mt-0.5">{item.assignee_name}</span>
-              )}
-            </div>
-            {item.status === 'requested' ? (
-              <div className="flex items-center gap-2 shrink-0">
-                {/* Remind button — only when someone is assigned but unconfirmed */}
-                {item.entity_id && (
-                  reminderResults[item.entity_id] ? (
-                    <span className={`text-[10px] font-medium px-2 py-1 rounded-lg border ${
-                      reminderResults[item.entity_id] === 'sent'
-                        ? 'text-[var(--color-signal-success)] bg-[var(--color-signal-success)]/10 border-[var(--color-signal-success)]/20'
-                        : 'text-[var(--color-unusonic-error)] bg-[var(--color-unusonic-error)]/10 border-[var(--color-unusonic-error)]/20'
-                    }`}>
-                      {reminderResults[item.entity_id] === 'sent' ? 'Sent' : 'Error'}
-                    </span>
+
+      <div className="mt-4 space-y-0">
+        {useDealCrew ? (
+          crewRows.slice(0, visibleCount).map((row, index) => {
+            if (!row.entity_id) {
+              return <OpenRoleRow key={row.id} row={row} onAssign={() => setAssignSheetIndex(index)} />;
+            }
+
+            const isConfirmed = row.confirmed_at != null;
+            const dispatchStatus = row.dispatch_status as DispatchStatus | null;
+
+            return (
+              <CrewIdentityRow
+                key={row.id}
+                row={row}
+                onClickName={row.employment_status === 'internal_employee' && row.roster_rel_id
+                  ? () => window.open(`/network/entity/${row.roster_rel_id}?kind=internal_employee`, '_blank')
+                  : undefined
+                }
+                actions={
+                  !isConfirmed ? (
+                    <>
+                      {row.entity_id && <ReminderButton entityId={row.entity_id} />}
+                      <button
+                        type="button"
+                        onClick={() => handleConfirm(row)}
+                        disabled={updating === row.id}
+                        className="px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
+                      >
+                        {updating === row.id ? '...' : 'Confirm'}
+                      </button>
+                    </>
                   ) : (
-                    <motion.button
+                    <button
                       type="button"
-                      onClick={() => handleSendReminder(item.entity_id!)}
-                      disabled={reminderSending === item.entity_id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      transition={UNUSONIC_PHYSICS}
-                      title="Send reminder email"
-                      className="p-2 rounded-xl text-ink-muted border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:text-ceramic disabled:opacity-60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      onClick={() => cycleDispatchStatus(row)}
+                      disabled={updating === row.id}
+                      className={`px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 ${DISPATCH_COLORS[dispatchStatus ?? 'standby']}`}
                     >
-                      <Bell size={13} className={reminderSending === item.entity_id ? 'animate-pulse' : ''} aria-hidden />
-                    </motion.button>
+                      {updating === row.id ? '...' : DISPATCH_LABELS[dispatchStatus ?? 'standby']}
+                    </button>
                   )
-                )}
-                <motion.button
-                  type="button"
-                  onClick={() => setAssignSheetIndex(index)}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={UNUSONIC_PHYSICS}
-                  className="px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border border-white/10 bg-white/[0.06] text-neon transition-colors hover:bg-white/[0.1] hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]"
-                >
-                  Select from team
-                </motion.button>
+                }
+              />
+            );
+          })
+        ) : (
+          /* Legacy JSONB fallback */
+          legacyItems.slice(0, visibleCount).map((item, index) => (
+            <motion.div
+              key={`${item.role}-${index}`}
+              layout
+              initial={false}
+              animate={{ opacity: 1 }}
+              transition={STAGE_LIGHT}
+              className="flex items-center justify-between gap-4 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0"
+            >
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)] truncate block">{item.role}</span>
+                {item.assignee_name && <span className="text-xs text-[var(--stage-text-secondary)] truncate block mt-0.5">{item.assignee_name}</span>}
               </div>
-            ) : (
-              <motion.button
-                type="button"
-                onClick={() => cycleStatus(index)}
-                disabled={updating === `${index}`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                transition={UNUSONIC_PHYSICS}
-                className={`
-                  shrink-0 px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight
-                  border transition-colors
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-obsidian)]
-                  disabled:opacity-60
-                  ${item.status === 'dispatched' ? 'bg-[var(--color-signal-success)]/20 text-ceramic border-[var(--color-signal-success)]/40 hover:brightness-110' : ''}
-                  ${item.status === 'confirmed' ? 'bg-[var(--color-neon-blue)]/15 text-ceramic border-[var(--color-neon-blue)]/30 hover:brightness-110' : ''}
-                `}
-              >
-                {updating === `${index}` ? '…' : CREW_LABELS[item.status]}
-              </motion.button>
-            )}
-          </motion.li>
-        ))}
-      </ul>
+              {item.status === 'requested' ? (
+                <div className="flex items-center gap-2 shrink-0">
+                  {item.entity_id && <ReminderButton entityId={item.entity_id} />}
+                  <button type="button" onClick={() => setAssignSheetIndex(index)} className="px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]">
+                    Select from team
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => legacyCycleStatus(index)}
+                  disabled={updating === `legacy-${index}`}
+                  className={`shrink-0 px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 ${item.status === 'dispatched' ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40' : ''} ${item.status === 'confirmed' ? 'bg-[var(--color-unusonic-info)]/15 text-[var(--stage-text-primary)] border-[var(--color-unusonic-info)]/30' : ''}`}
+                >
+                  {updating === `legacy-${index}` ? '...' : CREW_LABELS[item.status]}
+                </button>
+              )}
+            </motion.div>
+          ))
+        )}
+      </div>
+
       <AssignCrewSheet
         open={assignSheetIndex !== null}
         onOpenChange={(open) => !open && setAssignSheetIndex(null)}
-        role={assignSheetIndex !== null && items[assignSheetIndex] ? items[assignSheetIndex].role : ''}
+        role={assignSheetRole}
         eventId={eventId}
         onAssigned={onUpdated}
-        assignedEntityIds={items.map((i) => i.entity_id).filter((id): id is string => !!id)}
+        assignedEntityIds={assignedEntityIds}
       />
-      {hasMore && (
-        <p className="text-xs text-ink-muted mt-2">
-          +{items.length - maxVisible} more
-        </p>
+
+      {collapsed && showCollapse && (
+        <p className="text-xs text-[var(--stage-text-secondary)] mt-2">+{totalCount - maxVisible} more</p>
       )}
-    </LiquidPanel>
+    </StagePanel>
   );
 }

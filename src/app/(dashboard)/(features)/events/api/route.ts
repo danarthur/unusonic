@@ -25,9 +25,10 @@ export async function GET() {
   try {
     const workspaceId = (await getActiveWorkspaceId()) ?? (await getSession()).workspace.id;
     const supabase = getSystemClient();
-    // Legacy public.events not in generated Database type
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // ops.events not in generated Database type for public schema client
+     
     const { data: eventsData, error: eventsError } = await (supabase as any)
+      .schema('ops')
       .from('events')
       .select('id, title, status, starts_at, location_name')
       .eq('workspace_id', workspaceId)

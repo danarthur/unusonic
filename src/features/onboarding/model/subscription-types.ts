@@ -95,7 +95,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, {
     price: '~$1 per resolution',
     highlights: [
       'Digital Workers (SDRs/Support)',
-      'SignalPay required',
+      'UnusonicPay required',
       'Explainable AI (XAI)',
     ],
     suggestedPersonas: ['solo_professional', 'agency_team', 'venue_brand'],

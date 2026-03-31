@@ -129,7 +129,7 @@ export function AvatarUpload({ orgId, value, onChange, className }: AvatarUpload
       {pendingFile && previewUrl ? (
         <div className="flex flex-col items-center gap-4">
           <div
-            className="relative rounded-full overflow-hidden border-2 border-[var(--color-mercury)] bg-[var(--color-obsidian)] select-none"
+            className="relative rounded-full overflow-hidden border-2 border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)] select-none"
             style={{ width: CROP_SIZE, height: CROP_SIZE }}
           >
             <div
@@ -154,9 +154,9 @@ export function AvatarUpload({ orgId, value, onChange, className }: AvatarUpload
           </div>
           {canEditCrop && (
             <>
-              <p className="text-xs text-[var(--color-ink-muted)]">Drag to reposition</p>
+              <p className="text-xs text-[var(--stage-text-secondary)]">Drag to reposition</p>
               <div className="flex items-center gap-3 w-full max-w-[200px]">
-                <span className="text-xs text-[var(--color-ink-muted)] shrink-0">Zoom</span>
+                <span className="text-xs text-[var(--stage-text-secondary)] shrink-0">Zoom</span>
                 <input
                   type="range"
                   min={0.5}
@@ -164,7 +164,7 @@ export function AvatarUpload({ orgId, value, onChange, className }: AvatarUpload
                   step={0.05}
                   value={crop.scale}
                   onChange={(e) => setCrop((p) => ({ ...p, scale: Number(e.target.value) }))}
-                  className="flex-1 h-2 rounded-full appearance-none bg-white/10 accent-[var(--color-silk)]"
+                  className="flex-1 h-2 rounded-full appearance-none bg-[oklch(1_0_0_/_0.10)] accent-[var(--stage-accent)]"
                 />
               </div>
             </>
@@ -179,7 +179,7 @@ export function AvatarUpload({ orgId, value, onChange, className }: AvatarUpload
               size="sm"
               onClick={handleCropConfirm}
               disabled={uploading}
-              className="gap-1 bg-[var(--color-silk)]/90 text-[var(--color-canvas)] hover:bg-[var(--color-silk)]"
+              className="gap-1 bg-[var(--stage-accent)]/90 text-[var(--stage-text-on-accent)] hover:bg-[var(--stage-accent)]"
             >
               {uploading ? 'Uploading…' : (
                 <>
@@ -197,22 +197,22 @@ export function AvatarUpload({ orgId, value, onChange, className }: AvatarUpload
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
             className={cn(
-              'relative size-24 shrink-0 rounded-full border-2 border-[var(--color-mercury)] flex items-center justify-center overflow-hidden',
-              'bg-white/5 hover:border-[var(--color-silk)]/50 hover:bg-white/10 transition-colors cursor-pointer group',
+              'relative size-24 shrink-0 rounded-full border-2 border-[oklch(1_0_0_/_0.08)] flex items-center justify-center overflow-hidden',
+              'bg-[oklch(1_0_0_/_0.05)] hover:border-[var(--stage-accent)]/50 hover:bg-[oklch(1_0_0_/_0.10)] transition-colors cursor-pointer group',
               uploading && 'opacity-60 pointer-events-none'
             )}
           >
             {value ? (
               <img src={value} alt="Avatar" className="size-full object-cover" />
             ) : (
-              <User className="size-10 text-[var(--color-ink-muted)] group-hover:text-[var(--color-silk)] transition-colors" />
+              <User className="size-10 text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-accent)] transition-colors" />
             )}
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
-              <Camera className="size-6 text-white" />
+              <Camera className="size-6 text-[oklch(1_0_0)]" />
             </div>
             {uploading && (
               <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
-                <span className="text-xs text-white">Uploading…</span>
+                <span className="text-xs text-[oklch(1_0_0)]">Uploading…</span>
               </div>
             )}
           </button>
@@ -224,7 +224,7 @@ export function AvatarUpload({ orgId, value, onChange, className }: AvatarUpload
             onChange={handleFileSelect}
             disabled={uploading}
           />
-          <span className="text-xs text-[var(--color-ink-muted)]">Upload photo</span>
+          <span className="text-xs text-[var(--stage-text-secondary)]">Upload photo</span>
         </>
       )}
     </div>

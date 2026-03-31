@@ -41,6 +41,7 @@ export async function updateEventDetails(
   }
 
   const { error } = await supabase
+    .schema('ops')
     .from('events')
     .update({ ...filtered, updated_at: new Date().toISOString() })
     .eq('id', eventId)

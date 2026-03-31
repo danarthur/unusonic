@@ -42,19 +42,19 @@ export function OverdueAlert({ invoices, className }: OverdueAlertProps) {
         exit={{ opacity: 0, y: -8 }}
         transition={spring}
         className={cn(
-          'relative overflow-hidden rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-4',
+          'relative overflow-hidden rounded-2xl border border-[var(--color-unusonic-error)]/20 bg-[var(--color-unusonic-error)]/[0.06] p-4',
           className,
         )}
       >
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-red-500/10">
-            <AlertTriangle className="size-4 text-red-500 dark:text-red-400" />
+          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-[var(--color-unusonic-error)]/10">
+            <AlertTriangle className="size-4 text-[var(--color-unusonic-error)]" />
           </div>
 
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-red-700 dark:text-red-300">
+            <p className="text-sm font-medium text-[var(--color-unusonic-error)]">
               {overdue.length} invoice{overdue.length > 1 ? 's' : ''} overdue
-              <span className="ml-1.5 font-normal text-red-600/80 dark:text-red-400/80">
+              <span className="ml-1.5 font-normal text-[var(--color-unusonic-error)]/80">
                 ({fmt.format(totalOverdue)} outstanding)
               </span>
             </p>
@@ -64,14 +64,14 @@ export function OverdueAlert({ invoices, className }: OverdueAlertProps) {
                 <Link
                   key={inv.id}
                   href={`/events/${inv.eventId}`}
-                  className="inline-flex items-center gap-1 rounded-lg bg-red-500/10 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-500/20 dark:text-red-400 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-unusonic-error)]/10 px-2 py-1 text-xs font-medium text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/20 transition-colors"
                 >
                   {inv.invoiceNumber || inv.eventName || 'Invoice'}
                   <ChevronRight className="size-3" />
                 </Link>
               ))}
               {overdue.length > 3 && (
-                <span className="inline-flex items-center px-2 py-1 text-xs text-red-500/70">
+                <span className="inline-flex items-center px-2 py-1 text-xs text-[var(--color-unusonic-error)]/70">
                   +{overdue.length - 3} more
                 </span>
               )}
@@ -81,7 +81,7 @@ export function OverdueAlert({ invoices, className }: OverdueAlertProps) {
           <button
             type="button"
             onClick={() => setDismissed(true)}
-            className="shrink-0 rounded-lg p-1 text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"
+            className="shrink-0 rounded-lg p-1 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 hover:text-[var(--color-unusonic-error)] transition-colors"
           >
             <X className="size-4" />
           </button>

@@ -7,7 +7,6 @@ import { format, addMonths, subMonths, addWeeks, subWeeks, addYears, subYears } 
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 
-const KEYCAP_SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 };
 import type { CalendarEvent, EventStatus } from '@/features/calendar/model/types';
 import type { CalendarViewType } from '@/features/calendar/lib/date-ranges';
 import { MonthGrid } from '@/features/calendar/ui/grids/month-grid';
@@ -149,8 +148,8 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
     [setParams]
   );
 
-  /** Navigate to Event Command Center (event pill click in month grid). */
-  const goToCommandCenter = useCallback(
+  /** Navigate to Event Studio (event pill click in month grid). */
+  const goToEventStudio = useCallback(
     (eventId: string) => {
       const path = eventId.startsWith('gig:')
         ? `/events/g/${eventId.slice(4)}`
@@ -186,52 +185,43 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
   }, []);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 rounded-2xl overflow-hidden liquid-panel relative antialiased">
+    <div className="flex flex-col flex-1 min-h-0 rounded-[var(--stage-radius-panel,12px)] overflow-hidden stage-panel relative antialiased">
       {/* Grain overlay — Liquid Japandi: glass surfaces need subtle noise */}
-      <div className="pointer-events-none absolute inset-0 z-0 grain-overlay rounded-2xl" aria-hidden />
+      <div className="pointer-events-none absolute inset-0 z-0 grain-overlay rounded-[var(--stage-radius-panel,12px)]" aria-hidden />
       {/* Toolbar: nav + title + view selector + filter */}
-      <header className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-[var(--glass-border)] bg-[var(--glass-bg)]/50 backdrop-blur-xl rounded-t-2xl shrink-0">
+      <header className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] rounded-t-[var(--stage-radius-panel,12px)] shrink-0">
         <div className="flex items-center gap-2">
           <motion.button
             type="button"
             onClick={goPrev}
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.04 }}
-            transition={KEYCAP_SPRING}
-            className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
             aria-label="Previous"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-5 h-5" strokeWidth={1.5} />
           </motion.button>
-          <h1 className="text-xl md:text-3xl font-semibold tracking-tight text-ink min-w-[140px] md:min-w-[200px] text-center" style={{ letterSpacing: '-0.02em' }}>
+          <h1 className="text-xl md:text-3xl font-semibold tracking-tight text-[var(--stage-text-primary)] min-w-[140px] md:min-w-[200px] text-center" style={{ letterSpacing: '-0.02em' }}>
             {headerLabel}
           </h1>
           <motion.button
             type="button"
             onClick={goNext}
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.04 }}
-            transition={KEYCAP_SPRING}
-            className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
             aria-label="Next"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5" strokeWidth={1.5} />
           </motion.button>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-xl border border-[var(--glass-border)] overflow-hidden bg-ink/[0.03]">
+          <div className="flex rounded-xl border border-[oklch(1_0_0_/_0.08)] overflow-hidden bg-[var(--stage-accent)]/[0.03] p-1 gap-0.5">
             {VIEWS.map(({ value, label }) => (
               <motion.button
                 key={value}
                 type="button"
                 onClick={() => onViewChange(value)}
-                whileTap={{ scale: 0.96 }}
-                whileHover={{ scale: view === value ? 1 : 1.02 }}
-                transition={KEYCAP_SPRING}
-                className={`px-4 py-2.5 text-sm font-medium ${
+                className={`px-3.5 py-2 text-sm font-medium rounded-lg transition-[color,background-color,filter] duration-150 hover:brightness-[1.03] ${
                   view === value
-                    ? 'bg-ink text-canvas'
-                    : 'text-ink-muted hover:bg-[var(--glass-bg-hover)] hover:text-ink'
+                    ? 'bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]'
+                    : 'text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)]'
                 }`}
               >
                 {label}
@@ -243,13 +233,10 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
               ref={filterButtonRef}
               type="button"
               onClick={() => setFilterOpen((o) => !o)}
-              whileTap={{ scale: 0.96 }}
-              whileHover={{ scale: 1.02 }}
-              transition={KEYCAP_SPRING}
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[var(--glass-border)] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ring)] ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] text-sm font-medium transition-[color,background-color,filter] hover:brightness-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] ${
                 filterOpen
-                  ? 'bg-ink text-canvas'
-                  : 'bg-ink/[0.03] text-ink-muted hover:bg-[var(--glass-bg-hover)] hover:text-ink'
+                  ? 'bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]'
+                  : 'bg-[var(--stage-accent)]/[0.03] text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)]'
               }`}
               aria-label="Filter events"
               aria-expanded={filterOpen}
@@ -263,48 +250,48 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
               createPortal(
                 <div
                   ref={filterDropdownRef}
-                  className="fixed z-[200] w-56 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)]/95 backdrop-blur-xl liquid-panel-nested p-3"
+                  className="fixed z-[200] w-56 rounded-xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface-raised)] stage-panel-nested p-3"
                   style={{ top: filterPosition.top, left: filterPosition.left }}
                   role="dialog"
                   aria-label="Filter events by status"
                 >
-                  <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
+                  <p className="text-xs font-semibold text-[var(--stage-text-secondary)] uppercase tracking-wider mb-2">
                     Show status
                   </p>
                   <div className="flex flex-col gap-1.5">
                     {EVENT_STATUSES.map(({ value, label }) => (
                       <label
                         key={value}
-                        className="flex items-center gap-2 text-sm text-ink cursor-pointer hover:bg-[var(--glass-bg-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5"
+                        className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer hover:bg-[var(--stage-surface-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5"
                       >
                         <input
                           type="checkbox"
                           checked={statusFilter.has(value)}
                           onChange={() => toggleStatus(value)}
-                          className="rounded border-[var(--glass-border)] text-ink focus:ring-[var(--ring)]"
+                          className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus:ring-[var(--stage-accent)]"
                         />
                         {label}
                       </label>
                     ))}
                   </div>
-                  <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider mt-3 mb-1.5">
+                  <p className="text-xs font-semibold text-[var(--stage-text-secondary)] uppercase tracking-wider mt-3 mb-1.5">
                     Optional
                   </p>
-                  <label className="flex items-center gap-2 text-sm text-ink cursor-pointer hover:bg-[var(--glass-bg-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
+                  <label className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer hover:bg-[var(--stage-surface-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
                     <input
                       type="checkbox"
                       checked={withProjectOnly}
                       onChange={(e) => setWithProjectOnly(e.target.checked)}
-                      className="rounded border-[var(--glass-border)] text-ink focus:ring-[var(--ring)]"
+                      className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus:ring-[var(--stage-accent)]"
                     />
                     With project only
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-ink cursor-pointer hover:bg-[var(--glass-bg-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
+                  <label className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer hover:bg-[var(--stage-surface-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
                     <input
                       type="checkbox"
                       checked={withClientOnly}
                       onChange={(e) => setWithClientOnly(e.target.checked)}
-                      className="rounded border-[var(--glass-border)] text-ink focus:ring-[var(--ring)]"
+                      className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus:ring-[var(--stage-accent)]"
                     />
                     With client only
                   </label>
@@ -315,18 +302,16 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
         </div>
       </header>
 
-      {/* Grid area — fills remaining height, scrolls when content overflows; year view uses overflow-visible so hover-expanded months aren't clipped */}
+      {/* Grid area — fills remaining height, scrolls when content overflows */}
       <div
-        className={`relative z-10 flex-1 min-h-0 p-4 md:p-6 bg-[var(--glass-bg)]/20 backdrop-blur-sm rounded-b-2xl flex flex-col ${
-          view === 'year' ? 'overflow-visible' : 'overflow-auto'
-        }`}
+        className="relative z-10 flex-1 min-h-0 p-4 md:p-6 bg-[var(--stage-surface-nested)] rounded-b-[var(--stage-radius-panel,12px)] flex flex-col overflow-auto"
       >
         {view === 'month' && (
           <div className="flex-1 min-h-0 flex flex-col">
             <MonthGrid
               events={filteredEvents}
               viewDate={viewDate}
-              onEventClick={(event) => goToCommandCenter(event.id)}
+              onEventClick={(event) => goToEventStudio(event.id)}
               onDayClick={onOpenDayBlade}
             />
           </div>

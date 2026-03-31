@@ -115,18 +115,18 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
   return (
     <div className={cn('space-y-4', className)}>
       <div className="flex items-center justify-between gap-4">
-        <label className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-muted)]">
+        <label className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           Brand frequency (color)
         </label>
-        <div className="flex rounded-lg border border-[var(--color-mercury)] bg-white/5 p-0.5">
+        <div className="flex rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] p-0.5">
           <button
             type="button"
             onClick={() => setMode('presets')}
             className={cn(
               'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
               mode === 'presets'
-                ? 'bg-white/10 text-[var(--color-ink)]'
-                : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                ? 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)]'
+                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
             )}
           >
             Presets
@@ -137,8 +137,8 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
             className={cn(
               'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
               mode === 'hex'
-                ? 'bg-white/10 text-[var(--color-ink)]'
-                : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                ? 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)]'
+                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
             )}
           >
             Hex
@@ -157,8 +157,8 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
                 title={label}
                 onClick={() => handlePresetClick(presetValue)}
                 className={cn(
-                  'size-9 rounded-full border-2 transition-transform hover:scale-110',
-                  isSelected ? 'border-[var(--color-ink)] ring-2 ring-white/20' : 'border-transparent hover:border-white/20'
+                  'size-9 rounded-full border-2 transition-[border-color,filter] hover:brightness-[1.12]',
+                  isSelected ? 'border-[var(--stage-text-primary)] ring-2 ring-[oklch(1_0_0_/_0.20)]' : 'border-transparent hover:border-[oklch(1_0_0_/_0.20)]'
                 )}
                 style={{ backgroundColor: presetValue }}
                 aria-label={label}
@@ -173,24 +173,22 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
             <PopoverTrigger asChild>
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="size-12 shrink-0 rounded-full border border-white/10 shadow-lg overflow-hidden relative"
+                className="size-12 shrink-0 rounded-full border border-[oklch(1_0_0_/_0.10)] shadow-lg overflow-hidden relative transition-[filter] hover:brightness-[1.06] active:brightness-[0.98]"
                 style={{ backgroundColor: swatchColor }}
                 aria-label="Open color picker"
               >
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
               </motion.button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-3 bg-[var(--color-glass-surface)] border-[var(--color-mercury)] backdrop-blur-xl" align="start">
-              <label className="block text-[10px] font-medium uppercase tracking-widest text-[var(--color-ink-muted)] mb-2">
+            <PopoverContent className="w-auto p-3 bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.08)]" align="start">
+              <label className="block text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-2">
                 Choose any color
               </label>
               <input
                 type="color"
                 value={swatchColor}
                 onChange={(e) => handlePickerChange(e.target.value)}
-                className="h-10 w-full min-w-[200px] cursor-pointer rounded-lg border border-white/10 bg-transparent"
+                className="h-10 w-full min-w-[200px] cursor-pointer rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-transparent"
                 aria-label="Color picker"
               />
             </PopoverContent>
@@ -198,7 +196,7 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
 
           <div className="flex-1 min-w-0">
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)] font-mono text-sm select-none">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--stage-text-secondary)] font-mono text-sm select-none">
                 #
               </span>
               <input
@@ -208,9 +206,9 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
                 onFocus={() => { isFocusedRef.current = true; }}
                 onBlur={handleBlur}
                 className={cn(
-                  'w-full rounded-xl border bg-white/5 py-3 pl-8 pr-4 font-mono text-sm transition-colors outline-none uppercase tracking-wider',
-                  'border-[var(--color-mercury)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)]/50',
-                  'focus:border-[var(--color-silk)]/50 focus:ring-2 focus:ring-[var(--color-silk)]/20',
+                  'w-full rounded-xl border bg-[oklch(1_0_0_/_0.05)] py-3 pl-8 pr-4 font-mono text-sm transition-colors outline-none uppercase tracking-wider',
+                  'border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50',
+                  'focus:border-[var(--stage-accent)]/50 focus:ring-2 focus:ring-[var(--stage-accent)]/20',
                   !isValidHex && inputRaw.length === 6 && 'border-[var(--color-unusonic-error)]/50'
                 )}
                 maxLength={6}
@@ -218,8 +216,8 @@ export function ColorTuner({ value, onChange, className }: ColorTunerProps) {
                 aria-invalid={!isValidHex && inputRaw.length === 6}
               />
             </div>
-            <p className="mt-2 text-[10px] font-mono text-[var(--color-ink-muted)] flex items-center gap-2">
-              <span className="size-1.5 rounded-full bg-[var(--color-signal-success)]/60 shrink-0" />
+            <p className="mt-2 text-[10px] font-mono text-[var(--stage-text-secondary)] flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-[var(--color-unusonic-success)]/60 shrink-0" />
               {isValidHex ? (
                 <>Oklch: {oklchLabel}</>
               ) : (

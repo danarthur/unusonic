@@ -15,10 +15,10 @@ export interface GenesisCoreProps {
  */
 export function GenesisCore({ reaction }: GenesisCoreProps) {
   return (
-    <div className="relative z-0 transition-all duration-200 backdrop-blur-0">
+    <div className="relative z-0 transition-all duration-200 ">
       <motion.div
-        className={`flex items-center justify-center transition-all duration-200 ease-out ${
-          reaction ? 'scale-110 opacity-100' : 'opacity-80'
+        className={`flex items-center justify-center transition-[filter,opacity] duration-200 ease-out ${
+          reaction ? 'brightness-110 opacity-100' : 'opacity-80'
         }`}
         style={{ mixBlendMode: 'screen' }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}

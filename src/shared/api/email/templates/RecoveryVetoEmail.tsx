@@ -23,13 +23,13 @@ export function RecoveryVetoEmail({ cancelUrl }: RecoveryVetoEmailProps) {
   return (
     <Html>
       <Head />
-      <Preview>A recovery process has started on your Signal account. Cancel if this wasn’t you.</Preview>
+      <Preview>A recovery process has started on your Unusonic account. Cancel if this wasn’t you.</Preview>
       <Body style={main}>
         <Container style={container}>
           <Section style={section}>
             <Text style={heading}>Recovery started</Text>
             <Text style={body}>
-              A recovery process has been started for your Signal account. If you didn’t request this,
+              A recovery process has been started for your Unusonic account. If you didn’t request this,
               cancel it immediately to keep your account secure.
             </Text>
             <Button href={cancelUrl} style={button}>

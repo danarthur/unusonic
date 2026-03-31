@@ -7,7 +7,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FileText, ArrowRight } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { generateInvoiceFromProposal } from '../../api/invoice-actions';
 import { useState } from 'react';
@@ -45,17 +45,17 @@ export function SetupBilling({
   }
 
   return (
-    <LiquidPanel
+    <StagePanel
       className={`flex flex-col items-center justify-center gap-6 p-8 text-center ${className ?? ''}`}
     >
-      <div className="rounded-2xl bg-[var(--glass-bg-hover)] p-6 flex flex-col items-center gap-4 max-w-sm">
-        <div className="rounded-full bg-stone-100 dark:bg-stone-800 p-4">
-          <FileText className="size-8 text-ink-muted" aria-hidden />
+      <div className="rounded-2xl bg-[var(--stage-surface-hover)] p-6 flex flex-col items-center gap-4 max-w-sm">
+        <div className="rounded-full bg-[var(--stage-surface-elevated)] p-4">
+          <FileText className="size-8 text-[var(--stage-text-secondary)]" aria-hidden />
         </div>
-        <h3 className="text-lg font-medium text-ink tracking-tight">
+        <h3 className="text-lg font-medium text-[var(--stage-text-primary)] tracking-tight">
           Setup Billing
         </h3>
-        <p className="text-sm text-ink-muted">
+        <p className="text-sm text-[var(--stage-text-secondary)]">
           {firstProposal
             ? `Convert your active proposal for ${eventTitle} into an invoice to start tracking payments.`
             : `Create a proposal in the Deal room first, then convert it to an invoice here.`}
@@ -82,9 +82,9 @@ export function SetupBilling({
           </Button>
         )}
         {error && (
-          <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+          <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
         )}
       </div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

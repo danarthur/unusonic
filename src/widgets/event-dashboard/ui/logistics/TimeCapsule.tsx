@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Controller, type Control, type Path, type UseFormWatch, type UseFormSetValue } from 'react-hook-form';
 import { format, differenceInCalendarDays } from 'date-fns';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { CeramicDatePicker } from '@/app/(dashboard)/(features)/crm/components/ceramic-date-picker';
 import { CeramicSwitch } from '@/shared/ui/switch';
 import { usePreferences } from '@/shared/ui/providers/PreferencesContext';
@@ -144,9 +144,9 @@ function TimeInput({
         onBlur={handleBlur}
         placeholder={militaryTime ? '9:00 or 14:30' : '9:00 AM or 2:30 PM'}
         maxLength={militaryTime ? 5 : 9}
-        className="w-full min-w-0 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        className="w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
       />
-      <span className="text-[10px] text-ink-muted">
+      <span className="text-[10px] text-[var(--stage-text-secondary)]">
         {militaryTime ? '24h (14:30 = 2:30 PM)' : '12h (e.g. 2:30 PM)'}
       </span>
     </div>
@@ -274,14 +274,14 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
   }, [startDate, startTime, endDate, endTime, setByTime, showLoadInOut, loadInDate, loadInTime, loadOutDate, loadOutTime]);
 
   return (
-    <LiquidPanel className="h-full flex flex-col">
-      <h3 className="text-sm font-medium text-ink-muted uppercase tracking-wider mb-3">
+    <StagePanel className="h-full flex flex-col">
+      <h3 className="text-sm font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-3">
         Date & time
       </h3>
       <div className="flex flex-col gap-4">
         {/* Natural language summary */}
         {summary && (
-          <p className="text-sm font-medium text-ink" data-state="summary">
+          <p className="text-sm font-medium text-[var(--stage-text-primary)]" data-state="summary">
             {summary}
           </p>
         )}
@@ -296,10 +296,10 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
               aria-label="Set by time"
             />
             <label htmlFor="time-capsule-set-by-time" className="flex cursor-pointer items-center gap-2">
-              <Clock size={14} className="text-ink-muted" strokeWidth={1.5} />
-              <span className="text-sm text-ink">Set by time</span>
+              <Clock size={14} className="text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
+              <span className="text-sm text-[var(--stage-text-primary)]">Set by time</span>
               <span
-                className="relative inline-flex pb-28 -mb-28 text-ink-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-[var(--ring)] rounded-full cursor-help"
+                className="relative inline-flex pb-28 -mb-28 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded-full cursor-help"
                 onMouseEnter={() => setShowSetByTimeHelp(true)}
                 onMouseLeave={() => setShowSetByTimeHelp(false)}
                 onFocus={() => setShowSetByTimeHelp(true)}
@@ -311,7 +311,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
                 <HelpCircle size={14} strokeWidth={1.5} />
                 {showSetByTimeHelp && (
                   <span
-                    className="absolute left-1/2 -translate-x-1/2 top-full z-50 mt-1.5 px-3 py-2.5 w-64 text-xs font-normal text-ink whitespace-normal rounded-xl border border-[var(--glass-border)] shadow-[var(--glass-shadow-hover)] backdrop-blur-2xl bg-[var(--background)]/90 dark:bg-[var(--background)]/92"
+                    className="absolute left-1/2 -translate-x-1/2 top-full z-50 mt-1.5 px-3 py-2.5 w-64 text-xs font-normal text-[var(--stage-text-primary)] whitespace-normal rounded-xl border border-[oklch(1_0_0_/_0.08)] shadow-md bg-[var(--stage-surface-raised)]"
                     role="tooltip"
                   >
                     {SET_BY_TIME_HELP}
@@ -328,29 +328,29 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
               aria-label="Show load-in / load-out"
             />
             <label htmlFor="time-capsule-show-load-in-out" className="flex cursor-pointer items-center gap-2">
-              <Package size={14} className="text-ink-muted" strokeWidth={1.5} />
-              <span className="text-sm text-ink">Show load-in / load-out</span>
+              <Package size={14} className="text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
+              <span className="text-sm text-[var(--stage-text-primary)]">Show load-in / load-out</span>
             </label>
           </div>
           {multiDay && (
             <span
-              className="inline-flex items-center gap-1.5 rounded-full bg-silk/40 px-2.5 py-1 text-xs font-medium text-ink border border-[var(--glass-border)]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--stage-accent)]/40 px-2.5 py-1 text-xs font-medium text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.08)]"
               title="End date is different from start date"
             >
-              <Calendar size={12} className="text-ink-muted" strokeWidth={1.5} />
+              <Calendar size={12} className="text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
               Multi-day
             </span>
           )}
         </div>
 
         {endBeforeStart && (
-          <div className="flex items-center gap-2 text-amber-600 text-sm" role="alert">
+          <div className="flex items-center gap-2 text-[var(--color-unusonic-warning)] text-sm" role="alert">
             <AlertCircle size={14} strokeWidth={2} />
             <span>End time is before start time.</span>
             <button
               type="button"
               onClick={() => setVal('end_time', startTime || '00:00')}
-              className="text-xs font-medium underline hover:no-underline focus:outline-none focus:ring-2 focus:ring-[var(--ring)] rounded px-1"
+              className="text-xs font-medium underline hover:no-underline focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded px-1"
             >
               Set end = start
             </button>
@@ -360,7 +360,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
         {/* First line: date options */}
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-0">
-            <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+            <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
               Start date
             </label>
             <Controller
@@ -376,8 +376,8 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
             />
           </div>
           <div className="min-w-0">
-            <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
-              End date {!multiDay && <span className="normal-case text-ink-muted/80">(same day)</span>}
+            <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
+              End date {!multiDay && <span className="normal-case text-[var(--stage-text-secondary)]/80">(same day)</span>}
             </label>
             <Controller
               name={"end_date" as Path<T>}
@@ -397,7 +397,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
         <div className="flex flex-wrap items-end gap-4">
           {setByTime && (
             <div className="min-w-0">
-              <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+              <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
                 SET TIME
               </label>
               <Controller
@@ -415,7 +415,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
             </div>
           )}
           <div className="min-w-0">
-            <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+            <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
               Start time
             </label>
             <Controller
@@ -432,7 +432,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
             />
           </div>
           <div className="min-w-0">
-            <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+            <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
               End time
             </label>
             <Controller
@@ -451,13 +451,13 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
         </div>
 
         {showLoadInOut && (
-          <div className="border-l-2 border-amber-500/40 pl-3 ml-1 space-y-4">
-            <span className="text-xs font-medium text-ink-muted uppercase tracking-wider block">
+          <div className="border-l-2 border-[var(--color-unusonic-warning)]/40 pl-3 ml-1 space-y-4">
+            <span className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider block">
               Load-in / Load-out
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+                <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
                   Load-in date
                 </label>
                 <Controller
@@ -473,7 +473,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
                 />
                 {setByTime && (
                   <div className="mt-2">
-                    <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
                       Load-in time
                     </label>
                     <Controller
@@ -492,7 +492,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+                <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
                   Load-out date
                 </label>
                 <Controller
@@ -508,7 +508,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
                 />
                 {setByTime && (
                   <div className="mt-2">
-                    <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">
                       Load-out time
                     </label>
                     <Controller
@@ -533,20 +533,20 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
         {/* Visualizer bar: Load In (gray) | Event (brand) | Load Out (gray) — explicit widths so bar always reflects proportions */}
         <div className="mt-2">
           <div
-            className="flex h-2.5 w-full overflow-hidden rounded-full bg-ink-muted/20"
+            className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--stage-text-secondary)]/20"
             role="img"
             aria-label="Time span: Load In, Event, Load Out"
           >
             {visualizer.loadInPct > 0 && (
               <div
-                className="h-full shrink-0 bg-ink-muted/50 rounded-l-full transition-[width] duration-300 ease-out"
+                className="h-full shrink-0 bg-[var(--stage-text-secondary)]/50 rounded-l-full transition-[width] duration-300 ease-out"
                 style={{ width: `${visualizer.loadInPct}%` }}
                 title={`Load In: ${visualizer.loadInHours} Hour${visualizer.loadInHours !== 1 ? 's' : ''}`}
               />
             )}
             <div
               className={cn(
-                'h-full shrink-0 bg-silk/90 transition-[width] duration-300 ease-out',
+                'h-full shrink-0 bg-[var(--stage-accent)]/90 transition-[width] duration-300 ease-out',
                 visualizer.loadInPct <= 0 && 'rounded-l-full',
                 visualizer.loadOutPct <= 0 && 'rounded-r-full'
               )}
@@ -558,17 +558,17 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
             />
             {visualizer.loadOutPct > 0 && (
               <div
-                className="h-full shrink-0 bg-ink-muted/50 rounded-r-full transition-[width] duration-300 ease-out"
+                className="h-full shrink-0 bg-[var(--stage-text-secondary)]/50 rounded-r-full transition-[width] duration-300 ease-out"
                 style={{ width: `${visualizer.loadOutPct}%` }}
                 title={`Load Out: ${visualizer.loadOutHours} Hour${visualizer.loadOutHours !== 1 ? 's' : ''}`}
               />
             )}
           </div>
-          <p className="mt-1 text-[10px] text-ink-muted">
+          <p className="mt-1 text-[10px] text-[var(--stage-text-secondary)]">
             Hover segments for duration. Gray = load-in/out, brand = event.
           </p>
         </div>
       </div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

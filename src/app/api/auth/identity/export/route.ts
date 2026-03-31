@@ -1,7 +1,7 @@
 /**
  * Export Identity – CXF (Credential Exchange Format) compatible export.
  * Produces a JSON file with passkey descriptors (public keys). Private keys
- * are device-bound and not stored by Signal; for full portability use your
+ * are device-bound and not stored by Unusonic; for full portability use your
  * device or password manager's export.
  */
 
@@ -57,7 +57,7 @@ export async function GET() {
 
   const cxf = {
     version: 0,
-    exporter: 'Signal',
+    exporter: 'Unusonic',
     timestamp,
     accounts: [
       {
@@ -74,7 +74,7 @@ export async function GET() {
   return new NextResponse(JSON.stringify(cxf, null, 2), {
     headers: {
       'Content-Type': 'application/json',
-      'Content-Disposition': `attachment; filename="signal-identity-export-${new Date().toISOString().slice(0, 10)}.json"`,
+      'Content-Disposition': `attachment; filename="unusonic-identity-export-${new Date().toISOString().slice(0, 10)}.json"`,
     },
   });
 }

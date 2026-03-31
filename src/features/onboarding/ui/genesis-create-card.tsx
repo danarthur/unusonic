@@ -11,7 +11,7 @@ import type { GenesisTierId } from '@/features/org-identity/ui/TierSelector';
 import { Input } from '@/shared/ui/input';
 import type { UserPersona } from '@/features/onboarding/model/subscription-types';
 import type { OnboardingGenesisContext } from '@/features/onboarding/model/types';
-import { UNUSONIC_PHYSICS } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 const GENESIS_TO_SUBSCRIPTION: Record<GenesisTierId, 'foundation' | 'growth' | 'venue_os'> = {
   scout: 'foundation',
@@ -69,23 +69,23 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      transition={UNUSONIC_PHYSICS}
+      transition={STAGE_MEDIUM}
       className="w-full"
     >
-      <form action={submitAction} className="flex flex-col gap-8 liquid-card glass-panel rounded-3xl p-8 border border-[var(--glass-border)]">
+      <form action={submitAction} className="flex flex-col gap-8 stage-panel rounded-[var(--stage-radius-panel,12px)] p-8 border border-[oklch(1_0_0/0.08)]">
         {/* Slug (read-only) */}
         <div>
-          <span className="text-xs font-medium uppercase tracking-widest text-ink-muted">
+          <span className="text-[11px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
             Studio URL
           </span>
-          <p className="mt-2 text-lg text-ceramic font-mono">unusonic.events/{slug}</p>
+          <p className="mt-2 text-lg text-[var(--stage-text-primary)] font-mono">unusonic.events/{slug}</p>
         </div>
 
         {/* Name */}
         <section>
           <label
             htmlFor="genesis-name"
-            className="mb-2 block text-xs font-medium uppercase tracking-widest text-ink-muted"
+            className="mb-2 block text-[11px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
           >
             Organization name
           </label>
@@ -97,7 +97,7 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="h-11 border-[var(--glass-border)] bg-obsidian/50 text-ceramic placeholder:text-ink-muted/60 text-base rounded-xl px-4"
+            className="h-11 border-[oklch(1_0_0/0.08)] bg-[oklch(0.06_0_0/0.75)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-base rounded-xl px-4"
           />
         </section>
 
@@ -111,10 +111,8 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
         <motion.button
           type="submit"
           disabled={isPending || !name.trim()}
-          whileHover={!isPending && name.trim() ? { scale: 1.02 } : undefined}
-          whileTap={!isPending && name.trim() ? { scale: 0.98 } : undefined}
-          transition={UNUSONIC_PHYSICS}
-          className="w-full py-3.5 rounded-full font-medium text-sm bg-neon-blue text-obsidian hover:brightness-110 transition-colors disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+          transition={STAGE_MEDIUM}
+          className="stage-btn stage-btn-primary w-full py-3.5 rounded-full font-medium text-sm transition-colors disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
         >
           {isPending ? (
             <>

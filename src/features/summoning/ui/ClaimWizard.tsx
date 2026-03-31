@@ -55,7 +55,7 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
-      className="w-full max-w-md flex flex-col gap-6 rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-6 sm:p-8 shadow-xl backdrop-blur-xl"
+      className="w-full max-w-md flex flex-col gap-6 rounded-2xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] p-6 sm:p-8 shadow-xl"
     >
       <AnimatePresence mode="wait">
         {step === 'hook' && (
@@ -67,13 +67,13 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
             transition={spring}
             className="text-center space-y-6"
           >
-            <h1 className="text-xl font-medium tracking-tight text-[var(--color-ink)]">
+            <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
               You’re invited to connect
             </h1>
-            <p className="text-sm text-[var(--color-ink-muted)]">
-              A partner has sent you a link to collaborate on Signal. Confirm your identity to view shared work and claim your organization.
+            <p className="text-sm text-[var(--stage-text-secondary)]">
+              A partner has sent you a link to collaborate on Unusonic. Confirm your identity to view shared work and claim your organization.
             </p>
-            <p className="text-xs text-[var(--color-ink-muted)]">{email}</p>
+            <p className="text-xs text-[var(--stage-text-secondary)]">{email}</p>
             <Button type="button" onClick={() => setStep('identity')} className="w-full" size="lg">
               Continue
             </Button>
@@ -89,11 +89,11 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
             transition={spring}
             className="space-y-4"
           >
-            <h2 className="text-lg font-medium tracking-tight text-[var(--color-ink)]">
+            <h2 className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
               Confirm your business details
             </h2>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Organization name
               </label>
               <Input
@@ -103,18 +103,18 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
                   if (!slug) setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 64));
                 }}
                 placeholder="e.g. Neon Velvet"
-                className="bg-white/5 border-[var(--color-mercury)]"
+                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Slug (public URL)
               </label>
               <Input
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="neon-velvet"
-                className="bg-white/5 border-[var(--color-mercury)] font-mono text-sm"
+                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] font-mono text-sm"
               />
             </div>
             <div className="flex gap-3">
@@ -138,17 +138,17 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
             className="space-y-4"
             onSubmit={handleKeysSubmit}
           >
-            <h2 className="text-lg font-medium tracking-tight text-[var(--color-ink)]">
+            <h2 className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
               Set your password
             </h2>
-            <p className="text-sm text-[var(--color-ink-muted)]">
+            <p className="text-sm text-[var(--stage-text-secondary)]">
               Create a password to secure your account. You’ll sign in with {email}.
             </p>
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="name" value={name} />
             <input type="hidden" name="slug" value={slug} />
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Password
               </label>
               <Input
@@ -158,10 +158,10 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
                 placeholder="••••••••"
                 minLength={8}
                 required
-                className="bg-white/5 border-[var(--color-mercury)]"
+                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
-            <p className="text-[10px] text-[var(--color-ink-muted)]">
+            <p className="text-[10px] text-[var(--stage-text-secondary)]">
               We’ll create your account and then link your organization.
             </p>
             <div className="flex gap-3">
@@ -191,7 +191,7 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
       </AnimatePresence>
 
       <p className="text-center">
-        <Link href={`/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`} className="text-xs text-[var(--color-silk)] hover:underline">
+        <Link href={`/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`} className="text-xs text-[var(--stage-accent)] hover:underline">
           Already have an account? Sign in
         </Link>
       </p>

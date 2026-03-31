@@ -12,6 +12,7 @@ import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUp, Loader2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
 interface OnboardingChatInputProps {
   value: string;
@@ -81,7 +82,7 @@ export function OnboardingChatInput({
           data-form-type="other"
           data-1p-ignore
           className={cn(
-            'w-full min-w-0 bg-transparent border-none outline-none text-ink placeholder:text-ink-muted/70 cursor-text caret-[var(--color-silk)]',
+            'w-full min-w-0 bg-transparent border-none outline-none text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/70 cursor-text caret-[var(--stage-accent)]',
             'font-sans text-lg h-full min-h-[2rem] py-2 px-2 disabled:opacity-50'
           )}
         />
@@ -94,21 +95,20 @@ export function OnboardingChatInput({
               role="status"
               aria-busy={true}
               aria-label="Submitting…"
-              className="p-3 rounded-full bg-ink/10 text-ink-muted"
+              className="p-3 rounded-full bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)]"
             >
-              <Loader2 size={20} className="animate-spin" />
+              <Loader2 size={20} className="animate-spin" strokeWidth={1.5} />
             </div>
           ) : canSubmit ? (
             <motion.button
               type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              transition={STAGE_LIGHT}
               onClick={handleSubmit}
               aria-busy={isLoading}
               aria-label="Submit"
-              className="p-3 rounded-full bg-ink text-canvas liquid-levitation hover:bg-walnut transition-colors flex items-center justify-center"
+              className="p-3 rounded-full bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] transition-[filter] flex items-center justify-center"
             >
-              <ArrowUp size={20} strokeWidth={2.5} />
+              <ArrowUp size={20} strokeWidth={1.5} />
             </motion.button>
           ) : (
             <div className="w-14 h-14" />

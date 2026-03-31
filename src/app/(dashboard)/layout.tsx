@@ -9,12 +9,15 @@
 
 import { unstable_rethrow } from "next/navigation";
 import { createClient } from "@/shared/api/supabase/server";
-import { SidebarWithUser } from "@/shared/ui/layout/SidebarWithUser";
+import { SidebarContainer } from "@/shared/ui/layout/SidebarContainer";
 import { MobileDock } from "@/shared/ui/layout/MobileDock";
 import { WorkspaceProvider, type WorkspaceRole } from "@/shared/ui/providers/WorkspaceProvider";
 import { PreferencesProvider } from "@/shared/ui/providers/PreferencesContext";
 import { SystemHeartProvider } from "@/shared/ui/providers/SystemHeartContext";
 import { InactivityLogoutProvider } from "@/shared/ui/providers/InactivityLogoutProvider";
+import { AuthGuard } from "@/shared/ui/providers/AuthGuard";
+import { SessionExpiredOverlay } from "@/shared/ui/overlays/SessionExpiredOverlay";
+import { DensitySync } from "@/shared/ui/layout/DensitySync";
 
 /** Dashboard uses cookies (Supabase auth) — always render on the server. */
 export const dynamic = 'force-dynamic';
@@ -106,23 +109,24 @@ export default async function DashboardLayout({
     >
       <PreferencesProvider>
       <SystemHeartProvider>
+      <AuthGuard>
+      <SessionExpiredOverlay />
       <InactivityLogoutProvider>
+      <DensitySync />
       {/* Single full-height wrapper; safe-area and dock padding on mobile */}
       <div className="min-h-screen h-full flex flex-col min-w-0 overscroll-none">
-        {/* Same as login/onboarding: spotlight + grain — no colored orbs */}
-        <div className="fixed inset-0 z-0 bg-unusonic-void pointer-events-none" aria-hidden>
+        {/* Stage Engineering void: density-aware background + grain */}
+        <div className="fixed inset-0 z-0 bg-stage-void pointer-events-none" aria-hidden>
           <div className="absolute inset-0 grain-overlay" aria-hidden />
         </div>
 
         {/* Main Layout: sidebar (desktop) + content; mobile gets dock instead of sidebar */}
         <div className="relative z-10 flex flex-1 min-h-0 w-full min-w-0">
           {/* Desktop: Sidebar (hidden on mobile) */}
-          <div className="hidden lg:flex shrink-0 h-full">
-            <SidebarWithUser
-              user={userData}
-              workspaceName={activeWorkspace?.name}
-            />
-          </div>
+          <SidebarContainer
+            user={userData}
+            workspaceName={activeWorkspace?.name}
+          />
           {/* Content: extra bottom padding on mobile for dock + safe area */}
           <main className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden bg-transparent pt-[env(safe-area-inset-top)] pb-[max(env(safe-area-inset-bottom),5rem)] lg:pb-0 lg:pt-0">
             <div className="flex-1 min-h-0 min-w-0 overflow-auto flex flex-col">
@@ -140,6 +144,7 @@ export default async function DashboardLayout({
         </div>
       </div>
       </InactivityLogoutProvider>
+      </AuthGuard>
       </SystemHeartProvider>
       </PreferencesProvider>
     </WorkspaceProvider>

@@ -1,5 +1,5 @@
 /**
- * Command Center alias: /events/g/[id] → same as /events/[id] (unified events).
+ * Studio alias: /events/g/[id] → same as /events/[id] (unified events).
  * [id] is the event id. Renders EventCommandGrid.
  */
 
@@ -24,19 +24,19 @@ export default async function EventByGigPage({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <header className="shrink-0 flex items-center gap-4 p-4 border-b border-[var(--glass-border)] bg-[var(--glass-bg)]">
+      <header className="shrink-0 flex items-center gap-4 p-4 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]">
         <Link
           href="/calendar"
-          className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
           aria-label="Back to Calendar"
         >
           <ArrowLeft size={20} />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-ink-muted uppercase tracking-wider">
+          <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
             Event studio
           </p>
-          <p className="text-sm text-ink truncate">{event.title ?? eventId}</p>
+          <p className="text-sm text-[var(--stage-text-primary)] truncate">{event.title ?? eventId}</p>
         </div>
       </header>
 

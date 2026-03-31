@@ -36,6 +36,8 @@ export interface PublicInvoiceDTO {
     id: string;
     name: string;
     logo_url: string | null;
+    portal_theme_preset: string | null;
+    portal_theme_config: Record<string, unknown> | null;
   };
   event: {
     id: string;

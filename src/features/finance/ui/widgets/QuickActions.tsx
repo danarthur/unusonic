@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, FilePlus, ChevronDown } from 'lucide-react';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { generateInvoiceFromProposal } from '../../api/invoice-actions';
 
@@ -55,8 +55,8 @@ export function QuickActions({
   const hasProposals = proposalIds.length > 0;
 
   return (
-    <LiquidPanel className={`flex flex-col gap-4 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+    <StagePanel className={`flex flex-col gap-4 ${className ?? ''}`}>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Actions
       </h2>
       <div className="relative">
@@ -76,30 +76,30 @@ export function QuickActions({
             />
           </Button>
           {open && (
-            <ul className="liquid-panel-nested mt-2 rounded-xl overflow-hidden divide-y divide-[var(--glass-border)]">
+            <ul className="stage-panel-nested mt-2 rounded-xl overflow-hidden divide-y divide-[oklch(1_0_0_/_0.08)]">
               <li>
                 <button
                   type="button"
-                  className="w-full px-4 py-3 text-left text-sm text-ink hover:bg-[var(--glass-bg-hover)] transition-colors flex items-center gap-3"
+                  className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors flex items-center gap-3"
                   onClick={handleBlank}
                 >
-                  <FilePlus className="size-4 text-ink-muted" />
+                  <FilePlus className="size-4 text-[var(--stage-text-secondary)]" />
                   Blank
                 </button>
               </li>
               <li>
                 <button
                   type="button"
-                  className="w-full px-4 py-3 text-left text-sm text-ink hover:bg-[var(--glass-bg-hover)] transition-colors flex items-center justify-between gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors flex items-center justify-between gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleFromProposal}
                   disabled={!hasProposals || loadingProposalId !== null}
                 >
                   <span className="flex items-center gap-3">
-                    <FileText className="size-4 text-ink-muted" />
+                    <FileText className="size-4 text-[var(--stage-text-secondary)]" />
                     From Proposal
                   </span>
                   {loadingProposalId && (
-                    <span className="text-ink-muted text-xs">Creating…</span>
+                    <span className="text-[var(--stage-text-secondary)] text-xs">Creating…</span>
                   )}
                 </button>
               </li>
@@ -107,11 +107,11 @@ export function QuickActions({
           )}
         </div>
         {error && (
-          <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">
+          <p className="mt-2 text-xs text-[var(--color-unusonic-error)]">
             {error}
           </p>
         )}
       </div>
-    </LiquidPanel>
+    </StagePanel>
   );
 }

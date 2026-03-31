@@ -9,7 +9,7 @@
 import { useState, useCallback } from 'react';
 import { Copy, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { LiquidPanel } from '@/shared/ui/liquid-panel';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { formatCurrency } from '../../model/types';
 import type { InvoiceDTO } from '../../model/types';
@@ -49,7 +49,7 @@ function CopyInvoiceLinkButton({ invoice }: { invoice: InvoiceDTO }) {
       className="shrink-0"
     >
       {copied ? (
-        <Copy className="size-4 text-emerald-600" aria-hidden />
+        <Copy className="size-4 text-[var(--color-unusonic-success)]" aria-hidden />
       ) : (
         <Link2 className="size-4" aria-hidden />
       )}
@@ -76,7 +76,7 @@ function StatusPill({ status }: { status: string }) {
   if (status === 'paid') {
     return (
       <span
-        className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300`}
+        className={`${base} bg-[oklch(0.45_0.08_145_/_0.25)] text-[var(--color-unusonic-success)]`}
       >
         Paid
       </span>
@@ -85,7 +85,7 @@ function StatusPill({ status }: { status: string }) {
   if (status === 'draft') {
     return (
       <span
-        className={`${base} bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400`}
+        className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}
       >
         Draft
       </span>
@@ -94,7 +94,7 @@ function StatusPill({ status }: { status: string }) {
   if (status === 'overdue') {
     return (
       <span
-        className={`${base} bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300`}
+        className={`${base} bg-[oklch(0.35_0.08_20_/_0.25)] text-[var(--color-unusonic-error)]`}
       >
         Overdue
       </span>
@@ -103,7 +103,7 @@ function StatusPill({ status }: { status: string }) {
   if (status === 'sent') {
     return (
       <span
-        className={`${base} bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400`}
+        className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}
       >
         Sent
       </span>
@@ -112,13 +112,13 @@ function StatusPill({ status }: { status: string }) {
   if (status === 'cancelled') {
     return (
       <span
-        className={`${base} bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-500`}
+        className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}
       >
         Cancelled
       </span>
     );
   }
-  return <span className={`${base} bg-stone-100 text-stone-600`}>{status}</span>;
+  return <span className={`${base} bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]`}>{status}</span>;
 }
 
 /** Placeholder drawer – to be replaced with full Invoice Drawer */
@@ -142,29 +142,29 @@ function InvoiceDrawerPlaceholder({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-obsidian/50 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[oklch(0.06_0_0_/_0.75)] sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label="Invoice details"
     >
       <div
-        className="liquid-panel w-full max-w-lg max-h-[80vh] overflow-auto rounded-t-2xl sm:rounded-2xl p-6 animate-in slide-in-from-bottom duration-300"
+        className="stage-panel w-full max-w-lg max-h-[80vh] overflow-auto rounded-t-2xl sm:rounded-2xl p-6 animate-in slide-in-from-bottom duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-mono text-lg font-medium text-ink">
+          <h3 className="font-mono text-lg font-medium text-[var(--stage-text-primary)]">
             {invoice.invoice_number ?? invoice.id.slice(0, 8)}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-ink-muted hover:text-ink transition-colors p-1 rounded-lg hover:bg-[var(--glass-bg-hover)]"
+            className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]transition-colors p-1 rounded-lg hover:bg-[var(--stage-surface-hover)]"
             aria-label="Close"
           >
             ×
           </button>
         </div>
-        <p className="text-sm text-ink-muted mb-4">
+        <p className="text-sm text-[var(--stage-text-secondary)] mb-4">
           Invoice detail view — coming soon. ID: {invoice.id.slice(0, 8)}…
         </p>
         <Button
@@ -179,7 +179,7 @@ function InvoiceDrawerPlaceholder({
         <button
           type="button"
           onClick={onClose}
-          className="mt-4 ml-0 block text-sm text-ink-muted hover:text-ink underline"
+          className="mt-4 ml-0 block text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]underline"
         >
           Close
         </button>
@@ -199,29 +199,29 @@ export function InvoiceList({ invoices, className }: InvoiceListProps) {
 
   return (
     <>
-      <LiquidPanel
+      <StagePanel
         className={`overflow-hidden flex flex-col ${className ?? ''}`}
       >
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted mb-4 shrink-0">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4 shrink-0">
           Invoices
         </h2>
         <div className="min-h-0 overflow-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[var(--glass-border)]">
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <tr className="border-b border-[oklch(1_0_0_/_0.08)]">
+                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   ID
                 </th>
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Date
                 </th>
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Amount
                 </th>
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Status
                 </th>
-                <th className="pb-3 w-12 text-right text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                <th className="pb-3 w-12 text-right text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Action
                 </th>
               </tr>
@@ -231,7 +231,7 @@ export function InvoiceList({ invoices, className }: InvoiceListProps) {
                 <tr>
                   <td
                     colSpan={5}
-                    className="py-8 text-center text-sm text-ink-muted"
+                    className="py-8 text-center text-sm text-[var(--stage-text-secondary)]"
                   >
                     No invoices yet
                   </td>
@@ -240,16 +240,16 @@ export function InvoiceList({ invoices, className }: InvoiceListProps) {
                 invoices.map((inv) => (
                   <tr
                     key={inv.id}
-                    className="border-b border-[var(--glass-border)] last:border-b-0 liquid-panel-hover cursor-pointer transition-colors"
+                    className="border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 hover:bg-[var(--stage-surface-hover)] cursor-pointer transition-colors"
                     onClick={() => setDrawerInvoice(inv)}
                   >
-                    <td className="py-3 pr-4 font-mono text-sm text-ink">
+                    <td className="py-3 pr-4 font-mono text-sm text-[var(--stage-text-primary)]">
                       {inv.invoice_number ?? `INV-${inv.id.slice(0, 8)}`}
                     </td>
-                    <td className="py-3 pr-4 text-sm text-ink-muted">
+                    <td className="py-3 pr-4 text-sm text-[var(--stage-text-secondary)]">
                       {formatDate(inv.issue_date)}
                     </td>
-                    <td className="py-3 pr-4 font-mono text-sm text-ink">
+                    <td className="py-3 pr-4 font-mono text-sm text-[var(--stage-text-primary)]">
                       {formatCurrency(Number(inv.total_amount))}
                     </td>
                     <td className="py-3 pr-4">
@@ -264,7 +264,7 @@ export function InvoiceList({ invoices, className }: InvoiceListProps) {
             </tbody>
           </table>
         </div>
-      </LiquidPanel>
+      </StagePanel>
       <InvoiceDrawerPlaceholder
         invoice={drawerInvoice}
         onClose={() => setDrawerInvoice(null)}

@@ -6,7 +6,7 @@ const ROOT_DIR = process.cwd();
 const SRC_DIR = path.join(ROOT_DIR, 'src');
 const LAYERS = ['shared', 'entities', 'features', 'widgets', 'pages', 'app'];
 
-console.log("\x1b[36m%s\x1b[0m", "🏗️  DanielOS Architect: Auditing Feature-Sliced Design...");
+console.log("\x1b[36m%s\x1b[0m", "Unusonic Architect: Auditing Feature-Sliced Design...");
 
 // 1. Check for "Ghost Folders"
 function checkGhostFolders() {
@@ -60,7 +60,7 @@ const ghostPassed = checkGhostFolders();
 const barrierPassed = checkBarriers();
 
 if (ghostPassed && barrierPassed) {
-    console.log("\x1b[32m%s\x1b[0m", "✅ Architecture Compliant. The Liquid System is stable.");
+    console.log("\x1b[32m%s\x1b[0m", "Architecture compliant. FSD boundaries intact.");
     process.exit(0);
 } else {
     console.log("\x1b[31m%s\x1b[0m", "🛑 Architectural Violations Found. Refactoring required.");

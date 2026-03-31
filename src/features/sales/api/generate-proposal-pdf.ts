@@ -13,7 +13,7 @@ import type { PublicProposalDTO } from '../model/public-proposal';
 
 export async function generateProposalPdf(data: PublicProposalDTO): Promise<Buffer> {
   const element = React.createElement(ProposalPDF, { data });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const buffer = await renderToBuffer(element as any);
   return Buffer.from(buffer);
 }

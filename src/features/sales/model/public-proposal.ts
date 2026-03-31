@@ -13,16 +13,30 @@ export interface PublicProposalEvent {
   title: string;
   clientName: string | null;
   startsAt: string | null;
+  endsAt: string | null;
+  /** True when startsAt came from ops.events (real time), false when synthesized from deal.proposed_date */
+  hasEventTimes: boolean;
 }
 
 export interface PublicProposalWorkspace {
   id: string;
   name: string;
   logoUrl: string | null;
+  portalThemePreset: string | null;
+  portalThemeConfig: Record<string, unknown> | null;
 }
 
 export interface PublicProposalItem extends ProposalItem {
   packageImageUrl?: string | null;
+  isOptional: boolean;
+  clientSelected: boolean;
+  /** Talent names extracted from crew_meta where booking_type === 'talent'. Labor names are never exposed. */
+  talentNames?: string[] | null;
+}
+
+export interface PublicProposalVenue {
+  name: string;
+  address: string | null;
 }
 
 export interface PublicProposalDTO {
@@ -31,6 +45,10 @@ export interface PublicProposalDTO {
   workspace: PublicProposalWorkspace;
   items: PublicProposalItem[];
   total: number;
+  /** Resolved venue — from event or deal fallback. Null when no venue is set. */
+  venue: PublicProposalVenue | null;
   /** DocuSeal embed URL for in-page e-signature. Null when status is accepted or DocuSeal is not configured. */
   embedSrc: string | null;
+  /** Absolute download URL for the signed PDF. Generated server-side (signed storage URL or DocuSeal URL). Null until proposal is accepted. */
+  signedPdfDownloadUrl: string | null;
 }

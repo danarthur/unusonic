@@ -180,7 +180,7 @@ export function ProfileAvatarUpload({
       {pendingFile && previewUrl ? (
         <div className="flex flex-col items-center gap-4">
           <div
-            className="relative rounded-xl overflow-hidden border-2 border-[var(--glass-border)] bg-ink/[0.02] select-none"
+            className="relative rounded-xl overflow-hidden border-2 border-[var(--stage-border)] bg-[var(--stage-surface-elevated)] select-none"
             style={{ width: CROP_SIZE, height: CROP_SIZE }}
           >
             <div
@@ -204,9 +204,9 @@ export function ProfileAvatarUpload({
           </div>
           {canEditCrop && (
             <>
-              <p className="text-xs text-ink-muted">Drag to reposition</p>
+              <p className="text-xs text-[var(--stage-text-secondary)]">Drag to reposition</p>
               <div className="flex items-center gap-3 w-full max-w-[200px]">
-                <span className="text-xs text-ink-muted shrink-0">Zoom</span>
+                <span className="text-xs text-[var(--stage-text-secondary)] shrink-0">Zoom</span>
                 <input
                   type="range"
                   min={0.5}
@@ -214,7 +214,7 @@ export function ProfileAvatarUpload({
                   step={0.05}
                   value={crop.scale}
                   onChange={(e) => setCrop((p) => ({ ...p, scale: Number(e.target.value) }))}
-                  className="flex-1 h-2 rounded-full appearance-none bg-white/10 accent-[var(--color-silk)]"
+                  className="flex-1 h-2 rounded-full appearance-none bg-[var(--stage-surface-nested)] accent-[var(--stage-accent)]"
                 />
               </div>
             </>
@@ -235,7 +235,7 @@ export function ProfileAvatarUpload({
               size="sm"
               onClick={handleCropConfirm}
               disabled={uploading}
-              className="gap-1 bg-[var(--color-silk)]/90 text-[var(--color-canvas)] hover:bg-[var(--color-silk)]"
+              className="gap-1 bg-[var(--stage-accent)]/90 text-[var(--stage-text-on-accent)] hover:bg-[var(--stage-accent)]"
             >
               {uploading ? 'Uploading…' : (
                 <>
@@ -256,29 +256,29 @@ export function ProfileAvatarUpload({
               className={cn(
                 'relative w-24 h-24 flex items-center justify-center overflow-hidden transition-colors cursor-pointer group',
                 value
-                  ? 'avatar-primary hover:shadow-[0_0_20px_oklch(0.70_0.15_250/0.2)]'
-                  : 'rounded-xl border-2 border-dashed border-[var(--glass-border)] hover:border-walnut/40 hover:bg-ink/[0.03]',
+                  ? 'avatar-primary hover:shadow-[0_0_20px_oklch(0.88_0_0/0.2)]'
+                  : 'rounded-xl border-2 border-dashed border-[var(--stage-border)] hover:border-[var(--stage-border-hover)] hover:bg-[var(--stage-surface-elevated)]',
                 uploading && 'opacity-60 pointer-events-none'
               )}
             >
               {value ? (
                 <>
                   <img src={value} alt="Avatar" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-ink/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
-                    <Camera className="w-6 h-6 text-canvas" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                    <Camera className="w-6 h-6 text-[var(--stage-text-primary)]" />
                   </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-1">
-                  <User className="w-8 h-8 text-ink-muted/50 group-hover:text-[var(--color-silk)]/50 transition-colors" />
-                  <span className="text-[9px] text-ink-muted/50 uppercase tracking-wider">
+                  <User className="w-8 h-8 text-[var(--stage-text-secondary)]/50 group-hover:text-[var(--stage-accent)]/50 transition-colors" />
+                  <span className="text-[9px] text-[var(--stage-text-secondary)]/50 uppercase tracking-wider">
                     Avatar
                   </span>
                 </div>
               )}
               {uploading && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-ink/50">
-                  <span className="text-xs text-canvas">Uploading…</span>
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50">
+                  <span className="text-xs text-[var(--stage-text-primary)]">Uploading…</span>
                 </div>
               )}
             </button>
@@ -295,7 +295,7 @@ export function ProfileAvatarUpload({
                     toast.error(result.error || 'Failed to remove avatar');
                   }
                 }}
-                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
+                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-unusonic-error)] text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity hover:brightness-110 z-10"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -309,7 +309,7 @@ export function ProfileAvatarUpload({
             onChange={handleFileSelect}
             disabled={uploading}
           />
-          <span className="text-xs text-ink-muted">Upload photo</span>
+          <span className="text-xs text-[var(--stage-text-secondary)]">Upload photo</span>
         </>
       )}
     </div>

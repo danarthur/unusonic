@@ -9,11 +9,11 @@ import { LivingLogo } from '@/shared/ui/branding/living-logo';
 export function SystemLoader() {
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-obsidian"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-[var(--stage-void)]"
       aria-label="System loading"
     >
       <LivingLogo size="lg" status="loading" />
-      <p className="text-sm font-medium tracking-tight text-ink-muted">
+      <p className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Waking…
       </p>
     </div>

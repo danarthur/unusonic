@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com",
+      "headers": {
+        "Authorization": "Bearer sbp_0c8a0101cfddf707a5f6c592307292635f1c38d1"
+      }
+    }
+  }
+}

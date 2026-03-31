@@ -70,7 +70,7 @@ export function DayBlade({ date, events, focusEventId }: DayBladeProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-obsidian/40 backdrop-blur-xl"
+            className="fixed inset-0 z-40 bg-[oklch(0.06_0_0_/_0.75)]"
             onClick={close}
             aria-hidden
           />
@@ -81,24 +81,24 @@ export function DayBlade({ date, events, focusEventId }: DayBladeProps) {
             animate={{ x: 0 }}
             exit={{ x: DRAWER_WIDTH }}
             transition={springConfig}
-            className="fixed top-0 right-0 z-50 h-screen w-[400px] max-w-[100vw] flex flex-col border-l border-[var(--glass-border)] bg-[var(--glass-bg)]/95 backdrop-blur-2xl shadow-[var(--glass-shadow)] overflow-hidden antialiased"
+            className="fixed top-0 right-0 z-50 h-screen w-[400px] max-w-[100vw] flex flex-col border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/95 shadow-lg overflow-hidden antialiased"
             role="dialog"
             aria-label="Day details"
           >
             {/* Header */}
-            <div className="shrink-0 flex items-start justify-between gap-4 p-6 border-b border-[var(--glass-border)] bg-[var(--glass-bg)]/50 backdrop-blur-md">
+            <div className="shrink-0 flex items-start justify-between gap-4 p-6 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-ink">
+                <h2 className="text-2xl font-semibold tracking-tight text-[var(--stage-text-primary)]">
                   {format(parsedDate, 'EEEE, MMM d')}
                 </h2>
-                <p className="text-sm text-ink-muted mt-0.5">
+                <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">
                   {format(parsedDate, 'yyyy')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={close}
-                className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-[var(--glass-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
@@ -108,7 +108,7 @@ export function DayBlade({ date, events, focusEventId }: DayBladeProps) {
             {/* Body: chronological events */}
             <div className="flex-1 min-h-0 overflow-auto p-4 space-y-3">
               {dayEvents.length === 0 ? (
-                <p className="text-sm text-ink-muted py-8 text-center">
+                <p className="text-sm text-[var(--stage-text-secondary)] py-8 text-center">
                   No events this day
                 </p>
               ) : (
@@ -118,7 +118,7 @@ export function DayBlade({ date, events, focusEventId }: DayBladeProps) {
                     ref={(node) => {
                       if (node) eventRefsMap.current.set(event.id, node);
                     }}
-                    className={focusEventId === event.id ? 'ring-2 ring-[var(--ring)] ring-offset-2 ring-offset-canvas rounded-xl transition-[box-shadow] duration-300' : undefined}
+                    className={focusEventId === event.id ? 'ring-2 ring-[var(--stage-accent)] ring-offset-2 ring-offset-canvas rounded-xl transition-[box-shadow] duration-300' : undefined}
                   >
                     <EventCard event={event} />
                   </div>

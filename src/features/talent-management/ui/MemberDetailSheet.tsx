@@ -25,13 +25,18 @@ import {
   addSkillToMember,
   removeSkillFromMember,
 } from '../api/member-actions';
+import { getCrewSkillsForEntity } from '../api/crew-skill-actions';
+import { listWorkspaceSkillPresets } from '../api/skill-preset-actions';
 import { RoleSelect } from '@/features/team-invite/ui/RoleSelect';
-import type { SignalRoleId } from '@/features/team-invite/model/role-presets';
+import type { UnusonicRoleId } from '@/features/team-invite/model/role-presets';
 import { WorkspaceRoleSelect } from '@/features/role-builder';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { getWorkspaceMemberByOrgMemberId } from '../api/member-actions';
+import type { CrewSkillDTO } from '@/entities/talent';
 
-const PRESET_SKILL_TAGS = [
+// Fallback preset list — used when ops.workspace_skill_presets returns empty.
+// TODO: surface a settings UI for managing skill presets per workspace.
+const PRESET_SKILL_TAGS_FALLBACK = [
   'Audio A1',
   'Audio A2',
   'DJ',
@@ -73,15 +78,17 @@ export function MemberDetailSheet({
   const { workspaceId } = useWorkspace();
   const [tab, setTab] = React.useState<TabId>('profile');
   const [member, setMember] = React.useState<OrgMemberWithSkillsDTO | null>(initialMember ?? null);
+  const [crewSkills, setCrewSkills] = React.useState<CrewSkillDTO[]>([]);
+  const [skillPresets, setSkillPresets] = React.useState<string[]>([]);
   const [addSkillTag, setAddSkillTag] = React.useState('');
-  const [role, setRole] = React.useState<SignalRoleId>((member?.role as SignalRoleId) ?? 'member');
+  const [role, setRole] = React.useState<UnusonicRoleId>((member?.role as UnusonicRoleId) ?? 'member');
   const [workspaceMember, setWorkspaceMember] = React.useState<{
     workspaceMemberId: string;
     roleId: string | null;
   } | null>(null);
 
   React.useEffect(() => {
-    if (member?.role) setRole((member.role as SignalRoleId) || 'member');
+    if (member?.role) setRole((member.role as UnusonicRoleId) || 'member');
   }, [member?.role]);
 
   React.useEffect(() => {
@@ -93,8 +100,38 @@ export function MemberDetailSheet({
       }
     } else {
       setMember(null);
+      setCrewSkills([]);
     }
   }, [open, orgMemberId, initialMember?.id]);
+
+  // Load ops.crew_skills for the person entity when the sheet opens
+  React.useEffect(() => {
+    if (!open || !member?.entity_id) {
+      setCrewSkills([]);
+      return;
+    }
+    let cancelled = false;
+    getCrewSkillsForEntity(member.entity_id).then((skills) => {
+      if (!cancelled) setCrewSkills(skills);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, member?.entity_id]);
+
+  // Load workspace skill presets from ops.workspace_skill_presets
+  React.useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    listWorkspaceSkillPresets().then((presets) => {
+      if (!cancelled) {
+        setSkillPresets(presets.length > 0 ? presets : PRESET_SKILL_TAGS_FALLBACK);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   React.useEffect(() => {
     if (!open || !member?.id || !workspaceId) {
@@ -129,7 +166,7 @@ export function MemberDetailSheet({
         last_name,
         phone,
         job_title,
-        role: roleValue as SignalRoleId | undefined,
+        role: roleValue as UnusonicRoleId | undefined,
       });
       return result.ok ? result : { ok: false, error: result.error };
     },
@@ -150,12 +187,22 @@ export function MemberDetailSheet({
     }
   }, [identityState, member?.id, onSuccess, router]);
 
+  const refreshCrewSkills = React.useCallback(() => {
+    if (member?.entity_id) {
+      getCrewSkillsForEntity(member.entity_id).then(setCrewSkills);
+    }
+  }, [member]);
+
   const handleAddSkill = async () => {
     if (!member || !addSkillTag.trim()) return;
+    if (!member.entity_id) {
+      toast.error('Skills unavailable — this member is not yet linked to the network.');
+      return;
+    }
     const result = await addSkillToMember({ org_member_id: member.id, skill_tag: addSkillTag.trim() });
     if (result.ok) {
       toast.success('Skill added.');
-      getMemberForSheet(member.id).then(setMember);
+      refreshCrewSkills();
       setAddSkillTag('');
       onSuccess?.();
       router.refresh();
@@ -164,11 +211,11 @@ export function MemberDetailSheet({
     }
   };
 
-  const handleRemoveSkill = async (talent_skill_id: string) => {
-    const result = await removeSkillFromMember({ talent_skill_id });
+  const handleRemoveSkill = async (crew_skill_id: string) => {
+    const result = await removeSkillFromMember({ talent_skill_id: crew_skill_id });
     if (result.ok) {
       toast.success('Skill removed.');
-      if (member) getMemberForSheet(member.id).then(setMember);
+      refreshCrewSkills();
       onSuccess?.();
       router.refresh();
     } else {
@@ -188,16 +235,16 @@ export function MemberDetailSheet({
       <SheetContent
         side="right"
         className={cn(
-          'flex max-w-md flex-col border-l border-white/10 backdrop-blur-xl',
-          'bg-[var(--color-glass-surface)]/80'
+          'flex max-w-md flex-col border-l border-[var(--stage-border)]',
+          'bg-[var(--stage-surface)]'
         )}
       >
         {member && (
           <>
             <SheetHeader>
               <div className="flex items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-mercury)]/20">
-                  <User className="size-5 text-[var(--color-ink-muted)]" />
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface)]">
+                  <User className="size-5 text-[var(--stage-text-secondary)]" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <SheetTitle className="truncate">
@@ -208,8 +255,8 @@ export function MemberDetailSheet({
                     className={cn(
                       'mt-1 text-[10px]',
                       isContractor
-                        ? 'border-[var(--color-signal-warning)]/50 text-[var(--color-signal-warning)]'
-                        : 'border-[var(--color-silk)]/50 text-[var(--color-silk)]'
+                        ? 'border-[var(--color-unusonic-warning)]/50 text-[var(--color-unusonic-warning)]'
+                        : 'border-[var(--stage-accent)]/50 text-[var(--stage-accent)]'
                     )}
                   >
                     {isContractor ? 'Contractor' : 'Employee'}
@@ -218,17 +265,17 @@ export function MemberDetailSheet({
               </div>
               <SheetClose />
             </SheetHeader>
-            <div className="flex gap-1 border-b border-[var(--color-mercury)]/50 px-1">
+            <div className="flex gap-1 border-b border-[var(--stage-border)]/50 px-1">
               {tabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setTab(t.id)}
                   className={cn(
-                    'rounded-t-md px-3 py-2 text-xs font-medium transition-colors',
+                    'rounded-t-xl px-3 py-2 text-xs font-medium transition-colors',
                     tab === t.id
-                      ? 'bg-[var(--color-mercury)]/20 text-[var(--color-ink)]'
-                      : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                      ? 'bg-[var(--stage-surface)] text-[var(--stage-text-primary)]'
+                      : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
                   )}
                 >
                   {t.label}
@@ -241,7 +288,7 @@ export function MemberDetailSheet({
                   <input type="hidden" name="org_member_id" value={member.id} />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--color-ink-muted)]">
+                      <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
                         First name
                       </label>
                       <Input
@@ -249,11 +296,11 @@ export function MemberDetailSheet({
                         type="text"
                         defaultValue={member.first_name ?? ''}
                         placeholder="First"
-                        className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)]"
+                        className="border-[var(--stage-border)] text-[var(--stage-text-primary)]"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--color-ink-muted)]">
+                      <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
                         Last name
                       </label>
                       <Input
@@ -261,12 +308,12 @@ export function MemberDetailSheet({
                         type="text"
                         defaultValue={member.last_name ?? ''}
                         placeholder="Last"
-                        className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)]"
+                        className="border-[var(--stage-border)] text-[var(--stage-text-primary)]"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--color-ink-muted)]">
+                    <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
                       Phone
                     </label>
                     <Input
@@ -274,11 +321,11 @@ export function MemberDetailSheet({
                       type="tel"
                       defaultValue={member.phone ?? ''}
                       placeholder="+1 555 000 0000"
-                      className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)]"
+                      className="border-[var(--stage-border)] text-[var(--stage-text-primary)]"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--color-ink-muted)]">
+                    <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
                       Job title
                     </label>
                     <Input
@@ -286,7 +333,7 @@ export function MemberDetailSheet({
                       type="text"
                       defaultValue={member.job_title ?? ''}
                       placeholder="e.g. Audio A1"
-                      className="bg-transparent border-[var(--color-mercury)] text-[var(--color-ink)]"
+                      className="border-[var(--stage-border)] text-[var(--stage-text-primary)]"
                     />
                   </div>
                   <input type="hidden" name="role" value={role} />
@@ -308,12 +355,12 @@ export function MemberDetailSheet({
                         />
                       ) : (
                         <div>
-                          <p className="mb-1.5 text-xs font-medium uppercase tracking-widest text-ink-muted">
+                          <p className="mb-1.5 text-xs font-medium text-[var(--stage-text-secondary)]">
                             Workspace role
                           </p>
-                          <p className="text-sm text-ink-muted leading-relaxed">
+                          <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
                             This person is not in your workspace team. Add them in{' '}
-                            <Link href="/settings" className="text-[var(--color-neon-blue)] hover:underline">
+                            <Link href="/settings" className="text-[var(--stage-accent)] hover:underline">
                               Settings → Team
                             </Link>{' '}
                             to assign a workspace role (including custom roles).
@@ -323,7 +370,7 @@ export function MemberDetailSheet({
                     </>
                   )}
                   <div>
-                    <p className="mb-1.5 text-xs font-medium uppercase tracking-widest text-ink-muted">
+                    <p className="mb-1.5 text-xs font-medium text-[var(--stage-text-secondary)]">
                       Org role
                     </p>
                     <RoleSelect
@@ -341,35 +388,41 @@ export function MemberDetailSheet({
               {tab === 'skills' && (
                 <div className="flex flex-col gap-4">
                   <ul className="space-y-2">
-                    {member.skills.map((s) => (
+                    {crewSkills.map((s) => (
                       <li
                         key={s.id}
-                        className="flex items-center justify-between rounded-lg border border-[var(--color-mercury)]/50 bg-[var(--color-obsidian)]/30 px-3 py-2"
+                        className="flex items-center justify-between rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--stage-surface-nested)] px-3 py-2"
                       >
-                        <span className="text-sm text-[var(--color-ink)]">{s.skill_tag}</span>
+                        <span className="text-sm text-[var(--stage-text-primary)]">{s.skill_tag}</span>
+                        {s.proficiency && (
+                          <span className="text-xs text-[var(--stage-text-secondary)]/50 ml-auto mr-2 capitalize">
+                            {s.proficiency}
+                          </span>
+                        )}
+                        {/* TODO: add proficiency picker to skill add form */}
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => handleRemoveSkill(s.id)}
-                          className="text-[var(--color-ink-muted)] hover:text-[var(--color-unusonic-error)]"
+                          className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)]"
                         >
                           <Trash2 className="size-4" />
                         </Button>
                       </li>
                     ))}
                   </ul>
-                  {member.skills.length === 0 && (
-                    <p className="text-sm text-[var(--color-ink-muted)]">No skills yet.</p>
+                  {crewSkills.length === 0 && (
+                    <p className="text-sm text-[var(--stage-text-secondary)]">No skills yet.</p>
                   )}
                   <div className="flex gap-2">
                     <select
                       value={addSkillTag}
                       onChange={(e) => setAddSkillTag(e.target.value)}
-                      className="flex-1 rounded-md border border-[var(--color-mercury)] bg-transparent px-3 py-2 text-sm text-[var(--color-ink)]"
+                      className="flex-1 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     >
                       <option value="">Add skill…</option>
-                      {PRESET_SKILL_TAGS.filter((t) => !member.skills.some((s) => s.skill_tag === t)).map(
+                      {skillPresets.filter((t) => !crewSkills.some((s) => s.skill_tag === t)).map(
                         (t) => (
                           <option key={t} value={t}>
                             {t}
@@ -390,14 +443,18 @@ export function MemberDetailSheet({
               )}
 
               {tab === 'settings' && (
-                <p className="text-sm text-[var(--color-ink-muted)]">Settings coming soon.</p>
+                <p className="text-sm text-[var(--stage-text-secondary)]">Settings coming soon.</p>
               )}
             </SheetBody>
           </>
         )}
         {!member && orgMemberId && (
           <SheetBody>
-            <p className="text-sm text-[var(--color-ink-muted)]">Loading…</p>
+            <div className="flex flex-col gap-4 p-6">
+              <div className="h-16 w-16 rounded-full stage-skeleton mx-auto" />
+              <div className="h-4 w-1/2 stage-skeleton rounded mx-auto" />
+              <div className="h-3 w-1/3 stage-skeleton rounded mx-auto" />
+            </div>
           </SheetBody>
         )}
       </SheetContent>

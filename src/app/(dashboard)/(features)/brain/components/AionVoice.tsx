@@ -78,12 +78,12 @@ export default function AionVoice({ className }: AionVoiceProps) {
             animate={{ opacity: 1, y: -50, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
             className={cn(
-              'absolute whitespace-nowrap text-[10px] px-3 py-1.5 rounded-full font-mono uppercase tracking-widest backdrop-blur-md z-50 pointer-events-none liquid-panel',
+              'absolute whitespace-nowrap text-[10px] px-3 py-1.5 rounded-full font-mono uppercase tracking-widest z-50 pointer-events-none stage-panel',
               status === 'error'
-                ? '!bg-red-50 text-red-600 !border-red-100'
+                ? '!bg-[oklch(0.35_0.05_20_/_0.15)] text-[var(--color-unusonic-error)] !border-[oklch(0.65_0.18_20_/_0.2)]'
                 : status === 'recording'
-                  ? '!bg-rose-50 text-rose-600 !border-rose-100'
-                  : 'text-ink'
+                  ? '!bg-[oklch(0.35_0.05_20_/_0.15)] text-[var(--color-unusonic-error)] !border-[oklch(0.65_0.18_20_/_0.2)]'
+                  : 'text-[var(--stage-text-primary)]'
             )}
           >
             {status === 'recording' && "Listening..."}
@@ -96,21 +96,19 @@ export default function AionVoice({ className }: AionVoiceProps) {
 
       {/* The Button */}
       <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
         onClick={status === 'recording' ? stopRecording : startRecording}
         disabled={status === 'processing' || status === 'playing'}
         className={cn(
-          'p-3 rounded-full transition-all duration-300 flex items-center justify-center',
+          'p-3 rounded-full transition-[background-color,color,filter] duration-300 flex items-center justify-center enabled:hover:brightness-[1.05] enabled:active:brightness-[0.98]',
           status === 'recording'
-            ? 'bg-rose-100 text-rose-600 animate-pulse'
+            ? 'bg-[oklch(0.35_0.08_20_/_0.25)] text-[var(--color-unusonic-error)] animate-ping'
             : status === 'processing'
-              ? 'bg-amber-100 text-amber-600'
+              ? 'bg-[oklch(0.45_0.08_70_/_0.25)] text-[var(--color-unusonic-warning)]'
               : status === 'playing'
-                ? 'bg-emerald-100 text-emerald-600'
+                ? 'bg-[oklch(0.45_0.08_145_/_0.25)] text-[var(--color-unusonic-success)]'
                 : status === 'error'
-                  ? 'bg-red-100 text-red-500'
-                  : 'bg-ink/5 text-ink hover:bg-ink hover:text-[var(--background)]'
+                  ? 'bg-[oklch(0.35_0.08_20_/_0.25)] text-[var(--color-unusonic-error)]'
+                  : 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-accent)] hover:text-[var(--stage-text-on-accent)]'
         )}
       >
         {status === 'recording' ? <Square className="w-5 h-5 fill-current" /> :

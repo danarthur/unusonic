@@ -67,10 +67,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
-      className="w-full max-w-md flex flex-col gap-6 rounded-3xl border border-[var(--color-mercury)] bg-[var(--color-glass-surface)] p-6 sm:p-8 shadow-2xl backdrop-blur-xl"
-      style={{
-        boxShadow: '0 4px 24px -1px oklch(0 0 0 / 0.3), inset 0 1px 0 0 var(--color-glass-highlight)',
-      }}
+      className="w-full max-w-md flex flex-col gap-6 rounded-2xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] p-6 sm:p-8 shadow-2xl"
     >
       <AnimatePresence mode="wait">
         {step === 'handshake' && (
@@ -84,21 +81,21 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
           >
             {targetLogoUrl ? (
               <div className="flex justify-center">
-                <div className="relative size-20 rounded-2xl overflow-hidden bg-white/5 border border-white/10">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div className="relative size-20 rounded-2xl overflow-hidden bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)]">
+                  { }
                   <img src={targetLogoUrl} alt="" className="size-full object-contain" />
                 </div>
               </div>
             ) : (
-              <div className="flex size-20 items-center justify-center rounded-2xl bg-white/5 border border-white/10 mx-auto" />
+              <div className="flex size-20 items-center justify-center rounded-2xl bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] mx-auto" />
             )}
-            <h1 className="text-xl font-medium tracking-tight text-[var(--color-ink)]">
+            <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
               {originName} wants to connect with {targetName}.
             </h1>
-            <p className="text-sm text-[var(--color-ink-muted)]">
-              Confirm your identity to view shared work and claim your organization on Signal.
+            <p className="text-sm text-[var(--stage-text-secondary)]">
+              Confirm your identity to view shared work and claim your organization on Unusonic.
             </p>
-            <p className="text-xs text-[var(--color-ink-muted)]">{email}</p>
+            <p className="text-xs text-[var(--stage-text-secondary)]">{email}</p>
             <Button type="button" onClick={() => setStep('keys')} className="w-full" size="lg">
               This is me
             </Button>
@@ -115,49 +112,49 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
             className="space-y-4"
             onSubmit={handleKeysSubmit}
           >
-            <h2 className="text-lg font-medium tracking-tight text-[var(--color-ink)]">
+            <h2 className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
               The Keys
             </h2>
-            <p className="text-sm text-[var(--color-ink-muted)]">
+            <p className="text-sm text-[var(--stage-text-secondary)]">
               Set a password and your name. You’ll sign in with {email}.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+                <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                   First name
                 </label>
                 <Input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="First"
-                  className="bg-white/5 border-[var(--color-mercury)]"
+                  className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+                <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                   Last name
                 </label>
                 <Input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Last"
-                  className="bg-white/5 border-[var(--color-mercury)]"
+                  className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
                 />
               </div>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Organization name
               </label>
               <Input
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
                 placeholder="e.g. Neon Velvet"
-                className="bg-white/5 border-[var(--color-mercury)]"
+                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Password
               </label>
               <Input
@@ -167,11 +164,11 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                 placeholder="••••••••"
                 minLength={8}
                 required
-                className="bg-white/5 border-[var(--color-mercury)]"
+                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
                 Confirm password
               </label>
               <Input
@@ -180,7 +177,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 minLength={8}
-                className="bg-white/5 border-[var(--color-mercury)]"
+                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
               {confirmPassword && password !== confirmPassword && (
                 <p className="mt-1 text-xs text-[var(--color-unusonic-error)]">Passwords do not match.</p>
@@ -215,7 +212,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
       <p className="text-center">
         <Link
           href={`/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`}
-          className="text-xs text-[var(--color-silk)] hover:underline"
+          className="text-xs text-[var(--stage-accent)] hover:underline"
         >
           Already have an account? Sign in
         </Link>

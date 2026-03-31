@@ -7,7 +7,7 @@ import { updateEventSchema, type UpdateEventInput } from '@/entities/event';
 export type UpdateEventCommandResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Server Action: partial update of an event (Command Center).
+ * Server Action: partial update of an event (Event Studio).
  * Validates with Zod, updates events table, revalidates event page.
  */
 export async function updateEventCommand(
@@ -54,6 +54,7 @@ export async function updateEventCommand(
   }
 
   const { error } = await supabase
+    .schema('ops')
     .from('events')
     .update({ ...filtered, updated_at: new Date().toISOString() })
     .eq('id', id)

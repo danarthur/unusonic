@@ -52,7 +52,7 @@ export const selectPersonaSchema = z.object({
 /** Input for tier selection step. */
 export const selectTierSchema = z.object({
   tier: subscriptionTierSchema,
-  enableSignalPay: z.boolean().optional(),
+  enableUnusonicPay: z.boolean().optional(),
 });
 
 /** Organization type for commercial_organizations / initializeOrganization (maps 1:1 from persona). */

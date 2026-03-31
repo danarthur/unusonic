@@ -1,5 +1,5 @@
 'use server';
-/* eslint-disable no-restricted-syntax -- TODO: migrate entity attrs reads to readEntityAttrs() from @/shared/lib/entity-attrs */
+ 
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
@@ -67,7 +67,7 @@ export async function getEventExpenses(eventId: string): Promise<ExpenseRow[]> {
 
   // Resolve vendor names in one batch query
   const vendorIds = [...new Set(data.map((r) => r.vendor_entity_id).filter(Boolean))] as string[];
-  let vendorNames: Record<string, string> = {};
+  const vendorNames: Record<string, string> = {};
   if (vendorIds.length > 0) {
     const { data: entities } = await supabase
       .schema('directory')

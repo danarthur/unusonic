@@ -32,8 +32,8 @@ export function GenesisState({ hasIdentity = false, hasTeam = false, brandColor 
     background: `
       radial-gradient(
         circle at 50% 50%,
-        oklch(0.70 0.15 250 / 0.10) 0%,
-        oklch(0.70 0.15 250 / 0.04) 25%,
+        oklch(0.88 0 0 / 0.10) 0%,
+        oklch(0.88 0 0 / 0.04) 25%,
         transparent 45%
       )
     `,
@@ -56,7 +56,7 @@ export function GenesisState({ hasIdentity = false, hasTeam = false, brandColor 
       <div className="relative z-10 flex flex-col items-center w-full">
         <GenesisCore reaction={reaction} />
         <div className="mt-8 w-full max-w-5xl px-5 sm:px-6 md:px-8">
-          <h2 className="text-center text-2xl font-normal text-[var(--color-ink)] tracking-tight mb-8">
+          <h2 className="text-center text-2xl font-normal text-[var(--stage-text-primary)] tracking-tight mb-8">
             Network Architecture
           </h2>
           <GenesisGrid
