@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Building2, User, Star, MapPin } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { crewCompleteness, type CrewCompletenessLevel } from '@/shared/lib/crew-profile';
-import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import type { NetworkNode } from '../model/types';
 
 interface NetworkCardProps {
@@ -226,13 +226,13 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
       onClick={onClick}
       onKeyDown={handleCardKeyDown}
       className={cn(
-        'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left transition-all duration-300 cursor-pointer',
-        'stage-panel text-[var(--stage-text-primary)] hover:border-[var(--stage-accent)]/50',
+        'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left transition-[border-color,box-shadow] duration-75 cursor-pointer',
+        'text-[var(--stage-text-primary)]',
         isArchived && 'opacity-40',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
         className
       )}
-      transition={STAGE_LIGHT}
+      transition={STAGE_MEDIUM}
     >
       {content}
     </motion.div>

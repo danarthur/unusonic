@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { useOptimistic, useState, useEffect, useRef, Suspense, useCallback } from 'react';
+import { useOptimistic, useState, useEffect, useRef, Suspense, useCallback, useMemo } from 'react';
 import { Stream } from './stream';
 import { Prism } from './prism';
 import type { StreamCardItem } from './stream-card';
@@ -99,7 +99,17 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
     });
     return () => { cancelled = true; };
   }, [gigs]);
-  const [optimisticGigs, addOptimisticGig] = useOptimistic(clientGigs, gigsReducer);
+  const [rawOptimisticGigs, addOptimisticGig] = useOptimistic(clientGigs, gigsReducer);
+  // Deduplicate: refetchGigs + router.refresh can both add the same deal
+  const optimisticGigs = useMemo(() => {
+    const seen = new Set<string>();
+    return rawOptimisticGigs.filter((g) => {
+      const key = `${g.source}-${g.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawOptimisticGigs]);
   useEffect(() => {
     if (optimisticGigs.length > 0) sharedGigsCache = optimisticGigs;
   }, [optimisticGigs]);
@@ -109,6 +119,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
   const refetchGigs = useCallback(async () => {
     const fetched = await getCrmGigs();
     sharedGigsCache = fetched;
+    sharedGigsCacheTs = Date.now();
     setClientGigs(fetched);
   }, []);
 
@@ -135,11 +146,11 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-[80vh] md:min-h-0 relative" style={{ background: 'var(--stage-void)' }}>
+    <div className="flex flex-col md:flex-row h-full min-h-[80vh] md:min-h-0 relative" data-surface="void" style={{ background: 'var(--stage-void)' }}>
       {/* Left: Stream. On mobile hidden when item selected; on desktop always visible. */}
       <aside
         className={cn(
-          'flex flex-col shrink-0 border-r border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] w-full md:w-[380px] md:min-w-[320px] max-w-[420px]',
+          'flex flex-col shrink-0 w-full md:w-[380px] md:min-w-[320px] max-w-[420px]',
           selectedId && 'hidden md:flex'
         )}
       >

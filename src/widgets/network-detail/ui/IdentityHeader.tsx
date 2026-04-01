@@ -195,7 +195,7 @@ export function IdentityHeader({
           )}
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-[oklch(1_0_0_/_0.08)]" />
+      <div className="absolute bottom-0 left-0 right-0 border-b border-[var(--stage-edge-subtle)]" />
     </div>
   );
 }

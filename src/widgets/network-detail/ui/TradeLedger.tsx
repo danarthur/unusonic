@@ -18,7 +18,7 @@ export function TradeLedger({ details }: TradeLedgerProps) {
       <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Ledger
       </h3>
-      <div className="stage-panel rounded-2xl p-4">
+      <div className="stage-panel p-4">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-[var(--color-unusonic-success)]">In</span>
           <span className="font-mono text-[var(--stage-text-primary)]">

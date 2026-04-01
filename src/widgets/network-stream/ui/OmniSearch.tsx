@@ -8,8 +8,7 @@ import { searchNetworkOrgs, summonPartner, summonPartnerAsGhost } from '@/featur
 import type { NetworkSearchOrg } from '@/features/network-data';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const spring = { type: 'spring' as const, stiffness: 300, damping: 25 };
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
 interface OmniSearchProps {
   sourceOrgId: string;
@@ -27,6 +26,16 @@ interface OmniSearchProps {
  */
 export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSelectExisting }: OmniSearchProps) {
   const router = useRouter();
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const handleClose = React.useCallback(() => onOpenChange(false), [onOpenChange]);
+  React.useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, handleClose]);
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState<NetworkSearchOrg[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
@@ -151,33 +160,41 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
           onClick={() => onOpenChange(false)}
           aria-hidden
         >
-          {/* 1. THE VIGNETTE – radial gradient: transparent center, dark edges. Dashboard stays visible. */}
+          {/* 1. THE VIGNETTE -- radial gradient: transparent center, dark edges. Dashboard stays visible. */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
             className="pointer-events-none absolute inset-0 opacity-90"
             style={{
               background:
                 'radial-gradient(circle at 50% 35%, transparent 0%, oklch(0.15 0 0 / 0.4) 45%, oklch(0.12 0 0 / 0.85) 100%)',
-              backdropFilter: 'blur(2px)',
             }}
           />
 
-          {/* 2. THE ARTIFACT – levitating modal with silk glow + Deep Liquid glass */}
+          {/* 2. THE ARTIFACT -- levitating modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.98, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: -10 }}
-            transition={spring}
+            ref={containerRef}
+            role="dialog"
+            aria-modal="true"
+            initial={{ scale: 0.98, y: -20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.98, y: -10 }}
+            transition={STAGE_HEAVY}
             className="relative z-10 mx-4 w-full max-w-2xl"
             onClick={(e) => e.stopPropagation()}
           >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+            >
             <div
-          className="relative overflow-hidden rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)]"
+              className="relative overflow-hidden rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)]"
+              data-surface="raised"
               style={{
-                background: 'oklch(0.18 0 0 / 0.85)',
                 boxShadow:
                   '0 0 50px -10px oklch(0.88 0 0 / 0.18), 0 20px 40px -10px oklch(0 0 0 / 0.5), inset 0 1px 0 0 oklch(1_0_0_/_0.10)',
               }}
@@ -257,7 +274,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                 <motion.div
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...spring, delay: 0.03 }}
+                  transition={{ ...STAGE_HEAVY, delay: 0.03 }}
                 >
                 <Command.Group
                   heading={connectionResults.length === 1 ? 'Connection' : 'Connections'}
@@ -269,7 +286,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                       value={`${org.name} ${org.id}`}
                       onSelect={() => handleSelectExisting(org)}
                       disabled={pendingId === org.id}
-                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[var(--stage-surface-hover)] data-[selected=true]:text-[var(--stage-text-primary)] data-[selected=true]:shadow-lg"
+                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[oklch(1_0_0/0.08)] data-[selected=true]:text-[var(--stage-text-primary)] data-[selected=true]:shadow-lg"
                     >
                       <div className="relative shrink-0">
                         {pendingId === org.id ? (
@@ -293,7 +310,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="block truncate text-base font-medium text-[var(--stage-text-primary)] group-data-[selected=true]:text-[var(--stage-text-primary)]">
+                        <span className="block truncate text-base font-medium tracking-tight text-[var(--stage-text-primary)] group-data-[selected=true]:text-[var(--stage-text-primary)]">
                           {org.name}
                         </span>
                         <span className="text-xs text-[var(--stage-text-secondary)] group-data-[selected=true]:text-[var(--stage-text-secondary)]">
@@ -316,7 +333,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                 <motion.div
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...spring, delay: 0.06 }}
+                  transition={{ ...STAGE_HEAVY, delay: 0.06 }}
                 >
                 <Command.Group
                   heading="Directory"
@@ -328,7 +345,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                       value={`${org.name} ${org.id}`}
                       onSelect={() => handleSelectExisting(org)}
                       disabled={pendingId === org.id}
-                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[var(--stage-surface-hover)] data-[selected=true]:text-[var(--stage-text-primary)] data-[selected=true]:shadow-lg"
+                      className="group flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3.5 text-sm transition-all duration-200 data-[selected=true]:bg-[oklch(1_0_0/0.08)] data-[selected=true]:text-[var(--stage-text-primary)] data-[selected=true]:shadow-lg"
                     >
                       <div className="relative shrink-0">
                         {pendingId === org.id ? (
@@ -350,7 +367,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="block truncate text-base font-medium text-[var(--stage-text-primary)] group-data-[selected=true]:text-[var(--stage-text-primary)]">
+                        <span className="block truncate text-base font-medium tracking-tight text-[var(--stage-text-primary)] group-data-[selected=true]:text-[var(--stage-text-primary)]">
                           {org.name}
                         </span>
                         <span className="text-xs text-[var(--stage-accent)] group-data-[selected=true]:text-[var(--stage-accent)]">
@@ -387,6 +404,7 @@ export function OmniSearch({ sourceOrgId, open, onOpenChange, onOpenForge, onSel
             </div>
               </Command>
             </div>
+            </motion.div>
           </motion.div>
         </motion.div>
       )}

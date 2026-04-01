@@ -8,9 +8,8 @@ import { NetworkCard } from '@/entities/network';
 import { GenesisState } from './GenesisState';
 import { TheMembrane } from './TheMembrane';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import type { NetworkNode } from '@/entities/network';
-
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 // =============================================================================
 // Helpers: classify nodes into zones using existing kind/gravity/entityType
@@ -222,13 +221,12 @@ export function StreamLayout({
               <input
                 type="text"
                 placeholder="Search crew…"
+                aria-label="Search crew"
                 value={crewSearch}
                 onChange={(e) => setCrewSearch(e.target.value)}
                 className={cn(
-                  'h-8 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)]',
-                  'pl-7 pr-3 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50',
-                  'outline-none transition-all duration-200',
-                  'focus:border-[var(--stage-accent)]/40 focus:bg-[oklch(1_0_0/0.07)]',
+                  'stage-input h-8 pl-7 pr-3 text-xs',
+                  'focus-visible:outline-none',
                   crewSearch ? 'w-40' : 'w-28 focus:w-40'
                 )}
               />
@@ -289,21 +287,15 @@ export function StreamLayout({
                       {role}
                     </p>
                   )}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 auto-rows-[84px]">
-                    {groupNodes.map((node, index) => (
-                      <motion.div
-                        key={node.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ ...spring, delay: index * 0.04 }}
-                        className="h-full"
-                      >
+                  <div className="grid grid-cols-2 gap-[var(--stage-gap)] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 auto-rows-[84px]">
+                    {groupNodes.map((node) => (
+                      <div key={node.id} className="h-full">
                         <NetworkCard
                           node={node}
                           layoutId={`node-${node.id}`}
                           onClick={() => onNodeClick?.(node)}
                         />
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -339,13 +331,12 @@ export function StreamLayout({
                   <input
                     type="text"
                     placeholder="Search partners…"
+                    aria-label="Search inner circle"
                     value={innerCircleSearch}
                     onChange={(e) => setInnerCircleSearch(e.target.value)}
                     className={cn(
-                      'h-8 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)]',
-                      'pl-7 pr-3 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50',
-                      'outline-none transition-all duration-200',
-                      'focus:border-[var(--stage-accent)]/40 focus:bg-[oklch(1_0_0/0.07)]',
+                      'stage-input h-8 pl-7 pr-3 text-xs',
+                      'focus-visible:outline-none',
                       innerCircleSearch ? 'w-40' : 'w-28 focus:w-40'
                     )}
                   />
@@ -353,22 +344,16 @@ export function StreamLayout({
               )}
             </div>
             {displayedInnerCircle.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[124px]">
-                {displayedInnerCircle.map((node, index) => (
-                  <motion.div
-                    key={node.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...spring, delay: Math.min(index * 0.03, 0.18) }}
-                    className="h-full"
-                  >
+              <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[124px]">
+                {displayedInnerCircle.map((node) => (
+                  <div key={node.id} className="h-full">
                     <NetworkCard
                       node={node}
                       layoutId={`node-${node.id}`}
                       onClick={() => onNodeClick?.(node)}
                       onTogglePreferred={(onPin || onUnpin) ? () => handleTogglePreferred(node) : undefined}
                     />
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -402,7 +387,7 @@ export function StreamLayout({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={spring}
+            transition={STAGE_MEDIUM}
             className="flex flex-col gap-5"
           >
             {/* Collapsible header */}
@@ -433,7 +418,7 @@ export function StreamLayout({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={spring}
+                  transition={STAGE_MEDIUM}
                   className="flex flex-col gap-5 overflow-hidden"
                 >
                   {/* Filter + Sort bar */}
@@ -475,13 +460,12 @@ export function StreamLayout({
                         <input
                           type="text"
                           placeholder="Filter…"
+                          aria-label="Search network"
                           value={networkSearch}
                           onChange={(e) => setNetworkSearch(e.target.value)}
                           className={cn(
-                            'h-8 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)]',
-                            'pl-7 pr-3 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50',
-                            'outline-none transition-all duration-200',
-                            'focus:border-[var(--stage-accent)]/40 focus:bg-[oklch(1_0_0/0.07)]',
+                            'stage-input h-8 pl-7 pr-3 text-xs',
+                            'focus-visible:outline-none',
                             networkSearch ? 'w-40' : 'w-28 focus:w-40'
                           )}
                         />
@@ -508,24 +492,17 @@ export function StreamLayout({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[124px]"
+                        className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[124px]"
                       >
-                        {displayedNetwork.map((node, index) => (
-                          <motion.div
-                            key={node.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ ...spring, delay: Math.min(index * 0.03, 0.18) }}
-                            className="h-full"
-                          >
+                        {displayedNetwork.map((node) => (
+                          <div key={node.id} className="h-full">
                             <NetworkCard
                               node={node}
                               layoutId={`node-${node.id}`}
                               onClick={() => onNodeClick?.(node)}
                               onTogglePreferred={(onPin || onUnpin) ? () => handleTogglePreferred(node) : undefined}
                             />
-                          </motion.div>
+                          </div>
                         ))}
                       </motion.div>
                     ) : (
@@ -540,7 +517,7 @@ export function StreamLayout({
                           {networkSearch ? (
                             <>No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{networkSearch}&rdquo;</span></>
                           ) : (
-                            'Nothing here yet.'
+                            'No connections yet.'
                           )}
                         </p>
                         {networkSearch && (

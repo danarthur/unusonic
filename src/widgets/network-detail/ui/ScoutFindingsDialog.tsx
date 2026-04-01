@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, Building2, Mail, Phone, MapPin, Tag, Globe, Users } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import type { ScoutResult } from '@/features/intelligence';
+import { useModalLayer } from '@/shared/lib/use-modal-layer';
 
 interface ScoutFindingsDialogProps {
   open: boolean;
@@ -15,7 +16,7 @@ interface ScoutFindingsDialogProps {
   onDiscard: () => void;
 }
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
 function formatAddress(addr: ScoutResult['address']): string {
   if (!addr) return '';
@@ -30,6 +31,8 @@ export function ScoutFindingsDialog({
   onConfirm,
   onDiscard,
 }: ScoutFindingsDialogProps) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
   const handleConfirm = React.useCallback(() => {
     if (findings) onConfirm(findings);
     onOpenChange(false);
@@ -39,6 +42,8 @@ export function ScoutFindingsDialog({
     onDiscard();
     onOpenChange(false);
   }, [onDiscard, onOpenChange]);
+
+  useModalLayer({ open, onClose: handleDiscard, containerRef });
 
   const hasAnyFindings = findings && (
     findings.name ||
@@ -58,27 +63,36 @@ export function ScoutFindingsDialog({
       <>
         <motion.div
           role="presentation"
-          className="fixed inset-0 z-[9999] bg-[oklch(0.12_0_0/0.5)]"
+          className="fixed inset-0 z-50 bg-[oklch(0.12_0_0/0.5)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={spring}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
           onClick={() => handleDiscard()}
           aria-hidden
         />
         <motion.div
+          ref={containerRef}
           role="dialog"
-          aria-modal
+          aria-modal="true"
           aria-labelledby="aion-findings-title"
-          initial={{ opacity: 0, scale: 0.96, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 8 }}
-          transition={spring}
-          className="fixed left-1/2 top-1/2 z-[9999] flex max-h-[90vh] w-full max-w-[420px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] shadow-2xl"
+          initial={{ scale: 0.96, y: 8 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.96, y: 8 }}
+          transition={STAGE_HEAVY}
+          className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-[420px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] shadow-2xl"
+          data-surface="raised"
           onClick={(e) => e.stopPropagation()}
         >
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className="flex max-h-[90vh] flex-col"
+        >
           <div className="shrink-0 px-5 pt-5 pb-3">
-            <h2 id="aion-findings-title" className="text-sm font-semibold uppercase tracking-widest text-[var(--stage-accent)]">
+            <h2 id="aion-findings-title" className="text-sm font-medium uppercase tracking-widest text-[var(--stage-accent)]">
               Aion findings
             </h2>
           </div>
@@ -89,10 +103,7 @@ export function ScoutFindingsDialog({
                 <div className="flex items-start gap-4">
                   {findings.logoUrl && (
                     <div
-                      className="size-14 shrink-0 rounded-xl overflow-hidden border border-[oklch(1_0_0_/_0.08)] flex items-center justify-center"
-                      style={{
-                        background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.98 0 0 / 0.7) 0%, oklch(0.90 0 0 / 0.4) 50%, transparent 100%)',
-                      }}
+                      className="size-14 shrink-0 rounded-xl overflow-hidden border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-elevated)] flex items-center justify-center"
                     >
                       <img src={findings.logoUrl} alt="" className="size-full object-contain p-1.5" />
                     </div>
@@ -114,35 +125,35 @@ export function ScoutFindingsDialog({
 
                 <div className="space-y-3 text-sm">
                   {findings.website && (
-                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
+                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2">
                       <Globe className="size-4 shrink-0 text-[var(--stage-text-secondary)]" />
                       <span className="truncate font-mono text-xs text-[var(--stage-text-primary)]">{findings.website}</span>
                     </div>
                   )}
                   {findings.supportEmail && (
-                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
+                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2">
                       <Mail className="size-4 shrink-0 text-[var(--stage-text-secondary)]" />
                       <span className="truncate font-mono text-xs text-[var(--stage-text-primary)]">{findings.supportEmail}</span>
                     </div>
                   )}
                   {findings.phone && (
-                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
+                    <div className="flex items-center gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2">
                       <Phone className="size-4 shrink-0 text-[var(--stage-text-secondary)]" />
                       <span className="truncate text-xs text-[var(--stage-text-primary)]">{findings.phone}</span>
                     </div>
                   )}
                   {findings.address && formatAddress(findings.address) && (
-                    <div className="flex items-start gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-3 py-2">
+                    <div className="flex items-start gap-3 min-h-[36px] rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2">
                       <MapPin className="size-4 shrink-0 mt-0.5 text-[var(--stage-text-secondary)]" />
                       <span className="text-xs leading-relaxed text-[var(--stage-text-secondary)]">{formatAddress(findings.address)}</span>
                     </div>
                   )}
                   {findings.tags && findings.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-3 py-2 min-h-[36px]">
+                    <div className="flex flex-wrap gap-2 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2 min-h-[36px]">
                       {findings.tags.map((t) => (
                         <span
                           key={t}
-                          className="inline-flex rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-2 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                          className="inline-flex rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                         >
                           {t}
                         </span>
@@ -159,12 +170,12 @@ export function ScoutFindingsDialog({
                       </span>
                     </div>
                     {findings.roster && findings.roster.length > 0 ? (
-                      <div className="rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] max-h-[200px] overflow-y-auto">
+                      <div className="rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] max-h-[200px] overflow-y-auto">
                         <ul className="grid grid-cols-2 gap-2 p-2">
                           {findings.roster.map((m, i) => (
                             <li
                               key={i}
-                              className="flex items-center gap-2 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-2 py-1.5 min-w-0"
+                              className="flex items-center gap-2 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-1.5 min-w-0"
                             >
                               {m.avatarUrl ? (
                                 <img
@@ -210,7 +221,7 @@ export function ScoutFindingsDialog({
                 variant="outline"
                 size="sm"
                 onClick={handleDiscard}
-                className="flex-1 gap-2 border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)]"
+                className="flex-1 gap-2 border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:bg-[var(--ctx-well)]"
               >
                 <X className="size-4" />
                 Discard
@@ -225,6 +236,7 @@ export function ScoutFindingsDialog({
               </Button>
             </div>
           </div>
+        </motion.div>
         </motion.div>
       </>
     </AnimatePresence>

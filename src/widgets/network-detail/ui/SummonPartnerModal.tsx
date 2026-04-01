@@ -7,8 +7,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { createPartnerSummon } from '@/features/summoning';
-
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
 interface SummonPartnerModalProps {
   open: boolean;
@@ -28,6 +27,7 @@ export function SummonPartnerModal({
   onSuccess,
 }: SummonPartnerModalProps) {
   const router = useRouter();
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const [email, setEmail] = React.useState('');
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = React.useState('');
@@ -53,16 +53,25 @@ export function SummonPartnerModal({
       router.refresh();
     } else {
       setStatus('error');
-      setMessage(!result.ok ? result.error : 'Something went wrong.');
+      setMessage(!result.ok ? result.error : 'Unable to send invitation.');
     }
   };
 
-  const handleClose = () => {
+  const handleClose = React.useCallback(() => {
     onOpenChange(false);
     setEmail('');
     setStatus('idle');
     setMessage('');
-  };
+  }, [onOpenChange]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, handleClose]);
 
   return (
     <AnimatePresence>
@@ -77,19 +86,27 @@ export function SummonPartnerModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={spring}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={handleClose}
             aria-hidden
           />
           <motion.div
+            ref={containerRef}
             role="dialog"
-            aria-modal
+            aria-modal="true"
             aria-labelledby="summon-modal-title"
-            initial={{ opacity: 0, scale: 0.98, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: -10 }}
-            transition={spring}
+            initial={{ scale: 0.98, y: -10 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.98, y: -10 }}
+            transition={STAGE_HEAVY}
             className="relative z-10 w-full max-w-md rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-2xl"
+            data-surface="raised"
+          >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
           >
         <div className="flex items-center justify-between gap-4 mb-4">
           <h2 id="summon-modal-title" className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
@@ -112,7 +129,7 @@ export function SummonPartnerModal({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+              <label className="mb-1.5 block stage-label">
                 Email
               </label>
               <Input
@@ -121,7 +138,7 @@ export function SummonPartnerModal({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="booking@example.com"
                 required
-                className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)]"
+                className="stage-input"
               />
             </div>
             {status === 'error' && message && (
@@ -137,6 +154,7 @@ export function SummonPartnerModal({
             </div>
           </form>
         )}
+          </motion.div>
           </motion.div>
         </motion.div>
       )}

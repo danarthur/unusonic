@@ -17,7 +17,7 @@ import { RecentlyDeletedList } from './RecentlyDeletedList';
 import type { NetworkNode } from '@/entities/network';
 import type { DeletedRelationship } from '@/features/network-data';
 
-const SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
 // ── Add-menu item ──────────────────────────────────────────────────────────────
 
@@ -95,17 +95,19 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
         onClick={() => onOpenChange(false)}
       >
         <div className="pointer-events-none absolute inset-0 bg-[oklch(0_0_0/0.5)]" />
         <motion.div
-          initial={{ opacity: 0, y: 24, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 12, scale: 0.97 }}
-          transition={SPRING}
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 12 }}
+          transition={STAGE_HEAVY}
           onClick={(e) => e.stopPropagation()}
-          className="relative z-10 mx-4 w-full max-w-sm rounded-2xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(0.18_0_0/0.95)] p-6 shadow-[0_24px_64px_-8px_oklch(0_0_0/0.5)] "
+          className="relative z-10 mx-4 w-full max-w-sm rounded-2xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-[0_24px_64px_-8px_oklch(0_0_0/0.5)]"
+          data-surface="raised"
         >
           <h2 className="mb-1 text-base font-semibold tracking-tight text-[var(--stage-text-primary)]">
             Add freelancer
@@ -116,7 +118,7 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                <label className="block stage-label">
                   First name
                 </label>
                 <Input
@@ -125,18 +127,18 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
                   placeholder="First"
                   required
                   autoFocus
-                  className="h-9 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] text-sm focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
+                  className="stage-input h-9 text-sm"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                <label className="block stage-label">
                   Last name
                 </label>
                 <Input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Last"
-                  className="h-9 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] text-sm focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
+                  className="stage-input h-9 text-sm"
                 />
               </div>
             </div>
@@ -227,11 +229,11 @@ export function NetworkOrbitWithGenesis({
   };
 
   return (
-    <div className="relative flex flex-1 flex-col min-h-0">
+    <div className="relative flex flex-1 flex-col min-h-0" data-surface="void">
       <header className="shrink-0 flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-light tracking-tight text-[var(--stage-text-primary)]">
+            <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">
               Network
             </h1>
             <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">

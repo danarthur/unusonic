@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Sparkles, Plus, FileText, Wallet, Clock, MapPin } from 'lucide-react';
 import { CreateGigModal } from './create-gig-modal';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 type Gig = {
   id: string;
@@ -44,7 +45,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
 
   return (
     <>
-      <div className="flex-1 min-h-[80vh] p-6 overflow-y-auto">
+      <div className="flex-1 min-h-[80vh] p-6 overflow-y-auto" data-surface="void">
         <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight mb-2">Production queue</h1>
@@ -57,14 +58,14 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
-            className="bg-[var(--stage-void)] text-[var(--stage-text-primary)] px-6 py-3 rounded-full flex items-center gap-2 transition-colors hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
+            className="stage-btn stage-btn-primary"
           >
             <Plus size={18} /> New production
           </button>
         </header>
 
         <motion.div
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(200px,auto)]"
+          className="grid grid-cols-1 md:grid-cols-3 gap-[var(--stage-gap)] auto-rows-[minmax(200px,auto)]"
           initial="hidden"
           animate="visible"
           variants={{
@@ -80,7 +81,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                 visible: { opacity: 1, y: 0 },
                 hidden: { opacity: 0, y: 12 },
               }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
+              transition={STAGE_MEDIUM}
             >
               <StagePanel
                 interactive={!gig.isOptimistic}
@@ -106,12 +107,12 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                   className="flex flex-col flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset focus-visible:rounded-2xl"
                   onClick={(e) => gig.isOptimistic && e.preventDefault()}
                 >
-                  <h3 className="text-xl font-medium text-[var(--stage-text-primary)] mb-1 group-hover:text-[var(--color-unusonic-success)] transition-colors">
+                  <h3 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)] mb-1 transition-colors">
                     {gig.title ?? 'Untitled Production'}
                   </h3>
                   <p className="text-sm text-[var(--stage-text-secondary)] mb-4">{gig.client_name ?? 'Client'}</p>
 
-                  <div className="flex items-center gap-4 text-xs text-[var(--stage-text-secondary)] border-t border-[oklch(1_0_0_/_0.08)] pt-4 mt-2">
+                  <div className="flex items-center gap-4 text-xs text-[var(--stage-text-secondary)] border-t border-[var(--stage-edge-subtle)] pt-4 mt-2">
                     <span className="flex items-center gap-1.5">
                       <Clock size={14} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
                       {gig.event_date
@@ -125,19 +126,19 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                   </div>
                 </Link>
 
-                <div className="mt-4 pt-3 border-t border-[oklch(1_0_0_/_0.08)] flex gap-2 flex-wrap">
+                <div className="mt-4 pt-3 border-t border-[var(--stage-edge-subtle)] flex gap-2 flex-wrap">
                   {!gig.isOptimistic && gig.source === 'event' && (
                     <>
                       <Link
                         href={`/events/${gig.id}/deal`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
                       >
                         <FileText size={14} />
                         Deal room
                       </Link>
                       <Link
                         href={`/events/${gig.id}/finance`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
                       >
                         <Wallet size={14} />
                         Finance

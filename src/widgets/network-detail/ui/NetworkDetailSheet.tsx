@@ -19,6 +19,7 @@ import {
   updateRosterMemberField,
 } from '@/features/network-data';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
+import { STAGE_HEAVY, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 
 type TabId = 'transmission' | 'crew' | 'ledger';
 
@@ -162,7 +163,7 @@ function InlineEditField({
             if (e.key === 'Escape') { cancellingRef.current = true; setSaveError(null); setEditing(false); setTimeout(() => { cancellingRef.current = false; }, 0); }
           }}
           disabled={saving}
-          className="w-full rounded-lg bg-[oklch(1_0_0/0.05)] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-sm text-[var(--stage-text-primary)] outline-none focus:border-[var(--stage-accent)]/50 disabled:opacity-50"
+          className="stage-input py-1 text-sm disabled:opacity-50"
         />
         {saveError && (
           <p className="mt-1 text-xs text-[var(--color-unusonic-error)]">{saveError}</p>
@@ -317,7 +318,7 @@ function RosterStatusCard({
           </div>
           {doNotRebook ? (
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[oklch(0.75_0.15_60)]/15 px-2.5 py-1 text-xs font-medium text-[oklch(0.75_0.15_60)]">
+              <span className="rounded-full bg-[var(--color-unusonic-warning)]/15 px-2.5 py-1 text-xs font-medium text-[var(--color-unusonic-warning)]">
                 Flagged
               </span>
               <button
@@ -334,7 +335,7 @@ function RosterStatusCard({
               type="button"
               onClick={handleDnrToggle}
               disabled={dnrSaving}
-              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors disabled:opacity-50"
+              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-warning)]/50 hover:text-[var(--color-unusonic-warning)] transition-colors disabled:opacity-50"
             >
               Flag do not rebook
             </button>
@@ -377,7 +378,7 @@ function RosterStatusCard({
                 type="button"
                 onClick={handleArchive}
                 disabled={archiving}
-                className="rounded-lg bg-[oklch(0.75_0.15_60)]/15 px-3 py-1.5 text-xs font-medium text-[oklch(0.75_0.15_60)] hover:bg-[oklch(0.75_0.15_60)]/25 transition-colors disabled:opacity-50"
+                className="rounded-lg bg-[var(--color-unusonic-warning)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-unusonic-warning)] hover:bg-[var(--color-unusonic-warning)]/25 transition-colors disabled:opacity-50"
               >
                 {archiving ? 'Archiving…' : 'Confirm archive?'}
               </button>
@@ -393,7 +394,7 @@ function RosterStatusCard({
             <button
               type="button"
               onClick={() => setArchiveConfirm(true)}
-              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[oklch(0.75_0.15_60)]/50 hover:text-[oklch(0.75_0.15_60)] transition-colors"
+              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-warning)]/50 hover:text-[var(--color-unusonic-warning)] transition-colors"
             >
               Archive
             </button>
@@ -463,6 +464,7 @@ function getTabsForDetail(details: NodeDetail): { id: TabId; label: string }[] {
 export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }: NetworkDetailSheetProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<TabId>('transmission');
+  const sheetRef = React.useRef<HTMLDivElement>(null);
 
   const handleClose = React.useCallback(() => {
     if (onClose) {
@@ -529,31 +531,34 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         className="fixed inset-0 z-50 flex justify-end"
       >
         <motion.div
           role="presentation"
-          className="absolute inset-0 bg-[oklch(0.12_0_0/0.5)]"
+          className="absolute inset-0 bg-[oklch(0.06_0_0/0.75)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
           onClick={handleClose}
           aria-hidden
         />
         <motion.div
+          ref={sheetRef}
           id="network-detail-panel"
+          data-surface="raised"
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          transition={STAGE_HEAVY}
           className="
             fixed inset-y-0 right-0 z-10 flex flex-col h-dvh w-[85vw] max-w-[85vw] md:w-[600px] md:max-w-[600px]
-            bg-[var(--stage-surface-raised)]            border-l border-[oklch(1_0_0_/_0.08)] shadow-2xl rounded-l-2xl
+            bg-[var(--stage-surface-raised)]            border-l border-[oklch(1_0_0_/_0.08)] shadow-2xl rounded-l-[var(--stage-radius-panel,12px)]
           "
         >
           <header className="flex shrink-0 items-center gap-3 border-b border-[oklch(1_0_0_/_0.08)] px-4 py-3 md:px-5 md:py-3">
-            <h1 id="network-detail-title" className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-[var(--stage-text-primary)]">
+            <h1 id="network-detail-title" className="min-w-0 flex-1 truncate text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
               {details.identity.name}
             </h1>
             <div className="flex shrink-0 items-center gap-1">
@@ -633,7 +638,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                         layoutId="network-detail-tab-indicator"
                         className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--stage-accent)]"
                         initial={false}
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        transition={STAGE_LIGHT}
                       />
                     )}
                   </div>
@@ -651,10 +656,10 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   id="panel-transmission"
                   role="tabpanel"
                   aria-labelledby="tab-transmission"
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={STAGE_NAV_CROSSFADE}
                   className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(120px,auto)]"
                 >
                   {/* Ledger cell — col-span-1 */}
@@ -831,10 +836,10 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   id="panel-crew"
                   role="tabpanel"
                   aria-labelledby="tab-crew"
-                  initial={false}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={STAGE_NAV_CROSSFADE}
                   className="space-y-6"
                 >
                   {isPartner ? (
@@ -859,10 +864,10 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   id="panel-ledger"
                   role="tabpanel"
                   aria-labelledby="tab-ledger"
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={STAGE_NAV_CROSSFADE}
                   className="stage-panel flex flex-col items-center justify-center min-h-[180px] rounded-2xl p-6"
                 >
                   <p className="text-sm text-[var(--stage-text-secondary)] text-center">

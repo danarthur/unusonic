@@ -164,6 +164,7 @@ export function InviteTalentDialog({
         <SheetBody>
           <form
             onSubmit={handleSubmit}
+            data-surface="raised"
             className={cn(
               'stage-panel flex flex-col gap-6 p-5 transition-all duration-200',
               isContractor
@@ -173,7 +174,7 @@ export function InviteTalentDialog({
           >
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                <label className="mb-1.5 block stage-label">
                   First name
                 </label>
                 <Input
@@ -181,11 +182,11 @@ export function InviteTalentDialog({
                   type="text"
                   placeholder="First"
                   required
-                  className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
+                  className="stage-input"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                <label className="mb-1.5 block stage-label">
                   Last name
                 </label>
                 <Input
@@ -193,13 +194,13 @@ export function InviteTalentDialog({
                   type="text"
                   placeholder="Last"
                   required
-                  className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
+                  className="stage-input"
                 />
               </div>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+              <label className="mb-1.5 block stage-label">
                 Email
               </label>
               <Input
@@ -208,7 +209,7 @@ export function InviteTalentDialog({
                 placeholder="name@company.com"
                 required
                 onBlur={handleEmailBlur}
-                className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
+                className="stage-input"
               />
               {emailStatus === 'checking' && (
                 <p className="mt-1 text-[10px] text-[var(--stage-text-secondary)]">Checking…</p>
@@ -228,38 +229,38 @@ export function InviteTalentDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+              <label className="mb-1.5 block stage-label">
                 Phone
               </label>
               <Input
                 name="phone"
                 type="tel"
                 placeholder="+1 555 000 0000"
-                className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
+                className="stage-input"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+              <label className="mb-1.5 block stage-label">
                 Job title
               </label>
               <Input
                 name="job_title"
                 type="text"
                 placeholder="e.g. Audio A1"
-                className="bg-transparent border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.6] focus:border-[var(--stage-accent)]/50 focus:ring-1 focus:ring-[var(--stage-accent)]/20"
+                className="stage-input"
               />
             </div>
 
             {/* Status toggle — only shown when not pre-configured via initialStatus */}
             {!initialStatus && (
               <div>
-                <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                <span className="mb-1.5 block stage-label">
                   Status
                 </span>
                 <div
                   role="group"
-                  className="inline-flex rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-well)]/40 p-0.5"
+                  className="inline-flex rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] p-0.5"
                 >
                   <button
                     type="button"
@@ -290,7 +291,7 @@ export function InviteTalentDialog({
             )}
 
             <div className="border-t border-[oklch(1_0_0_/_0.08)]/50 pt-5">
-              <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+              <span className="mb-1.5 block stage-label">
                 Role
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -312,7 +313,7 @@ export function InviteTalentDialog({
             </div>
 
             <div className="border-t border-[oklch(1_0_0_/_0.08)]/50 pt-5">
-              <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+              <span className="mb-1.5 block stage-label">
                 Skills {isContractor && <span className="text-[var(--color-unusonic-warning)]">(at least one)</span>}
               </span>
               <div className="flex flex-wrap gap-2">
@@ -335,7 +336,7 @@ export function InviteTalentDialog({
 
             {capPresets.length > 0 && (
               <div className="border-t border-[oklch(1_0_0_/_0.08)]/50 pt-5">
-                <span className="mb-1.5 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                <span className="mb-1.5 block stage-label">
                   Business functions
                 </span>
                 <div className="flex flex-wrap gap-2">

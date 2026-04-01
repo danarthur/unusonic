@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import { scoutEntity } from '@/features/intelligence';
 import type { ScoutResult } from '@/features/intelligence';
@@ -31,7 +32,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
   const handleScan = async () => {
     if (status !== 'ready' && status !== 'success') return;
     setStatus('scanning');
-    const toastId = toast.loading('Acquiring signal…');
+    const toastId = toast.loading('Scanning...');
 
     const result = await scoutEntity(value.trim());
 
@@ -39,7 +40,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
       toast.error(result.error, { id: toastId });
       setStatus('ready');
     } else {
-      toast.success('Intelligence acquired', { id: toastId });
+      toast.success('Scan complete', { id: toastId });
       setStatus('success');
       setFindings(result.data);
       setFindingsOpen(true);
@@ -84,7 +85,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="e.g. neonvelvet.net"
-          className="relative z-10 min-w-0 flex-[2] h-full bg-transparent px-5 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 outline-none font-mono text-sm"
+          className="stage-input relative z-10 min-w-0 flex-[2] h-full border-0 bg-transparent px-5 font-mono text-sm"
         />
         <motion.button
           type="button"
@@ -107,7 +108,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
           }
           whileHover={canActivate && !isScanning ? { background: 'linear-gradient(to right, transparent 0%, color-mix(in oklch, var(--stage-text-primary) 3%, transparent) 30%, color-mix(in oklch, var(--stage-text-primary) 8%, transparent) 100%)' } : undefined}
           whileTap={canActivate && !isScanning ? { backgroundColor: 'color-mix(in oklch, var(--stage-text-primary) 8%, transparent)' } : undefined}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          transition={STAGE_LIGHT}
         >
           <motion.div
             className={`flex items-center justify-center pointer-events-none ${status === 'idle' ? 'opacity-30 grayscale' : 'opacity-100'}`}
@@ -119,7 +120,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
             transition={
               canActivate && isHovered && !isScanning && status !== 'success'
                 ? { opacity: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' } }
-                : { type: 'spring', stiffness: 400, damping: 25 }
+                : STAGE_LIGHT
             }
           >
             <LivingLogo
@@ -129,7 +130,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
           </motion.div>
           <span
             className={`
-              text-xs font-semibold uppercase tracking-widest
+              text-xs font-medium uppercase tracking-widest
               ${isScanning ? 'text-[var(--stage-accent)]' : canActivate ? 'text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-accent)]/90' : 'text-[var(--stage-text-secondary)]/50'}
             `}
           >

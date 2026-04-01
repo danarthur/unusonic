@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Building2, User, Globe, Mail, Phone, MapPin } from 'lucide-react';
 
-const formStagger = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+
+const formStagger = STAGE_MEDIUM;
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -47,11 +49,10 @@ const PAYMENT_TERMS_OPTIONS = [
   { value: 'Immediate', label: 'Immediate' },
 ];
 
-const inputCls =
-  'h-11 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:border-[var(--stage-accent)]/50';
-const labelCls = 'text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]';
+const inputCls = 'stage-input h-11 rounded-xl';
+const labelCls = 'block stage-label mb-1';
 const selectCls =
-  'h-11 w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 text-sm text-[var(--stage-text-primary)] focus:outline-none focus:border-[var(--stage-accent)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] appearance-none';
+  'stage-input h-11 w-full rounded-xl px-3 text-sm appearance-none';
 
 /**
  * Ghost Forge – slide-over to capture new connection: org or person + primary contact.
@@ -119,7 +120,7 @@ export function GhostForgeSheet({
       startScoutTransition(async () => {
         const result = await createConnectionFromScout(sourceOrgId, data);
         if (result.success) {
-          toast.success('Connection added. We pulled the details from the website.');
+          toast.success('Connection added. Details pulled from website.');
           onOpenChange(false);
           router.push(`/network?nodeId=${encodeURIComponent(result.relationshipId)}&kind=external_partner`);
           router.refresh();
@@ -178,6 +179,7 @@ export function GhostForgeSheet({
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent
         side="center"
+        data-surface="raised"
         className="flex w-full max-w-md flex-col border-l border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-0"
       >
         <SheetHeader className="flex-col items-stretch gap-2 border-b border-[oklch(1_0_0_/_0.08)] px-6 py-6">
@@ -220,7 +222,7 @@ export function GhostForgeSheet({
         <SheetBody className="flex-1 space-y-6 px-6 pt-6 overflow-y-auto">
           {mode === 'scout' && (
             <motion.section
-              className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] p-5 space-y-4"
+              className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[var(--stage-surface-nested)] p-5 space-y-4"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={formStagger}
@@ -282,28 +284,18 @@ export function GhostForgeSheet({
               {type === 'person' && (
                 <>
                   {/* Name */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.05 }}
-                  >
+                  <div className="space-y-2">
                     <label className={labelCls}>Name</label>
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Jane Doe"
-                      className={cn('h-12 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:border-[var(--stage-accent)]/50')}
+                      className={cn(inputCls, 'h-12')}
                     />
-                  </motion.div>
+                  </div>
 
-                  {/* Phone — most time-critical field for crew */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.08 }}
-                  >
+                  {/* Phone -- most time-critical field for crew */}
+                  <div className="space-y-2">
                     <label className={labelCls}>Phone</label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
@@ -315,15 +307,10 @@ export function GhostForgeSheet({
                         className={cn(inputCls, 'pl-10')}
                       />
                     </div>
-                  </motion.div>
+                  </div>
 
                   {/* Email */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.1 }}
-                  >
+                  <div className="space-y-2">
                     <label className={labelCls}>Email <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
@@ -335,15 +322,10 @@ export function GhostForgeSheet({
                         className={cn(inputCls, 'pl-10')}
                       />
                     </div>
-                  </motion.div>
+                  </div>
 
                   {/* Market */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.12 }}
-                  >
+                  <div className="space-y-2">
                     <label className={labelCls}>Market <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
@@ -354,15 +336,10 @@ export function GhostForgeSheet({
                         className={cn(inputCls, 'pl-10')}
                       />
                     </div>
-                  </motion.div>
+                  </div>
 
                   {/* Union status */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.14 }}
-                  >
+                  <div className="space-y-2">
                     <label className={labelCls}>Union status <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <Input
                       value={unionStatus}
@@ -370,7 +347,7 @@ export function GhostForgeSheet({
                       placeholder="e.g. IATSE Local 33 or Non-union"
                       className={inputCls}
                     />
-                  </motion.div>
+                  </div>
                 </>
               )}
 
@@ -378,28 +355,18 @@ export function GhostForgeSheet({
               {type === 'organization' && (
                 <>
                   {/* Name */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.05 }}
-                  >
+                  <div className="space-y-2">
                     <label className={labelCls}>Name</label>
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Acme Corp"
-                      className="h-12 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:border-[var(--stage-accent)]/50"
+                      className={cn(inputCls, 'h-12')}
                     />
-                  </motion.div>
+                  </div>
 
-                  {/* Relationship type — required */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.08 }}
-                  >
+                  {/* Relationship type -- required */}
+                  <div className="space-y-2">
                     <label className={labelCls}>Relationship type</label>
                     <select
                       value={relType}
@@ -412,15 +379,10 @@ export function GhostForgeSheet({
                         </option>
                       ))}
                     </select>
-                  </motion.div>
+                  </div>
 
                   {/* Website */}
-                  <motion.div
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.1 }}
-                  >
+                  <div className="space-y-2">
                     <label className={labelCls}>Website <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></label>
                     <div className="relative">
                       <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--stage-text-secondary)]" />
@@ -431,15 +393,10 @@ export function GhostForgeSheet({
                         className={cn(inputCls, 'pl-10')}
                       />
                     </div>
-                  </motion.div>
+                  </div>
 
                   {/* Primary contact */}
-                  <motion.div
-                    className="space-y-3 border-t border-[oklch(1_0_0_/_0.08)] pt-4"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.12 }}
-                  >
+                  <div className="space-y-3 border-t border-[oklch(1_0_0_/_0.08)] pt-4">
                     <span className={cn(labelCls, 'block mb-2')}>Primary contact <span className="normal-case tracking-normal text-[var(--stage-text-secondary)]/60">(optional)</span></span>
                     <Input
                       value={contactName}
@@ -457,15 +414,10 @@ export function GhostForgeSheet({
                         className={cn(inputCls, 'pl-10')}
                       />
                     </div>
-                  </motion.div>
+                  </div>
 
                   {/* Compliance fields */}
-                  <motion.div
-                    className="space-y-3 border-t border-[oklch(1_0_0_/_0.08)] pt-4"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...formStagger, delay: 0.14 }}
-                  >
+                  <div className="space-y-3 border-t border-[oklch(1_0_0_/_0.08)] pt-4">
                     <span className={cn(labelCls, 'block mb-2')}>Compliance</span>
 
                     {/* W-9 checkbox */}
@@ -505,9 +457,9 @@ export function GhostForgeSheet({
                         ))}
                       </select>
                     </div>
-                  </motion.div>
+                  </div>
 
-                  {/* Venue-specific fields — shown only when relType === 'venue' */}
+                  {/* Venue-specific fields -- shown only when relType === 'venue' */}
                   <AnimatePresence>
                     {relType === 'venue' && (
                       <motion.div
@@ -516,7 +468,7 @@ export function GhostForgeSheet({
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        transition={formStagger}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
                       >
                         <span className={cn(labelCls, 'block mb-2')}>Venue ops</span>
 

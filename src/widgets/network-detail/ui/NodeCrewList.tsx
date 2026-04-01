@@ -7,16 +7,15 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { addContactToGhostOrg } from '@/features/network-data';
 import { getContactFieldLabel } from '@/shared/lib/contact-field-labels';
+import { STAGE_MEDIUM, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 
 const listVariants = {
-  visible: {
-    transition: { staggerChildren: 0.05, delayChildren: 0 },
-  },
+  visible: {},
 };
 
 const itemVariants = {
   hidden: { y: 8, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { type: 'spring' as const, stiffness: 300, damping: 30 } },
+  visible: { y: 0, opacity: 1, transition: { ...STAGE_MEDIUM, opacity: { duration: 0.12, ease: 'easeOut' } } },
 };
 import type { NodeDetailCrewMember } from '@/features/network-data';
 
@@ -68,7 +67,7 @@ export function NodeCrewList({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium tracking-wide text-[var(--stage-text-secondary)]">
+      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Crew
       </h3>
       <motion.ul
@@ -118,7 +117,7 @@ export function NodeCrewList({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              transition={STAGE_NAV_CROSSFADE}
             >
             <Button
               type="button"
@@ -137,7 +136,7 @@ export function NodeCrewList({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              transition={{ ...STAGE_MEDIUM, opacity: { duration: 0.12, ease: 'easeOut' } }}
               onSubmit={handleSubmit}
               className="overflow-hidden stage-panel rounded-2xl p-4 space-y-3"
             >
@@ -145,20 +144,23 @@ export function NodeCrewList({
                 <Input
                   name="firstName"
                   placeholder={getContactFieldLabel('first_name')}
-                  className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
+                  aria-label={getContactFieldLabel('first_name')}
+                  className="stage-input text-[var(--stage-text-primary)]"
                   required
                 />
                 <Input
                   name="lastName"
                   placeholder={getContactFieldLabel('last_name')}
-                  className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
+                  aria-label={getContactFieldLabel('last_name')}
+                  className="stage-input text-[var(--stage-text-primary)]"
                 />
               </div>
               <Input
                 name="email"
                 type="email"
                 placeholder={`${getContactFieldLabel('email')} (optional)`}
-                className="bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]"
+                aria-label={getContactFieldLabel('email')}
+                className="stage-input text-[var(--stage-text-primary)]"
               />
               {error && (
                 <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>

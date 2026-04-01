@@ -58,7 +58,7 @@ export function IndustryTagPicker({
         {Array.from({ length: 5 }).map((_, i) => (
           <span
             key={i}
-            className="h-6 w-16 stage-skeleton rounded-full bg-[oklch(1_0_0_/_0.08)]/20"
+            className="h-6 w-16 stage-skeleton rounded-full bg-[var(--stage-surface-nested)]"
           />
         ))}
       </div>
@@ -89,6 +89,7 @@ export function IndustryTagPicker({
               type="button"
               onClick={() => toggle(entry.tag)}
               disabled={disabled}
+              aria-pressed={isSelected}
               className={cn(
                 'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
                 isSelected

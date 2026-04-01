@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, AlertCircle } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useModalLayer } from '@/shared/lib/use-modal-layer';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
 /** Parse "yyyy-MM-dd" as local date. new Date("yyyy-MM-dd") is UTC midnight and shifts to previous day in western timezones. */
 export function parseLocalDateString(dateStr: string): Date {
@@ -26,15 +26,15 @@ export const DAY_PICKER_CLASSNAMES = {
   /** Hide caption label when using dropdown layout to avoid duplicate month text (dropdown already shows month). */
   caption_label: 'hidden',
   dropdowns: 'flex gap-2 justify-center',
-  dropdown: 'min-w-0 rounded-xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)]',
+  dropdown: 'min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--ctx-dropdown)] px-3 py-2 text-[length:var(--stage-input-font-size,13px)] text-[var(--stage-text-primary)]',
   weekdays: 'flex gap-1 w-full justify-between',
   weekday: 'w-9 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] text-center',
   week: 'flex gap-1 w-full justify-between',
   day: 'w-9 h-9 p-0',
   day_button: cn(
-    'h-9 w-9 rounded-xl text-sm font-medium transition-colors duration-200',
-    'hover:bg-[var(--stage-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset',
-    'data-[selected]:bg-walnut data-[selected]:text-[oklch(0.10_0_0)] data-[selected]:font-semibold',
+    'h-9 w-9 rounded-[var(--stage-radius-input,6px)] text-[length:var(--stage-input-font-size,13px)] font-medium transition-colors duration-200',
+    'hover:bg-[oklch(1_0_0/0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset',
+    'data-[selected]:bg-[oklch(0.90_0_0)] data-[selected]:text-[oklch(0.10_0_0)] data-[selected]:font-semibold',
     'data-[outside]:text-[var(--stage-text-secondary)]/50'
   ),
   today: 'bg-[var(--today-bg)] ring-1 ring-[var(--today-ring)]',
@@ -61,7 +61,7 @@ export function CalendarPanel({ value, onChange, onClose, className }: CalendarP
       role="dialog"
       aria-label="Choose date"
       className={cn(
-        'overflow-hidden rounded-2xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] shadow-lg',
+        'overflow-hidden rounded-[var(--stage-radius-panel,12px)] border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--ctx-dropdown)] shadow-lg',
         className
       )}
     >
@@ -87,7 +87,7 @@ export function CalendarPanel({ value, onChange, onClose, className }: CalendarP
           <button
             type="button"
             onClick={onClose}
-            className="text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset rounded-lg px-3 py-1.5 transition-colors"
+            className="text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset rounded-lg px-3 py-1.5 transition-colors"
           >
             Close
           </button>
@@ -162,12 +162,12 @@ export function CeramicDatePicker({
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.97 }}
-      transition={STAGE_MEDIUM}
+      transition={STAGE_LIGHT}
       className={cn(
-        'overflow-hidden rounded-[var(--stage-radius-panel)] border p-4 shadow-lg',
+        'overflow-hidden rounded-[var(--stage-radius-panel,12px)] border p-4 shadow-lg',
         useOverlay
           ? 'border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)] shadow-2xl'
-          : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)]'
+          : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--ctx-dropdown)]'
       )}
     >
       <DayPicker
@@ -189,16 +189,18 @@ export function CeramicDatePicker({
     <div ref={ref} className={cn('relative min-w-0 w-full', className)}>
       <button
         type="button"
+        aria-expanded={open}
+        aria-haspopup="dialog"
         onMouseDown={(e) => {
           e.stopPropagation();
           setOpen((o) => !o);
         }}
         className={cn(
-          'flex w-full min-w-[11rem] max-w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors duration-200',
+          'flex w-full min-w-[11rem] max-w-full items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] transition-colors duration-200',
           isPastDate
             ? 'border-[oklch(0.80_0.16_85/0.45)] bg-[oklch(0.80_0.16_85/0.08)] text-[var(--stage-text-primary)]'
-            : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]',
-          'focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]'
+            : 'border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.15)]',
+          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]'
         )}
       >
         <Calendar
@@ -224,7 +226,7 @@ export function CeramicDatePicker({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            transition={STAGE_MEDIUM}
+            transition={STAGE_LIGHT}
             className="absolute left-0 right-0 top-full z-50 mt-1.5 min-w-[320px]"
           >
             <div className="w-full max-w-[320px]">

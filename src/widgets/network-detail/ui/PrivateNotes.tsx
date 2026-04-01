@@ -32,7 +32,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
   if (!relationshipId) {
     return (
       <div className="space-y-2">
-        <h3 className="text-sm font-medium tracking-wide text-[var(--stage-text-secondary)]">
+        <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
           Notes
         </h3>
         <p className="text-xs text-[var(--stage-text-secondary)]">
@@ -44,7 +44,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium tracking-wide text-[var(--stage-text-secondary)]">
+      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Notes
       </h3>
       <p className="text-[10px] text-[var(--stage-text-secondary)] mb-2">
@@ -64,7 +64,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
           name="notes"
           defaultValue={initialNotes ?? ''}
           placeholder="Notes about this partner…"
-          className="min-h-[100px] resize-y bg-[oklch(1_0_0/0.05)] border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]"
+          className="min-h-[100px] resize-y w-full rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0/0.08)] bg-[var(--ctx-well,var(--stage-surface-nested))] px-3 py-2.5 text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none hover:border-[oklch(1_0_0/0.15)] focus-visible:border-[var(--stage-accent)]"
           rows={4}
         />
         {state?.error && (

@@ -1,10 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { Input } from '@/shared/ui/input';
 import { cn } from '@/shared/lib/utils';
 
-interface FloatingLabelInputProps extends Omit<React.ComponentProps<typeof Input>, 'placeholder'> {
+interface FloatingLabelInputProps extends Omit<React.ComponentProps<'input'>, 'placeholder'> {
   label: string;
   containerClassName?: string;
 }
@@ -35,15 +34,16 @@ export function FloatingLabelInput({
 
   return (
     <div className={cn('relative', containerClassName)}>
-      <Input
+      <input
         id={inputId}
         value={value}
         defaultValue={defaultValue}
         className={cn(
-          'peer h-11 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] pt-5 text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-transparent transition-all duration-200',
-          'hover:bg-[var(--ctx-well-hover)] hover:border-[oklch(1_0_0_/_0.20)] focus-visible:bg-[var(--ctx-well-focus)] focus-visible:border-[var(--stage-accent)] focus-visible:ring-0',
+          'peer w-full h-11 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well,var(--stage-surface-nested))] px-3 pt-5 pb-1 text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-transparent outline-none transition-all duration-200',
+          'hover:border-[oklch(1_0_0_/_0.15)] focus-visible:border-[var(--stage-accent)] focus-visible:ring-0',
           className
         )}
+        {...props}
         onFocus={(e) => {
           setFocused(true);
           props.onFocus?.(e);
@@ -58,7 +58,6 @@ export function FloatingLabelInput({
         }}
         placeholder=" "
         aria-label={label}
-        {...props}
       />
       <label
         htmlFor={inputId}

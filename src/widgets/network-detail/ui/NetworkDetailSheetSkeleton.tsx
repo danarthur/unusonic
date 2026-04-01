@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
 /** Skeleton shown while node details load (Suspense fallback) */
 export function NetworkDetailSheetSkeleton() {
@@ -10,7 +11,7 @@ export function NetworkDetailSheetSkeleton() {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-[oklch(0.12_0_0/0.5)]"
+        className="fixed inset-0 z-40 bg-[oklch(0.06_0_0/0.75)]"
         onClick={() => router.push('/network')}
         aria-hidden
       />
@@ -22,10 +23,10 @@ export function NetworkDetailSheetSkeleton() {
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      transition={STAGE_HEAVY}
       className="
         fixed inset-y-0 right-0 z-50 flex flex-col h-dvh w-[85vw] max-w-[85vw] md:w-[600px] md:max-w-[600px]
-        rounded-l-2xl bg-[var(--stage-surface-raised)]        border-l border-[oklch(1_0_0_/_0.08)] shadow-2xl
+        rounded-l-[var(--stage-radius-panel,12px)] bg-[var(--stage-surface-raised)]        border-l border-[oklch(1_0_0_/_0.08)] shadow-2xl
       "
     >
       <header className="flex shrink-0 items-center gap-3 border-b border-[oklch(1_0_0_/_0.08)] px-4 py-3 md:px-5 md:py-3">

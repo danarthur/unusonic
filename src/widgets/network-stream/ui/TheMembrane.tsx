@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { STAGE_NAV_CROSSFADE, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 interface MembraneProps {
   label?: string;
@@ -16,13 +17,13 @@ export function TheMembrane({ label = 'Network' }: MembraneProps) {
       className="flex flex-col items-center gap-3 py-2"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 200, damping: 24 }}
+      transition={STAGE_NAV_CROSSFADE}
     >
       <motion.div
         className="h-px w-full max-w-md flex-1 origin-center"
         initial={{ scaleX: 0, opacity: 0.5 }}
         animate={{ scaleX: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.15 }}
+        transition={STAGE_MEDIUM}
         style={{
           background:
             'linear-gradient(90deg, transparent 0%, oklch(0.88 0 0 / 0.4) 50%, transparent 100%)',

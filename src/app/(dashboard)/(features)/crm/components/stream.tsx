@@ -19,7 +19,7 @@ import {
   type StreamSort,
 } from './stream-sort-control';
 import type { OptimisticUpdate } from './crm-production-queue';
-import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 export type StreamMode = 'inquiry' | 'active' | 'past';
@@ -158,7 +158,7 @@ export function Stream({
   const hasResults = modeFiltered.length > 0 || searchQuery.length > 0 || filtersActive;
 
   return (
-    <div className={cn('flex flex-col h-full min-h-0', className)} style={{ background: 'var(--stage-surface)' }}>
+    <div className={cn('flex flex-col h-full min-h-0', className)} data-surface="surface" style={{ background: 'var(--stage-surface)' }}>
       <header className="shrink-0 flex flex-col gap-4 p-4">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -274,18 +274,15 @@ export function Stream({
           className="flex flex-col gap-3"
         >
           {filtered.map((item) => (
-            <motion.li
+            <li
               key={`${item.source}-${item.id}`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={STAGE_MEDIUM}
             >
               <StreamCard
                 item={item}
                 selected={selectedId === item.id}
                 onClick={() => onSelect(item.id)}
               />
-            </motion.li>
+            </li>
           ))}
 
           {filtered.length === 0 && (
@@ -317,7 +314,7 @@ export function Stream({
                   )}
                 </span>
               ) : (
-                'Nothing here yet.'
+                'No matching productions.'
               )}
             </motion.li>
           )}
