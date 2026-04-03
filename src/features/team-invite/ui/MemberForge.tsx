@@ -10,7 +10,7 @@ import { RoleSelect } from './RoleSelect';
 import type { UnusonicRoleId } from '../model/role-presets';
 import { AvatarUpload } from './AvatarUpload';
 import { cn } from '@/shared/lib/utils';
-import { upsertGhostMember } from '../api/actions';
+import { upsertGhostMember, deployInvites } from '../api/actions';
 import type { RosterBadgeData } from '../model/types';
 import type { MemberForgeDefaults } from '../model/types';
 import { toast } from 'sonner';
@@ -49,6 +49,7 @@ export function MemberForge({
   );
   const [jobTitle, setJobTitle] = React.useState(defaultValues?.job_title ?? '');
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [sendInviteNow, setSendInviteNow] = React.useState(!defaultValues?.id);
 
   const effectiveRole: UnusonicRoleId =
     !canAssignAdmin && (role === 'admin' || role === 'manager') ? 'member' : role;
@@ -103,7 +104,17 @@ export function MemberForge({
           ...raw,
           avatarUrl: avatarUrl ?? raw.avatarUrl ?? null,
         };
-        toast.success(defaultValues?.id ? 'Saved.' : 'Ghost profile forged.');
+        // Optionally send invite immediately after creation
+        if (sendInviteNow && !defaultValues?.id && member.id) {
+          const invResult = await deployInvites(orgId, [member.id]);
+          if (invResult.ok && invResult.sent > 0) {
+            toast.success('Invite sent.');
+          } else {
+            toast.success('Profile created. Invite will be sent when you deploy.');
+          }
+        } else {
+          toast.success(defaultValues?.id ? 'Saved.' : 'Ghost profile forged.');
+        }
         onSave(member);
       } catch (err) {
         console.error('[MemberForge]', err);
@@ -172,6 +183,21 @@ export function MemberForge({
         onChange={setRole}
         canAssignElevated={canAssignAdmin}
       />
+
+      {/* Send invite toggle — only for new members */}
+      {!defaultValues?.id && (
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={sendInviteNow}
+            onChange={(e) => setSendInviteNow(e.target.checked)}
+            className="size-4 rounded border-[oklch(1_0_0/0.15)] bg-[oklch(1_0_0/0.05)] accent-[var(--stage-accent)]"
+          />
+          <span className="text-sm text-[var(--stage-text-secondary)]">
+            Send invite immediately
+          </span>
+        </label>
+      )}
 
       <div className="flex flex-wrap items-center justify-end gap-2 pt-4">
         {onCancel && (

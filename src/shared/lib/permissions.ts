@@ -34,13 +34,16 @@ export interface WorkspacePermissions {
   manage_locations: boolean;
 }
 
-export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer' | 'employee';
 
 // Re-export for callers that want the new capability type
 export type { CapabilityKey } from '@/shared/lib/permission-registry';
 
 // Owner and admin have all permissions by default
 const ELEVATED_ROLES: WorkspaceRole[] = ['owner', 'admin'];
+
+// Employee role slug — used for portal routing checks
+const EMPLOYEE_ROLE_SLUG = 'employee';
 
 // ============================================================================
 // Capability check (unified path: role_id → permission_bundle)
@@ -240,6 +243,33 @@ export async function getUserRole(
 }
 
 // ============================================================================
+// Role Slug Resolution (for middleware routing)
+// ============================================================================
+
+/**
+ * Returns the role slug for the current user in a workspace via the
+ * get_member_role_slug RPC. Used by middleware and layout for role-based routing.
+ */
+export async function getUserRoleSlug(
+  workspaceId: string
+): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('get_member_role_slug', {
+    p_workspace_id: workspaceId,
+  });
+  if (error || !data) return null;
+  return data as string;
+}
+
+/**
+ * Returns true if the current user has the employee role in the given workspace.
+ */
+export async function isEmployee(workspaceId: string): Promise<boolean> {
+  const slug = await getUserRoleSlug(workspaceId);
+  return slug === EMPLOYEE_ROLE_SLUG;
+}
+
+// ============================================================================
 // Convenience Methods
 // ============================================================================
 
@@ -406,7 +436,7 @@ export async function requireRole(
     throw new Error('Not a workspace member');
   }
   
-  const roleHierarchy: WorkspaceRole[] = ['owner', 'admin', 'member', 'viewer'];
+  const roleHierarchy: WorkspaceRole[] = ['owner', 'admin', 'member', 'viewer', 'employee'];
   const userRoleIndex = roleHierarchy.indexOf(role);
   const requiredRoleIndex = roleHierarchy.indexOf(minimumRole);
   

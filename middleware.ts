@@ -2,10 +2,13 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 // Public routes - no auth required (clients can view/sign proposals via link without an account)
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p'];
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p', '/claim', '/confirm', '/crew'];
+
+// Portal routes — employee-only
+const PORTAL_PREFIX = '/portal';
 
 // Routes exempt from onboarding check
-const ONBOARDING_EXEMPT = ['/onboarding', '/api/'];
+const ONBOARDING_EXEMPT = ['/onboarding', '/api/', '/portal', '/claim', '/confirm'];
 
 // Routes exempt from SignalPay gating (Autonomous tier)
 const SIGNALPAY_EXEMPT = ['/onboarding', '/api/', '/settings/connect-payouts', '/login', '/signup'];
@@ -72,7 +75,8 @@ export async function middleware(request: NextRequest) {
   // RULE 2: User + public route (except callback and /p) → Check onboarding then home
   // ═══════════════════════════════════════════════════════════════════════════
   const isProposalLink = pathname.startsWith('/p/');
-  if (user && isPublicRoute && pathname !== '/auth/callback' && !isProposalLink) {
+  const isClaimOrConfirm = pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew');
+  if (user && isPublicRoute && pathname !== '/auth/callback' && !isProposalLink && !isClaimOrConfirm) {
     console.log(`[Middleware] User on public route ${pathname}, checking profile...`);
     
     const { data: profile, error } = await supabase
@@ -123,6 +127,54 @@ export async function middleware(request: NextRequest) {
       if (!profile.onboarding_completed) {
         console.log('[Middleware] Onboarding required, → /onboarding');
         return NextResponse.redirect(new URL('/onboarding', request.url));
+      }
+
+      // RULE 3b: Role-based portal routing
+      const isPortalRoute = pathname.startsWith(PORTAL_PREFIX);
+      let roleSlug = request.cookies.get('unusonic_role_slug')?.value ?? null;
+
+      if (!roleSlug) {
+        // Resolve role slug from workspace_members + ops.workspace_roles
+        const { data: memberRow } = await supabase
+          .from('workspace_members')
+          .select('role, role_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (memberRow?.role_id) {
+          const { data: roleRow } = await supabase
+            .schema('ops')
+            .from('workspace_roles')
+            .select('slug')
+            .eq('id', memberRow.role_id)
+            .maybeSingle();
+          roleSlug = roleRow?.slug ?? memberRow.role ?? null;
+        } else {
+          roleSlug = memberRow?.role ?? null;
+        }
+
+        // Cache in cookie for subsequent requests (expires on session end)
+        if (roleSlug) {
+          response.cookies.set('unusonic_role_slug', roleSlug, {
+            path: '/',
+            httpOnly: true,
+            sameSite: 'lax',
+            maxAge: 60 * 60, // 1 hour — refresh on next middleware run after expiry
+          });
+        }
+      }
+
+      const isEmployee = roleSlug === 'employee';
+
+      // Employee trying to access dashboard → redirect to portal
+      if (isEmployee && !isPortalRoute && !pathname.startsWith('/api/') && !pathname.startsWith('/signout') && !pathname.startsWith('/settings')) {
+        return NextResponse.redirect(new URL('/portal', request.url));
+      }
+
+      // Non-employee trying to access portal → redirect to dashboard
+      if (!isEmployee && isPortalRoute) {
+        return NextResponse.redirect(new URL('/lobby', request.url));
       }
 
       // RULE 4: Autonomous tier + !signalpay_enabled → force connect payouts

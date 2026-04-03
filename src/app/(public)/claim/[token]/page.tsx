@@ -44,6 +44,8 @@ export default async function ClaimPage({
     );
   }
 
+  const isEmployeeInvite = invitation.type === 'employee_invite';
+
   const validation = await validateInvitation(token);
   if (!validation.ok) {
     return (
@@ -64,6 +66,7 @@ export default async function ClaimPage({
         email={validation.email}
         orgName={validation.org_name}
         isAuthenticated={isAuthenticated}
+        isEmployeeInvite={isEmployeeInvite}
       />
     </div>
   );

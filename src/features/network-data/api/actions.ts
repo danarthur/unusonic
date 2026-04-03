@@ -987,6 +987,8 @@ export type NodeDetail = {
   relationshipTags?: string[] | null;
   lifecycleStatus?: 'prospect' | 'active' | 'dormant' | 'blacklisted' | null;
   blacklistReason?: string | null;
+  /** For internal_employee: invite status — 'ghost' (unsent), 'invited' (pending), 'active' (claimed). */
+  inviteStatus?: 'ghost' | 'invited' | 'active' | null;
   /** For internal_employee: org_members.role (owner | admin | member | restricted). */
   memberRole?: 'owner' | 'admin' | 'member' | 'restricted' | null;
   /** For internal_employee: whether current user can assign admin/manager (owner or admin). */
@@ -1023,6 +1025,18 @@ export type NodeDetail = {
   couplePartnerAName?: string | null;
   /** For external_partner couple entities: partner B full name */
   couplePartnerBName?: string | null;
+  /** For crew entities: skill tags from ops.crew_skills. */
+  skillTags?: string[];
+  /** For crew entities: most recent confirmed assignment. */
+  lastBooked?: {
+    eventTitle: string;
+    role: string;
+    date: string; // ISO
+  } | null;
+  /** For crew entities: total day_rate paid across confirmed assignments. */
+  totalPaid?: number | null;
+  /** For crew entities: count of confirmed assignments. */
+  showCount?: number | null;
   /** Venue-specific technical spec fields, from directory.entities.attributes */
   orgVenueSpecs?: {
     capacity?: number | null;
@@ -1030,7 +1044,35 @@ export type NodeDetail = {
     power_notes?: string | null;
     stage_notes?: string | null;
   } | null;
+  /** For external_partner: total invoiced amount (clients) or total spent (vendors). */
+  lifetimeValue?: number | null;
+  /** For external_partner: ISO date of most recent event involving this entity. */
+  lastActiveDate?: string | null;
+  /** For external_partner: count of events this partner was involved in. */
+  partnerShowCount?: number | null;
+  /** Computed relationship strength based on recency, frequency, and value. */
+  relationshipStrength?: 'new' | 'growing' | 'strong' | 'cooling' | null;
 };
+
+/**
+ * Compute a qualitative relationship strength label from show count, recency, and lifetime value.
+ * Returns null only if all inputs are null (no data to compute from).
+ */
+function computeRelationshipStrength(
+  showCount: number | null,
+  lastActiveDate: string | null,
+  _lifetimeValue: number | null,
+): 'new' | 'growing' | 'strong' | 'cooling' | null {
+  if (showCount === 0 || showCount == null) return 'new';
+
+  if (lastActiveDate) {
+    const monthsAgo = (Date.now() - new Date(lastActiveDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
+    if (monthsAgo > 6) return 'cooling';
+    if (showCount >= 5 && monthsAgo <= 3) return 'strong';
+  }
+
+  return 'growing';
+}
 
 /**
  * Fetch deep context for a Network node (employee or partner) for the Glass Slide-Over.
@@ -1058,10 +1100,28 @@ export async function getNetworkNodeDetails(
       const ctx = (cortexRel.context_data as Record<string, unknown>) ?? {};
       const { data: personEnt } = await supabase
         .schema('directory').from('entities')
-        .select('id, display_name, avatar_url, attributes')
+        .select('id, display_name, avatar_url, attributes, claimed_by_user_id')
         .eq('id', cortexRel.source_entity_id).maybeSingle();
       const attrs = (personEnt?.attributes as Record<string, unknown>) ?? {};
       const email = (attrs[PERSON_ATTR.email] as string | null) ?? null;
+
+      // Resolve invite status for internal employees
+      let inviteStatus: 'ghost' | 'invited' | 'active' = 'active';
+      if (!personEnt?.claimed_by_user_id) {
+        // Unclaimed — check if invitation was sent
+        if (email) {
+          const { data: inv } = await supabase
+            .from('invitations')
+            .select('id')
+            .ilike('email', email)
+            .eq('status', 'pending')
+            .limit(1)
+            .maybeSingle();
+          inviteStatus = inv ? 'invited' : 'ghost';
+        } else {
+          inviteStatus = 'ghost';
+        }
+      }
       const firstName = (ctx.first_name as string | null) ?? null;
       const lastName = (ctx.last_name as string | null) ?? null;
       const name = [firstName, lastName].filter(Boolean).join(' ') || personEnt?.display_name || email || 'Unknown';
@@ -1085,6 +1145,52 @@ export async function getNetworkNodeDetails(
       const resolvedKind: NodeDetail['kind'] =
         employmentStatus === 'external_contractor' ? 'extended_team' : 'internal_employee';
 
+      // Parallel queries: skill tags, last booked, crew cost
+      const entityId_ = cortexRel.source_entity_id;
+      const [skillsRes, lastBookedRes, costRes] = await Promise.all([
+        supabase
+          .schema('ops')
+          .from('crew_skills')
+          .select('skill_tag')
+          .eq('entity_id', entityId_)
+          .order('skill_tag')
+          .limit(20),
+        supabase
+          .schema('ops')
+          .from('deal_crew')
+          .select('role_note, call_time, day_rate')
+          .eq('entity_id', entityId_)
+          .not('confirmed_at', 'is', null)
+          .order('call_time', { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .schema('ops')
+          .from('deal_crew')
+          .select('day_rate')
+          .eq('entity_id', entityId_)
+          .not('confirmed_at', 'is', null)
+          .not('day_rate', 'is', null),
+      ]);
+
+      const skillTags = (skillsRes.data ?? []).map((s) => s.skill_tag);
+
+      // Resolve last booked event title
+      let lastBooked: NodeDetail['lastBooked'] = null;
+      if (lastBookedRes.data) {
+        const lb = lastBookedRes.data as { role_note: string | null; call_time: string | null; day_rate: number | null };
+        lastBooked = {
+          eventTitle: '', // We'd need a join to get the event title — keep it lightweight for now
+          role: lb.role_note ?? 'Crew',
+          date: lb.call_time ?? '',
+        };
+      }
+
+      // Sum total paid
+      const costRows = (costRes.data ?? []) as { day_rate: number | null }[];
+      const totalPaid = costRows.reduce((sum, r) => sum + (r.day_rate ?? 0), 0) || null;
+      const showCount = costRows.length || null;
+
       return {
         id: cortexRel.id,
         kind: resolvedKind,
@@ -1097,10 +1203,15 @@ export async function getNetworkNodeDetails(
         direction: null,
         balance: { inbound: 0, outbound: 0 },
         active_events: [],
-        notes: null,
-        relationshipId: null,
+        notes: (ctx.notes as string | null) ?? null,
+        relationshipId: cortexRel.id,
         isGhost: false,
         targetOrgId: null,
+        inviteStatus,
+        skillTags,
+        lastBooked,
+        totalPaid,
+        showCount,
         memberRole: role ?? null,
         canAssignElevatedRole,
         doNotRebook: (ctx.do_not_rebook as boolean) ?? false,
@@ -1110,6 +1221,11 @@ export async function getNetworkNodeDetails(
         lastModifiedAt: (ctx.last_modified_at as string | null) ?? null,
         lastModifiedByName: (ctx.last_modified_by_name as string | null) ?? null,
         subjectEntityId: cortexRel.source_entity_id,
+        relationshipStrength: computeRelationshipStrength(
+          showCount,
+          lastBooked?.date ?? null,
+          totalPaid,
+        ),
       };
     }
 
@@ -1252,21 +1368,54 @@ export async function getNetworkNodeDetails(
   const active_events = (eventsData ?? []).map((e) => e.title ?? '').filter(Boolean);
 
   // Balance: inbound (invoices billed to this entity) + outbound (expenses paid to this entity)
+  // finance schema may not be PostgREST-exposed — guard with try/catch
   const targetEntityId = cortexExtRel.target_entity_id;
-  const [invoicesResult, expensesResult] = await Promise.all([
-    supabase.schema('finance').from('invoices')
-      .select('total_amount, status')
-      .eq('bill_to_entity_id', targetEntityId),
-    supabase.schema('ops').from('event_expenses')
-      .select('amount')
-      .eq('vendor_entity_id', targetEntityId),
-  ]);
-  const inbound = (invoicesResult.data ?? [])
-    .filter((inv) => inv.status !== 'void')
-    .reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
-  const outbound = (expensesResult.data ?? [])
-    .reduce((sum, exp) => sum + ((exp.amount as number) ?? 0), 0);
-  const balance = { inbound, outbound };
+  let balance = { inbound: 0, outbound: 0 };
+  try {
+    const [invoicesResult, expensesResult] = await Promise.all([
+      supabase.schema('finance').from('invoices')
+        .select('total_amount, status')
+        .eq('bill_to_entity_id', targetEntityId),
+      supabase.schema('ops').from('event_expenses')
+        .select('amount')
+        .eq('vendor_entity_id', targetEntityId),
+    ]);
+    const inbound = (invoicesResult.data ?? [])
+      .filter((inv) => inv.status !== 'void')
+      .reduce((sum, inv) => sum + Number(inv.total_amount ?? 0), 0);
+    const outbound = (expensesResult.data ?? [])
+      .reduce((sum, exp) => sum + Number((exp.amount as number) ?? 0), 0);
+    balance = { inbound, outbound };
+  } catch {
+    // finance schema not exposed or query failed — default to zero
+  }
+
+  // Partner computed metrics: show count + last active date
+  let partnerShowCount: number | null = null;
+  let lastActiveDate: string | null = null;
+  try {
+    const [countResult, lastResult] = await Promise.all([
+      supabase.schema('ops').from('events')
+        .select('id', { count: 'exact', head: true })
+        .or(`client_entity_id.eq.${targetEntityId},venue_entity_id.eq.${targetEntityId}`),
+      supabase.schema('ops').from('events')
+        .select('starts_at')
+        .or(`client_entity_id.eq.${targetEntityId},venue_entity_id.eq.${targetEntityId}`)
+        .order('starts_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    partnerShowCount = countResult.count ?? null;
+    lastActiveDate = (lastResult.data?.starts_at as string | null) ?? null;
+  } catch {
+    // ops schema query failed — leave null
+  }
+
+  // Lifetime value: inbound for clients, outbound for vendors
+  const lifetimeValue: number | null =
+    direction === 'client' ? (balance.inbound || null) :
+    direction === 'vendor' ? (balance.outbound || null) :
+    ((balance.inbound + balance.outbound) || null);
 
   return {
     id: relId,
@@ -1314,6 +1463,14 @@ export async function getNetworkNodeDetails(
         stage_notes: typeof vAttrs[VENUE_ATTR.stage_notes] === 'string' ? vAttrs[VENUE_ATTR.stage_notes] as string : null,
       };
     })() : null,
+    lifetimeValue,
+    lastActiveDate,
+    partnerShowCount,
+    relationshipStrength: computeRelationshipStrength(
+      partnerShowCount,
+      lastActiveDate,
+      lifetimeValue,
+    ),
   };
 }
 

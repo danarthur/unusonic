@@ -192,13 +192,56 @@ export type Database = {
           },
         ]
       }
+      contracts: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          pdf_url: string | null
+          signed_at: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          pdf_url?: string | null
+          signed_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          pdf_url?: string | null
+          signed_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deals: {
         Row: {
           archived_at: string | null
           budget_estimated: number | null
           created_at: string
           event_archetype: string | null
+          event_end_time: string | null
           event_id: string | null
+          event_start_time: string | null
           id: string
           lead_source: string | null
           lead_source_detail: string | null
@@ -216,6 +259,7 @@ export type Database = {
           proposed_end_time: string | null
           proposed_start_time: string | null
           referrer_entity_id: string | null
+          show_health: Json | null
           status: string
           title: string | null
           updated_at: string
@@ -229,7 +273,9 @@ export type Database = {
           budget_estimated?: number | null
           created_at?: string
           event_archetype?: string | null
+          event_end_time?: string | null
           event_id?: string | null
+          event_start_time?: string | null
           id?: string
           lead_source?: string | null
           lead_source_detail?: string | null
@@ -247,6 +293,7 @@ export type Database = {
           proposed_end_time?: string | null
           proposed_start_time?: string | null
           referrer_entity_id?: string | null
+          show_health?: Json | null
           status?: string
           title?: string | null
           updated_at?: string
@@ -260,7 +307,9 @@ export type Database = {
           budget_estimated?: number | null
           created_at?: string
           event_archetype?: string | null
+          event_end_time?: string | null
           event_id?: string | null
+          event_start_time?: string | null
           id?: string
           lead_source?: string | null
           lead_source_detail?: string | null
@@ -278,6 +327,7 @@ export type Database = {
           proposed_end_time?: string | null
           proposed_start_time?: string | null
           referrer_entity_id?: string | null
+          show_health?: Json | null
           status?: string
           title?: string | null
           updated_at?: string
@@ -1125,6 +1175,22 @@ export type Database = {
       }
       current_entity_id: { Args: never; Returns: string }
       get_active_workspace_id: { Args: never; Returns: string }
+      get_catalog_availability: {
+        Args: {
+          p_date_end: string
+          p_date_start: string
+          p_workspace_id: string
+        }
+        Returns: {
+          catalog_package_id: string
+          deal_id: string
+          deal_status: string
+          deal_title: string
+          proposed_date: string
+          quantity_allocated: number
+          stock_quantity: number
+        }[]
+      }
       get_catalog_item_assignees: {
         Args: { p_package_id: string }
         Returns: {
@@ -1144,6 +1210,10 @@ export type Database = {
       get_member_permissions: {
         Args: { p_user_id?: string; p_workspace_id: string }
         Returns: Json
+      }
+      get_member_role_slug: {
+        Args: { p_workspace_id: string }
+        Returns: string
       }
       get_my_entity_id: { Args: never; Returns: string }
       get_my_organization_ids: { Args: never; Returns: string[] }

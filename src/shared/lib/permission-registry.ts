@@ -35,6 +35,10 @@ export const CAPABILITY_KEYS = [
   'proposals:view',
   'proposals:send',
   'proposals:approve',
+  // Portal (employee self-service)
+  'portal:own_schedule',
+  'portal:own_profile',
+  'portal:own_pay',
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
@@ -69,6 +73,15 @@ export const OBSERVER_CAPABILITIES: CapabilityKey[] = [
   'ros:view',
   'deals:read:global',
   'proposals:view',
+];
+
+/** Employee: portal self-service + minimal platform visibility. */
+export const EMPLOYEE_CAPABILITIES: CapabilityKey[] = [
+  'planning:view',
+  'ros:view',
+  'portal:own_schedule',
+  'portal:own_profile',
+  'portal:own_pay',
 ];
 
 // =============================================================================

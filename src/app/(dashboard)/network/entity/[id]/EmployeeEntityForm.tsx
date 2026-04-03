@@ -17,6 +17,7 @@ import {
   Wrench,
   X,
   Landmark,
+  Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
@@ -39,6 +40,7 @@ import {
   type EntityCapabilityRow,
 } from '@/features/talent-management/api/capability-actions';
 import { AvatarUpload } from '@/features/team-invite/ui/AvatarUpload';
+import { deployInvites } from '@/features/team-invite/api/actions';
 import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import type { CrewSkillDTO, SkillLevel } from '@/entities/talent';
@@ -198,6 +200,25 @@ export function EmployeeEntityForm({
   const [dnrConfirmPending, setDnrConfirmPending] = React.useState(false);
   const [avatarUrl, setAvatarUrl] = React.useState(details.identity.avatarUrl ?? '');
   const [hasChanges, setHasChanges] = React.useState(false);
+
+  // ── Invite state ─────────────────────────────────────────────────────────────
+  const [inviteSending, setInviteSending] = React.useState(false);
+  const [inviteSent, setInviteSent] = React.useState(details.inviteStatus === 'invited');
+  const isGhostMember = details.inviteStatus === 'ghost' || details.inviteStatus === 'invited';
+
+  const handleSendInvite = async () => {
+    setInviteSending(true);
+    const result = await deployInvites(sourceOrgId, [details.id]);
+    setInviteSending(false);
+    if (result.ok && result.sent > 0) {
+      setInviteSent(true);
+      toast.success('Invite sent.');
+    } else if (result.ok && result.sent === 0) {
+      toast.error('No invite to send. Check the email address.');
+    } else if (!result.ok) {
+      toast.error(result.error);
+    }
+  };
 
   // ── Skills state ──────────────────────────────────────────────────────────────
   const [crewSkills, setCrewSkills] = React.useState<CrewSkillDTO[]>([]);
@@ -432,6 +453,41 @@ export function EmployeeEntityForm({
           )}
         </AnimatePresence>
       </header>
+
+      {/* ── Invite banner ────────────────────────────────────────────────── */}
+      {isGhostMember && (
+        <div className="max-w-2xl mx-auto px-6 pt-6">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-[oklch(1_0_0/0.08)] bg-[var(--stage-surface)] p-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--stage-text-primary)]">
+                {inviteSent ? 'Invite sent' : 'No portal access yet'}
+              </p>
+              <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
+                {inviteSent
+                  ? 'Waiting for them to accept and set up their account.'
+                  : 'Send an invite so they can access their schedule and profile.'}
+              </p>
+            </div>
+            {!inviteSent && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSendInvite}
+                disabled={inviteSending}
+                className="shrink-0"
+              >
+                <Send className="size-3.5 mr-1.5" />
+                {inviteSending ? 'Sending...' : 'Send invite'}
+              </Button>
+            )}
+            {inviteSent && (
+              <span className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-[oklch(0.75_0.15_55/0.15)] text-[oklch(0.85_0.12_55)]">
+                Pending
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-4">

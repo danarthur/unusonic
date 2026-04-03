@@ -30,19 +30,19 @@ const directionConfig = {
     icon: ArrowDownRight,
     label: 'Vendor',
     sub: 'Out',
-    className: 'bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)] border-[var(--color-unusonic-warning)]/30',
+    className: 'bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-primary)] border-[var(--stage-edge-top)]',
   },
   client: {
     icon: ArrowUpRight,
     label: 'Client',
     sub: 'In',
-    className: 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)] border-[var(--color-unusonic-success)]/30',
+    className: 'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-primary)] border-[oklch(1_0_0/0.10)]',
   },
   partner: {
     icon: ArrowLeftRight,
     label: 'Partner',
     sub: 'Both',
-    className: 'bg-[var(--color-unusonic-info)]/15 text-[var(--color-unusonic-info)] border-[var(--color-unusonic-info)]/30',
+    className: 'bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-secondary)] border-[var(--stage-edge-top)]',
   },
 } as const;
 
@@ -89,24 +89,15 @@ export function IdentityHeader({
             className={cn(
               'relative size-14 shrink-0 flex items-center justify-center overflow-hidden',
               isPersonOrCouple ? 'rounded-full' : 'rounded-[var(--stage-radius-nested)]',
-              'border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)]'
+              'border border-[var(--stage-edge-top)] bg-[var(--stage-surface-raised)]'
             )}
           >
             {avatarUrl ? (
-              <>
-                <div
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.98 0 0 / 0.7) 0%, oklch(0.90 0 0 / 0.4) 50%, transparent 100%)',
-                  }}
-                  aria-hidden
-                />
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="relative z-10 size-full object-contain p-1.5"
-                />
-              </>
+              <img
+                src={avatarUrl}
+                alt=""
+                className="size-full object-contain p-1.5"
+              />
             ) : details.entityDirectoryType === 'venue' ? (
               <MapPin className="size-6 text-[var(--stage-text-secondary)]" />
             ) : (
@@ -120,7 +111,7 @@ export function IdentityHeader({
                   className={cn(
                     'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium uppercase tracking-widest',
                     isGhost
-                      ? 'border-[var(--stage-accent)]/40 bg-[var(--stage-accent)]/10 text-[var(--stage-accent)]'
+                      ? 'border-[oklch(1_0_0/0.12)] bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)]'
                       : 'border-[var(--color-unusonic-success)]/40 bg-[var(--color-unusonic-success)]/10 text-[var(--color-unusonic-success)]'
                   )}
                 >
@@ -156,15 +147,28 @@ export function IdentityHeader({
               {dir.label} · {dir.sub}
             </span>
           )}
-          {details.lifecycleStatus && details.lifecycleStatus !== 'active' && (
-            <span className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize
-              border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)]">
-              {details.lifecycleStatus}
+          {details.relationshipTier && (
+            <span className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize border-[var(--stage-edge-top)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-primary)]">
+              {details.relationshipTier}
             </span>
           )}
+          {details.lifecycleStatus && details.lifecycleStatus !== 'active' && (() => {
+            const status = details.lifecycleStatus!;
+            const style =
+              status === 'blacklisted'
+                ? 'border-[var(--color-unusonic-error)]/30 bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)]'
+                : status === 'dormant'
+                ? 'border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)]'
+                : 'border-[oklch(1_0_0/0.08)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-secondary)]';
+            return (
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${style}`}>
+                {status}
+              </span>
+            );
+          })()}
           {Array.isArray(details.relationshipTags) && details.relationshipTags.slice(0, 3).map((tag: string) => (
             <span key={tag} className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium
-              border-[var(--stage-accent)]/20 bg-[var(--stage-accent)]/10 text-[var(--stage-accent)]">
+              border-[oklch(1_0_0/0.08)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-primary)]">
               {tag}
             </span>
           ))}
@@ -178,7 +182,7 @@ export function IdentityHeader({
                 variant="outline"
                 size="sm"
                 onClick={() => setSummonOpen(true)}
-                className="h-8 gap-1.5 border-[var(--stage-accent)]/40 bg-[var(--stage-accent)]/10 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/20"
+                className="h-8 gap-1.5"
               >
                 <Send className="size-3.5" />
                 Invite to Unusonic

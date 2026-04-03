@@ -567,6 +567,7 @@ const WORKSPACE_ROLE_SLUG_TO_LEGACY: Record<string, 'owner' | 'admin' | 'member'
   admin: 'admin',
   member: 'member',
   observer: 'viewer',
+  employee: 'member', // employee role uses 'member' as legacy fallback
 };
 
 /**

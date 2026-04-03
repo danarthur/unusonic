@@ -78,7 +78,7 @@ export function NodeCrewList({
       >
         {crew.length === 0 && !showForm && (
           <li className="text-sm text-[var(--stage-text-secondary)]">
-            No members.
+            No contacts yet.
           </li>
         )}
         {crew.map((m) => (
@@ -87,9 +87,9 @@ export function NodeCrewList({
             variants={itemVariants}
             initial="hidden"
             animate="visible"
-            className="flex items-center gap-3 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-4 py-3 shadow-sm"
+            className="flex items-center gap-3 rounded-xl border border-[var(--stage-edge-top)] bg-[var(--stage-surface-elevated)] px-4 py-3"
           >
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface-raised)] border border-[oklch(1_0_0_/_0.08)]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface)] border border-[var(--stage-edge-top)]">
               <User className="size-5 text-[var(--stage-text-secondary)]" />
             </div>
             <div className="min-w-0 flex-1">
@@ -124,7 +124,7 @@ export function NodeCrewList({
               variant="outline"
               size="sm"
               onClick={() => setShowForm(true)}
-              className="gap-2 border-[var(--stage-accent)]/40 text-[var(--stage-accent)]"
+              className="gap-2"
             >
               <UserPlus className="size-4" />
               Add contact
@@ -163,14 +163,14 @@ export function NodeCrewList({
                 className="stage-input text-[var(--stage-text-primary)]"
               />
               {error && (
-                <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
+                <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
               )}
               <div className="flex gap-2">
                 <Button
                   type="submit"
+                  variant="default"
                   size="sm"
                   disabled={status === 'loading'}
-                  className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40"
                 >
                   {status === 'loading' ? 'Adding…' : 'Add contact'}
                 </Button>

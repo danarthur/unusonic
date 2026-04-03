@@ -17,6 +17,7 @@ import { ProposalLinkEmail } from './templates/ProposalLinkEmail';
 import { ProposalAcceptedEmail } from './templates/ProposalAcceptedEmail';
 import { ProposalSignedEmail } from './templates/ProposalSignedEmail';
 import { ProposalReminderEmail } from './templates/ProposalReminderEmail';
+import { EmployeeInviteEmail } from './templates/EmployeeInviteEmail';
 import { createClient } from '@/shared/api/supabase/server';
 import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
 
@@ -179,6 +180,10 @@ export type SendProposalLinkSenderOptions = {
   entityType?: 'person' | 'couple' | 'company' | 'venue' | null;
   /** Event archetype key (e.g. 'wedding', 'concert') — collision-free personalization signal. */
   eventArchetype?: string | null;
+  /** Raw HH:MM event start time — shown alongside date in the email. */
+  eventStartTime?: string | null;
+  /** Raw HH:MM event end time. */
+  eventEndTime?: string | null;
 };
 
 /**
@@ -258,6 +263,8 @@ export async function sendProposalLinkEmail(
     paymentDueDays: senderOptions?.paymentDueDays ?? null,
     entityType: senderOptions?.entityType ?? null,
     eventArchetype: senderOptions?.eventArchetype ?? null,
+    eventStartTime: senderOptions?.eventStartTime ?? null,
+    eventEndTime: senderOptions?.eventEndTime ?? null,
   });
   const html = await render(element);
   const text = toPlainText(html);
@@ -415,6 +422,48 @@ export async function sendProposalSignedNotificationEmail(opts: {
     from: fromAddress,
     to: [to],
     subject: `${signerName} signed — ${dealTitle}`,
+    html,
+    text,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// =============================================================================
+// sendEmployeeInviteEmail — roster member invite to join portal
+// =============================================================================
+
+/**
+ * Send an employee invite email. Link goes to /claim/{token}.
+ * Workspace-aware: uses verified custom sending domain when configured.
+ * No-op if RESEND_API_KEY is not set (invitation row still exists; link can be copied).
+ */
+export async function sendEmployeeInviteEmail(opts: {
+  to: string;
+  token: string;
+  workspaceId: string;
+  workspaceName: string;
+  inviterName?: string | null;
+  roleName?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const resend = getResend();
+  if (!resend) {
+    return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
+  }
+  const claimUrl = `${baseUrl.replace(/\/$/, '')}/claim/${opts.token}`;
+  const element = EmployeeInviteEmail({
+    workspaceName: opts.workspaceName,
+    inviterName: opts.inviterName,
+    claimUrl,
+    roleName: opts.roleName,
+  });
+  const html = await render(element);
+  const text = toPlainText(html);
+  const fromAddress = await getWorkspaceFrom(opts.workspaceId);
+  const { error } = await resend.emails.send({
+    from: fromAddress,
+    to: [opts.to],
+    subject: `${opts.workspaceName} invited you to join their team`,
     html,
     text,
   });

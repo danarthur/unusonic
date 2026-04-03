@@ -3,10 +3,11 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileEdit, Globe, Pencil } from 'lucide-react';
+import { X, FileEdit, Globe, Pencil, Send, Phone, Mail, Clock } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { IdentityHeader } from './IdentityHeader';
 import { TradeLedger } from './TradeLedger';
+import { DealHistoryPanel } from './DealHistoryPanel';
 import { PrivateNotes } from './PrivateNotes';
 import { NodeCrewList } from './NodeCrewList';
 import { RoleSelect } from '@/features/team-invite/ui/RoleSelect';
@@ -18,10 +19,14 @@ import {
   setDoNotRebook,
   updateRosterMemberField,
 } from '@/features/network-data';
+import { deployInvites } from '@/features/team-invite/api/actions';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { STAGE_HEAVY, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
+import { UpcomingAssignments } from './UpcomingAssignments';
+import { AvailabilityCheck } from './AvailabilityCheck';
+import { QuickBookAction } from './QuickBookAction';
 
-type TabId = 'transmission' | 'crew' | 'ledger';
+type TabId = 'transmission' | 'crew';
 
 interface NetworkDetailSheetProps {
   details: NodeDetail;
@@ -36,7 +41,6 @@ interface NetworkDetailSheetProps {
 const ALL_TABS: { id: TabId; label: string }[] = [
   { id: 'transmission', label: 'Overview' },
   { id: 'crew', label: 'Crew' },
-  { id: 'ledger', label: 'Ledger' },
 ];
 
 function InternalMemberRoleCard({
@@ -101,7 +105,7 @@ function InternalMemberRoleCard({
       )}
 
       {error && (
-        <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
+        <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
       )}
     </div>
   );
@@ -163,10 +167,10 @@ function InlineEditField({
             if (e.key === 'Escape') { cancellingRef.current = true; setSaveError(null); setEditing(false); setTimeout(() => { cancellingRef.current = false; }, 0); }
           }}
           disabled={saving}
-          className="stage-input py-1 text-sm disabled:opacity-50"
+          className="stage-input py-1 text-sm disabled:opacity-[0.45]"
         />
         {saveError && (
-          <p className="mt-1 text-xs text-[var(--color-unusonic-error)]">{saveError}</p>
+          <p role="alert" className="mt-1 text-xs text-[var(--color-unusonic-error)]">{saveError}</p>
         )}
       </div>
     );
@@ -185,7 +189,7 @@ function InlineEditField({
         <span className="text-sm text-[var(--stage-text-primary)]">
           {value || <span className="text-[var(--stage-text-secondary)]">—</span>}
         </span>
-        <Pencil className="size-3 opacity-0 transition-opacity group-hover:opacity-50 text-[var(--stage-text-secondary)]" />
+        <Pencil className="size-3 opacity-0 transition-opacity duration-[80ms] group-hover:opacity-50 text-[var(--stage-text-secondary)]" />
       </button>
     </div>
   );
@@ -229,6 +233,71 @@ function InternalMemberFieldsCard({
 }
 
 // ─── Roster status actions card ───────────────────────────────────────────────
+
+function InviteCard({
+  details,
+  sourceOrgId,
+  onSaved,
+}: {
+  details: NodeDetail;
+  sourceOrgId: string;
+  onSaved: () => void;
+}) {
+  const router = useRouter();
+  const [sending, setSending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [sent, setSent] = React.useState(details.inviteStatus === 'invited');
+
+  const handleSend = async () => {
+    setSending(true);
+    setError(null);
+    const result = await deployInvites(sourceOrgId, [details.id]);
+    setSending(false);
+    if (result.ok && result.sent > 0) {
+      setSent(true);
+      onSaved();
+      router.refresh();
+    } else if (result.ok && result.sent === 0) {
+      setError('No invite to send. Check that this member has an email address.');
+    } else if (!result.ok) {
+      setError(result.error);
+    }
+  };
+
+  return (
+    <div className="stage-panel rounded-2xl p-4 md:col-span-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)]">
+            {sent ? 'Invite sent' : 'Invite to portal'}
+          </h3>
+          <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
+            {sent
+              ? 'Waiting for acceptance.'
+              : 'Send an invite so they can access their schedule and profile.'}
+          </p>
+        </div>
+        {!sent && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleSend}
+            disabled={sending}
+          >
+            <Send className="size-3.5 mr-1.5" />
+            {sending ? 'Sending...' : 'Send invite'}
+          </Button>
+        )}
+        {sent && (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]">
+            Pending
+          </span>
+        )}
+      </div>
+      {error && <p role="alert" className="text-xs text-[var(--color-unusonic-error)] mt-2">{error}</p>}
+    </div>
+  );
+}
 
 function RosterStatusCard({
   details,
@@ -325,7 +394,7 @@ function RosterStatusCard({
                 type="button"
                 onClick={handleDnrToggle}
                 disabled={dnrSaving}
-                className="rounded-lg px-2.5 py-1 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
+                className="rounded-lg px-2.5 py-1 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-[0.45]"
               >
                 Clear
               </button>
@@ -335,23 +404,23 @@ function RosterStatusCard({
               type="button"
               onClick={handleDnrToggle}
               disabled={dnrSaving}
-              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-warning)]/50 hover:text-[var(--color-unusonic-warning)] transition-colors disabled:opacity-50"
+              className="rounded-lg border border-[var(--stage-edge-top)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-warning)]/50 hover:text-[var(--color-unusonic-warning)] transition-colors disabled:opacity-[0.45]"
             >
               Flag do not rebook
             </button>
           )}
         </div>
         {doNotRebook && details.lastModifiedByName && (
-          <p className="text-xs text-[var(--stage-text-secondary)]/70">
+          <p className="text-xs text-[var(--stage-text-tertiary)]">
             Set by {details.lastModifiedByName}
             {details.lastModifiedAt ? ` · ${new Date(details.lastModifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
           </p>
         )}
-        {dnrError && <p className="text-xs text-[var(--color-unusonic-error)]">{dnrError}</p>}
+        {dnrError && <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{dnrError}</p>}
       </div>
 
       {/* Archive / Unarchive */}
-      <div className="space-y-1 pt-1 border-t border-[oklch(1_0_0_/_0.08)]">
+      <div className="space-y-1 pt-1 border-t border-[var(--stage-edge-top)]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1">
             <p className="text-sm text-[var(--stage-text-primary)]">
@@ -368,7 +437,7 @@ function RosterStatusCard({
               type="button"
               onClick={() => handleArchive()}
               disabled={archiving}
-              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-50"
+              className="rounded-lg border border-[var(--stage-edge-top)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.05)] transition-colors disabled:opacity-[0.45]"
             >
               {archiving ? 'Restoring…' : 'Unarchive'}
             </button>
@@ -378,7 +447,7 @@ function RosterStatusCard({
                 type="button"
                 onClick={handleArchive}
                 disabled={archiving}
-                className="rounded-lg bg-[var(--color-unusonic-warning)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-unusonic-warning)] hover:bg-[var(--color-unusonic-warning)]/25 transition-colors disabled:opacity-50"
+                className="rounded-lg bg-[var(--color-unusonic-warning)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-unusonic-warning)] hover:bg-[var(--color-unusonic-warning)]/25 transition-colors disabled:opacity-[0.45]"
               >
                 {archiving ? 'Archiving…' : 'Confirm archive?'}
               </button>
@@ -394,17 +463,17 @@ function RosterStatusCard({
             <button
               type="button"
               onClick={() => setArchiveConfirm(true)}
-              className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-warning)]/50 hover:text-[var(--color-unusonic-warning)] transition-colors"
+              className="rounded-lg border border-[var(--stage-edge-top)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-warning)]/50 hover:text-[var(--color-unusonic-warning)] transition-colors"
             >
               Archive
             </button>
           )}
         </div>
-        {archiveError && <p className="text-xs text-[var(--color-unusonic-error)]">{archiveError}</p>}
+        {archiveError && <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{archiveError}</p>}
       </div>
 
       {/* Remove from roster */}
-      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[oklch(1_0_0_/_0.08)]">
+      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--stage-edge-top)]">
         <div className="flex-1">
           <p className="text-sm text-[var(--stage-text-primary)]">Remove from roster</p>
           <p className="text-xs text-[var(--stage-text-secondary)]">
@@ -417,7 +486,7 @@ function RosterStatusCard({
               type="button"
               onClick={() => handleRemove(forceCount !== null ? true : false)}
               disabled={removing}
-              className="rounded-lg bg-[var(--color-unusonic-error)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/25 transition-colors disabled:opacity-50"
+              className="rounded-lg bg-[var(--color-unusonic-error)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/25 transition-colors disabled:opacity-[0.45]"
             >
               {removing
                 ? 'Removing…'
@@ -441,13 +510,13 @@ function RosterStatusCard({
               setForceCount(null);
               setRemoveError(null);
             }}
-            className="rounded-lg border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-error)]/50 hover:text-[var(--color-unusonic-error)] transition-colors"
+            className="rounded-lg border border-[var(--stage-edge-top)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-error)]/50 hover:text-[var(--color-unusonic-error)] transition-colors"
           >
             Remove from roster
           </button>
         )}
       </div>
-      {removeError && <p className="text-xs text-[var(--color-unusonic-error)]">{removeError}</p>}
+      {removeError && <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{removeError}</p>}
     </div>
   );
 }
@@ -554,10 +623,10 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
           transition={STAGE_HEAVY}
           className="
             fixed inset-y-0 right-0 z-10 flex flex-col h-dvh w-[85vw] max-w-[85vw] md:w-[600px] md:max-w-[600px]
-            bg-[var(--stage-surface-raised)]            border-l border-[oklch(1_0_0_/_0.08)] shadow-2xl rounded-l-[var(--stage-radius-panel,12px)]
+            bg-[var(--stage-surface-raised)]            border-l border-[var(--stage-edge-top)] shadow-2xl rounded-l-[var(--stage-radius-panel,12px)]
           "
         >
-          <header className="flex shrink-0 items-center gap-3 border-b border-[oklch(1_0_0_/_0.08)] px-4 py-3 md:px-5 md:py-3">
+          <header className="flex shrink-0 items-center gap-3 border-b border-[var(--stage-edge-top)] px-4 py-3 md:px-5 md:py-3">
             <h1 id="network-detail-title" className="min-w-0 flex-1 truncate text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
               {details.identity.name}
             </h1>
@@ -568,7 +637,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push(`/network/entity/${details.id}?kind=external_partner${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
-                  className="h-8 gap-1.5 px-2 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/10"
+                  className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.06)]"
                 >
                   <FileEdit className="size-4" />
                   Edit
@@ -580,7 +649,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push(`/network/entity/${details.id}?kind=${details.kind}${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
-                  className="h-8 gap-1.5 px-2 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/10"
+                  className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.06)]"
                 >
                   <FileEdit className="size-4" />
                   Edit
@@ -608,8 +677,142 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
               onSummonSuccess={handleRefresh}
             />
 
+            {/* Contact strip — always visible, outside tabs */}
+            {(() => {
+              const showEmployeeStrip = !isPartner;
+              const showPartnerPersonStrip = isPartner
+                && (details.entityDirectoryType === 'person' || details.entityDirectoryType === 'couple')
+                && (details.personEmail || details.personPhone);
+              const hasPartnerMetrics = !!(isPartner
+                && (details.partnerShowCount || details.lifetimeValue || details.lastActiveDate));
+              const hasPartnerOpsInfo = !!(isPartner
+                && details.entityDirectoryType === 'company'
+                && details.orgOperationalSettings
+                && (details.orgOperationalSettings.payment_terms || details.orgOperationalSettings.tax_id));
+
+              if (!showEmployeeStrip && !showPartnerPersonStrip && !hasPartnerMetrics && !hasPartnerOpsInfo && !details.relationshipStrength) return null;
+
+              const phone = showEmployeeStrip ? details.phone : details.personPhone;
+              const email = showEmployeeStrip ? details.identity.email : details.personEmail;
+
+              return (
+                <div className="px-4 py-3 md:px-5 space-y-2 border-b border-[var(--stage-edge-top)]">
+                  {/* Contact links */}
+                  {(phone || email) && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {phone && (
+                        <a href={`tel:${phone}`} className="flex items-center gap-1.5 text-sm text-[var(--stage-text-primary)] hover:underline">
+                          <Phone className="size-3.5 text-[var(--stage-text-tertiary)]" />
+                          {phone}
+                        </a>
+                      )}
+                      {email && (
+                        <a href={`mailto:${email}`} className="flex items-center gap-1.5 text-sm text-[var(--stage-text-secondary)] hover:underline truncate">
+                          <Mail className="size-3.5 text-[var(--stage-text-tertiary)]" />
+                          {email}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {/* Partner computed metrics */}
+                  {hasPartnerMetrics && (() => {
+                    const parts: string[] = [];
+                    const dir = details.direction;
+                    const isVenue = details.entityDirectoryType === 'venue';
+
+                    if (isVenue) {
+                      if (details.partnerShowCount) parts.push(`${details.partnerShowCount} show${details.partnerShowCount === 1 ? '' : 's'} hosted`);
+                    } else {
+                      if (details.lifetimeValue) {
+                        const label = dir === 'client' ? 'Lifetime' : 'Total spent';
+                        parts.push(`${label}: $${details.lifetimeValue.toLocaleString()}`);
+                      }
+                      if (details.partnerShowCount) parts.push(`${details.partnerShowCount} show${details.partnerShowCount === 1 ? '' : 's'}`);
+                    }
+                    if (details.lastActiveDate) {
+                      const d = new Date(details.lastActiveDate);
+                      parts.push(`Last: ${d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`);
+                    }
+
+                    if (!parts.length) return null;
+                    return (
+                      <p className="text-xs text-[var(--stage-text-secondary)] font-mono tabular-nums">
+                        {parts.join(' \u00b7 ')}
+                      </p>
+                    );
+                  })()}
+                  {/* Operational info — company entities only */}
+                  {hasPartnerOpsInfo && (() => {
+                    const ops = details.orgOperationalSettings!;
+                    const infoParts: string[] = [];
+                    if (ops.payment_terms) infoParts.push(String(ops.payment_terms));
+                    if (ops.tax_id) infoParts.push('Tax ID on file');
+                    if (!infoParts.length) return null;
+                    return (
+                      <p className="text-xs text-[var(--stage-text-secondary)]">
+                        {infoParts.join(' \u00b7 ')}
+                      </p>
+                    );
+                  })()}
+                  {/* Skill pills — employees only */}
+                  {showEmployeeStrip && details.skillTags && details.skillTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {details.skillTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-xs px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Last booked — employees only */}
+                  {showEmployeeStrip && details.lastBooked && (
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--stage-text-tertiary)]">
+                      <Clock className="size-3.5" />
+                      <span>
+                        Last booked: {details.lastBooked.role}
+                        {details.lastBooked.date && ` · ${new Date(details.lastBooked.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                      </span>
+                    </div>
+                  )}
+                  {/* Availability check — employees only */}
+                  {showEmployeeStrip && details.subjectEntityId && (
+                    <AvailabilityCheck entityId={details.subjectEntityId} />
+                  )}
+                  {/* Portal status — employees only */}
+                  {showEmployeeStrip && details.inviteStatus === 'active' && (
+                    <span className="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)]">
+                      Active on portal
+                    </span>
+                  )}
+                  {/* Relationship strength indicator */}
+                  {details.relationshipStrength && (() => {
+                    const strengthLabels: Record<NonNullable<typeof details.relationshipStrength>, string> = {
+                      new: 'New',
+                      growing: 'Growing',
+                      strong: 'Strong',
+                      cooling: 'Cooling',
+                    };
+                    const strengthStyles: Record<NonNullable<typeof details.relationshipStrength>, string> = {
+                      new: 'bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-tertiary)]',
+                      growing: 'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)]',
+                      strong: 'bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]',
+                      cooling: 'bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-tertiary)]',
+                    };
+                    return (
+                      <span className={`inline-flex text-xs font-medium px-2 py-0.5 rounded-full ${strengthStyles[details.relationshipStrength!]}`}>
+                        {strengthLabels[details.relationshipStrength!]}
+                      </span>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+
             {/* Tab strip with sliding indicator */}
-            <div className="shrink-0 border-b border-[oklch(1_0_0_/_0.08)] px-4 md:px-5">
+            <div className="shrink-0 border-b border-[var(--stage-edge-top)] px-4 md:px-5">
               <div className="relative flex h-12" role="tablist">
                 {getTabsForDetail(details).map((tab) => {
                   const displayLabel = tab.id === 'crew' && details.entityDirectoryType === 'venue'
@@ -626,7 +829,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       onClick={() => setActiveTab(tab.id)}
                       className={`
                         text-xs font-medium uppercase tracking-widest
-                        transition-colors duration-200 text-[var(--stage-text-secondary)]
+                        transition-colors duration-[80ms] text-[var(--stage-text-secondary)]
                         hover:text-[var(--stage-text-primary)]
                         ${activeTab === tab.id ? 'text-[var(--stage-text-primary)]' : ''}
                       `}
@@ -662,8 +865,47 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   transition={STAGE_NAV_CROSSFADE}
                   className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(120px,auto)]"
                 >
-                  {/* Ledger cell — col-span-1 */}
-                  <TradeLedger details={details} />
+                  {/* Ledger cell — col-span-1, partners only */}
+                  {isPartner && (
+                    <div className="stage-panel rounded-2xl p-4 md:col-span-1">
+                      <TradeLedger details={details} />
+                    </div>
+                  )}
+                  {/* Employee summary metrics */}
+                  {!isPartner && (details.showCount || details.totalPaid) && (
+                    <div className="stage-panel rounded-2xl p-4 md:col-span-1">
+                      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-3">Summary</h3>
+                      <div className="space-y-2">
+                        {details.showCount != null && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-[var(--stage-text-secondary)]">Shows</span>
+                            <span className="font-mono tabular-nums text-[var(--stage-text-primary)]">{details.showCount}</span>
+                          </div>
+                        )}
+                        {details.totalPaid != null && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-[var(--stage-text-secondary)]">Total paid</span>
+                            <span className="font-mono tabular-nums text-[var(--stage-text-primary)]">${details.totalPaid.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {/* Upcoming assignments — internal employees/contractors only */}
+                  {!isPartner && details.subjectEntityId && (
+                    <UpcomingAssignments entityId={details.subjectEntityId} />
+                  )}
+                  {/* Quick-book on show — internal employees/contractors only */}
+                  {!isPartner && details.subjectEntityId && (
+                    <QuickBookAction
+                      entityId={details.subjectEntityId}
+                      entityName={details.identity.name}
+                    />
+                  )}
+                  {/* Deal history — external partners only */}
+                  {isPartner && details.subjectEntityId && (
+                    <DealHistoryPanel entityId={details.subjectEntityId} />
+                  )}
                   {/* Support cell: Notes — col-span-2 */}
                   <div className="stage-panel rounded-2xl p-4 md:col-span-2">
                     <PrivateNotes
@@ -687,6 +929,14 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       onSaved={handleRefresh}
                     />
                   )}
+                  {/* Invite to portal — for ghost/invited internal employees */}
+                  {!isPartner && (details.inviteStatus === 'ghost' || details.inviteStatus === 'invited') && (
+                    <InviteCard
+                      details={details}
+                      sourceOrgId={sourceOrgId}
+                      onSaved={handleRefresh}
+                    />
+                  )}
                   {/* Roster status actions — internal_employee + owner/admin only */}
                   {!isPartner && details.canAssignElevatedRole && (
                     <RosterStatusCard
@@ -695,43 +945,6 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       onRemoved={handleClose}
                       onSaved={handleRefresh}
                     />
-                  )}
-                  {/* Contact info — person/couple entities */}
-                  {isPartner && (details.entityDirectoryType === 'person' || details.entityDirectoryType === 'couple') && (details.personEmail || details.personPhone || details.couplePartnerBEmail) && (
-                    <div className="stage-panel rounded-2xl p-4 md:col-span-2">
-                      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-3">
-                        Contact
-                      </h3>
-                      {details.entityDirectoryType === 'couple' ? (
-                        <div className="space-y-2">
-                          {details.personEmail && (
-                            <div>
-                              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-0.5">{details.couplePartnerAName ?? 'Partner A'}</p>
-                              <p className="text-sm text-[var(--stage-text-primary)]">{details.personEmail}</p>
-                            </div>
-                          )}
-                          {details.couplePartnerBEmail && (
-                            <div>
-                              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-0.5">{details.couplePartnerBName ?? 'Partner B'}</p>
-                              <p className="text-sm text-[var(--stage-text-primary)]">{details.couplePartnerBEmail}</p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {details.personEmail && (
-                            <p className="text-sm text-[var(--stage-text-primary)]">{details.personEmail}</p>
-                          )}
-                          {details.personPhone && (
-                            <a href={`tel:${details.personPhone}`}
-                              className="text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
-                              onClick={(e) => e.stopPropagation()}>
-                              {details.personPhone}
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
                   )}
                   {/* Website — org/venue entities only (not person/couple) */}
                   {isPartner && details.orgWebsite && details.entityDirectoryType !== 'person' && details.entityDirectoryType !== 'couple' && (
@@ -743,7 +956,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                         href={details.orgWebsite.startsWith('http') ? details.orgWebsite : `https://${details.orgWebsite}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-[var(--stage-accent)] hover:underline break-all"
+                        className="text-sm text-[var(--stage-text-primary)] hover:underline break-all"
                       >
                         {details.orgWebsite}
                       </a>
@@ -761,7 +974,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                           {specs.capacity && (
                             <div className="flex items-center justify-between text-sm">
                               <dt className="text-[var(--stage-text-secondary)]">Capacity</dt>
-                              <dd className="font-mono text-[var(--stage-text-primary)]">{specs.capacity.toLocaleString()}</dd>
+                              <dd className="font-mono tabular-nums text-[var(--stage-text-primary)]">{specs.capacity.toLocaleString()}</dd>
                             </div>
                           )}
                           {specs.load_in_notes && (
@@ -814,11 +1027,11 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                       );
                     })()
                   }
-                  {/* Events — col-span-1 */}
+                  {/* Active shows — col-span-1 */}
                   {details.active_events.length > 0 && (
                     <div className="stage-panel rounded-2xl p-4 md:col-span-1">
                       <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-2">
-                        Events
+                        Active shows
                       </h3>
                       <ul className="space-y-1 text-sm text-[var(--stage-text-primary)]">
                         {details.active_events.map((name, i) => (
@@ -858,26 +1071,6 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                 </motion.div>
               )}
 
-              {activeTab === 'ledger' && (
-                <motion.div
-                  key="ledger"
-                  id="panel-ledger"
-                  role="tabpanel"
-                  aria-labelledby="tab-ledger"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={STAGE_NAV_CROSSFADE}
-                  className="stage-panel flex flex-col items-center justify-center min-h-[180px] rounded-2xl p-6"
-                >
-                  <p className="text-sm text-[var(--stage-text-secondary)] text-center">
-                    Coming soon.
-                  </p>
-                  <p className="text-xs text-[var(--stage-text-secondary)]/70 mt-1">
-                    Trade ledger and balance tracking
-                  </p>
-                </motion.div>
-              )}
               </AnimatePresence>
             </div>
           </div>

@@ -47,7 +47,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
       <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Notes
       </h3>
-      <p className="text-[10px] text-[var(--stage-text-secondary)] mb-2">
+      <p className="text-xs text-[var(--stage-text-secondary)] mb-2">
         Private. Auto-saves.
       </p>
       <form
@@ -64,15 +64,15 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
           name="notes"
           defaultValue={initialNotes ?? ''}
           placeholder="Notes about this partner…"
-          className="min-h-[100px] resize-y w-full rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0/0.08)] bg-[var(--ctx-well,var(--stage-surface-nested))] px-3 py-2.5 text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none hover:border-[oklch(1_0_0/0.15)] focus-visible:border-[var(--stage-accent)]"
+          className="stage-input min-h-[100px] resize-y"
           rows={4}
         />
         {state?.error && (
-          <p className="text-xs text-[var(--color-unusonic-error)]">{state.error}</p>
+          <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{state.error}</p>
         )}
         <button
           type="submit"
-          className="text-xs font-medium text-[var(--stage-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-sm"
+          className="text-xs font-medium text-[var(--stage-text-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] rounded-sm"
         >
           Save
         </button>

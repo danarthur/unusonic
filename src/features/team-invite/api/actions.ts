@@ -10,7 +10,9 @@ import { listOrgMembers } from '@/entities/organization/api/list-org-members';
 import { upsertGhostMemberSchema, type UpsertGhostMemberInput } from '../model/schema';
 import type { RosterBadgeData, RosterBadgeStatus, RosterMemberDisplay } from '../model/types';
 import type { OrgMemberRole } from '@/entities/organization/model/types';
+import { sendEmployeeInviteEmail } from '@/shared/api/email/send';
 
+export type AcceptEmployeeInviteResult = { ok: true } | { ok: false; error: string };
 export type InviteEmployeeResult = { ok: true; message: string } | { ok: false; error: string };
 export type UpsertGhostResult = { ok: true; member: RosterBadgeData } | { ok: false; error: string };
 export type DeployInvitesResult = { ok: true; sent: number } | { ok: false; error: string };
@@ -372,6 +374,27 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
     .maybeSingle();
   if (!authRel2) return { ok: false, error: 'You do not have permission to send invites for this organization.' };
 
+  // Resolve workspace info for email sending
+  const org = await getOrgDetails(orgId);
+  const workspaceId = org?.workspace_id ?? null;
+  let workspaceName = 'Unusonic';
+  if (workspaceId) {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    workspaceName = (ws as { name?: string } | null)?.name ?? 'Unusonic';
+  }
+
+  // Resolve inviter name from profile
+  const { data: inviterProfile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .maybeSingle();
+  const inviterName = (inviterProfile as { full_name?: string } | null)?.full_name ?? null;
+
   // Resolve org entity for the member edge lookup (same as myOrgEnt above)
   const orgEntForDeploy = myOrgEnt;
 
@@ -440,8 +463,116 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
     });
     if (invErr) continue;
     sent++;
-    // TODO: send email with invite link (e.g. /claim?token=…)
+
+    // Send invite email (best-effort — invitation row exists even if email fails)
+    if (workspaceId) {
+      await sendEmployeeInviteEmail({
+        to: m.email.trim(),
+        token,
+        workspaceId,
+        workspaceName,
+        inviterName,
+      }).catch(() => {
+        // Email failure is non-fatal; the invite link is still valid
+      });
+    }
   }
 
   return { ok: true, sent };
+}
+
+/**
+ * Accept an employee invite: claim the ghost person entity and mark invitation accepted.
+ * Unlike claimOrganization (which makes the user an org owner), this just claims the
+ * person entity. The ROSTER_MEMBER edge already exists from add_ghost_member.
+ * If workspace_members row doesn't exist yet, it's created here with the employee role.
+ */
+export async function acceptEmployeeInvite(
+  token: string
+): Promise<AcceptEmployeeInviteResult> {
+  if (!token?.trim()) return { ok: false, error: 'Missing token.' };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user?.email) {
+    return { ok: false, error: 'You must be signed in to accept this invite.' };
+  }
+
+  // Validate invitation
+  const { data: invitation, error: invError } = await supabase
+    .from('invitations')
+    .select('id, organization_id, email, status, expires_at')
+    .eq('token', token.trim())
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
+  if (invError || !invitation) {
+    return { ok: false, error: 'Invalid or expired invitation.' };
+  }
+  if (invitation.email.toLowerCase() !== user.email.toLowerCase()) {
+    return { ok: false, error: 'This invitation was sent to a different email address.' };
+  }
+
+  // Find the ghost person entity for this email
+  const { data: ghostPerson } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, owner_workspace_id')
+    .ilike('attributes->>email', user.email)
+    .eq('type', 'person')
+    .is('claimed_by_user_id', null)
+    .maybeSingle();
+  if (!ghostPerson) {
+    return { ok: false, error: 'No matching team member found for this email.' };
+  }
+
+  // Claim the ghost person entity
+  const { error: claimErr } = await supabase
+    .schema('directory')
+    .from('entities')
+    .update({ claimed_by_user_id: user.id })
+    .eq('id', ghostPerson.id);
+  if (claimErr) {
+    return { ok: false, error: 'Failed to link your account.' };
+  }
+
+  // Ensure workspace_members row exists (may already exist if inviteTeamMember was used)
+  const workspaceId = ghostPerson.owner_workspace_id;
+  if (workspaceId) {
+    const { data: existingMember } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!existingMember) {
+      // Look up the employee system role
+      const { data: employeeRole } = await supabase
+        .schema('ops')
+        .from('workspace_roles')
+        .select('id')
+        .eq('slug', 'employee')
+        .is('workspace_id', null)
+        .maybeSingle();
+
+      await supabase.from('workspace_members').insert({
+        workspace_id: workspaceId,
+        user_id: user.id,
+        role_id: employeeRole?.id ?? null,
+        role: 'member', // legacy fallback
+      });
+    }
+  }
+
+  // Mark invitation as accepted
+  await supabase
+    .from('invitations')
+    .update({ status: 'accepted' })
+    .eq('id', invitation.id);
+
+  return { ok: true };
 }

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { claimOrganization } from '@/features/onboarding/api/actions';
+import { acceptEmployeeInvite } from '@/features/team-invite/api/actions';
 import { Button } from '@/shared/ui/button';
 
 const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
@@ -16,6 +17,8 @@ interface ClaimViewProps {
   orgName: string;
   /** Caller may pass whether user is authenticated so we can show "Sign in to claim". */
   isAuthenticated?: boolean;
+  /** When true, uses the employee invite claim flow (no org ownership transfer). */
+  isEmployeeInvite?: boolean;
 }
 
 export function ClaimView({
@@ -23,9 +26,14 @@ export function ClaimView({
   email,
   orgName,
   isAuthenticated = false,
+  isEmployeeInvite = false,
 }: ClaimViewProps) {
   const [state, submitClaim, isPending] = useActionState(
     async (_prev: { ok: boolean; error?: string } | null, formData: FormData) => {
+      if (isEmployeeInvite) {
+        const result = await acceptEmployeeInvite(formData.get('token') as string);
+        return result.ok ? { ok: true } : { ok: false, error: result.error };
+      }
       const result = await claimOrganization(null, formData);
       return result.ok ? { ok: true } : { ok: false, error: result.error };
     },
@@ -45,14 +53,18 @@ export function ClaimView({
         <CheckCircle2 className="size-14 text-[var(--color-unusonic-success)]" />
         <div>
           <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
-            You’re all set
+            You're all set
           </h1>
           <p className="mt-2 text-sm text-[var(--stage-text-secondary)]">
-            You now manage <strong className="text-[var(--stage-text-primary)]">{orgName}</strong>. Sign in to get started.
+            {isEmployeeInvite
+              ? <>You've joined <strong className="text-[var(--stage-text-primary)]">{orgName}</strong>. View your schedule and assignments.</>
+              : <>You now manage <strong className="text-[var(--stage-text-primary)]">{orgName}</strong>. Sign in to get started.</>}
           </p>
         </div>
         <Button asChild variant="default" size="lg" className="w-full sm:w-auto">
-          <Link href="/lobby">Go to dashboard</Link>
+          <Link href={isEmployeeInvite ? '/portal' : '/lobby'}>
+            {isEmployeeInvite ? 'Go to portal' : 'Go to dashboard'}
+          </Link>
         </Button>
       </motion.div>
     );
@@ -70,7 +82,7 @@ export function ClaimView({
           Welcome, {email}
         </h1>
         <p className="text-sm text-[var(--stage-text-secondary)]">
-          <strong className="text-[var(--stage-text-primary)]">{orgName}</strong> has invited you to manage their organization. Sign in or create an account with this email to accept.
+          <strong className="text-[var(--stage-text-primary)]">{orgName}</strong> has invited you to {isEmployeeInvite ? 'join their team' : 'manage their organization'}. Sign in or create an account with this email to accept.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Button asChild variant="default" size="lg" className="w-full sm:w-auto">
@@ -99,7 +111,7 @@ export function ClaimView({
         Welcome, {email}
       </h1>
       <p className="text-sm text-[var(--stage-text-secondary)]">
-        <strong className="text-[var(--stage-text-primary)]">{orgName}</strong> has invited you to manage their organization.
+        <strong className="text-[var(--stage-text-primary)]">{orgName}</strong> has invited you to {isEmployeeInvite ? 'join their team' : 'manage their organization'}.
       </p>
       <form action={submitClaim} className="flex flex-col gap-4">
         <input type="hidden" name="token" value={token} />
