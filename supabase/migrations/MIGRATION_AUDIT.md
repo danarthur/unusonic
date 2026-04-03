@@ -1,7 +1,7 @@
 # Supabase Migration Audit
 
-**Last synced:** 2026-03-30 (Session 15 — proposal email tracking, deal note attachments/pinning, deal_notes grants)
-**DB total:** ~99 applied migrations (estimate — new columns and grants applied via MCP)
+**Last synced:** 2026-04-02 (Session 16 — employee portal, invitations table, network detail sheet redesign)
+**DB total:** ~101 applied migrations (estimate — new columns and grants applied via MCP)
 **Local files:** 66
 
 ---
@@ -52,10 +52,12 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | *(2026-03-29)* | add_deal_note_attachments — Added `attachments jsonb` to `ops.deal_notes`. Created `deal-attachments` private storage bucket with RLS policy scoped to workspace. |
 | *(2026-03-29)* | add_deal_note_pinned_at — Added `pinned_at timestamptz` to `ops.deal_notes` for pinned note sorting. |
 | *(2026-03-29)* | grant_ops_deal_notes — Table-level SELECT/INSERT/UPDATE/DELETE grants on `ops.deal_notes` for `authenticated` role. |
+| *(2026-04-02)* | add_employee_system_role_and_portal_capabilities — Added `employee` system role to `ops.workspace_roles` with capabilities: `planning:view`, `ros:view`, `portal:own_schedule`, `portal:own_profile`, `portal:own_pay`. Created `get_member_role_slug(p_workspace_id uuid)` RPC returning the role slug for the current user in a workspace — used by middleware for portal routing. |
+| *(2026-04-02)* | create_invitations_table — `public.invitations` table for employee (and future) invites. Columns: `id`, `workspace_id`, `entity_id` (FK to `directory.entities`), `email`, `role`, `token` (unique), `expires_at`, `accepted_at`, `created_at`. RLS via `workspace_members` subquery (public schema pattern). In `public` because invites are consumed pre-auth, outside workspace-scoped RLS. |
 
 ---
 
-## Current schema state (2026-03-26)
+## Current schema state (2026-04-02)
 
 ### Tables
 
@@ -104,6 +106,7 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | `public` | `recovery_requests` | In-flight recovery requests. |
 | `public` | `agent_configs` | Aion agent configuration per workspace. |
 | `public` | `catalog_embeddings` | Vector embeddings for catalog packages. |
+| `public` | `invitations` | Employee (and future) invites. `token` unique, `entity_id` FK to `directory.entities`, `role`, `expires_at`, `accepted_at`. In `public` because consumed pre-auth. Applied 2026-04-02. |
 | `public` | `commercial_organizations` | Legacy org table (migration target: `directory.entities`). |
 | `public` | `organization_members` | Legacy (migration target: `cortex.relationships`). |
 
@@ -114,6 +117,7 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | `get_my_workspace_ids()` | Returns workspace IDs for current user — used in all RLS policies for `ops`/`finance`/`directory` schemas. |
 | `user_has_workspace_role(workspace_id, roles[])` | Checks if current user has any of the given roles in the workspace. |
 | `get_member_permissions(workspace_id)` | Returns capability set for current user. |
+| `get_member_role_slug(workspace_id)` | Returns role slug (e.g. `'employee'`, `'admin'`) for current user. Used by middleware for portal routing. |
 | `patch_entity_attributes(entity_id, patch)` | Safe JSONB merge for `directory.entities.attributes`. Strips sentinel keys. |
 | `patch_relationship_context(source, target, type, patch)` | JSONB merge on `cortex.relationships.context_data`. |
 | `add_roster_member(...)` | Adds a `ROSTER_MEMBER` edge to `cortex.relationships`. SECURITY DEFINER. |
@@ -139,6 +143,7 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | `20260324000200_expand_deals_status_check.sql` | Expanded `public.deals` CHECK constraint `deals_status_check` to include `'contract_signed'` and `'deposit_received'`. |
 | *(DB-only, 2026-03-26)* | `ops.deal_notes` — timestamped deal diary entries. `ops.workspace_lead_sources` — workspace-configurable lead sources (16 seeded defaults). `finance.payment_reminder_log` — payment reminder cadence tracking. New columns on `public.deals` (`lead_source_id`, `lead_source_detail`, `referrer_entity_id`), `public.workspaces` (3 payment default columns), `public.proposals` (`deposit_deadline_days`). See DB-only migrations table above for details. |
 | *(DB-only, 2026-03-29)* | `add_proposal_email_tracking` — `resend_message_id text`, `email_delivered_at timestamptz`, `email_bounced_at timestamptz` on `public.proposals` with index. `add_deal_note_attachments` — `attachments jsonb` on `ops.deal_notes`, `deal-attachments` storage bucket. `add_deal_note_pinned_at` — `pinned_at timestamptz` on `ops.deal_notes`. `grant_ops_deal_notes` — table grants for authenticated role. |
+| *(DB-only, 2026-04-02)* | `add_employee_system_role_and_portal_capabilities` — `employee` role in `ops.workspace_roles` with 5 capabilities. `get_member_role_slug(uuid)` RPC for middleware routing. `create_invitations_table` — `public.invitations` with token, entity_id, role, expires_at. RLS via workspace_members. |
 
 ---
 
