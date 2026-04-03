@@ -4,11 +4,11 @@ import { createServerClient } from '@supabase/ssr';
 // Public routes - no auth required (clients can view/sign proposals via link without an account)
 const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p', '/claim', '/confirm', '/crew'];
 
-// Portal routes — employee-only
-const PORTAL_PREFIX = '/portal';
+// Portal routes — employee-only (route group is (portal), so no /portal prefix in URL)
+const PORTAL_ROUTES = ['/schedule', '/profile', '/pay'];
 
 // Routes exempt from onboarding check
-const ONBOARDING_EXEMPT = ['/onboarding', '/api/', '/portal', '/claim', '/confirm'];
+const ONBOARDING_EXEMPT = ['/onboarding', '/api/', '/schedule', '/profile', '/pay', '/claim', '/confirm'];
 
 // Routes exempt from SignalPay gating (Autonomous tier)
 const SIGNALPAY_EXEMPT = ['/onboarding', '/api/', '/settings/connect-payouts', '/login', '/signup'];
@@ -130,7 +130,7 @@ export async function middleware(request: NextRequest) {
       }
 
       // RULE 3b: Role-based portal routing
-      const isPortalRoute = pathname.startsWith(PORTAL_PREFIX);
+      const isPortalRoute = PORTAL_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'));
       let roleSlug = request.cookies.get('unusonic_role_slug')?.value ?? null;
 
       if (!roleSlug) {
@@ -169,7 +169,7 @@ export async function middleware(request: NextRequest) {
 
       // Employee trying to access dashboard → redirect to portal
       if (isEmployee && !isPortalRoute && !pathname.startsWith('/api/') && !pathname.startsWith('/signout') && !pathname.startsWith('/settings')) {
-        return NextResponse.redirect(new URL('/portal/schedule', request.url));
+        return NextResponse.redirect(new URL('/schedule', request.url));
       }
 
       // Non-employee trying to access portal → redirect to dashboard

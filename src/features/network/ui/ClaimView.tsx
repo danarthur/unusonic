@@ -67,7 +67,7 @@ export function ClaimView({
           </p>
         </div>
         <Button asChild variant="default" size="lg" className="w-full sm:w-auto">
-          <Link href={isEmployeeInvite ? '/portal/schedule' : '/lobby'}>
+          <Link href={isEmployeeInvite ? '/schedule' : '/lobby'}>
             {isEmployeeInvite ? 'Go to portal' : 'Go to dashboard'}
           </Link>
         </Button>

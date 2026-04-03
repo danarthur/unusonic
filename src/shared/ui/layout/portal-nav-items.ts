@@ -14,9 +14,9 @@ export interface PortalNavItem {
 }
 
 export const portalNavItems: PortalNavItem[] = [
-  { id: 'schedule', label: 'Schedule', icon: CalendarDays, href: '/portal/schedule' },
-  { id: 'profile', label: 'Profile', icon: UserCircle, href: '/portal/profile' },
-  { id: 'pay', label: 'Pay', icon: Banknote, href: '/portal/pay' },
+  { id: 'schedule', label: 'Schedule', icon: CalendarDays, href: '/schedule' },
+  { id: 'profile', label: 'Profile', icon: UserCircle, href: '/profile' },
+  { id: 'pay', label: 'Pay', icon: Banknote, href: '/pay' },
 ];
 
 export function isPortalNavActive(itemHref: string, pathname: string): boolean {
