@@ -14,8 +14,7 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { signUpForClaim, finishPartnerClaim } from '@/features/summoning';
 import type { ClaimInvitation } from '@/features/summoning';
-
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 type Step = 'handshake' | 'keys' | 'claim';
 
@@ -66,8 +65,9 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={spring}
-      className="w-full max-w-md flex flex-col gap-6 rounded-2xl border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--stage-surface)] p-6 sm:p-8 shadow-2xl"
+      transition={STAGE_MEDIUM}
+      data-surface="surface"
+      className="w-full max-w-md flex flex-col gap-6 rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-6 sm:p-8"
     >
       <AnimatePresence mode="wait">
         {step === 'handshake' && (
@@ -76,18 +76,18 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
             initial={{ opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 12 }}
-            transition={spring}
+            transition={STAGE_MEDIUM}
             className="text-center space-y-6"
           >
             {targetLogoUrl ? (
               <div className="flex justify-center">
-                <div className="relative size-20 rounded-2xl overflow-hidden bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)]">
+                <div className="relative size-20 rounded-2xl overflow-hidden bg-[var(--stage-surface-nested)] border border-[var(--stage-edge-top)]">
                   { }
                   <img src={targetLogoUrl} alt="" className="size-full object-contain" />
                 </div>
               </div>
             ) : (
-              <div className="flex size-20 items-center justify-center rounded-2xl bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] mx-auto" />
+              <div className="flex size-20 items-center justify-center rounded-2xl bg-[var(--stage-surface-nested)] border border-[var(--stage-edge-top)] mx-auto" />
             )}
             <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
               {originName} wants to connect with {targetName}.
@@ -108,7 +108,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
             initial={{ opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 12 }}
-            transition={spring}
+            transition={STAGE_MEDIUM}
             className="space-y-4"
             onSubmit={handleKeysSubmit}
           >
@@ -127,7 +127,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="First"
-                  className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                  className="stage-input"
                 />
               </div>
               <div>
@@ -138,7 +138,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Last"
-                  className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                  className="stage-input"
                 />
               </div>
             </div>
@@ -150,7 +150,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
                 placeholder="e.g. Neon Velvet"
-                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                className="stage-input"
               />
             </div>
             <div>
@@ -164,7 +164,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                 placeholder="••••••••"
                 minLength={8}
                 required
-                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                className="stage-input"
               />
             </div>
             <div>
@@ -177,10 +177,10 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 minLength={8}
-                className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                className="stage-input"
               />
               {confirmPassword && password !== confirmPassword && (
-                <p className="mt-1 text-xs text-[var(--color-unusonic-error)]">Passwords do not match.</p>
+                <p role="alert" className="mt-1 text-xs text-[var(--color-unusonic-error)]">Passwords do not match.</p>
               )}
             </div>
             <div className="flex gap-3 pt-2">
@@ -194,7 +194,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
               >
                 {isPending ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" strokeWidth={1.5} />
                     Claiming…
                   </>
                 ) : (
@@ -203,7 +203,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
               </Button>
             </div>
             {state?.ok === false && state?.error && (
-              <p className="text-sm text-[var(--color-unusonic-error)]">{state.error}</p>
+              <p role="alert" className="text-sm text-[var(--color-unusonic-error)]">{state.error}</p>
             )}
           </motion.form>
         )}
@@ -212,7 +212,7 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
       <p className="text-center">
         <Link
           href={`/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`}
-          className="text-xs text-[var(--stage-accent)] hover:underline"
+          className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:underline"
         >
           Already have an account? Sign in
         </Link>

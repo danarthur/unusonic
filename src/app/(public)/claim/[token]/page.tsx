@@ -29,7 +29,7 @@ export default async function ClaimPage({
   const result = await getInvitationForClaim(token);
   if (!result.ok) {
     return (
-      <div className={claimLayoutClass} style={safeAreaStyle}>
+      <div className={claimLayoutClass} style={safeAreaStyle} data-surface="void" data-density="spacious">
         <ClaimError message={result.error} />
       </div>
     );
@@ -38,7 +38,7 @@ export default async function ClaimPage({
   const { invitation } = result;
   if (invitation.type === 'partner_summon') {
     return (
-      <div className={claimLayoutClass} style={safeAreaStyle}>
+      <div className={claimLayoutClass} style={safeAreaStyle} data-surface="void" data-density="spacious">
         <ClaimWizard invitation={invitation} />
       </div>
     );
@@ -49,7 +49,7 @@ export default async function ClaimPage({
   const validation = await validateInvitation(token);
   if (!validation.ok) {
     return (
-      <div className={claimLayoutClass} style={safeAreaStyle}>
+      <div className={claimLayoutClass} style={safeAreaStyle} data-surface="void" data-density="spacious">
         <ClaimError message="Invalid or expired link." />
       </div>
     );
@@ -60,13 +60,14 @@ export default async function ClaimPage({
   const isAuthenticated = !!user;
 
   return (
-    <div className={claimLayoutClass} style={safeAreaStyle}>
+    <div className={claimLayoutClass} style={safeAreaStyle} data-surface="void" data-density="spacious">
       <ClaimView
         token={token}
         email={validation.email}
         orgName={validation.org_name}
         isAuthenticated={isAuthenticated}
         isEmployeeInvite={isEmployeeInvite}
+        userEmail={user?.email ?? null}
       />
     </div>
   );
