@@ -8,7 +8,9 @@ import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Command } from 'cmdk';
 import { Building2, User, MapPin, Plus, ChevronRight, ChevronDown, Heart, Loader2, X } from 'lucide-react';
-import { createDeal, type CreateDealInput } from '../actions/deal-actions';
+import { createDeal, type CreateDealInput, type CreateDealResult } from '../actions/deal-actions';
+import { UpgradeInline } from '@/shared/ui/upgrade-prompt';
+import { toast } from 'sonner';
 import { getWorkspaceLeadSources, type WorkspaceLeadSource } from '@/features/lead-sources';
 import { checkDateFeasibility, type FeasibilityStatus, type CheckDateFeasibilityResult } from '../actions/check-date-feasibility';
 import { searchOmni, getVenueSuggestions, createGhostReferrerEntity, type OmniResult, type VenueSuggestion } from '../actions/lookup';
@@ -89,6 +91,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   const [referrerSearching, setReferrerSearching] = useState(false);
   const [referrerCreating, setReferrerCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLimitData, setShowLimitData] = useState<{ current: number; limit: number | null } | null>(null);
   const budgetEstimatedDisplay = budgetEstimated === undefined ? '' : String(budgetEstimated);
 
   // Client type selection
@@ -122,10 +125,11 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
 
   // Clear error when modal opens or stage changes so stale submit errors don't linger
   useEffect(() => {
-    if (open) setError(null);
+    if (open) { setError(null); setShowLimitData(null); }
   }, [open]);
   const goToStage = (next: 1 | 2) => {
     setError(null);
+    setShowLimitData(null);
     setStage(next);
   };
 
@@ -420,16 +424,24 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
         };
       }
 
-      const result = await createDeal(dealInput);
+      const result: CreateDealResult = await createDeal(dealInput);
 
       if (result.success) {
         addOptimisticGig({ type: 'replaceId', tempId, realId: result.dealId });
+        if (result.warning === 'approaching_show_limit') {
+          toast('You are approaching your active show limit.', { description: 'Review your plan in settings.' });
+        }
         await onRefetchList?.();
         router.refresh();
         onClose();
         resetForm();
+      } else if (result.error === 'show_limit_reached' && 'current' in result) {
+        addOptimisticGig({ type: 'revert', tempId });
+        setShowLimitData({ current: result.current, limit: result.limit });
+        setError(null);
       } else {
         addOptimisticGig({ type: 'revert', tempId });
+        setShowLimitData(null);
         setError(result.error);
       }
     });
@@ -468,6 +480,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
     setCoupleForm({ partnerAFirst: '', partnerALast: '', partnerAEmail: '', partnerBFirst: '', partnerBLast: '', partnerBEmail: '' });
     setCoupleDisplayName('');
     setDisplayNameMode('auto');
+    setShowLimitData(null);
   }
 
   const handleClientTypeChange = (type: ClientType) => {
@@ -1472,7 +1485,14 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 No workspace selected. Complete onboarding first.
               </p>
             )}
-            {hasWorkspace && error && (
+            {hasWorkspace && showLimitData && (
+              <UpgradeInline
+                type="show_limit"
+                current={showLimitData.current}
+                limit={showLimitData.limit ?? 0}
+              />
+            )}
+            {hasWorkspace && error && !showLimitData && (
               <p className="text-[length:var(--stage-input-font-size,13px)] text-[var(--color-unusonic-error)] break-words">{error}</p>
             )}
             <div className="flex gap-2 min-w-0">
@@ -1513,7 +1533,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 </button>
                 <button
                   type="submit"
-                  disabled={!hasWorkspace || isPending}
+                  disabled={!hasWorkspace || isPending || !!showLimitData}
                   className="flex-1 stage-btn stage-btn-primary h-[var(--stage-input-height,34px)] rounded-[var(--stage-radius-input,6px)] disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] flex items-center justify-center gap-2"
                 >
                   {isPending ? 'Creating...' : 'Create deal'}

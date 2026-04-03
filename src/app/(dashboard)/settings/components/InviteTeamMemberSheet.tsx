@@ -15,6 +15,7 @@ import {
 } from '@/shared/ui/select';
 import { inviteTeamMember, type InviteTeamMemberResult } from '@/app/actions/workspace';
 import { inviteTeamMemberPayloadSchema, type InviteInternalRole } from '@/app/actions/invite-team-member-schema';
+import { UpgradeInline } from '@/shared/ui/upgrade-prompt';
 import { getWorkspaceRolesForBuilder } from '@/features/role-builder/api/actions';
 import { Plus, Loader2, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -52,6 +53,7 @@ export function InviteTeamMemberSheet({
   const [open, setOpen] = React.useState(false);
   const [roles, setRoles] = React.useState<{ id: string; name: string; slug: string }[]>([]);
   const [rolesLoading, setRolesLoading] = React.useState(false);
+  const [seatLimitData, setSeatLimitData] = React.useState<{ current: number; limit: number } | null>(null);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -81,7 +83,7 @@ export function InviteTeamMemberSheet({
   }, [open, grantAccess, workspaceId, roles.length]);
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) form.reset();
+    if (!next) { form.reset(); setSeatLimitData(null); }
     setOpen(next);
   };
 
@@ -108,7 +110,11 @@ export function InviteTeamMemberSheet({
     if (result.success) {
       handleOpenChange(false);
       router.refresh();
+    } else if (result.error === 'seat_limit_reached' && 'current' in result) {
+      setSeatLimitData({ current: result.current, limit: result.limit });
+      form.clearErrors('root');
     } else {
+      setSeatLimitData(null);
       form.setError('root', { message: result.error });
     }
   };
@@ -137,7 +143,16 @@ export function InviteTeamMemberSheet({
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6 pt-4"
         >
-          {rootError && (
+          {seatLimitData && (
+            <div className="mb-4">
+              <UpgradeInline
+                type="seat_limit"
+                current={seatLimitData.current}
+                limit={seatLimitData.limit}
+              />
+            </div>
+          )}
+          {rootError && !seatLimitData && (
             <div className="mb-4 rounded-xl border border-[var(--color-unusonic-error)]/20 bg-[var(--color-unusonic-error)]/10 px-3 py-2 text-sm text-[var(--color-unusonic-error)]">
               {rootError}
             </div>
@@ -287,7 +302,7 @@ export function InviteTeamMemberSheet({
             >
               Cancel
             </Button>
-            <Button type="submit" variant="silk" disabled={isSubmitting} className="gap-2">
+            <Button type="submit" variant="silk" disabled={isSubmitting || !!seatLimitData} className="gap-2">
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
