@@ -1,6 +1,6 @@
 # Supabase Migration Audit
 
-**Last synced:** 2026-04-02 (Session 16 — employee portal, invitations table, network detail sheet redesign)
+**Last synced:** 2026-04-02 (Session 17 — subscription tier migration to 3-tier per-seat model, Stripe billing, seat/show enforcement)
 **DB total:** ~101 applied migrations (estimate — new columns and grants applied via MCP)
 **Local files:** 66
 
@@ -54,6 +54,9 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | *(2026-03-29)* | grant_ops_deal_notes — Table-level SELECT/INSERT/UPDATE/DELETE grants on `ops.deal_notes` for `authenticated` role. |
 | *(2026-04-02)* | add_employee_system_role_and_portal_capabilities — Added `employee` system role to `ops.workspace_roles` with capabilities: `planning:view`, `ros:view`, `portal:own_schedule`, `portal:own_profile`, `portal:own_pay`. Created `get_member_role_slug(p_workspace_id uuid)` RPC returning the role slug for the current user in a workspace — used by middleware for portal routing. |
 | *(2026-04-02)* | create_invitations_table — `public.invitations` table for employee (and future) invites. Columns: `id`, `workspace_id`, `entity_id` (FK to `directory.entities`), `email`, `role`, `token` (unique), `expires_at`, `accepted_at`, `created_at`. RLS via `workspace_members` subquery (public schema pattern). In `public` because invites are consumed pre-auth, outside workspace-scoped RLS. |
+| *(2026-04-02)* | rename_subscription_tier_enum — Migrated `subscription_tier` enum from 4-tier to 3-tier: renamed `venue_os` → `studio`, removed `autonomous` (existing rows remapped to `studio`). |
+| *(2026-04-02)* | tier_config_and_workspace_columns — Created `public.tier_config` reference table (tier, label, pricing, seat/show limits, Aion mode). Added workspace columns: `stripe_customer_id`, `extra_seats`, `billing_status`, `aion_actions_used`, `aion_actions_reset_at`, `autonomous_addon_enabled`. Seeded tier_config with Foundation/Growth/Studio rows. |
+| *(2026-04-02)* | seat_and_show_count_rpcs — Three SECURITY DEFINER RPCs: `count_team_seats(workspace_id)` (counts owner/admin/member seats), `get_workspace_seat_limit(workspace_id)` (included + extra), `count_active_shows(workspace_id)` (non-terminal deals). |
 
 ---
 
@@ -107,6 +110,7 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | `public` | `agent_configs` | Aion agent configuration per workspace. |
 | `public` | `catalog_embeddings` | Vector embeddings for catalog packages. |
 | `public` | `invitations` | Employee (and future) invites. `token` unique, `entity_id` FK to `directory.entities`, `role`, `expires_at`, `accepted_at`. In `public` because consumed pre-auth. Applied 2026-04-02. |
+| `public` | `tier_config` | Read-only reference table for subscription tier pricing, seat limits, show limits, and Aion mode. Keyed by `subscription_tier` enum. Applied 2026-04-02. |
 | `public` | `commercial_organizations` | Legacy org table (migration target: `directory.entities`). |
 | `public` | `organization_members` | Legacy (migration target: `cortex.relationships`). |
 
@@ -131,10 +135,13 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | `add_catalog_item_assignee(p_package_id, p_entity_id, p_role_note)` | Adds a named-person assignee to a catalog item. SECURITY DEFINER. |
 | `add_catalog_role_assignee(p_package_id, p_role_note)` | Adds a role-only slot (entity_id NULL) to a catalog item. SECURITY DEFINER. |
 | `remove_catalog_item_assignee(p_assignee_id)` | Removes a catalog item assignee row. SECURITY DEFINER. |
+| `count_team_seats(p_workspace_id)` | Counts workspace members with role slug in (owner, admin, member). Used for seat limit enforcement. SECURITY DEFINER. Applied 2026-04-02. |
+| `get_workspace_seat_limit(p_workspace_id)` | Returns `tier_config.included_seats + workspaces.extra_seats` for a workspace. SECURITY DEFINER. Applied 2026-04-02. |
+| `count_active_shows(p_workspace_id)` | Counts active deals (status not in won, lost, archived). Used for show limit enforcement. SECURITY DEFINER. Applied 2026-04-02. |
 
 ---
 
-## Recent migrations (2026-03-30)
+## Recent migrations (2026-04-02)
 
 | File | Description |
 |---|---|
@@ -144,6 +151,9 @@ These 21 migrations are in the DB but were applied outside the local folder (via
 | *(DB-only, 2026-03-26)* | `ops.deal_notes` — timestamped deal diary entries. `ops.workspace_lead_sources` — workspace-configurable lead sources (16 seeded defaults). `finance.payment_reminder_log` — payment reminder cadence tracking. New columns on `public.deals` (`lead_source_id`, `lead_source_detail`, `referrer_entity_id`), `public.workspaces` (3 payment default columns), `public.proposals` (`deposit_deadline_days`). See DB-only migrations table above for details. |
 | *(DB-only, 2026-03-29)* | `add_proposal_email_tracking` — `resend_message_id text`, `email_delivered_at timestamptz`, `email_bounced_at timestamptz` on `public.proposals` with index. `add_deal_note_attachments` — `attachments jsonb` on `ops.deal_notes`, `deal-attachments` storage bucket. `add_deal_note_pinned_at` — `pinned_at timestamptz` on `ops.deal_notes`. `grant_ops_deal_notes` — table grants for authenticated role. |
 | *(DB-only, 2026-04-02)* | `add_employee_system_role_and_portal_capabilities` — `employee` role in `ops.workspace_roles` with 5 capabilities. `get_member_role_slug(uuid)` RPC for middleware routing. `create_invitations_table` — `public.invitations` with token, entity_id, role, expires_at. RLS via workspace_members. |
+| `20260402120000_rename_subscription_tier_enum.sql` | Migrates `subscription_tier` enum from 4-tier to 3-tier. Renames `venue_os` → `studio`, removes `autonomous` (remapped to `studio`). |
+| `20260402120100_tier_config_and_workspace_columns.sql` | Creates `public.tier_config` reference table. Adds billing columns to `public.workspaces`: `stripe_customer_id`, `extra_seats`, `billing_status`, `aion_actions_used`, `aion_actions_reset_at`, `autonomous_addon_enabled`. Seeds tier_config rows. |
+| `20260402120200_seat_and_show_count_rpcs.sql` | Three SECURITY DEFINER RPCs: `count_team_seats`, `get_workspace_seat_limit`, `count_active_shows`. Used by seat/show limit enforcement in server actions. |
 
 ---
 
