@@ -150,6 +150,9 @@ export const PersonAttrsSchema = z.object({
   [PERSON_ATTR.w9_status]: boolFlag,
   [PERSON_ATTR.coi_expiry]: optStr,
   [PERSON_ATTR.emergency_contact]: EmergencyContactSchema,
+  [PERSON_ATTR.availability_blackouts]: z
+    .array(z.object({ start: z.string(), end: z.string() }))
+    .catch([]),
   [PERSON_ATTR.instagram]: optStr,
 });
 

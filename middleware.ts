@@ -5,10 +5,10 @@ import { createServerClient } from '@supabase/ssr';
 const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p', '/claim', '/confirm', '/crew'];
 
 // Portal routes — employee-only (route group is (portal), so no /portal prefix in URL)
-const PORTAL_ROUTES = ['/schedule', '/profile', '/pay'];
+const PORTAL_ROUTES = ['/schedule', '/calendar', '/profile', '/pay'];
 
 // Routes exempt from onboarding check
-const ONBOARDING_EXEMPT = ['/onboarding', '/api/', '/schedule', '/profile', '/pay', '/claim', '/confirm'];
+const ONBOARDING_EXEMPT = ['/onboarding', '/api/', '/schedule', '/calendar', '/profile', '/pay', '/claim', '/confirm'];
 
 // Routes exempt from SignalPay gating (Autonomous tier)
 const SIGNALPAY_EXEMPT = ['/onboarding', '/api/', '/settings/connect-payouts', '/login', '/signup'];

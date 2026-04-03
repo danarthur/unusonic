@@ -47,6 +47,8 @@ export const PERSON_ATTR = {
   coi_expiry: 'coi_expiry',
   /** Emergency contact — { name: string; phone: string } */
   emergency_contact: 'emergency_contact',
+  /** Availability blackout ranges — array of { start: YYYY-MM-DD, end: YYYY-MM-DD } */
+  availability_blackouts: 'availability_blackouts',
   /** Instagram handle (without @) */
   instagram: 'instagram',
 } as const;

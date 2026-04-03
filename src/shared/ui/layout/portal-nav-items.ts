@@ -3,7 +3,7 @@
  * Simpler than the dashboard nav: schedule, profile, pay.
  */
 
-import { CalendarDays, UserCircle, Banknote } from 'lucide-react';
+import { CalendarDays, Calendar, UserCircle, Banknote } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface PortalNavItem {
@@ -14,9 +14,10 @@ export interface PortalNavItem {
 }
 
 export const portalNavItems: PortalNavItem[] = [
-  { id: 'schedule', label: 'Schedule', icon: CalendarDays, href: '/schedule' },
-  { id: 'profile', label: 'Profile', icon: UserCircle, href: '/profile' },
+  { id: 'schedule', label: 'Gigs', icon: CalendarDays, href: '/schedule' },
+  { id: 'calendar', label: 'Calendar', icon: Calendar, href: '/calendar' },
   { id: 'pay', label: 'Pay', icon: Banknote, href: '/pay' },
+  { id: 'profile', label: 'Profile', icon: UserCircle, href: '/profile' },
 ];
 
 export function isPortalNavActive(itemHref: string, pathname: string): boolean {

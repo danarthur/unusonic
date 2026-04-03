@@ -16,6 +16,7 @@ import {
   Check,
   X,
   Loader2,
+  Download,
 } from 'lucide-react';
 import { respondToCrewAssignment } from '@/features/ops/actions/respond-to-crew-assignment';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -36,6 +37,7 @@ interface GigDetailViewProps {
   crewMembers: { name: string; role: string | null; phone: string | null; entityId: string | null; isYou: boolean }[];
   showDayContacts: { role: string; name: string; phone: string | null; email: string | null }[];
   specialNotes: string | null;
+  documents: { name: string; url: string; size: number; type: string }[];
   assignmentId: string;
 }
 
@@ -62,6 +64,13 @@ function formatEventDate(iso: string | null): string {
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function SectionHeader({ icon: Icon, label }: { icon: typeof Clock; label: string }) {
@@ -91,6 +100,7 @@ export function GigDetailView({
   crewMembers,
   showDayContacts,
   specialNotes,
+  documents,
   assignmentId,
 }: GigDetailViewProps) {
   return (
@@ -247,6 +257,50 @@ export function GigDetailView({
         <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
           <SectionHeader icon={FileText} label="Notes" />
           <p className="text-sm text-[var(--stage-text-secondary)] whitespace-pre-wrap">{specialNotes}</p>
+        </div>
+      )}
+
+      {/* ── Documents ───────────────────────────────────────────── */}
+      {documents.length > 0 && (
+        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+          <SectionHeader icon={FileText} label="Documents" />
+          <div className="flex flex-col gap-2">
+            {documents.map((doc, i) => {
+              const isImage = doc.type.startsWith('image/');
+              const isPdf = doc.type === 'application/pdf';
+              return (
+                <a
+                  key={i}
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-2.5 -mx-0.5 rounded-lg hover:bg-[oklch(1_0_0/0.04)] transition-colors group"
+                >
+                  {isImage ? (
+                    <img
+                      src={doc.url}
+                      alt={doc.name}
+                      className="size-10 rounded-md object-cover shrink-0 border border-[oklch(1_0_0/0.06)]"
+                    />
+                  ) : (
+                    <div className="size-10 rounded-md bg-[oklch(1_0_0/0.06)] flex items-center justify-center shrink-0">
+                      <FileText className="size-4 text-[var(--stage-text-tertiary)]" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
+                      {doc.name}
+                    </p>
+                    <p className="text-xs text-[var(--stage-text-tertiary)]">
+                      {formatFileSize(doc.size)}
+                      {isPdf && ' · PDF'}
+                    </p>
+                  </div>
+                  <Download className="size-4 text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                </a>
+              );
+            })}
+          </div>
         </div>
       )}
     </motion.div>

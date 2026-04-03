@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
-import { User, Phone, Mail, Briefcase, Shield, AlertCircle } from 'lucide-react';
+import { User, Phone, Mail, Briefcase, Shield, AlertCircle, Calendar, Copy, Check } from 'lucide-react';
+import { getOrCreateIcalToken } from '@/features/ops/actions/get-ical-token';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { updateMyProfile } from './actions';
 
@@ -211,6 +212,76 @@ export function ProfileView({
           </div>
         </div>
       )}
+
+      {/* Calendar sync */}
+      <CalendarSyncSection />
     </motion.div>
+  );
+}
+
+/* ── Calendar Sync Section ───────────────────────────────────────── */
+
+function CalendarSyncSection() {
+  const [icalUrl, setIcalUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const generateLink = () => {
+    startTransition(async () => {
+      const token = await getOrCreateIcalToken();
+      if (token) {
+        const base = typeof window !== 'undefined' ? window.location.origin : '';
+        setIcalUrl(`${base}/api/portal/ical/${token}`);
+      }
+    });
+  };
+
+  const copyUrl = async () => {
+    if (!icalUrl) return;
+    await navigator.clipboard.writeText(icalUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+        Calendar sync
+      </h3>
+      <div className="rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)] p-4">
+        <div className="flex items-start gap-3">
+          <Calendar className="size-5 text-[var(--stage-text-tertiary)] mt-0.5 shrink-0" />
+          <div className="flex flex-col gap-2 min-w-0">
+            <p className="text-sm text-[var(--stage-text-secondary)]">
+              Subscribe to your show schedule in Apple Calendar, Google Calendar, or Outlook. Updates automatically when gigs change.
+            </p>
+            {!icalUrl ? (
+              <button
+                onClick={generateLink}
+                disabled={isPending}
+                className="text-sm font-medium text-[var(--stage-text-primary)] bg-[oklch(1_0_0/0.08)] hover:bg-[oklch(1_0_0/0.12)] px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 w-fit"
+              >
+                {isPending ? 'Generating...' : 'Get calendar link'}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={icalUrl}
+                  className="flex-1 text-xs font-mono bg-[var(--stage-well)] rounded-lg px-3 py-1.5 text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none truncate"
+                />
+                <button
+                  onClick={copyUrl}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.12)] transition-colors shrink-0"
+                >
+                  {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

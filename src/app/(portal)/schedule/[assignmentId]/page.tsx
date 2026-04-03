@@ -7,6 +7,8 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import { GigDetailView } from './gig-detail-view';
+import { DjPrepWorkspace } from './dj-prep-workspace';
+import type { DjPrepData } from '@/features/ops/actions/save-dj-prep';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +47,7 @@ export default async function GigDetailPage({
   const { data: event } = await supabase
     .schema('ops')
     .from('events')
-    .select('id, title, starts_at, ends_at, venue_name, venue_address, location_name, location_address, show_day_contacts, run_of_show_data, dates_load_in, dates_load_out, event_archetype, deal_id, notes')
+    .select('id, title, starts_at, ends_at, venue_name, venue_address, location_name, location_address, show_day_contacts, run_of_show_data, dates_load_in, dates_load_out, event_archetype, deal_id, notes, workspace_id')
     .eq('id', assignment.event_id)
     .maybeSingle();
 
@@ -132,6 +134,49 @@ export default async function GigDetailPage({
   const rosData = (event.run_of_show_data ?? {}) as Record<string, unknown>;
   const specialNotes = (rosData.venue_restrictions as string | null) ?? event.notes ?? null;
 
+  // Event documents from storage
+  const documents: { name: string; url: string; size: number; type: string }[] = [];
+  if (event.workspace_id) {
+    const storagePath = `${event.workspace_id}/${event.id}/documents`;
+    const { data: files } = await supabase.storage
+      .from('workspace-files')
+      .list(storagePath, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+
+    if (files && files.length > 0) {
+      // Filter out folder placeholders
+      const realFiles = files.filter((f) => f.name !== '.emptyFolderPlaceholder' && f.id);
+      if (realFiles.length > 0) {
+        const paths = realFiles.map((f) => `${storagePath}/${f.name}`);
+        const { data: signedUrls } = await supabase.storage
+          .from('workspace-files')
+          .createSignedUrls(paths, 3600); // 1 hour expiry
+
+        for (let i = 0; i < realFiles.length; i++) {
+          const file = realFiles[i];
+          const signed = signedUrls?.find((s) => s.path === paths[i]);
+          if (signed?.signedUrl) {
+            const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+            const mimeMap: Record<string, string> = {
+              pdf: 'application/pdf',
+              png: 'image/png',
+              jpg: 'image/jpeg',
+              jpeg: 'image/jpeg',
+              gif: 'image/gif',
+              webp: 'image/webp',
+              svg: 'image/svg+xml',
+            };
+            documents.push({
+              name: file.name,
+              url: signed.signedUrl,
+              size: file.metadata?.size ?? 0,
+              type: mimeMap[ext] ?? 'application/octet-stream',
+            });
+          }
+        }
+      }
+    }
+  }
+
   // Rate
   const payRate = assignment.pay_rate ? Number(assignment.pay_rate) : null;
   const payDisplay = payRate
@@ -140,8 +185,18 @@ export default async function GigDetailPage({
       : `$${payRate.toFixed(0)}`
     : null;
 
+  // DJ/entertainer roles get the show prep workspace
+  const isDjRole = /\b(dj|mc|emcee|entertainer|host)\b/i.test(assignment.role ?? '');
+  const djPrepInitial: Partial<DjPrepData> = {
+    dj_timeline: rosData.dj_timeline as DjPrepData['dj_timeline'] | undefined,
+    dj_must_play: rosData.dj_must_play as string[] | undefined,
+    dj_do_not_play: rosData.dj_do_not_play as string[] | undefined,
+    dj_client_notes: rosData.dj_client_notes as string | undefined,
+    dj_client_info: rosData.dj_client_info as DjPrepData['dj_client_info'] | undefined,
+  };
+
   return (
-    <div className="max-w-2xl mx-auto w-full">
+    <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
       <GigDetailView
         eventTitle={event.title ?? 'Untitled show'}
         eventDate={event.starts_at}
@@ -156,8 +211,12 @@ export default async function GigDetailPage({
         crewMembers={crewMembers}
         showDayContacts={showDayContacts}
         specialNotes={specialNotes}
+        documents={documents}
         assignmentId={assignmentId}
       />
+      {isDjRole && (
+        <DjPrepWorkspace eventId={event.id} initialData={djPrepInitial} />
+      )}
     </div>
   );
 }
