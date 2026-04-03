@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, MapPin, XCircle, Archive, TrendingDown, CalendarClock, RotateCcw, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { ReadinessRibbon } from './readiness-ribbon';
 import { cn } from '@/shared/lib/utils';
+import type { ReadinessData } from '../lib/compute-readiness';
 import { cancelEvent } from '../actions/delete-event';
 import { archiveDeal } from '../actions/archive-deal';
 import { reopenDeal } from '../actions/reopen-deal';
@@ -35,10 +37,14 @@ export type StreamCardItem = {
   owner_name?: string | null;
   /** ISO timestamp of deal/event creation. */
   created_at?: string | null;
+  /** Show health status from PM. */
+  show_health_status?: 'on_track' | 'at_risk' | 'blocked' | null;
   /** Follow-up engine signals */
   followUpReason?: string | null;
   followUpPriority?: number | null;
   followUpStatus?: 'pending' | 'snoozed' | 'acted' | 'dismissed' | null;
+  /** Production readiness signals — present for won deals with events. */
+  readiness?: ReadinessData | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -208,7 +214,7 @@ export function StreamCard({
           className={cn(
             'relative px-4 py-3 transition-colors duration-100',
             'bg-[var(--stage-surface-elevated)] hover:bg-[var(--stage-surface-raised)]',
-            item.lifecycle_status === 'cancelled' && 'opacity-50',
+            item.lifecycle_status === 'cancelled' && 'opacity-[0.45]',
           )}
           style={{
             borderRadius: 'var(--stage-radius-panel, 12px)',
@@ -217,8 +223,21 @@ export function StreamCard({
         >
           {/* Row 1: Title + Status */}
           <div className="flex items-baseline justify-between gap-3 min-w-0">
-            <h3 className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight truncate leading-none">
-              {item.title ?? 'Untitled'}
+            <h3 className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight truncate leading-none flex items-center gap-1.5">
+              {item.show_health_status && (
+                <span
+                  className="size-2 rounded-full shrink-0 inline-block"
+                  style={{
+                    backgroundColor:
+                      item.show_health_status === 'on_track'
+                        ? 'var(--color-unusonic-success)'
+                        : item.show_health_status === 'at_risk'
+                          ? 'var(--color-unusonic-warning)'
+                          : 'var(--color-unusonic-error)',
+                  }}
+                />
+              )}
+              <span className="truncate">{item.title ?? 'Untitled'}</span>
             </h3>
             <div className="flex items-center gap-2 shrink-0">
               {needsAttention && (
@@ -275,6 +294,12 @@ export function StreamCard({
             )}
           </div>
 
+          {/* Readiness mini ribbon — won deals with event data */}
+          {item.readiness && (
+            <div className="mt-2">
+              <ReadinessRibbon readiness={item.readiness} mini />
+            </div>
+          )}
 
           {/* Action buttons — shown on hover/selected */}
           <AnimatePresence>

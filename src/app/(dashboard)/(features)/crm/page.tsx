@@ -105,7 +105,7 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
       ? supabase
           .schema('ops')
           .from('events')
-          .select('id, title, starts_at, lifecycle_status, created_at, client_entity_id, venue_entity_id')
+          .select('id, title, starts_at, lifecycle_status, created_at, client_entity_id, venue_entity_id, deal_id')
           .eq('workspace_id', workspaceId)
           .order('starts_at', { ascending: true })
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
@@ -213,7 +213,14 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
       };
     });
 
-    const eventGigs: StreamCardItem[] = (eventsRes.data ?? []).map((e: Record<string, unknown>) => {
+    // Filter out events that already have a deal card — avoids duplicate cards for won deals
+    const dealIdSet = new Set(dealIds);
+    const filteredEvents = (eventsRes.data ?? []).filter((e: Record<string, unknown>) => {
+      const eDealId = e.deal_id as string | null;
+      return !eDealId || !dealIdSet.has(eDealId);
+    });
+
+    const eventGigs: StreamCardItem[] = filteredEvents.map((e: Record<string, unknown>) => {
       const clientId = e.client_entity_id as string | null;
       const venueId = e.venue_entity_id as string | null;
       return {

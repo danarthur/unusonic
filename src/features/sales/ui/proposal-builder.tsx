@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useTransition } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Minus, X, FileText, Send, Mail, BookMarked, Trash2, PackageOpen } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetBody } from '@/shared/ui/sheet';
@@ -9,14 +9,23 @@ import { upsertProposal, publishProposal, sendForSignature, deleteProposalItemsB
 import { createPackage } from '../api/package-actions';
 import { PackageSelectorPalette } from './package-selector-palette';
 import type { ProposalWithItems, ProposalBuilderLineItem, ProposalLineItemCategory, UnitType } from '../model/types';
+import type { RequiredRole } from '../api/package-types';
 import { CurrencyInput } from '@/shared/ui/currency-input';
 import { cn } from '@/shared/lib/utils';
 import { ProposalLineInspector } from './proposal-line-inspector';
 import { ProposalProductionTeam } from './proposal-production-team';
+import { ProposalSummaryCard } from './proposal-summary-card';
 import { getCurrentOrgId } from '@/features/network/api/actions';
+import { syncCrewFromProposal } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
 
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { computeHoursBetween } from '@/shared/lib/parse-time';
 import type { ProposalLineItemInput } from '../api/proposal-actions';
+import { checkBatchAvailability, type ItemAvailability } from '../api/catalog-availability';
+import { getItemHistoryForClient, type ItemClientHistory } from '../api/catalog-customer-history';
+import { getAlternativesWithAvailability, type AlternativeWithAvailability } from '../api/catalog-alternatives';
+import { swapProposalLineItem } from '../api/proposal-swap-action';
+import { RiderParserModal } from '@/features/ai/ui/rider-parser-modal';
 
 /** Map a UI line item to the server action input shape. Single source of truth — no duplicates. */
 function toLineItemInput(item: ProposalBuilderLineItem): ProposalLineItemInput {
@@ -74,10 +83,22 @@ export interface ProposalBuilderProps {
   isDragOver?: boolean;
   /** Deal title for proposal link email subject/body. */
   dealTitle?: string | null;
+  /** Deal event start time (HH:MM) — auto-inherited by hourly line items. */
+  dealEventStartTime?: string | null;
+  /** Deal event end time (HH:MM) — auto-inherited by hourly line items. */
+  dealEventEndTime?: string | null;
+  /** Deal proposed date — used for rental item availability checks. */
+  proposedDate?: string | null;
+  /** Client entity ID (org or person) — used for customer booking history on line items. */
+  clientEntityId?: string | null;
   className?: string;
 }
 
-function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null | undefined): ProposalBuilderLineItem[] {
+function mapProposalItemsToLineItems(
+  initialProposal: ProposalWithItems | null | undefined,
+  dealEventStartTime?: string | null,
+  dealEventEndTime?: string | null,
+): ProposalBuilderLineItem[] {
   if (!initialProposal?.items?.length) return [];
   return initialProposal.items.map((item) => {
     const row = item as {
@@ -115,7 +136,7 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
      
     const requiredRoles = (row.definition_snapshot?.crew_meta?.required_roles as any[] | null | undefined) ?? null;
     const unitType = (row.unit_type === 'hour' || row.unit_type === 'day' ? row.unit_type : 'flat') as ProposalBuilderLineItem['unitType'];
-    return {
+    const mapped: ProposalBuilderLineItem = {
       id: row.id,
       packageId: row.package_id ?? null,
       originPackageId: row.origin_package_id ?? null,
@@ -142,6 +163,19 @@ function mapProposalItemsToLineItems(initialProposal: ProposalWithItems | null |
       timeEnd: row.time_end ?? null,
       showTimesOnProposal: row.show_times_on_proposal ?? true,
     };
+
+    // Auto-inherit deal event times for hourly items with no saved times
+    if (unitType === 'hour' || unitType === 'day') {
+      if (!mapped.timeStart && dealEventStartTime) mapped.timeStart = dealEventStartTime;
+      if (!mapped.timeEnd && dealEventEndTime) mapped.timeEnd = dealEventEndTime;
+    }
+    // Auto-compute unitMultiplier from effective times for hourly items
+    if (unitType === 'hour' && mapped.timeStart && mapped.timeEnd) {
+      const hours = computeHoursBetween(mapped.timeStart, mapped.timeEnd);
+      if (hours != null && hours > 0) mapped.unitMultiplier = hours;
+    }
+
+    return mapped;
   });
 }
 
@@ -178,10 +212,14 @@ export function ProposalBuilder({
   emptyDropHint,
   isDragOver = false,
   dealTitle = null,
+  dealEventStartTime,
+  dealEventEndTime,
+  proposedDate,
+  clientEntityId,
   className,
 }: ProposalBuilderProps) {
   const [lineItems, setLineItems] = useState<ProposalBuilderLineItem[]>(() =>
-    mapProposalItemsToLineItems(initialProposal)
+    mapProposalItemsToLineItems(initialProposal, dealEventStartTime, dealEventEndTime)
   );
   const [proposalId, setProposalId] = useState<string | null>(initialProposal?.id ?? null);
   const [saving, setSaving] = useState(false);
@@ -200,15 +238,67 @@ export function ProposalBuilder({
   const [showDraftSaved, setShowDraftSaved] = useState(false);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [riderModalOpen, setRiderModalOpen] = useState(false);
   /** When true, actual_cost is editable for Rental/Retail (sub-rental or custom order). */
   const [subRentalCostUnlocked, setSubRentalCostUnlocked] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [sourceOrgId, setSourceOrgId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  /** Availability data for rental line items keyed by origin_package_id. */
+  const [lineItemAvailability, setLineItemAvailability] = useState<Record<string, ItemAvailability>>({});
+  /** Which proposal_item ID has its alternatives picker open (null = none). */
+  const [alternativesOpenId, setAlternativesOpenId] = useState<string | null>(null);
+  /** Fetched alternatives for the currently open picker. */
+  const [alternativesData, setAlternativesData] = useState<AlternativeWithAvailability[]>([]);
+  /** Loading state for alternatives fetch. */
+  const [alternativesLoading, setAlternativesLoading] = useState(false);
   // Sync line items when parent refetches proposal (e.g. after drop from catalog or "Apply to proposal" in palette).
   useEffect(() => {
-    setLineItems(mapProposalItemsToLineItems(initialProposal));
+    setLineItems(mapProposalItemsToLineItems(initialProposal, dealEventStartTime, dealEventEndTime));
     setProposalId(initialProposal?.id ?? null);
+  }, [initialProposal, dealEventStartTime, dealEventEndTime]);
+
+  // ── Auto-save: debounced persist after user edits ──────────────────────────
+  // Skip the first render (initial load) — only save on user-initiated changes.
+  const isInitialLoad = useRef(true);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Mark initial load complete after first lineItems sync
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+    // Don't auto-save if readOnly, no dealId, or no items
+    if (readOnly || !dealId || lineItems.length === 0) return;
+    // Don't auto-save while an explicit save/send is in progress
+    if (saving || sending) return;
+
+    // Clear previous timer
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    autoSaveTimer.current = setTimeout(() => {
+      startTransition(async () => {
+        const input = lineItems.map(toLineItemInput);
+        const result = await upsertProposal(dealId, input);
+        if (result.proposalId) {
+          setProposalId(result.proposalId);
+          onSaved?.(result.proposalId, result.total);
+          setShowDraftSaved(true);
+          // Sync crew assignments from proposal to deal_crew so the deal page stays in sync
+          syncCrewFromProposal(dealId).catch(() => {});
+        }
+      });
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [lineItems, dealId, readOnly, saving, sending, onSaved]);
+
+  // Reset initial load flag when proposal changes (e.g. after adding from catalog)
+  useEffect(() => {
+    isInitialLoad.current = true;
   }, [initialProposal]);
 
   // Fetch workspace org id for crew search in production team card
@@ -216,6 +306,61 @@ export function ProposalBuilder({
     getCurrentOrgId().then((id) => setSourceOrgId(id));
   }, []);
 
+  // Derive a stable key from the set of rental package IDs so the availability
+  // check doesn't re-fire on every lineItems edit (name/price/qty keystrokes).
+  const rentalPackageIdsKey = useMemo(() => {
+    const ids = lineItems
+      .filter((item) => item.originPackageId && item.category === 'rental')
+      .map((item) => item.originPackageId!)
+      .filter((id, i, arr) => arr.indexOf(id) === i);
+    return ids.sort().join(',');
+  }, [lineItems]);
+
+  // Fetch availability for rental line items when the set of rental packages or date changes
+  useEffect(() => {
+    if (!proposedDate || !workspaceId || !rentalPackageIdsKey) {
+      setLineItemAvailability({});
+      return;
+    }
+    const rentalPackageIds = rentalPackageIdsKey.split(',');
+    checkBatchAvailability(workspaceId, rentalPackageIds, proposedDate).then((result) => {
+      setLineItemAvailability(result);
+    });
+  }, [proposedDate, workspaceId, rentalPackageIdsKey]);
+
+  // Customer booking history — how many times this client has booked each catalog item
+  const [customerHistory, setCustomerHistory] = useState<Record<string, ItemClientHistory>>({});
+
+  // Derive a stable key from unique originPackageIds so history doesn't refetch on every keystroke
+  const originPackageIdsKey = useMemo(() => {
+    const ids = lineItems
+      .filter((item) => item.originPackageId)
+      .map((item) => item.originPackageId!)
+      .filter((id, i, arr) => arr.indexOf(id) === i);
+    return ids.sort().join(',');
+  }, [lineItems]);
+
+  useEffect(() => {
+    if (!clientEntityId || !originPackageIdsKey) {
+      setCustomerHistory({});
+      return;
+    }
+    const packageIds = originPackageIdsKey.split(',');
+    let cancelled = false;
+    Promise.all(
+      packageIds.map((pkgId) =>
+        getItemHistoryForClient(pkgId, clientEntityId).then((h) => [pkgId, h] as const)
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const map: Record<string, ItemClientHistory> = {};
+      for (const [pkgId, history] of results) {
+        if (history.bookingCount > 0) map[pkgId] = history;
+      }
+      setCustomerHistory(map);
+    });
+    return () => { cancelled = true; };
+  }, [clientEntityId, originPackageIdsKey]);
 
   // Mobile breakpoint detection for sheet inspector
   useEffect(() => {
@@ -345,15 +490,70 @@ export function ProposalBuilder({
     );
   }, []);
 
-  const updateUnitType = useCallback((index: number, value: UnitType) => {
-    setLineItems((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? { ...item, unitType: value, unitMultiplier: (value === 'flat' ? 1 : (item.unitMultiplier ?? 1)) }
-          : item
-      )
-    );
-  }, []);
+  /**
+   * Billing mode change: updates unitType AND syncs booking_type on required roles.
+   * Flat → talent (performer names show on client proposal).
+   * Hourly/Daily → labor (billed by duration, names hidden).
+   */
+  const handleBillingModeChange = useCallback((index: number, newUnitType: UnitType) => {
+    setLineItems((prev) => {
+      const items = [...prev];
+      const item = { ...items[index] };
+      const oldUnitType = item.unitType ?? 'flat';
+      const currentPrice = item.overridePrice != null && Number.isFinite(item.overridePrice) ? item.overridePrice : item.unitPrice;
+      const oldMultiplier = (oldUnitType === 'hour' || oldUnitType === 'day') ? Math.max(1, Number(item.unitMultiplier) || 1) : 1;
+
+      const currentCost = item.actualCost != null && Number.isFinite(item.actualCost) ? item.actualCost : null;
+
+      item.unitType = newUnitType;
+      if (newUnitType === 'flat') {
+        // Switching to flat: collapse rate × hours into single flat price/cost
+        if (oldUnitType !== 'flat' && oldMultiplier > 1) {
+          const flatTotal = Math.round(currentPrice * oldMultiplier);
+          if (item.overridePrice != null) item.overridePrice = flatTotal;
+          else item.unitPrice = flatTotal;
+          if (currentCost != null) item.actualCost = Math.round(currentCost * oldMultiplier);
+        }
+        // Reset multiplier — flat items don't use it
+        item.unitMultiplier = 1;
+        item.timeStart = null;
+        item.timeEnd = null;
+        // floorPrice is NOT converted — it's always a total floor, not per-unit
+      } else {
+        if (!item.timeStart && dealEventStartTime) item.timeStart = dealEventStartTime;
+        if (!item.timeEnd && dealEventEndTime) item.timeEnd = dealEventEndTime;
+        // Compute hours from time range
+        let newMultiplier = item.unitMultiplier ?? 1;
+        if (newUnitType === 'hour' && item.timeStart && item.timeEnd) {
+          const hours = computeHoursBetween(item.timeStart, item.timeEnd);
+          if (hours != null && hours > 0) newMultiplier = hours;
+        }
+        item.unitMultiplier = newMultiplier;
+        // Switching from flat: divide flat price AND cost by hours to get per-unit rates
+        // floorPrice is NOT divided — it stays as the total floor
+        if (oldUnitType === 'flat' && newMultiplier > 1) {
+          if (currentPrice > 0) {
+            const perUnitRate = Math.round(currentPrice / newMultiplier);
+            if (item.overridePrice != null) item.overridePrice = perUnitRate;
+            else item.unitPrice = perUnitRate;
+          }
+          if (currentCost != null && currentCost > 0) item.actualCost = Math.round(currentCost / newMultiplier);
+        }
+      }
+
+      // Sync booking_type in required roles based on billing mode
+      if (item.requiredRoles && item.requiredRoles.length > 0) {
+        const newBookingType = newUnitType === 'flat' ? 'talent' : 'labor';
+        item.requiredRoles = item.requiredRoles.map((role: RequiredRole) => ({
+          ...role,
+          booking_type: newBookingType,
+        }));
+      }
+
+      items[index] = item;
+      return items;
+    });
+  }, [dealEventStartTime, dealEventEndTime]);
 
   const updateLineItemUnitPrice = useCallback((index: number, value: number) => {
     const v = Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -371,9 +571,29 @@ export function ProposalBuilder({
   const updateRoleAssignment = useCallback((lineIdx: number, roleIdx: number, entityId: string | null, name: string | null) => {
     setLineItems((prev) =>
       prev.map((item, i) => {
-        if (i !== lineIdx || !item.requiredRoles) return item;
-        const roles = [...item.requiredRoles];
-        roles[roleIdx] = { ...roles[roleIdx], entity_id: entityId, assignee_name: name };
+        if (i !== lineIdx) return item;
+        const roles = [...(item.requiredRoles ?? [])];
+        if (roleIdx >= 0 && roleIdx < roles.length) {
+          roles[roleIdx] = { ...roles[roleIdx], entity_id: entityId, assignee_name: name };
+        }
+        return { ...item, requiredRoles: roles };
+      })
+    );
+  }, []);
+
+  const addRoleToLineItem = useCallback((lineIdx: number) => {
+    setLineItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== lineIdx) return item;
+        const roles = [...(item.requiredRoles ?? [])];
+        const bookingType = item.unitType === 'flat' ? 'talent' : 'labor';
+        roles.push({
+          role: item.name || 'Crew',
+          booking_type: bookingType,
+          quantity: 1,
+          entity_id: null,
+          assignee_name: null,
+        } as RequiredRole);
         return { ...item, requiredRoles: roles };
       })
     );
@@ -381,13 +601,29 @@ export function ProposalBuilder({
 
   const updateTimeStart = useCallback((index: number, value: string | null) => {
     setLineItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, timeStart: value } : item))
+      prev.map((item, i) => {
+        if (i !== index) return item;
+        const updated = { ...item, timeStart: value };
+        if (updated.unitType === 'hour' && value && updated.timeEnd) {
+          const hours = computeHoursBetween(value, updated.timeEnd);
+          if (hours != null && hours > 0) updated.unitMultiplier = hours;
+        }
+        return updated;
+      })
     );
   }, []);
 
   const updateTimeEnd = useCallback((index: number, value: string | null) => {
     setLineItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, timeEnd: value } : item))
+      prev.map((item, i) => {
+        if (i !== index) return item;
+        const updated = { ...item, timeEnd: value };
+        if (updated.unitType === 'hour' && updated.timeStart && value) {
+          const hours = computeHoursBetween(updated.timeStart, value);
+          if (hours != null && hours > 0) updated.unitMultiplier = hours;
+        }
+        return updated;
+      })
     );
   }, []);
 
@@ -396,6 +632,17 @@ export function ProposalBuilder({
       prev.map((item, i) => (i === index ? { ...item, showTimesOnProposal: value } : item))
     );
   }, []);
+
+  const updateDisplayGroupName = useCallback((index: number, value: string | null) => {
+    setLineItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, displayGroupName: value || null } : item))
+    );
+  }, []);
+
+  const existingSections = useMemo(() => {
+    const names = new Set(lineItems.map((i) => i.displayGroupName).filter(Boolean) as string[]);
+    return [...names].sort();
+  }, [lineItems]);
 
   const handleSaveDraft = useCallback(() => {
     setSaving(true);
@@ -407,6 +654,7 @@ export function ProposalBuilder({
         setProposalId(result.proposalId);
         onSaved?.(result.proposalId, result.total);
         setShowDraftSaved(true);
+        syncCrewFromProposal(dealId).catch(() => {});
       }
     });
   }, [dealId, lineItems, onSaved]);
@@ -478,6 +726,35 @@ export function ProposalBuilder({
     });
   }, [workspaceId, lineItems]);
 
+  // ── Helpers for inspector alternatives ─────────────────────────────────
+  // (Must be declared before the readOnly early return to satisfy rules-of-hooks.)
+  const handleShowAlternativesInInspector = useCallback(() => {
+    const item = selectedLineIndex != null ? lineItems[selectedLineIndex] : null;
+    if (!item?.id || !item.originPackageId || !proposedDate) return;
+    const itemId = item.id;
+    if (alternativesOpenId === itemId) {
+      setAlternativesOpenId(null);
+      return;
+    }
+    setAlternativesOpenId(itemId);
+    setAlternativesData([]);
+    setAlternativesLoading(true);
+    getAlternativesWithAvailability(workspaceId, item.originPackageId, proposedDate)
+      .then((alts) => { setAlternativesData(alts); setAlternativesLoading(false); })
+      .catch(() => { setAlternativesLoading(false); });
+  }, [selectedLineIndex, lineItems, proposedDate, workspaceId, alternativesOpenId]);
+
+  const handleSwapAlternativeInInspector = useCallback(async (alternativeId: string) => {
+    const item = selectedLineIndex != null ? lineItems[selectedLineIndex] : null;
+    if (!item?.id) return;
+    const result = await swapProposalLineItem(item.id, alternativeId);
+    if (result.success) {
+      setAlternativesOpenId(null);
+      setAlternativesData([]);
+      onProposalRefetch?.();
+    }
+  }, [selectedLineIndex, lineItems, onProposalRefetch]);
+
   if (readOnly) {
     return (
       <div className={cn('flex flex-col gap-4', className)}>
@@ -512,13 +789,7 @@ export function ProposalBuilder({
     );
   }
 
-  const hasVariableUnits = lineItems.some((i) => i.unitType === 'hour' || i.unitType === 'day');
-  const receiptRowClass = hasVariableUnits
-    ? 'grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 items-center py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] min-w-0 transition-colors duration-[80ms] ease-out'
-    : 'grid grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 items-center py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] min-w-0 transition-colors duration-[80ms] ease-out';
-  const receiptHeaderClass = hasVariableUnits
-    ? 'grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 items-center py-2 px-4 mb-3 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] border-b border-[var(--stage-edge-subtle)]'
-    : 'grid grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 items-center py-2 px-4 mb-3 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] border-b border-[var(--stage-edge-subtle)]';
+  const receiptHeaderClass = 'flex items-center gap-3 py-2 px-4 mb-3 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] border-b border-[var(--stage-edge-subtle)]';
   const qtyStepperClass =
     'flex flex-col items-center shrink-0 w-10 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-transparent';
   const qtyBtnClass =
@@ -529,14 +800,15 @@ export function ProposalBuilder({
   const renderReceiptRow = (index: number, showIncludedWhenZero: boolean) => {
     const item = lineItems[index];
     const isIncluded = showIncludedWhenZero && effectiveUnitPrice(item) === 0;
+    const avail = item.originPackageId ? lineItemAvailability[item.originPackageId] : undefined;
+
     return (
       <motion.li
         key={item.id ?? `row-${index}`}
         layout
         transition={STAGE_MEDIUM}
         className={cn(
-          receiptRowClass,
-          'cursor-pointer transition-colors',
+          'group flex items-center gap-3 py-2.5 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] transition-colors duration-[80ms] ease-out cursor-pointer',
           selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
         )}
         onClick={() => {
@@ -545,39 +817,53 @@ export function ProposalBuilder({
           setSubRentalCostUnlocked(false);
         }}
       >
-        <div className="min-w-0 pr-2 overflow-hidden">
+        {/* Name + indicator badges */}
+        <div className="min-w-0 flex-1 flex items-center gap-2">
           <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm leading-snug">
             {item.name || 'Custom item'}
           </p>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <select
-              value={item.unitType ?? 'flat'}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => updateUnitType(index, e.target.value as UnitType)}
-              className="text-xs bg-[var(--stage-surface-elevated)] border border-[var(--stage-edge-subtle)] rounded-[var(--stage-radius-input)] px-1.5 py-0.5 text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
-              aria-label="Billing unit type"
-            >
-              <option value="flat">Flat</option>
-              <option value="hour">Hourly</option>
-              <option value="day">Daily</option>
-            </select>
-            <span className="text-xs text-[var(--stage-text-secondary)] tabular-nums">
-              {isIncluded ? 'Included' : `$${effectiveUnitPrice(item).toLocaleString()}${item.unitType === 'hour' ? '/hr' : item.unitType === 'day' ? '/day' : ' each'}`}
-            </span>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handleToggleOptional(index); }}
+
+          {/* Availability dot */}
+          {avail && (
+            <span
               className={cn(
-                'text-xs px-2 py-1 rounded-[var(--stage-radius-input)] border transition-colors',
-                item.isOptional
-                  ? 'border-[var(--color-unusonic-info)]/50 text-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/10'
-                  : 'border-[var(--stage-border)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
+                'inline-block w-2 h-2 rounded-full shrink-0',
+                avail.status === 'available' ? 'bg-emerald-400' :
+                avail.status === 'tight' ? 'bg-amber-400' : 'bg-red-400'
               )}
-            >
-              {item.isOptional ? 'Optional' : 'Required'}
-            </button>
-          </div>
+              title={
+                avail.status === 'available'
+                  ? `${avail.available} available`
+                  : avail.status === 'tight'
+                    ? `${avail.available} of ${avail.stockQuantity} remaining`
+                    : `Fully booked (${avail.totalAllocated} allocated, ${avail.stockQuantity} in stock)`
+              }
+            />
+          )}
+
+          {/* Billing mode label (read-only pill — only shown for non-flat) */}
+          {item.unitType && item.unitType !== 'flat' && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.06)] text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
+              {item.unitType === 'hour' ? 'Hourly' : 'Daily'}
+            </span>
+          )}
+
+          {/* Optional badge */}
+          {item.isOptional && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[var(--color-unusonic-info)]/10 text-[10px] font-medium text-[var(--color-unusonic-info)]">
+              Optional
+            </span>
+          )}
+
+          {/* Click to edit hint — visible on hover, hidden when selected */}
+          {selectedLineIndex !== index && (
+            <span className="shrink-0 text-[10px] text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">
+              Click to edit
+            </span>
+          )}
         </div>
+
+        {/* Qty stepper */}
         <div className={qtyStepperClass} onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
@@ -611,26 +897,13 @@ export function ProposalBuilder({
             <Minus className="w-3.5 h-3.5" />
           </button>
         </div>
-        {hasVariableUnits && (
-          <div className="w-12 shrink-0 flex justify-center" onClick={(e) => e.stopPropagation()}>
-            {(item.unitType === 'hour' || item.unitType === 'day') ? (
-              <input
-                type="number"
-                min={0.25}
-                step={0.25}
-                value={item.unitMultiplier ?? 1}
-                onChange={(e) => updateUnitMultiplier(index, e.target.valueAsNumber)}
-                className="w-full text-center text-sm font-medium tabular-nums bg-[var(--ctx-well)] border border-[var(--stage-border)] rounded-[var(--stage-radius-input)] py-1 px-1 text-[var(--stage-text-primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                aria-label={item.unitType === 'hour' ? 'Hours' : 'Days'}
-              />
-            ) : (
-              <span className="text-xs text-[var(--stage-text-secondary)]">—</span>
-            )}
-          </div>
-        )}
-        <span className="text-sm font-medium text-[var(--stage-text-primary)] tabular-nums w-14 shrink-0 text-right">
+
+        {/* Total */}
+        <span className="text-sm font-medium text-[var(--stage-text-primary)] tabular-nums w-20 shrink-0 text-right">
           {isIncluded ? 'Included' : `$${lineTotal(item).toLocaleString()}`}
         </span>
+
+        {/* Delete */}
         <button
           type="button"
           onClick={(e) => {
@@ -638,10 +911,10 @@ export function ProposalBuilder({
             removeItem(index);
             if (selectedLineIndex === index) setSelectedLineIndex(null);
           }}
-          className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] w-9 h-9 flex items-center justify-center shrink-0"
+          className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] w-8 h-8 flex items-center justify-center shrink-0"
           aria-label={`Remove ${item.name || 'item'}`}
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </motion.li>
     );
@@ -651,11 +924,10 @@ export function ProposalBuilder({
     <div className="flex-1 overflow-auto min-h-[160px] min-w-0">
       {lineItems.length > 0 && (
         <div className={receiptHeaderClass}>
-          <span>Item</span>
-          <span className="text-center">Qty</span>
-          {hasVariableUnits && <span className="text-center w-12 shrink-0">Hrs</span>}
-          <span className="text-right w-14 shrink-0">Total</span>
-          <span className="w-9 shrink-0" aria-hidden />
+          <span className="flex-1">Item</span>
+          <span className="text-center w-10 shrink-0">Qty</span>
+          <span className="text-right w-20 shrink-0">Total</span>
+          <span className="w-8 shrink-0" aria-hidden />
         </div>
       )}
       <ul className="space-y-3 mt-1 pb-1 mx-px">
@@ -693,8 +965,7 @@ export function ProposalBuilder({
                           transition={STAGE_MEDIUM}
                           role="row"
                           className={cn(
-                            receiptRowClass,
-                            'cursor-pointer transition-colors',
+                            'py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] min-w-0 transition-colors duration-[80ms] ease-out cursor-pointer',
                             selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
                           )}
                           onClick={() => {
@@ -702,7 +973,8 @@ export function ProposalBuilder({
                             setSubRentalCostUnlocked(false);
                           }}
                         >
-                          <div className="min-w-0 pr-2 overflow-hidden">
+                        <div className="flex items-center gap-3">
+                          <div className="min-w-0 flex-1">
                             <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm leading-snug">
                               {item.name || 'Package'}
                             </p>
@@ -711,12 +983,7 @@ export function ProposalBuilder({
                           <div className={qtyStepperClass} onClick={(e) => e.stopPropagation()}>
                             <span className="text-sm font-medium text-[var(--stage-text-secondary)] py-2">1</span>
                           </div>
-                          {hasVariableUnits && (
-                            <div className="w-12 shrink-0 flex justify-center">
-                              <span className="text-xs text-[var(--stage-text-secondary)]">—</span>
-                            </div>
-                          )}
-                          <div className="w-14 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                          <div className="w-20 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
                             <CurrencyInput
                               value={String(effectiveUnitPrice(item))}
                               onChange={(v) => updateLineItemUnitPrice(index, Number(v) || 0)}
@@ -749,6 +1016,7 @@ export function ProposalBuilder({
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
+                        </div>
                         </motion.div>
                       );
                     })()}
@@ -792,12 +1060,94 @@ export function ProposalBuilder({
     </div>
   );
 
+  // ── Proposal summary card values ──────────────────────────────────────────
+  const summaryValues = useMemo(() => {
+    const totalRevenue = lineItems.reduce((sum, item) => sum + lineTotal(item), 0);
+    let hasCost = false;
+    let costSum = 0;
+    let floorGapCount = 0;
+    let floorGapTotal = 0;
+    let floorSum = 0;
+    let hasFloor = false;
+    for (const item of lineItems) {
+      // Skip bundle children for cost — the header row carries the total bundle cost.
+      const isBundleChild = !item.isPackageHeader && item.packageInstanceId != null;
+      if (item.actualCost != null && !isBundleChild) {
+        hasCost = true;
+        costSum += item.actualCost * item.quantity * unitMultiplier(item);
+      }
+      // Floor comparison at LINE TOTAL level, not per-unit.
+      // floorPrice in the snapshot is the flat total floor for this line item.
+      // Compare the actual line total against the floor — regardless of billing mode.
+      const itemLineTotal = lineTotal(item);
+      const fp = item.floorPrice;
+      if (fp != null && itemLineTotal < fp) {
+        floorGapCount += 1;
+        floorGapTotal += fp - itemLineTotal;
+      }
+      // Talent budget: floor price is already a total (not per-unit)
+      if (!isBundleChild) {
+        const floorVal = fp ?? (item.actualCost != null ? item.actualCost * item.quantity * unitMultiplier(item) : null);
+        if (floorVal != null) {
+          hasFloor = true;
+          floorSum += floorVal;
+        }
+      }
+    }
+    // talentBudget = revenue minus floor sum; only show when at least one item has a floor or cost
+    const talentBudget = hasFloor ? Math.round(totalRevenue - floorSum) : null;
+    return {
+      totalRevenue,
+      estimatedCost: hasCost ? costSum : null,
+      floorGapCount,
+      floorGapTotal,
+      talentBudget,
+    };
+  }, [lineItems]);
+
   const selectedItem = selectedLineIndex != null ? lineItems[selectedLineIndex] ?? null : null;
   const inspectorCategory: ProposalLineItemCategory | null = selectedItem?.category ?? null;
   const costFullyEditable = inspectorCategory === 'service' || inspectorCategory === 'talent';
   const costRentalRetail = inspectorCategory === 'rental' || inspectorCategory === 'retail_sale';
   const costEditable = costFullyEditable || (costRentalRetail && subRentalCostUnlocked) || inspectorCategory == null;
   const costHidden = inspectorCategory === 'package' || inspectorCategory === 'fee';
+
+  /** Shared inspector props used by both desktop and mobile renderers. */
+  const inspectorProps = selectedItem && selectedLineIndex != null ? {
+    item: selectedItem,
+    lineIndex: selectedLineIndex,
+    onUpdateName: updateLineItemName,
+    onUpdateOverridePrice: updateLineItemOverridePrice,
+    onUpdateActualCost: updateLineItemActualCost,
+    onUpdateUnitPrice: updateLineItemUnitPrice,
+    onUpdateDisplayGroupName: updateDisplayGroupName,
+    existingSections,
+    costEditable,
+    costHidden,
+    costRentalRetail,
+    subRentalCostUnlocked,
+    onToggleSubRental: setSubRentalCostUnlocked,
+    // New relocated controls
+    onUpdateBillingMode: handleBillingModeChange,
+    onUpdateUnitMultiplier: updateUnitMultiplier,
+    onToggleOptional: handleToggleOptional,
+    customerHistory: selectedItem.originPackageId ? customerHistory[selectedItem.originPackageId] ?? null : null,
+    availability: selectedItem.originPackageId ? lineItemAvailability[selectedItem.originPackageId] ?? null : null,
+    alternativesData,
+    alternativesLoading,
+    alternativesOpen: selectedItem.id != null && alternativesOpenId === selectedItem.id,
+    onShowAlternatives: handleShowAlternativesInInspector,
+    onSwapAlternative: handleSwapAlternativeInInspector,
+    onCloseAlternatives: () => { setAlternativesOpenId(null); setAlternativesData([]); },
+    proposedDate,
+    onUpdateTimeStart: updateTimeStart,
+    onUpdateTimeEnd: updateTimeEnd,
+    onUpdateShowTimes: (index: number, value: boolean) => {
+      setLineItems((prev) =>
+        prev.map((item, i) => (i === index ? { ...item, showTimesOnProposal: value } : item))
+      );
+    },
+  } as const : null;
 
   return (
     <div className={cn('flex flex-col gap-4', className)} style={{ overflow: 'visible' }}>
@@ -819,6 +1169,7 @@ export function ProposalBuilder({
                 <PackageSelectorPalette
                   workspaceId={workspaceId}
                   dealId={dealId}
+                  proposedDate={proposedDate}
                   open={paletteOpen}
                   onOpenChange={setPaletteOpen}
                   onApplied={onProposalRefetch}
@@ -834,103 +1185,119 @@ export function ProposalBuilder({
                   }
                 />
               )}
+
+              {/* Parse rider — opens Aion rider parser modal */}
+              {workspaceId && dealId && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setRiderModalOpen(true)}
+                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 mt-2 rounded-[var(--stage-radius-button)] text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors"
+                  >
+                    <FileText size={16} strokeWidth={1.5} />
+                    Parse rider
+                  </button>
+                  <RiderParserModal
+                    open={riderModalOpen}
+                    onOpenChange={setRiderModalOpen}
+                    dealId={dealId}
+                    workspaceId={workspaceId}
+                    onItemsAdded={() => onProposalRefetch?.()}
+                  />
+                </>
+              )}
             </div>
 
-            {/* Send for signature — always visible, replaces old "Send to" + signing prompt */}
+            {/* Send to client */}
             <div className="shrink-0 pt-4 mt-2 border-t border-[var(--stage-edge-subtle)] space-y-3">
               <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-                Send for signature
+                Send to
               </p>
 
-              {/* Contact pills + custom email toggle */}
-              <div className="flex flex-wrap items-center gap-2">
-                {contacts.map((c) => (
+              {/* Contact pills */}
+              {contacts.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {contacts.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        if (selectedSignerContactId === c.id) {
+                          setSelectedSignerContactId(null);
+                          setSigningName('');
+                          setSigningEmail('');
+                        } else {
+                          setSelectedSignerContactId(c.id);
+                          setSigningName(c.name);
+                          setSigningEmail(c.email);
+                          setShowCustomEmailForm(false);
+                        }
+                      }}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+                        selectedSignerContactId === c.id
+                          ? 'border-[var(--stage-accent)]/60 bg-[var(--stage-accent)]/10 text-[var(--stage-text-primary)]'
+                          : 'border-[var(--stage-border)] hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
+                      )}
+                    >
+                      <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                      {c.name}
+                    </button>
+                  ))}
                   <button
-                    key={c.id}
                     type="button"
                     onClick={() => {
-                      if (selectedSignerContactId === c.id) {
+                      const next = !showCustomEmailForm;
+                      setShowCustomEmailForm(next);
+                      if (next) {
                         setSelectedSignerContactId(null);
                         setSigningName('');
                         setSigningEmail('');
-                      } else {
-                        setSelectedSignerContactId(c.id);
-                        setSigningName(c.name);
-                        setSigningEmail(c.email);
-                        setShowCustomEmailForm(false);
                       }
                     }}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-                      selectedSignerContactId === c.id
-                        ? 'border-[var(--stage-accent)]/60 bg-[var(--stage-accent)]/10 text-[var(--stage-text-primary)]'
+                      'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+                      showCustomEmailForm
+                        ? 'border-[var(--stage-border-focus)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)]'
                         : 'border-[var(--stage-border)] hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
                     )}
                   >
-                    <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                    {c.name}
+                    <Plus className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                    Other email
                   </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !showCustomEmailForm;
-                    setShowCustomEmailForm(next);
-                    if (next) {
-                      setSelectedSignerContactId(null);
-                      setSigningName('');
-                      setSigningEmail('');
-                    }
-                  }}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-                    showCustomEmailForm
-                      ? 'border-[var(--stage-border-focus)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)]'
-                      : 'border-[var(--stage-border)] hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
-                  )}
-                >
-                  <Plus className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                  Custom email
-                </button>
-              </div>
+                </div>
+              )}
 
-              {/* Custom email form — shown when toggled or when no contacts exist */}
+              {/* Email form — shown when "Other email" toggled or when no contacts exist */}
               {(showCustomEmailForm || contacts.length === 0) && (
                 <div className="space-y-2">
                   <input
                     type="text"
                     value={signingName}
                     onChange={(e) => { setSelectedSignerContactId(null); setSigningName(e.target.value); }}
-                    placeholder="Name"
+                    placeholder="Recipient name"
                     className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
                   />
                   <input
                     type="email"
                     value={signingEmail}
                     onChange={(e) => { setSelectedSignerContactId(null); setSigningEmail(e.target.value); }}
-                    placeholder="Email"
+                    placeholder="Recipient email"
                     className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
                   />
                 </div>
               )}
 
               {/* Send button */}
-              <div className="flex items-center justify-between gap-3">
-                {!signingEmail.trim() && (
-                  <p className="text-xs text-[var(--stage-text-secondary)]">
-                    {contacts.length > 0 ? 'Select a contact or add a custom email' : 'Enter an email to send'}
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleSendSubmit(signingEmail, signingName)}
-                  disabled={!signingEmail.trim() || lineItems.length === 0 || sending || isPending || clientAttached === false}
-                  className="ml-auto stage-btn stage-btn-primary inline-flex items-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  {sending ? 'Sending…' : 'Send for signature'}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleSendSubmit(signingEmail, signingName)}
+                disabled={!signingEmail.trim() || lineItems.length === 0 || sending || isPending || clientAttached === false}
+                className="w-full stage-btn stage-btn-primary py-2.5 h-auto disabled:opacity-30"
+              >
+                <Send className="w-4 h-4" />
+                {sending ? 'Sending…' : 'Send proposal'}
+              </button>
               {clientAttached === false && (
                 <p className="text-xs text-[var(--color-unusonic-error)]">Attach a client to this deal before sending.</p>
               )}
@@ -1005,23 +1372,22 @@ export function ProposalBuilder({
 
         {/* Right: Sidebar — always visible on desktop, stacks below on mobile */}
         <div className="min-w-0 flex flex-col gap-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:sticky lg:top-0 lg:self-start">
+          {/* Proposal health summary — always visible */}
+          {lineItems.length > 0 && (
+            <ProposalSummaryCard
+              totalRevenue={summaryValues.totalRevenue}
+              estimatedCost={summaryValues.estimatedCost}
+              floorGapCount={summaryValues.floorGapCount}
+              floorGapTotal={summaryValues.floorGapTotal}
+              talentBudget={summaryValues.talentBudget}
+            />
+          )}
+
           {/* Financial Inspector — slides in when a line item is selected */}
           {!isMobile && (
             <AnimatePresence>
-              {selectedLineIndex != null && selectedItem && (
-                <ProposalLineInspector
-                  item={selectedItem}
-                  lineIndex={selectedLineIndex}
-                  onUpdateName={updateLineItemName}
-                  onUpdateOverridePrice={updateLineItemOverridePrice}
-                  onUpdateActualCost={updateLineItemActualCost}
-                  onUpdateUnitPrice={updateLineItemUnitPrice}
-                  costEditable={costEditable}
-                  costHidden={costHidden}
-                  costRentalRetail={costRentalRetail}
-                  subRentalCostUnlocked={subRentalCostUnlocked}
-                  onToggleSubRental={setSubRentalCostUnlocked}
-                />
+              {inspectorProps && (
+                <ProposalLineInspector {...inspectorProps} />
               )}
             </AnimatePresence>
           )}
@@ -1031,9 +1397,12 @@ export function ProposalBuilder({
             lineItems={lineItems}
             sourceOrgId={sourceOrgId}
             onUpdateRoleAssignment={updateRoleAssignment}
+            onAddRole={addRoleToLineItem}
             onUpdateTimeStart={updateTimeStart}
             onUpdateTimeEnd={updateTimeEnd}
             onUpdateShowTimes={updateShowTimesOnProposal}
+            dealEventStartTime={dealEventStartTime}
+            dealEventEndTime={dealEventEndTime}
           />
         </div>
 
@@ -1050,20 +1419,8 @@ export function ProposalBuilder({
                 </span>
               </SheetHeader>
               <SheetBody>
-                {selectedItem && selectedLineIndex != null && (
-                  <ProposalLineInspector
-                    item={selectedItem}
-                    lineIndex={selectedLineIndex}
-                    onUpdateName={updateLineItemName}
-                    onUpdateOverridePrice={updateLineItemOverridePrice}
-                    onUpdateActualCost={updateLineItemActualCost}
-                    onUpdateUnitPrice={updateLineItemUnitPrice}
-                    costEditable={costEditable}
-                    costHidden={costHidden}
-                    costRentalRetail={costRentalRetail}
-                    subRentalCostUnlocked={subRentalCostUnlocked}
-                    onToggleSubRental={setSubRentalCostUnlocked}
-                  />
+                {inspectorProps && (
+                  <ProposalLineInspector {...inspectorProps} />
                 )}
               </SheetBody>
             </SheetContent>

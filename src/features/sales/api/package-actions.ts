@@ -7,6 +7,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import type { Package } from '@/types/supabase';
+import { generateAndUpsertEmbedding } from './catalog-embeddings';
 
 export type { Package };
 
@@ -62,6 +63,8 @@ export type PackageDefinitionBlock =
 /** Ingredient-specific fields (Service/Rental/Talent/Retail) stored in definition.ingredient_meta. */
 export interface IngredientMeta {
   duration_hours?: number | null;
+  /** Number of performance sets (e.g. 2 for "2 x 45-min sets"). Default 1. */
+  performance_set_count?: number | null;
   staff_role?: string | null;
   stock_quantity?: number | null;
   buffer_percent?: number | null;
@@ -99,6 +102,14 @@ export interface CreatePackageInput {
   tagIds?: string[] | null;
   /** Whether this item is subject to sales tax. Defaults true for rental/retail_sale; false for service/talent/fee. */
   is_taxable?: boolean;
+  /** Billing basis: flat (one-time), hour (hourly rate), day (daily rate). Default 'flat'. */
+  unit_type?: 'flat' | 'hour' | 'day';
+  /** Default hours or days when billing by time (e.g. 4 = "4 hour minimum"). */
+  unit_multiplier?: number | null;
+  /** Item thumbnail URL (stored via Supabase storage). */
+  image_url?: string | null;
+  /** Whether this item is in draft state (not yet ready for proposals). */
+  is_draft?: boolean;
 }
 
 export interface UpdatePackageInput {
@@ -122,6 +133,14 @@ export interface UpdatePackageInput {
   tagIds?: string[] | null;
   /** Whether this item is subject to sales tax. */
   is_taxable?: boolean;
+  /** Billing basis: flat (one-time), hour (hourly rate), day (daily rate). */
+  unit_type?: 'flat' | 'hour' | 'day';
+  /** Default hours or days when billing by time. */
+  unit_multiplier?: number | null;
+  /** Item thumbnail URL (stored via Supabase storage). */
+  image_url?: string | null;
+  /** Whether this item is in draft state (not yet ready for proposals). */
+  is_draft?: boolean;
 }
 
 export interface CreatePackageResult {
@@ -242,8 +261,12 @@ export async function createPackage(
       replacement_cost: replacementCost,
       buffer_days: bufferDays,
       is_active: true,
+      is_draft: input.is_draft === true,
       is_taxable: input.is_taxable ?? true,
+      image_url: input.image_url?.trim() || null,
       definition: input.definition ?? null,
+      unit_type: input.unit_type ?? 'flat',
+      unit_multiplier: input.unit_multiplier != null && Number.isFinite(Number(input.unit_multiplier)) && Number(input.unit_multiplier) > 0 ? Number(input.unit_multiplier) : 1,
     })
     .select()
     .single();
@@ -259,6 +282,10 @@ export async function createPackage(
     );
   }
   const tagsMap = await fetchTagsForPackages(supabase, [pkg.id]);
+
+  // Fire-and-forget embedding generation — don't block the user
+  generateAndUpsertEmbedding(workspaceId, pkg.id).catch(() => {});
+
   return { package: { ...pkg, tags: tagsMap.get(pkg.id) ?? [] } as PackageWithTags };
 }
 
@@ -302,6 +329,12 @@ export async function updatePackage(
   }
   if (input.definition !== undefined) updates.definition = input.definition;
   if (input.is_taxable !== undefined) updates.is_taxable = input.is_taxable;
+  if (input.image_url !== undefined) updates.image_url = input.image_url?.trim() || null;
+  if (input.is_draft !== undefined) updates.is_draft = input.is_draft === true;
+  if (input.unit_type !== undefined) updates.unit_type = input.unit_type ?? 'flat';
+  if (input.unit_multiplier !== undefined) {
+    updates.unit_multiplier = input.unit_multiplier != null && Number.isFinite(Number(input.unit_multiplier)) && Number(input.unit_multiplier) > 0 ? Number(input.unit_multiplier) : 1;
+  }
   if (input.tagIds !== undefined) {
     await supabase.from('package_tags').delete().eq('package_id', packageId);
     const ids = (input.tagIds ?? []).filter(Boolean);
@@ -330,5 +363,11 @@ export async function updatePackage(
   }
   const pkg = data as Package;
   const tagsMap = await fetchTagsForPackages(supabase, [pkg.id]);
+
+  // Fire-and-forget embedding update
+  if (pkg.workspace_id) {
+    generateAndUpsertEmbedding(pkg.workspace_id, pkg.id).catch(() => {});
+  }
+
   return { package: { ...pkg, tags: tagsMap.get(pkg.id) ?? [] } as PackageWithTags };
 }

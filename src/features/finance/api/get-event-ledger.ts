@@ -5,6 +5,7 @@ import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import { formatCurrency } from '../model/types';
 import { getEventExpenses } from './expense-actions';
+import { computeHoursBetween } from '@/shared/lib/parse-time';
 
 export type LedgerTransaction = {
   id: string;
@@ -29,6 +30,10 @@ export type EventLedgerDTO = {
   crewCost: number;
   /** Projected cost from proposal_items.actual_cost on the accepted proposal (null if no accepted proposal). */
   projectedCost: number | null;
+  /** Event duration in hours (from deal start/end times). Null if times unavailable. */
+  eventHours: number | null;
+  /** (Revenue - Crew Cost) / Event Hours. Null if event hours or revenue unavailable. */
+  effectiveHourlyRate: number | null;
   transactions: LedgerTransaction[];
   // Formatted strings for display
   fmt: {
@@ -40,6 +45,7 @@ export type EventLedgerDTO = {
     projectedRevenue: string | null;
     crewCost: string;
     projectedCost: string | null;
+    effectiveHourlyRate: string | null;
   };
 };
 
@@ -69,7 +75,7 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
 
   const { data: deal } = await supabase
     .from('deals')
-    .select('id')
+    .select('id, proposed_start_time, proposed_end_time')
     .eq('event_id', eventId)
     .limit(1)
     .maybeSingle();
@@ -87,7 +93,7 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
     if (proposal) {
       const { data: items } = await supabase
         .from('proposal_items')
-        .select('quantity, unit_price, unit_multiplier, override_price, actual_cost, definition_snapshot')
+        .select('quantity, unit_price, unit_type, unit_multiplier, override_price, actual_cost, definition_snapshot, is_package_header, package_instance_id')
         .eq('proposal_id', (proposal as { id: string }).id);
 
       if (items && items.length > 0) {
@@ -108,10 +114,11 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
         let costSum = 0;
         let hasCost = false;
         for (const item of items) {
-          type ItemRow = { quantity: number; unit_price: number; unit_multiplier: number | null; override_price: number | null; actual_cost: number | null; definition_snapshot?: { tax_meta?: { is_taxable?: boolean | null }; margin_meta?: { category?: string } } | null };
+          type ItemRow = { quantity: number; unit_price: number; unit_type: string | null; unit_multiplier: number | null; override_price: number | null; actual_cost: number | null; is_package_header?: boolean | null; package_instance_id?: string | null; definition_snapshot?: { tax_meta?: { is_taxable?: boolean | null }; margin_meta?: { category?: string } } | null };
           const i = item as ItemRow;
           const price = i.override_price ?? i.unit_price ?? 0;
-          const multiplier = i.unit_multiplier ?? 1;
+          // Only apply unit_multiplier for hourly/daily billing; flat-rate items store informational hours only
+          const multiplier = (i.unit_type === 'hour' || i.unit_type === 'day') ? (i.unit_multiplier ?? 1) : 1;
           const lineAmt = (i.quantity ?? 1) * multiplier * Number(price);
           revSum += lineAmt;
           // Accumulate taxable subtotal from snapshot (same logic as proposal-builder and public view)
@@ -119,8 +126,11 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
           if (snap?.margin_meta?.category !== 'text' && snap?.tax_meta?.is_taxable !== false) {
             taxableSubtotal += lineAmt;
           }
-          if (i.actual_cost != null) {
-            costSum += Number(i.actual_cost);
+          // Skip bundle children for cost — the header row already carries the total bundle cost.
+          // Including both would double-count.
+          const isBundleChild = !i.is_package_header && i.package_instance_id != null;
+          if (i.actual_cost != null && !isBundleChild) {
+            costSum += Number(i.actual_cost) * (i.quantity ?? 1) * multiplier;
             hasCost = true;
           }
         }
@@ -198,7 +208,7 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
   const expenses = await getEventExpenses(eventId);
   let totalCost = 0;
   const expenseTransactions: LedgerTransaction[] = expenses.map((exp) => {
-    totalCost += exp.amount;
+    totalCost += Number(exp.amount);
     return {
       id: exp.id,
       type: 'expense' as const,
@@ -213,6 +223,20 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
   // ── Margin ────────────────────────────────────────────────────────────────
   const margin = totalRevenue - totalCost;
   const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
+
+  // ── Effective Hourly Rate (EHR) ────────────────────────────────────────────
+  const dealRow = deal as { proposed_start_time?: string | null; proposed_end_time?: string | null } | null;
+  const startTime = dealRow?.proposed_start_time ?? null;
+  const endTime = dealRow?.proposed_end_time ?? null;
+  const eventHours = startTime && endTime ? computeHoursBetween(startTime, endTime) : null;
+
+  // EHR = (revenue - crew cost) / event hours
+  // Use projectedRevenue when no invoices exist yet, fall back to totalRevenue
+  const revenueForEHR = totalRevenue > 0 ? totalRevenue : (projectedRevenue ?? 0);
+  const effectiveHourlyRate =
+    eventHours != null && eventHours > 0 && revenueForEHR > 0
+      ? Math.round((revenueForEHR - crewCost) / eventHours)
+      : null;
 
   // ── Unified transaction stream (newest first) ─────────────────────────────
   const transactions = [...invoiceTransactions, ...expenseTransactions].sort((a, b) => {
@@ -232,6 +256,8 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
     projectedRevenue,
     crewCost,
     projectedCost,
+    eventHours,
+    effectiveHourlyRate,
     transactions,
     fmt: {
       totalRevenue: formatCurrency(totalRevenue),
@@ -242,6 +268,7 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
       projectedRevenue: projectedRevenue != null ? formatCurrency(projectedRevenue) : null,
       crewCost: formatCurrency(crewCost),
       projectedCost: projectedCost != null ? formatCurrency(projectedCost) : null,
+      effectiveHourlyRate: effectiveHourlyRate != null ? `${formatCurrency(effectiveHourlyRate)}/hr` : null,
     },
   };
 }

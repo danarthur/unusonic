@@ -14,6 +14,14 @@ const UpdateDealScalarsSchema = z.object({
   lead_source_id: z.string().uuid().nullable().optional(),
   lead_source_detail: z.string().max(500).nullable().optional(),
   referrer_entity_id: z.string().uuid().nullable().optional(),
+  event_start_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  event_end_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  show_health: z.object({
+    status: z.enum(['on_track', 'at_risk', 'blocked']),
+    note: z.string().max(500),
+    updated_at: z.string(),
+    updated_by_name: z.string(),
+  }).nullable().optional(),
 });
 
 export type UpdateDealScalarsInput = z.infer<typeof UpdateDealScalarsSchema>;

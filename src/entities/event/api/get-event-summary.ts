@@ -39,7 +39,7 @@ export type RunOfShowData = {
     assignee_name?: string | null;
   }[] | null;
   gear_requirements?: string | null;
-  gear_items?: { id: string; name: string; quantity?: number; status: 'pending' | 'pulled' | 'loaded'; catalog_package_id?: string | null; is_sub_rental?: boolean | null }[] | null;
+  gear_items?: { id: string; name: string; quantity?: number; status: string; catalog_package_id?: string | null; is_sub_rental?: boolean | null; history?: { status: string; changed_at: string; changed_by: string }[] }[] | null;
   venue_restrictions?: string | null;
   logistics?: { venue_access_confirmed?: boolean; truck_loaded?: boolean; crew_confirmed?: boolean; transport_mode?: TransportMode | null; transport_status?: TransportStatus | null } | null;
   call_time_slots?: CallTimeSlot[] | null;
@@ -59,6 +59,7 @@ export type EventSummary = {
   venue_entity_id: string | null;
   deal_id: string | null;
   run_of_show_data: RunOfShowData | null;
+  show_day_contacts: { role: string; name: string; phone: string | null; email: string | null }[] | null;
 };
 
 export async function getEventSummary(eventId: string): Promise<EventSummary | null> {
@@ -82,9 +83,9 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     const res = await supabase
       .schema('ops')
       .from('events')
-      .select('title, starts_at, ends_at, location_name, location_address, venue_entity_id, deal_id, run_of_show_data, client_entity_id, project:projects!inner(workspace_id)')
+      .select('title, starts_at, ends_at, location_name, location_address, venue_entity_id, deal_id, run_of_show_data, show_day_contacts, client_entity_id')
       .eq('id', eventId)
-      .eq('projects.workspace_id', workspaceId)
+      .eq('workspace_id', workspaceId)
       .maybeSingle();
     if (res.error) {
       console.error('[event] getEventSummary:', res.error.message);
@@ -123,5 +124,6 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     venue_entity_id: (r.venue_entity_id as string) ?? null,
     deal_id: (r.deal_id as string) ?? null,
     run_of_show_data: (r.run_of_show_data as RunOfShowData) ?? null,
+    show_day_contacts: (r.show_day_contacts as EventSummary['show_day_contacts']) ?? null,
   };
 }

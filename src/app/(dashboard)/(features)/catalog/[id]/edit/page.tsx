@@ -11,10 +11,10 @@ import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ChevronLeft, LayoutGrid, HelpCircle, Users } from 'lucide-react';
+import { ChevronLeft, LayoutGrid, HelpCircle, Users, Search, X } from 'lucide-react';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { getPackage, updatePackage } from '@/features/sales/api/package-actions';
+import { getPackage, updatePackage, getCatalogPackagesWithTags } from '@/features/sales/api/package-actions';
 import { getCatalogItemAssignees, addCatalogItemAssignee, addCatalogRoleAssignee, removeCatalogItemAssignee, type CatalogAssigneeRow } from '@/features/sales/api/catalog-assignee-actions';
 import { listWorkspaceJobTitles } from '@/features/talent-management/api/job-title-actions';
 import { searchNetworkOrgs } from '@/features/network-data';
@@ -28,6 +28,7 @@ import {
 import { SmartTagInput } from '@/shared/ui/smart-tag-input';
 import { CurrencyInput } from '@/shared/ui/currency-input';
 import { cn } from '@/shared/lib/utils';
+import { CatalogImageUpload } from '../../components/catalog-image-upload';
 
 const CATEGORIES: { value: PackageCategory; label: string }[] = [
   { value: 'package', label: 'Package (The Bundle)' },
@@ -61,6 +62,7 @@ export default function CatalogEditPage() {
   const [targetCost, setTargetCost] = useState('');
   const [selectedTags, setSelectedTags] = useState<WorkspaceTag[]>([]);
   const [durationHours, setDurationHours] = useState('');
+  const [performanceSetCount, setPerformanceSetCount] = useState('');
   const [staffRole, setStaffRole] = useState('');
   const [stockQuantity, setStockQuantity] = useState('');
   const [bufferPercent, setBufferPercent] = useState('');
@@ -68,6 +70,9 @@ export default function CatalogEditPage() {
   const [replacementCost, setReplacementCost] = useState('');
   const [bufferDays, setBufferDays] = useState('');
   const [contactInfo, setContactInfo] = useState('');
+  const [unitType, setUnitType] = useState<'flat' | 'hour' | 'day'>('flat');
+  const [unitMultiplier, setUnitMultiplier] = useState('');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [showCostHelp, setShowCostHelp] = useState(false);
   const [costHelpPosition, setCostHelpPosition] = useState<{ top: number; left: number } | null>(null);
   const costHelpTriggerRef = useRef<HTMLButtonElement>(null);
@@ -94,6 +99,12 @@ export default function CatalogEditPage() {
   const [roleAdding, setRoleAdding] = useState(false);
   const crewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Alternatives state (rental items only)
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [altSearchOpen, setAltSearchOpen] = useState(false);
+  const [altSearchQuery, setAltSearchQuery] = useState('');
+  const [allRentalPackages, setAllRentalPackages] = useState<PackageWithTags[]>([]);
+
   const loadPackage = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -113,14 +124,20 @@ export default function CatalogEditPage() {
         setSelectedTags(
           (p.tags ?? []).map((t: PackageTag) => ({ ...t, workspace_id: p.workspace_id }))
         );
+        const pkgAny = p as PackageWithTags & { unit_type?: string; unit_multiplier?: number };
+        setUnitType((pkgAny.unit_type === 'hour' || pkgAny.unit_type === 'day') ? pkgAny.unit_type : 'flat');
+        setUnitMultiplier(pkgAny.unit_multiplier != null && pkgAny.unit_multiplier > 1 ? String(pkgAny.unit_multiplier) : '');
+        setImageUrl((p as PackageWithTags & { image_url?: string | null }).image_url ?? null);
         const meta = (p.definition as { ingredient_meta?: IngredientMeta } | null)?.ingredient_meta;
         if (meta) {
           setDurationHours(meta.duration_hours != null ? String(meta.duration_hours) : '');
+          setPerformanceSetCount(meta.performance_set_count != null ? String(meta.performance_set_count) : '');
           setStaffRole(meta.staff_role ?? '');
           setBufferPercent(meta.buffer_percent != null ? String(meta.buffer_percent) : '');
           setContactInfo(meta.contact_info ?? '');
         } else {
           setDurationHours('');
+          setPerformanceSetCount('');
           setStaffRole('');
           setBufferPercent('');
           setContactInfo('');
@@ -139,6 +156,9 @@ export default function CatalogEditPage() {
           setReplacementCost('');
           setBufferDays('');
         }
+        // Initialize alternatives
+        const existingAlts = (p.definition as Record<string, unknown> | null)?.alternatives as string[] | undefined;
+        setAlternatives(existingAlts ?? []);
       }
     } catch (e) {
       setPkg(null);
@@ -158,6 +178,17 @@ export default function CatalogEditPage() {
     getCatalogItemAssignees(id).then(setAssignees);
     listWorkspaceJobTitles().then(setJobTitles);
   }, [id]);
+
+  // Load all rental packages for alternatives picker
+  useEffect(() => {
+    if (!workspaceId || category !== 'rental') { setAllRentalPackages([]); return; }
+    getCatalogPackagesWithTags(workspaceId).then((result) => {
+      const rentals = (result.packages ?? []).filter(
+        (p) => p.category === 'rental' && p.is_active && p.id !== id
+      );
+      setAllRentalPackages(rentals);
+    });
+  }, [workspaceId, category, id]);
 
   // For bundle packages: load crew inherited from ingredient items
   useEffect(() => {
@@ -257,14 +288,16 @@ export default function CatalogEditPage() {
     const tagIds = selectedTags.map((t) => t.id);
     const isBundle = category === 'package';
     const existingDef = (pkg?.definition ?? null) as Record<string, unknown> | null;
+    const isServiceOrTalent = category === 'service' || category === 'talent';
     const ingredient_meta: IngredientMeta | undefined = isBundle
       ? undefined
       : {
-          duration_hours: category === 'service' && durationHours.trim() ? Number(durationHours) || null : null,
-          staff_role: category === 'service' && staffRole.trim() ? staffRole : null,
+          duration_hours: isServiceOrTalent && durationHours.trim() ? Number(durationHours) || null : null,
+          performance_set_count: isServiceOrTalent && performanceSetCount.trim() ? Number(performanceSetCount) || null : null,
+          staff_role: isServiceOrTalent && staffRole.trim() ? staffRole : null,
           stock_quantity: category === 'retail_sale' && stockQuantity.trim() ? Number(stockQuantity) || null : null,
           buffer_percent: category === 'retail_sale' && bufferPercent.trim() ? Number(bufferPercent) || null : null,
-          contact_info: category === 'talent' && contactInfo.trim() ? contactInfo : null,
+          contact_info: isServiceOrTalent && contactInfo.trim() ? contactInfo : null,
         };
     const definition = isBundle
       ? (existingDef as unknown as PackageDefinition) ?? undefined
@@ -272,7 +305,9 @@ export default function CatalogEditPage() {
           layout: (existingDef as { layout?: string })?.layout,
           blocks: Array.isArray((existingDef as { blocks?: unknown })?.blocks) ? (existingDef as { blocks: unknown[] }).blocks : [],
           staffing: (existingDef as { staffing?: unknown })?.staffing ?? null,
+          required_roles: (existingDef as { required_roles?: unknown })?.required_roles ?? null,
           ingredient_meta,
+          ...(category === 'rental' && alternatives.length > 0 ? { alternatives } : {}),
         } as PackageDefinition);
 
     const floorPriceValue = isBundle ? null : (floorPrice.trim() ? (Number(floorPrice) || null) : null);
@@ -294,8 +329,11 @@ export default function CatalogEditPage() {
       price: priceNum,
       floor_price: floorPriceValue,
       target_cost: targetCostValue,
+      unit_type: isBundle ? 'flat' : unitType,
+      unit_multiplier: unitMultiplier.trim() ? (Number(unitMultiplier) || null) : null,
       tagIds: tagIds.length ? tagIds : null,
       definition: definition ?? null,
+      image_url: imageUrl,
       ...rentalPayload,
     });
     setSaving(false);
@@ -395,6 +433,15 @@ export default function CatalogEditPage() {
             />
           </div>
           <div>
+            <label className={labelClass}>Image (optional)</label>
+            <CatalogImageUpload
+              packageId={id}
+              workspaceId={workspaceId}
+              currentImageUrl={imageUrl}
+              onImageChange={setImageUrl}
+            />
+          </div>
+          <div>
             <label htmlFor="edit-category" className={labelClass}>Category</label>
             <select
               id="edit-category"
@@ -432,7 +479,7 @@ export default function CatalogEditPage() {
             <div className={cn(category === 'package' && 'col-span-2')}>
               <div className="flex items-center gap-1.5 mb-1">
                 <label htmlFor="edit-price" className={cn(labelClass, '!mb-0')}>
-                  {category === 'package' ? 'Starting price' : category === 'service' ? 'Rate' : category === 'rental' ? 'Rental price' : 'Price'}
+                  {unitType === 'hour' ? 'Rate per hour' : unitType === 'day' ? 'Rate per day' : category === 'package' ? 'Starting price' : category === 'service' ? 'Rate' : category === 'rental' ? 'Rental price' : 'Price'}
                 </label>
                 <button
                   ref={priceHelpTriggerRef}
@@ -583,6 +630,25 @@ export default function CatalogEditPage() {
                     onChange={setFloorPrice}
                     placeholder="Lowest acceptable"
                   />
+                  {/* Margin readout: current margin vs floor margin */}
+                  {price && targetCost && Number(price) > 0 && Number(targetCost) >= 0 && (
+                    <div className="mt-1.5 flex items-center gap-3 text-xs tabular-nums text-[var(--stage-text-secondary)]">
+                      <span>
+                        Current margin:{' '}
+                        <span className="text-[var(--stage-text-primary)] font-medium">
+                          {((Number(price) - Number(targetCost)) / Number(price) * 100).toFixed(0)}%
+                        </span>
+                      </span>
+                      {floorPrice && Number(floorPrice) > 0 && (
+                        <span>
+                          Floor margin:{' '}
+                          <span className="text-[var(--stage-text-primary)] font-medium">
+                            {((Number(floorPrice) - Number(targetCost)) / Number(floorPrice) * 100).toFixed(0)}%
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5 mb-1">
@@ -669,9 +735,9 @@ export default function CatalogEditPage() {
             )}
           </div>
 
-          {category === 'service' && (
+          {(category === 'service' || category === 'talent') && (
             <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Service</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">{category === 'talent' ? 'Talent' : 'Service'}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit-duration" className={labelClass}>Duration (hours)</label>
@@ -701,6 +767,67 @@ export default function CatalogEditPage() {
                   </select>
                 </div>
               </div>
+              {(category === 'talent' || durationHours.trim()) && (
+                <div>
+                  <label htmlFor="edit-set-count" className={labelClass}>Sets</label>
+                  <input
+                    id="edit-set-count"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={performanceSetCount}
+                    onChange={(e) => setPerformanceSetCount(e.target.value)}
+                    className={inputClass}
+                    placeholder="e.g. 2"
+                  />
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
+                    Number of sets (e.g. 2 × 45 min)
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {category !== 'package' && (
+            <div>
+              <label className={cn(labelClass, 'mb-1.5')}>Billing type</label>
+              <div className="flex gap-1 p-1 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]">
+                {([['flat', 'Flat rate'], ['hour', 'Hourly'], ['day', 'Daily']] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => { setUnitType(val); if (val === 'flat') setUnitMultiplier(''); }}
+                    className={cn(
+                      'flex-1 px-3 py-1.5 rounded-[calc(var(--stage-radius-input)-2px)] text-xs font-medium tracking-tight transition-colors',
+                      unitType === val
+                        ? 'bg-[var(--stage-accent)] text-[var(--stage-void)]'
+                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)]'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {unitType !== 'flat' && (
+                <div className="mt-3">
+                  <label htmlFor="edit-default-units" className={labelClass}>
+                    Default {unitType === 'hour' ? 'hours' : 'days'} (optional)
+                  </label>
+                  <input
+                    id="edit-default-units"
+                    type="number"
+                    min={0.25}
+                    step={0.25}
+                    value={unitMultiplier}
+                    onChange={(e) => setUnitMultiplier(e.target.value)}
+                    className={cn(inputClass, '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none')}
+                    placeholder={unitType === 'hour' ? 'e.g. 4 (minimum hours)' : 'e.g. 2'}
+                  />
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
+                    Pre-fills when added to proposals. Can be adjusted per event.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -776,6 +903,113 @@ export default function CatalogEditPage() {
             </div>
           )}
 
+          {category === 'rental' && (
+            <div className="space-y-3 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
+                  Alternative items
+                </p>
+                <p className="text-xs text-[var(--stage-text-secondary)]/60 mt-0.5 leading-relaxed">
+                  When this item is unavailable, these will be suggested as replacements
+                </p>
+              </div>
+
+              {/* Current alternatives list */}
+              {alternatives.length > 0 && (
+                <ul className="space-y-1.5">
+                  {alternatives.map((altId) => {
+                    const altPkg = allRentalPackages.find((p) => p.id === altId);
+                    return (
+                      <li
+                        key={altId}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--stage-surface-nested)]"
+                      >
+                        <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">
+                          {altPkg?.name ?? altId}
+                        </span>
+                        {altPkg && (
+                          <span className="text-xs tabular-nums text-[var(--stage-text-secondary)] shrink-0">
+                            ${Number(altPkg.price).toLocaleString()}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setAlternatives((prev) => prev.filter((a) => a !== altId))}
+                          className="text-[var(--stage-text-secondary)]/30 hover:text-[var(--color-unusonic-error)]/70 transition-colors focus:outline-none"
+                          aria-label="Remove alternative"
+                        >
+                          <X size={14} strokeWidth={1.5} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {/* Add alternative search */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAltSearchOpen(!altSearchOpen)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none"
+                >
+                  <Search size={12} strokeWidth={1.5} />
+                  Add alternative
+                </button>
+                {altSearchOpen && (
+                  <div className="absolute left-0 top-full mt-1 z-20 w-full max-w-xs rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface-raised)] overflow-hidden shadow-lg">
+                    <div className="p-2 border-b border-[oklch(1_0_0_/_0.06)]">
+                      <input
+                        type="text"
+                        value={altSearchQuery}
+                        onChange={(e) => setAltSearchQuery(e.target.value)}
+                        placeholder="Search rental items..."
+                        className={cn(inputClass, 'text-xs py-1.5')}
+                        autoFocus
+                      />
+                    </div>
+                    <ul className="max-h-48 overflow-y-auto">
+                      {allRentalPackages
+                        .filter(
+                          (p) =>
+                            !alternatives.includes(p.id) &&
+                            p.name.toLowerCase().includes(altSearchQuery.toLowerCase())
+                        )
+                        .slice(0, 20)
+                        .map((p) => (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAlternatives((prev) => [...prev, p.id]);
+                                setAltSearchQuery('');
+                                setAltSearchOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] transition-colors flex items-center justify-between gap-2"
+                            >
+                              <span className="truncate">{p.name}</span>
+                              <span className="text-xs tabular-nums text-[var(--stage-text-secondary)]/50 shrink-0">
+                                ${Number(p.price).toLocaleString()}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      {allRentalPackages.filter(
+                        (p) =>
+                          !alternatives.includes(p.id) &&
+                          p.name.toLowerCase().includes(altSearchQuery.toLowerCase())
+                      ).length === 0 && (
+                        <li className="px-3 py-2 text-xs text-[var(--stage-text-secondary)]/50">
+                          No matching rental items
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {category === 'retail_sale' && (
             <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Retail</p>
@@ -806,23 +1040,6 @@ export default function CatalogEditPage() {
                     placeholder="e.g. 10"
                   />
                 </div>
-              </div>
-            </div>
-          )}
-
-          {category === 'talent' && (
-            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Talent</p>
-              <div>
-                <label htmlFor="edit-contact" className={labelClass}>Contact info</label>
-                <input
-                  id="edit-contact"
-                  type="text"
-                  value={contactInfo}
-                  onChange={(e) => setContactInfo(e.target.value)}
-                  className={inputClass}
-                  placeholder="e.g. agent email or link to contact"
-                />
               </div>
             </div>
           )}

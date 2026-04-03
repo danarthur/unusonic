@@ -14,6 +14,9 @@ export interface LineItemGridProps {
   style?: React.CSSProperties;
   onSelectionChange?: (itemId: string, selected: boolean) => void;
   disabled?: boolean;
+  /** Event-level start/end times — line items matching these exactly won't show times (avoid redundancy). */
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
 }
 
 function formatCurrency(value: number): string {
@@ -33,8 +36,10 @@ function effectiveUnitPrice(item: PublicProposalItem): number {
 }
 
 function lineTotal(item: PublicProposalItem): number {
+  const unitType = (item as { unit_type?: string | null }).unit_type;
   const unitMultiplier = (item as { unit_multiplier?: number | null }).unit_multiplier;
-  const multiplier = unitMultiplier != null && Number(unitMultiplier) > 0 ? Number(unitMultiplier) : 1;
+  // Only multiply by unit_multiplier for hourly/daily billing; flat-rate stores informational hours only
+  const multiplier = (unitType === 'hour' || unitType === 'day') && unitMultiplier != null && Number(unitMultiplier) > 0 ? Number(unitMultiplier) : 1;
   return (item.quantity ?? 1) * multiplier * effectiveUnitPrice(item);
 }
 
@@ -70,7 +75,7 @@ function groupItems(items: PublicProposalItem[]): { groupName: string; groupItem
   return Array.from(groups.entries()).map(([groupName, groupItems]) => ({ groupName, groupItems }));
 }
 
-export function LineItemGrid({ items, className, style, onSelectionChange, disabled }: LineItemGridProps) {
+export function LineItemGrid({ items, className, style, onSelectionChange, disabled, eventStartTime, eventEndTime }: LineItemGridProps) {
   if (!items.length) return null;
 
   const isSingle = items.length === 1;
@@ -150,15 +155,60 @@ export function LineItemGrid({ items, className, style, onSelectionChange, disab
               {item.description}
             </p>
           ) : null}
-          {getTimeRangeLabel(item) && (
-            <p className="text-[13px] tabular-nums leading-snug" style={{ color: 'var(--portal-text-secondary)' }}>
-              {getTimeRangeLabel(item)}
-            </p>
-          )}
+          {(() => {
+            const timeLabel = getTimeRangeLabel(item);
+            if (!timeLabel) return null;
+            // Skip showing times if they match the event-level default (avoid redundancy)
+            const itemStart = (item as { time_start?: string | null }).time_start;
+            const itemEnd = (item as { time_end?: string | null }).time_end;
+            if (eventStartTime && eventEndTime && itemStart === eventStartTime && itemEnd === eventEndTime) return null;
+            return (
+              <p className="text-[13px] tabular-nums leading-snug" style={{ color: 'var(--portal-text-secondary)' }}>
+                {timeLabel}
+              </p>
+            );
+          })()}
+          {(() => {
+            const ut = (item as { unit_type?: string | null }).unit_type;
+            const um = (item as { unit_multiplier?: number | null }).unit_multiplier;
+            if ((!ut || ut === 'flat') && um != null && Number(um) > 1) {
+              const hrs = Number(um);
+              return (
+                <p className="text-[13px] tabular-nums leading-snug" style={{ color: 'var(--portal-text-secondary)' }}>
+                  {hrs % 1 === 0 ? hrs : hrs.toFixed(1)} hour{hrs !== 1 ? 's' : ''}
+                </p>
+              );
+            }
+            return null;
+          })()}
+          {(() => {
+            const snap = (item as { definition_snapshot?: Record<string, unknown> }).definition_snapshot;
+            const sMeta = snap?.schedule_meta as { performance_set_count?: number; performance_duration_minutes?: number } | undefined;
+            const setCount = sMeta?.performance_set_count;
+            const setDuration = sMeta?.performance_duration_minutes;
+            if (setCount && setDuration) {
+              return (
+                <p className="text-[13px] tabular-nums leading-snug" style={{ color: 'var(--portal-text-secondary)' }}>
+                  {setCount} × {setDuration} min set{setCount > 1 ? 's' : ''}
+                </p>
+              );
+            }
+            return null;
+          })()}
           {item.talentNames && item.talentNames.length > 0 && (
-            <p className="text-[13px] leading-snug" style={{ color: 'var(--portal-accent)' }}>
-              Featuring {item.talentNames.join(' & ')}
-            </p>
+            <div className="flex items-center gap-2">
+              {item.talentAvatarUrl && (
+                <img
+                  src={item.talentAvatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover shrink-0"
+                  style={{ border: 'var(--portal-border-width) solid var(--portal-border)' }}
+                />
+              )}
+              <p className="text-[13px] leading-snug" style={{ color: 'var(--portal-accent)' }}>
+                Featuring {item.talentNames.join(' & ')}
+              </p>
+            </div>
           )}
           <div className="mt-auto pt-2 flex items-baseline justify-between gap-2">
             <p className="text-xs" style={{ color: 'var(--portal-text-secondary)' }}>

@@ -68,7 +68,7 @@ export async function syncGearFromProposalToEvent(eventId: string): Promise<Sync
     workspace_id: workspaceId,
     name: g.name,
     quantity: (g as unknown as { quantity?: number }).quantity ?? 1,
-    status: 'pending' as const,
+    status: 'allocated' as const,
     catalog_package_id: (g.catalog_package_id ?? g.id) || null,
     is_sub_rental: (g as unknown as { is_sub_rental?: boolean }).is_sub_rental ?? false,
     department: (g as unknown as { department?: string | null }).department ?? null,

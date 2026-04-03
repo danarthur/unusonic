@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Layers } from 'lucide-react';
 import { StreamCard, type StreamCardItem } from './stream-card';
 import { CreateGigModal } from './create-gig-modal';
+import { CrossShowResourceModal } from './cross-show-resource-modal';
 import {
   FilterChipBar,
   INITIAL_FILTERS,
@@ -82,6 +83,7 @@ export function Stream({
   onRefetchList,
   mode,
   onModeChange,
+  sourceOrgId,
   className,
 }: {
   items: StreamCardItem[];
@@ -91,6 +93,7 @@ export function Stream({
   onRefetchList?: () => Promise<void>;
   mode: StreamMode;
   onModeChange: (mode: StreamMode) => void;
+  sourceOrgId?: string | null;
   className?: string;
 }) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -98,6 +101,7 @@ export function Stream({
   const [filters, setFilters] = useState<StreamFilters>(INITIAL_FILTERS);
   const [sort, setSort] = useState<StreamSort>(INITIAL_SORT);
   const [sortBeforeAttention, setSortBeforeAttention] = useState<StreamSort | null>(null);
+  const [dayViewDate, setDayViewDate] = useState<string | null>(null);
 
   const handleFiltersChange = (newFilters: StreamFilters) => {
     const wasAttention = filters.needsAttention;
@@ -269,56 +273,23 @@ export function Stream({
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <ul
-          key={`stream-list-${mode}`}
-          className="flex flex-col gap-3"
-        >
-          {filtered.map((item) => (
-            <li
-              key={`${item.source}-${item.id}`}
-            >
-              <StreamCard
-                item={item}
-                selected={selectedId === item.id}
-                onClick={() => onSelect(item.id)}
-              />
-            </li>
-          ))}
-
-          {filtered.length === 0 && (
-            <motion.li
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center text-sm py-12 list-none"
-              style={{ color: 'var(--stage-text-secondary)' }}
-            >
-              {searchQuery || filtersActive ? (
-                <span>
-                  No results.{' '}
-                  {filtersActive && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFilters(INITIAL_FILTERS);
-                        setSearchQuery('');
-                        if (sortBeforeAttention) {
-                          setSort(sortBeforeAttention);
-                          setSortBeforeAttention(null);
-                        }
-                      }}
-                      className="underline"
-                      style={{ color: 'var(--stage-text-primary)' }}
-                    >
-                      Clear filters
-                    </button>
-                  )}
-                </span>
-              ) : (
-                'No matching productions.'
-              )}
-            </motion.li>
-          )}
-        </ul>
+        <DateGroupedList
+          items={filtered}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          searchQuery={searchQuery}
+          filtersActive={filtersActive}
+          onClearFilters={() => {
+            setFilters(INITIAL_FILTERS);
+            setSearchQuery('');
+            if (sortBeforeAttention) {
+              setSort(sortBeforeAttention);
+              setSortBeforeAttention(null);
+            }
+          }}
+          onOpenDayView={setDayViewDate}
+          mode={mode}
+        />
       </div>
 
       <CreateGigModal
@@ -327,6 +298,153 @@ export function Stream({
         addOptimisticGig={addOptimisticGig}
         onRefetchList={onRefetchList}
       />
+
+      <CrossShowResourceModal
+        open={!!dayViewDate}
+        onClose={() => setDayViewDate(null)}
+        date={dayViewDate ?? ''}
+        sourceOrgId={sourceOrgId ?? null}
+      />
     </div>
+  );
+}
+
+// =============================================================================
+// DateGroupedList — renders stream cards with date group headers.
+// When a date has 2+ items, the header shows a "Day view" link.
+// =============================================================================
+
+function formatGroupDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function DateGroupedList({
+  items,
+  selectedId,
+  onSelect,
+  searchQuery,
+  filtersActive,
+  onClearFilters,
+  onOpenDayView,
+  mode,
+}: {
+  items: StreamCardItem[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  searchQuery: string;
+  filtersActive: boolean;
+  onClearFilters: () => void;
+  onOpenDayView: (date: string) => void;
+  mode: string;
+}) {
+  // Build date groups: { date: string | null, items: StreamCardItem[] }[]
+  // Items are already sorted, so we preserve order and insert headers between date changes.
+  const groups = useMemo(() => {
+    const result: { date: string | null; items: StreamCardItem[] }[] = [];
+    let currentDate: string | null | undefined = undefined;
+    let currentGroup: StreamCardItem[] = [];
+
+    for (const item of items) {
+      const d = item.event_date ?? null;
+      if (d !== currentDate) {
+        if (currentGroup.length > 0) {
+          result.push({ date: currentDate ?? null, items: currentGroup });
+        }
+        currentDate = d;
+        currentGroup = [item];
+      } else {
+        currentGroup.push(item);
+      }
+    }
+    if (currentGroup.length > 0) {
+      result.push({ date: currentDate ?? null, items: currentGroup });
+    }
+    return result;
+  }, [items]);
+
+  // Count items per date for day-view trigger
+  const dateCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of items) {
+      if (item.event_date) {
+        map.set(item.event_date, (map.get(item.event_date) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [items]);
+
+  return (
+    <ul
+      key={`stream-list-${mode}`}
+      className="flex flex-col gap-3"
+    >
+      {groups.map((group) => (
+        <li key={group.date ?? 'no-date'} className="flex flex-col gap-3">
+          {/* Date group header */}
+          {group.date && (
+            <div className="flex items-center justify-between gap-2 px-1 pt-1">
+              <span
+                className="text-[10px] font-medium uppercase tracking-wider"
+                style={{ color: 'var(--stage-text-tertiary)' }}
+              >
+                {formatGroupDate(group.date)}
+              </span>
+              {(dateCountMap.get(group.date) ?? 0) >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => onOpenDayView(group.date!)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium tracking-wide transition-colors hover:bg-[var(--stage-surface-elevated)]"
+                  style={{
+                    color: 'var(--stage-text-secondary)',
+                    borderRadius: 'var(--stage-radius-input, 6px)',
+                  }}
+                >
+                  <Layers size={10} />
+                  Day view
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Cards in this date group */}
+          {group.items.map((item) => (
+            <StreamCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              selected={selectedId === item.id}
+              onClick={() => onSelect(item.id)}
+            />
+          ))}
+        </li>
+      ))}
+
+      {items.length === 0 && (
+        <motion.li
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center text-sm py-12 list-none"
+          style={{ color: 'var(--stage-text-secondary)' }}
+        >
+          {searchQuery || filtersActive ? (
+            <span>
+              No results.{' '}
+              {filtersActive && (
+                <button
+                  type="button"
+                  onClick={onClearFilters}
+                  className="underline"
+                  style={{ color: 'var(--stage-text-primary)' }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </span>
+          ) : (
+            'No matching productions.'
+          )}
+        </motion.li>
+      )}
+    </ul>
   );
 }

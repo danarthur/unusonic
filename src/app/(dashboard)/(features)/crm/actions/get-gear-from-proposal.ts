@@ -119,7 +119,7 @@ export async function getGearItemsFromProposalForDeal(dealId: string): Promise<G
         catalog_package_id: pkgId,
         name: pkg.name,
         quantity: qty,
-        status: 'pending',
+        status: 'allocated',
         is_sub_rental: inv.is_sub_rental,
         department: inv.department,
       } as GearItem & { department: string | null });
@@ -159,7 +159,7 @@ export async function getGearItemsFromProposalForDeal(dealId: string): Promise<G
         catalog_package_id: row.id,
         name: row.name,
         quantity: qty,
-        status: 'pending',
+        status: 'allocated',
         is_sub_rental: inv.is_sub_rental,
         department: inv.department,
       } as GearItem & { department: string | null });

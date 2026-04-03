@@ -4,7 +4,8 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-// getCrewRolesFromProposalForDeal removed — crew is managed via deal_crew table (Phase B)
+import { syncGearFromProposalToEvent } from './sync-gear-from-proposal';
+import { seedAdvancingChecklist } from './advancing-checklist';
 
 export type HandoverResult =
   | { success: true; eventId: string }
@@ -52,7 +53,7 @@ export async function handoverDeal(
 
   const { data: deal, error: dealErr } = await supabase
     .from('deals')
-    .select('id, title, status, proposed_date, workspace_id, event_id')
+    .select('id, title, status, proposed_date, workspace_id, event_id, event_start_time, event_end_time')
     .eq('id', dealId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -64,6 +65,27 @@ export async function handoverDeal(
   const r = deal as Record<string, unknown>;
   if (r.event_id) {
     return { success: true, eventId: r.event_id as string };
+  }
+
+  // Guard: check for orphaned event (event created but deal.event_id not set due to prior failure)
+  const { data: existingEvent } = await supabase
+    .schema('ops')
+    .from('events')
+    .select('id')
+    .eq('deal_id', dealId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingEvent) {
+    // Fix the orphan: link the existing event to the deal
+    const eid = (existingEvent as { id: string }).id;
+    await supabase
+      .from('deals')
+      .update({ status: 'won', event_id: eid, won_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', dealId)
+      .eq('workspace_id', workspaceId);
+    revalidatePath('/crm');
+    return { success: true, eventId: eid };
   }
 
   const status = (r.status as string) ?? '';
@@ -123,8 +145,10 @@ export async function handoverDeal(
     eventName = (payload.name ?? title).trim() || title;
     runOfShowData = payload.run_of_show_data ?? null;
   } else {
-    startAt = `${proposedDate}T08:00:00.000Z`;
-    endAt = `${proposedDate}T18:00:00.000Z`;
+    const dealStartTime = (r.event_start_time as string) ?? null;
+    const dealEndTime = (r.event_end_time as string) ?? null;
+    startAt = dealStartTime ? `${proposedDate}T${dealStartTime}:00` : `${proposedDate}T08:00:00.000Z`;
+    endAt = dealEndTime ? `${proposedDate}T${dealEndTime}:00` : `${proposedDate}T18:00:00.000Z`;
     eventName = title;
   }
 
@@ -167,6 +191,17 @@ export async function handoverDeal(
       .update({ client_entity_id: clientEntityId })
       .eq('id', projectId);
   }
+
+  // C1: Auto-map proposal gear → event gear items (fire-and-forget, non-blocking)
+  syncGearFromProposalToEvent(eventId).catch((err) =>
+    console.error('[CRM] handoverDeal gear sync:', err)
+  );
+
+  // Seed advancing checklist with archetype template
+  const archetype = (deal as Record<string, unknown>).event_archetype as string | null;
+  seedAdvancingChecklist(eventId, archetype).catch((err) =>
+    console.error('[CRM] handoverDeal checklist seed:', err)
+  );
 
   const { error: updateErr } = await supabase
     .from('deals')

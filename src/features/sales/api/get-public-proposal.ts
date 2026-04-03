@@ -44,7 +44,7 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   // 2. Deal (and event if handed over)
   const { data: dealRow, error: dealError } = await supabase
     .from('deals')
-    .select('id, title, proposed_date, event_id, organization_id, venue_id')
+    .select('id, title, proposed_date, event_id, organization_id, venue_id, event_start_time, event_end_time')
     .eq('id', dealId)
     .single();
 
@@ -99,9 +99,14 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   }
 
   const eventTitle = eventRow?.title ?? deal.title ?? '';
-  const hasEventTimes = !!eventRow?.starts_at;
-  const startsAt = eventRow?.starts_at ?? (deal.proposed_date ? `${deal.proposed_date}T08:00:00.000Z` : null);
-  const endsAt = eventRow?.ends_at ?? null;
+  const dealStartTime = (deal as Record<string, unknown>).event_start_time as string | null ?? null;
+  const dealEndTime = (deal as Record<string, unknown>).event_end_time as string | null ?? null;
+  const hasEventTimes = !!eventRow?.starts_at || !!dealStartTime;
+  const startsAt = eventRow?.starts_at
+    ?? (deal.proposed_date && dealStartTime ? `${deal.proposed_date}T${dealStartTime}:00` : null)
+    ?? (deal.proposed_date ? `${deal.proposed_date}T08:00:00.000Z` : null);
+  const endsAt = eventRow?.ends_at
+    ?? (deal.proposed_date && dealEndTime ? `${deal.proposed_date}T${dealEndTime}:00` : null);
   const eventIdForReturn = eventRow?.id ?? deal.event_id ?? dealId;
 
   // Resolve venue: event venue_name (denormalized) > venue entity lookup > null
@@ -150,14 +155,17 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   if (itemsError) return null;
 
   const itemList = items ?? [];
-  const packageIds = [...new Set(itemList.map((i) => i.package_id).filter(Boolean))] as string[];
+  // Collect all package references (both package_id and origin_package_id) for image lookup
+  const allPackageIds = [...new Set(
+    itemList.flatMap((i) => [i.package_id, i.origin_package_id]).filter(Boolean)
+  )] as string[];
 
   const packageImages: Record<string, string | null> = {};
-  if (packageIds.length > 0) {
+  if (allPackageIds.length > 0) {
     const { data: packages } = await supabase
       .from('packages')
       .select('id, image_url')
-      .in('id', packageIds);
+      .in('id', allPackageIds);
     if (packages) {
       for (const p of packages) {
         packageImages[p.id] = p.image_url ?? null;
@@ -177,21 +185,54 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
     const clientSelected = isOptional
       ? (selectionsMap.has(item.id) ? selectionsMap.get(item.id)! : true)
       : true;
-    // Extract talent names from crew_meta (only booking_type === 'talent' are client-facing)
+    // Extract talent names and entity IDs from crew_meta (only booking_type === 'talent' are client-facing)
     const snapshot = (item as { definition_snapshot?: Record<string, unknown> }).definition_snapshot;
-    const roles = (snapshot?.crew_meta as { required_roles?: Array<{ booking_type?: string; assignee_name?: string | null }> })?.required_roles;
-    const talentNames = roles
-      ?.filter((r) => r.booking_type === 'talent' && r.assignee_name)
-      .map((r) => r.assignee_name!) ?? null;
+    const roles = (snapshot?.crew_meta as { required_roles?: Array<{ booking_type?: string; assignee_name?: string | null; entity_id?: string | null }> })?.required_roles;
+    const talentRoles = roles?.filter((r) => r.booking_type === 'talent' && r.assignee_name) ?? [];
+    const talentNames = talentRoles.length > 0 ? talentRoles.map((r) => r.assignee_name!) : null;
+    // Collect talent entity IDs for avatar lookup
+    const talentEntityIds = talentRoles
+      .map((r) => r.entity_id)
+      .filter(Boolean) as string[];
 
     return {
       ...item,
-      packageImageUrl: item.package_id ? packageImages[item.package_id] ?? null : null,
+      packageImageUrl: (item.package_id ? packageImages[item.package_id] : null)
+        ?? (item.origin_package_id ? packageImages[item.origin_package_id] : null)
+        ?? null,
       isOptional,
       clientSelected,
-      talentNames: talentNames?.length ? talentNames : null,
+      talentNames,
+      talentEntityIds: talentEntityIds.length > 0 ? talentEntityIds : null,
     };
   });
+
+  // Resolve talent avatars from directory.entities
+  const allTalentEntityIds = [...new Set(
+    allItemsWithImages.flatMap((r) => r.talentEntityIds ?? [])
+  )];
+  const talentAvatars: Record<string, string> = {};
+  if (allTalentEntityIds.length > 0 && crossSchema) {
+    const { data: entities } = await crossSchema
+      .schema('directory')
+      .from('entities')
+      .select('id, avatar_url')
+      .in('id', allTalentEntityIds);
+    for (const e of entities ?? []) {
+      if (e.avatar_url) talentAvatars[e.id] = e.avatar_url as string;
+    }
+  }
+  // Attach talent avatar as a separate field (badge-size, not hero image)
+  for (const item of allItemsWithImages) {
+    if (item.talentEntityIds?.length) {
+      const firstAvatar = item.talentEntityIds
+        .map((id) => talentAvatars[id])
+        .find(Boolean);
+      if (firstAvatar) {
+        (item as unknown as { talentAvatarUrl: string | null }).talentAvatarUrl = firstAvatar;
+      }
+    }
+  }
 
   // Filter out internal-only rows before sending to the client
   const itemsWithImages = allItemsWithImages.filter(
@@ -202,8 +243,11 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
     if (!row.clientSelected) return sum;
     // Use override_price when set (proposal-level price lock), else unit_price from catalog
     const price = parseFloat(String((row as { override_price?: number | null }).override_price ?? row.unit_price ?? 0));
-    // unit_multiplier handles per-day / per-head rate multipliers
-    const multiplier = Number((row as { unit_multiplier?: number | null }).unit_multiplier ?? 1) || 1;
+    // unit_multiplier only applies for hourly/daily billing; flat-rate items always use multiplier=1
+    const unitType = (row as { unit_type?: string | null }).unit_type;
+    const multiplier = (unitType === 'hour' || unitType === 'day')
+      ? (Number((row as { unit_multiplier?: number | null }).unit_multiplier ?? 1) || 1)
+      : 1;
     return sum + (row.quantity ?? 1) * multiplier * price;
   }, 0);
 
@@ -231,6 +275,9 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
       startsAt,
       endsAt,
       hasEventTimes,
+      /** Raw HH:MM event times for display (avoids timezone issues with Date parsing). */
+      eventStartTime: dealStartTime,
+      eventEndTime: dealEndTime,
     },
     venue: venueName ? { name: venueName, address: venueAddress } : null,
     workspace: workspace

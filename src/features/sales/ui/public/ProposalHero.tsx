@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Calendar, Building2, MapPin } from 'lucide-react';
+import { Calendar, Building2, MapPin, Clock } from 'lucide-react';
 import type { PublicProposalDTO } from '../../model/public-proposal';
 import { cn } from '@/shared/lib/utils';
 
@@ -19,11 +19,10 @@ export interface ProposalHeroProps {
  * We use a wrapper div with text-align and matching flexbox justify
  * so all children inherit the alignment from one source of truth.
  */
-function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(iso));
+function formatTime12(time24: string): string {
+  const [h, m] = time24.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
 export function ProposalHero({ data, className }: ProposalHeroProps) {
@@ -32,33 +31,32 @@ export function ProposalHero({ data, className }: ProposalHeroProps) {
 
   let eventDate: string | null = null;
   if (event.startsAt) {
-    const datePart = new Date(event.startsAt).toLocaleDateString(undefined, {
+    eventDate = new Date(event.startsAt).toLocaleDateString(undefined, {
       weekday: 'short',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-    if (event.hasEventTimes) {
-      const startTime = formatTime(event.startsAt);
-      const endTime = event.endsAt ? formatTime(event.endsAt) : null;
-      eventDate = endTime
-        ? `${datePart} · ${startTime} – ${endTime}`
-        : `${datePart} · ${startTime}`;
-    } else {
-      eventDate = datePart;
+  }
+
+  // Build time label from raw HH:MM strings (avoids timezone issues)
+  let timeLabel: string | null = null;
+  if (event.hasEventTimes && event.eventStartTime) {
+    timeLabel = formatTime12(event.eventStartTime);
+    if (event.eventEndTime) {
+      timeLabel += ` \u2013 ${formatTime12(event.eventEndTime)}`;
     }
   }
 
   const eventTitle = event.title && event.title !== clientName ? event.title : null;
 
-  // CSS custom property values for alignment — consumed via inline styles.
-  // --portal-hero-align maps: 'center' → center, 'left' → flex-start / left.
-  const alignStyle = {
+  // Alignment — driven by --portal-hero-align (center | left depending on theme).
+  // text-align works for text. For flex containers, we need justify-content.
+  // CSS can't map 'left' → 'flex-start' via a single var, so we read the computed value client-side isn't possible in SSR.
+  // Instead: use 'center' as default, and add a CSS class that themes can override.
+  const textAlignStyle = {
     textAlign: 'var(--portal-hero-align, center)' as React.CSSProperties['textAlign'],
   };
-  // For flex containers: 'center' → center, 'left' → start
-  // CSS can't do this mapping natively, so we use a second token.
-  // We'll just set both text-align and align-items via the same var.
 
   return (
     <motion.header
@@ -66,9 +64,9 @@ export function ProposalHero({ data, className }: ProposalHeroProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
       className={cn('w-full max-w-2xl mx-auto', className)}
-      style={alignStyle}
+      style={textAlignStyle}
     >
-      <div className="flex mb-4" style={alignStyle}>
+      <div className="mb-4" style={textAlignStyle}>
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-widest"
           style={{
@@ -100,7 +98,7 @@ export function ProposalHero({ data, className }: ProposalHeroProps) {
         }}
       >
         {workspace.logoUrl ? (
-          <div className="flex mb-5" style={alignStyle}>
+          <div className="mb-5" style={textAlignStyle}>
             <img
               src={workspace.logoUrl}
               alt={workspace.name}
@@ -140,7 +138,7 @@ export function ProposalHero({ data, className }: ProposalHeroProps) {
           {eventTitle ?? 'Proposal'}
         </h1>
 
-        <div className="flex flex-wrap gap-2.5 mt-6" style={alignStyle}>
+        <div className="mt-6 [&>*]:mr-2.5 [&>*]:mb-2.5" style={textAlignStyle}>
           {eventDate && (
             <span
               className="inline-flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium"
@@ -153,6 +151,20 @@ export function ProposalHero({ data, className }: ProposalHeroProps) {
             >
               <Calendar className="size-3.5 shrink-0 opacity-50" aria-hidden />
               {eventDate}
+            </span>
+          )}
+          {timeLabel && (
+            <span
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 text-sm font-medium"
+              style={{
+                border: 'var(--portal-border-width) solid var(--portal-border)',
+                backgroundColor: 'var(--portal-accent-subtle)',
+                color: 'var(--portal-text)',
+                borderRadius: 'var(--portal-btn-radius)',
+              }}
+            >
+              <Clock className="size-3.5 shrink-0 opacity-50" aria-hidden />
+              {timeLabel}
             </span>
           )}
           <span

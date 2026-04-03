@@ -38,12 +38,18 @@ export interface RequiredRole {
   default_hours?: number | null;
   /** Billing floor in hours. Industry standard minimum: 4. */
   minimum_hours?: number | null;
+  /** Overtime rate in dollars. Applied after overtime_threshold hours. Null = no overtime. */
+  overtime_rate?: number | null;
+  /** Hours after which overtime_rate kicks in. Default 8 if overtime_rate is set. */
+  overtime_threshold?: number | null;
   /** Default call time in "HH:MM" 24h format, e.g. "16:00". Written to call_time_override at handover. */
   default_call_time?: string | null;
   /** Optional preferred staff: directory.entities.id (Ghost Protocol — may not have an account yet). */
   entity_id?: string | null;
   /** Display name for the preferred staff member above. */
   assignee_name?: string | null;
+  /** When true, this specific person was requested by the client and should not be swapped without approval. */
+  client_locked?: boolean;
 }
 
 /**
@@ -59,7 +65,38 @@ export function estimatedRoleCost(r: RequiredRole): number {
   const billableHours = Math.max(scheduled, minimum);
   const qty = Math.max(1, r.quantity ?? 1);
   if (r.booking_type === 'talent') return rate * qty;
+  if (r.overtime_rate != null && billableHours > (r.overtime_threshold ?? 8)) {
+    const threshold = r.overtime_threshold ?? 8;
+    return (rate * threshold + r.overtime_rate * (billableHours - threshold)) * qty;
+  }
   return rate * billableHours * qty;
+}
+
+/**
+ * Computes the overtime-aware cost breakdown for a labor role.
+ * Returns { regularHours, overtimeHours, regularRate, overtimeRate, total }
+ * so callers can display the split without re-implementing the formula.
+ */
+export function roleCostBreakdown(
+  r: RequiredRole,
+  billableHours: number,
+  qty: number
+): {
+  regularHours: number;
+  overtimeHours: number;
+  regularRate: number;
+  overtimeRate: number | null;
+  total: number;
+} {
+  const rate = r.default_rate ?? 0;
+  if (r.overtime_rate != null && billableHours > (r.overtime_threshold ?? 8)) {
+    const threshold = r.overtime_threshold ?? 8;
+    const regularHours = threshold;
+    const overtimeHours = billableHours - threshold;
+    const total = (rate * regularHours + r.overtime_rate * overtimeHours) * qty;
+    return { regularHours, overtimeHours, regularRate: rate, overtimeRate: r.overtime_rate, total };
+  }
+  return { regularHours: billableHours, overtimeHours: 0, regularRate: rate, overtimeRate: null, total: rate * billableHours * qty };
 }
 
 /** Staffing requirement for Service packages (legacy). @deprecated Use required_roles[] instead. */
@@ -110,6 +147,8 @@ export interface IngredientMeta {
   /** Display name for the talent performer (e.g. "DJ Allegra"). */
   talent_display_name?: string | null;
   performance_duration_minutes?: number | null;
+  /** Number of performance sets (e.g. 2 for "2 x 45-min sets"). Default 1. */
+  performance_set_count?: number | null;
   performance_notes?: string | null;
 }
 
@@ -160,11 +199,11 @@ export function computeBundleTargetCost(
 export function resolveRequiredRoles(def: PackageDefinition | null | undefined): RequiredRole[] {
   if (!def) return [];
   // Canonical path (post-backfill or new items).
-  // Use != null (not ?.length) so that an intentional empty array [] — meaning "no crew needed" —
-  // is returned as-is and does NOT fall through to the legacy fallback paths below.
-  if (def.required_roles != null) return def.required_roles;
-  // Ingredient path (Labor/Service items, pre-backfill). Same guard logic.
-  if (def.ingredient_meta?.required_roles != null) return def.ingredient_meta.required_roles;
+  // Only return if the array has actual roles — empty arrays fall through to legacy paths
+  // so staff_role still works when required_roles was accidentally emptied.
+  if (def.required_roles != null && def.required_roles.length > 0) return def.required_roles;
+  // Ingredient path (Labor/Service items, pre-backfill).
+  if (def.ingredient_meta?.required_roles != null && def.ingredient_meta.required_roles.length > 0) return def.ingredient_meta.required_roles;
   // Legacy scalar fallback — covers migration window until Migrations 3 + 4 Step 2 run
   const legacyRole = def.ingredient_meta?.staff_role ?? def.staffing?.role;
   if (legacyRole) {

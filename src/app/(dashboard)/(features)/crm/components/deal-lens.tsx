@@ -394,7 +394,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
           )}
 
           {/* Production team */}
-          <ProductionTeamCard dealId={deal.id} sourceOrgId={sourceOrgId ?? null} />
+          <ProductionTeamCard dealId={deal.id} sourceOrgId={sourceOrgId ?? null} eventDate={deal.proposed_date} workspaceId={deal.workspace_id} />
 
           {/* Deal diary */}
           <DealDiaryCard dealId={deal.id} dealTitle={deal.title} workspaceId={deal.workspace_id} />

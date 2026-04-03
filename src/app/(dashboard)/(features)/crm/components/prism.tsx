@@ -197,12 +197,21 @@ export function Prism({
         setLens(d?.event_id ? 'plan' : 'deal');
       });
     } else {
-      getEventSummaryForPrism(selectedId).then((e) => {
+      // Event card: fetch event summary AND linked deal in parallel
+      Promise.all([
+        getEventSummaryForPrism(selectedId),
+        getDealByEventId(selectedId),
+      ]).then(([e, d]) => {
         setEventSummary(e);
-        setDeal(null);
+        setDeal(d ?? null);
         setClient(null);
         setLoading(false);
         setLens('plan');
+        // Fetch stakeholders if we found a linked deal
+        if (d?.id) {
+          getDealStakeholders(d.id).then((s) => setStakeholders(s ?? []));
+          getDealClientContext(d.id, sourceOrgId).then((c) => setClient(c ?? null));
+        }
       });
     }
   }, [selectedId, selectedItem?.source, sourceOrgId]);
@@ -744,9 +753,9 @@ export function Prism({
               >
                 <PlanLens
                   eventId={isEvent ? selectedId : (deal?.event_id ?? null)}
-                  dealId={deal?.id ?? eventSummary?.deal_id ?? null}
+                  dealId={deal?.id ?? linkedDeal?.id ?? eventSummary?.deal_id ?? null}
                   event={eventSummary ?? null}
-                  deal={deal ?? null}
+                  deal={deal ?? linkedDeal ?? null}
                   client={client}
                   stakeholders={stakeholders}
                   sourceOrgId={sourceOrgId}
@@ -759,6 +768,7 @@ export function Prism({
                   }}
                   onHandoverSuccess={handleHandoverSuccess}
                   onStakeholdersChange={refetchDealAndClient}
+                  onDealUpdated={refetchDealAndClient}
                 />
               </motion.div>
             )}
@@ -772,7 +782,6 @@ export function Prism({
               >
                 <LedgerLens
                   eventId={isEvent ? selectedId : deal!.event_id!}
-                  eventTitle={selectedItem.title}
                   ledger={ledger}
                 />
               </motion.div>

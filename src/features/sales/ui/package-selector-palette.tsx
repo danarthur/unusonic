@@ -19,10 +19,14 @@ import type { Package } from '@/types/supabase';
 import { Popover, PopoverContent, PopoverAnchor } from '@/shared/ui/popover';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
+import { checkBatchAvailability, type ItemAvailability } from '../api/catalog-availability';
+import { semanticSearchCatalog } from '../api/catalog-embeddings';
 
 export type PackageSelectorPaletteProps = {
   workspaceId: string;
   dealId: string;
+  /** Deal proposed date — used for rental item availability checks. */
+  proposedDate?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** After package applied (deep copy), parent should refetch proposal. */
@@ -37,6 +41,7 @@ export type PackageSelectorPaletteProps = {
 export function PackageSelectorPalette({
   workspaceId,
   dealId,
+  proposedDate,
   open,
   onOpenChange,
   onApplied,
@@ -53,6 +58,9 @@ export function PackageSelectorPalette({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<Record<string, ItemAvailability>>({});
+  const [semanticResults, setSemanticResults] = useState<Package[]>([]);
+  const [semanticLoading, setSemanticLoading] = useState(false);
 
   const loadPackages = useCallback(async () => {
     if (!workspaceId) {
@@ -83,6 +91,58 @@ export function PackageSelectorPalette({
       setApplyError(null);
     });
   }, [open]);
+
+  // Fetch availability for rental packages when palette has packages and a proposed date
+  useEffect(() => {
+    if (!proposedDate || packages.length === 0 || !workspaceId) {
+      setAvailability({});
+      return;
+    }
+    const rentalIds = packages
+      .filter((p) => p.category === 'rental')
+      .map((p) => p.id);
+    if (rentalIds.length === 0) {
+      setAvailability({});
+      return;
+    }
+    checkBatchAvailability(workspaceId, rentalIds, proposedDate).then((result) => {
+      setAvailability(result);
+    });
+  }, [packages, proposedDate, workspaceId]);
+
+  // Semantic search — async, debounced, never blocks keyword filter
+  useEffect(() => {
+    if (!workspaceId || !open || search.trim().length < 3) {
+      setSemanticResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSemanticLoading(true);
+      try {
+        const results = await semanticSearchCatalog(workspaceId, search.trim(), 8);
+        const keywordIds = new Set(
+          packages
+            .filter(
+              (p) =>
+                p.name.toLowerCase().includes(search.toLowerCase()) ||
+                (p.description ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                (p.category ?? '').toLowerCase().includes(search.toLowerCase())
+            )
+            .map((p) => p.id)
+        );
+        const semanticPkgs = results
+          .filter((r) => !keywordIds.has(r.packageId))
+          .map((r) => packages.find((p) => p.id === r.packageId))
+          .filter(Boolean) as Package[];
+        setSemanticResults(semanticPkgs);
+      } catch {
+        setSemanticResults([]);
+      } finally {
+        setSemanticLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search, workspaceId, open, packages]);
 
   const filteredPackages = search.trim()
     ? packages.filter(
@@ -188,9 +248,37 @@ export function PackageSelectorPalette({
                     onClick={() => handleSelectPackage(pkg)}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
+                        {pkg.category === 'rental' && availability[pkg.id] && (
+                          <span
+                            className={cn(
+                              'inline-block w-2 h-2 rounded-full shrink-0',
+                              availability[pkg.id].status === 'available' ? 'bg-emerald-400' :
+                              availability[pkg.id].status === 'tight' ? 'bg-amber-400' : 'bg-red-400'
+                            )}
+                            title={
+                              availability[pkg.id].status === 'available'
+                                ? `${availability[pkg.id].available} available`
+                                : availability[pkg.id].status === 'tight'
+                                  ? `${availability[pkg.id].available} of ${availability[pkg.id].stockQuantity} remaining`
+                                  : `Fully booked (${availability[pkg.id].totalAllocated} allocated, ${availability[pkg.id].stockQuantity} in stock)`
+                            }
+                          />
+                        )}
+                      </div>
                       {pkg.description && (
                         <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{pkg.description}</p>
+                      )}
+                      {pkg.category === 'rental' && availability[pkg.id] && availability[pkg.id].status !== 'available' && (
+                        <p className={cn(
+                          'text-xs mt-0.5',
+                          availability[pkg.id].status === 'tight' ? 'text-amber-400' : 'text-red-400'
+                        )}>
+                          {availability[pkg.id].status === 'shortage'
+                            ? 'Fully booked'
+                            : `${availability[pkg.id].available} of ${availability[pkg.id].stockQuantity} remaining`}
+                        </p>
                       )}
                       <p className="text-sm font-medium text-[var(--stage-text-primary)] tabular-nums mt-1">
                         ${Number(pkg.price).toLocaleString()}
@@ -199,6 +287,47 @@ export function PackageSelectorPalette({
                     <Plus className="w-4 h-4 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} aria-hidden />
                   </motion.li>
                 ))
+              )}
+              {search.trim().length >= 3 && semanticResults.length > 0 && (
+                <>
+                  <li className="flex items-center gap-3 py-1.5 px-2">
+                    <div className="h-px flex-1 bg-[oklch(1_0_0_/_0.08)]" />
+                    <span className="text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider">
+                      Related
+                    </span>
+                    <div className="h-px flex-1 bg-[oklch(1_0_0_/_0.08)]" />
+                  </li>
+                  {semanticResults.map((pkg) => (
+                    <motion.li
+                      key={`semantic-${pkg.id}`}
+                      layout
+                      transition={STAGE_LIGHT}
+                      className="flex items-center gap-3 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-3 hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors duration-[80ms] ease-out cursor-pointer opacity-75"
+                      onClick={() => handleSelectPackage(pkg)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
+                          <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.06)] text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider">
+                            AI
+                          </span>
+                        </div>
+                        {pkg.description && (
+                          <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{pkg.description}</p>
+                        )}
+                        <p className="text-sm font-medium text-[var(--stage-text-primary)] tabular-nums mt-1">
+                          ${Number(pkg.price).toLocaleString()}
+                        </p>
+                      </div>
+                      <Plus className="w-4 h-4 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} aria-hidden />
+                    </motion.li>
+                  ))}
+                </>
+              )}
+              {semanticLoading && search.trim().length >= 3 && (
+                <li className="py-2 text-center text-xs text-[var(--stage-text-secondary)]">
+                  Searching with Aion...
+                </li>
               )}
             </ul>
           ) : (

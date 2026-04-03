@@ -282,7 +282,12 @@ function buildSnapshot(item: any): Record<string, unknown> | null {
   if (item.requiredRoles?.length) snap.crew_meta = { required_roles: item.requiredRoles };
   if (item.floorPrice != null) snap.price_meta = { floor_price: item.floorPrice };
   if (item.isTaxable != null) snap.tax_meta = { is_taxable: item.isTaxable };
-  if (item.timeStart || item.timeEnd) snap.schedule_meta = { time_start: item.timeStart ?? null, time_end: item.timeEnd ?? null };
+  const scheduleMeta: Record<string, unknown> = {};
+  if (item.timeStart) scheduleMeta.time_start = item.timeStart;
+  if (item.timeEnd) scheduleMeta.time_end = item.timeEnd;
+  if (item.performanceSetCount != null) scheduleMeta.performance_set_count = item.performanceSetCount;
+  if (item.performanceDurationMinutes != null) scheduleMeta.performance_duration_minutes = item.performanceDurationMinutes;
+  if (Object.keys(scheduleMeta).length > 0) snap.schedule_meta = scheduleMeta;
   return Object.keys(snap).length > 0 ? snap : null;
 }
 
@@ -303,6 +308,8 @@ export interface ExpandedLineItem {
   requiredRoles: RequiredRole[] | null;
   floorPrice: number | null;
   isTaxable: boolean;
+  performanceSetCount?: number | null;
+  performanceDurationMinutes?: number | null;
 }
 
 export async function getExpandedPackageLineItems(
@@ -338,6 +345,7 @@ export async function getExpandedPackageLineItems(
   if (catalogIds.length === 0) {
     const cat = (pkg.category as string) as ProposalLineItemCategory;
     const roles = resolveRequiredRoles(def as PackageDefinition | null);
+    const ingredientMeta = (def as PackageDefinition | null)?.ingredient_meta;
     return {
       items: [
         {
@@ -353,6 +361,8 @@ export async function getExpandedPackageLineItems(
           requiredRoles: roles.length > 0 ? roles : null,
           floorPrice: (pkg as { floor_price?: number }).floor_price != null ? Number((pkg as { floor_price?: number }).floor_price) : null,
           isTaxable: (pkg as { is_taxable?: boolean }).is_taxable !== false,
+          performanceSetCount: ingredientMeta?.performance_set_count ?? null,
+          performanceDurationMinutes: ingredientMeta?.performance_duration_minutes ?? null,
         },
       ],
     };
@@ -375,6 +385,7 @@ export async function getExpandedPackageLineItems(
     const ut = (ref.unit_type === 'hour' || ref.unit_type === 'day' ? ref.unit_type : 'flat') as UnitType;
     const um = Number(ref.unit_multiplier) > 0 ? Number(ref.unit_multiplier) : 1;
     const ingredientRoles = resolveRequiredRoles(ref.definition as PackageDefinition | null);
+    const refMeta = (ref.definition as PackageDefinition | null)?.ingredient_meta;
     items.push({
       name: ref.name,
       description: ref.description ?? null,
@@ -388,6 +399,8 @@ export async function getExpandedPackageLineItems(
       requiredRoles: ingredientRoles.length > 0 ? ingredientRoles : null,
       floorPrice: ref.floor_price != null ? Number(ref.floor_price) : null,
       isTaxable: ref.is_taxable !== false,
+      performanceSetCount: refMeta?.performance_set_count ?? null,
+      performanceDurationMinutes: refMeta?.performance_duration_minutes ?? null,
     });
   }
   return { items };
@@ -738,7 +751,7 @@ export async function upsertProposal(
       is_package_header: item.isPackageHeader ?? false,
       original_base_price: item.originalBasePrice != null && Number.isFinite(Number(item.originalBasePrice)) ? Number(item.originalBasePrice) : null,
       unit_type: (item.unitType === 'hour' || item.unitType === 'day' ? item.unitType : 'flat') as string,
-      unit_multiplier: multiplier(item),
+      unit_multiplier: Math.max(0, Number(item.unitMultiplier) || 1),
       name: item.name,
       description: item.description ?? null,
       quantity: item.quantity,
@@ -1058,6 +1071,8 @@ export async function sendForSignature(
     paymentDueDays: (proposalData?.proposal as { payment_due_days?: number | null } | undefined)?.payment_due_days ?? null,
     entityType: entityType as 'person' | 'couple' | 'company' | 'venue' | null,
     eventArchetype: deal?.event_archetype ?? null,
+    eventStartTime: proposalData?.event.eventStartTime ?? null,
+    eventEndTime: proposalData?.event.eventEndTime ?? null,
   };
 
   if (!submission.success) {

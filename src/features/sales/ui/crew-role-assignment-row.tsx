@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X } from 'lucide-react';
+import { Search, X, Lock } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { searchCrewMembers, type CrewSearchResult } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
 
@@ -13,6 +13,7 @@ export interface CrewRoleAssignmentRowProps {
     quantity: number;
     entity_id?: string | null;
     assignee_name?: string | null;
+    client_locked?: boolean;
   };
   roleIndex: number;
   sourceOrgId: string | null;
@@ -101,10 +102,19 @@ export function CrewRoleAssignmentRow({
       {role.entity_id && role.assignee_name ? (
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] text-xs font-medium text-[var(--stage-text-primary)]">
+            {role.client_locked && (
+              <Lock className="w-3 h-3 text-[var(--color-unusonic-warning)]" strokeWidth={1.5} aria-label="Client locked" />
+            )}
             {role.assignee_name}
             <button
               type="button"
-              onClick={() => onClear(roleIndex)}
+              onClick={() => {
+                if (role.client_locked) {
+                  const confirmed = window.confirm('This talent was requested by the client. Change anyway?');
+                  if (!confirmed) return;
+                }
+                onClear(roleIndex);
+              }}
               className="ml-0.5 p-0.5 rounded hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors"
               aria-label={`Remove ${role.assignee_name}`}
             >

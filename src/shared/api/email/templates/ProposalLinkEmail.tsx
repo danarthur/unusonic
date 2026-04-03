@@ -31,6 +31,8 @@ export interface ProposalLinkEmailProps {
   paymentDueDays?: number | null;
   entityType?: string | null;
   eventArchetype?: string | null;
+  eventStartTime?: string | null;
+  eventEndTime?: string | null;
 }
 
 
@@ -46,6 +48,8 @@ export function ProposalLinkEmail({
   paymentDueDays,
   entityType,
   eventArchetype,
+  eventStartTime,
+  eventEndTime,
 }: ProposalLinkEmailProps) {
   const from = workspaceName?.trim() || senderName?.trim() || 'your production company';
   const firstName = clientFirstName?.trim() || null;
@@ -135,6 +139,27 @@ export function ProposalLinkEmail({
                     </Column>
                     <Column style={detailValue}>
                       <Text style={detailValueText}>{formatEventDate(eventDate)}</Text>
+                    </Column>
+                  </Row>
+                )}
+                {eventStartTime && (
+                  <Row style={detailRow}>
+                    <Column style={detailLabel}>
+                      <Text style={detailLabelText}>Time</Text>
+                    </Column>
+                    <Column style={detailValue}>
+                      <Text style={detailValueText}>
+                        {(() => {
+                          const fmt = (t: string) => {
+                            const [h, m] = t.split(':').map(Number);
+                            const p = h >= 12 ? 'PM' : 'AM';
+                            return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${p}`;
+                          };
+                          return eventEndTime
+                            ? `${fmt(eventStartTime)} – ${fmt(eventEndTime)}`
+                            : fmt(eventStartTime);
+                        })()}
+                      </Text>
                     </Column>
                   </Row>
                 )}

@@ -12,7 +12,7 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type { DealCrewRow } from '../actions/deal-crew';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
-import { normalizeGearItems, normalizeLogistics } from './flight-checks/types';
+import { normalizeGearItems, normalizeLogistics, GEAR_LIFECYCLE_ORDER, GEAR_BRANCH_STATES } from './flight-checks/types';
 
 type OpsActionsCardProps = {
   crewRows: DealCrewRow[];
@@ -38,8 +38,14 @@ export function OpsActionsCard({
 
   const assignedCrew = crewRows.filter((r) => r.entity_id);
   const confirmedCrew = assignedCrew.filter((r) => r.confirmed_at);
-  const gearPulled = gearItems.filter((g) => g.status === 'pulled' || g.status === 'loaded');
-  const gearLoaded = gearItems.filter((g) => g.status === 'loaded');
+  // "Pulled" means at least index 1 (pulled) in lifecycle, or in a branch state (handled)
+  const gearPulled = gearItems.filter((g) =>
+    GEAR_BRANCH_STATES.includes(g.status) || GEAR_LIFECYCLE_ORDER.indexOf(g.status) >= 1
+  );
+  // "Loaded" means at least index 3 (loaded) in lifecycle
+  const gearLoaded = gearItems.filter((g) =>
+    GEAR_LIFECYCLE_ORDER.indexOf(g.status) >= 3
+  );
 
   const callTimeSlots = runOfShowData?.call_time_slots;
   const hasCallTimes = Array.isArray(callTimeSlots) && callTimeSlots.length > 0;

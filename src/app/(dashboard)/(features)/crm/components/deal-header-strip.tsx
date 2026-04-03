@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, MapPin, Building2, Plus, X, Loader2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { StagePanel } from '@/shared/ui/stage-panel';
+import { TimePicker } from '@/shared/ui/time-picker';
+import { formatTime12h } from '@/shared/lib/parse-time';
 import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
 import { NetworkDetailSheet } from '@/widgets/network-detail';
@@ -21,6 +23,7 @@ import {
   type OrgRosterContact,
 } from '../actions/deal-stakeholders';
 import { createGhostVenueEntity, createGhostPlannerEntity, getEntityDisplayName } from '../actions/lookup';
+import { searchReferrerEntities } from '../actions/search-referrer';
 import { getWorkspaceMembersForPicker, type WorkspaceMemberOption } from '../actions/get-workspace-members';
 import { assignDealOwner } from '../actions/update-deal-status';
 import {
@@ -51,7 +54,7 @@ export type DealHeaderStripProps = {
   saving?: boolean;
   onTitleChange?: (value: string) => void;
   /** Save a scalar field change (date, archetype, budget). Pickers are now owned by the header strip. */
-  onSaveScalar?: (patch: { proposed_date?: string | null; event_archetype?: string | null; budget_estimated?: number | null }) => void;
+  onSaveScalar?: (patch: { proposed_date?: string | null; event_archetype?: string | null; budget_estimated?: number | null; event_start_time?: string | null; event_end_time?: string | null }) => void;
   // Stakeholders (client, venue, owner, planner)
   deal: DealDetail;
   stakeholders: DealStakeholderDisplay[];
@@ -165,11 +168,24 @@ function SlotPicker({
     if (q.trim().length < 1) { setResults([]); return; }
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
-      const r = await searchNetworkOrgs(sourceOrgId, q, entityTypeFilter ? { entityType: entityTypeFilter } : undefined);
-      setResults(r);
+      if (slot === 'planner') {
+        // Planner search: use full network + employee expansion
+        const refs = await searchReferrerEntities(q);
+        setResults(refs.map((r) => ({
+          id: r.id,
+          entity_uuid: r.id,
+          name: r.subtitle ? `${r.name}` : r.name,
+          entity_type: r.subtitle ? 'person' : 'company',
+          _source: r.section === 'team' ? 'connection' as const : 'global' as const,
+          _subtitle: r.subtitle,
+        } as NetworkSearchOrg & { _subtitle?: string | null })));
+      } else {
+        const r = await searchNetworkOrgs(sourceOrgId, q, entityTypeFilter ? { entityType: entityTypeFilter } : undefined);
+        setResults(r);
+      }
       setLoading(false);
     }, 250);
-  }, [sourceOrgId, entityTypeFilter]);
+  }, [sourceOrgId, entityTypeFilter, slot]);
 
   const handleGhostCreate = async () => {
     const name = query.trim();
@@ -216,17 +232,23 @@ function SlotPicker({
           <Loader2 className="size-3.5 animate-spin text-[var(--stage-text-tertiary)]" />
         </div>
       )}
-      {!loading && results.map((r) => (
-        <button
-          key={r.entity_uuid ?? r.id}
-          type="button"
-          onClick={() => onSelect(r)}
-          className="w-full text-left px-4 py-2.5 text-sm text-[var(--stage-text-secondary)] hover:bg-[var(--stage-accent-muted)] hover:text-[var(--stage-text-primary)] transition-colors flex items-center gap-2.5"
-        >
-          <EntityIcon entityType={r.entity_type} />
-          <span className="truncate">{r.name}</span>
-        </button>
-      ))}
+      {!loading && results.map((r) => {
+        const sub = (r as NetworkSearchOrg & { _subtitle?: string | null })._subtitle;
+        return (
+          <button
+            key={r.entity_uuid ?? r.id}
+            type="button"
+            onClick={() => onSelect(r)}
+            className="w-full text-left px-4 py-2.5 text-sm text-[var(--stage-text-secondary)] hover:bg-[var(--stage-accent-muted)] hover:text-[var(--stage-text-primary)] transition-colors flex items-center gap-2.5 min-w-0"
+          >
+            <EntityIcon entityType={r.entity_type} />
+            <span className="truncate flex items-baseline gap-1.5 min-w-0">
+              <span className="truncate">{r.name}</span>
+              {sub && <span className="text-xs text-[var(--stage-text-tertiary)] shrink-0">{sub}</span>}
+            </span>
+          </button>
+        );
+      })}
       {!loading && query.trim().length >= 2 && (
         <button
           type="button"
@@ -676,6 +698,39 @@ export function DealHeaderStrip({
               document.body
             )}
           </div>
+
+          {/* Time block */}
+          <div className={cn(fieldBlock, "shrink-0")}>
+            <p className={fieldLabel}>Time</p>
+            {isEditable ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <TimePicker
+                  value={deal.event_start_time ?? null}
+                  onChange={(v) => onSaveScalar?.({ event_start_time: v })}
+                  placeholder="Start"
+                  context="evening"
+                  variant="ghost"
+                  className="w-[90px]"
+                />
+                <span className="text-[var(--stage-text-tertiary)] text-xs select-none px-0.5">–</span>
+                <TimePicker
+                  value={deal.event_end_time ?? null}
+                  onChange={(v) => onSaveScalar?.({ event_end_time: v })}
+                  placeholder="End"
+                  context="evening"
+                  variant="ghost"
+                  className="w-[90px]"
+                />
+              </div>
+            ) : (
+              <span className="text-sm text-[var(--stage-text-secondary)] tracking-tight whitespace-nowrap">
+                {deal.event_start_time
+                  ? `${formatTime12h(deal.event_start_time)}${deal.event_end_time ? ` – ${formatTime12h(deal.event_end_time)}` : ''}`
+                  : '—'}
+              </span>
+            )}
+          </div>
+
         </div>
 
         {/* ── Divider ── */}

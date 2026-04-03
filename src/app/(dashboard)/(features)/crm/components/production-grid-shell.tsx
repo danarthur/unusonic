@@ -162,6 +162,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
           onRefetchList={refetchGigs}
           mode={currentStream}
           onModeChange={setStreamMode}
+          sourceOrgId={currentOrgId}
         />
       </aside>
 

@@ -2,14 +2,13 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Wallet, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { Wallet, ArrowDownRight, ArrowUpRight, Clock } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type { EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
 
 type LedgerLensProps = {
   eventId: string;
-  eventTitle: string | null;
   ledger: EventLedgerDTO | null;
 };
 
@@ -22,7 +21,7 @@ export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
       transition={STAGE_LIGHT}
       className="flex flex-col gap-6"
     >
-      {/* Waterfall card — Total Revenue / Estimated Cost / Projected Margin */}
+      {/* Waterfall card — Total Revenue / Estimated Cost / Projected Margin / EHR */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--color-unusonic-success)]">
           <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">Total revenue</p>
@@ -43,6 +42,28 @@ export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
           </p>
         </StagePanel>
       </div>
+
+      {/* Effective Hourly Rate — only shown when event hours are known */}
+      {ledger?.effectiveHourlyRate != null && (
+        <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--stage-text-primary)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1 flex items-center gap-1.5">
+                <Clock size={14} strokeWidth={1.5} aria-hidden />
+                Effective rate
+              </p>
+              <p className="text-xl font-semibold text-[var(--stage-text-primary)] tracking-tight tabular-nums">
+                {ledger.fmt.effectiveHourlyRate}
+              </p>
+            </div>
+            {ledger.eventHours != null && (
+              <p className="text-xs text-[var(--stage-text-secondary)] tabular-nums">
+                {ledger.eventHours}h event
+              </p>
+            )}
+          </div>
+        </StagePanel>
+      )}
 
       {/* Transaction stream */}
       <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--color-unusonic-error)]">

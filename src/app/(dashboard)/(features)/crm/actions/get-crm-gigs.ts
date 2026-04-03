@@ -3,6 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { computePaymentStatus, paymentStatusLabel, paymentStatusColor } from '@/features/sales/lib/compute-payment-status';
+import { computeReadiness } from '../lib/compute-readiness';
 import type { StreamCardItem } from '../components/stream-card';
 
 /**
@@ -17,7 +18,7 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
     workspaceId
       ? supabase
           .from('deals')
-          .select('id, title, status, proposed_date, organization_id, venue_id, event_archetype, lead_source, owner_entity_id, created_at')
+          .select('id, title, status, proposed_date, organization_id, venue_id, event_archetype, lead_source, owner_entity_id, created_at, show_health')
           .eq('workspace_id', workspaceId)
           .is('archived_at', null)
           .order('proposed_date', { ascending: true })
@@ -26,7 +27,7 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
       ? supabase
           .schema('ops')
           .from('events')
-          .select('id, title, starts_at, lifecycle_status, client_entity_id, venue_entity_id, created_at')
+          .select('id, title, starts_at, lifecycle_status, client_entity_id, venue_entity_id, deal_id, created_at')
           .eq('workspace_id', workspaceId)
           .order('starts_at', { ascending: true })
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
@@ -103,6 +104,9 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
     );
   }
 
+  // Build a set of deal IDs so we can filter out events that are already represented by a deal card
+  const dealIdSet = new Set(dealIds);
+
   const dealGigs: StreamCardItem[] = (dealsRes.data ?? []).map((d: Record<string, unknown>) => {
     const dealId = d.id as string;
     const proposal = proposalByDealId.get(dealId);
@@ -137,10 +141,17 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
       lead_source: (d.lead_source as string) ?? null,
       owner_name: ownerId ? (entityNameMap.get(ownerId) ?? null) : null,
       created_at: (d.created_at as string) ?? null,
+      show_health_status: (d.show_health as Record<string, unknown> | null)?.status as StreamCardItem['show_health_status'] ?? null,
     };
   });
 
-  const eventGigs: StreamCardItem[] = (eventsRes.data ?? []).map((e: Record<string, unknown>) => ({
+  // Exclude events whose deal_id matches a deal already in the list — avoids duplicate cards for won deals
+  const filteredEvents = (eventsRes.data ?? []).filter((e: Record<string, unknown>) => {
+    const eDealId = e.deal_id as string | null;
+    return !eDealId || !dealIdSet.has(eDealId);
+  });
+
+  const eventGigs: StreamCardItem[] = filteredEvents.map((e: Record<string, unknown>) => ({
     id: e.id as string,
     title: (e.title as string) ?? null,
     status: null,
@@ -183,6 +194,92 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
           gig.followUpPriority = fu.priority_score;
           gig.followUpStatus = fu.status as 'pending' | 'snoozed';
         }
+      }
+    }
+  }
+
+  // ── Readiness signals for won deals ──
+  // Won deals have an event — batch-fetch event + crew data to compute readiness.
+  const wonDealIds = (dealsRes.data ?? [])
+    .filter((d: Record<string, unknown>) => d.status === 'won')
+    .map((d: Record<string, unknown>) => d.id as string);
+
+  if (wonDealIds.length > 0 && workspaceId) {
+    // Find events linked to won deals
+    const { data: wonEvents } = await supabase
+      .schema('ops')
+      .from('events')
+      .select('id, deal_id, run_of_show_data')
+      .in('deal_id', wonDealIds)
+      .eq('workspace_id', workspaceId);
+
+    if (wonEvents && wonEvents.length > 0) {
+      const eventByDealId = new Map<string, { id: string; run_of_show_data: Record<string, unknown> | null }>();
+      for (const ev of wonEvents) {
+        if (ev.deal_id) eventByDealId.set(ev.deal_id as string, { id: ev.id as string, run_of_show_data: ev.run_of_show_data as Record<string, unknown> | null });
+      }
+
+      // Batch-fetch crew counts per deal
+      const wonDealIdsWithEvents = [...eventByDealId.keys()];
+      const { data: crewRows } = await (supabase as any)
+        .schema('ops')
+        .from('deal_crew')
+        .select('deal_id, entity_id, confirmed_at, declined_at')
+        .in('deal_id', wonDealIdsWithEvents);
+
+      // Aggregate crew counts per deal
+      type CrewCounts = { assigned: number; confirmed: number; declined: number };
+      const crewCountsByDeal = new Map<string, CrewCounts>();
+      for (const row of (crewRows ?? []) as { deal_id: string; entity_id: string | null; confirmed_at: string | null; declined_at: string | null }[]) {
+        const c = crewCountsByDeal.get(row.deal_id) ?? { assigned: 0, confirmed: 0, declined: 0 };
+        if (row.entity_id) {
+          c.assigned++;
+          if (row.confirmed_at) c.confirmed++;
+          if (row.declined_at) c.declined++;
+        }
+        crewCountsByDeal.set(row.deal_id, c);
+      }
+
+      // Batch-fetch stakeholders for won deals (venue + client presence)
+      const { data: wonStakeholders } = await (supabase as any)
+        .schema('ops')
+        .from('deal_stakeholders')
+        .select('deal_id, role')
+        .in('deal_id', wonDealIdsWithEvents)
+        .in('role', ['venue_contact', 'bill_to']);
+
+      const stakeholderRolesByDeal = new Map<string, Set<string>>();
+      for (const s of (wonStakeholders ?? []) as { deal_id: string; role: string }[]) {
+        const roles = stakeholderRolesByDeal.get(s.deal_id) ?? new Set();
+        roles.add(s.role);
+        stakeholderRolesByDeal.set(s.deal_id, roles);
+      }
+
+      // Compute readiness for each won deal and attach to gig
+      const loadedStatuses = ['loaded', 'on_site', 'returned'];
+      for (const gig of gigs) {
+        const ev = eventByDealId.get(gig.id);
+        if (!ev) continue;
+        const ros = ev.run_of_show_data as Record<string, unknown> | null;
+        const gearItems = (ros?.gear_items as { status: string }[] | undefined) ?? [];
+        const logistics = ros?.logistics as { venue_access_confirmed?: boolean; truck_loaded?: boolean; transport_mode?: string | null } | undefined;
+        const crew = crewCountsByDeal.get(gig.id) ?? { assigned: 0, confirmed: 0, declined: 0 };
+        const roles = stakeholderRolesByDeal.get(gig.id) ?? new Set<string>();
+
+        gig.readiness = computeReadiness({
+          crewAssigned: crew.assigned,
+          crewConfirmed: crew.confirmed,
+          crewDeclined: crew.declined,
+          gearTotal: gearItems.length,
+          gearLoaded: gearItems.filter((g) => loadedStatuses.includes(g.status)).length,
+          gearAllocatedOnly: gearItems.filter((g) => g.status === 'allocated' || g.status === 'pending').length,
+          hasVenueStakeholder: roles.has('venue_contact'),
+          venueAccessConfirmed: logistics?.venue_access_confirmed ?? false,
+          hasTransportMode: !!(ros?.transport_mode || logistics?.transport_mode),
+          truckLoaded: logistics?.truck_loaded ?? false,
+          hasClientStakeholder: roles.has('bill_to'),
+          clientBriefConfirmed: false,
+        });
       }
     }
   }

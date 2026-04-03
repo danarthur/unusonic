@@ -10,7 +10,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ChevronLeft, Image, Type, List } from 'lucide-react';
+import { ChevronLeft, GripVertical, Image, List, Type, X } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { StagePanel } from '@/shared/ui/stage-panel';
@@ -223,6 +239,107 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
   );
 }
 
+interface SortableBlockProps {
+  block: PackageDefinitionBlock;
+  index: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+  onCanvasDragOver: (e: React.DragEvent) => void;
+  onCanvasDrop: (e: React.DragEvent, dropIndex?: number) => Promise<void> | void;
+  catalogPackages: PackageWithTags[];
+}
+
+function SortableBlock({
+  block,
+  index,
+  isSelected,
+  onSelect,
+  onRemove,
+  onCanvasDragOver,
+  onCanvasDrop,
+  catalogPackages,
+}: SortableBlockProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: block.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      onDragOver={onCanvasDragOver}
+      onDrop={(e) => onCanvasDrop(e, index)}
+    >
+      <div
+        className={cn(
+          'rounded-[var(--stage-radius-nested)] border p-4 cursor-pointer transition-colors relative group',
+          isSelected
+            ? 'border-[oklch(1_0_0_/_0.25)] bg-[oklch(1_0_0_/_0.06)] ring-1 ring-[var(--stage-accent)]'
+            : 'border-[var(--stage-edge-subtle)] hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[var(--stage-surface)]',
+          isDragging && 'shadow-lg'
+        )}
+        onClick={onSelect}
+      >
+        {/* Drag handle */}
+        <button
+          type="button"
+          {...listeners}
+          className="absolute left-2 top-1/2 -translate-y-1/2 p-1 cursor-grab active:cursor-grabbing text-[var(--stage-text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical size={16} strokeWidth={1.5} />
+        </button>
+
+        {/* Remove button */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="absolute right-2 top-2 p-1 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Remove block"
+        >
+          <X size={14} strokeWidth={1.5} />
+        </button>
+
+        {/* Block content */}
+        <div className="pl-6 pr-4">
+          <span className="text-xs uppercase tracking-wider text-[var(--stage-text-secondary)]">
+            {block.type.replace(/_/g, ' ')}
+          </span>
+          {block.type === 'header_hero' && 'content' in block && (
+            <p className="text-[var(--stage-text-primary)] font-medium mt-1">
+              {(block.content as { title?: string }).title || 'Untitled'}
+            </p>
+          )}
+          {block.type === 'line_item' && 'catalogId' in block && (
+            <p className="text-[var(--stage-text-primary)] font-medium mt-1">
+              {catalogPackages.find((p) => p.id === (block as { catalogId: string }).catalogId)?.name ??
+                (block as { catalogId: string }).catalogId}{' '}
+              × {(block as { quantity: number }).quantity ?? 1}
+            </p>
+          )}
+          {block.type === 'line_item_group' && 'label' in block && (
+            <p className="text-[var(--stage-text-primary)] font-medium mt-1">{block.label}</p>
+          )}
+          {block.type === 'text_block' && 'content' in block && (
+            <p className="text-sm text-[var(--stage-text-secondary)] mt-1 line-clamp-2">
+              {(block.content as string) || 'Empty'}
+            </p>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export default function CatalogBuilderPage() {
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
@@ -332,6 +449,38 @@ export default function CatalogBuilderPage() {
     }));
   }, []);
 
+  const removeBlock = useCallback((blockId: string) => {
+    setDefinition((prev) => ({
+      ...prev,
+      blocks: prev.blocks.filter((b) => b.id !== blockId),
+    }));
+    if (selectedBlockId === blockId) setSelectedBlockId(null);
+  }, [selectedBlockId]);
+
+  const reorderBlocks = useCallback((activeId: string, overId: string) => {
+    setDefinition((prev) => {
+      const oldIndex = prev.blocks.findIndex((b) => b.id === activeId);
+      const newIndex = prev.blocks.findIndex((b) => b.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const blocks = [...prev.blocks];
+      const [moved] = blocks.splice(oldIndex, 1);
+      blocks.splice(newIndex, 0, moved);
+      return { ...prev, blocks };
+    });
+  }, []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      reorderBlocks(String(active.id), String(over.id));
+    }
+  }, [reorderBlocks]);
+
   const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
@@ -404,7 +553,7 @@ export default function CatalogBuilderPage() {
 
   const selectedBlock = definition.blocks.find((b) => b.id === selectedBlockId);
   const staffing = definition.staffing ?? emptyStaffing;
-  const isService = pkg?.category === 'service';
+  const isService = pkg?.category === 'service' || pkg?.category === 'talent';
 
   const handleIonSubmit = useCallback(async () => {
     if (!workspaceId || !ionPrompt.trim()) return;
@@ -636,48 +785,25 @@ export default function CatalogBuilderPage() {
                   Drag blocks here to build your package.
                 </p>
               ) : (
-                <ul className="space-y-4">
-                  {definition.blocks.map((block, index) => (
-                    <motion.li
-                      key={block.id}
-                      layout
-                      transition={STAGE_LIGHT}
-                      onDragOver={handleCanvasDragOver}
-                      onDrop={(e) => handleCanvasDrop(e, index)}
-                      className={cn(
-                        'rounded-[var(--stage-radius-nested)] border p-4 cursor-pointer transition-colors',
-                        selectedBlockId === block.id
-                          ? 'border-[oklch(1_0_0_/_0.25)] bg-[oklch(1_0_0_/_0.06)]'
-                          : 'border-[var(--stage-edge-subtle)] hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[var(--stage-surface)]'
-                      )}
-                      onClick={() => setSelectedBlockId(block.id)}
-                    >
-                      <span className="text-xs uppercase tracking-wider text-[var(--stage-text-secondary)]">
-                        {block.type.replace(/_/g, ' ')}
-                      </span>
-                      {block.type === 'header_hero' && 'content' in block && (
-                        <p className="text-[var(--stage-text-primary)] font-medium mt-1">
-                          {(block.content as { title?: string }).title || 'Untitled'}
-                        </p>
-                      )}
-                      {block.type === 'line_item' && 'catalogId' in block && (
-                        <p className="text-[var(--stage-text-primary)] font-medium mt-1">
-                          {catalogPackages.find((p) => p.id === (block as { catalogId: string }).catalogId)?.name ??
-                            (block as { catalogId: string }).catalogId}{' '}
-                          × {(block as { quantity: number }).quantity ?? 1}
-                        </p>
-                      )}
-                      {block.type === 'line_item_group' && 'label' in block && (
-                        <p className="text-[var(--stage-text-primary)] font-medium mt-1">{block.label}</p>
-                      )}
-                      {block.type === 'text_block' && 'content' in block && (
-                        <p className="text-sm text-[var(--stage-text-secondary)] mt-1 line-clamp-2">
-                          {(block.content as string) || 'Empty'}
-                        </p>
-                      )}
-                    </motion.li>
-                  ))}
-                </ul>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={definition.blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                    <ul className="space-y-4">
+                      {definition.blocks.map((block, index) => (
+                        <SortableBlock
+                          key={block.id}
+                          block={block}
+                          index={index}
+                          isSelected={block.id === selectedBlockId}
+                          onSelect={() => setSelectedBlockId(block.id)}
+                          onRemove={() => removeBlock(block.id)}
+                          onCanvasDragOver={handleCanvasDragOver}
+                          onCanvasDrop={handleCanvasDrop}
+                          catalogPackages={catalogPackages}
+                        />
+                      ))}
+                    </ul>
+                  </SortableContext>
+                </DndContext>
               )}
             </StagePanel>
           </div>

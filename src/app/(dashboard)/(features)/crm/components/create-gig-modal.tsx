@@ -16,6 +16,7 @@ import { searchReferrerEntities, type ReferrerSearchResult } from '../actions/se
 import { CalendarPanel, parseLocalDateString } from './ceramic-date-picker';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { cn } from '@/shared/lib/utils';
+import { TimePicker } from '@/shared/ui/time-picker';
 import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { useModalLayer } from '@/shared/lib/use-modal-layer';
 import { format } from 'date-fns';
@@ -47,35 +48,6 @@ function FeasibilityBadge({ status, message }: { status: FeasibilityStatus; mess
       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dots[status])} aria-hidden />
       {message}
     </span>
-  );
-}
-
-function normalizeTime(v: string): string | null {
-  if (!v) return null;
-  const parts = v.split(':');
-  const h = (parts[0] ?? '00').padStart(2, '0');
-  const m = (parts[1] ?? '00').padStart(2, '0').slice(0, 2);
-  if (parseInt(h, 10) <= 23 && parseInt(m, 10) <= 59) return `${h}:${m}`;
-  return null;
-}
-
-function TimeInput({
-  id,
-  value,
-  onChange,
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <input
-      id={id}
-      type="time"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="stage-input w-full min-w-0 [color-scheme:dark]"
-    />
   );
 }
 
@@ -394,8 +366,8 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
           leadSourceDetail: leadSourceDetail.trim() || undefined,
           referrerEntityId: referrerEntityId ?? undefined,
           plannerEntityId: selectedPlanner?.id ?? undefined,
-          eventStartTime: normalizeTime(startTime) ?? undefined,
-          eventEndTime: normalizeTime(endTime) ?? undefined,
+          eventStartTime: startTime || undefined,
+          eventEndTime: endTime || undefined,
         };
       } else if (clientType === 'couple') {
         dealInput = {
@@ -420,8 +392,8 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
           leadSourceDetail: leadSourceDetail.trim() || undefined,
           referrerEntityId: referrerEntityId ?? undefined,
           plannerEntityId: selectedPlanner?.id ?? undefined,
-          eventStartTime: normalizeTime(startTime) ?? undefined,
-          eventEndTime: normalizeTime(endTime) ?? undefined,
+          eventStartTime: startTime || undefined,
+          eventEndTime: endTime || undefined,
         };
       } else {
         // Company (default)
@@ -443,8 +415,8 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
           leadSourceDetail: leadSourceDetail.trim() || undefined,
           referrerEntityId: referrerEntityId ?? undefined,
           plannerEntityId: selectedPlanner?.id ?? undefined,
-          eventStartTime: normalizeTime(startTime) ?? undefined,
-          eventEndTime: normalizeTime(endTime) ?? undefined,
+          eventStartTime: startTime || undefined,
+          eventEndTime: endTime || undefined,
         };
       }
 
@@ -716,11 +688,11 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                       >
                         <div>
                           <label htmlFor="create-gig-start-time" className="block stage-label mb-1.5">Start time</label>
-                          <TimeInput id="create-gig-start-time" value={startTime} onChange={setStartTime} />
+                          <TimePicker value={startTime || null} onChange={(v) => setStartTime(v ?? '')} placeholder="Start time" context="evening" />
                         </div>
                         <div>
                           <label htmlFor="create-gig-end-time" className="block stage-label mb-1.5">End time</label>
-                          <TimeInput id="create-gig-end-time" value={endTime} onChange={setEndTime} />
+                          <TimePicker value={endTime || null} onChange={(v) => setEndTime(v ?? '')} placeholder="End time" context="evening" />
                         </div>
                       </motion.div>
                     )}

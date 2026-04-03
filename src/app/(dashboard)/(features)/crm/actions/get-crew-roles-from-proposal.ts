@@ -6,7 +6,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
 /**
  * Derives crew roles from a deal's latest proposal: for each proposal line item that
- * references a package with category "service", reads the package's staff_role
+ * references a package with category "service" or "talent", reads the package's staff_role
  * (definition.ingredient_meta.staff_role). When the line item is a bundle (category "package"),
  * also looks inside definition.blocks for line_item blocks and collects staff_role from those
  * ingredient packages (e.g. a "Wedding Package" that contains "DJ service" will yield DJ).
@@ -61,7 +61,7 @@ export async function getCrewRolesFromProposalForDeal(dealId: string): Promise<s
     const row = p as { id: string; category?: string; definition?: unknown };
     const def = typeof row.definition === 'string' ? (JSON.parse(row.definition) as Record<string, unknown>) : row.definition;
 
-    if (row.category === 'service') {
+    if (row.category === 'service' || row.category === 'talent') {
       const staffRole = (def as { ingredient_meta?: { staff_role?: string | null } } | null)?.ingredient_meta?.staff_role;
       if (typeof staffRole === 'string' && staffRole.trim()) roles.push(staffRole.trim());
       continue;
@@ -86,7 +86,7 @@ export async function getCrewRolesFromProposalForDeal(dealId: string): Promise<s
 
     for (const p of ingredientPackages ?? []) {
       const row = p as { category?: string; definition?: unknown };
-      if (row.category !== 'service') continue;
+      if (row.category !== 'service' && row.category !== 'talent') continue;
       const def = typeof row.definition === 'string' ? (JSON.parse(row.definition) as Record<string, unknown>) : row.definition;
       const staffRole = (def as { ingredient_meta?: { staff_role?: string | null } } | null)?.ingredient_meta?.staff_role;
       if (typeof staffRole === 'string' && staffRole.trim()) roles.push(staffRole.trim());
@@ -102,9 +102,9 @@ export type CrewRolesDiagnostic = {
   proposalStatus?: string;
   itemCount?: number;
   packageIdCount?: number;
-  /** Top-level packages on the proposal (name, category, staffRole if service). */
+  /** Top-level packages on the proposal (name, category, staffRole if service/talent). */
   packages?: { name: string; category: string; staffRole?: string | null }[];
-  /** Ingredients we looked up from bundles (name, category, staffRole if service). */
+  /** Ingredients we looked up from bundles (name, category, staffRole if service/talent). */
   ingredients?: { name: string; category: string; staffRole?: string | null }[];
   rolesFound?: string[];
 };
@@ -186,7 +186,7 @@ export async function getCrewRolesFromProposalDiagnostic(dealId: string): Promis
     const name = (row.name ?? 'Untitled') as string;
     const category = (row.category ?? '') as string;
 
-    if (row.category === 'service') {
+    if (row.category === 'service' || row.category === 'talent') {
       const staffRole = (def as { ingredient_meta?: { staff_role?: string | null } } | null)?.ingredient_meta?.staff_role;
       packageSummary.push({ name, category, staffRole: staffRole ?? null });
       if (typeof staffRole === 'string' && staffRole.trim()) continue;

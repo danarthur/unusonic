@@ -46,6 +46,8 @@ export type DealCrewRow = {
   roster_rel_id: string | null;
   // Skills
   skills: DealCrewSkill[];
+  // Contact
+  email: string | null;
   // Package reference
   package_name: string | null;
   // Ops dispatch fields (Phase A — used by Plan tab)
@@ -55,6 +57,9 @@ export type DealCrewRow = {
   arrival_location: string | null;
   day_rate: number | null;
   crew_notes: string | null;
+  // Department grouping + confirmation
+  department: string | null;
+  declined_at: string | null;
 };
 
 // =============================================================================
@@ -131,6 +136,23 @@ async function syncDealCrewFromProposal(
       if (data) {
         for (const row of data as { id: string; package_id: string; entity_id: string | null; role_note: string | null }[]) {
           assigneeRows.push({ entity_id: row.entity_id, role_note: row.role_note, package_id: row.package_id });
+        }
+      }
+    }
+
+    // Also read required_roles from package definitions (e.g. DJ service with role: "DJ")
+    const { data: allPkgs } = await supabase
+      .from('packages')
+      .select('id, definition')
+      .in('id', [...allPackageIds]);
+    for (const pkg of (allPkgs ?? []) as { id: string; definition: unknown }[]) {
+      const def = pkg.definition as { required_roles?: { role?: string; entity_id?: string | null; quantity?: number }[] } | null;
+      for (const r of def?.required_roles ?? []) {
+        if (r.role) {
+          const qty = r.quantity ?? 1;
+          for (let i = 0; i < qty; i++) {
+            assigneeRows.push({ entity_id: r.entity_id ?? null, role_note: r.role, package_id: pkg.id });
+          }
         }
       }
     }
@@ -214,6 +236,26 @@ async function syncDealCrewFromProposal(
 }
 
 // =============================================================================
+// syncCrewFromProposal — public sync-only action (no full crew fetch)
+// Call after saving a proposal to keep deal_crew in sync.
+// =============================================================================
+
+export async function syncCrewFromProposal(dealId: string): Promise<void> {
+  const parsed = z.string().uuid().safeParse(dealId);
+  if (!parsed.success) return;
+
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return;
+
+  try {
+    const supabase = await createClient();
+    await syncDealCrewFromProposal(supabase, dealId, workspaceId);
+  } catch (err) {
+    console.error('[syncCrewFromProposal] Failed:', err);
+  }
+}
+
+// =============================================================================
 // getDealCrew — public action; runs sync then returns full crew list
 // =============================================================================
 
@@ -239,6 +281,32 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
 
     // RPC returns a JSONB array — PostgREST may return it as a single object or array
     const rows = Array.isArray(data) ? data : [data];
+
+    // Fetch emails from directory.entities separately (RPC doesn't return email)
+    const entityIds = (rows as Record<string, unknown>[])
+      .map((r) => r.entity_id as string | null)
+      .filter((id): id is string => !!id);
+
+    const emailMap = new Map<string, string | null>();
+    if (entityIds.length > 0) {
+      const { data: entities } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('id, type, attributes')
+        .in('id', entityIds);
+      for (const e of (entities ?? []) as { id: string; type: string | null; attributes: unknown }[]) {
+        const t = e.type ?? 'person';
+        let email: string | null = null;
+        if (t === 'person') {
+          email = readEntityAttrs(e.attributes, 'person').email ?? null;
+        } else if (t === 'individual') {
+          email = readEntityAttrs(e.attributes, 'individual').email ?? null;
+        } else if (t === 'company') {
+          email = readEntityAttrs(e.attributes, 'company').support_email ?? null;
+        }
+        emailMap.set(e.id, email);
+      }
+    }
 
     return (rows as Record<string, unknown>[]).map((r) => ({
       id: r.id as string,
@@ -272,6 +340,7 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
             verified: Boolean(s.verified),
           }))
         : [],
+      email: r.entity_id ? (emailMap.get(r.entity_id as string) ?? null) : null,
       package_name: (r.package_name as string | null) ?? null,
       dispatch_status: (r.dispatch_status as DealCrewRow['dispatch_status']) ?? null,
       call_time: (r.call_time as string | null) ?? null,
@@ -279,6 +348,8 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
       arrival_location: (r.arrival_location as string | null) ?? null,
       day_rate: r.day_rate != null ? Number(r.day_rate) : null,
       crew_notes: (r.notes as string | null) ?? null,
+      department: (r.department as string | null) ?? null,
+      declined_at: (r.declined_at as string | null) ?? null,
     }));
   } catch {
     return [];
@@ -812,6 +883,77 @@ export async function searchCrewMembers(
   }
 
   return [...teamResults.slice(0, 10), ...networkResults];
+}
+
+// =============================================================================
+// remindAllUnconfirmed — batch remind all pending (unconfirmed, not declined) crew
+// Returns counts for toast display. Actual email sending to be wired once
+// deal_crew has its own confirmation token flow (currently crew_assignments only).
+// =============================================================================
+
+export async function remindAllUnconfirmed(
+  dealId: string,
+): Promise<{ sent: number; skipped: number }> {
+  const parsed = z.string().uuid().safeParse(dealId);
+  if (!parsed.success) return { sent: 0, skipped: 0 };
+
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return { sent: 0, skipped: 0 };
+
+  try {
+    const supabase = await createClient();
+
+    // Fetch all pending crew (assigned but not confirmed, not declined)
+    const { data: pendingRows } = await (supabase as any)
+      .schema('ops')
+      .from('deal_crew')
+      .select('id, entity_id')
+      .eq('deal_id', dealId)
+      .eq('workspace_id', workspaceId)
+      .not('entity_id', 'is', null)
+      .is('confirmed_at', null)
+      .is('declined_at', null);
+
+    if (!pendingRows?.length) return { sent: 0, skipped: 0 };
+
+    // Resolve emails from directory.entities
+    const entityIds = (pendingRows as { id: string; entity_id: string }[]).map((r) => r.entity_id);
+    const { data: entities } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id, type, attributes')
+      .in('id', entityIds);
+
+    const emailMap = new Map<string, string | null>();
+    for (const e of (entities ?? []) as { id: string; type: string | null; attributes: unknown }[]) {
+      const t = e.type ?? 'person';
+      let email: string | null = null;
+      if (t === 'person') {
+        email = readEntityAttrs(e.attributes, 'person').email ?? null;
+      } else if (t === 'individual') {
+        email = readEntityAttrs(e.attributes, 'individual').email ?? null;
+      } else if (t === 'company') {
+        email = readEntityAttrs(e.attributes, 'company').support_email ?? null;
+      }
+      emailMap.set(e.id, email);
+    }
+
+    let sent = 0;
+    let skipped = 0;
+    for (const row of pendingRows as { id: string; entity_id: string }[]) {
+      const email = emailMap.get(row.entity_id);
+      if (email) {
+        // TODO: Wire to actual deal_crew reminder email when token flow is ready
+        sent++;
+      } else {
+        skipped++;
+      }
+    }
+
+    return { sent, skipped };
+  } catch {
+    return { sent: 0, skipped: 0 };
+  }
 }
 
 // =============================================================================

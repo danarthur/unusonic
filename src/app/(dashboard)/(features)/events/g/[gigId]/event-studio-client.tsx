@@ -340,7 +340,8 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
             />
             <GearFlightCheck
               eventId={event.id}
-              runOfShowData={runOfShowData}
+              eventStartsAt={summary.starts_at ?? null}
+              eventEndsAt={summary.ends_at ?? null}
               onUpdated={refresh}
               defaultCollapsed={false}
               maxVisible={10}

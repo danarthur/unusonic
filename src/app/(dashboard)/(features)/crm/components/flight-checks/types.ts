@@ -1,7 +1,13 @@
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
 
 export type CrewStatus = 'requested' | 'confirmed' | 'dispatched';
-export type GearStatus = 'pending' | 'pulled' | 'loaded';
+export type GearStatus = 'allocated' | 'pulled' | 'packed' | 'loaded' | 'on_site' | 'returned' | 'quarantine' | 'sub_rented';
+
+export type GearHistoryEntry = {
+  status: GearStatus;
+  changed_at: string;
+  changed_by: string;
+};
 
 export type CrewItem = {
   role: string;
@@ -16,6 +22,25 @@ export type GearItem = {
   quantity?: number;
   catalog_package_id?: string | null;
   is_sub_rental?: boolean | null;
+  history?: GearHistoryEntry[];
+};
+
+/** Linear progression order for the gear lifecycle. */
+export const GEAR_LIFECYCLE_ORDER: GearStatus[] = ['allocated', 'pulled', 'packed', 'loaded', 'on_site', 'returned'];
+
+/** Branch states that sit outside the linear progression. */
+export const GEAR_BRANCH_STATES: GearStatus[] = ['quarantine', 'sub_rented'];
+
+/** Human-readable labels for each gear status. */
+export const GEAR_STATUS_LABELS: Record<GearStatus, string> = {
+  allocated: 'Allocated',
+  pulled: 'Pulled',
+  packed: 'Packed',
+  loaded: 'Loaded',
+  on_site: 'On site',
+  returned: 'Returned',
+  quarantine: 'Quarantine',
+  sub_rented: 'Sub-rented',
 };
 
 export type LogisticsState = {
@@ -45,16 +70,28 @@ export function normalizeCrewItems(ros: RunOfShowData | null): CrewItem[] {
   return [];
 }
 
+/** Map any legacy status value to the current GearStatus enum. */
+function coerceGearStatus(raw: string | undefined | null): GearStatus {
+  if (!raw || raw === 'pending') return 'allocated';
+  if (GEAR_LIFECYCLE_ORDER.includes(raw as GearStatus) || GEAR_BRANCH_STATES.includes(raw as GearStatus)) {
+    return raw as GearStatus;
+  }
+  return 'allocated';
+}
+
 export function normalizeGearItems(ros: RunOfShowData | null): GearItem[] {
   if (!ros) return [];
   if (Array.isArray(ros.gear_items) && ros.gear_items.length > 0) {
     return ros.gear_items.map((g, i) => ({
       id: g.id ?? `gear-${i}`,
       name: g.name,
-      status: (g.status ?? 'pending') as GearStatus,
+      status: coerceGearStatus(g.status),
       quantity: g.quantity ?? undefined,
       catalog_package_id: g.catalog_package_id ?? null,
       is_sub_rental: g.is_sub_rental ?? null,
+      history: Array.isArray((g as Record<string, unknown>).history)
+        ? ((g as Record<string, unknown>).history as GearHistoryEntry[])
+        : undefined,
     }));
   }
   if (ros.gear_requirements && String(ros.gear_requirements).trim()) {
@@ -62,7 +99,7 @@ export function normalizeGearItems(ros: RunOfShowData | null): GearItem[] {
       {
         id: 'gear-requirements',
         name: String(ros.gear_requirements).slice(0, 80),
-        status: 'pending' as GearStatus,
+        status: 'allocated' as GearStatus,
       },
     ];
   }

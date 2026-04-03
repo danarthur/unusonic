@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useOptimistic, startTransition } 
 import { Clock, Mic, Sun, Video, Truck, Copy, Trash2, MousePointerClick } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
+import { toast } from 'sonner';
 import type { Cue, CueType, AssignedCrewEntry } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
 
 type CueInspectorProps = {
@@ -77,7 +78,7 @@ export function CueInspector({
       clearTimeout(debounceRef.current);
     }
     debounceRef.current = setTimeout(() => {
-      onSave(updates).catch(() => undefined);
+      onSave(updates).catch(() => toast.error('Failed to save cue'));
     }, 500);
   };
 

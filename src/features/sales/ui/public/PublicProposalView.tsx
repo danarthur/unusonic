@@ -112,6 +112,16 @@ function SignedConfirmation({
               month: 'long',
               year: 'numeric',
             })}
+            {data.event.hasEventTimes && data.event.eventStartTime && (() => {
+              const fmt = (t: string) => {
+                const [h, m] = t.split(':').map(Number);
+                const period = h >= 12 ? 'PM' : 'AM';
+                return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${period}`;
+              };
+              const start = fmt(data.event.eventStartTime);
+              const end = data.event.eventEndTime ? fmt(data.event.eventEndTime) : null;
+              return end ? ` \u00B7 ${start} \u2013 ${end}` : ` \u00B7 ${start}`;
+            })()}
           </p>
         )}
         <p className="text-sm font-semibold tabular-nums" style={{ color: 'var(--portal-text)' }}>
@@ -362,6 +372,8 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
           style={{ gap: 'var(--portal-gap)' } as React.CSSProperties}
           onSelectionChange={!signed ? handleSelectionChange : undefined}
           disabled={signed}
+          eventStartTime={data.event.eventStartTime ?? null}
+          eventEndTime={data.event.eventEndTime ?? null}
         />
       </motion.section>
 

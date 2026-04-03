@@ -8,17 +8,17 @@ import { ArrowLeft, Package, Users, ChevronDown, ChevronUp, Printer } from 'luci
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { updateGearItemStatus } from '@/app/(dashboard)/(features)/crm/actions/update-gear-item-status';
+import {
+  GEAR_LIFECYCLE_ORDER,
+  GEAR_STATUS_LABELS,
+  type GearStatus,
+} from '@/app/(dashboard)/(features)/crm/components/flight-checks/types';
 import type { PullSheetGearItem, PullSheetCrewItem } from './get-pull-sheet-data';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const GEAR_STATUS_CYCLE = ['pending', 'pulled', 'loaded'] as const;
-type GearStatus = typeof GEAR_STATUS_CYCLE[number];
-const GEAR_STATUS_LABELS: Record<GearStatus, string> = {
-  pending: 'Pending',
-  pulled: 'Pulled',
-  loaded: 'Loaded',
-};
+/** Pull sheet cycles through the first 3 linear states for quick field use. */
+const PULL_SHEET_CYCLE: GearStatus[] = ['allocated', 'pulled', 'packed', 'loaded'];
 
 const CREW_STATUS_LABELS: Record<string, string> = {
   requested: 'Invited',
@@ -95,16 +95,16 @@ export function PullSheetClient({
   // ── Gear stats ─────────────────────────────────────────────────────────────
 
   const totalGear = gearItems.length;
-  const pulledGear = gearItems.filter((i) => i.status === 'pulled').length;
-  const loadedGear = gearItems.filter((i) => i.status === 'loaded').length;
-  const pendingGear = totalGear - pulledGear - loadedGear;
+  const pulledGear = gearItems.filter((i) => GEAR_LIFECYCLE_ORDER.indexOf(i.status as GearStatus) >= 1).length;
+  const loadedGear = gearItems.filter((i) => GEAR_LIFECYCLE_ORDER.indexOf(i.status as GearStatus) >= 3).length;
+  const pendingGear = totalGear - pulledGear;
 
   const cycleGearStatus = async (item: PullSheetGearItem) => {
-    const validStatus = GEAR_STATUS_CYCLE.includes(item.status as GearStatus)
+    const currentStatus = PULL_SHEET_CYCLE.includes(item.status as GearStatus)
       ? (item.status as GearStatus)
-      : 'pending';
-    const idx = GEAR_STATUS_CYCLE.indexOf(validStatus);
-    const next = GEAR_STATUS_CYCLE[(idx + 1) % GEAR_STATUS_CYCLE.length];
+      : 'allocated';
+    const idx = PULL_SHEET_CYCLE.indexOf(currentStatus);
+    const next = PULL_SHEET_CYCLE[(idx + 1) % PULL_SHEET_CYCLE.length];
 
     setGearItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, status: next } : i))
@@ -259,7 +259,7 @@ export function PullSheetClient({
         {departments.map((dept, di) => {
           const deptItems = grouped.get(dept) ?? [];
           const collapsed = collapsedDepts.has(dept);
-          const deptLoaded = deptItems.filter((i) => i.status === 'loaded').length;
+          const deptLoaded = deptItems.filter((i) => GEAR_LIFECYCLE_ORDER.indexOf(i.status as GearStatus) >= 3).length;
           const deptTotal = deptItems.length;
           const allLoaded = deptTotal > 0 && deptLoaded === deptTotal;
 
@@ -311,7 +311,7 @@ export function PullSheetClient({
                         >
                           <div className="min-w-0 flex-1 flex items-center gap-2.5">
                             <span className={`text-sm font-medium tracking-tight truncate ${
-                              item.status === 'loaded' ? 'text-[var(--stage-text-secondary)] line-through decoration-[var(--stage-text-secondary)]/40' : 'text-[var(--stage-text-primary)]'
+                              GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) >= 3 ? 'text-[var(--stage-text-secondary)] line-through decoration-[var(--stage-text-secondary)]/40' : 'text-[var(--stage-text-primary)]'
                             }`}>
                               {item.name}
                             </span>
@@ -336,9 +336,9 @@ export function PullSheetClient({
                               border transition-colors text-center
                               focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]
                               disabled:opacity-60
-                              ${item.status === 'loaded' ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40 hover:brightness-[1.04]' : ''}
-                              ${item.status === 'pulled' ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-text-primary)] border-[var(--stage-accent)]/30 hover:brightness-[1.04]' : ''}
-                              ${item.status === 'pending' ? 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]' : ''}
+                              ${GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) >= 3 ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40 hover:brightness-[1.04]' : ''}
+                              ${GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) >= 1 && GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) < 3 ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-text-primary)] border-[var(--stage-accent)]/30 hover:brightness-[1.04]' : ''}
+                              ${item.status === 'allocated' || !GEAR_LIFECYCLE_ORDER.includes(item.status as GearStatus) ? 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]' : ''}
                             `}
                           >
                             {updatingGear === item.id

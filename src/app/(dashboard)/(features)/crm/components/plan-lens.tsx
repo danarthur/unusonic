@@ -1,18 +1,34 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import { FileCheck, FileText, ExternalLink } from 'lucide-react';
+import { StagePanel } from '@/shared/ui/stage-panel';
 import { DispatchSummary } from './dispatch-summary';
 import { DealHeaderStrip } from './deal-header-strip';
 import { DealDiaryCard } from './deal-diary-card';
 import { CompletionIndicators } from './completion-indicators';
 import { HandoffConfirmStrip } from './handoff-confirm-strip';
-import { OpsActionsCard } from './ops-actions-card';
+import { LaborCostSummary } from './labor-cost-summary';
+import { ProductionTeamCard } from './production-team-card';
+import { AdvancingChecklist } from './advancing-checklist';
+import { ShowHealthCard } from './show-health-card';
+import { ReadinessRibbon } from './readiness-ribbon';
+import { ShowDayContactsCard } from './show-day-contacts-card';
+import { VenueIntelCard } from './venue-intel-card';
+import { WrapReportCard } from './wrap-report-card';
+import { DaySheetActionStrip } from './day-sheet-action-strip';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
+import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
 import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-milestones';
-import { getProposalForDeal } from '@/features/sales/api/proposal-actions';
+import { computeReadiness } from '../lib/compute-readiness';
+import { getProposalForDeal, getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
+import type { ProposalWithItems } from '@/features/sales/model/types';
 import { getDealCrew, getDealCrewForEvent, type DealCrewRow } from '../actions/deal-crew';
 import { getEventLoadDates } from '../actions/get-event-summary';
+import { getContractForEvent } from '../actions/get-contract-for-event';
+import { updateDealScalars } from '../actions/update-deal-scalars';
 import type { EventSummaryForPrism } from '../actions/get-event-summary';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
@@ -29,6 +45,8 @@ type PlanLensProps = {
   onEventUpdated?: () => void;
   onHandoverSuccess?: (eventId: string) => void;
   onStakeholdersChange?: () => void;
+  /** Called when deal scalars are updated so parent can refetch deal data. */
+  onDealUpdated?: () => void;
 };
 
 export function PlanLens({
@@ -42,8 +60,43 @@ export function PlanLens({
   onEventUpdated,
   onHandoverSuccess,
   onStakeholdersChange,
+  onDealUpdated,
 }: PlanLensProps) {
   const isPostHandoff = !!eventId && !!event;
+
+  // ── Scalar editing (same pattern as DealLens, with confirmation for post-handoff) ──
+  const [localTitle, setLocalTitle] = useState(deal?.title ?? '');
+  const [scalarsSaving, setScalarsSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalTitle(deal?.title ?? '');
+  }, [deal?.id, deal?.title]);
+
+  const handleSaveScalar = async (patch: Parameters<typeof updateDealScalars>[1]) => {
+    if (!dealId) return;
+    // Post-handoff: confirm before saving
+    if (isPostHandoff) {
+      const confirmed = window.confirm('This show has been handed off to production. Save this change?');
+      if (!confirmed) return;
+    }
+    setScalarsSaving(true);
+    const result = await updateDealScalars(dealId, patch);
+    setScalarsSaving(false);
+    if (!result.success) {
+      toast.error(result.error ?? 'Failed to save');
+    } else {
+      onDealUpdated?.();
+    }
+  };
+
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleTitleChange = (value: string) => {
+    setLocalTitle(value);
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+    titleDebounceRef.current = setTimeout(() => {
+      handleSaveScalar({ title: value || null });
+    }, 800);
+  };
 
   // Crew — shared between pre and post handoff
   const [crewRows, setCrewRows] = useState<DealCrewRow[]>([]);
@@ -82,9 +135,17 @@ export function PlanLens({
   const [proposalData, setProposalData] = useState<ProposalSnapshot | null>(null);
   const [eventDates, setEventDates] = useState<{ loadIn: string | null; loadOut: string | null }>({ loadIn: null, loadOut: null });
 
+  // Full proposal for read-only receipt + contract reference
+  const [initialProposal, setInitialProposal] = useState<ProposalWithItems | null | undefined>(undefined);
+  const [publicProposalUrl, setPublicProposalUrl] = useState<string | null>(null);
+  const [contract, setContract] = useState<Awaited<ReturnType<typeof getContractForEvent>>>(null);
+
   useEffect(() => {
     if (!dealId) return;
+    let cancelled = false;
     getProposalForDeal(dealId).then((p) => {
+      if (cancelled) return;
+      setInitialProposal(p);
       if (!p) { setProposalData(null); return; }
       const total = (p.items ?? []).reduce((sum, item) => {
         if ((item as { is_optional?: boolean }).is_optional) return sum;
@@ -105,7 +166,19 @@ export function PlanLens({
         firstViewedAt: (p as unknown as Record<string, unknown>).first_viewed_at as string | null ?? null,
       });
     });
+    // Public proposal URL for "View signed proposal" link
+    getProposalPublicUrl(dealId).then((url) => { if (!cancelled) setPublicProposalUrl(url); });
+    return () => { cancelled = true; };
   }, [dealId]);
+
+  // Contract for event
+  useEffect(() => {
+    const eid = eventId ?? deal?.event_id;
+    if (!eid) { setContract(null); return; }
+    let cancelled = false;
+    getContractForEvent(eid).then((c) => { if (!cancelled) setContract(c); });
+    return () => { cancelled = true; };
+  }, [eventId, deal?.event_id]);
 
   // Fetch load-in/load-out dates for timeline
   useEffect(() => {
@@ -151,18 +224,43 @@ export function PlanLens({
       }
     : undefined;
 
+  // ── Readiness ribbon (post-handoff only) ──
+  const readiness = useMemo(() => {
+    if (!isPostHandoff) return null;
+    const gearItems = event?.run_of_show_data?.gear_items ?? [];
+    const loadedStatuses = ['loaded', 'on_site', 'returned'];
+    return computeReadiness({
+      crewAssigned: crewRows.filter((r) => r.entity_id).length,
+      crewConfirmed: crewRows.filter((r) => r.confirmed_at).length,
+      crewDeclined: crewRows.filter((r) => r.declined_at).length,
+      gearTotal: gearItems.length,
+      gearLoaded: gearItems.filter((g) => loadedStatuses.includes(g.status)).length,
+      gearAllocatedOnly: gearItems.filter((g) => g.status === 'allocated' || g.status === 'pending').length,
+      hasVenueStakeholder: stakeholders.some((s) => s.role === 'venue_contact'),
+      venueAccessConfirmed: event?.run_of_show_data?.logistics?.venue_access_confirmed ?? false,
+      hasTransportMode: !!(event?.run_of_show_data?.transport_mode || event?.run_of_show_data?.logistics?.transport_mode),
+      truckLoaded: event?.run_of_show_data?.logistics?.truck_loaded ?? false,
+      hasClientStakeholder: stakeholders.some((s) => s.role === 'bill_to'),
+      clientBriefConfirmed: false,
+    });
+  }, [crewRows, event, stakeholders, isPostHandoff]);
+
   const hasVenue = stakeholders.some((s) => s.role === 'venue_contact') || !!deal?.venue_id;
 
   // ── Render ──
 
-  // Shared header strip — same component as Deal tab, read-only in Plan
+  // Shared header strip — editable on Plan (with confirmation for post-handoff changes)
   const headerStrip = deal ? (
     <DealHeaderStrip
-      title={deal.title}
+      title={localTitle}
       proposedDate={deal.proposed_date}
       eventArchetype={deal.event_archetype ?? null}
       budgetEstimated={deal.budget_estimated}
-      readOnly
+      saving={scalarsSaving}
+      onTitleChange={handleTitleChange}
+      onSaveScalar={(patch) => {
+        handleSaveScalar(patch as Parameters<typeof updateDealScalars>[1]);
+      }}
       deal={deal}
       stakeholders={stakeholders}
       client={client}
@@ -176,10 +274,41 @@ export function PlanLens({
   if (isPostHandoff) {
     content = (
       <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+        {/* ── Layer 1: Identity + Show Status ── */}
         {headerStrip}
+        {/* Merge 1: ShowHealthCard with ReadinessRibbon nested inside */}
+        <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
+          {dealId && deal && (
+            <ShowHealthCard dealId={dealId} health={deal.show_health} onSaved={() => onDealUpdated?.()} inline />
+          )}
+          {readiness && (
+            <div style={{ marginTop: dealId && deal ? 'var(--stage-gap-wide, 12px)' : 0 }}>
+              <ReadinessRibbon readiness={readiness} />
+            </div>
+          )}
+        </StagePanel>
 
+        {/* ── Layer 2: Two-column layout ── */}
         <div className="flex flex-col lg:flex-row gap-6 min-h-0">
+
+          {/* ── Main column: plan → prepare → execute → reference → close ── */}
           <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+
+            {/* Plan: Advancing checklist */}
+            <AdvancingChecklist
+              eventId={eventId}
+              crewRows={crewRows}
+              runOfShowData={event.run_of_show_data}
+              contractStatus={contract?.status ?? null}
+              archetype={deal?.event_archetype ?? null}
+            />
+
+            {/* Prepare: Crew */}
+            {dealId && (
+              <ProductionTeamCard dealId={dealId} sourceOrgId={sourceOrgId ?? null} eventDate={deal?.proposed_date} workspaceId={deal?.workspace_id} />
+            )}
+
+            {/* Prepare: Gear + logistics + day sheet send */}
             <DispatchSummary
               eventId={eventId}
               dealId={dealId}
@@ -187,14 +316,81 @@ export function PlanLens({
               crewRows={crewRows}
               crewLoading={crewLoading}
               onFlightCheckUpdated={handleCrewUpdated}
+              hideVitals
+              sourceOrgId={sourceOrgId ?? null}
             />
+            {/* Merge 2: Day sheet action moved here as execution step after dispatch */}
+            {dealId && eventId && (
+              <DaySheetActionStrip
+                eventId={eventId}
+                dealId={dealId}
+                crewCount={crewRows.filter((r) => r.entity_id).length}
+                crewWithEmailCount={crewRows.filter((r) => r.entity_id && r.email).length}
+              />
+            )}
+
+            {/* Merge 3: Agreed scope with contract info collapsed into header */}
+            {dealId && deal?.workspace_id && (
+              <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
+                    Agreed scope
+                  </p>
+                  <div className="flex items-center" style={{ gap: 'var(--stage-gap, 6px)' }}>
+                    {contract?.status === 'signed' && (
+                      <span className="flex items-center gap-1 text-[10px] tracking-tight px-2 py-0.5 rounded-full" style={{ background: 'oklch(0.7 0.17 145 / 0.15)', color: 'var(--color-unusonic-success)', border: '1px solid oklch(0.7 0.17 145 / 0.2)' }}>
+                        <FileCheck size={10} aria-hidden />
+                        Signed{contract.signed_at ? ` ${new Date(contract.signed_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                      </span>
+                    )}
+                    {contract?.pdf_url && (
+                      <a href={contract.pdf_url} target="_blank" rel="noopener noreferrer" className="text-[10px] tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+                        PDF
+                      </a>
+                    )}
+                    {publicProposalUrl && (
+                      <a href={publicProposalUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+                        View proposal
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <ProposalBuilder
+                  dealId={dealId}
+                  workspaceId={deal.workspace_id}
+                  initialProposal={initialProposal}
+                  readOnly
+                />
+              </div>
+            )}
+
+            {/* Journal */}
             {dealId && deal?.workspace_id && (
               <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
             )}
+
+            {/* Close out: Wrap report (only after event date has passed) */}
+            {event && new Date(event.starts_at) < new Date() && (
+              <WrapReportCard
+                eventId={eventId!}
+                eventStartsAt={event.starts_at}
+                crewRows={crewRows}
+                gearItems={(event.run_of_show_data?.gear_items ?? []) as { id: string; name: string; status: string }[]}
+              />
+            )}
           </div>
 
+          {/* ── Sidebar: context + financials + timeline ── */}
           <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col lg:sticky lg:top-0 lg:self-start" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-            <OpsActionsCard crewRows={crewRows} runOfShowData={event.run_of_show_data} eventStartsAt={event.starts_at} hasVenue={hasVenue} />
+            <LaborCostSummary crewRows={crewRows} proposalTotal={proposalData?.total ?? null} />
+            <ShowDayContactsCard
+              eventId={eventId}
+              initialContacts={(event.show_day_contacts ?? []) as { role: string; name: string; phone: string | null; email: string | null }[]}
+              onSaved={onEventUpdated}
+            />
+            {event.venue_entity_id && (
+              <VenueIntelCard venueEntityId={event.venue_entity_id} />
+            )}
             {proposalData && proposalData.status !== 'draft' && (
               <ProductionTimelineWidget eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null} eventTitle={deal?.title ?? event.title} paymentMilestones={paymentMilestones} dealMilestones={dealMilestones} />
             )}
@@ -206,10 +402,18 @@ export function PlanLens({
         </div>
       </div>
     );
-  } else if (!deal) {
+  } else if (eventId && !event) {
+    // Event ID known but summary still loading (async fetch in progress)
     content = (
       <div className="stage-panel-elevated p-6 text-[var(--stage-text-secondary)] text-sm leading-relaxed">
-        No event linked yet.
+        Loading event data...
+      </div>
+    );
+  } else if (!deal) {
+    // No deal and no event — genuinely unlinked
+    content = (
+      <div className="stage-panel-elevated p-6 text-[var(--stage-text-secondary)] text-sm leading-relaxed">
+        No deal linked to this event.
       </div>
     );
   } else {

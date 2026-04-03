@@ -20,6 +20,7 @@ export type EventSummaryForPrism = {
   venue_name?: string | null;
   venue_address?: string | null;
   run_of_show_data: RunOfShowData | null;
+  show_day_contacts: { role: string; name: string; phone: string | null; email: string | null }[] | null;
 };
 
 export type { RunOfShowData };
@@ -42,6 +43,7 @@ export async function getEventSummaryForPrism(
     venue_name: s.location_name,
     venue_address: s.location_address,
     run_of_show_data: s.run_of_show_data ?? null,
+    show_day_contacts: s.show_day_contacts ?? null,
   };
 }
 

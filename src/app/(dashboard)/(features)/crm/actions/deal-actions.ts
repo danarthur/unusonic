@@ -40,6 +40,12 @@ const createDealSchema = z.object({
   leadSourceDetail: z.string().max(500).nullable().optional(),
   /** Entity who referred this client (for referral sources) */
   referrerEntityId: z.string().uuid().nullable().optional(),
+  /** Planner / coordinator entity linked to this deal */
+  plannerEntityId: z.string().uuid().nullable().optional(),
+  /** Event start time as HH:MM (24h) */
+  eventStartTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  /** Event end time as HH:MM (24h) */
+  eventEndTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
 });
 
 export type CreateDealInput = z.infer<typeof createDealSchema>;
@@ -92,6 +98,9 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       leadSourceId,
       leadSourceDetail,
       referrerEntityId,
+      plannerEntityId,
+      eventStartTime,
+      eventEndTime,
     } = parsed.data;
 
     const supabase = await createClient();
@@ -270,6 +279,8 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
         lead_source_id: leadSourceId ?? null,
         lead_source_detail: leadSourceDetail?.trim() ?? null,
         referrer_entity_id: referrerEntityId ?? null,
+        event_start_time: eventStartTime ?? null,
+        event_end_time: eventEndTime ?? null,
       })
       .select('id')
       .single();
@@ -292,6 +303,9 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
     }
     if (resolvedVenueId) {
       stakeholderRows.push({ deal_id: deal.id, organization_id: resolvedVenueId, entity_id: null, role: 'venue_contact', is_primary: false });
+    }
+    if (plannerEntityId) {
+      stakeholderRows.push({ deal_id: deal.id, organization_id: plannerEntityId, entity_id: null, role: 'planner', is_primary: false });
     }
     if (stakeholderRows.length > 0) {
       await supabase.schema('ops').from('deal_stakeholders').insert(stakeholderRows);
@@ -356,7 +370,8 @@ export async function updateDealNotes(
     const { error } = await supabase
       .from('deals')
       .update({ notes: notes?.trim() ?? null })
-      .eq('id', dealId);
+      .eq('id', dealId)
+      .eq('workspace_id', workspaceId);
 
     if (error) return { success: false, error: error.message };
 

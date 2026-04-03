@@ -48,7 +48,7 @@ import { SwapItemPicker } from './SwapItemPicker';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_HEAVY, M3_FADE_THROUGH_VARIANTS } from '@/shared/lib/motion-constants';
 import type { ProposalBuilderLineItem, ProposalLineItemCategory, UnitType } from '../model/types';
-import { estimatedRoleCost } from '../api/package-types';
+import { estimatedRoleCost, roleCostBreakdown } from '../api/package-types';
 import type { RequiredRole } from '../api/package-types';
 
 // =============================================================================
@@ -65,9 +65,21 @@ function estimatedRoleCostForItem(role: RequiredRole, item: ProposalBuilderLineI
       role.minimum_hours ?? 0
     );
     const qty = Math.max(1, role.quantity ?? 1);
+    if (role.overtime_rate != null && hours > (role.overtime_threshold ?? 8)) {
+      const threshold = role.overtime_threshold ?? 8;
+      return (rate * threshold + role.overtime_rate * (hours - threshold)) * qty;
+    }
     return rate * hours * qty;
   }
   return estimatedRoleCost(role);
+}
+
+/** Returns billable hours for a role given the item context. */
+function effectiveRoleHours(role: RequiredRole, item: ProposalBuilderLineItem): number {
+  if (item.unitType === 'hour' && role.booking_type === 'labor') {
+    return Math.max(item.unitMultiplier ?? 1, role.minimum_hours ?? 0);
+  }
+  return Math.max(role.default_hours ?? 0, role.minimum_hours ?? 0);
 }
 
 // =============================================================================
@@ -91,6 +103,9 @@ export interface LineItemFinancialEditorProps {
 
   // --- Scalar update callbacks ---
   onUpdateName: (index: number, name: string) => void;
+  onUpdateDisplayGroupName?: (index: number, value: string | null) => void;
+  /** Existing section names across all line items (for autocomplete). */
+  existingSections?: string[];
   onUpdateDescription: (index: number, description: string | null) => void;
   onUpdateInternalNotes: (index: number, notes: string | null) => void;
   onUpdateIsClientVisible: (index: number, visible: boolean) => void;
@@ -120,6 +135,8 @@ export function LineItemFinancialEditor({
   readOnly = false,
   onSelectIndex,
   onUpdateName,
+  onUpdateDisplayGroupName,
+  existingSections = [],
   onUpdateDescription,
   onUpdateInternalNotes,
   onUpdateIsClientVisible,
@@ -310,6 +327,34 @@ export function LineItemFinancialEditor({
                     />
                   </div>
 
+                  {/* ── 1b. Section (display group name) ── */}
+                  {onUpdateDisplayGroupName && !readOnly && (
+                    <div>
+                      <label
+                        htmlFor="editor-section"
+                        className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1.5"
+                      >
+                        Section
+                      </label>
+                      <input
+                        id="editor-section"
+                        type="text"
+                        list="editor-section-list"
+                        value={item.displayGroupName ?? ''}
+                        onChange={(e) => onUpdateDisplayGroupName(selectedIndex!, e.target.value || null)}
+                        placeholder="e.g. Entertainment, Production, Staffing"
+                        className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)]"
+                      />
+                      {existingSections.length > 0 && (
+                        <datalist id="editor-section-list">
+                          {existingSections.map((s) => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      )}
+                    </div>
+                  )}
+
                   {/* ── 2. Description / client notes ── */}
                   <div>
                     <label
@@ -435,11 +480,37 @@ export function LineItemFinancialEditor({
                       disabled={readOnly}
                       className={cn(belowFloor && 'border-[oklch(0.80_0.16_85/0.5)]')}
                     />
-                    {belowFloor && floorPrice != null && (
-                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--color-unusonic-warning)]">
-                        <AlertTriangle className="w-3 h-3 shrink-0" strokeWidth={1.5} aria-hidden />
-                        Below floor price of ${floorPrice.toLocaleString()}
+                    {floorPrice != null && (
+                      <div className={cn(
+                        'mt-2 flex flex-col gap-1 px-3 py-2 rounded-[var(--stage-radius-nested)] text-sm',
+                        belowFloor
+                          ? 'bg-[oklch(0.65_0.15_55_/_0.1)] text-amber-400'
+                          : 'bg-[oklch(1_0_0_/_0.03)] text-[var(--stage-text-secondary)]'
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Floor</span>
+                          <span className="tabular-nums text-xs">${floorPrice.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Current</span>
+                          <span className="tabular-nums text-xs">${effectivePrice.toLocaleString()}</span>
+                        </div>
+                        {belowFloor && (
+                          <div className="flex items-center justify-between font-medium">
+                            <span className="text-xs">Gap</span>
+                            <span className="tabular-nums text-xs">-${(floorPrice - effectivePrice).toLocaleString()}</span>
+                          </div>
+                        )}
                       </div>
+                    )}
+                    {belowFloor && floorPrice != null && !readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateOverridePrice(selectedIndex!, floorPrice)}
+                        className="mt-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] underline transition-colors"
+                      >
+                        Restore to floor
+                      </button>
                     )}
                   </div>
 
@@ -628,6 +699,13 @@ export function LineItemFinancialEditor({
                       <div className="space-y-2">
                         {roles.map((role, i) => {
                           const roleCost = estimatedRoleCostForItem(role, item);
+                          const hours = effectiveRoleHours(role, item);
+                          const rawHours = item.unitType === 'hour' ? (item.unitMultiplier ?? 1) : (role.default_hours ?? 0);
+                          const minimumApplies = role.minimum_hours != null && rawHours < role.minimum_hours;
+                          const breakdown = role.booking_type === 'labor' && role.default_rate != null
+                            ? roleCostBreakdown(role, hours, Math.max(1, role.quantity ?? 1))
+                            : null;
+                          const hasOvertime = breakdown != null && breakdown.overtimeHours > 0;
                           return (
                             <div
                               key={i}
@@ -640,10 +718,14 @@ export function LineItemFinancialEditor({
                                 <p className="text-[11px] text-[var(--stage-text-secondary)] mt-0.5">
                                   {role.booking_type === 'talent'
                                     ? 'Talent — flat fee'
-                                    : role.default_hours
-                                    ? `Labor — ${role.default_hours}h`
+                                    : hasOvertime
+                                    ? `${breakdown.regularHours}h @ $${breakdown.regularRate.toLocaleString()}/hr + ${breakdown.overtimeHours}h OT @ $${breakdown.overtimeRate!.toLocaleString()}/hr`
+                                    : minimumApplies
+                                    ? `Labor — ${hours}h (${role.minimum_hours}h minimum)`
+                                    : hours > 0
+                                    ? `Labor — ${hours}h`
                                     : 'Labor'}
-                                  {role.default_rate != null && (
+                                  {role.default_rate != null && !hasOvertime && (
                                     <>
                                       {' · '}
                                       {role.booking_type === 'talent'
@@ -652,8 +734,14 @@ export function LineItemFinancialEditor({
                                     </>
                                   )}
                                 </p>
+                                {minimumApplies && (
+                                  <span className="text-xs text-[var(--color-unusonic-warning)] mt-0.5 block">
+                                    {role.minimum_hours}h minimum applies
+                                  </span>
+                                )}
                                 {role.assignee_name && (
-                                  <p className="text-[11px] text-[var(--color-unusonic-warning)] mt-0.5 truncate">
+                                  <p className="text-[11px] text-[var(--color-unusonic-warning)] mt-0.5 truncate flex items-center gap-1">
+                                    {role.client_locked && <Lock className="w-3 h-3 shrink-0" strokeWidth={1.5} aria-label="Client locked" />}
                                     → {role.assignee_name}
                                   </p>
                                 )}

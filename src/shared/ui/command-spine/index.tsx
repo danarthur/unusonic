@@ -16,6 +16,7 @@ import {
   Network,
   Building2,
   Loader2,
+  Package,
 } from 'lucide-react';
 import { searchGlobal, type SearchGlobalResult } from '@/shared/actions/search-global';
 import { useCommandPaletteOrg } from '@/shared/ui/providers/CommandPaletteContext';
@@ -37,6 +38,7 @@ const STATIC_NAV = [
   { label: 'Calendar', href: '/calendar', icon: CalendarDays },
   { label: 'Production (CRM)', href: '/crm', icon: FolderKanban },
   { label: 'Finance', href: '/finance', icon: Wallet },
+  { label: 'Catalog', href: '/catalog', icon: Package },
   { label: 'Network', href: '/network', icon: Network },
 ] as const;
 

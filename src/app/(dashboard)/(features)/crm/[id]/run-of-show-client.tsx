@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Clock, MapPin, Users, Plus, Timer, CalendarClock } from 'lucide-react';
+import { toast } from 'sonner';
 import { GlassShell } from '@/shared/ui/glass-shell';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import dynamic from 'next/dynamic';
@@ -110,13 +111,15 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
   const handleSave = async (updates: Partial<Cue>) => {
     const cueId = selectedCueId;
     if (!cueId || !eventId) return;
+    const snapshot = cues;
     setCues((prev) =>
       prev.map((cue) => (cue.id === cueId ? { ...cue, ...updates } : cue))
     );
     try {
       await updateCue(eventId, cueId, updates);
     } catch {
-      // Optimistic rollback logic
+      setCues(snapshot);
+      toast.error('Failed to save cue');
     }
   };
 
