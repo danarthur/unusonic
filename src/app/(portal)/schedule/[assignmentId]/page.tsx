@@ -6,6 +6,7 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { resolveGigProfile, PORTAL_PROFILES } from '@/shared/lib/portal-profiles';
 import { GigDetailView } from './gig-detail-view';
 import { DjPrepWorkspace } from './dj-prep-workspace';
 import type { DjPrepData } from '@/features/ops/actions/save-dj-prep';
@@ -185,8 +186,9 @@ export default async function GigDetailPage({
       : `$${payRate.toFixed(0)}`
     : null;
 
-  // DJ/entertainer roles get the show prep workspace
-  const isDjRole = /\b(dj|mc|emcee|entertainer|host)\b/i.test(assignment.role ?? '');
+  // Resolve gig-specific portal profile for role-aware workspace sections
+  const gigProfile = resolveGigProfile(assignment.role, PORTAL_PROFILES.tech_stagehand);
+  const showDjWorkspace = gigProfile.key === 'dj_entertainer';
   const djPrepInitial: Partial<DjPrepData> = {
     dj_timeline: rosData.dj_timeline as DjPrepData['dj_timeline'] | undefined,
     dj_must_play: rosData.dj_must_play as string[] | undefined,
@@ -214,7 +216,7 @@ export default async function GigDetailPage({
         documents={documents}
         assignmentId={assignmentId}
       />
-      {isDjRole && (
+      {showDjWorkspace && (
         <DjPrepWorkspace eventId={event.id} initialData={djPrepInitial} />
       )}
     </div>

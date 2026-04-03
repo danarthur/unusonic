@@ -3,14 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut } from 'lucide-react';
-import { portalNavItems, isPortalNavActive } from '@/shared/ui/layout/portal-nav-items';
+import { isPortalNavActive } from '@/shared/ui/layout/portal-nav-items';
+import type { PortalNavItem } from '@/shared/lib/portal-profiles';
 
 interface PortalShellProps {
   user: { email: string; fullName: string | null; avatarUrl: string | null } | null;
   workspaceName: string | null;
+  navItems: PortalNavItem[];
 }
 
-export function PortalShell({ user, workspaceName }: PortalShellProps) {
+export function PortalShell({ user, workspaceName, navItems }: PortalShellProps) {
   const pathname = usePathname();
 
   return (
@@ -26,7 +28,7 @@ export function PortalShell({ user, workspaceName }: PortalShellProps) {
 
         {/* Center: nav items (desktop only) */}
         <nav className="hidden sm:flex items-center gap-1">
-          {portalNavItems.map((item) => {
+          {navItems.map((item) => {
             const active = isPortalNavActive(item.href, pathname);
             const Icon = item.icon;
             return (
@@ -67,7 +69,7 @@ export function PortalShell({ user, workspaceName }: PortalShellProps) {
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex sm:hidden items-stretch justify-around border-t border-[oklch(1_0_0/0.06)] bg-[var(--stage-void)]/90 backdrop-blur-md"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        {portalNavItems.map((item) => {
+        {navItems.map((item) => {
           const active = isPortalNavActive(item.href, pathname);
           const Icon = item.icon;
           return (
