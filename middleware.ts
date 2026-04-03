@@ -169,7 +169,7 @@ export async function middleware(request: NextRequest) {
 
       // Employee trying to access dashboard → redirect to portal
       if (isEmployee && !isPortalRoute && !pathname.startsWith('/api/') && !pathname.startsWith('/signout') && !pathname.startsWith('/settings')) {
-        return NextResponse.redirect(new URL('/portal', request.url));
+        return NextResponse.redirect(new URL('/portal/schedule', request.url));
       }
 
       // Non-employee trying to access portal → redirect to dashboard
