@@ -421,7 +421,7 @@ export async function validateInvitation(
   const supabase = await createClient();
   const { data: inv, error } = await supabase
     .from('invitations')
-    .select('id, organization_id, email, status, expires_at')
+    .select('id, organization_id, email, status, expires_at, payload')
     .eq('token', token.trim())
     .maybeSingle();
   if (error || !inv) return { ok: false, error: 'Invalid or expired invitation.' };
@@ -430,16 +430,23 @@ export async function validateInvitation(
   if (new Date(inv.expires_at) <= new Date())
     return { ok: false, error: 'This invitation has expired.' };
 
-  const { data: orgEnt } = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('display_name')
-    .eq('legacy_org_id', inv.organization_id)
-    .maybeSingle();
+  // Try payload first (works for anon users), then directory lookup (needs auth)
+  const payloadOrgName = (inv.payload as { orgName?: string } | null)?.orgName ?? null;
+  let orgName = payloadOrgName;
+  if (!orgName) {
+    const { data: orgEnt } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('legacy_org_id', inv.organization_id)
+      .maybeSingle();
+    orgName = orgEnt?.display_name ?? null;
+  }
+
   return {
     ok: true,
     email: inv.email,
-    org_name: orgEnt?.display_name ?? 'Organization',
+    org_name: orgName ?? 'Organization',
     organization_id: inv.organization_id,
   };
 }

@@ -460,6 +460,8 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
       token,
       expires_at: expiresAt.toISOString(),
       status: 'pending',
+      type: 'employee_invite',
+      payload: { orgName: workspaceName, inviterName },
     });
     if (invErr) continue;
     sent++;

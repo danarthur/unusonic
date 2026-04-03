@@ -270,10 +270,12 @@ export async function getInvitationForClaim(
     supabase.schema('directory').from('entities').select('display_name').or(`legacy_org_id.eq.${invRow.created_by_org_id},id.eq.${invRow.created_by_org_id}`).eq('type', 'company').maybeSingle(),
     supabase.schema('directory').from('entities').select('display_name, avatar_url').or(`legacy_org_id.eq.${targetOrgId},id.eq.${targetOrgId}`).eq('type', 'company').maybeSingle(),
   ]);
-  const originName = originRes.data?.display_name ?? 'A partner';
-  const targetName = targetRes.data?.display_name ?? (inv as { email: string }).email.split('@')[0] ?? 'Your organization';
+  const payload = (invRow.payload as { redirectTo?: string; orgName?: string; inviterName?: string } | null) ?? null;
+  // For employee invites, org name is stored in payload (avoids RLS issues for anon users)
+  const payloadOrgName = payload?.orgName ?? null;
+  const originName = originRes.data?.display_name ?? payloadOrgName ?? 'A partner';
+  const targetName = targetRes.data?.display_name ?? payloadOrgName ?? (inv as { email: string }).email.split('@')[0] ?? 'Your organization';
   const targetLogoUrl = targetRes.data?.avatar_url ?? null;
-  const payload = (invRow.payload as { redirectTo?: string } | null) ?? null;
 
   return {
     ok: true,
