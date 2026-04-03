@@ -70,6 +70,7 @@ export async function signUpAction(
     password: formData.get('password'),
     fullName: formData.get('fullName'),
   };
+  const redirectTo = (formData.get('redirectTo') as string)?.trim() || null;
 
   const parsed = signupSchema.safeParse(raw);
   if (!parsed.success) {
@@ -126,9 +127,11 @@ export async function signUpAction(
 
   // Note: Profile is automatically created by database trigger (handle_new_user)
   // The trigger populates: id, email, full_name from auth user metadata
-  
-  // Redirect to onboarding to complete setup
-  redirect('/onboarding');
+
+  // If a redirectTo is specified (e.g. /claim/[token] for employee invites),
+  // go there instead of onboarding. The claim flow handles workspace setup.
+  const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/onboarding';
+  redirect(destination);
 }
 
 /**

@@ -79,6 +79,8 @@ const signUpMessages = ['Creating account…', 'Setting up…'];
 interface SmartLoginFormProps {
   redirectTo?: string;
   defaultMode?: AuthMode;
+  /** Pre-fill the email field (e.g. from an invite link). */
+  defaultEmail?: string;
   /** Show a brief message when user was signed out due to inactivity. */
   showInactivityMessage?: boolean;
   /** Show a brief message when the session expired naturally. */
@@ -88,6 +90,7 @@ interface SmartLoginFormProps {
 export function SmartLoginForm({
   redirectTo,
   defaultMode = 'signin',
+  defaultEmail,
   showInactivityMessage = false,
   showSessionExpiredMessage = false,
 }: SmartLoginFormProps) {
@@ -118,7 +121,7 @@ export function SmartLoginForm({
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(defaultEmail ?? '');
   const [password, setPassword] = useState('');
   const [trustDevice, setTrustDevice] = useState(false);
 
@@ -315,13 +318,14 @@ export function SmartLoginForm({
             return;
           }
           const passkeyResult = await registerPasskey();
+          const postSignupDest = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/onboarding';
           if (!passkeyResult.ok) {
             // Account exists but passkey failed — navigate anyway so the user isn't locked out.
             // They can add a passkey from Settings once inside.
-            window.location.href = '/onboarding';
+            window.location.href = postSignupDest;
             return;
           }
-          window.location.href = '/onboarding';
+          window.location.href = postSignupDest;
         } catch (e) {
           setPasskeyError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
         }

@@ -12,12 +12,13 @@ export const metadata = {
 };
 
 interface SignUpPageProps {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ redirect?: string; next?: string; email?: string }>;
 }
 
 export default async function SignUpPage({ searchParams }: SignUpPageProps) {
-  const { redirect } = await searchParams;
-  
+  const { redirect, next, email } = await searchParams;
+  const redirectTo = redirect || next;
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
       {/* Spotlight / Cove Light — single light source from top, no colored orbs */}
@@ -26,7 +27,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
       </div>
 
       <div className="relative z-10 w-full">
-        <SmartLoginForm redirectTo={redirect} defaultMode="signup" />
+        <SmartLoginForm redirectTo={redirectTo} defaultMode="signup" defaultEmail={email} />
       </div>
     </div>
   );

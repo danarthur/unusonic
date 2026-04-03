@@ -88,17 +88,17 @@ export function ClaimView({
           Welcome, {email}
         </h1>
         <p className="text-sm text-[var(--stage-text-secondary)]">
-          <span className="font-medium text-[var(--stage-text-primary)]">{orgName}</span> has invited you to {isEmployeeInvite ? 'join their team' : 'manage their organization'}. Sign in or create an account with this email to accept.
+          <span className="font-medium text-[var(--stage-text-primary)]">{orgName}</span> has invited you to {isEmployeeInvite ? 'join their team' : 'manage their organization'}. Create an account with this email to get started.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Button asChild variant="default" size="lg" className="w-full sm:w-auto">
-            <Link href={`/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`}>
-              Sign in to claim
+            <Link href={`/signup?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`}>
+              Create account
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-            <Link href={`/signup?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`}>
-              Create account
+            <Link href={`/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`}>
+              Already have an account
             </Link>
           </Button>
         </div>
