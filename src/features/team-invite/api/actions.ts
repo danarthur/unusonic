@@ -4,6 +4,7 @@ import 'server-only';
 import { randomBytes } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
+import { getSystemClient } from '@/shared/api/supabase/system';
 import { getCurrentOrgId, getCurrentEntityId } from '@/features/network/api/actions';
 import { getOrgDetails } from '@/features/org-management/api';
 import { listOrgMembers } from '@/entities/organization/api/list-org-members';
@@ -518,8 +519,12 @@ export async function acceptEmployeeInvite(
     return { ok: false, error: 'This invitation was sent to a different email address.' };
   }
 
+  // Use system client for ghost lookup, claim, and workspace membership —
+  // the employee isn't a workspace member yet so RLS blocks these operations.
+  const system = getSystemClient();
+
   // Find the ghost person entity for this email
-  const { data: ghostPerson } = await supabase
+  const { data: ghostPerson } = await system
     .schema('directory')
     .from('entities')
     .select('id, owner_workspace_id')
@@ -532,7 +537,7 @@ export async function acceptEmployeeInvite(
   }
 
   // Claim the ghost person entity
-  const { error: claimErr } = await supabase
+  const { error: claimErr } = await system
     .schema('directory')
     .from('entities')
     .update({ claimed_by_user_id: user.id })
@@ -544,7 +549,7 @@ export async function acceptEmployeeInvite(
   // Ensure workspace_members row exists (may already exist if inviteTeamMember was used)
   const workspaceId = ghostPerson.owner_workspace_id;
   if (workspaceId) {
-    const { data: existingMember } = await supabase
+    const { data: existingMember } = await system
       .from('workspace_members')
       .select('user_id')
       .eq('workspace_id', workspaceId)
@@ -553,7 +558,7 @@ export async function acceptEmployeeInvite(
 
     if (!existingMember) {
       // Look up the employee system role
-      const { data: employeeRole } = await supabase
+      const { data: employeeRole } = await system
         .schema('ops')
         .from('workspace_roles')
         .select('id')
@@ -561,7 +566,7 @@ export async function acceptEmployeeInvite(
         .is('workspace_id', null)
         .maybeSingle();
 
-      await supabase.from('workspace_members').insert({
+      await system.from('workspace_members').insert({
         workspace_id: workspaceId,
         user_id: user.id,
         role_id: employeeRole?.id ?? null,
@@ -571,7 +576,7 @@ export async function acceptEmployeeInvite(
   }
 
   // Mark invitation as accepted
-  await supabase
+  await system
     .from('invitations')
     .update({ status: 'accepted' })
     .eq('id', invitation.id);
