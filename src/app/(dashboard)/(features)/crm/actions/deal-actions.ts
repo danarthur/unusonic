@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { DEAL_ARCHETYPES } from './deal-model';
 import { INDIVIDUAL_ATTR, COUPLE_ATTR } from '@/features/network-data/model/attribute-keys';
+import { canCreateShow } from '@/shared/lib/show-limits';
 
 const createDealSchema = z.object({
   proposedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be yyyy-MM-dd'),
@@ -50,8 +51,9 @@ const createDealSchema = z.object({
 
 export type CreateDealInput = z.infer<typeof createDealSchema>;
 export type CreateDealResult =
-  | { success: true; dealId: string }
-  | { success: false; error: string };
+  | { success: true; dealId: string; warning?: 'approaching_show_limit' }
+  | { success: false; error: string }
+  | { success: false; error: 'show_limit_reached'; current: number; limit: number | null };
 
 /**
  * Creates a new deal (inquiry) in the active workspace.
@@ -73,6 +75,18 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
         error: 'No active workspace. Complete onboarding or select a workspace.',
       };
     }
+
+    // Show limit enforcement
+    const showCheck = await canCreateShow(workspaceId);
+    if (!showCheck.allowed) {
+      return {
+        success: false,
+        error: 'show_limit_reached',
+        current: showCheck.current,
+        limit: showCheck.limit,
+      } as CreateDealResult;
+    }
+    const showWarning = showCheck.atWarning;
 
     const {
       proposedDate,
@@ -334,7 +348,7 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
     revalidatePath('/crm');
     revalidatePath('/');
 
-    return { success: true, dealId: deal.id };
+    return { success: true, dealId: deal.id, ...(showWarning && { warning: 'approaching_show_limit' as const }) };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create deal';
     console.error('[CRM] createDeal unexpected:', err);

@@ -15,7 +15,7 @@ const springConfig = { type: 'spring', stiffness: 300, damping: 30 } as const;
 const TIER_PERSONA_MAP: Record<UserPersona, SubscriptionTier> = {
   solo_professional: 'foundation',
   agency_team: 'growth',
-  venue_brand: 'venue_os',
+  venue_brand: 'studio',
 };
 
 interface TierStepProps {
@@ -43,7 +43,7 @@ export function TierStep({
 }: TierStepProps) {
   const suggestedTier = persona ? TIER_PERSONA_MAP[persona] : 'foundation';
   const showPmsToggle = persona === 'venue_brand';
-  const showUnusonicPayToggle = selectedTier === 'autonomous';
+  const showUnusonicPayToggle = selectedTier === 'studio';
 
   const foundationGated = projectCount >= FOUNDATION_PROJECT_LIMIT;
 

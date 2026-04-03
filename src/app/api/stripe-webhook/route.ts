@@ -69,6 +69,22 @@ export async function POST(req: NextRequest) {
     case 'payment_intent.payment_failed':
       return handlePaymentFailed(event.data.object as Stripe.PaymentIntent);
 
+    // ─── Subscription lifecycle events ──────────────────────────────────────
+    case 'customer.subscription.created':
+      return handleSubscriptionCreated(event.data.object as Stripe.Subscription);
+
+    case 'customer.subscription.updated':
+      return handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+
+    case 'customer.subscription.deleted':
+      return handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+
+    case 'invoice.paid':
+      return handleInvoicePaid(event.data.object as Stripe.Invoice);
+
+    case 'invoice.payment_failed':
+      return handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+
     default:
       return json({ received: true });
   }
@@ -236,7 +252,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   const supabase = getSystemClient();
-   
+
   const from = (table: string) => (supabase as any).from(table);
 
   // Update any pending payment rows for this payment intent to failed
@@ -248,6 +264,313 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   if (error) {
     console.error('[Stripe Webhook] Failed to update payment status:', error.message);
     return json({ error: 'Failed to update payment status' }, 500);
+  }
+
+  return json({ received: true });
+}
+
+// =============================================================================
+// Subscription lifecycle handlers
+// =============================================================================
+
+/**
+ * Resolve workspace_id from Stripe subscription metadata.
+ * All subscriptions created via our code include workspace_id in metadata.
+ */
+function getWorkspaceIdFromSubscription(subscription: Stripe.Subscription): string | null {
+  return subscription.metadata?.workspace_id ?? null;
+}
+
+/**
+ * Resolve the tier slug from a Stripe subscription by looking up the price ID
+ * in the tier_config table.
+ */
+async function resolveTierFromSubscription(
+  subscription: Stripe.Subscription,
+): Promise<string | null> {
+  const supabase = getSystemClient();
+
+  // Collect all price IDs from the subscription items
+  const priceIds = subscription.items.data.map((item) => item.price.id);
+
+  // Look for a tier_config row where stripe_price_id matches any subscription item
+  const { data, error } = await (supabase as any)
+    .from('tier_config')
+    .select('tier, stripe_price_id')
+    .in('stripe_price_id', priceIds)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.warn('[Stripe Webhook] Could not resolve tier from subscription prices:', priceIds);
+    return null;
+  }
+
+  return data.tier as string;
+}
+
+// =============================================================================
+// customer.subscription.created
+// =============================================================================
+
+async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
+  const workspaceId = getWorkspaceIdFromSubscription(subscription);
+  if (!workspaceId) {
+    console.warn('[Stripe Webhook] subscription.created missing workspace_id metadata:', subscription.id);
+    return json({ received: true });
+  }
+
+  const supabase = getSystemClient();
+
+  // Idempotency: check if this subscription ID is already stored
+  const { data: existing } = await supabase
+    .from('workspaces')
+    .select('id, stripe_subscription_id')
+    .eq('id', workspaceId)
+    .maybeSingle();
+
+  if (existing?.stripe_subscription_id === subscription.id) {
+    return json({ received: true, deduplicated: true });
+  }
+
+  const tier = await resolveTierFromSubscription(subscription);
+
+  const updatePayload: Record<string, unknown> = {
+    stripe_subscription_id: subscription.id,
+    billing_status: 'active',
+  };
+
+  if (tier) {
+    updatePayload.subscription_tier = tier;
+  }
+
+  const { error } = await supabase
+    .from('workspaces')
+    .update(updatePayload as any)
+    .eq('id', workspaceId);
+
+  if (error) {
+    console.error('[Stripe Webhook] subscription.created DB update failed:', error.message);
+    return json({ error: 'Failed to confirm subscription' }, 500);
+  }
+
+  return json({ received: true });
+}
+
+// =============================================================================
+// customer.subscription.updated
+// =============================================================================
+
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  const workspaceId = getWorkspaceIdFromSubscription(subscription);
+  if (!workspaceId) {
+    console.warn('[Stripe Webhook] subscription.updated missing workspace_id metadata:', subscription.id);
+    return json({ received: true });
+  }
+
+  const supabase = getSystemClient();
+
+  const updatePayload: Record<string, unknown> = {};
+
+  // Sync tier from subscription prices
+  const tier = await resolveTierFromSubscription(subscription);
+  if (tier) {
+    // Only update if different from current
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('subscription_tier')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (workspace && workspace.subscription_tier !== tier) {
+      updatePayload.subscription_tier = tier;
+    }
+  }
+
+  // Sync extra seat quantity — look for items that are NOT the base tier price
+  const tierConfig = tier
+    ? await (async () => {
+        const { data } = await (supabase as any)
+          .from('tier_config')
+          .select('stripe_price_id, stripe_extra_seat_price_id')
+          .eq('tier', tier)
+          .maybeSingle();
+        return data;
+      })()
+    : null;
+
+  if (tierConfig?.stripe_extra_seat_price_id) {
+    const seatItem = subscription.items.data.find(
+      (item) => item.price.id === tierConfig.stripe_extra_seat_price_id,
+    );
+    if (seatItem) {
+      updatePayload.extra_seats = seatItem.quantity ?? 0;
+    }
+  }
+
+  // Sync billing status
+  if (subscription.cancel_at_period_end) {
+    updatePayload.billing_status = 'canceling';
+  } else if (subscription.status === 'active') {
+    updatePayload.billing_status = 'active';
+  } else if (subscription.status === 'past_due') {
+    updatePayload.billing_status = 'past_due';
+  }
+
+  // Only update if there's something to change
+  if (Object.keys(updatePayload).length === 0) {
+    return json({ received: true });
+  }
+
+  const { error } = await supabase
+    .from('workspaces')
+    .update(updatePayload as any)
+    .eq('id', workspaceId);
+
+  if (error) {
+    console.error('[Stripe Webhook] subscription.updated DB update failed:', error.message);
+    return json({ error: 'Failed to sync subscription update' }, 500);
+  }
+
+  return json({ received: true });
+}
+
+// =============================================================================
+// customer.subscription.deleted
+// =============================================================================
+
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const workspaceId = getWorkspaceIdFromSubscription(subscription);
+  if (!workspaceId) {
+    console.warn('[Stripe Webhook] subscription.deleted missing workspace_id metadata:', subscription.id);
+    return json({ received: true });
+  }
+
+  const supabase = getSystemClient();
+
+  // Idempotency: check current state
+  // billing_status column added by tier migration — not yet in generated types
+  const { data: workspace } = await (supabase as any)
+    .from('workspaces')
+    .select('billing_status')
+    .eq('id', workspaceId)
+    .maybeSingle();
+
+  if ((workspace as any)?.billing_status === 'canceled') {
+    return json({ received: true, deduplicated: true });
+  }
+
+  // Downgrade to foundation (free tier) and mark canceled
+  const { error } = await supabase
+    .from('workspaces')
+    .update({
+      billing_status: 'canceled',
+      subscription_tier: 'foundation',
+      extra_seats: 0,
+    } as any)
+    .eq('id', workspaceId);
+
+  if (error) {
+    console.error('[Stripe Webhook] subscription.deleted DB update failed:', error.message);
+    return json({ error: 'Failed to process cancellation' }, 500);
+  }
+
+  return json({ received: true });
+}
+
+// =============================================================================
+// invoice.paid — subscription billing period reset
+// =============================================================================
+
+async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  // Only handle subscription invoices, not one-off payment intents
+  // In Stripe API 2026-02-25.clover, subscription is under parent.subscription_details
+  const subscriptionRef = invoice.parent?.subscription_details?.subscription;
+  if (!subscriptionRef) {
+    return json({ received: true });
+  }
+
+  const subscriptionId =
+    typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef.id;
+
+  const supabase = getSystemClient();
+
+  // Look up workspace by subscription ID
+  // billing_status + aion columns not yet in generated types
+  const { data: workspace } = await (supabase as any)
+    .from('workspaces')
+    .select('id, billing_status')
+    .eq('stripe_subscription_id', subscriptionId)
+    .maybeSingle();
+
+  if (!workspace) {
+    console.warn('[Stripe Webhook] invoice.paid — no workspace for subscription:', subscriptionId);
+    return json({ received: true });
+  }
+
+  const ws = workspace as { id: string; billing_status: string | null };
+
+  // Reset Aion action counter for the new billing period and ensure active status
+  const { error } = await (supabase as any)
+    .from('workspaces')
+    .update({
+      aion_actions_used: 0,
+      aion_actions_reset_at: new Date().toISOString(),
+      billing_status: 'active',
+    })
+    .eq('id', ws.id);
+
+  if (error) {
+    console.error('[Stripe Webhook] invoice.paid DB update failed:', error.message);
+    return json({ error: 'Failed to process invoice payment' }, 500);
+  }
+
+  return json({ received: true });
+}
+
+// =============================================================================
+// invoice.payment_failed — mark workspace past due
+// =============================================================================
+
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+  // Only handle subscription invoices
+  const subscriptionRef = invoice.parent?.subscription_details?.subscription;
+  if (!subscriptionRef) {
+    return json({ received: true });
+  }
+
+  const subscriptionId =
+    typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef.id;
+
+  const supabase = getSystemClient();
+
+  // Look up workspace by subscription ID
+  // billing_status column not yet in generated types
+  const { data: workspace } = await (supabase as any)
+    .from('workspaces')
+    .select('id, billing_status')
+    .eq('stripe_subscription_id', subscriptionId)
+    .maybeSingle();
+
+  if (!workspace) {
+    console.warn('[Stripe Webhook] invoice.payment_failed — no workspace for subscription:', subscriptionId);
+    return json({ received: true });
+  }
+
+  const ws = workspace as { id: string; billing_status: string | null };
+
+  // Idempotency: skip if already past_due
+  if (ws.billing_status === 'past_due') {
+    return json({ received: true, deduplicated: true });
+  }
+
+  const { error } = await (supabase as any)
+    .from('workspaces')
+    .update({ billing_status: 'past_due' })
+    .eq('id', ws.id);
+
+  if (error) {
+    console.error('[Stripe Webhook] invoice.payment_failed DB update failed:', error.message);
+    return json({ error: 'Failed to update billing status' }, 500);
   }
 
   return json({ received: true });

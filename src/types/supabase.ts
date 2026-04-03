@@ -370,6 +370,51 @@ export type Database = {
         }
         Relationships: []
       }
+      invitations: {
+        Row: {
+          created_at: string
+          created_by_org_id: string | null
+          email: string
+          expires_at: string
+          id: string
+          organization_id: string
+          payload: Json | null
+          status: string
+          target_org_id: string | null
+          token: string
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_org_id?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          organization_id: string
+          payload?: Json | null
+          status?: string
+          target_org_id?: string | null
+          token: string
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_org_id?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          organization_id?: string
+          payload?: Json | null
+          status?: string
+          target_org_id?: string | null
+          token?: string
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       organization_members: {
         Row: {
           created_at: string | null
@@ -937,6 +982,48 @@ export type Database = {
         }
         Relationships: []
       }
+      tier_config: {
+        Row: {
+          aion_mode: string
+          aion_monthly_actions: number | null
+          base_price_cents: number
+          billing_interval: string
+          extra_seat_price_cents: number
+          included_seats: number
+          label: string
+          max_active_shows: number | null
+          stripe_extra_seat_price_id: string | null
+          stripe_price_id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Insert: {
+          aion_mode?: string
+          aion_monthly_actions?: number | null
+          base_price_cents: number
+          billing_interval?: string
+          extra_seat_price_cents: number
+          included_seats: number
+          label: string
+          max_active_shows?: number | null
+          stripe_extra_seat_price_id?: string | null
+          stripe_price_id?: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Update: {
+          aion_mode?: string
+          aion_monthly_actions?: number | null
+          base_price_cents?: number
+          billing_interval?: string
+          extra_seat_price_cents?: number
+          included_seats?: number
+          label?: string
+          max_active_shows?: number | null
+          stripe_extra_seat_price_id?: string | null
+          stripe_price_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Relationships: []
+      }
       webauthn_challenges: {
         Row: {
           challenge: string
@@ -1018,13 +1105,18 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          aion_actions_reset_at: string | null
+          aion_actions_used: number
+          autonomous_addon_enabled: boolean
           autonomous_resolution_count: number | null
+          billing_status: string
           created_at: string | null
           default_balance_due_days_before_event: number
           default_deposit_deadline_days: number
           default_deposit_percent: number
           default_tax_rate: number
           dmarc_status: string | null
+          extra_seats: number
           id: string
           logo_url: string | null
           name: string
@@ -1044,13 +1136,18 @@ export type Database = {
             | null
         }
         Insert: {
+          aion_actions_reset_at?: string | null
+          aion_actions_used?: number
+          autonomous_addon_enabled?: boolean
           autonomous_resolution_count?: number | null
+          billing_status?: string
           created_at?: string | null
           default_balance_due_days_before_event?: number
           default_deposit_deadline_days?: number
           default_deposit_percent?: number
           default_tax_rate?: number
           dmarc_status?: string | null
+          extra_seats?: number
           id?: string
           logo_url?: string | null
           name: string
@@ -1070,13 +1167,18 @@ export type Database = {
             | null
         }
         Update: {
+          aion_actions_reset_at?: string | null
+          aion_actions_used?: number
+          autonomous_addon_enabled?: boolean
           autonomous_resolution_count?: number | null
+          billing_status?: string
           created_at?: string | null
           default_balance_due_days_before_event?: number
           default_deposit_deadline_days?: number
           default_deposit_percent?: number
           default_tax_rate?: number
           dmarc_status?: string | null
+          extra_seats?: number
           id?: string
           logo_url?: string | null
           name?: string
@@ -1165,6 +1267,8 @@ export type Database = {
       }
       cleanup_webauthn_challenges: { Args: never; Returns: number }
       complete_onboarding: { Args: never; Returns: boolean }
+      count_active_shows: { Args: { p_workspace_id: string }; Returns: number }
+      count_team_seats: { Args: { p_workspace_id: string }; Returns: number }
       create_default_location: {
         Args: { p_location_name?: string; p_workspace_id: string }
         Returns: string
@@ -1220,6 +1324,10 @@ export type Database = {
       get_my_workspace_ids: { Args: never; Returns: string[] }
       get_user_id_by_email: { Args: { user_email: string }; Returns: string }
       get_user_workspace_ids: { Args: never; Returns: string[] }
+      get_workspace_seat_limit: {
+        Args: { p_workspace_id: string }
+        Returns: number
+      }
       increment_proposal_view: {
         Args: {
           p_now: string
@@ -1454,7 +1562,7 @@ export type Database = {
         | "message"
         | "journal"
         | "finance_data"
-      subscription_tier: "foundation" | "growth" | "venue_os" | "autonomous"
+      subscription_tier: "foundation" | "growth" | "studio"
       task_status: "inbox" | "next" | "doing" | "waiting" | "done" | "dropped"
       user_persona: "solo_professional" | "agency_team" | "venue_brand"
     }
@@ -1680,12 +1788,13 @@ export const Constants = {
         "journal",
         "finance_data",
       ],
-      subscription_tier: ["foundation", "growth", "venue_os", "autonomous"],
+      subscription_tier: ["foundation", "growth", "studio"],
       task_status: ["inbox", "next", "doing", "waiting", "done", "dropped"],
       user_persona: ["solo_professional", "agency_team", "venue_brand"],
     },
   },
 } as const
+
 
 // =============================================================================
 // Convenience row type aliases — add here after db:types regeneration
@@ -1693,3 +1802,4 @@ export const Constants = {
 export type Package = Database['public']['Tables']['packages']['Row'];
 export type Proposal = Database['public']['Tables']['proposals']['Row'];
 export type ProposalItem = Database['public']['Tables']['proposal_items']['Row'];
+

@@ -97,7 +97,7 @@ export async function saveTier(
     .from('workspaces')
     .update({
       subscription_tier: tier,
-      signalpay_enabled: tier === 'autonomous' ? true : (parsed.data.enableUnusonicPay ?? false),
+      signalpay_enabled: tier === 'studio' ? true : (parsed.data.enableUnusonicPay ?? false),
     })
     .eq('id', workspaceId);
 
@@ -121,7 +121,7 @@ export async function saveTier(
         persona,
         tier,
         xai_reasoning_enabled: true,
-        agent_mode: tier === 'autonomous' ? 'autonomous' : 'assist',
+        agent_mode: tier === 'studio' ? 'autonomous' : 'assist',
         modules_enabled: ['crm', 'calendar'],
         updated_at: new Date().toISOString(),
       },

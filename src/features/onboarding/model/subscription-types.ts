@@ -4,6 +4,8 @@
  * @module features/onboarding/model/subscription-types
  */
 
+import type { TierSlug } from '@/shared/lib/tier-config';
+
 // ─── Personas (Progressive Disclosure) ───────────────────────────────────────
 
 export type UserPersona =
@@ -15,18 +17,18 @@ export type UserPersona =
 export const PATHFINDING_PERSONAS: Record<UserPersona, { label: string; subtitle: string; tierHint: string }> = {
   solo_professional: {
     label: 'Solo Planner',
-    subtitle: 'Free / Lite',
-    tierHint: '1:1 personalization, basic automation',
+    subtitle: 'Foundation',
+    tierHint: '2 team seats, 5 active shows, Aion suggestions',
   },
   agency_team: {
     label: 'Boutique Agency',
     subtitle: 'Growth',
-    tierHint: 'Team collab, SMS triggers, reports',
+    tierHint: 'Team collab, custom roles, full dispatch',
   },
   venue_brand: {
-    label: 'Venue Command',
-    subtitle: 'OS',
-    tierHint: 'PMS integration, space management, BEO',
+    label: 'Venue / Brand',
+    subtitle: 'Studio',
+    tierHint: 'Multi-venue, Aion autonomous, 15 seats included',
   },
 };
 
@@ -47,11 +49,8 @@ export const USER_PERSONAS: Record<UserPersona, { label: string; description: st
 
 // ─── Subscription Tiers ──────────────────────────────────────────────────────
 
-export type SubscriptionTier =
-  | 'foundation'   // $30–45/mo: unlimited projects/clients, basic AI
-  | 'growth'       // $80–120/mo: team workflows, standard reports
-  | 'venue_os'     // $250–500/mo: PMS, geofenced scheduling, BEO
-  | 'autonomous';  // Pay-per-result (~$1/resolution): Digital Workers
+/** Re-export TierSlug as SubscriptionTier for onboarding consumers. Single source of truth: tier-config.ts */
+export type SubscriptionTier = TierSlug;
 
 export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, {
   label: string;
@@ -61,44 +60,40 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, {
 }> = {
   foundation: {
     label: 'Foundation',
-    price: '$30–45/mo',
+    price: '$39/mo',
     highlights: [
-      'Unlimited projects & clients',
-      'Basic AI credits',
-      '1:1 personalization',
+      '2 team seats included',
+      '5 active shows',
+      'CRM, proposals, invoices, catalog, run of show',
+      'Aion suggestions and alerts',
+      'Unlimited crew, freelancers, and clients',
     ],
     suggestedPersonas: ['solo_professional'],
   },
   growth: {
     label: 'Growth',
-    price: '$80–120/mo',
+    price: '$99/mo',
     highlights: [
-      'Team collaboration',
-      'SMS triggers',
-      'Standard reports',
+      '5 team seats included',
+      '25 active shows',
+      'Custom roles (Role Builder)',
+      'Full crew dispatch (bulk, templates)',
+      'Aion drafts and recommendations',
+      'Advanced reporting',
     ],
     suggestedPersonas: ['agency_team'],
   },
-  venue_os: {
-    label: 'Venue OS',
-    price: '$250–500/mo',
+  studio: {
+    label: 'Studio',
+    price: '$249/mo',
     highlights: [
-      '2-way PMS integration',
-      'Geofenced staff scheduling',
-      'Automated BEO generation',
-      'Custom domain (white-label)',
+      '15 team seats included',
+      'Unlimited active shows',
+      'Multi-venue and geofencing',
+      'Aion autonomous actions',
+      'Everything in Growth',
     ],
     suggestedPersonas: ['venue_brand'],
-  },
-  autonomous: {
-    label: 'Autonomous',
-    price: '~$1 per resolution',
-    highlights: [
-      'Digital Workers (SDRs/Support)',
-      'UnusonicPay required',
-      'Explainable AI (XAI)',
-    ],
-    suggestedPersonas: ['solo_professional', 'agency_team', 'venue_brand'],
   },
 };
 

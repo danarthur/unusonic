@@ -42,7 +42,7 @@ export const createGenesisOrganizationSchema = z.object({
 export const userPersonaSchema = z.enum(['solo_professional', 'agency_team', 'venue_brand']);
 
 /** Subscription tier for workspace. */
-export const subscriptionTierSchema = z.enum(['foundation', 'growth', 'venue_os', 'autonomous']);
+export const subscriptionTierSchema = z.enum(['foundation', 'growth', 'studio']);
 
 /** Input for persona selection step. */
 export const selectPersonaSchema = z.object({

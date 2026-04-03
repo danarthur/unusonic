@@ -13,10 +13,10 @@ import type { UserPersona } from '@/features/onboarding/model/subscription-types
 import type { OnboardingGenesisContext } from '@/features/onboarding/model/types';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
-const GENESIS_TO_SUBSCRIPTION: Record<GenesisTierId, 'foundation' | 'growth' | 'venue_os'> = {
+const GENESIS_TO_SUBSCRIPTION: Record<GenesisTierId, 'foundation' | 'growth' | 'studio'> = {
   scout: 'foundation',
   vanguard: 'growth',
-  command: 'venue_os',
+  command: 'studio',
 };
 
 const PERSONA_TO_ORG_TYPE: Record<UserPersona, 'solo' | 'agency' | 'venue'> = {

@@ -20,6 +20,7 @@ import {
   offboardTeamMemberPayloadSchema,
   type OffboardTeamMemberPayload,
 } from '@/app/actions/offboard-team-member-schema';
+import { canAddSeat } from '@/shared/lib/seat-limits';
 
 // ============================================================================
 // Types
@@ -551,7 +552,8 @@ export async function offboardTeamMember(
 
 export type InviteTeamMemberResult =
   | { success: true; message: string }
-  | { success: false; error: string };
+  | { success: false; error: string }
+  | { success: false; error: 'seat_limit_reached'; current: number; limit: number };
 
 /** DB org_member_role: owner, admin, member, restricted (no manager; map manager → member). */
 const INTERNAL_ROLE_TO_DB: Record<string, 'owner' | 'admin' | 'member' | 'restricted'> = {
@@ -664,6 +666,35 @@ export async function inviteTeamMember(
     return { success: false, error: 'Workspace role is required when granting login access.' };
   }
 
+  // Resolve the role FIRST so we can check seat limits before sending the Auth invite
+  const { data: roleRow } = await supabase
+    .schema('ops')
+    .from('workspace_roles')
+    .select('id, slug')
+    .eq('id', workspace_role_id)
+    .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+    .single();
+
+  if (!roleRow) {
+    await rollbackRosterStep(supabase, orgMemberId, entityIdForRollback);
+    return { success: false, error: 'Invalid workspace role.' };
+  }
+
+  // Seat limit enforcement — employee role is free and unlimited, skip the check.
+  // Must run BEFORE the Auth invite so we don't send a login email to someone we can't seat.
+  if (roleRow.slug !== 'employee') {
+    const seatCheck = await canAddSeat(workspaceId);
+    if (!seatCheck.allowed) {
+      await rollbackRosterStep(supabase, orgMemberId, entityIdForRollback);
+      return {
+        success: false,
+        error: 'seat_limit_reached',
+        current: seatCheck.current,
+        limit: seatCheck.limit,
+      } as InviteTeamMemberResult;
+    }
+  }
+
   const system = getSystemClient();
   const { data: invitedUser, error: inviteError } = await system.auth.admin.inviteUserByEmail(
     email.trim(),
@@ -680,19 +711,6 @@ export async function inviteTeamMember(
   }
 
   const invitedUserId = invitedUser.user.id;
-
-  const { data: roleRow } = await supabase
-    .schema('ops')
-    .from('workspace_roles')
-    .select('id, slug')
-    .eq('id', workspace_role_id)
-    .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
-    .single();
-
-  if (!roleRow) {
-    await rollbackRosterStep(supabase, orgMemberId, entityIdForRollback);
-    return { success: false, error: 'Invalid workspace role.' };
-  }
 
   const legacyRole = WORKSPACE_ROLE_SLUG_TO_LEGACY[roleRow.slug] ?? 'member';
 

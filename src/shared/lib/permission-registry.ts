@@ -39,13 +39,25 @@ export const CAPABILITY_KEYS = [
   'portal:own_schedule',
   'portal:own_profile',
   'portal:own_pay',
+
+  // --- Tier-gated capabilities (checked against workspace subscription tier, not user role) ---
+  'tier:aion:active',
+  'tier:aion:autonomous',
+  'tier:custom_roles',
+  'tier:advanced_reporting',
+  'tier:bulk_dispatch',
+  'tier:multi_venue',
+  'tier:geofencing',
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
 
-/** All capabilities except owner-only (for building Admin bundle). */
+/** Tier-gated capability keys (subset that starts with `tier:`). */
+export type TierCapabilityKey = Extract<CapabilityKey, `tier:${string}`>;
+
+/** All capabilities except owner-only and tier-gated (for building Admin bundle). */
 export const ALL_CAPABILITIES_EXCEPT_OWNER: CapabilityKey[] = CAPABILITY_KEYS.filter(
-  (k) => k !== 'workspace:owner'
+  (k) => k !== 'workspace:owner' && !k.startsWith('tier:')
 );
 
 /** Admin gets everything except workspace:delete and workspace:transfer. */

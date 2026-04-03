@@ -147,7 +147,7 @@ export async function initializeOrganization(
       persona,
       tier: input.subscriptionTier,
       xai_reasoning_enabled: true,
-      agent_mode: input.subscriptionTier === 'autonomous' ? 'autonomous' : 'assist',
+      agent_mode: input.subscriptionTier === 'studio' ? 'autonomous' : 'assist',
       modules_enabled: ['crm', 'calendar'],
     });
 
@@ -160,7 +160,7 @@ export async function initializeOrganization(
     if (input.type === 'venue') {
       triggerVectorEmbeddings(orgId).catch(console.warn);
     }
-    if (tier === 'autonomous') {
+    if (tier === 'studio') {
       registerAgent(orgId).catch(console.warn);
     }
 
@@ -178,7 +178,7 @@ export async function initializeOrganization(
 
 /** Redirect path based on tier (Event-Driven UI). */
 function getRedirectPath(tier: SubscriptionTier, type: OrganizationType): string {
-  if (tier === 'autonomous') return '/dashboard/agent';
+  if (tier === 'studio') return '/dashboard/agent';
   if (type === 'venue') return '/dashboard/venue';
   return '/lobby';
 }
