@@ -521,7 +521,8 @@ export async function acceptEmployeeInvite(
 
   // Use system client for ghost lookup, claim, and workspace membership —
   // the employee isn't a workspace member yet so RLS blocks these operations.
-  const system = getSystemClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- system client typed to public; cross-schema access needs cast
+  const system = getSystemClient() as any;
 
   // Find the ghost person entity for this email
   const { data: ghostPerson } = await system
@@ -531,7 +532,7 @@ export async function acceptEmployeeInvite(
     .ilike('attributes->>email', user.email)
     .eq('type', 'person')
     .is('claimed_by_user_id', null)
-    .maybeSingle();
+    .maybeSingle() as { data: { id: string; owner_workspace_id: string | null } | null };
   if (!ghostPerson) {
     return { ok: false, error: 'No matching team member found for this email.' };
   }
@@ -564,7 +565,7 @@ export async function acceptEmployeeInvite(
         .select('id')
         .eq('slug', 'employee')
         .is('workspace_id', null)
-        .maybeSingle();
+        .maybeSingle() as { data: { id: string } | null };
 
       await system.from('workspace_members').insert({
         workspace_id: workspaceId,
