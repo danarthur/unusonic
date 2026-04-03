@@ -126,9 +126,9 @@ export function ClaimView({
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Button asChild variant="default" size="lg" className="w-full sm:w-auto">
-            <Link href={`/signout?next=${encodeURIComponent(`/claim/${token}`)}`}>
+            <a href={`/signout?next=${encodeURIComponent(`/claim/${token}`)}`}>
               Sign out
-            </Link>
+            </a>
           </Button>
           <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
             <Link href={`/signup?email=${encodeURIComponent(email)}&next=${encodeURIComponent(`/claim/${token}`)}`}>
