@@ -57,39 +57,40 @@ export default async function PayPage() {
     .not('hourly_rate', 'is', null)
     .order('skill_tag');
 
-  // Get assignment pay history (confirmed gigs with day_rate)
-  const { data: assignments } = await supabase
+  // Get assignment pay history from crew_assignments (has event join for titles)
+  const { data: crewAssignments } = await supabase
     .schema('ops')
-    .from('deal_crew')
-    .select('id, role_note, day_rate, confirmed_at, call_time')
+    .from('entity_crew_schedule')
+    .select('assignment_id, role, status, pay_rate, pay_rate_type, scheduled_hours, event_title, starts_at')
     .eq('entity_id', personEntity.id)
-    .not('confirmed_at', 'is', null)
-    .not('day_rate', 'is', null)
-    .order('call_time', { ascending: false, nullsFirst: false })
-    .limit(20);
+    .in('status', ['confirmed', 'dispatched'])
+    .not('pay_rate', 'is', null)
+    .order('starts_at', { ascending: false })
+    .limit(50);
+
+  const payAssignments = (crewAssignments ?? []).map(a => {
+    const rate = Number(a.pay_rate);
+    const total = a.pay_rate_type === 'hourly' && a.scheduled_hours
+      ? rate * Number(a.scheduled_hours)
+      : rate;
+    return {
+      id: a.assignment_id,
+      role: a.role ?? 'Crew',
+      dayRate: total,
+      date: a.starts_at as string | null,
+      eventTitle: a.event_title as string | null,
+    };
+  });
 
   return (
-    <div className="flex flex-col gap-8 max-w-2xl mx-auto w-full">
-      <div>
-        <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
-          My pay
-        </h1>
-        <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
-          Your rates and assignment pay history. All rates are set by your team admin.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
       <PayView
         defaultHourlyRate={defaultHourlyRate}
         skillRates={(skills ?? []).map(s => ({
           tag: s.skill_tag,
           hourlyRate: s.hourly_rate as number,
         }))}
-        assignments={(assignments ?? []).map(a => ({
-          id: a.id,
-          role: a.role_note ?? 'Crew',
-          dayRate: a.day_rate as number,
-          date: a.call_time as string | null,
-        }))}
+        assignments={payAssignments}
       />
     </div>
   );

@@ -570,14 +570,24 @@ export async function acceptEmployeeInvite(
         .is('workspace_id', null)
         .maybeSingle() as { data: { id: string } | null };
 
-      await system.from('workspace_members').insert({
+      const { error: insertErr } = await system.from('workspace_members').insert({
         workspace_id: workspaceId,
         user_id: user.id,
         role_id: employeeRole?.id ?? null,
         role: 'member', // legacy fallback
       });
+      if (insertErr) {
+        console.error('[acceptEmployeeInvite] workspace_members insert failed:', insertErr);
+        return { ok: false, error: 'Failed to join workspace.' };
+      }
     }
   }
+
+  // Employees skip onboarding — mark complete so middleware doesn't redirect
+  await system
+    .from('profiles')
+    .update({ onboarding_completed: true })
+    .eq('id', user.id);
 
   // Mark invitation as accepted
   await system

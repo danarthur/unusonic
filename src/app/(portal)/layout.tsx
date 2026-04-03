@@ -123,7 +123,7 @@ export default async function PortalLayout({
               </div>
               <div className="relative z-10 flex flex-1 flex-col min-h-0 w-full min-w-0">
                 <PortalShell user={userData} workspaceName={workspaceName} />
-                <main className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-auto pt-[env(safe-area-inset-top)] pb-[max(env(safe-area-inset-bottom),1rem)]">
+                <main className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-auto pt-[env(safe-area-inset-top)] pb-[max(env(safe-area-inset-bottom),5rem)] sm:pb-[max(env(safe-area-inset-bottom),1rem)]">
                   <div className="flex-1 min-h-0 min-w-0 flex flex-col px-4 sm:px-6 lg:px-8 py-6">
                     {children}
                   </div>

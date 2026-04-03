@@ -42,15 +42,7 @@ export default async function SchedulePage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-8 max-w-2xl mx-auto w-full">
-      <div>
-        <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
-          My schedule
-        </h1>
-        <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
-          Your upcoming and past assignments.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
       <ScheduleList upcoming={upcoming} past={past} />
     </div>
   );
