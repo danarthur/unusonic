@@ -9,6 +9,7 @@ import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import { resolveGigProfile, PORTAL_PROFILES } from '@/shared/lib/portal-profiles';
 import { GigDetailView } from './gig-detail-view';
 import { DjPrepWorkspace } from './dj-prep-workspace';
+import { TechDaySheet } from './tech-day-sheet';
 import type { DjPrepData } from '@/features/ops/actions/save-dj-prep';
 
 export const dynamic = 'force-dynamic';
@@ -48,7 +49,7 @@ export default async function GigDetailPage({
   const { data: event } = await supabase
     .schema('ops')
     .from('events')
-    .select('id, title, starts_at, ends_at, venue_name, venue_address, location_name, location_address, show_day_contacts, run_of_show_data, dates_load_in, dates_load_out, event_archetype, deal_id, notes, workspace_id')
+    .select('id, title, starts_at, ends_at, venue_name, venue_address, location_name, location_address, show_day_contacts, run_of_show_data, dates_load_in, dates_load_out, event_archetype, deal_id, notes, workspace_id, logistics_dock_info, logistics_power_info, tech_requirements')
     .eq('id', assignment.event_id)
     .maybeSingle();
 
@@ -188,7 +189,8 @@ export default async function GigDetailPage({
 
   // Resolve gig-specific portal profile for role-aware workspace sections
   const gigProfile = resolveGigProfile(assignment.role, PORTAL_PROFILES.tech_stagehand);
-  const showDjWorkspace = gigProfile.key === 'dj_entertainer';
+
+  // DJ prep data
   const djPrepInitial: Partial<DjPrepData> = {
     dj_timeline: rosData.dj_timeline as DjPrepData['dj_timeline'] | undefined,
     dj_must_play: rosData.dj_must_play as string[] | undefined,
@@ -196,6 +198,13 @@ export default async function GigDetailPage({
     dj_client_notes: rosData.dj_client_notes as string | undefined,
     dj_client_info: rosData.dj_client_info as DjPrepData['dj_client_info'] | undefined,
   };
+
+  // Tech day sheet data
+  const gearItems = (rosData.gear_items ?? []) as { id: string; name: string; quantity: number; status: string; is_sub_rental: boolean }[];
+  const callTimeSlots = (rosData.call_time_slots ?? []) as { id: string; label: string; time: string }[];
+  const transportMode = (rosData.transport_mode as string) ?? null;
+  const transportStatus = (rosData.transport_status as string) ?? null;
+  const techRequirements = (event.tech_requirements ?? null) as Record<string, unknown> | null;
 
   return (
     <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
@@ -216,8 +225,20 @@ export default async function GigDetailPage({
         documents={documents}
         assignmentId={assignmentId}
       />
-      {showDjWorkspace && (
+      {/* Role-aware workspace sections */}
+      {gigProfile.key === 'dj_entertainer' && (
         <DjPrepWorkspace eventId={event.id} initialData={djPrepInitial} />
+      )}
+      {gigProfile.key === 'tech_stagehand' && (
+        <TechDaySheet
+          gearItems={gearItems}
+          callTimeSlots={callTimeSlots}
+          transportMode={transportMode}
+          transportStatus={transportStatus}
+          dockInfo={event.logistics_dock_info}
+          powerInfo={event.logistics_power_info}
+          techRequirements={techRequirements}
+        />
       )}
     </div>
   );
