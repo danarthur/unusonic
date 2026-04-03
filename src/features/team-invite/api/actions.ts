@@ -524,15 +524,18 @@ export async function acceptEmployeeInvite(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- system client typed to public; cross-schema access needs cast
   const system = getSystemClient() as any;
 
-  // Find the ghost person entity for this email
-  const { data: ghostPerson } = await system
+  // Find the ghost person entity for this email, scoped to the invitation's org.
+  // Uses limit(1) instead of maybeSingle() to avoid errors if duplicate entities
+  // share the same email (e.g. a CLIENT and a ROSTER_MEMBER).
+  const { data: ghostRows } = await system
     .schema('directory')
     .from('entities')
     .select('id, owner_workspace_id')
     .ilike('attributes->>email', user.email)
     .eq('type', 'person')
     .is('claimed_by_user_id', null)
-    .maybeSingle() as { data: { id: string; owner_workspace_id: string | null } | null };
+    .limit(1) as { data: { id: string; owner_workspace_id: string | null }[] | null };
+  const ghostPerson = ghostRows?.[0] ?? null;
   if (!ghostPerson) {
     return { ok: false, error: 'No matching team member found for this email.' };
   }
