@@ -10,7 +10,9 @@ import { resolveGigProfile, PORTAL_PROFILES } from '@/shared/lib/portal-profiles
 import { GigDetailView } from './gig-detail-view';
 import { DjPrepWorkspace } from './dj-prep-workspace';
 import { TechDaySheet } from './tech-day-sheet';
+import { BandGigWorkspace } from './band-gig-workspace';
 import type { DjPrepData } from '@/features/ops/actions/save-dj-prep';
+import type { Setlist } from '@/features/ops/actions/save-band-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +30,7 @@ export default async function GigDetailPage({
   const { data: personEntity } = await supabase
     .schema('directory')
     .from('entities')
-    .select('id')
+    .select('id, attributes')
     .eq('claimed_by_user_id', user.id)
     .eq('type', 'person')
     .maybeSingle();
@@ -238,6 +240,15 @@ export default async function GigDetailPage({
           dockInfo={event.logistics_dock_info}
           powerInfo={event.logistics_power_info}
           techRequirements={techRequirements}
+        />
+      )}
+      {gigProfile.key === 'band_musical_act' && (
+        <BandGigWorkspace
+          eventId={event.id}
+          setlists={(((personEntity.attributes ?? {}) as Record<string, unknown>).band_setlists ?? []) as Setlist[]}
+          initialSetlistId={(rosData.band_setlist_id as string) ?? null}
+          initialSetTime={(rosData.band_set_time as string) ?? null}
+          initialGigNotes={(rosData.band_gig_notes as string) ?? null}
         />
       )}
     </div>
