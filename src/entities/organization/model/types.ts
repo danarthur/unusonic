@@ -106,4 +106,6 @@ export interface OrgMemberRosterItem {
   skill_tags: string[];
   /** Public URL for member/ghost avatar (org_members.avatar_url). */
   avatar_url: string | null;
+  /** Admin override for portal experience (null = auto-detect from capabilities/skills). */
+  portal_profile: string | null;
 }

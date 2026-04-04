@@ -92,6 +92,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRosterItem
       '';
     const legacyMemberId = ctx.org_member_id as string | undefined;
     const skill_tags = legacyMemberId ? (skillsByLegacyId.get(legacyMemberId) ?? []) : [];
+    const portal_profile = (ctx.primary_portal_profile as string | undefined) ?? null;
 
     items.push({
       id: rel.id,
@@ -108,6 +109,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRosterItem
       display_name,
       skill_tags,
       avatar_url: dirEnt.avatar_url ?? null,
+      portal_profile,
     });
   }
 

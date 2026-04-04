@@ -9,6 +9,8 @@ import { TitleSelector } from './TitleSelector';
 import { RoleSelect } from './RoleSelect';
 import type { UnusonicRoleId } from '../model/role-presets';
 import { AvatarUpload } from './AvatarUpload';
+import { PortalProfileSelect } from './PortalProfileSelect';
+import type { PortalProfileKey } from '../model/schema';
 import { cn } from '@/shared/lib/utils';
 import { upsertGhostMember, deployInvites } from '../api/actions';
 import type { RosterBadgeData } from '../model/types';
@@ -48,6 +50,7 @@ export function MemberForge({
     (defaultValues?.role as UnusonicRoleId) ?? 'member'
   );
   const [jobTitle, setJobTitle] = React.useState(defaultValues?.job_title ?? '');
+  const [portalProfile, setPortalProfile] = React.useState<PortalProfileKey | null>((defaultValues?.portal_profile as PortalProfileKey) ?? null);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [sendInviteNow, setSendInviteNow] = React.useState(!defaultValues?.id);
 
@@ -84,6 +87,7 @@ export function MemberForge({
             role: effectiveRole,
             job_title: jobTitle.trim() || null,
             avatarUrl: avatarUrl ?? null,
+            portal_profile: portalProfile,
           },
           defaultValues?.id
         );
@@ -182,6 +186,11 @@ export function MemberForge({
         value={effectiveRole}
         onChange={setRole}
         canAssignElevated={canAssignAdmin}
+      />
+
+      <PortalProfileSelect
+        value={portalProfile}
+        onChange={(v) => setPortalProfile(v as PortalProfileKey | null)}
       />
 
       {/* Send invite toggle — only for new members */}

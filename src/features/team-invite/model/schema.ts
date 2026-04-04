@@ -4,6 +4,16 @@ import { z } from 'zod';
 export const ghostMemberRoleSchema = z.enum(['owner', 'admin', 'manager', 'member', 'restricted']);
 export type GhostMemberRole = z.infer<typeof ghostMemberRoleSchema>;
 
+/** Valid portal profile keys (matches PORTAL_PROFILES registry). */
+export const portalProfileKeySchema = z.enum([
+  'dj_entertainer',
+  'tech_stagehand',
+  'salesperson',
+  'band_musical_act',
+  'production_manager',
+]);
+export type PortalProfileKey = z.infer<typeof portalProfileKeySchema>;
+
 export const upsertGhostMemberSchema = z.object({
   first_name: z.string().min(1, 'First name required').max(120),
   last_name: z.string().min(1, 'Last name required').max(120),
@@ -12,6 +22,8 @@ export const upsertGhostMemberSchema = z.object({
   job_title: z.string().max(120).optional().nullable(),
   /** Public URL for avatar (e.g. from storage). Persisted to org_members.avatar_url. */
   avatarUrl: z.string().max(2000).optional().nullable(),
+  /** Admin override for portal experience (null = auto-detect). */
+  portal_profile: portalProfileKeySchema.optional().nullable(),
 });
 
 export type UpsertGhostMemberInput = z.infer<typeof upsertGhostMemberSchema>;

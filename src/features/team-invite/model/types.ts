@@ -19,6 +19,8 @@ export interface RosterBadgeData {
   avatarUrl: string | null;
   /** Ghost (profile_id null) and no invitation sent yet. */
   isUnsentGhost?: boolean;
+  /** Admin override for portal experience (null = auto-detect). */
+  portal_profile?: string | null;
 }
 
 /** Roster member as returned by getRoster (includes status). */
@@ -34,4 +36,4 @@ export interface GhostMemberInput {
 }
 
 /** Forge default values when editing (partial). */
-export type MemberForgeDefaults = Partial<GhostMemberInput> & { id?: string; avatarUrl?: string | null };
+export type MemberForgeDefaults = Partial<GhostMemberInput> & { id?: string; avatarUrl?: string | null; portal_profile?: string | null };

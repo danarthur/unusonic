@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Plus, Crown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { getRoleLabel } from '../model/role-presets';
+import { PORTAL_PROFILES } from '@/shared/lib/portal-profiles';
 import type { RosterBadgeData, RosterBadgeStatus } from '../model/types';
 
 export interface GhostBadgeProps {
@@ -24,6 +25,9 @@ export function GhostBadge({ status, data, onClick, className }: GhostBadgeProps
   const hasPhoto = Boolean(data?.avatarUrl);
   const initial = data?.name?.trim().charAt(0).toUpperCase() ?? data?.email?.trim().charAt(0).toUpperCase() ?? '?';
   const roleLabel = data?.role ? getRoleLabel(data.role) : null;
+  const portalLabel = data?.portal_profile && PORTAL_PROFILES[data.portal_profile]
+    ? PORTAL_PROFILES[data.portal_profile].label
+    : null;
 
   return (
     <motion.button
@@ -76,9 +80,9 @@ export function GhostBadge({ status, data, onClick, className }: GhostBadgeProps
             <p className="w-full truncate font-medium tracking-tight text-[var(--stage-text-primary)] text-sm sm:text-base">
               {data?.name ?? 'Unnamed'}
             </p>
-            {(roleLabel || data?.job_title) && (
+            {(roleLabel || data?.job_title || portalLabel) && (
               <p className="w-full truncate text-[11px] sm:text-xs text-[var(--stage-text-secondary)]">
-                {[roleLabel, data?.job_title].filter(Boolean).join(' · ')}
+                {[roleLabel, data?.job_title, portalLabel].filter(Boolean).join(' · ')}
               </p>
             )}
             {data?.email && status !== 'captain' && (

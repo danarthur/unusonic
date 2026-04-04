@@ -8,7 +8,7 @@ import { getSystemClient } from '@/shared/api/supabase/system';
 import { getCurrentOrgId, getCurrentEntityId } from '@/features/network/api/actions';
 import { getOrgDetails } from '@/features/org-management/api';
 import { listOrgMembers } from '@/entities/organization/api/list-org-members';
-import { upsertGhostMemberSchema, type UpsertGhostMemberInput } from '../model/schema';
+import { upsertGhostMemberSchema, portalProfileKeySchema, type UpsertGhostMemberInput } from '../model/schema';
 import type { RosterBadgeData, RosterBadgeStatus, RosterMemberDisplay } from '../model/types';
 import type { OrgMemberRole } from '@/entities/organization/model/types';
 import { sendEmployeeInviteEmail } from '@/shared/api/email/send';
@@ -17,6 +17,7 @@ export type AcceptEmployeeInviteResult = { ok: true } | { ok: false; error: stri
 export type InviteEmployeeResult = { ok: true; message: string } | { ok: false; error: string };
 export type UpsertGhostResult = { ok: true; member: RosterBadgeData } | { ok: false; error: string };
 export type DeployInvitesResult = { ok: true; sent: number } | { ok: false; error: string };
+export type UpdatePortalProfileResult = { ok: true } | { ok: false; error: string };
 
 /** Map DB/Supabase errors to Unusonic-friendly messages (no raw RLS or constraint text). */
 function normalizeRosterError(err: { message?: string; code?: string } | null | undefined): string {
@@ -135,6 +136,7 @@ export async function getRoster(orgId: string): Promise<{ members: RosterMemberD
       avatarUrl: r.avatar_url ?? null,
       isUnsentGhost,
       status,
+      portal_profile: r.portal_profile ?? null,
     };
   });
 
@@ -153,7 +155,7 @@ export async function upsertGhostMember(
     return { ok: false, error: first?.message ?? 'Invalid input.' };
   }
 
-  const { first_name, last_name, email, role, job_title, avatarUrl: inputAvatarUrl } = parsed.data;
+  const { first_name, last_name, email, role, job_title, avatarUrl: inputAvatarUrl, portal_profile } = parsed.data;
   const supabase = await createClient();
 
   const {
@@ -223,6 +225,7 @@ export async function upsertGhostMember(
       last_name,
       job_title: job_title?.trim() || null,
       role: dbRole,
+      primary_portal_profile: portal_profile ?? null,
     };
     if (inputAvatarUrl !== undefined) patch.avatar_url = inputAvatarUrl || null;
 
@@ -257,6 +260,7 @@ export async function upsertGhostMember(
         job_title: job_title?.trim() || null,
         avatarUrl: inputAvatarUrl ?? null,
         isUnsentGhost: true,
+        portal_profile: portal_profile ?? null,
       },
     };
   }
@@ -291,6 +295,24 @@ export async function upsertGhostMember(
     return { ok: false, error: result?.error ?? 'Failed to add member.' };
   }
 
+  // Patch portal profile override into the ROSTER_MEMBER edge if specified
+  if (portal_profile && result.entity_id) {
+    const { data: orgEntForProfile } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('legacy_org_id', orgId)
+      .maybeSingle();
+    if (orgEntForProfile) {
+      await supabase.rpc('patch_relationship_context', {
+        p_source_entity_id: result.entity_id,
+        p_target_entity_id: orgEntForProfile.id,
+        p_relationship_type: 'ROSTER_MEMBER',
+        p_patch: { primary_portal_profile: portal_profile },
+      });
+    }
+  }
+
   // Update avatar on directory entity if supplied (add_ghost_member returns entity_id)
   if (inputAvatarUrl && result.entity_id) {
     await supabase
@@ -314,6 +336,7 @@ export async function upsertGhostMember(
       job_title: result.job_title ?? job_title?.trim() ?? null,
       avatarUrl: inputAvatarUrl ?? null,
       isUnsentGhost: true,
+      portal_profile: portal_profile ?? null,
     },
   };
 }
@@ -595,5 +618,53 @@ export async function acceptEmployeeInvite(
     .update({ status: 'accepted' })
     .eq('id', invitation.id);
 
+  return { ok: true };
+}
+
+/**
+ * Update the portal profile override on a ROSTER_MEMBER edge.
+ * Sets `primary_portal_profile` in context_data via `patch_relationship_context` RPC.
+ * Pass `null` for profileKey to clear the override (auto-detect).
+ */
+export async function updatePortalProfile(
+  orgId: string,
+  memberId: string,
+  profileKey: string | null
+): Promise<UpdatePortalProfileResult> {
+  // Validate profile key if provided
+  if (profileKey !== null) {
+    const parsed = portalProfileKeySchema.safeParse(profileKey);
+    if (!parsed.success) {
+      return { ok: false, error: 'Invalid portal profile type.' };
+    }
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return { ok: false, error: 'You must be signed in.' };
+
+  // Fetch the ROSTER_MEMBER edge by its ID to get source/target entity IDs
+  const { data: rel } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('id, source_entity_id, target_entity_id')
+    .eq('id', memberId)
+    .eq('relationship_type', 'ROSTER_MEMBER')
+    .maybeSingle();
+  if (!rel) return { ok: false, error: 'Member not found.' };
+
+  // Patch the portal profile via SECURITY DEFINER RPC
+  const { error: patchErr } = await supabase.rpc('patch_relationship_context', {
+    p_source_entity_id: rel.source_entity_id,
+    p_target_entity_id: rel.target_entity_id,
+    p_relationship_type: 'ROSTER_MEMBER',
+    p_patch: { primary_portal_profile: profileKey },
+  });
+  if (patchErr) return { ok: false, error: normalizeRosterError(patchErr) };
+
+  revalidatePath('/settings/team');
   return { ok: true };
 }

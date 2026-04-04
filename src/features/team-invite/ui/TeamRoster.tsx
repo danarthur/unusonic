@@ -186,6 +186,7 @@ export function TeamRoster({
                       role: selectedMember.role,
                       job_title: selectedMember.job_title,
                       avatarUrl: selectedMember.avatarUrl,
+                      portal_profile: selectedMember.portal_profile,
                     }
                   : undefined
               }
