@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useCallback } from 'react';
+import { useState, useTransition, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, X, Music, ListMusic, FileText, Users, GripVertical, Save, Loader2 } from 'lucide-react';
 import { saveDjPrep, type DjTimelineItem, type DjPrepData } from '@/features/ops/actions/save-dj-prep';
@@ -54,6 +54,17 @@ export function DjPrepWorkspace({ eventId, initialData }: DjPrepWorkspaceProps) 
     special_requests: '',
   });
 
+  // Dirty tracking — warn before navigating away with unsaved changes
+  const isDirty = useRef(false);
+  useEffect(() => { isDirty.current = true; }, [timeline, mustPlay, doNotPlay, clientNotes, clientInfo]);
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty.current && !saved) { e.preventDefault(); }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [saved]);
+
   const handleSave = useCallback(() => {
     setSaved(false);
     startTransition(async () => {
@@ -64,7 +75,7 @@ export function DjPrepWorkspace({ eventId, initialData }: DjPrepWorkspaceProps) 
         dj_client_notes: clientNotes,
         dj_client_info: clientInfo,
       });
-      if (result.ok) setSaved(true);
+      if (result.ok) { setSaved(true); isDirty.current = false; }
     });
   }, [eventId, timeline, mustPlay, doNotPlay, clientNotes, clientInfo]);
 

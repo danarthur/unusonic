@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut } from 'lucide-react';
-import { isPortalNavActive } from '@/shared/ui/layout/portal-nav-items';
-import type { PortalNavItem } from '@/shared/lib/portal-profiles';
+import { isPortalNavActive, type PortalNavItem } from '@/shared/lib/portal-profiles';
 
 interface PortalShellProps {
   user: { email: string; fullName: string | null; avatarUrl: string | null } | null;

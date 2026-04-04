@@ -6,6 +6,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getEntityCrewSchedule, getEntityCrewHistory } from '@/features/ops/actions/get-entity-crew-schedule';
 import { ScheduleList } from './schedule-list';
+import { PushPrompt } from '../components/push-prompt';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,7 @@ export default async function SchedulePage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
+      <PushPrompt />
       <ScheduleList upcoming={upcoming} past={past} />
     </div>
   );

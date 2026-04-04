@@ -6,6 +6,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { getEntityCrewSchedule, getEntityCrewHistory } from '@/features/ops/actions/get-entity-crew-schedule';
 import { CalendarView } from './calendar-view';
 
 export const dynamic = 'force-dynamic';
@@ -42,19 +43,24 @@ export default async function CalendarPage() {
   const attrs = readEntityAttrs(personEntity.attributes, 'person');
   const blackouts = attrs.availability_blackouts ?? [];
 
+  // Fetch scheduled gigs for calendar dots
+  const [upcoming, past] = await Promise.all([
+    getEntityCrewSchedule(personEntity.id),
+    getEntityCrewHistory(personEntity.id),
+  ]);
+  const allGigs = [...upcoming, ...past].map(g => ({
+    date: g.starts_at,
+    title: g.event_title ?? 'Show',
+    status: g.status,
+    assignmentId: g.assignment_id,
+  }));
+
   return (
-    <div className="flex flex-col gap-8 max-w-2xl mx-auto w-full">
-      <div>
-        <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
-          Availability
-        </h1>
-        <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
-          Mark dates you are unavailable. Your team will see these when scheduling shows.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
       <CalendarView
         entityId={personEntity.id}
         initialBlackouts={blackouts}
+        gigs={allGigs}
       />
     </div>
   );

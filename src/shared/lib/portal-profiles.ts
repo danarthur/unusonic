@@ -98,7 +98,7 @@ export const PORTAL_PROFILES: Record<string, PortalProfile> = {
     matchCapabilities: ['sales', 'account management', 'business development'],
     matchSkillTags: [],
     matchGigRolePatterns: [],
-    navItemIds: ['gigs', 'calendar', 'pipeline', 'pay', 'profile'],
+    navItemIds: ['gigs', 'calendar', 'pipeline', 'proposals', 'pay', 'profile'],
     defaultLanding: '/schedule',
     hasGigWorkspace: false,
   },
@@ -222,4 +222,9 @@ export function resolveGigProfile(
  */
 export function getDefaultNavItems(): PortalNavItem[] {
   return DEFAULT_PROFILE.navItemIds.map(id => NAV[id]).filter(Boolean);
+}
+
+/** Check if a nav item is active based on current pathname. */
+export function isPortalNavActive(itemHref: string, pathname: string): boolean {
+  return pathname === itemHref || pathname.startsWith(itemHref + '/');
 }

@@ -54,9 +54,13 @@ export function PayView({ defaultHourlyRate, skillRates, assignments }: PayViewP
     grouped.set(key, list);
   }
 
-  // Overall totals
-  const totalEarned = assignments.reduce((sum, a) => sum + a.dayRate, 0);
-  const totalShows = assignments.length;
+  // Split past (earned) vs future (projected)
+  const now = new Date();
+  const pastAssignments = assignments.filter(a => a.date && new Date(a.date) < now);
+  const futureAssignments = assignments.filter(a => !a.date || new Date(a.date) >= now);
+  const totalEarned = pastAssignments.reduce((sum, a) => sum + a.dayRate, 0);
+  const totalProjected = futureAssignments.reduce((sum, a) => sum + a.dayRate, 0);
+  const totalShows = pastAssignments.length;
 
   if (!hasRates && !hasAssignments) {
     return (
@@ -78,21 +82,33 @@ export function PayView({ defaultHourlyRate, skillRates, assignments }: PayViewP
     >
       {/* Earnings summary */}
       {hasAssignments && (
-        <div className="flex items-center gap-6 p-5 rounded-2xl border border-[oklch(1_0_0/0.1)] bg-[var(--stage-surface-elevated)]">
-          <div className="flex-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
-              Total earned
+        <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1 p-4 rounded-xl border border-[oklch(1_0_0/0.1)] bg-[var(--stage-surface-elevated)]">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+              Earned
             </p>
-            <p className="text-2xl font-semibold tracking-tight text-[var(--stage-text-primary)] mt-1">
+            <p className="text-xl font-semibold tracking-tight text-[var(--stage-text-primary)]">
               {formatCurrency(totalEarned)}
             </p>
+            <p className="text-[10px] text-[var(--stage-text-tertiary)]">{totalShows} {totalShows === 1 ? 'show' : 'shows'}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
-              Shows
+          {totalProjected > 0 && (
+            <div className="flex flex-col gap-1 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+                Upcoming
+              </p>
+              <p className="text-xl font-semibold tracking-tight text-[var(--stage-text-secondary)]">
+                {formatCurrency(totalProjected)}
+              </p>
+              <p className="text-[10px] text-[var(--stage-text-tertiary)]">{futureAssignments.length} {futureAssignments.length === 1 ? 'show' : 'shows'}</p>
+            </div>
+          )}
+          <div className="flex flex-col gap-1 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+              Total
             </p>
-            <p className="text-2xl font-semibold tracking-tight text-[var(--stage-text-primary)] mt-1">
-              {totalShows}
+            <p className="text-xl font-semibold tracking-tight text-[var(--stage-text-secondary)]">
+              {formatCurrency(totalEarned + totalProjected)}
             </p>
           </div>
         </div>

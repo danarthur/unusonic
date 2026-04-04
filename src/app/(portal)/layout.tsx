@@ -82,7 +82,7 @@ async function getProfileData(supabase: Awaited<ReturnType<typeof createClient>>
     supabase.schema('ops').from('crew_skills').select('skill_tag').eq('entity_id', person.id),
     // Check for admin override on ROSTER_MEMBER edge
     supabase.schema('cortex').from('relationships').select('context_data')
-      .eq('target_entity_id', person.id).eq('relationship_type', 'ROSTER_MEMBER').limit(1).maybeSingle(),
+      .eq('source_entity_id', person.id).eq('relationship_type', 'ROSTER_MEMBER').limit(1).maybeSingle(),
   ]);
 
   const capabilities = (capResult.data ?? []).map(r => r.capability);

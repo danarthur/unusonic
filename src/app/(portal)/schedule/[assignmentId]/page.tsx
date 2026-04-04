@@ -6,7 +6,7 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
-import { resolveGigProfile, PORTAL_PROFILES } from '@/shared/lib/portal-profiles';
+import { resolveGigProfile, resolvePortalProfile } from '@/shared/lib/portal-profiles';
 import { GigDetailView } from './gig-detail-view';
 import { DjPrepWorkspace } from './dj-prep-workspace';
 import { TechDaySheet } from './tech-day-sheet';
@@ -36,6 +36,16 @@ export default async function GigDetailPage({
     .maybeSingle();
 
   if (!personEntity) notFound();
+
+  // Resolve user's primary portal profile for gig detail fallback
+  const [capsResult, skillsResult] = await Promise.all([
+    supabase.schema('ops').from('entity_capabilities').select('capability').eq('entity_id', personEntity.id),
+    supabase.schema('ops').from('crew_skills').select('skill_tag').eq('entity_id', personEntity.id),
+  ]);
+  const userProfile = resolvePortalProfile({
+    capabilities: (capsResult.data ?? []).map(c => c.capability),
+    skillTags: (skillsResult.data ?? []).map(s => s.skill_tag),
+  });
 
   // Fetch assignment
   const { data: assignment } = await supabase
@@ -190,7 +200,7 @@ export default async function GigDetailPage({
     : null;
 
   // Resolve gig-specific portal profile for role-aware workspace sections
-  const gigProfile = resolveGigProfile(assignment.role, PORTAL_PROFILES.tech_stagehand);
+  const gigProfile = resolveGigProfile(assignment.role, userProfile.primary);
 
   // DJ prep data
   const djPrepInitial: Partial<DjPrepData> = {

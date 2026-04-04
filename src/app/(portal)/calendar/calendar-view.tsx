@@ -130,12 +130,20 @@ function StripePattern() {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+interface GigEntry {
+  date: string | null;
+  title: string;
+  status: string;
+  assignmentId: string;
+}
+
 interface CalendarViewProps {
   entityId: string;
   initialBlackouts: BlackoutRange[];
+  gigs?: GigEntry[];
 }
 
-export function CalendarView({ entityId, initialBlackouts }: CalendarViewProps) {
+export function CalendarView({ entityId, initialBlackouts, gigs = [] }: CalendarViewProps) {
   const today = useMemo(() => toDateStr(new Date()), []);
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
@@ -148,6 +156,19 @@ export function CalendarView({ entityId, initialBlackouts }: CalendarViewProps) 
   const [blackoutDates, setBlackoutDates] = useState<Set<string>>(
     () => expandBlackouts(initialBlackouts)
   );
+
+  // Build gig map by date
+  const gigMap = useMemo(() => {
+    const map = new Map<string, GigEntry[]>();
+    for (const g of gigs) {
+      if (!g.date) continue;
+      const key = toDateStr(new Date(g.date));
+      const list = map.get(key) ?? [];
+      list.push(g);
+      map.set(key, list);
+    }
+    return map;
+  }, [gigs]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,9 +372,23 @@ export function CalendarView({ entityId, initialBlackouts }: CalendarViewProps) 
                     {parseInt(dateStr.split('-')[2], 10)}
                   </span>
 
-                  {/* Today indicator */}
-                  {isToday && inMonth && (
-                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 size-1 rounded-full bg-[var(--stage-text-primary)]" />
+                  {/* Gig dots + today indicator */}
+                  {inMonth && (
+                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+                      {isToday && (
+                        <span className="size-1 rounded-full bg-[var(--stage-text-primary)]" />
+                      )}
+                      {(gigMap.get(dateStr) ?? []).slice(0, 2).map((g, i) => (
+                        <span
+                          key={i}
+                          className={`size-1.5 rounded-full ${
+                            g.status === 'confirmed' ? 'bg-[oklch(0.75_0.15_145)]' :
+                            g.status === 'requested' ? 'bg-[oklch(0.75_0.15_55)]' :
+                            'bg-[var(--stage-text-tertiary)]'
+                          }`}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
               );

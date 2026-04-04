@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Music, Clock, FileText, Save, Loader2, ListMusic } from 'lucide-react';
 import { saveBandGigData, type Setlist } from '@/features/ops/actions/save-band-data';
@@ -34,6 +34,17 @@ export function BandGigWorkspace({
 
   const selectedSetlist = setlists.find(s => s.id === selectedSetlistId) ?? null;
 
+  // Dirty tracking — warn before navigating away with unsaved changes
+  const isDirty = useRef(false);
+  useEffect(() => { isDirty.current = true; }, [selectedSetlistId, setTime, gigNotes]);
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty.current && !saved) { e.preventDefault(); }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [saved]);
+
   const handleSave = () => {
     setSaved(false);
     startTransition(async () => {
@@ -42,7 +53,7 @@ export function BandGigWorkspace({
         band_set_time: setTime || undefined,
         band_gig_notes: gigNotes || undefined,
       });
-      if (result.ok) setSaved(true);
+      if (result.ok) { setSaved(true); isDirty.current = false; }
     });
   };
 
