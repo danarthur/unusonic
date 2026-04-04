@@ -134,21 +134,11 @@ export async function saveBandGigData(
 
   if (!assignment) return { ok: false, error: 'Not assigned to this event.' };
 
-  const { data: event } = await ctx.supabase
-    .schema('ops')
-    .from('events')
-    .select('run_of_show_data')
-    .eq('id', eventId)
-    .maybeSingle();
-
-  const current = (event?.run_of_show_data ?? {}) as Record<string, unknown>;
-  const merged = { ...current, ...data };
-
-  const { error } = await ctx.supabase
-    .schema('ops')
-    .from('events')
-    .update({ run_of_show_data: merged })
-    .eq('id', eventId);
+  // Atomic JSONB merge via RPC — prevents race conditions with concurrent saves
+  const { error } = await ctx.supabase.rpc('patch_event_ros_data', {
+    p_event_id: eventId,
+    p_patch: data as unknown as Record<string, unknown>,
+  });
 
   if (error) return { ok: false, error: 'Failed to save.' };
   return { ok: true };

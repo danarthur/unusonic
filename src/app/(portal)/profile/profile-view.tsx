@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
 import { User, Phone, Mail, Briefcase, Shield, AlertCircle, Calendar, Copy, Check } from 'lucide-react';
-import { getOrCreateIcalToken } from '@/features/ops/actions/get-ical-token';
+import { getOrCreateIcalToken, rotateIcalToken, revokeIcalToken } from '@/features/ops/actions/get-ical-token';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { updateMyProfile } from './actions';
 
@@ -264,19 +264,51 @@ function CalendarSyncSection() {
                 {isPending ? 'Generating...' : 'Get calendar link'}
               </button>
             ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  readOnly
-                  value={icalUrl}
-                  className="flex-1 text-xs font-mono bg-[var(--stage-well)] rounded-lg px-3 py-1.5 text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none truncate"
-                />
-                <button
-                  onClick={copyUrl}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.12)] transition-colors shrink-0"
-                >
-                  {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={icalUrl}
+                    className="flex-1 text-xs font-mono bg-[var(--stage-well)] rounded-lg px-3 py-1.5 text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none truncate"
+                  />
+                  <button
+                    onClick={copyUrl}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.12)] transition-colors shrink-0"
+                  >
+                    {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      startTransition(async () => {
+                        const newToken = await rotateIcalToken();
+                        if (newToken) {
+                          const base = typeof window !== 'undefined' ? window.location.origin : '';
+                          setIcalUrl(`${base}/api/portal/ical/${newToken}`);
+                        }
+                      });
+                    }}
+                    disabled={isPending}
+                    className="text-xs text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-50"
+                  >
+                    Regenerate link
+                  </button>
+                  <span className="text-[var(--stage-text-tertiary)]">·</span>
+                  <button
+                    onClick={() => {
+                      startTransition(async () => {
+                        const ok = await revokeIcalToken();
+                        if (ok) setIcalUrl(null);
+                      });
+                    }}
+                    disabled={isPending}
+                    className="text-xs text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-50"
+                  >
+                    Revoke access
+                  </button>
+                </div>
               </div>
             )}
           </div>

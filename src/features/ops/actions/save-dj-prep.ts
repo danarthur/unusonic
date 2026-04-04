@@ -61,22 +61,11 @@ export async function saveDjPrep(
 
   if (!assignment) return { ok: false, error: 'Not assigned to this event.' };
 
-  // Fetch current run_of_show_data and merge
-  const { data: event } = await supabase
-    .schema('ops')
-    .from('events')
-    .select('run_of_show_data')
-    .eq('id', eventId)
-    .maybeSingle();
-
-  const current = (event?.run_of_show_data ?? {}) as Record<string, unknown>;
-  const merged = { ...current, ...data };
-
-  const { error } = await supabase
-    .schema('ops')
-    .from('events')
-    .update({ run_of_show_data: merged })
-    .eq('id', eventId);
+  // Atomic JSONB merge via RPC — prevents race conditions with concurrent saves
+  const { error } = await supabase.rpc('patch_event_ros_data', {
+    p_event_id: eventId,
+    p_patch: data as unknown as Record<string, unknown>,
+  });
 
   if (error) {
     console.error('[saveDjPrep]', error.message);

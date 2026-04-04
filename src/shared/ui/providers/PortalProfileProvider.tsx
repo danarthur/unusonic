@@ -4,6 +4,8 @@ import { createContext, useContext, type ReactNode } from 'react';
 import type { PortalProfile, PortalNavItem } from '@/shared/lib/portal-profiles';
 
 interface PortalProfileContextValue {
+  /** The user's person entity ID (resolved once in layout) */
+  personEntityId: string | null;
   /** Primary resolved profile for this employee */
   primary: PortalProfile;
   /** All matched profiles (for hybrid role awareness) */

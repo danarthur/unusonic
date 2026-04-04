@@ -29,6 +29,7 @@ export async function getEntityCrewSchedule(entityId: string): Promise<CrewSched
     .from('entity_crew_schedule')
     .select('assignment_id, event_id, role, status, event_title, starts_at, ends_at, venue_name, venue_address, location_address, deal_id, pay_rate, pay_rate_type, scheduled_hours, event_archetype')
     .eq('entity_id', entityId)
+    .in('status', ['requested', 'confirmed', 'dispatched'])
     .gte('starts_at', new Date().toISOString())
     .order('starts_at', { ascending: true })
     .limit(20);

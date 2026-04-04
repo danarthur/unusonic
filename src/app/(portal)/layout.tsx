@@ -72,7 +72,7 @@ async function getProfileData(supabase: Awaited<ReturnType<typeof createClient>>
     .eq('type', 'person')
     .maybeSingle();
 
-  if (!person) return { capabilities: [], skillTags: [], adminOverride: null };
+  if (!person) return { personEntityId: null, capabilities: [], skillTags: [], adminOverride: null };
 
   // Fetch capabilities and skills in parallel
   const [capResult, skillResult, rosterResult] = await Promise.all([
@@ -90,7 +90,7 @@ async function getProfileData(supabase: Awaited<ReturnType<typeof createClient>>
   const rosterCtx = (rosterResult.data?.context_data ?? {}) as Record<string, unknown>;
   const adminOverride = (rosterCtx.primary_portal_profile as string) ?? null;
 
-  return { capabilities, skillTags, adminOverride };
+  return { personEntityId: person.id, capabilities, skillTags, adminOverride };
 }
 
 export default async function PortalLayout({
@@ -102,7 +102,7 @@ export default async function PortalLayout({
   let workspaceId: string | null = null;
   let workspaceName: string | null = null;
   let role: WorkspaceRole | null = null;
-  let profileData = { capabilities: [] as string[], skillTags: [] as string[], adminOverride: null as string | null };
+  let profileData = { personEntityId: null as string | null, capabilities: [] as string[], skillTags: [] as string[], adminOverride: null as string | null };
 
   try {
     const supabase = await createClient();
@@ -151,6 +151,7 @@ export default async function PortalLayout({
   });
 
   const portalProfileValue = {
+    personEntityId: profileData.personEntityId,
     primary: resolved.primary,
     all: resolved.all,
     navItems: resolved.navItems,
