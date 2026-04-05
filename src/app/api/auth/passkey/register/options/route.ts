@@ -9,6 +9,7 @@ import { generateRegistrationOptions, type AuthenticatorTransportFuture } from '
 import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { checkPasskeyOptionsRate } from '@/shared/api/auth/passkey-rate-limit';
 import { cookies } from 'next/headers';
 
 const rpName = 'Unusonic';
@@ -44,6 +45,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized. Sign in to add a passkey.' },
         { status: 401 }
+      );
+    }
+
+    // Rate limit per user
+    const rateResult = await checkPasskeyOptionsRate(user.id);
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Wait a few minutes and try again.' },
+        { status: 429, headers: { 'Retry-After': String(rateResult.retryAfterSeconds) } }
       );
     }
 

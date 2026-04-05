@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAuthenticationOptions, type AuthenticatorTransportFuture } from '@simplewebauthn/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { checkPasskeyOptionsRate } from '@/shared/api/auth/passkey-rate-limit';
 import { cookies } from 'next/headers';
 import { randomUUID } from 'crypto';
 
@@ -35,16 +36,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
-
-    const origin =
-      request.headers.get('origin') ||
-      request.nextUrl.origin ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      'http://localhost:3000';
-
     const rpId = getRpId(request);
 
     let options: Awaited<ReturnType<typeof generateAuthenticationOptions>>;
+    let resolvedUserId: string | null = null;
     const system = getSystemClient();
 
     if (email) {
@@ -66,6 +61,18 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      resolvedUserId = user.id;
+
+      // Rate limit per user
+      const rateResult = await checkPasskeyOptionsRate(user.id);
+      if (!rateResult.allowed) {
+        return NextResponse.json(
+          { error: 'Too many sign-in attempts. Wait a few minutes and try again.' },
+          { status: 429, headers: { 'Retry-After': String(rateResult.retryAfterSeconds) } }
+        );
+      }
+
       const allowCredentials = await getAllowCredentials(system, user.id);
       if (allowCredentials.length === 0) {
         return NextResponse.json(
@@ -92,7 +99,7 @@ export async function POST(request: NextRequest) {
     const challengeId = randomUUID();
     const { error: insertError } = await system
       .from('webauthn_challenges')
-      .insert({ id: challengeId, user_id: null, challenge: options.challenge });
+      .insert({ id: challengeId, user_id: resolvedUserId, challenge: options.challenge });
 
     if (insertError) {
       console.error('[passkey/authenticate/options] insert challenge', insertError);

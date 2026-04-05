@@ -19,6 +19,7 @@ import { AionOnboardingShell } from '@/features/onboarding/ui/aion-onboarding-sh
 import { OnboardingChatInput } from '@/features/onboarding/ui/onboarding-chat-input';
 import { WebsiteStep } from '@/features/onboarding/ui/website-step';
 import type { ScoutOnboardingPayload } from '@/features/onboarding/ui/website-step';
+import type { UserPersona } from '@/features/onboarding/model/subscription-types';
 import type { LivingLogoStatus } from '@/shared/ui/branding/living-logo';
 import { M3_EASING_ENTER, M3_EASING_EXIT } from '@/shared/lib/motion-constants';
 
@@ -66,6 +67,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialState.profile.avatarUrl);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [scoutPayload, setScoutPayload] = useState<ScoutOnboardingPayload | null>(null);
+  const [manualPersona, setManualPersona] = useState<UserPersona>('solo_professional');
   const [error, setError] = useState<string | null>(null);
   const [genesisLogoStatus, setGenesisLogoStatus] = useState<LivingLogoStatus>('idle');
   const [profileSubmitted, setProfileSubmitted] = useState(false);
@@ -255,12 +257,13 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
           >
             <GenesisOrchestrator
               onboardingContext={{
-                persona: scoutPayload?.suggestedPersona ?? 'solo_professional',
+                persona: scoutPayload?.suggestedPersona ?? manualPersona,
                 suggestedTier: scoutPayload?.suggestedTier,
                 scoutData: scoutPayload?.data,
               }}
               contentOnly
               onLogoStatusChange={setGenesisLogoStatus}
+              onPersonaChange={setManualPersona}
             />
           </motion.div>
         )}

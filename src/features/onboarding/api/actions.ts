@@ -57,6 +57,7 @@ async function findOrgEntity(
 
 /**
  * Check if a slug is available for a new organization (Genesis) or for an existing org (exclude its id).
+ * Checks directory.entities (canonical) + workspaces (slug field) for completeness.
  */
 export async function checkSlugAvailability(
   slug: string,
@@ -67,22 +68,33 @@ export async function checkSlugAvailability(
     return { available: false };
   }
   const supabase = await createClient();
-  const { data: rows, error } = await supabase
-    .from('commercial_organizations')
-    .select('id, name');
 
-  if (error) return { available: true };
-  const taken = (rows ?? []).some(
-    (row) =>
-      slugify(row.name ?? '') === normalized &&
-      (excludeOrgId == null || row.id !== excludeOrgId)
+  // Check directory.entities (handle field)
+  const { data: entityRows } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, handle')
+    .eq('type', 'company')
+    .eq('handle', normalized);
+
+  const takenInDirectory = (entityRows ?? []).some(
+    (row) => excludeOrgId == null || row.id !== excludeOrgId
   );
-  return { available: !taken };
+  if (takenInDirectory) return { available: false };
+
+  // Also check workspaces.slug for backward compat (legacy orgs may only exist there)
+  const { count } = await supabase
+    .from('workspaces')
+    .select('id', { count: 'exact', head: true })
+    .eq('slug', normalized);
+
+  return { available: !count || count === 0 };
 }
 
 /**
  * Check Nexus availability for Quantum Input flow.
  * Returns VOID (available), TAKEN (claimed org), or GHOST (unclaimed org with preview).
+ * Checks directory.entities (canonical) + workspaces for backward compat.
  */
 export async function checkNexusAvailability(slug: string): Promise<NexusResult> {
   const normalized = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-|-$/g, '') || '';
@@ -90,14 +102,34 @@ export async function checkNexusAvailability(slug: string): Promise<NexusResult>
     return { type: 'VOID' };
   }
   const supabase = await createClient();
-  const { data: rows, error } = await supabase
-    .from('commercial_organizations')
-    .select('id, name');
 
-  if (error) return { type: 'VOID' };
-  const match = (rows ?? []).find((row) => slugify(row.name ?? '') === normalized);
-  if (!match) return { type: 'VOID' };
-  return { type: 'TAKEN' };
+  // Check directory.entities for exact handle match
+  const { data: entityMatch } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, handle, display_name, attributes')
+    .eq('type', 'company')
+    .eq('handle', normalized)
+    .maybeSingle();
+
+  if (entityMatch) {
+    const attrs = entityMatch.attributes as { is_ghost?: boolean } | null;
+    if (attrs?.is_ghost) {
+      // Ghost org in directory — could be claimed
+      return { type: 'GHOST', data: { name: entityMatch.display_name ?? normalized, slug: normalized, event_count: 0, collaborator_count: 0 } };
+    }
+    return { type: 'TAKEN' };
+  }
+
+  // Fallback: check workspaces.slug for legacy orgs not yet in directory
+  const { count } = await supabase
+    .from('workspaces')
+    .select('id', { count: 'exact', head: true })
+    .eq('slug', normalized);
+
+  if (count && count > 0) return { type: 'TAKEN' };
+
+  return { type: 'VOID' };
 }
 
 /**

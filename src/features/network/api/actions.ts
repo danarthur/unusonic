@@ -139,14 +139,24 @@ export async function getCurrentOrgId(): Promise<string | null> {
     }
   }
 
-  // Fallback: organization_members (workspace-based onboarding path)
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('organization_id')
+  // Fallback: find any company entity owned by the user's workspace
+  const { data: wsMember } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
     .eq('user_id', user.id)
     .limit(1)
     .maybeSingle();
-  if (membership?.organization_id) return membership.organization_id;
+  if (wsMember?.workspace_id) {
+    const { data: orgEnt } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('type', 'company')
+      .eq('owner_workspace_id', wsMember.workspace_id)
+      .limit(1)
+      .maybeSingle();
+    if (orgEnt?.id) return orgEnt.id;
+  }
 
   return null;
 }

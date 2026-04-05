@@ -36,9 +36,23 @@ export function getAuthErrorDisplay(raw: string): AuthErrorDisplay {
     };
   }
 
-  if (/canceled|cancelled/i.test(trimmed)) {
+  if (/NotAllowedError/i.test(trimmed) || /canceled|cancelled/i.test(trimmed)) {
     return {
-      friendly: 'Sign-in was cancelled.',
+      friendly: 'Sign-in was cancelled. Try again or use your password.',
+      technical: trimmed,
+    };
+  }
+
+  if (/SecurityError/i.test(trimmed)) {
+    return {
+      friendly: 'Passkeys require a secure connection.',
+      technical: trimmed,
+    };
+  }
+
+  if (/no credentials|no passkey/i.test(trimmed)) {
+    return {
+      friendly: 'No passkeys found for this device. Use your password instead.',
       technical: trimmed,
     };
   }

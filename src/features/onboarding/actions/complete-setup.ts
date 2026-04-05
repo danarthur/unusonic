@@ -1,6 +1,7 @@
 /**
  * Unusonic Onboarding – Server-Side Event Orchestration (EDA)
  * initializeOrganization: Transaction + Async Triggers (Afterburner)
+ * Creates workspace + directory.entities org + cortex ROSTER_MEMBER edge.
  * @module features/onboarding/actions/complete-setup
  */
 
@@ -12,6 +13,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { revalidatePath } from 'next/cache';
 import type { UserPersona, SubscriptionTier } from '../model/subscription-types';
+import { getModulesForTier } from '../lib/get-modules-for-tier';
 
 function slugify(name: string): string {
   return name
@@ -42,17 +44,17 @@ export interface InitializeOrganizationResult {
 
 /**
  * Initialize Organization: Transaction + Async Triggers
- * 1. Create Commercial Organization
- * 2. Create Workspace (1:1)
- * 3. Add User as Owner (organization_members + workspace_members)
- * 4. Update Profile (onboarding_completed)
- * 5. Create Agent Config
- * 6. Async Triggers (Venue: triggerVectorEmbeddings, Autonomous: registerAgent)
+ * 1. Create Workspace (with subscription_tier + signalpay_enabled)
+ * 2. Create directory.entities company (handle = slug)
+ * 3. Create person entity (if missing) + ROSTER_MEMBER edge
+ * 4. Add User as Owner (workspace_members)
+ * 5. Update Profile (onboarding_completed)
+ * 6. Create Agent Config
+ * 7. Async Triggers (Venue: triggerVectorEmbeddings, Autonomous: registerAgent)
  */
 export async function initializeOrganization(
   input: InitializeOrganizationInput
 ): Promise<InitializeOrganizationResult> {
-  // Validate user with cookie-based client (session must be present)
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -70,10 +72,25 @@ export async function initializeOrganization(
   const db = getSystemClient();
 
   try {
-    // 1. Create Workspace first (workspaces.id needed for commercial_organizations)
+    // 1. Create Workspace (canonical source for subscription tier + billing flags)
+    // Try the clean slug first; only append a random suffix on collision
+    let finalSlug = slug;
+    const { count } = await db
+      .from('workspaces')
+      .select('id', { count: 'exact', head: true })
+      .eq('slug', slug);
+    if (count && count > 0) {
+      finalSlug = `${slug}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
     const { data: workspace, error: wsError } = await db
       .from('workspaces')
-      .insert({ name, slug: `${slug}-${Math.random().toString(36).slice(2, 8)}` })
+      .insert({
+        name,
+        slug: finalSlug,
+        subscription_tier: input.subscriptionTier,
+        signalpay_enabled: input.unusonicPayEnabled ?? false,
+      })
       .select('id')
       .single();
 
@@ -81,38 +98,83 @@ export async function initializeOrganization(
       return { success: false, error: wsError?.message ?? 'Failed to create workspace' };
     }
 
-    // 2. Create Commercial Organization
-    const { data: org, error: orgError } = await db
-      .from('commercial_organizations')
+    // 2. Create directory.entities company (replaces commercial_organizations)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- directory schema not in generated types for service-role client
+    const dirDb = (db as any).schema('directory');
+    const { data: orgEntity, error: orgError } = await dirDb
+      .from('entities')
       .insert({
-        name,
-        type: input.type,
-        subscription_tier: input.subscriptionTier,
-        pms_integration_enabled: input.pmsIntegrationEnabled ?? false,
-        signalpay_enabled: input.unusonicPayEnabled ?? false,
-        workspace_id: workspace.id,
+        display_name: name,
+        handle: finalSlug,
+        type: 'company',
+        owner_workspace_id: workspace.id,
+        attributes: {
+          is_ghost: false,
+          is_claimed: true,
+          organization_type: input.type,
+          pms_integration_enabled: input.pmsIntegrationEnabled ?? false,
+        },
       })
       .select('id')
       .single();
 
-    if (orgError || !org) {
+    if (orgError || !orgEntity) {
       await db.from('workspaces').delete().eq('id', workspace.id);
       return { success: false, error: orgError?.message ?? 'Failed to create organization' };
     }
 
-    // 3. Add User as Owner (org + workspace)
-    const { error: omError } = await db.from('organization_members').insert({
-      user_id: user.id,
-      organization_id: org.id,
-      role: 'owner',
-    });
+    // 3. Get or create person entity for the user + ROSTER_MEMBER edge
+    const { data: existingPerson } = await dirDb
+      .from('entities')
+      .select('id')
+      .eq('claimed_by_user_id', user.id)
+      .eq('type', 'person')
+      .maybeSingle();
 
-    if (omError) {
-      await db.from('commercial_organizations').delete().eq('id', org.id);
-      await db.from('workspaces').delete().eq('id', workspace.id);
-      return { success: false, error: `Organization member: ${omError.message}` };
+    let personId = (existingPerson as { id: string } | null)?.id ?? null;
+    if (!personId) {
+      const { data: profile } = await db
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const { data: newPerson, error: personErr } = await dirDb
+        .from('entities')
+        .insert({
+          display_name: (profile as { full_name?: string | null } | null)?.full_name ?? user.email ?? 'Owner',
+          type: 'person',
+          claimed_by_user_id: user.id,
+          owner_workspace_id: workspace.id,
+          attributes: { email: user.email ?? '', is_ghost: false },
+        })
+        .select('id')
+        .single();
+
+      if (personErr || !newPerson) {
+        await dirDb.from('entities').delete().eq('id', (orgEntity as { id: string }).id);
+        await db.from('workspaces').delete().eq('id', workspace.id);
+        return { success: false, error: personErr?.message ?? 'Failed to create person entity' };
+      }
+      personId = (newPerson as { id: string }).id;
     }
 
+    const orgId = (orgEntity as { id: string }).id;
+
+    // Create ROSTER_MEMBER edge (person → org) via RPC
+    const { error: relError } = await db.rpc('upsert_relationship', {
+      p_source_entity_id: personId,
+      p_target_entity_id: orgId,
+      p_type: 'ROSTER_MEMBER',
+      p_context_data: { role: 'owner', employment_status: 'internal_employee' },
+    });
+
+    if (relError) {
+      console.warn('[Onboarding] ROSTER_MEMBER edge failed (non-fatal):', relError.message);
+      // Non-fatal — workspace_members is the primary membership. Edge is for graph queries.
+    }
+
+    // 4. Add User as Owner (workspace_members — primary membership table)
     const { error: wmError } = await db.from('workspace_members').insert({
       workspace_id: workspace.id,
       user_id: user.id,
@@ -120,13 +182,12 @@ export async function initializeOrganization(
     });
 
     if (wmError) {
-      await db.from('organization_members').delete().eq('user_id', user.id).eq('organization_id', org.id);
-      await db.from('commercial_organizations').delete().eq('id', org.id);
+      await dirDb.from('entities').delete().eq('id', orgId);
       await db.from('workspaces').delete().eq('id', workspace.id);
       return { success: false, error: `Workspace member: ${wmError.message}` };
     }
 
-    // 4. Update Profile (onboarding_completed)
+    // 5. Update Profile (onboarding_completed)
     const personaMap: Record<OrganizationType, UserPersona> = {
       solo: 'solo_professional',
       agency: 'agency_team',
@@ -140,22 +201,20 @@ export async function initializeOrganization(
       persona,
     }).eq('id', user.id);
 
-    // 5. Create Agent Config (organization_id + workspace_id for backward compat)
+    // 6. Create Agent Config (workspace_id only — no legacy organization_id)
     await db.from('agent_configs').insert({
       workspace_id: workspace.id,
-      organization_id: org.id,
       persona,
       tier: input.subscriptionTier,
       xai_reasoning_enabled: true,
       agent_mode: input.subscriptionTier === 'studio' ? 'autonomous' : 'assist',
-      modules_enabled: ['crm', 'calendar'],
+      modules_enabled: getModulesForTier(input.subscriptionTier),
     });
 
     revalidatePath('/');
 
-    // 6. Async Triggers (non-blocking; fire-and-forget)
+    // 7. Async Triggers (non-blocking; fire-and-forget)
     const tier = input.subscriptionTier;
-    const orgId = org.id;
 
     if (input.type === 'venue') {
       triggerVectorEmbeddings(orgId).catch(console.warn);
@@ -183,12 +242,22 @@ function getRedirectPath(tier: SubscriptionTier, type: OrganizationType): string
   return '/lobby';
 }
 
-/** Afterburner: Venue → ingest floor plans. */
-async function triggerVectorEmbeddings(_orgId: string): Promise<void> {
-  // TODO: Server-to-Server call to ingest floor plans / venue data
+/**
+ * @stub Venue afterburner — ingest floor plans / venue data via vector embeddings.
+ * Blocked on: Aion RAG pipeline (cortex.memory ingestion endpoint).
+ * When implemented: call server-to-server ingest endpoint with entityId + venue assets.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function triggerVectorEmbeddings(_entityId: string): Promise<void> {
+  // No-op until RAG pipeline is ready
 }
 
-/** Afterburner: Autonomous → spin up LangGraph. */
-async function registerAgent(_orgId: string): Promise<void> {
-  // TODO: Call orchestrator.registerAgent(orgId)
+/**
+ * @stub Autonomous afterburner — register a LangGraph agent for the workspace.
+ * Blocked on: Aion orchestrator deployment (autonomous agent provisioning).
+ * When implemented: call orchestrator.registerAgent(entityId) to spin up dedicated agent.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function registerAgent(_entityId: string): Promise<void> {
+  // No-op until orchestrator is deployed
 }

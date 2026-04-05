@@ -71,6 +71,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   
+  // ─── Onboarding status helper (cookie-cached, DB fallback) ───
+  async function checkOnboardingCompleted(): Promise<boolean> {
+    const cached = request.cookies.get('unusonic_onboarding')?.value;
+    if (cached === '1') return true;
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', user!.id)
+      .single();
+
+    if (error || !profile || !profile.onboarding_completed) return false;
+
+    // Cache for 1 hour to avoid DB hit on subsequent navigations
+    response.cookies.set('unusonic_onboarding', '1', {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 60 * 60,
+    });
+    return true;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // RULE 2: User + public route (except callback and /p) → Check onboarding then home
   // ═══════════════════════════════════════════════════════════════════════════
@@ -78,53 +101,31 @@ export async function middleware(request: NextRequest) {
   const isClaimOrConfirm = pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew');
   if (user && isPublicRoute && pathname !== '/auth/callback' && !isProposalLink && !isClaimOrConfirm) {
     console.log(`[Middleware] User on public route ${pathname}, checking profile...`);
-    
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('onboarding_completed')
-      .eq('id', user.id)
-      .single();
-    
-    // Profile doesn't exist or error → needs onboarding
-    if (error || !profile) {
-      console.log('[Middleware] No profile found, → /onboarding');
-      return NextResponse.redirect(new URL('/onboarding', request.url));
-    }
-    
-    // Onboarding not complete → onboarding
-    if (!profile.onboarding_completed) {
+
+    const onboarded = await checkOnboardingCompleted();
+
+    if (!onboarded) {
       console.log('[Middleware] Onboarding incomplete, → /onboarding');
       return NextResponse.redirect(new URL('/onboarding', request.url));
     }
-    
+
     // All good → dashboard
     console.log('[Middleware] Onboarding complete, → /');
     return NextResponse.redirect(new URL('/', request.url));
   }
-  
+
   // ═══════════════════════════════════════════════════════════════════════════
   // RULE 3: User + protected route → Must have completed onboarding
   // ═══════════════════════════════════════════════════════════════════════════
   if (user && !isPublicRoute) {
     const isExempt = ONBOARDING_EXEMPT.some(r => pathname.startsWith(r));
-    
+
     if (!isExempt) {
       console.log(`[Middleware] Checking onboarding for ${pathname}...`);
-      
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('onboarding_completed')
-        .eq('id', user.id)
-        .single();
-      
-      // No profile or error → needs onboarding (FAIL CLOSED)
-      if (error || !profile) {
-        console.log('[Middleware] Profile check failed, → /onboarding');
-        return NextResponse.redirect(new URL('/onboarding', request.url));
-      }
-      
-      // Onboarding not complete
-      if (!profile.onboarding_completed) {
+
+      const onboarded = await checkOnboardingCompleted();
+
+      if (!onboarded) {
         console.log('[Middleware] Onboarding required, → /onboarding');
         return NextResponse.redirect(new URL('/onboarding', request.url));
       }
@@ -134,24 +135,19 @@ export async function middleware(request: NextRequest) {
       let roleSlug = request.cookies.get('unusonic_role_slug')?.value ?? null;
 
       if (!roleSlug) {
-        // Resolve role slug from workspace_members + ops.workspace_roles
+        // Resolve role slug via RPC — avoids PostgREST schema access issues in middleware context
         const { data: memberRow } = await supabase
           .from('workspace_members')
-          .select('role, role_id')
+          .select('workspace_id')
           .eq('user_id', user.id)
           .limit(1)
           .maybeSingle();
 
-        if (memberRow?.role_id) {
-          const { data: roleRow } = await supabase
-            .schema('ops')
-            .from('workspace_roles')
-            .select('slug')
-            .eq('id', memberRow.role_id)
-            .maybeSingle();
-          roleSlug = roleRow?.slug ?? memberRow.role ?? null;
-        } else {
-          roleSlug = memberRow?.role ?? null;
+        if (memberRow?.workspace_id) {
+          const { data: slug } = await supabase.rpc('get_member_role_slug', {
+            p_workspace_id: memberRow.workspace_id,
+          });
+          roleSlug = slug ?? null;
         }
 
         // Cache in cookie for subsequent requests (expires on session end)
@@ -178,16 +174,17 @@ export async function middleware(request: NextRequest) {
       }
 
       // RULE 4: Autonomous tier + !signalpay_enabled → force connect payouts
+      // Reads from workspaces (canonical source) via workspace_members
       const isSignalPayExempt = SIGNALPAY_EXEMPT.some(r => pathname.startsWith(r));
       if (!isSignalPayExempt) {
         const { data: rows } = await supabase
-          .from('organization_members')
-          .select('commercial_organizations(subscription_tier, signalpay_enabled)')
+          .from('workspace_members')
+          .select('workspaces(subscription_tier, signalpay_enabled)')
           .eq('user_id', user.id);
 
         const needsSignalPay = rows?.some((r) => {
-          const co = r.commercial_organizations as { subscription_tier?: string; signalpay_enabled?: boolean } | null;
-          return co?.subscription_tier === 'autonomous' && !co?.signalpay_enabled;
+          const ws = r.workspaces as { subscription_tier?: string; signalpay_enabled?: boolean } | null;
+          return ws?.subscription_tier === 'autonomous' && !ws?.signalpay_enabled;
         });
 
         if (needsSignalPay) {

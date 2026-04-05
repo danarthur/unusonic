@@ -53,16 +53,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const response = body as {
+    const { friendly_name: rawFriendlyName, ...credential_body } = body as {
       id: string;
       rawId: string;
       type: string;
+      friendly_name?: string;
       response: {
         clientDataJSON: string;
         attestationObject: string;
         transports?: string[];
       };
     };
+    const response = credential_body;
 
     if (!response?.id || !response?.response?.clientDataJSON) {
       return NextResponse.json(
@@ -119,12 +121,15 @@ export async function POST(request: NextRequest) {
         ? credential.publicKey
         : Buffer.from(credential.publicKey).toString('base64url');
 
+    const friendlyName = typeof rawFriendlyName === 'string' ? rawFriendlyName.trim().slice(0, 100) : null;
+
     await system.from('passkeys').insert({
       user_id: user.id,
       credential_id: credential.id,
       public_key: publicKeyBase64,
       counter: credential.counter,
       transports: response.response.transports ?? null,
+      ...(friendlyName ? { friendly_name: friendlyName } : {}),
     });
 
     return NextResponse.json({ verified: true });

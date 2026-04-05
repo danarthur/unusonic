@@ -66,11 +66,19 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
       setStatusIndex((i) => (i + 1) % THINKING_STATUSES.length);
     }, 1200);
 
-    const scoutResult = await scoutCompanyForOnboarding(trimmed);
+    const scoutPromise = scoutCompanyForOnboarding(trimmed);
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30_000));
+    const scoutResult = await Promise.race([scoutPromise, timeoutPromise]);
 
     if (statusIntervalRef.current) {
       clearInterval(statusIntervalRef.current);
       statusIntervalRef.current = null;
+    }
+
+    if (!scoutResult) {
+      setError('The scan took too long. Try again or skip this step.');
+      setPhase('idle');
+      return;
     }
 
     if (!scoutResult.success || !scoutResult.data) {

@@ -11,7 +11,12 @@ export type RegisterPasskeyResult =
   | { ok: true }
   | { ok: false; error: string };
 
-export async function registerPasskey(): Promise<RegisterPasskeyResult> {
+export interface RegisterPasskeyOptions {
+  /** Optional human-readable label for this passkey (e.g. "MacBook Pro"). */
+  friendlyName?: string;
+}
+
+export async function registerPasskey(options?: RegisterPasskeyOptions): Promise<RegisterPasskeyResult> {
   const base = typeof window !== 'undefined' ? window.location.origin : '';
   const optionsUrl = `${base}/api/auth/passkey/register/options`;
   const verifyUrl = `${base}/api/auth/passkey/register/verify`;
@@ -28,9 +33,9 @@ export async function registerPasskey(): Promise<RegisterPasskeyResult> {
         error: (data.error as string) || `Failed to get options (${optionsRes.status})`,
       };
     }
-    const options = await optionsRes.json();
+    const webauthnOptions = await optionsRes.json();
 
-    const credential = await startRegistration({ optionsJSON: options });
+    const credential = await startRegistration({ optionsJSON: webauthnOptions });
     if (!credential) {
       return { ok: false, error: 'Registration was cancelled.' };
     }
@@ -39,7 +44,10 @@ export async function registerPasskey(): Promise<RegisterPasskeyResult> {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credential),
+      body: JSON.stringify({
+        ...credential,
+        ...(options?.friendlyName ? { friendly_name: options.friendlyName } : {}),
+      }),
     });
     if (!verifyRes.ok) {
       const data = await verifyRes.json().catch(() => ({}));

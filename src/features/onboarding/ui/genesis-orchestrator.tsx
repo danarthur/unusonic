@@ -6,8 +6,10 @@ import { LivingLogo, type LivingLogoStatus } from '@/shared/ui/branding/living-l
 import { OnboardingChatInput } from './onboarding-chat-input';
 import { GhostClaimCard } from './ghost-claim-card';
 import { GenesisCreateCard } from './genesis-create-card';
+import { PersonaInlinePicker } from './persona-inline-picker';
 import { checkNexusAvailability } from '@/features/onboarding/api/actions';
 import type { NexusResult, OnboardingGenesisContext } from '@/features/onboarding/model/types';
+import type { UserPersona } from '@/features/onboarding/model/subscription-types';
 import { STAGE_MEDIUM, M3_EASING_ENTER } from '@/shared/lib/motion-constants';
 
 function nameToSlug(raw: string): string {
@@ -27,12 +29,15 @@ interface GenesisOrchestratorProps {
   contentOnly?: boolean;
   /** Called when logo status changes (for parent to control LivingLogo when contentOnly) */
   onLogoStatusChange?: (status: LivingLogoStatus) => void;
+  /** Called when persona changes (for parent to update onboardingContext). */
+  onPersonaChange?: (persona: UserPersona) => void;
 }
 
 export function GenesisOrchestrator({
   onboardingContext,
   contentOnly = false,
   onLogoStatusChange,
+  onPersonaChange,
 }: GenesisOrchestratorProps) {
   const isEmbedded = !!onboardingContext;
   const scoutName = onboardingContext?.scoutData?.name?.trim() ?? '';
@@ -157,12 +162,19 @@ export function GenesisOrchestrator({
         </div>
       )}
 
+      {/* Inline persona picker when website scout was skipped */}
+      {onboardingContext && !onboardingContext.scoutData && showCreateForm && (
+        <PersonaInlinePicker
+          value={onboardingContext.persona}
+          onChange={(persona) => onPersonaChange?.(persona)}
+        />
+      )}
+
       {/* Cards */}
       <AnimatePresence mode="wait">
         {result?.type === 'GHOST' && !showCreateForm && (
           <GhostClaimCard key="ghost" data={result.data} />
         )}
-
 
         {showCreateForm && slug.length >= 2 && (
           <GenesisCreateCard

@@ -21,7 +21,7 @@ import { decodeJwtExp } from '@/shared/lib/auth/decode-jwt-exp';
  */
 
 /** Minimum idle gap (ms) before an interaction triggers a session check. */
-const INTERACTION_CHECK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+const INTERACTION_CHECK_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
 
 /** If the access token expires within this buffer, proactively refresh. */
 const REFRESH_BUFFER_S = 60; // 1 minute

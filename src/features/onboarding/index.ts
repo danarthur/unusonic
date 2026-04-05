@@ -3,10 +3,8 @@
  * @module features/onboarding
  */
 
-export { PersonaStep } from './ui/PersonaStep';
 export { AionOnboardingShell } from './ui/aion-onboarding-shell';
 export { OnboardingChatInput } from './ui/onboarding-chat-input';
-export { TierStep } from './ui/TierStep';
 export { GenesisOrchestrator } from './ui/genesis-orchestrator';
 export { WebsiteStep } from './ui/website-step';
 export type { ScoutOnboardingPayload } from './ui/website-step';

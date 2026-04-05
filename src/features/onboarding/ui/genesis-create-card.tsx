@@ -46,9 +46,10 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
   const [state, submitAction, isPending] = useActionState(
     async (_prev: { ok: boolean; error?: string } | null, formData: FormData) => {
       if (onboardingContext) {
+        const persona = (formData.get('persona') as UserPersona) || onboardingContext.persona;
         const result = await initializeOrganization({
           name: (formData.get('name') as string)?.trim() ?? '',
-          type: PERSONA_TO_ORG_TYPE[onboardingContext.persona],
+          type: PERSONA_TO_ORG_TYPE[persona],
           subscriptionTier: GENESIS_TO_SUBSCRIPTION[(formData.get('tier') as GenesisTierId) ?? 'scout'],
         });
         if (result.success) return { ok: true };
@@ -103,6 +104,9 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
 
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="tier" value={tier} />
+        {onboardingContext && (
+          <input type="hidden" name="persona" value={onboardingContext.persona} />
+        )}
 
         {state?.ok === false && state?.error && (
           <p className="text-sm text-unusonic-error -mt-2">{state.error}</p>
