@@ -97,11 +97,11 @@ export function SignInCard({
     setPasskeyFallbackHint(null);
   }, []);
 
-  const { handleEmailFocus, handleEmailBlur } = useConditionalMediation({
-    enabled: !isPending,
-    redirectTo,
-    onError: handlePasskeyError,
-  });
+  // Conditional mediation disabled — browser-native autocomplete="webauthn" causes
+  // repeated passkey dialogs on focus in some browsers (especially incognito).
+  // Users sign in via the explicit "Continue" button instead.
+  const handleEmailFocus = useCallback(() => {}, []);
+  const handleEmailBlur = useCallback(() => {}, []);
 
   const handleContinueWithPasskey = useCallback(() => {
     const trimmed = email.trim().toLowerCase();
@@ -221,7 +221,7 @@ export function SignInCard({
                 id="email"
                 name="email"
                 type="email"
-                autoComplete="username webauthn"
+                autoComplete="username"
                 aria-label="Email address"
                 required={showPasswordForm}
                 disabled={isPending}
