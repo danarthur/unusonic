@@ -14,6 +14,8 @@ import {
   type PasskeyRow,
 } from '@/features/auth/passkey-management/api/actions';
 import { guessDeviceName } from '@/features/auth/passkey-management/lib/guess-device-name';
+import type { TeamAccessMember } from '@/features/auth/passkey-management/api/team-access';
+import { Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 const sectionSpring = { type: 'spring' as const, stiffness: 200, damping: 20 };
 
@@ -22,11 +24,25 @@ type PendingRecovery = { id: string; timelock_until: string } | null;
 interface SecuritySectionProps {
   hasRecoveryKit?: boolean;
   pendingRecoveryRequest?: PendingRecovery;
+  teamAccess?: TeamAccessMember[] | null;
+}
+
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return 'Never';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 365) return `${Math.floor(days / 30)} months ago`;
+  return 'Over a year ago';
 }
 
 export function SecuritySection({
   hasRecoveryKit = false,
   pendingRecoveryRequest = null,
+  teamAccess,
 }: SecuritySectionProps) {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeyMessage, setPasskeyMessage] = useState<string | null>(null);
@@ -388,6 +404,99 @@ export function SecuritySection({
           </p>
         )}
       </motion.section>
+
+      {/* Team access — owner/admin only */}
+      {teamAccess && teamAccess.length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...sectionSpring, delay: 0.35 }}
+          className="stage-panel p-6"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <Users className="w-5 h-5 text-[var(--stage-accent)]" strokeWidth={1.5} />
+              <h2 className="text-base font-medium text-[var(--stage-text-primary)]">Team access</h2>
+            </div>
+            <span className="text-xs text-[var(--stage-text-secondary)]">
+              {teamAccess.length} {teamAccess.length === 1 ? 'member' : 'members'}
+            </span>
+          </div>
+          <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mb-5">
+            Security posture for your workspace. Members at risk may get locked out if they lose their device.
+          </p>
+
+          <div className="space-y-2">
+            {teamAccess.map((member) => (
+              <div
+                key={member.userId}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--stage-surface-nested)] border border-[var(--stage-border)]"
+              >
+                {/* Avatar */}
+                <div className="w-8 h-8 rounded-lg bg-[oklch(1_0_0_/_0.08)] flex items-center justify-center shrink-0 overflow-hidden">
+                  {member.avatarUrl ? (
+                    <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-medium text-[var(--stage-text-secondary)]">
+                      {(member.fullName ?? member.email)?.[0]?.toUpperCase() ?? '?'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Name + email */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
+                    {member.fullName ?? member.email}
+                  </p>
+                  {member.fullName && (
+                    <p className="text-xs text-[var(--stage-text-secondary)] truncate">{member.email}</p>
+                  )}
+                </div>
+
+                {/* Passkey count */}
+                <div className="flex items-center gap-1 shrink-0" title={`${member.passkeyCount} passkey${member.passkeyCount !== 1 ? 's' : ''}`}>
+                  <KeyRound className="w-3.5 h-3.5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
+                  <span className={`text-xs font-medium ${
+                    member.passkeyCount === 0
+                      ? 'text-[var(--color-unusonic-error)]'
+                      : member.passkeyCount === 1
+                        ? 'text-[var(--color-unusonic-warning)]'
+                        : 'text-[var(--color-unusonic-success)]'
+                  }`}>
+                    {member.passkeyCount}
+                  </span>
+                </div>
+
+                {/* Recovery kit */}
+                <div className="shrink-0" title={member.hasRecoveryKit ? 'Recovery kit set up' : 'No recovery kit'}>
+                  {member.hasRecoveryKit ? (
+                    <CheckCircle2 className="w-4 h-4 text-[var(--color-unusonic-success)]" strokeWidth={1.5} />
+                  ) : (
+                    <Shield className="w-4 h-4 text-[var(--stage-text-secondary)]/40" strokeWidth={1.5} />
+                  )}
+                </div>
+
+                {/* Last active */}
+                <span className="text-xs text-[var(--stage-text-secondary)] shrink-0 w-20 text-right" title={member.lastSignInAt ? new Date(member.lastSignInAt).toLocaleString() : 'Never signed in'}>
+                  {formatRelativeTime(member.lastSignInAt)}
+                </span>
+
+                {/* Risk badge */}
+                {member.risk && (
+                  <span className={`flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
+                    member.risk === 'high'
+                      ? 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]'
+                      : 'bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]'
+                  }`}>
+                    <AlertTriangle className="w-3 h-3" strokeWidth={2} />
+                    {member.risk === 'high' ? 'At risk' : 'Setup needed'}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.section>
+      )}
     </div>
   );
 }
