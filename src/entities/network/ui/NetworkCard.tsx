@@ -78,10 +78,10 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
         <button
           type="button"
           onClick={handleTogglePreferred}
-          className={`absolute top-2.5 left-2.5 z-10 rounded p-1 transition-all duration-150 ${
+          className={`absolute top-2.5 left-2.5 z-10 rounded p-1 transition-colors duration-[80ms] ${
             isPreferred
-              ? 'text-[var(--stage-accent)]'
-              : 'text-[var(--stage-text-secondary)]/30 hover:text-[var(--stage-accent)]/70'
+              ? 'text-[var(--stage-text-primary)]'
+              : 'text-[var(--stage-text-secondary)]/30 hover:text-[var(--stage-text-primary)]/70'
           }`}
           title={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
           aria-label={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
@@ -89,12 +89,13 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
         >
           <Star
             size={13}
-            className={isPreferred ? 'fill-[var(--stage-accent)]' : ''}
+            strokeWidth={1.5}
+            className={isPreferred ? 'fill-[var(--stage-text-primary)]' : ''}
           />
         </button>
       ) : isPartner && isPreferred ? (
-        <span className="absolute top-2.5 left-2.5 text-[var(--stage-accent)]" aria-label="Preferred partner">
-          <Star size={13} className="fill-[var(--stage-accent)]" />
+        <span className="absolute top-2.5 left-2.5 text-[var(--stage-text-primary)]" aria-label="Preferred partner">
+          <Star size={13} className="fill-[var(--stage-text-primary)]" />
         </span>
       ) : null}
       {isCore && node.meta.doNotRebook && (
@@ -141,7 +142,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
               <p className="text-xs text-[var(--stage-text-secondary)]">
                 {node.identity.label}
                 {node.kind === 'extended_team' && (
-                  <span className="ml-1.5 text-[var(--color-unusonic-warning)]/70">· 1099</span>
+                  <span className="ml-1.5 text-[var(--stage-text-secondary)]">· 1099</span>
                 )}
               </p>
             )}
@@ -171,7 +172,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
                 {node.meta.capabilities!.slice(0, 2).map((cap) => (
                   <span
                     key={cap}
-                    className="rounded bg-[var(--stage-accent)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                    className="rounded bg-[oklch(1_0_0/0.08)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                   >
                     {cap}
                   </span>
@@ -191,12 +192,12 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
               </p>
             )}
             {(node.meta.referral_count ?? 0) > 0 && (
-              <p className="mt-1 text-[10px] font-medium text-[var(--color-unusonic-warning)]/70">
+              <p className="mt-1 text-[10px] font-medium text-[var(--stage-text-secondary)]">
                 {node.meta.referral_count} referral{node.meta.referral_count! > 1 ? 's' : ''}
               </p>
             )}
             {!(node.meta.outstanding_balance ?? 0) && !(node.meta.referral_count ?? 0) && node.meta.connectedSince && (
-              <p className="mt-1 text-[10px] text-[var(--stage-text-secondary)]/50 tabular-nums">
+              <p className="mt-1 text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
                 since {formatSince(node.meta.connectedSince)}
               </p>
             )}
@@ -206,7 +207,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
           className={cn(
             'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
             isPartner
-              ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]'
+              ? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
               : 'bg-[var(--stage-text-primary)]/10 text-[var(--stage-text-secondary)]'
           )}
         >
@@ -226,7 +227,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
       onClick={onClick}
       onKeyDown={handleCardKeyDown}
       className={cn(
-        'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left transition-[border-color,box-shadow] duration-75 cursor-pointer',
+        'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left transition-[border-color,box-shadow] duration-[80ms] cursor-pointer',
         'text-[var(--stage-text-primary)]',
         isArchived && 'opacity-40',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',

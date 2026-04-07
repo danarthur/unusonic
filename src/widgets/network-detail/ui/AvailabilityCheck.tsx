@@ -1,55 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { getEntityCrewSchedule, type CrewScheduleEntry } from '@/features/ops/actions/get-entity-crew-schedule';
+import { checkCrewAvailability, type CrewAvailabilityResult } from '@/features/ops/actions/check-crew-availability';
 
 interface AvailabilityCheckProps {
   entityId: string;
 }
 
-function isSameDay(dateStr: string, target: string): boolean {
-  return dateStr.slice(0, 10) === target;
-}
-
-function overlapsDate(entry: CrewScheduleEntry, date: string): boolean {
-  if (!entry.starts_at) return false;
-
-  // If no ends_at, treat it as a single-day event
-  if (!entry.ends_at) return isSameDay(entry.starts_at, date);
-
-  const startDay = entry.starts_at.slice(0, 10);
-  const endDay = entry.ends_at.slice(0, 10);
-
-  return date >= startDay && date <= endDay;
-}
-
-type CheckResult =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'available' }
-  | { status: 'booked'; conflict: CrewScheduleEntry };
-
 export function AvailabilityCheck({ entityId }: AvailabilityCheckProps) {
   const [selectedDate, setSelectedDate] = React.useState('');
-  const [result, setResult] = React.useState<CheckResult>({ status: 'idle' });
-  const scheduleRef = React.useRef<CrewScheduleEntry[] | null>(null);
+  const [result, setResult] = React.useState<
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | CrewAvailabilityResult
+  >({ status: 'idle' });
+  const cacheRef = React.useRef<Map<string, CrewAvailabilityResult>>(new Map());
   const [, startTransition] = React.useTransition();
-
-  const checkDate = React.useCallback(
-    (date: string, schedule: CrewScheduleEntry[]) => {
-      if (!date) {
-        setResult({ status: 'idle' });
-        return;
-      }
-      const conflict = schedule.find((entry) => overlapsDate(entry, date));
-      if (conflict) {
-        setResult({ status: 'booked', conflict });
-      } else {
-        setResult({ status: 'available' });
-      }
-    },
-    []
-  );
 
   const handleDateChange = React.useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,30 +27,51 @@ export function AvailabilityCheck({ entityId }: AvailabilityCheckProps) {
         return;
       }
 
-      // If we already have the schedule cached, check locally
-      if (scheduleRef.current) {
-        checkDate(date, scheduleRef.current);
+      // Check cache first
+      const cached = cacheRef.current.get(date);
+      if (cached) {
+        setResult(cached);
         return;
       }
 
-      // Fetch schedule then check
+      // Fetch via unified availability action
       setResult({ status: 'loading' });
       startTransition(() => {
-        getEntityCrewSchedule(entityId).then((schedule) => {
-          scheduleRef.current = schedule;
-          checkDate(date, schedule);
+        checkCrewAvailability(entityId, date).then((res) => {
+          cacheRef.current.set(date, res);
+          setResult(res);
         });
       });
     },
-    [entityId, checkDate]
+    [entityId],
   );
 
   // Reset cache when entityId changes
   React.useEffect(() => {
-    scheduleRef.current = null;
+    cacheRef.current = new Map();
     setSelectedDate('');
     setResult({ status: 'idle' });
   }, [entityId]);
+
+  const statusLabel =
+    result.status === 'available'
+      ? 'Available'
+      : result.status === 'held'
+        ? 'Held'
+        : result.status === 'booked'
+          ? 'Booked'
+          : result.status === 'blackout'
+            ? 'Blackout'
+            : null;
+
+  const statusStyle =
+    result.status === 'available'
+      ? 'bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]'
+      : result.status === 'held'
+        ? 'bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]'
+        : result.status === 'booked' || result.status === 'blackout'
+          ? 'bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-secondary)]'
+          : '';
 
   return (
     <div className="space-y-1.5">
@@ -97,26 +84,24 @@ export function AvailabilityCheck({ entityId }: AvailabilityCheckProps) {
           aria-label="Check availability date"
         />
         {result.status === 'loading' && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-tertiary)] animate-pulse">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] animate-pulse">
             Checking…
           </span>
         )}
-        {result.status === 'available' && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]">
-            Available
-          </span>
-        )}
-        {result.status === 'booked' && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-tertiary)]">
-            Booked
+        {statusLabel && (
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusStyle}`}>
+            {statusLabel}
           </span>
         )}
       </div>
-      {result.status === 'booked' && (
-        <p className="text-xs text-[var(--stage-text-secondary)]">
-          {result.conflict.event_title ?? 'Untitled event'}
-          {result.conflict.role ? ` · ${result.conflict.role}` : ''}
-        </p>
+      {result.status !== 'idle' && result.status !== 'loading' && result.conflicts && result.conflicts.length > 0 && (
+        <div className="space-y-0.5">
+          {result.conflicts.map((conflict, i) => (
+            <p key={i} className="text-xs text-[var(--stage-text-secondary)]">
+              {conflict.label}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   );

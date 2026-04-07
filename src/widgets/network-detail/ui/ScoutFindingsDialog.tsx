@@ -63,7 +63,7 @@ export function ScoutFindingsDialog({
       <>
         <motion.div
           role="presentation"
-          className="fixed inset-0 z-50 bg-[oklch(0.12_0_0/0.5)]"
+          className="fixed inset-0 z-50 bg-[oklch(0.06_0_0/0.75)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -76,9 +76,9 @@ export function ScoutFindingsDialog({
           role="dialog"
           aria-modal="true"
           aria-labelledby="aion-findings-title"
-          initial={{ scale: 0.96, y: 8 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.96, y: 8 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
           transition={STAGE_HEAVY}
           className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-[420px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] shadow-2xl"
           data-surface="raised"
@@ -92,7 +92,7 @@ export function ScoutFindingsDialog({
           className="flex max-h-[90vh] flex-col"
         >
           <div className="shrink-0 px-5 pt-5 pb-3">
-            <h2 id="aion-findings-title" className="text-sm font-medium uppercase tracking-widest text-[var(--stage-accent)]">
+            <h2 id="aion-findings-title" className="text-sm font-medium uppercase tracking-widest text-[var(--stage-text-primary)]">
               Aion findings
             </h2>
           </div>
@@ -153,7 +153,7 @@ export function ScoutFindingsDialog({
                       {findings.tags.map((t) => (
                         <span
                           key={t}
-                          className="inline-flex rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                          className="inline-flex rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.08)] px-2 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
                         >
                           {t}
                         </span>
@@ -175,7 +175,7 @@ export function ScoutFindingsDialog({
                           {findings.roster.map((m, i) => (
                             <li
                               key={i}
-                              className="flex items-center gap-2 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-1.5 min-w-0"
+                              className="flex items-center gap-2 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-card)] px-2 py-1.5 min-w-0"
                             >
                               {m.avatarUrl ? (
                                 <img
@@ -201,7 +201,7 @@ export function ScoutFindingsDialog({
                         </ul>
                       </div>
                     ) : (
-                      <p className="text-xs text-[var(--stage-text-secondary)]/80 py-1">No team members found on this site.</p>
+                      <p className="text-xs text-[var(--stage-text-secondary)] py-1">No team members found on this site.</p>
                     )}
                   </div>
                 </div>
@@ -211,7 +211,7 @@ export function ScoutFindingsDialog({
             <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center px-5 py-8 text-center">
               <Building2 className="size-10 text-[var(--stage-text-secondary)]/40 mb-3" />
               <p className="text-sm text-[var(--stage-text-secondary)]">No structured data found.</p>
-              <p className="mt-1 text-xs text-[var(--stage-text-secondary)]/70">You can still apply to fill defaults.</p>
+              <p className="mt-1 text-xs text-[var(--stage-text-secondary)]">You can still apply to fill defaults.</p>
             </div>
           )}
 
@@ -229,7 +229,7 @@ export function ScoutFindingsDialog({
               <Button
                 size="sm"
                 onClick={handleConfirm}
-                className="flex-1 gap-2 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
+                className="flex-1 gap-2 bg-[var(--stage-accent)] text-[oklch(0.10_0_0)] border border-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/90"
               >
                 <Check className="size-4" />
                 Apply

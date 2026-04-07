@@ -12,7 +12,7 @@ const formStagger = STAGE_MEDIUM;
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
-import { createGhostWithContact, createConnectionFromScout } from '../api/actions';
+import { createGhostWithContact, createConnectionFromScout } from '../api/ghost-actions';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
@@ -191,14 +191,14 @@ export function GhostForgeSheet({
             Ask Aion to scout a website for details, or add them manually.
           </p>
 
-          <div className="mt-4 flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 p-1">
+          <div className="mt-4 flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] p-1">
             <button
               type="button"
               onClick={() => setMode('scout')}
               className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
+                'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors',
                 mode === 'scout'
-                  ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
+                  ? 'bg-[oklch(1_0_0/0.12)] text-[var(--stage-text-primary)] shadow-sm'
                   : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
               )}
             >
@@ -208,9 +208,9 @@ export function GhostForgeSheet({
               type="button"
               onClick={() => setMode('manual')}
               className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
+                'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors',
                 mode === 'manual'
-                  ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
+                  ? 'bg-[oklch(1_0_0/0.12)] text-[var(--stage-text-primary)] shadow-sm'
                   : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
               )}
             >
@@ -222,7 +222,7 @@ export function GhostForgeSheet({
         <SheetBody className="flex-1 space-y-6 px-6 pt-6 overflow-y-auto">
           {mode === 'scout' && (
             <motion.section
-              className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[var(--stage-surface-nested)] p-5 space-y-4"
+              className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[var(--ctx-well)] p-5 space-y-4"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={formStagger}
@@ -251,12 +251,12 @@ export function GhostForgeSheet({
           {mode === 'manual' && (
             <>
               {/* Type toggle */}
-              <div className="flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 p-1">
+              <div className="flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] p-1">
                 <button
                   type="button"
                   onClick={() => setType('organization')}
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
+                    'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors',
                     type === 'organization'
                       ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
                       : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
@@ -269,7 +269,7 @@ export function GhostForgeSheet({
                   type="button"
                   onClick={() => setType('person')}
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all',
+                    'flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-colors',
                     type === 'person'
                       ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] shadow-sm'
                       : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
@@ -518,7 +518,7 @@ export function GhostForgeSheet({
         </SheetBody>
 
         {mode === 'manual' && (
-          <div className="shrink-0 border-t border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/20 px-6 py-5">
+          <div className="shrink-0 border-t border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)] px-6 py-5">
             <Button
               className="h-12 w-full rounded-xl bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/30"
               onClick={handleSubmit}

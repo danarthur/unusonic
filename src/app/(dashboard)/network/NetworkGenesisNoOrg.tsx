@@ -25,13 +25,13 @@ export function NetworkGenesisNoOrg() {
   return (
     <div className="flex flex-1 flex-col min-h-0 gap-6 p-6">
       <header className="shrink-0">
-        <h1 className="text-2xl font-light tracking-tight text-[var(--stage-text-primary)]">
+        <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">
           Network
         </h1>
         <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
           Your team and partners.
         </p>
-        <p className="mt-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-accent)]/90" role="status">
+        <p className="mt-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]" role="status">
           No organization linked. Create one to begin.
         </p>
       </header>

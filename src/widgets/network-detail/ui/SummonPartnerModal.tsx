@@ -82,7 +82,7 @@ export function SummonPartnerModal({
         >
           <motion.div
             role="presentation"
-            className="absolute inset-0 bg-[oklch(0.12_0_0/0.6)]"
+            className="absolute inset-0 bg-[oklch(0.06_0_0/0.75)]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -95,9 +95,9 @@ export function SummonPartnerModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="summon-modal-title"
-            initial={{ scale: 0.98, y: -10 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.98, y: -10 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
             transition={STAGE_HEAVY}
             className="relative z-10 w-full max-w-md rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-2xl"
             data-surface="raised"
@@ -142,7 +142,7 @@ export function SummonPartnerModal({
               />
             </div>
             {status === 'error' && message && (
-              <p className="text-sm text-[var(--color-unusonic-error)]">{message}</p>
+              <p role="alert" className="text-sm text-[var(--color-unusonic-error)]">{message}</p>
             )}
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={handleClose} className="flex-1">

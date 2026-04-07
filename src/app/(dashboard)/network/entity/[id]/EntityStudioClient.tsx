@@ -15,9 +15,6 @@ import {
   ChevronDown,
   RotateCcw,
   Trash2,
-  Calendar,
-  Briefcase,
-  Receipt,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -30,779 +27,23 @@ import {
   addScoutRosterToGhostOrg,
   softDeleteGhostRelationship,
 } from '@/features/network-data';
-import { updateIndividualEntity } from '@/app/(dashboard)/(features)/crm/actions/update-individual-entity';
-import { updateCoupleEntity } from '@/app/(dashboard)/(features)/crm/actions/update-couple-entity';
-import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/crm/actions/reclassify-client-entity';
-import type { IndividualAttrs, CoupleAttrs, PersonAttrs } from '@/shared/lib/entity-attrs';
+import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
 import { EmployeeEntityForm } from './EmployeeEntityForm';
 import { FreelancerEntityForm } from './FreelancerEntityForm';
+import { PersonEntityForm } from './PersonEntityForm';
+import { CoupleEntityForm } from './CoupleEntityForm';
+import { AccordionSection, AssignmentsPanel, DealsPanel, FinancePanel } from './entity-studio-panels';
+import { VenueSpecsEditor } from './VenueSpecsEditor';
+import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
 import { ColorTuner } from '@/features/org-identity';
 import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
-import {
-  getEntityDeals,
-  getEntityFinancialSummary,
-  updateVenueTechnicalSpecs,
-  type EntityDeal,
-  type EntityInvoiceSummary,
-  type VenueTechSpecs,
-} from '@/features/network-data/api/entity-context-actions';
-import { getEntityCrewSchedule, getEntityCrewHistory, type CrewScheduleEntry } from '@/features/ops/actions/get-entity-crew-schedule';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 
 const LABEL = 'text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest';
-
-function AccordionSection({
-  label,
-  icon: Icon,
-  defaultOpen = false,
-  children,
-}: {
-  label: string;
-  icon: React.ElementType;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(defaultOpen);
-  return (
-    <div className="stage-panel rounded-2xl overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0_/_0.05)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-      >
-        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-          <Icon className="size-3.5" />
-          {label}
-        </span>
-        <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ─── Context panels (assignments, deals, finance) ─────────────────────────────
-
-function AssignmentRow({ entry, muted = false }: { entry: CrewScheduleEntry; muted?: boolean }) {
-  return (
-    <li className="flex items-start gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2.5">
-      <div className="min-w-0 flex-1">
-        <p className={cn('text-sm font-medium truncate', muted ? 'text-[var(--stage-text-secondary)]' : 'text-[var(--stage-text-primary)]')}>
-          {entry.event_title ?? 'Untitled event'}
-        </p>
-        <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
-          {entry.role}
-          {entry.starts_at ? ` · ${new Date(entry.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
-          {entry.venue_name ? ` · ${entry.venue_name}` : ''}
-        </p>
-      </div>
-      <span className={cn(
-        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
-        muted
-          ? 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)]/60'
-          : entry.status === 'confirmed'
-            ? 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]'
-            : entry.status === 'dispatched'
-              ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]'
-              : 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-      )}>
-        {entry.status}
-      </span>
-    </li>
-  );
-}
-
-function AssignmentsPanel({ entityId }: { entityId: string }) {
-  const [upcoming, setUpcoming] = React.useState<CrewScheduleEntry[] | null>(null);
-  const [history, setHistory] = React.useState<CrewScheduleEntry[] | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [showPast, setShowPast] = React.useState(false);
-
-  React.useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      getEntityCrewSchedule(entityId),
-      getEntityCrewHistory(entityId),
-    ]).then(([upcomingData, historyData]) => {
-      setUpcoming(upcomingData);
-      setHistory(historyData);
-      setLoading(false);
-    });
-  }, [entityId]);
-
-  if (loading) return (
-    <AccordionSection label="Assignments" icon={Calendar}>
-      <div className="space-y-2">
-        <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
-        <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
-      </div>
-    </AccordionSection>
-  );
-  if ((!upcoming || upcoming.length === 0) && (!history || history.length === 0)) return null;
-
-  return (
-    <AccordionSection label="Assignments" icon={Calendar}>
-      <div className="space-y-4">
-        {upcoming && upcoming.length > 0 && (
-          <div>
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-              Upcoming
-            </p>
-            <ul className="space-y-2">
-              {upcoming.map((entry) => (
-                <AssignmentRow key={entry.assignment_id} entry={entry} />
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {history && history.length > 0 && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowPast((p) => !p)}
-              className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
-            >
-              <ChevronDown className={cn('size-3 transition-transform', showPast && 'rotate-180')} />
-              {showPast ? 'Hide history' : `Show history (${history.length})`}
-            </button>
-            {showPast && (
-              <ul className="space-y-2">
-                {history.map((entry) => (
-                  <AssignmentRow key={entry.assignment_id} entry={entry} muted />
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-    </AccordionSection>
-  );
-}
-
-function DealsPanel({ entityId }: { entityId: string }) {
-  const [data, setData] = React.useState<EntityDeal[] | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    setLoading(true);
-    getEntityDeals(entityId).then((d) => { setData(d); setLoading(false); });
-  }, [entityId]);
-
-  if (loading) return (
-    <AccordionSection label="Related deals" icon={Briefcase}>
-      <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
-    </AccordionSection>
-  );
-  if (!data || data.length === 0) return null;
-
-  return (
-    <AccordionSection label="Related deals" icon={Briefcase}>
-      <ul className="space-y-2">
-        {data.map((deal) => (
-          <li key={deal.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--stage-text-primary)] capitalize">
-                {deal.event_archetype?.replace(/_/g, ' ') ?? 'Deal'}
-              </p>
-              <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
-                {new Date(deal.proposed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                {deal.budget_estimated ? ` · $${deal.budget_estimated.toLocaleString()}` : ''}
-              </p>
-            </div>
-            <span className={cn(
-              'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
-              deal.status === 'confirmed' && 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]',
-              deal.status === 'signed' && 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]',
-              deal.status === 'prospect' && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-              !['confirmed','signed','prospect'].includes(deal.status) && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-            )}>
-              {deal.status}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </AccordionSection>
-  );
-}
-
-function FinancePanel({ entityId }: { entityId: string }) {
-  const [data, setData] = React.useState<EntityInvoiceSummary[] | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    setLoading(true);
-    getEntityFinancialSummary(entityId).then((d) => { setData(d); setLoading(false); });
-  }, [entityId]);
-
-  if (loading) return (
-    <AccordionSection label="Financial obligations" icon={Receipt}>
-      <div className="h-8 rounded-lg bg-[oklch(1_0_0_/_0.05)] stage-skeleton" />
-    </AccordionSection>
-  );
-  if (!data || data.length === 0) return null;
-
-  const totalOutstanding = data
-    .filter((inv) => inv.status !== 'paid' && inv.status !== 'void')
-    .reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
-
-  return (
-    <AccordionSection label="Financial obligations" icon={Receipt}>
-      {totalOutstanding > 0 && (
-        <div className="rounded-lg bg-[oklch(0.75_0.15_60)]/10 border border-[oklch(0.75_0.15_60)]/20 px-3 py-2 mb-3">
-          <p className="text-xs text-[var(--stage-text-secondary)]">Outstanding</p>
-          <p className="text-lg font-semibold text-[oklch(0.75_0.15_60)]">
-            ${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-      )}
-      <ul className="space-y-2">
-        {data.map((inv) => (
-          <li key={inv.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--stage-text-primary)]">
-                ${(inv.total_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-              {inv.due_date && (
-                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
-                  Due {new Date(inv.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </p>
-              )}
-            </div>
-            <span className={cn(
-              'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
-              inv.status === 'paid' && 'bg-[oklch(0.65_0.18_145)]/15 text-[oklch(0.65_0.18_145)]',
-              inv.status === 'overdue' && 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]',
-              inv.status === 'sent' && 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]',
-              !['paid','overdue','sent'].includes(inv.status ?? '') && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-            )}>
-              {inv.status ?? 'draft'}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </AccordionSection>
-  );
-}
-
-// ─── Venue technical specs card ───────────────────────────────────────────────
-
-function VenueTechSpecsCard({
-  entityId,
-  initialSpecs,
-}: {
-  entityId: string;
-  initialSpecs: NonNullable<import('@/features/network-data').NodeDetail['orgVenueSpecs']>;
-}) {
-  const [capacity, setCapacity] = React.useState<string>(
-    initialSpecs.capacity != null ? String(initialSpecs.capacity) : ''
-  );
-  const [loadInNotes, setLoadInNotes] = React.useState(initialSpecs.load_in_notes ?? '');
-  const [powerNotes, setPowerNotes] = React.useState(initialSpecs.power_notes ?? '');
-  const [stageNotes, setStageNotes] = React.useState(initialSpecs.stage_notes ?? '');
-  const [saving, startSave] = React.useTransition();
-  const [saveError, setSaveError] = React.useState<string | null>(null);
-
-  function handleSave() {
-    setSaveError(null);
-    startSave(async () => {
-      const specs: VenueTechSpecs = {
-        capacity: capacity !== '' ? Math.max(0, parseInt(capacity, 10)) || null : null,
-        load_in_notes: loadInNotes || null,
-        power_notes: powerNotes || null,
-        stage_notes: stageNotes || null,
-      };
-      const result = await updateVenueTechnicalSpecs(entityId, specs);
-      if (!result.ok) setSaveError(result.error);
-    });
-  }
-
-  return (
-    <div className="rounded-2xl bg-[var(--stage-surface-elevated)] p-5">
-      <h3 className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Technical Specs</h3>
-      <div className="space-y-3">
-        <div>
-          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Capacity</label>
-          <input
-            type="number"
-            value={capacity}
-            onChange={(e) => setCapacity(e.target.value)}
-            className="w-full rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
-            placeholder="e.g. 500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Load-in notes</label>
-          <textarea
-            value={loadInNotes}
-            onChange={(e) => setLoadInNotes(e.target.value)}
-            rows={3}
-            className="w-full resize-none rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
-            placeholder="Dock access, elevator, stairs..."
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Power notes</label>
-          <input
-            type="text"
-            value={powerNotes}
-            onChange={(e) => setPowerNotes(e.target.value)}
-            className="w-full rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
-            placeholder="200A 3-phase, 4× 20A circuits..."
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-[var(--stage-text-secondary)]">Stage dimensions</label>
-          <input
-            type="text"
-            value={stageNotes}
-            onChange={(e) => setStageNotes(e.target.value)}
-            className="w-full rounded-lg bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/40"
-            placeholder="40ft W × 30ft D × 20ft H"
-          />
-        </div>
-      </div>
-      {saveError && (
-        <p className="mt-2 text-xs text-[var(--color-unusonic-error)]">{saveError}</p>
-      )}
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saving}
-        className="mt-4 w-full rounded-xl bg-[var(--stage-accent)]/10 py-2 text-sm font-medium text-[var(--stage-accent)] transition-opacity hover:opacity-80 disabled:opacity-40"
-      >
-        {saving ? 'Saving…' : 'Save specs'}
-      </button>
-    </div>
-  );
-}
-
-// ─── Person entity form ───────────────────────────────────────────────────────
-
-function PersonEntityForm({
-  details,
-  initialAttrs,
-  returnPath,
-}: {
-  details: NodeDetail;
-  initialAttrs: IndividualAttrs;
-  returnPath: string;
-}) {
-  const router = useRouter();
-  const [firstName, setFirstName] = React.useState(initialAttrs.first_name ?? '');
-  const [lastName, setLastName] = React.useState(initialAttrs.last_name ?? '');
-  const [email, setEmail] = React.useState(initialAttrs.email ?? '');
-  const [phone, setPhone] = React.useState(initialAttrs.phone ?? '');
-  const [hasChanges, setHasChanges] = React.useState(false);
-  const [isPending, startTransition] = React.useTransition();
-  const [reclassifyPending, startReclassify] = React.useTransition();
-
-  const entityId = details.subjectEntityId ?? '';
-  const displayName = [firstName, lastName].filter(Boolean).join(' ') || details.identity.name;
-
-  const handleSave = () => {
-    if (!entityId) return;
-    startTransition(async () => {
-      const result = await updateIndividualEntity({
-        entityId,
-        firstName,
-        lastName,
-        email: email || null,
-        phone: phone || null,
-        displayName,
-      });
-      if (result.success) {
-        toast.success('Saved');
-        setHasChanges(false);
-        router.push(returnPath);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  };
-
-  const handleReclassify = (newType: 'couple' | 'company') => {
-    if (!entityId) return;
-    startReclassify(async () => {
-      const result = await reclassifyClientEntity(entityId, newType);
-      if (result.success) {
-        toast.success(`Reclassified to ${newType}`);
-        router.push(returnPath);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)]/80  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" />
-          </Button>
-          <div>
-            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
-              Entity Studio — Individual
-            </p>
-            <h1 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
-              {displayName || 'Individual Client'}
-            </h1>
-          </div>
-        </div>
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="flex items-center gap-3"
-            >
-              <span className="text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
-              <Button
-                onClick={handleSave}
-                disabled={isPending}
-                className="gap-2 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
-              >
-                <Save className="size-4" />
-                Save
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        <section className="stage-panel rounded-2xl p-6 space-y-5">
-          <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
-            Contact details
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={LABEL}>First name</label>
-              <Input
-                value={firstName}
-                onChange={(e) => { setFirstName(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-              />
-            </div>
-            <div>
-              <label className={LABEL}>Last name</label>
-              <Input
-                value={lastName}
-                onChange={(e) => { setLastName(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-              />
-            </div>
-          </div>
-          <div>
-            <label className={LABEL}>Email</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setHasChanges(true); }}
-              placeholder="client@example.com"
-              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-            />
-          </div>
-          <div>
-            <label className={LABEL}>Phone</label>
-            <Input
-              value={phone}
-              onChange={(e) => { setPhone(e.target.value); setHasChanges(true); }}
-              placeholder="+1 (555) 000-0000"
-              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-            />
-          </div>
-        </section>
-
-        {details.subjectEntityId && (
-          <>
-            <DealsPanel entityId={details.subjectEntityId} />
-            <FinancePanel entityId={details.subjectEntityId} />
-          </>
-        )}
-
-        <section className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
-            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest">
-              Reclassify
-            </h3>
-          </div>
-          <div className="px-5 py-4 space-y-3">
-            <p className="text-xs text-[var(--stage-text-secondary)]">
-              Change this client record type. Existing field data from the old type will be cleared.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={reclassifyPending}
-                onClick={() => handleReclassify('couple')}
-                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
-              >
-                Change to Couple
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={reclassifyPending}
-                onClick={() => handleReclassify('company')}
-                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
-              >
-                Change to Company
-              </Button>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-// ─── Couple entity form ───────────────────────────────────────────────────────
-
-function CoupleEntityForm({
-  details,
-  initialAttrs,
-  returnPath,
-}: {
-  details: NodeDetail;
-  initialAttrs: CoupleAttrs;
-  returnPath: string;
-}) {
-  const router = useRouter();
-  const [partnerAFirst, setPartnerAFirst] = React.useState(initialAttrs.partner_a_first_name ?? '');
-  const [partnerALast, setPartnerALast] = React.useState(initialAttrs.partner_a_last_name ?? '');
-  const [partnerAEmail, setPartnerAEmail] = React.useState(initialAttrs.partner_a_email ?? '');
-  const [partnerBFirst, setPartnerBFirst] = React.useState(initialAttrs.partner_b_first_name ?? '');
-  const [partnerBLast, setPartnerBLast] = React.useState(initialAttrs.partner_b_last_name ?? '');
-  const [partnerBEmail, setPartnerBEmail] = React.useState(initialAttrs.partner_b_email ?? '');
-  const [hasChanges, setHasChanges] = React.useState(false);
-  const [isPending, startTransition] = React.useTransition();
-  const [reclassifyPending, startReclassify] = React.useTransition();
-
-  const entityId = details.subjectEntityId ?? '';
-
-  const displayName = React.useMemo(() => {
-    const a = [partnerAFirst, partnerALast].filter(Boolean).join(' ');
-    const b = [partnerBFirst, partnerBLast].filter(Boolean).join(' ');
-    if (a && b) return `${a} & ${b}`;
-    return a || b || details.identity.name;
-  }, [partnerAFirst, partnerALast, partnerBFirst, partnerBLast, details.identity.name]);
-
-  const handleSave = () => {
-    if (!entityId) return;
-    startTransition(async () => {
-      const result = await updateCoupleEntity({
-        entityId,
-        partnerAFirst,
-        partnerALast,
-        partnerAEmail: partnerAEmail || null,
-        partnerBFirst,
-        partnerBLast,
-        partnerBEmail: partnerBEmail || null,
-        displayName,
-      });
-      if (result.success) {
-        toast.success('Saved');
-        setHasChanges(false);
-        router.push(returnPath);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  };
-
-  const handleReclassify = (newType: 'person' | 'company') => {
-    if (!entityId) return;
-    startReclassify(async () => {
-      const result = await reclassifyClientEntity(entityId, newType);
-      if (result.success) {
-        toast.success(`Reclassified to ${newType}`);
-        router.push(returnPath);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)]/80  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" />
-          </Button>
-          <div>
-            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
-              Entity Studio — Couple
-            </p>
-            <h1 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
-              {displayName}
-            </h1>
-          </div>
-        </div>
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="flex items-center gap-3"
-            >
-              <span className="text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
-              <Button
-                onClick={handleSave}
-                disabled={isPending}
-                className="gap-2 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
-              >
-                <Save className="size-4" />
-                Save
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        <section className="stage-panel rounded-2xl p-6 space-y-5">
-          <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
-            Partner A
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={LABEL}>First name</label>
-              <Input
-                value={partnerAFirst}
-                onChange={(e) => { setPartnerAFirst(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-              />
-            </div>
-            <div>
-              <label className={LABEL}>Last name</label>
-              <Input
-                value={partnerALast}
-                onChange={(e) => { setPartnerALast(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-              />
-            </div>
-          </div>
-          <div>
-            <label className={LABEL}>Email</label>
-            <Input
-              type="email"
-              value={partnerAEmail}
-              onChange={(e) => { setPartnerAEmail(e.target.value); setHasChanges(true); }}
-              placeholder="partner@example.com"
-              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-            />
-          </div>
-        </section>
-
-        <section className="stage-panel rounded-2xl p-6 space-y-5">
-          <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
-            Partner B
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={LABEL}>First name</label>
-              <Input
-                value={partnerBFirst}
-                onChange={(e) => { setPartnerBFirst(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-              />
-            </div>
-            <div>
-              <label className={LABEL}>Last name</label>
-              <Input
-                value={partnerBLast}
-                onChange={(e) => { setPartnerBLast(e.target.value); setHasChanges(true); }}
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-              />
-            </div>
-          </div>
-          <div>
-            <label className={LABEL}>Email</label>
-            <Input
-              type="email"
-              value={partnerBEmail}
-              onChange={(e) => { setPartnerBEmail(e.target.value); setHasChanges(true); }}
-              placeholder="partner@example.com"
-              className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
-            />
-          </div>
-        </section>
-
-        {details.subjectEntityId && (
-          <>
-            <DealsPanel entityId={details.subjectEntityId} />
-            <FinancePanel entityId={details.subjectEntityId} />
-          </>
-        )}
-
-        <section className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
-            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest">
-              Reclassify
-            </h3>
-          </div>
-          <div className="px-5 py-4 space-y-3">
-            <p className="text-xs text-[var(--stage-text-secondary)]">
-              Change this client record type. Existing field data from the old type will be cleared.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={reclassifyPending}
-                onClick={() => handleReclassify('person')}
-                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
-              >
-                Change to Individual
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={reclassifyPending}
-                onClick={() => handleReclassify('company')}
-                className="border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
-              >
-                Change to Company
-              </Button>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface EntityStudioClientProps {
   details: NodeDetail;
@@ -814,13 +55,17 @@ interface EntityStudioClientProps {
   initialCoupleAttrs?: CoupleAttrs | null;
   /** Present when kind === 'internal_employee'. Parsed as PersonAttrs from directory.entities.attributes. */
   initialEmployeeAttrs?: PersonAttrs | null;
+  /** Present when entityDirectoryType === 'venue'. Full parsed venue attributes. */
+  initialVenueAttrs?: VenueAttrs | null;
+  /** Resolved workspace ID for document operations. */
+  workspaceId?: string | null;
 }
 
 /**
  * Route dispatcher — renders one of three form components based on entity type.
  * Hooks must not be called here; each sub-component manages its own hook lifecycle.
  */
-export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs, initialEmployeeAttrs }: EntityStudioClientProps) {
+export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs, initialEmployeeAttrs, initialVenueAttrs, workspaceId }: EntityStudioClientProps) {
   const dirType = details.entityDirectoryType;
 
   if (details.kind === 'internal_employee' || details.kind === 'extended_team') {
@@ -830,6 +75,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
         sourceOrgId={sourceOrgId}
         initialAttrs={initialEmployeeAttrs ?? null}
         returnPath={returnPath ?? '/network'}
+        workspaceId={workspaceId ?? undefined}
       />
     );
   }
@@ -841,6 +87,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
         sourceOrgId={sourceOrgId}
         initialAttrs={initialEmployeeAttrs ?? null}
         returnPath={returnPath ?? '/network'}
+        workspaceId={workspaceId ?? undefined}
       />
     );
   }
@@ -851,6 +98,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
         details={details}
         initialAttrs={initialPersonAttrs ?? { first_name: '', last_name: '', email: undefined, phone: undefined, category: undefined }}
         returnPath={returnPath}
+        workspaceId={workspaceId ?? undefined}
       />
     );
   }
@@ -860,13 +108,14 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
         details={details}
         initialAttrs={initialCoupleAttrs ?? { partner_a_first_name: '', partner_a_last_name: '', partner_a_email: undefined, partner_b_first_name: '', partner_b_last_name: '', partner_b_email: undefined, category: undefined }}
         returnPath={returnPath}
+        workspaceId={workspaceId ?? undefined}
       />
     );
   }
-  return <CompanyEntityForm details={details} sourceOrgId={sourceOrgId} returnPath={returnPath} />;
+  return <CompanyEntityForm details={details} sourceOrgId={sourceOrgId} returnPath={returnPath} workspaceId={workspaceId ?? undefined} initialVenueAttrs={initialVenueAttrs ?? undefined} />;
 }
 
-function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { details: NodeDetail; sourceOrgId: string; returnPath: string }) {
+function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', workspaceId, initialVenueAttrs }: { details: NodeDetail; sourceOrgId: string; returnPath: string; workspaceId?: string; initialVenueAttrs?: VenueAttrs }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [hasChanges, setHasChanges] = React.useState(false);
@@ -879,7 +128,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
 
   const [name, setName] = React.useState(details.identity.name ?? '');
   const [website, setWebsite] = React.useState(details.orgWebsite ?? '');
-  const [brandColor, setBrandColor] = React.useState(details.orgBrandColor ?? '#1a1a1a');
+  const [brandColor, setBrandColor] = React.useState(details.orgBrandColor ?? 'oklch(0.12 0 0)');
   const [logoUrl, setLogoUrl] = React.useState(details.orgLogoUrl ?? '');
   const [doingBusinessAs, setDoingBusinessAs] = React.useState((ops.doing_business_as as string) ?? '');
   const [entityType, setEntityType] = React.useState<string>((ops.entity_type as string) ?? 'organization');
@@ -908,7 +157,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
   const resetToEmpty = React.useCallback(() => {
     setName('');
     setWebsite('');
-    setBrandColor('#1a1a1a');
+    setBrandColor('oklch(0.12 0 0)');
     setLogoUrl('');
     setDoingBusinessAs('');
     setEntityType('organization');
@@ -1116,16 +365,16 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
 
   return (
     <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)]/80  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-[var(--stage-void)]  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
             <ArrowLeft className="size-5" />
           </Button>
           <div>
             <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
-              Entity Studio
+              Profile
             </p>
-            <h1 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
+            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
               {name || 'Untitled Entity'}
             </h1>
           </div>
@@ -1156,7 +405,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
         {/* Column A: Identity (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
           <section className="stage-panel rounded-2xl p-6 space-y-6">
-            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
+            <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
               Core Identity
             </h3>
             <div className="flex items-center gap-4">
@@ -1181,7 +430,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                     />
                   </>
                 ) : (
-                  <span className="text-2xl font-light text-[var(--stage-text-secondary)]">
+                  <span className="text-2xl font-medium text-[var(--stage-text-secondary)]">
                     {(name?.[0] ?? '?').toUpperCase()}
                   </span>
                 )}
@@ -1192,7 +441,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   <Input
                     value={name}
                     onChange={(e) => { setName(e.target.value); markChanged(); }}
-                    className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                    className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
                   />
                 </div>
                 <div>
@@ -1201,7 +450,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                     value={logoUrl}
                     onChange={(e) => { setLogoUrl(e.target.value); markChanged(); }}
                     placeholder="https://..."
-                    className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
+                    className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
                   />
                 </div>
               </div>
@@ -1212,7 +461,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 value={doingBusinessAs}
                 onChange={(e) => { setDoingBusinessAs(e.target.value); markChanged(); }}
                 placeholder="e.g. NV Productions LLC"
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
             <div>
@@ -1220,7 +469,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               <select
                 value={entityType}
                 onChange={(e) => { setEntityType(e.target.value); markChanged(); }}
-                className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]"
               >
                 <option value="organization">Organization</option>
                 <option value="single_operator">Single operator</option>
@@ -1233,7 +482,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
         {/* Column B: Intelligence + Classification (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
           <section className="stage-panel rounded-2xl p-6 space-y-6">
-            <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
+            <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
               Digital Intelligence
             </h3>
             <AionScoutInput
@@ -1248,7 +497,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   value={supportEmail}
                   onChange={(e) => { setSupportEmail(e.target.value); markChanged(); }}
                   placeholder="booking@example.com"
-                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
                 />
               </div>
               <div>
@@ -1257,7 +506,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   value={phone}
                   onChange={(e) => { setPhone(e.target.value); markChanged(); }}
                   placeholder="Main office line"
-                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
                 />
               </div>
             </div>
@@ -1267,7 +516,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.street}
                   onChange={(e) => { setAddress((a) => ({ ...a, street: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
+                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -1275,7 +524,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.city}
                   onChange={(e) => { setAddress((a) => ({ ...a, city: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
+                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -1283,7 +532,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.state}
                   onChange={(e) => { setAddress((a) => ({ ...a, state: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
+                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
               <div>
@@ -1291,7 +540,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <Input
                   value={address.postal_code}
                   onChange={(e) => { setAddress((a) => ({ ...a, postal_code: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
+                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
                 />
               </div>
             </div>
@@ -1300,7 +549,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               <Input
                 value={address.country}
                 onChange={(e) => { setAddress((a) => ({ ...a, country: e.target.value })); markChanged(); }}
-                className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] text-xs"
+                className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
               />
             </div>
           </section>
@@ -1312,7 +561,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <select
                   value={relType}
                   onChange={(e) => { setRelType(e.target.value as 'vendor' | 'partner' | 'client'); markChanged(); }}
-                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]"
                 >
                   <option value="vendor">Vendor</option>
                   <option value="client">Client</option>
@@ -1324,7 +573,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 <select
                   value={lifecycle}
                   onChange={(e) => { setLifecycle(e.target.value as 'prospect' | 'active' | 'dormant' | 'blacklisted'); markChanged(); }}
-                  className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]"
                 >
                   <option value="prospect">Prospect</option>
                   <option value="active">Active</option>
@@ -1338,7 +587,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   <Input
                     value={blacklistReason}
                     onChange={(e) => { setBlacklistReason(e.target.value); markChanged(); }}
-                    className="mt-1 bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+                    className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
                   />
                 </div>
               )}
@@ -1348,14 +597,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                   {localTags.map((t) => (
                     <span
                       key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] px-2 py-0.5 text-xs"
+                      className="inline-flex items-center gap-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)] px-2 py-0.5 text-xs"
                     >
                       {t}
                       <button type="button" onClick={() => { setLocalTags(localTags.filter((x) => x !== t)); markChanged(); }}>×</button>
                     </span>
                   ))}
                   <div className="flex gap-1">
-                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-[oklch(1_0_0_/_0.05)]" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
+                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-[var(--ctx-well)]" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
                     <Button type="button" variant="ghost" size="sm" onClick={addTag}>Add</Button>
                   </div>
                 </div>
@@ -1368,11 +617,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               <div className="space-y-4">
                 <div>
                   <label className={LABEL}>Tax ID</label>
-                  <Input value={taxId} onChange={(e) => { setTaxId(e.target.value); markChanged(); }} className="mt-1 bg-[oklch(1_0_0_/_0.05)]" />
+                  <Input value={taxId} onChange={(e) => { setTaxId(e.target.value); markChanged(); }} className="mt-1 bg-[var(--ctx-well)]" />
                 </div>
                 <div>
                   <label className={LABEL}>Currency</label>
-                  <select value={defaultCurrency} onChange={(e) => { setDefaultCurrency(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]">
+                  <select value={defaultCurrency} onChange={(e) => { setDefaultCurrency(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]">
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
                     <option value="GBP">GBP</option>
@@ -1380,7 +629,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 </div>
                 <div>
                   <label className={LABEL}>Payment terms</label>
-                  <select value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]">
+                  <select value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]">
                     <option value="">—</option>
                     <option value="immediate">Immediate</option>
                     <option value="net_15">Net 15</option>
@@ -1397,14 +646,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
               value={notes}
               onChange={(e) => { setNotes(e.target.value); markChanged(); }}
               placeholder="Internal notes about this partner…"
-              className="min-h-[100px] resize-y bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
+              className="min-h-[100px] resize-y bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
               rows={4}
             />
           </AccordionSection>
 
           <section className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] overflow-hidden">
             <div className="px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
-              <h3 className="text-xs font-bold text-[var(--stage-text-secondary)] uppercase tracking-widest">
+              <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
                 Danger zone
               </h3>
             </div>
@@ -1414,7 +663,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
                 variant="outline"
                 size="sm"
                 onClick={() => setResetConfirmOpen(true)}
-                className="gap-2 border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
+                className="gap-2 border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well)]"
               >
                 <RotateCcw className="size-4" />
                 Reset all fields
@@ -1451,10 +700,18 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network' }: { 
             </>
           )}
 
-          {details.entityDirectoryType === 'venue' && details.subjectEntityId && details.orgVenueSpecs && (
-            <VenueTechSpecsCard
+          {details.entityDirectoryType === 'venue' && details.subjectEntityId && initialVenueAttrs && (
+            <VenueSpecsEditor
               entityId={details.subjectEntityId}
-              initialSpecs={details.orgVenueSpecs}
+              initialAttributes={initialVenueAttrs}
+            />
+          )}
+
+          {details.subjectEntityId && workspaceId && (
+            <EntityDocumentsCard
+              entityId={details.subjectEntityId}
+              entityType={(details.entityDirectoryType as 'person' | 'company' | 'venue') ?? 'company'}
+              workspaceId={workspaceId}
             />
           )}
         </div>
@@ -1548,7 +805,7 @@ function RosterSection({
     <div className="space-y-3">
       <ul className="space-y-2">
         {crew.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2">
+          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2">
             <div className="size-10 rounded-full bg-[var(--stage-surface-raised)] flex items-center justify-center overflow-hidden">
               {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" /> : <span className="text-sm text-[var(--stage-text-secondary)]">{(m.name?.[0] ?? '?').toUpperCase()}</span>}
             </div>
@@ -1570,15 +827,15 @@ function RosterSection({
           Add contact
         </Button>
       ) : (
-        <div ref={addRef} className="rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] p-4 space-y-3">
+        <div ref={addRef} className="rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_firstName" placeholder="First name" className="bg-[oklch(1_0_0_/_0.05)]" />
-            <Input name="ac_lastName" placeholder="Last name" className="bg-[oklch(1_0_0_/_0.05)]" />
+            <Input name="ac_firstName" placeholder="First name" className="bg-[var(--ctx-well)]" />
+            <Input name="ac_lastName" placeholder="Last name" className="bg-[var(--ctx-well)]" />
           </div>
-          <Input name="ac_email" type="email" placeholder="Email" className="bg-[oklch(1_0_0_/_0.05)]" />
+          <Input name="ac_email" type="email" placeholder="Email" className="bg-[var(--ctx-well)]" />
           <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_role" placeholder="Role" className="bg-[oklch(1_0_0_/_0.05)]" />
-            <Input name="ac_jobTitle" placeholder="Job title" className="bg-[oklch(1_0_0_/_0.05)]" />
+            <Input name="ac_role" placeholder="Role" className="bg-[var(--ctx-well)]" />
+            <Input name="ac_jobTitle" placeholder="Job title" className="bg-[var(--ctx-well)]" />
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={handleAdd} disabled={saving} className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]">

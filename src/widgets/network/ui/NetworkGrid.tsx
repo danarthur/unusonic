@@ -7,6 +7,7 @@ import { NetworkCard } from './NetworkCard';
 import { EntitySheet } from './EntitySheet';
 import { OrgDashboardSheet } from '@/widgets/org-dashboard';
 import { MemberDetailSheet } from '@/features/talent-management';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import type { NetworkGraph, NetworkOrganization, NetworkEntity } from '@/features/network/model/types';
 import type { NetworkBadgeKind } from '@/features/network/model/types';
 
@@ -49,7 +50,7 @@ export function NetworkGrid({ graph, orgBadges = {} }: NetworkGridProps) {
 
   if (!graph) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)]/30 p-8">
+      <div className="flex min-h-[320px] items-center justify-center rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] p-8">
         <p className="text-sm text-[var(--stage-text-secondary)]">
           No network data. Ensure you belong to an organization.
         </p>
@@ -61,7 +62,7 @@ export function NetworkGrid({ graph, orgBadges = {} }: NetworkGridProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[minmax(140px,auto)]">
+      <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[minmax(140px,auto)]">
         {organizations.map((org) => (
           <motion.div
             key={org.id}
@@ -74,9 +75,8 @@ export function NetworkGrid({ graph, orgBadges = {} }: NetworkGridProps) {
                 openSheet({ type: 'org', data: org });
               }
             }}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            initial={false}
+            transition={STAGE_MEDIUM}
             className="cursor-pointer"
           >
             <NetworkCard
@@ -89,9 +89,8 @@ export function NetworkGrid({ graph, orgBadges = {} }: NetworkGridProps) {
         {entities.map((entity) => (
           <motion.div
             key={entity.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            initial={false}
+            transition={STAGE_MEDIUM}
           >
             <NetworkCard
               item={{

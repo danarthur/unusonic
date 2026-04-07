@@ -50,21 +50,9 @@ const badgeLabel: Record<NetworkBadgeKind, string> = {
   coordinator: 'Coordinator',
 };
 
-/** Badge variant classes (Unusonic tokens: --color-unusonic-* and --stage-accent). */
+/** Badge variant classes — achromatic only, no semantic color misuse. */
 function getBadgeVariant(category: NetworkBadgeKind | null | undefined): string {
-  if (!category) return 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]';
-  switch (category) {
-    case 'coordinator':
-      return 'bg-[var(--color-unusonic-info)]/15 text-[var(--color-unusonic-info)]';
-    case 'venue':
-      return 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]';
-    case 'vendor':
-      return 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]';
-    case 'client':
-      return 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)]';
-    default:
-      return 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]';
-  }
+  return 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]';
 }
 
 export function NetworkCard({ item, badge, onClick, className }: NetworkCardProps) {
@@ -145,10 +133,10 @@ export function NetworkCard({ item, badge, onClick, className }: NetworkCardProp
       type="button"
       onClick={onClick}
       className={cn(
-        'stage-panel-interactive flex w-full flex-col rounded-[var(--stage-radius-panel)] p-4 text-left transition-all duration-300',
+        'stage-panel-interactive flex w-full flex-col rounded-[var(--stage-radius-panel)] p-4 text-left transition-colors duration-75',
         isGhost
-          ? 'bg-[oklch(1_0_0_/_0.10)] border border-[oklch(1_0_0_/_0.08)]'
-          : 'bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0_/_0.08)]',
+          ? 'opacity-[0.45] border border-[oklch(1_0_0_/_0.08)]'
+          : 'border border-[oklch(1_0_0_/_0.08)]',
         'hover:border-[oklch(1_0_0_/_0.12)]',
         className
       )}

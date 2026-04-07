@@ -16,6 +16,7 @@ import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { Textarea } from '@/shared/ui/textarea';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { updatePrivateNotes } from '@/features/network/api/actions';
 import { MemberDetailSheet } from '@/features/talent-management';
 import type { NetworkOrganization, NetworkEntity } from '@/features/network/model/types';
@@ -91,7 +92,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
   const tabs: { id: TabId; label: string }[] = isOrg
     ? [
         { id: 'profile', label: 'Profile' },
-        { id: 'private_notes', label: 'Private Notes' },
+        { id: 'private_notes', label: 'Private notes' },
         { id: 'roster', label: 'Roster' },
       ]
     : [{ id: 'profile', label: 'Profile' }];
@@ -157,7 +158,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
 
               {tab === 'private_notes' && isOrg && org && (
                 <div className="space-y-4">
-                  <p className="rounded-lg bg-[var(--color-surface-warning)]/30 px-3 py-2 text-xs font-medium text-[var(--stage-text-primary)]">
+                  <p className="rounded-lg border-l-[3px] border-[oklch(1_0_0/0.12)] bg-[var(--stage-surface)] px-3 py-2 text-xs font-medium text-[var(--stage-text-primary)]">
                     Internal only — visible to your organization.
                   </p>
                   <form
@@ -180,7 +181,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                         name="private_notes"
                         defaultValue={org.private_notes ?? ''}
                         placeholder="Internal notes about this org…"
-                        className="min-h-[120px] resize-y bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+                        className="min-h-[120px] resize-y bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
                         rows={4}
                       />
                     </div>
@@ -193,7 +194,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                         <select
                           name="internal_rating"
                           defaultValue={org.internal_rating ?? ''}
-                          className="rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-2 py-1 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                          className="rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-1 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                           onChange={(e) => {
                             const v = e.target.value ? Number(e.target.value) : null;
                             setOptimisticRating(v);
@@ -209,7 +210,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                       </div>
                     </div>
                     {notesState?.error && (
-                      <p className="text-xs text-[var(--color-unusonic-error)]">{notesState.error}</p>
+                      <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{notesState.error}</p>
                     )}
                     <Button type="submit" variant="default" size="sm">
                       Save
@@ -225,10 +226,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                   animate="visible"
                   variants={{
                     hidden: { opacity: 0 },
-                    visible: {
-                      opacity: 1,
-                      transition: { staggerChildren: 0.05, delayChildren: 0.02 },
-                    },
+                    visible: { opacity: 1 },
                   }}
                 >
                   {(org.roster ?? []).map((person) => {
@@ -239,7 +237,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                         key={person.id}
                         variants={{
                           hidden: { opacity: 0, y: 6 },
-                          visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } },
+                          visible: { opacity: 1, y: 0, transition: STAGE_MEDIUM },
                         }}
                         role={hasMemberId ? 'button' : undefined}
                         tabIndex={hasMemberId ? 0 : undefined}
@@ -263,8 +261,8 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                             : undefined
                         }
                         className={cn(
-                          'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)]/50 px-4 py-3',
-                          hasMemberId && 'cursor-pointer hover:bg-[var(--stage-surface-raised)]/70 transition-colors'
+                          'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-card)] px-4 py-3',
+                          hasMemberId && 'cursor-pointer overflow-hidden transition-colors'
                         )}
                       >
                         <div className="min-w-0 flex-1">

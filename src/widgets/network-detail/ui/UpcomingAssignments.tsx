@@ -18,7 +18,7 @@ function formatShortDate(iso: string | null): string {
 
 function StatusBadge({ status }: { status: CrewScheduleEntry['status'] }) {
   const styles: Record<CrewScheduleEntry['status'], string> = {
-    requested: 'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-tertiary)]',
+    requested: 'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)]',
     confirmed: 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]',
     dispatched: 'bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]',
   };
@@ -79,7 +79,7 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
             Upcoming
           </h3>
           {!loading && count > 0 && (
-            <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-tertiary)] tabular-nums">
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] tabular-nums">
               {count}
             </span>
           )}
@@ -88,7 +88,7 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
           animate={{ rotate: expanded ? 0 : -90 }}
           transition={STAGE_MEDIUM}
         >
-          <ChevronDown className="size-4 text-[var(--stage-text-tertiary)]" />
+          <ChevronDown className="size-4 text-[var(--stage-text-secondary)]" />
         </motion.span>
       </button>
 
@@ -113,19 +113,19 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
               )}
 
               {!loading && count === 0 && (
-                <div className="flex items-center gap-2 py-3 text-xs text-[var(--stage-text-tertiary)]">
+                <div className="flex items-center gap-2 py-3 text-xs text-[var(--stage-text-secondary)]">
                   <Calendar className="size-3.5" />
                   No upcoming assignments
                 </div>
               )}
 
               {!loading && count > 0 && (
-                <div className="divide-y divide-[var(--stage-edge-top)]">
+                <div className="divide-y divide-[var(--stage-edge-subtle)]">
                   {visible.map((entry) => (
                     <div key={entry.assignment_id} className="flex items-center justify-between py-2 first:pt-0">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-[var(--stage-text-primary)] truncate">
-                          {entry.event_title ?? 'Untitled event'}
+                          {entry.event_title ?? 'Untitled show'}
                         </p>
                         <p className="text-xs text-[var(--stage-text-secondary)]">
                           {entry.role}

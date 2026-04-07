@@ -89,7 +89,7 @@ export function IdentityHeader({
             className={cn(
               'relative size-14 shrink-0 flex items-center justify-center overflow-hidden',
               isPersonOrCouple ? 'rounded-full' : 'rounded-[var(--stage-radius-nested)]',
-              'border border-[var(--stage-edge-top)] bg-[var(--stage-surface-raised)]'
+              'border border-[var(--stage-edge-top)] bg-[var(--stage-surface-elevated)]'
             )}
           >
             {avatarUrl ? (
@@ -101,7 +101,7 @@ export function IdentityHeader({
             ) : details.entityDirectoryType === 'venue' ? (
               <MapPin className="size-6 text-[var(--stage-text-secondary)]" />
             ) : (
-              <span className="text-2xl font-light text-[var(--stage-text-secondary)]">{initial}</span>
+              <span className="text-2xl font-medium text-[var(--stage-text-secondary)]">{initial}</span>
             )}
           </motion.div>
           <div className="min-w-0 flex-1 space-y-1">
@@ -115,7 +115,7 @@ export function IdentityHeader({
                       : 'border-[var(--color-unusonic-success)]/40 bg-[var(--color-unusonic-success)]/10 text-[var(--color-unusonic-success)]'
                   )}
                 >
-                  {isGhost ? <FileEdit className="size-2.5" /> : <ShieldCheck className="size-2.5" />}
+                  {isGhost ? <FileEdit className="size-3" strokeWidth={1.5} /> : <ShieldCheck className="size-2.5" strokeWidth={1.5} />}
                   {isGhost ? 'Internal' : 'Verified'}
                 </span>
               )}

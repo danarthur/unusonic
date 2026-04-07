@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { updateEmployeeEntityAttrs } from '@/features/talent-management/api/update-employee-entity';
 import { updateEntityAvatar } from '@/features/talent-management/api/update-entity-avatar';
 import {
@@ -43,6 +44,7 @@ import { AvatarUpload } from '@/features/team-invite/ui/AvatarUpload';
 import { deployInvites } from '@/features/team-invite/api/actions';
 import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
+import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
 import type { CrewSkillDTO, SkillLevel } from '@/entities/talent';
 import { coiStatus } from '@/shared/lib/crew-profile';
 
@@ -62,7 +64,6 @@ const FALLBACK_SKILL_PRESETS = [
 
 // ─── Spring constant ───────────────────────────────────────────────────────────
 
-const SPRING = { type: 'spring', stiffness: 300, damping: 30 } as const;
 
 // ─── Label constant ────────────────────────────────────────────────────────────
 
@@ -87,8 +88,8 @@ function AccordionSection({
       <motion.button
         type="button"
         onClick={() => setOpen(!open)}
-        transition={SPRING}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0_/_0.04)] transition-[background-color,filter] duration-150 hover:brightness-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+        transition={STAGE_MEDIUM}
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0/0.05)] transition-colors duration-[80ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
       >
         <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           <Icon className="size-3.5" />
@@ -96,7 +97,7 @@ function AccordionSection({
         </span>
         <motion.div
           animate={{ rotate: open ? 180 : 0 }}
-          transition={SPRING}
+          transition={STAGE_MEDIUM}
         >
           <ChevronDown className="size-4 text-[var(--stage-text-secondary)]" />
         </motion.div>
@@ -107,7 +108,7 @@ function AccordionSection({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={SPRING}
+            transition={STAGE_MEDIUM}
             className="overflow-hidden"
           >
             <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">
@@ -140,15 +141,15 @@ function TogglePill({
       ? 'bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)] border-[var(--color-unusonic-warning)]/30'
       : 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)] border-[var(--color-unusonic-success)]/30';
   const inactiveClass =
-    'bg-[oklch(1_0_0_/_0.10)]/20 text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.08)]/20';
+    'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.08)]/20';
 
   return (
     <motion.button
       type="button"
       onClick={onToggle}
-      transition={SPRING}
+      transition={STAGE_MEDIUM}
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-[filter] hover:brightness-[1.04] active:brightness-[0.98]',
+        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[oklch(1_0_0/0.06)]',
         active ? activeClass : inactiveClass
       )}
     >
@@ -165,6 +166,7 @@ interface EmployeeEntityFormProps {
   sourceOrgId: string;
   initialAttrs: PersonAttrs | null;
   returnPath: string;
+  workspaceId?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -174,6 +176,7 @@ export function EmployeeEntityForm({
   sourceOrgId,
   initialAttrs,
   returnPath,
+  workspaceId,
 }: EmployeeEntityFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = React.useTransition();
@@ -350,7 +353,7 @@ export function EmployeeEntityForm({
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={SPRING}
+          transition={STAGE_MEDIUM}
           className="stage-panel rounded-2xl p-8 max-w-sm text-center space-y-4"
         >
           <div className="flex size-12 items-center justify-center rounded-full bg-[oklch(1_0_0_/_0.08)]/10 mx-auto">
@@ -435,7 +438,7 @@ export function EmployeeEntityForm({
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={SPRING}
+              transition={STAGE_MEDIUM}
               className="flex items-center gap-3"
             >
               <span className="hidden sm:block text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
@@ -586,7 +589,7 @@ export function EmployeeEntityForm({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={SPRING}
+                  transition={STAGE_MEDIUM}
                   className="overflow-hidden"
                 >
                   <div className="flex items-center gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)]/50 bg-[var(--stage-surface-raised)] px-3 py-2">
@@ -597,7 +600,7 @@ export function EmployeeEntityForm({
                         const val = e.target.value as SkillLevel;
                         if (val) handleUpdateProficiency(s.id, val);
                       }}
-                      className="rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-2 py-0.5 text-xs text-[var(--stage-text-secondary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-[3px] focus-visible:ring-[var(--stage-accent)]/30 focus:outline-none"
+                      className="rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-0.5 text-xs text-[var(--stage-text-secondary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none"
                     >
                       <option value="">Level</option>
                       {PROFICIENCY_LEVELS.map((l) => (
@@ -607,8 +610,8 @@ export function EmployeeEntityForm({
                     <motion.button
                       type="button"
                       onClick={() => handleRemoveSkill(s.id)}
-                      transition={SPRING}
-                      className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-[color,filter] hover:brightness-[1.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-unusonic-error)] rounded"
+                      transition={STAGE_MEDIUM}
+                      className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors hover:bg-[oklch(1_0_0/0.06)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-unusonic-error)] rounded"
                       aria-label={`Remove ${s.skill_tag}`}
                     >
                       <X className="size-3.5" />
@@ -628,7 +631,7 @@ export function EmployeeEntityForm({
             <select
               value={addSkillTag}
               onChange={(e) => setAddSkillTag(e.target.value)}
-              className="flex-1 rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-3 py-2 text-sm text-[var(--stage-text-primary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-[3px] focus-visible:ring-[var(--stage-accent)]/30 focus:outline-none"
+              className="flex-1 rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2 text-sm text-[var(--stage-text-primary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none"
             >
               <option value="">Add skill…</option>
               {skillPresets
@@ -638,7 +641,7 @@ export function EmployeeEntityForm({
             <select
               value={addSkillLevel}
               onChange={(e) => setAddSkillLevel(e.target.value as SkillLevel | '')}
-              className="rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-2 py-2 text-sm text-[var(--stage-text-secondary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-[3px] focus-visible:ring-[var(--stage-accent)]/30 focus:outline-none"
+              className="rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-2 text-sm text-[var(--stage-text-secondary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none"
             >
               <option value="">Level</option>
               {PROFICIENCY_LEVELS.map((l) => (
@@ -667,7 +670,7 @@ export function EmployeeEntityForm({
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  transition={SPRING}
+                  transition={STAGE_MEDIUM}
                   className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(1_0_0_/_0.08)]/30 bg-[oklch(1_0_0_/_0.10)]/15 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)]"
                 >
                   {cap.capability}
@@ -739,7 +742,7 @@ export function EmployeeEntityForm({
                   initial={{ opacity: 0, y: -4, height: 0 }}
                   animate={{ opacity: 1, y: 0, height: 'auto' }}
                   exit={{ opacity: 0, y: -4, height: 0 }}
-                  transition={SPRING}
+                  transition={STAGE_MEDIUM}
                   className="overflow-hidden"
                 >
                   <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/10 px-3 py-2.5">
@@ -829,7 +832,7 @@ export function EmployeeEntityForm({
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0, opacity: 0 }}
-                      transition={SPRING}
+                      transition={STAGE_MEDIUM}
                       className={cn('size-2 rounded-full flex-shrink-0', dotColor)}
                       aria-label={`COI status: ${status}`}
                     />
@@ -876,6 +879,15 @@ export function EmployeeEntityForm({
             />
           </div>
         </AccordionSection>
+
+        {/* 8 — Documents */}
+        {details.subjectEntityId && workspaceId && (
+          <EntityDocumentsCard
+            entityId={details.subjectEntityId}
+            entityType="person"
+            workspaceId={workspaceId}
+          />
+        )}
 
       </div>
     </div>

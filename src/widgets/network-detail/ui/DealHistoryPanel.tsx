@@ -19,7 +19,7 @@ function formatCurrency(amount: number): string {
 }
 
 function stageBadgeLabel(status: string): string {
-  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return status.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 }
 
 function DealRow({ deal }: { deal: EntityDeal }) {
@@ -88,7 +88,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
         <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-3">
           Deals
         </h3>
-        <div className="divide-y divide-[var(--stage-edge-top)]">
+        <div className="divide-y divide-[var(--stage-edge-subtle)]">
           <SkeletonRow />
           <SkeletonRow />
           <SkeletonRow />
@@ -120,7 +120,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
           <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-1">
             Active deals
           </h3>
-          <div className="divide-y divide-[var(--stage-edge-top)]">
+          <div className="divide-y divide-[var(--stage-edge-subtle)]">
             {visibleActive.map((deal) => (
               <DealRow key={deal.id} deal={deal} />
             ))}
@@ -135,7 +135,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
 
       {/* Past deals — collapsible */}
       {pastDeals.length > 0 && (
-        <div className={activeDeals.length > 0 ? 'mt-3 pt-3 border-t border-[var(--stage-edge-top)]' : ''}>
+        <div className={activeDeals.length > 0 ? 'mt-3 pt-3 border-t border-[var(--stage-edge-subtle)]' : ''}>
           <button
             type="button"
             onClick={() => setPastExpanded((v) => !v)}
@@ -158,7 +158,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
                 transition={STAGE_MEDIUM}
                 className="overflow-hidden"
               >
-                <div className="divide-y divide-[var(--stage-edge-top)] pt-1">
+                <div className="divide-y divide-[var(--stage-edge-subtle)] pt-1">
                   {pastDeals.map((deal) => (
                     <DealRow key={deal.id} deal={deal} />
                   ))}

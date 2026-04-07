@@ -9,14 +9,6 @@ import { addContactToGhostOrg } from '@/features/network-data';
 import { getContactFieldLabel } from '@/shared/lib/contact-field-labels';
 import { STAGE_MEDIUM, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 
-const listVariants = {
-  visible: {},
-};
-
-const itemVariants = {
-  hidden: { y: 8, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { ...STAGE_MEDIUM, opacity: { duration: 0.12, ease: 'easeOut' } } },
-};
 import type { NodeDetailCrewMember } from '@/features/network-data';
 
 interface NodeCrewListProps {
@@ -70,23 +62,15 @@ export function NodeCrewList({
       <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
         Crew
       </h3>
-      <motion.ul
-        className="space-y-3"
-        variants={listVariants}
-        initial="visible"
-        animate="visible"
-      >
+      <ul className="space-y-3">
         {crew.length === 0 && !showForm && (
           <li className="text-sm text-[var(--stage-text-secondary)]">
             No contacts yet.
           </li>
         )}
         {crew.map((m) => (
-          <motion.li
+          <li
             key={m.id}
-            variants={itemVariants}
-            initial="hidden"
-            animate="visible"
             className="flex items-center gap-3 rounded-xl border border-[var(--stage-edge-top)] bg-[var(--stage-surface-elevated)] px-4 py-3"
           >
             <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface)] border border-[var(--stage-edge-top)]">
@@ -104,9 +88,9 @@ export function NodeCrewList({
                 <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{m.role}</p>
               )}
             </div>
-          </motion.li>
+          </li>
         ))}
-      </motion.ul>
+      </ul>
 
       {isEditable && (
         <div className="pt-2">

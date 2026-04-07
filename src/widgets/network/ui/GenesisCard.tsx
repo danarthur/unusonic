@@ -11,6 +11,7 @@ import { ColorTuner } from '@/features/org-identity/ui/ColorTuner';
 import { LogoField } from '@/features/org-identity/ui/LogoField';
 import { Input } from '@/shared/ui/input';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 function slugify(name: string): string {
   return name
@@ -50,7 +51,7 @@ export function GenesisCard() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      transition={STAGE_MEDIUM}
       className="w-full"
     >
       <form action={submitAction} className="flex flex-col gap-8">
@@ -71,7 +72,7 @@ export function GenesisCard() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="h-11 border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 text-base rounded-xl px-4"
+              className="h-11 border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 text-base rounded-xl px-4"
             />
           </div>
           <SlugInput
@@ -108,19 +109,19 @@ export function GenesisCard() {
         <input type="hidden" name="brand_color" value={brandColor ?? ''} />
 
         {state?.ok === false && state?.error && (
-          <p className="text-sm text-unusonic-error -mt-2">{state.error}</p>
+          <p className="text-sm text-[var(--color-unusonic-error)] -mt-2">{state.error}</p>
         )}
 
         <button
           type="submit"
           disabled={isPending || !name.trim()}
           className={cn(
-            'mt-2 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-medium transition-all duration-300',
+            'mt-2 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-medium transition-colors duration-[80ms]',
             'border border-[oklch(1_0_0_/_0.08)] h-12',
             'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]',
             'hover:bg-[var(--stage-accent)]/25 hover:border-[var(--stage-accent)]/40',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
-            'disabled:pointer-events-none disabled:opacity-50',
+            'disabled:pointer-events-none disabled:opacity-[0.45]',
             'shadow-[0_0_0_1px_var(--stage-edge-subtle),inset_0_1px_0_0_var(--stage-edge-top)]'
           )}
         >

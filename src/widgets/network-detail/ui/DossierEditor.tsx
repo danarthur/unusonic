@@ -271,7 +271,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
 
       <form ref={formRef} onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
         {/* ID Card — always visible */}
-        <div className="stage-panel rounded-2xl p-4 space-y-4">
+        <div className="stage-panel rounded-xl p-4 space-y-4">
           <div className="flex items-center gap-4">
             <div
               className="relative size-14 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[oklch(1_0_0_/_0.08)]"
@@ -296,7 +296,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                   />
                 </>
               ) : (
-                <span className="text-2xl font-light text-[var(--stage-text-secondary)]">
+                <span className="text-2xl font-medium text-[var(--stage-text-secondary)]">
                   {((enrichmentPreview?.name ?? details.identity.name)?.[0] ?? '?').toUpperCase()}
                 </span>
               )}
@@ -326,7 +326,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                       <Input
                         value={brandColor}
                         // eslint-disable-next-line stage-engineering/no-raw-colors -- color picker JS default
-                        onChange={(e) => setBrandColor(e.target.value || '#000000')}
+                        onChange={(e) => setBrandColor(e.target.value || 'oklch(0 0 0)')}
                         className="flex-1 stage-input font-mono text-xs"
                       />
                     </div>
@@ -504,7 +504,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 {localTags.map((t) => (
                   <span
                     key={t}
-                    className="inline-flex items-center gap-1 rounded-full bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] px-2 py-0.5 text-xs"
+                    className="inline-flex items-center gap-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)] px-2 py-0.5 text-xs"
                   >
                     {t}
                     <button type="button" onClick={() => removeTag(t)} className="hover:opacity-80" aria-label={`Remove ${t}`}>
@@ -603,7 +603,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           <Button
             type="submit"
             disabled={isPending}
-            className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
+            className="bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)] border-[oklch(1_0_0/0.12)] hover:bg-[oklch(1_0_0/0.14)]"
           >
             {isPending ? 'Saving…' : 'Save'}
           </Button>
@@ -673,7 +673,7 @@ function DossierRosterSection({
             key={m.id}
             className="flex items-center gap-3 rounded-lg stage-panel-nested px-3 py-2"
           >
-            <div className="size-10 shrink-0 rounded-full bg-[var(--stage-surface-raised)] border border-[oklch(1_0_0_/_0.08)] flex items-center justify-center overflow-hidden">
+            <div className="size-10 shrink-0 rounded-full bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0_/_0.08)] flex items-center justify-center overflow-hidden">
               {m.avatarUrl ? (
                 <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" />
               ) : (
@@ -695,7 +695,7 @@ function DossierRosterSection({
               variant="ghost"
               size="sm"
               onClick={() => setEditingMemberId(editingMemberId === m.id ? null : m.id)}
-              className="text-[var(--stage-accent)]"
+              className="text-[var(--stage-text-primary)]"
             >
               Edit
             </Button>
@@ -721,7 +721,7 @@ function DossierRosterSection({
           variant="outline"
           size="sm"
           onClick={() => setShowAddCrew(true)}
-          className="gap-2 border-[var(--stage-accent)]/40 text-[var(--stage-accent)]"
+          className="gap-2 border-[oklch(1_0_0/0.12)] text-[var(--stage-text-primary)]"
         >
           <UserPlus className="size-4" />
           Add contact
@@ -746,9 +746,9 @@ function DossierRosterSection({
             <Input name="addCrew_role" placeholder="Role (e.g. admin)" className="stage-input" />
             <Input name="addCrew_jobTitle" placeholder="Job title" className="stage-input" />
           </div>
-          {error && <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
+          {error && <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
           <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={status === 'loading'} onClick={handleAddCrew} className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]">
+            <Button type="button" size="sm" disabled={status === 'loading'} onClick={handleAddCrew} className="bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]">
               {status === 'loading' ? 'Adding…' : 'Add contact'}
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddCrew(false)}>
@@ -849,7 +849,7 @@ function CrewMemberEditor({
         />
       </div>
       <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={pending} className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]">
+        <Button size="sm" onClick={handleSave} disabled={pending} className="bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]">
           {pending ? 'Saving…' : 'Save'}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>

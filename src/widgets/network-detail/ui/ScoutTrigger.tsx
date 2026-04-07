@@ -7,6 +7,7 @@ import { scoutEntity } from '@/features/intelligence';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { ScoutFindingsDialog } from './ScoutFindingsDialog';
 
 interface ScoutTriggerProps {
@@ -60,29 +61,28 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
       type="button"
       onClick={handleScan}
       disabled={!canScan}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      transition={STAGE_MEDIUM}
       className={cn(
-        'group relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 border transition-[border-color,background-color,filter] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-        canScan && 'hover:brightness-[1.02] active:brightness-[0.98]',
+        'group relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 border transition-colors duration-[80ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
         canScan
-          ? 'border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/5 hover:bg-[var(--stage-accent)]/10 hover:border-[var(--stage-accent)]/60 text-[var(--stage-accent)] cursor-pointer'
+          ? 'border-[oklch(1_0_0/0.10)] bg-[oklch(1_0_0/0.06)] hover:bg-[oklch(1_0_0/0.08)] hover:border-[oklch(1_0_0/0.14)] text-[var(--stage-text-primary)] cursor-pointer'
           : 'border-[oklch(1_0_0_/_0.08)]/50 bg-[oklch(0.20_0_0/0.05)] text-[var(--stage-text-secondary)]/60 cursor-not-allowed',
       )}
     >
       <span
         className={cn(
           'flex shrink-0 items-center justify-center rounded-lg p-1.5',
-          canScan ? 'bg-[var(--stage-accent)]/15' : 'bg-[var(--stage-surface-raised)]',
+          canScan ? 'bg-[oklch(1_0_0/0.10)]' : 'bg-[var(--stage-surface-raised)]',
         )}
       >
         {scanning ? (
-          <Loader2 className={cn('size-4 animate-spin', canScan ? 'text-[var(--stage-accent)]' : 'text-[var(--stage-text-secondary)]')} />
+          <Loader2 className={cn('size-4 animate-spin', canScan ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]')} />
         ) : (
-          <ScanSearch className={cn('size-4', canScan ? 'text-[var(--stage-accent)]' : 'text-[var(--stage-text-secondary)]')} />
+          <ScanSearch className={cn('size-4', canScan ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]')} />
         )}
       </span>
       <div className="flex flex-col items-start min-w-0">
-        <span className="text-[11px] font-semibold uppercase tracking-widest leading-none">
+        <span className="text-[11px] font-medium uppercase tracking-widest leading-none">
           {scanning ? 'Scanning' : 'Aion'}
         </span>
         <span className="text-[10px] text-[var(--stage-text-secondary)] mt-0.5 truncate max-w-[140px]">
@@ -90,7 +90,7 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
         </span>
       </div>
       {canScan && (
-        <Sparkles className="size-3.5 shrink-0 text-[var(--stage-accent)]/60 group-hover:text-[var(--stage-accent)]/90 transition-colors" />
+        <Sparkles className="size-3.5 shrink-0 text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] transition-colors" />
       )}
     </motion.button>
     </div>

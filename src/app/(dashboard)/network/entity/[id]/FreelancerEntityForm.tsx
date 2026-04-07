@@ -9,6 +9,8 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
 import { softDeleteGhostRelationship } from '@/features/network-data';
 import { updatePreferredPerson } from '@/features/network-data/api/update-preferred-person';
 import {
@@ -29,7 +31,6 @@ import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import type { CrewSkillDTO } from '@/entities/talent';
 
-const SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 type SkillLevel = 'junior' | 'mid' | 'senior' | 'lead';
 
@@ -57,18 +58,18 @@ function AccordionSection({
       className="stage-panel rounded-2xl overflow-hidden"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={SPRING}
+      transition={STAGE_MEDIUM}
     >
       <motion.button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0_/_0.05)] transition-[background-color,filter] hover:brightness-[1.01]"
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0/0.05)] transition-[background-color]"
       >
         <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           <Icon className="size-3.5" />
           {label}
         </span>
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={SPRING}>
+        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={STAGE_MEDIUM}>
           <svg className="size-4 text-[var(--stage-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
           </svg>
@@ -80,7 +81,7 @@ function AccordionSection({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={SPRING}
+            transition={STAGE_MEDIUM}
             className="overflow-hidden"
           >
             <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">
@@ -95,16 +96,17 @@ function AccordionSection({
 
 const LABEL = 'text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest';
 const INPUT_BASE =
-  'h-9 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50 focus-visible:border-[var(--stage-accent)] focus-visible:ring-[3px] focus-visible:ring-[var(--stage-accent)]/30 focus:outline-none shadow-xs transition-[color,box-shadow]';
+  'h-9 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50 focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none shadow-xs transition-[color,box-shadow]';
 
 interface FreelancerEntityFormProps {
   details: NodeDetail;
   sourceOrgId: string;
   initialAttrs: PersonAttrs | null;
   returnPath?: string;
+  workspaceId?: string;
 }
 
-export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, returnPath = '/network' }: FreelancerEntityFormProps) {
+export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, returnPath = '/network', workspaceId }: FreelancerEntityFormProps) {
   const router = useRouter();
   const entityId = details.subjectEntityId ?? '';
   const relationshipId = details.id;
@@ -257,12 +259,12 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
           <ArrowLeft className="size-4" />
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-base font-semibold tracking-tight text-[var(--stage-text-primary)] truncate">
+          <h1 className="text-base font-medium tracking-tight text-[var(--stage-text-primary)] truncate">
             {[firstName, lastName].filter(Boolean).join(' ') || details.identity.name}
           </h1>
           <p className="text-xs text-[var(--stage-text-secondary)]">Preferred partner</p>
         </div>
-        <span className="shrink-0 rounded-full border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-accent)]">
+        <span className="shrink-0 rounded-full border border-[oklch(1_0_0/0.12)] bg-[oklch(1_0_0/0.08)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           Preferred
         </span>
       </header>
@@ -338,7 +340,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    transition={SPRING}
+                    transition={STAGE_MEDIUM}
                     className="flex items-center gap-2 overflow-hidden"
                   >
                     <span className="flex-1 truncate text-sm text-[var(--stage-text-primary)]">{skill.skill_tag}</span>
@@ -346,8 +348,8 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                       value={skill.proficiency ?? ''}
                       onChange={(e) => handleUpdateProficiency(skill.id, e.target.value as SkillLevel)}
                       className={cn(
-                        'h-7 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-2 text-xs text-[var(--stage-text-secondary)]',
-                        'focus-visible:border-[var(--stage-accent)] focus-visible:ring-[3px] focus-visible:ring-[var(--stage-accent)]/30 focus:outline-none shadow-xs transition-[color,box-shadow]'
+                        'h-7 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 text-xs text-[var(--stage-text-secondary)]',
+                        'focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus:outline-none shadow-xs transition-[color,box-shadow]'
                       )}
                     >
                       <option value="">Level</option>
@@ -359,7 +361,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                       type="button"
                       onClick={() => handleRemoveSkill(skill.id)}
                       disabled={removingSkillId === skill.id}
-                      className="p-1 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-[color,background-color,filter] enabled:hover:brightness-[1.06] disabled:opacity-40"
+                      className="p-1 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-[color,background-color] disabled:opacity-40"
                       aria-label={`Remove ${skill.skill_tag}`}
                     >
                       {removingSkillId === skill.id
@@ -371,7 +373,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                 ))}
               </AnimatePresence>
               {skills.length === 0 && (
-                <p className="text-xs text-[var(--stage-text-secondary)]/60">No skills yet.</p>
+                <p className="text-xs text-[var(--stage-text-secondary)]">No skills yet.</p>
               )}
             </div>
 
@@ -415,7 +417,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                         toast.error(result.error);
                       }
                     }}
-                    className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-2.5 py-1 text-[11px] text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/40 hover:text-[var(--stage-text-primary)] transition-colors"
+                    className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.08)] px-2.5 py-1 text-[11px] text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0/0.15)] hover:text-[var(--stage-text-primary)] transition-colors"
                   >
                     + {preset}
                   </button>
@@ -423,6 +425,15 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
               </div>
             )}
           </AccordionSection>
+
+          {/* Documents */}
+          {entityId && workspaceId && (
+            <EntityDocumentsCard
+              entityId={entityId}
+              entityType="person"
+              workspaceId={workspaceId}
+            />
+          )}
 
           {/* Business Functions */}
           <AccordionSection label="Business functions" icon={Landmark} defaultOpen>
@@ -434,7 +445,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    transition={SPRING}
+                    transition={STAGE_MEDIUM}
                     className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(1_0_0_/_0.08)]/30 bg-[oklch(1_0_0_/_0.10)]/15 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)]"
                   >
                     {cap.capability}
@@ -460,7 +471,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                       type="button"
                       onClick={() => handleAddCapability(preset)}
                       disabled={capLoading}
-                      className="rounded-full border border-dashed border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-2.5 py-1 text-[11px] text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/40 hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-40"
+                      className="rounded-full border border-dashed border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.06)] px-2.5 py-1 text-[11px] text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0/0.15)] hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-40"
                     >
                       + {preset}
                     </button>
@@ -482,7 +493,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
-              transition={SPRING}
+              transition={STAGE_MEDIUM}
               className="flex items-center gap-2"
             >
               <span className="text-xs text-[var(--stage-text-secondary)]">Remove from preferred?</span>
@@ -510,7 +521,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={SPRING}
+              transition={STAGE_MEDIUM}
             >
               <Button
                 variant="ghost"
@@ -528,7 +539,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
         <Button
           onClick={handleSave}
           disabled={isPending}
-          className="h-9 gap-2 rounded-xl bg-[var(--stage-accent)] px-4 text-sm font-medium text-[var(--stage-text-on-accent)] hover:bg-[var(--stage-accent)]/90 disabled:opacity-50"
+          className="h-9 gap-2 rounded-xl bg-[var(--stage-accent)] px-4 text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90 disabled:opacity-[0.45]"
         >
           {isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
           Save

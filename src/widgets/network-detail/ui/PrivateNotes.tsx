@@ -72,7 +72,7 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
         )}
         <button
           type="submit"
-          className="text-xs font-medium text-[var(--stage-text-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] rounded-sm"
+          className="text-xs font-medium text-[var(--stage-text-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] rounded-sm"
         >
           Save
         </button>

@@ -73,12 +73,11 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
         className={`
           group relative flex h-16 w-full items-stretch
           rounded-xl overflow-hidden
-          transition-all duration-300
+          transition-colors duration-[80ms]
           ${canActivate
             ? 'border border-[var(--stage-accent)]/50 bg-[oklch(1_0_0_/_0.10)]/50 focus-within:border-[var(--stage-accent)]/70'
             : 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-text-primary)]/[0.02]'
           }
-          ${canActivate && isHovered ? 'shadow-[0_0_24px_-6px_var(--stage-accent)]/25' : ''}
         `}
       >
         <input
@@ -93,10 +92,10 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
           disabled={!canActivate || isScanning}
           className={`
             relative z-10 flex min-w-[140px] sm:min-w-[160px] flex-1 items-center justify-center gap-3 pl-8 pr-5
-            transition-colors duration-300
+            transition-colors duration-[80ms]
             ${canActivate && !isScanning
-              ? 'cursor-pointer text-[var(--stage-accent)]'
-              : 'cursor-default text-[var(--stage-text-secondary)]/40 pointer-events-none'
+              ? 'cursor-pointer text-[var(--stage-accent)] hover:bg-[oklch(1_0_0/0.08)] active:bg-[oklch(1_0_0/0.04)]'
+              : 'cursor-default text-[var(--stage-text-secondary)] opacity-[0.45] pointer-events-none'
             }
           `}
           style={
@@ -106,8 +105,6 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
                 }
               : undefined
           }
-          whileHover={canActivate && !isScanning ? { background: 'linear-gradient(to right, transparent 0%, color-mix(in oklch, var(--stage-text-primary) 3%, transparent) 30%, color-mix(in oklch, var(--stage-text-primary) 8%, transparent) 100%)' } : undefined}
-          whileTap={canActivate && !isScanning ? { backgroundColor: 'color-mix(in oklch, var(--stage-text-primary) 8%, transparent)' } : undefined}
           transition={STAGE_LIGHT}
         >
           <motion.div
@@ -131,7 +128,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
           <span
             className={`
               text-xs font-medium uppercase tracking-widest
-              ${isScanning ? 'text-[var(--stage-accent)]' : canActivate ? 'text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-accent)]/90' : 'text-[var(--stage-text-secondary)]/50'}
+              ${isScanning ? 'text-[var(--stage-accent)]' : canActivate ? 'text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-accent)]/90' : 'text-[var(--stage-text-tertiary)]'}
             `}
           >
             {isScanning ? 'Scanning' : status === 'success' ? 'Acquired' : 'Aion'}
@@ -139,7 +136,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
         </motion.button>
         {isScanning && (
           <motion.div
-            className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-[var(--stage-accent)]/12 to-transparent pointer-events-none"
+            className="motion-reduce:hidden absolute inset-0 z-0 bg-gradient-to-r from-transparent via-[var(--stage-accent)]/12 to-transparent pointer-events-none"
             initial={{ x: '-100%' }}
             animate={{ x: '100%' }}
             transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}

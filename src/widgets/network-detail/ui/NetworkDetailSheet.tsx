@@ -189,7 +189,7 @@ function InlineEditField({
         <span className="text-sm text-[var(--stage-text-primary)]">
           {value || <span className="text-[var(--stage-text-secondary)]">—</span>}
         </span>
-        <Pencil className="size-3 opacity-0 transition-opacity duration-[80ms] group-hover:opacity-50 text-[var(--stage-text-secondary)]" />
+        <Pencil className="size-3 opacity-0 transition-opacity duration-[80ms] group-hover:opacity-100 text-[var(--stage-text-secondary)]" />
       </button>
     </div>
   );
@@ -769,7 +769,7 @@ export function NetworkDetailSheet({ details, onClose, sourceOrgId, returnPath }
                   )}
                   {/* Last booked — employees only */}
                   {showEmployeeStrip && details.lastBooked && (
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--stage-text-tertiary)]">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)]">
                       <Clock className="size-3.5" />
                       <span>
                         Last booked: {details.lastBooked.role}

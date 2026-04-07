@@ -34,10 +34,10 @@ function AddMenuItem({ icon: Icon, label, description, onClick, accent }: MenuIt
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[oklch(1_0_0/0.06)]"
+      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.06)]"
     >
       <div
-        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] transition-colors group-hover:border-[oklch(1_0_0/0.15)] group-hover:bg-[oklch(1_0_0/0.08)]"
+        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] group-hover:border-[oklch(1_0_0/0.15)]"
         style={accent ? { color: accent } : undefined}
       >
         <Icon className="size-3.5 text-[var(--stage-text-secondary)] transition-colors group-hover:text-[var(--stage-text-primary)]" style={accent ? { color: accent } : undefined} />
@@ -87,11 +87,9 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
     }
   };
 
-  if (!open) return null;
-
   return (
     <AnimatePresence>
-      <motion.div
+      {open && <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -99,17 +97,17 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
         className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
         onClick={() => onOpenChange(false)}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[oklch(0_0_0/0.5)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[oklch(0.06_0_0/0.75)]" />
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={STAGE_HEAVY}
           onClick={(e) => e.stopPropagation()}
-          className="relative z-10 mx-4 w-full max-w-sm rounded-2xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-[0_24px_64px_-8px_oklch(0_0_0/0.5)]"
+          className="relative z-10 mx-4 w-full max-w-sm rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-[0_24px_64px_-8px_oklch(0_0_0/0.5)]"
           data-surface="raised"
         >
-          <h2 className="mb-1 text-base font-semibold tracking-tight text-[var(--stage-text-primary)]">
+          <h2 className="mb-1 text-base font-medium tracking-tight text-[var(--stage-text-primary)]">
             Add freelancer
           </h2>
           <p className="mb-5 text-xs text-[var(--stage-text-secondary)]">
@@ -142,7 +140,7 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
                 />
               </div>
             </div>
-            <p className="text-[10px] text-[var(--stage-text-secondary)]/60">
+            <p className="text-[10px] text-[var(--stage-text-secondary)]">
               You can add contact details, skills, and job title on their profile page.
             </p>
             <div className="flex gap-2 pt-1">
@@ -157,14 +155,14 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
               <Button
                 type="submit"
                 disabled={pending || !firstName.trim()}
-                className="flex-1 rounded-xl bg-[var(--stage-accent)] text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-[var(--stage-accent)] text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90 disabled:opacity-[0.45]"
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : 'Add'}
               </Button>
             </div>
           </form>
         </motion.div>
-      </motion.div>
+      </motion.div>}
     </AnimatePresence>
   );
 }
@@ -240,7 +238,7 @@ export function NetworkOrbitWithGenesis({
               Your team and partners.
             </p>
             {orgName?.trim() && (
-              <p className="mt-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-accent)]/90" aria-label="Linked organization">
+              <p className="mt-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]" aria-label="Linked organization">
                 {orgName.trim()}
               </p>
             )}
@@ -262,7 +260,7 @@ export function NetworkOrbitWithGenesis({
             <Popover open={menuOpen} onOpenChange={setMenuOpen}>
               <PopoverTrigger asChild>
                 <Button
-                  className="gap-2 rounded-2xl bg-[var(--stage-accent)] px-4 text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90"
+                  className="gap-2 rounded-xl bg-[var(--stage-accent)] px-4 text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90"
                 >
                   <Plus className="size-4" />
                   Add
