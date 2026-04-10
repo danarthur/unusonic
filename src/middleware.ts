@@ -143,15 +143,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // ─── RULE 4: Role-based route enforcement ───
+  // Portal-only users cannot access dashboard routes.
+  // Dashboard users CAN access portal routes (progressive access — additive, never subtractive).
   if (userId && !isPublic && !pathname.startsWith('/api/') && !pathname.startsWith('/onboarding') && !pathname.startsWith('/signout')) {
-    const onPortal = isPortalRoute(pathname);
-    if (isPortalUser && !onPortal) {
+    if (isPortalUser && !isPortalRoute(pathname)) {
       Sentry.logger.info('middleware.portalUserOnDashboard', { pathname });
       return NextResponse.redirect(new URL(PORTAL_HOME, request.url));
-    }
-    if (!isPortalUser && onPortal) {
-      Sentry.logger.info('middleware.dashboardUserOnPortal', { pathname });
-      return NextResponse.redirect(new URL(DASHBOARD_HOME, request.url));
     }
   }
 

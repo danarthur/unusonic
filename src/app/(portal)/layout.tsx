@@ -156,11 +156,8 @@ export default async function PortalLayout({
 
     const ctx = await getPortalContext(supabase, user.id);
 
-    // Dashboard roles (owner/admin/member) should not access the portal
-    const DASHBOARD_ROLES = ['owner', 'admin', 'member'];
-    if (ctx && ctx.roleSlug && DASHBOARD_ROLES.includes(ctx.roleSlug)) {
-      redirect('/');
-    }
+    // Progressive access: dashboard roles (owner/admin/member) CAN access portal routes.
+    // Portal is a focused view, not a restricted zone — promotions should only add access.
 
     if (ctx) {
       workspaceId = ctx.workspaceId;
