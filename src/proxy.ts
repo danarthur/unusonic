@@ -19,7 +19,7 @@ function isDashboardRole(slug: string | null | undefined): boolean {
   return DASHBOARD_ROLES.includes(slug);
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip static files and Next.js internals
