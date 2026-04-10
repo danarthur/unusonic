@@ -9,7 +9,7 @@
 import { useActionState, useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { signInAction } from '../api/actions';
+import { signInAction, sendOtpAction, verifyOtpAction } from '../api/actions';
 import { authenticatePasskey } from '@/features/auth/passkey-authenticate/api/authenticate-passkey';
 import { setTrustedDeviceCookie } from '@/shared/lib/trusted-device';
 import { useConditionalMediation } from '../lib/use-conditional-mediation';
@@ -65,7 +65,13 @@ export function SignInCard({
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [passkeyFallbackHint, setPasskeyFallbackHint] = useState<string | null>(null);
   const [isPasskeyPending, setIsPasskeyPending] = useState(false);
+  const [showOtpForm, setShowOtpForm] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isOtpPending, setIsOtpPending] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus password input when form reveals
   useEffect(() => {
@@ -76,7 +82,7 @@ export function SignInCard({
     }
   }, [showPasswordForm]);
 
-  const isPending = externalPending || isSigningIn || isPasskeyPending;
+  const isPending = externalPending || isSigningIn || isPasskeyPending || isOtpPending;
   const currentState = signInState;
   const signInEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const exitDuration = prefersReducedMotion ? 0.3 : 0.28;
@@ -96,6 +102,33 @@ export function SignInCard({
     setShowPasswordForm(true);
     setPasskeyFallbackHint(null);
   }, []);
+
+  const handleSendOtp = useCallback(async () => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || isOtpPending) return;
+    setIsOtpPending(true);
+    setOtpError(null);
+    const result = await sendOtpAction(trimmed);
+    setIsOtpPending(false);
+    if (result.ok) {
+      setOtpSent(true);
+      setTimeout(() => otpInputRef.current?.focus(), 100);
+    } else {
+      setOtpError(result.error);
+    }
+  }, [email, isOtpPending]);
+
+  const handleVerifyOtp = useCallback(async () => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !otpCode || isOtpPending) return;
+    setIsOtpPending(true);
+    setOtpError(null);
+    const result = await verifyOtpAction(trimmed, otpCode, redirectTo);
+    setIsOtpPending(false);
+    if (!result.ok) {
+      setOtpError(result.error);
+    }
+  }, [email, otpCode, isOtpPending, redirectTo]);
 
   // Conditional mediation disabled — browser-native autocomplete="webauthn" causes
   // repeated passkey dialogs on focus in some browsers (especially incognito).
@@ -193,7 +226,7 @@ export function SignInCard({
               </motion.div>
               <div className="mt-3 mb-5 text-center">
                 <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">Unusonic</p>
-                <p className="text-[11px] text-[var(--stage-text-tertiary)] tracking-widest uppercase mt-1">Sign in to your workspace</p>
+                <p className="stage-label text-[var(--stage-text-tertiary)] mt-1">Sign in to your workspace</p>
               </div>
 
             <motion.div
@@ -234,10 +267,10 @@ export function SignInCard({
                 data-1p-ignore
                 className="w-full h-12 px-4 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)]
                   text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]
-                  focus:outline-none focus:border-[oklch(1_0_0_/_0.12)] focus:ring-2 focus:ring-ring/30
+                  focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.12)] focus-visible:ring-2 focus-visible:ring-ring/30
                   hover:border-[oklch(1_0_0_/_0.12)]
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-all duration-200"
+                  disabled:opacity-45 disabled:cursor-not-allowed
+                  transition-colors duration-[80ms]"
                 placeholder="your@email.com"
               />
 
@@ -285,7 +318,7 @@ export function SignInCard({
                       onClick={handleContinueWithPasskey}
                       disabled={!signInEmailValid || isPending}
                       transition={STAGE_HEAVY}
-                      className="stage-btn stage-btn-primary w-full h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-25 disabled:cursor-not-allowed transition-all duration-200"
+                      className="stage-btn stage-btn-primary w-full h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-45 disabled:cursor-not-allowed transition-colors duration-[80ms]"
                     >
                       {isPasskeyPending ? (
                         <>
@@ -338,7 +371,7 @@ export function SignInCard({
                     <div>
                       <label
                         htmlFor="password"
-                        className="block text-[11px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest mb-2"
+                        className="block stage-label mb-2"
                       >
                         Password
                       </label>
@@ -353,14 +386,14 @@ export function SignInCard({
                           disabled={isPending}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full h-11 px-4 pr-11 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:border-[oklch(1_0_0_/_0.12)] focus:ring-2 focus:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto cursor-text transition-all duration-200"
+                          className="w-full h-11 px-4 pr-11 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.12)] focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-45 disabled:cursor-not-allowed pointer-events-auto cursor-text transition-colors duration-[80ms]"
                           placeholder="Password"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           disabled={isPending}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-45 disabled:cursor-not-allowed transition-colors duration-[80ms]"
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? (
@@ -389,7 +422,7 @@ export function SignInCard({
                     <motion.button
                       type="submit"
                       disabled={isPending}
-                      className="w-full h-12 rounded-xl font-medium text-sm bg-[var(--stage-accent)]/80 text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 transition-all duration-300"
+                      className="w-full h-12 rounded-xl font-medium text-sm bg-[var(--stage-accent)]/80 text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)] disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 transition-colors duration-100"
                     >
                       {isPending ? (
                         <>
@@ -405,19 +438,108 @@ export function SignInCard({
                     </motion.button>
                   </form>
                 </motion.div>
+              ) : showOtpForm ? (
+                <motion.div
+                  key="otp-form"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ ...STAGE_HEAVY, opacity: { duration: 0.2 } }}
+                  className="overflow-hidden pt-2 pb-3 px-1"
+                >
+                  {!otpSent ? (
+                    <div className="space-y-4">
+                      <p className="text-sm text-[var(--stage-text-secondary)] text-center">
+                        We&apos;ll send a 6-digit code to <span className="text-[var(--stage-text-primary)]">{email}</span>
+                      </p>
+                      {otpError && (
+                        <div className="p-3 rounded-xl bg-surface-error border border-unusonic-error/40">
+                          <AuthErrorBlock error={otpError} />
+                        </div>
+                      )}
+                      <motion.button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={isPending || !signInEmailValid}
+                        className="w-full h-12 rounded-xl font-medium text-sm bg-[var(--stage-accent)]/80 text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)] disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 transition-colors duration-100"
+                      >
+                        {isOtpPending ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Sending code...</>
+                        ) : (
+                          'Send sign-in code'
+                        )}
+                      </motion.button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-sm text-[var(--stage-text-secondary)] text-center">
+                        Enter the code sent to <span className="text-[var(--stage-text-primary)]">{email}</span>
+                      </p>
+                      <input
+                        ref={otpInputRef}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        disabled={isPending}
+                        className="w-full h-12 px-4 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] text-center text-lg tracking-[0.3em] font-mono placeholder:text-[var(--stage-text-secondary)] placeholder:tracking-normal placeholder:text-sm placeholder:font-sans focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.12)] focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-45 disabled:cursor-not-allowed transition-colors duration-[80ms]"
+                        placeholder="000000"
+                      />
+                      {otpError && (
+                        <div className="p-3 rounded-xl bg-surface-error border border-unusonic-error/40">
+                          <AuthErrorBlock error={otpError} />
+                        </div>
+                      )}
+                      <motion.button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={isPending || otpCode.length !== 6}
+                        className="w-full h-12 rounded-xl font-medium text-sm bg-[var(--stage-accent)]/80 text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)] disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 transition-colors duration-100"
+                      >
+                        {isOtpPending ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+                        ) : (
+                          <>Verify code <ArrowRight className="w-4 h-4" /></>
+                        )}
+                      </motion.button>
+                      <button
+                        type="button"
+                        onClick={() => { setOtpSent(false); setOtpCode(''); setOtpError(null); }}
+                        disabled={isPending}
+                        className="w-full text-sm text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-45"
+                      >
+                        Resend code
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
               ) : (
-                <motion.button
-                  key="use-password-link"
-                  type="button"
-                  onClick={() => setShowPasswordForm(true)}
-                  disabled={isPending}
-                  className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center"
+                <motion.div
+                  key="sign-in-options"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  className="space-y-2"
                 >
-                  Other sign-in options
-                </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={() => setShowPasswordForm(true)}
+                    disabled={isPending}
+                    className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-45 disabled:cursor-not-allowed text-center"
+                  >
+                    Sign in with password
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={() => setShowOtpForm(true)}
+                    disabled={isPending || !signInEmailValid}
+                    className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-45 disabled:cursor-not-allowed text-center"
+                  >
+                    Send sign-in code to email
+                  </motion.button>
+                </motion.div>
               )}
               </AnimatePresence>
 
@@ -435,7 +557,7 @@ export function SignInCard({
                   type="button"
                   onClick={() => onModeSwitch('signup')}
                   disabled={isPending}
-                  className="text-sm text-[var(--stage-text-tertiary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-sm text-[var(--stage-text-tertiary)] transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
                 >
                   New here?{' '}
                   <span className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors">Create account</span>

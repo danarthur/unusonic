@@ -12,6 +12,7 @@ import { upsertGhostMemberSchema, portalProfileKeySchema, type UpsertGhostMember
 import type { RosterBadgeData, RosterBadgeStatus, RosterMemberDisplay } from '../model/types';
 import type { OrgMemberRole } from '@/entities/organization/model/types';
 import { sendEmployeeInviteEmail } from '@/shared/api/email/send';
+import { instrument } from '@/shared/lib/instrumentation';
 
 export type AcceptEmployeeInviteResult = { ok: true } | { ok: false; error: string };
 export type InviteEmployeeResult = { ok: true; message: string } | { ok: false; error: string };
@@ -44,6 +45,7 @@ function normalizeRosterError(err: { message?: string; code?: string } | null | 
 
 /** Current user's role in the org (for canAssignAdmin: only owner/admin can assign admin). */
 export async function getCurrentUserOrgRole(orgId: string): Promise<OrgMemberRole | null> {
+  return instrument('getCurrentUserOrgRole', async () => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -77,10 +79,12 @@ export async function getCurrentUserOrgRole(orgId: string): Promise<OrgMemberRol
     .maybeSingle();
 
   return ((rel?.context_data as Record<string, unknown>)?.role as OrgMemberRole) ?? null;
+  });
 }
 
 /** List roster for current org with status per member. Captain first in list. */
 export async function getRoster(orgId: string): Promise<{ members: RosterMemberDisplay[]; captainId: string | null }> {
+  return instrument('getRoster', async () => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   let currentEntityId: string | null = null;
@@ -141,6 +145,7 @@ export async function getRoster(orgId: string): Promise<{ members: RosterMemberD
   });
 
   return { members, captainId };
+  });
 }
 
 /** Create or update a ghost member (no email sent). Uses add_ghost_member RPC / cortex.relationships. */
@@ -149,6 +154,7 @@ export async function upsertGhostMember(
   input: UpsertGhostMemberInput,
   existingMemberId?: string | null
 ): Promise<UpsertGhostResult> {
+  return instrument('upsertGhostMember', async () => {
   const parsed = upsertGhostMemberSchema.safeParse(input);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
@@ -339,10 +345,12 @@ export async function upsertGhostMember(
       portal_profile: portal_profile ?? null,
     },
   };
+  });
 }
 
 /** Invite by email only (e.g. TeamAssembler). Resolves current org, creates ghost, returns InviteEmployeeResult. */
 export async function inviteEmployee(email: string): Promise<InviteEmployeeResult> {
+  return instrument('inviteEmployee', async () => {
   const orgId = await getCurrentOrgId();
   if (!orgId) return { ok: false, error: 'No organization selected. Open Network or Settings to pick one.' };
   const trimmed = email.trim();
@@ -357,10 +365,12 @@ export async function inviteEmployee(email: string): Promise<InviteEmployeeResul
   });
   if (result.ok) return { ok: true, message: `Invite added for ${trimmed}.` };
   return { ok: false, error: result.error };
+  });
 }
 
 /** Send invites: create invitation rows and send emails for unsent ghosts. */
 export async function deployInvites(orgId: string, memberIds: string[]): Promise<DeployInvitesResult> {
+  return instrument('deployInvites', async () => {
   if (memberIds.length === 0) return { ok: true, sent: 0 };
 
   const supabase = await createClient();
@@ -505,6 +515,7 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
   }
 
   return { ok: true, sent };
+  });
 }
 
 /**
@@ -516,6 +527,7 @@ export async function deployInvites(orgId: string, memberIds: string[]): Promise
 export async function acceptEmployeeInvite(
   token: string
 ): Promise<AcceptEmployeeInviteResult> {
+  return instrument('acceptEmployeeInvite', async () => {
   if (!token?.trim()) return { ok: false, error: 'Missing token.' };
 
   const supabase = await createClient();
@@ -523,6 +535,7 @@ export async function acceptEmployeeInvite(
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
+  console.log('[acceptEmployeeInvite] auth check:', { userId: user?.id, email: user?.email, error: authError?.message });
   if (authError || !user?.email) {
     return { ok: false, error: 'You must be signed in to accept this invite.' };
   }
@@ -547,34 +560,39 @@ export async function acceptEmployeeInvite(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- system client typed to public; cross-schema access needs cast
   const system = getSystemClient() as any;
 
-  // Find the ghost person entity for this email, scoped to the invitation's org.
+  // Find the person entity for this email, scoped to the invitation's org.
+  // Accepts both unclaimed ghosts AND entities already claimed by the current user
+  // (e.g. when signup partially ran before the user reached this step).
   // Uses limit(1) instead of maybeSingle() to avoid errors if duplicate entities
   // share the same email (e.g. a CLIENT and a ROSTER_MEMBER).
-  const { data: ghostRows } = await system
+  const { data: personRows, error: personErr } = await system
     .schema('directory')
     .from('entities')
-    .select('id, owner_workspace_id')
+    .select('id, owner_workspace_id, claimed_by_user_id')
     .ilike('attributes->>email', user.email)
     .eq('type', 'person')
-    .is('claimed_by_user_id', null)
-    .limit(1) as { data: { id: string; owner_workspace_id: string | null }[] | null };
-  const ghostPerson = ghostRows?.[0] ?? null;
-  if (!ghostPerson) {
+    .or(`claimed_by_user_id.is.null,claimed_by_user_id.eq.${user.id}`)
+    .limit(1) as { data: { id: string; owner_workspace_id: string | null; claimed_by_user_id: string | null }[] | null; error: unknown };
+  console.log('[acceptEmployeeInvite] personRows:', personRows, 'err:', personErr);
+  const personEntity = personRows?.[0] ?? null;
+  if (!personEntity) {
     return { ok: false, error: 'No matching team member found for this email.' };
   }
 
-  // Claim the ghost person entity
-  const { error: claimErr } = await system
-    .schema('directory')
-    .from('entities')
-    .update({ claimed_by_user_id: user.id })
-    .eq('id', ghostPerson.id);
-  if (claimErr) {
-    return { ok: false, error: 'Failed to link your account.' };
+  // Claim the entity if it's still a ghost
+  if (!personEntity.claimed_by_user_id) {
+    const { error: claimErr } = await system
+      .schema('directory')
+      .from('entities')
+      .update({ claimed_by_user_id: user.id })
+      .eq('id', personEntity.id);
+    if (claimErr) {
+      return { ok: false, error: 'Failed to link your account.' };
+    }
   }
 
   // Ensure workspace_members row exists (may already exist if inviteTeamMember was used)
-  const workspaceId = ghostPerson.owner_workspace_id;
+  const workspaceId = personEntity.owner_workspace_id;
   if (workspaceId) {
     const { data: existingMember } = await system
       .from('workspace_members')
@@ -584,23 +602,56 @@ export async function acceptEmployeeInvite(
       .maybeSingle();
 
     if (!existingMember) {
-      // Look up the employee system role
-      const { data: employeeRole } = await system
-        .schema('ops')
-        .from('workspace_roles')
-        .select('id')
-        .eq('slug', 'employee')
-        .is('workspace_id', null)
-        .maybeSingle() as { data: { id: string } | null };
+      // Look up the employee's role from their ROSTER_MEMBER edge, falling back to
+      // a workspace-scoped employee role, then finally a system-level employee role.
+      let roleId: string | null = null;
 
+      // 1. Check ROSTER_MEMBER edge for an assigned role
+      const { data: rosterEdge } = await system
+        .schema('cortex')
+        .from('relationships')
+        .select('context_data')
+        .eq('target_entity_id', personEntity.id)
+        .eq('type', 'ROSTER_MEMBER')
+        .limit(1)
+        .maybeSingle() as { data: { context_data: Record<string, unknown> | null } | null };
+      const edgeRoleId = rosterEdge?.context_data?.role_id as string | undefined;
+      if (edgeRoleId) roleId = edgeRoleId;
+
+      // 2. Fallback: workspace-scoped employee/dj role
+      if (!roleId) {
+        const { data: wsRole } = await system
+          .schema('ops')
+          .from('workspace_roles')
+          .select('id')
+          .eq('workspace_id', workspaceId)
+          .not('slug', 'in', '("owner","admin")')
+          .limit(1)
+          .maybeSingle() as { data: { id: string } | null };
+        if (wsRole) roleId = wsRole.id;
+      }
+
+      // 3. Fallback: system-level employee role
+      if (!roleId) {
+        const { data: sysRole } = await system
+          .schema('ops')
+          .from('workspace_roles')
+          .select('id')
+          .eq('slug', 'employee')
+          .is('workspace_id', null)
+          .maybeSingle() as { data: { id: string } | null };
+        if (sysRole) roleId = sysRole.id;
+      }
+
+      console.log('[acceptEmployeeInvite] inserting workspace_members:', { workspaceId, userId: user.id, roleId });
       const { error: insertErr } = await system.from('workspace_members').insert({
         workspace_id: workspaceId,
         user_id: user.id,
-        role_id: employeeRole?.id ?? null,
-        role: 'member', // legacy fallback
+        role_id: roleId,
+        role: 'member', // legacy column — check constraint only allows owner/admin/member
       });
       if (insertErr) {
-        console.error('[acceptEmployeeInvite] workspace_members insert failed:', insertErr);
+        console.error('[acceptEmployeeInvite] workspace_members insert failed:', JSON.stringify(insertErr));
         return { ok: false, error: 'Failed to join workspace.' };
       }
     }
@@ -619,6 +670,7 @@ export async function acceptEmployeeInvite(
     .eq('id', invitation.id);
 
   return { ok: true };
+  });
 }
 
 /**
@@ -631,6 +683,7 @@ export async function updatePortalProfile(
   memberId: string,
   profileKey: string | null
 ): Promise<UpdatePortalProfileResult> {
+  return instrument('updatePortalProfile', async () => {
   // Validate profile key if provided
   if (profileKey !== null) {
     const parsed = portalProfileKeySchema.safeParse(profileKey);
@@ -666,5 +719,80 @@ export async function updatePortalProfile(
   if (patchErr) return { ok: false, error: normalizeRosterError(patchErr) };
 
   revalidatePath('/settings/team');
+  return { ok: true };
+  });
+}
+
+/**
+ * Resend an expired invite: generates a new token, extends expiry, and sends a fresh email.
+ * Self-service — the invitee can trigger this from the expired claim page.
+ * Rate-limited: rejects if the invitation was updated within the last 5 minutes.
+ */
+export async function resendInviteAction(
+  oldToken: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await getSystemClient();
+
+  // Look up the invitation by token (including expired ones, but not accepted)
+  const { data: invitation, error } = await supabase
+    .from('invitations')
+    .select('id, email, organization_id, status, type, payload, updated_at')
+    .eq('token', oldToken.trim())
+    .maybeSingle();
+
+  if (error || !invitation) {
+    return { ok: false, error: 'Invitation not found.' };
+  }
+
+  if (invitation.status === 'accepted') {
+    return { ok: false, error: 'This invitation has already been accepted.' };
+  }
+
+  // Rate limit: reject if updated within the last 5 minutes
+  if (invitation.updated_at) {
+    const lastUpdate = new Date(invitation.updated_at).getTime();
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    if (lastUpdate > fiveMinutesAgo) {
+      return { ok: false, error: 'A new link was sent recently. Please check your email.' };
+    }
+  }
+
+  // Generate new token and extend expiry
+  const newToken = randomBytes(24).toString('hex');
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  const { error: updateErr } = await supabase
+    .from('invitations')
+    .update({
+      token: newToken,
+      expires_at: expiresAt.toISOString(),
+    })
+    .eq('id', invitation.id);
+
+  if (updateErr) {
+    return { ok: false, error: 'Failed to refresh invitation.' };
+  }
+
+  // Resolve workspace for email sending
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('id, name')
+    .eq('id', invitation.organization_id)
+    .maybeSingle();
+
+  if (workspace) {
+    const payload = (invitation.payload ?? {}) as Record<string, unknown>;
+    await sendEmployeeInviteEmail({
+      to: invitation.email,
+      token: newToken,
+      workspaceId: workspace.id,
+      workspaceName: workspace.name ?? 'your team',
+      inviterName: (payload.inviterName as string) ?? null,
+    }).catch(() => {
+      // Email failure is non-fatal; the new token is still valid
+    });
+  }
+
   return { ok: true };
 }

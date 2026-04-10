@@ -45,6 +45,27 @@ export const signupForPasskeySchema = z.object({
     .min(2, 'Name must be at least 2 characters'),
 });
 
+/** Email OTP: send code to email, then verify the 6-digit code. */
+export const otpEmailSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Please enter a valid email address'),
+});
+
+export const otpVerifySchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Please enter a valid email address'),
+  token: z
+    .string()
+    .min(6, 'Enter the 6-digit code')
+    .max(6, 'Enter the 6-digit code'),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type SignupForPasskeyInput = z.infer<typeof signupForPasskeySchema>;
+export type OtpEmailInput = z.infer<typeof otpEmailSchema>;
+export type OtpVerifyInput = z.infer<typeof otpVerifySchema>;

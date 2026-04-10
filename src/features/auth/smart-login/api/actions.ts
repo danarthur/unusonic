@@ -13,7 +13,7 @@ import {
   TRUSTED_DEVICE_COOKIE_NAME,
   TRUSTED_DEVICE_COOKIE_MAX_AGE_SECONDS,
 } from '@/shared/lib/constants';
-import { loginSchema, signupSchema, signupForPasskeySchema } from '../model/schema';
+import { loginSchema, signupSchema, signupForPasskeySchema, otpEmailSchema, otpVerifySchema } from '../model/schema';
 import type { AuthState, ProfileStatus } from '../model/types';
 
 /** Generates a cryptographically random password that satisfies schema (8+ chars, 1 upper, 1 number). */
@@ -276,12 +276,16 @@ export async function signInAction(
   const rawNext = (formData.get('redirect') ?? formData.get('next')) as string | null;
   const sanitizedNext = sanitizeRedirectPath(rawNext);
 
-  if (!profileStatus.exists || !profileStatus.onboardingCompleted) {
+  if (sanitizedNext?.startsWith('/claim') || sanitizedNext?.startsWith('/confirm')) {
+    // Employee invite claim flow — let them reach the claim page
+    // even if onboarding isn't complete. Claim acceptance sets onboarding_completed.
+    redirectPath = sanitizedNext;
+  } else if (!profileStatus.exists || !profileStatus.onboardingCompleted) {
     redirectPath = '/onboarding';
   } else if (sanitizedNext) {
     redirectPath = sanitizedNext;
   } else {
-    redirectPath = '/lobby';
+    redirectPath = '/';
   }
 
   const trustDevice = formData.get('trustDevice');
@@ -350,4 +354,62 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
   }
 
   return { success: true };
+}
+
+/**
+ * Send a one-time sign-in code to the user's email.
+ * Supabase sends a 6-digit OTP code. Fallback for devices without passkey support.
+ */
+export async function sendOtpAction(
+  email: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = otpEmailSchema.safeParse({ email });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid email' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: parsed.data.email,
+    options: { shouldCreateUser: false },
+  });
+
+  if (error) {
+    // Don't reveal whether the email exists
+    if (error.message.includes('not found') || error.message.includes('not registered')) {
+      return { ok: true }; // Silent success to prevent email enumeration
+    }
+    return { ok: false, error: 'Failed to send code. Try again.' };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Verify a 6-digit OTP code sent to the user's email.
+ * On success, establishes a session and redirects to home.
+ */
+export async function verifyOtpAction(
+  email: string,
+  token: string,
+  redirectTo?: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = otpVerifySchema.safeParse({ email, token });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid code' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    email: parsed.data.email,
+    token: parsed.data.token,
+    type: 'email',
+  });
+
+  if (error) {
+    return { ok: false, error: 'Invalid or expired code. Try again.' };
+  }
+
+  const sanitized = sanitizeRedirectPath(redirectTo);
+  redirect(sanitized ?? '/');
 }

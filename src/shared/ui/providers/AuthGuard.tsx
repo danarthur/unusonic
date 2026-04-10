@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/client';
+import { getQueryClient } from '@/shared/api/query-client';
 import { useAuthStatusStore } from '@/shared/lib/auth/auth-status-store';
 import { decodeJwtExp } from '@/shared/lib/auth/decode-jwt-exp';
 
@@ -26,15 +28,23 @@ const INTERACTION_CHECK_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
 /** If the access token expires within this buffer, proactively refresh. */
 const REFRESH_BUFFER_S = 60; // 1 minute
 
+/** BroadcastChannel name for cross-tab session sync. */
+const AUTH_CHANNEL = 'unusonic-auth';
+
+type AuthBroadcast = { type: 'session-expired' } | { type: 'session-restored' };
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const lastCheckRef = useRef(Date.now());
+  const channelRef = useRef<BroadcastChannel | null>(null);
   const setSessionExpired = useAuthStatusStore((s) => s.setSessionExpired);
+  const router = useRouter();
 
   /**
    * Core session check:
    * 1. Read cached session (no network call)
    * 2. If access token expires within REFRESH_BUFFER_S → attempt refresh
    * 3. If refresh fails → mark session as expired (overlay appears)
+   * 4. If refresh succeeds → router.refresh() so server components re-render
    */
   const checkSession = useCallback(async () => {
     lastCheckRef.current = Date.now();
@@ -53,25 +63,46 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const nowS = Math.floor(Date.now() / 1000);
 
     if (exp !== null && exp - nowS < REFRESH_BUFFER_S) {
-      // Token about to expire — try a silent refresh
+      // Token about to expire or already expired — try a silent refresh
       const { error } = await supabase.auth.refreshSession();
       if (error) {
         setSessionExpired(true);
+      } else {
+        // Session refreshed — re-render server components and invalidate
+        // TanStack Query cache so everything picks up the renewed cookies.
+        router.refresh();
+        getQueryClient().invalidateQueries();
       }
     }
-  }, [setSessionExpired]);
+  }, [setSessionExpired, router]);
 
   useEffect(() => {
     const supabase = createClient();
+
+    // ── Cross-tab session sync ────────────────────────────────────────
+    const channel = new BroadcastChannel(AUTH_CHANNEL);
+    channelRef.current = channel;
+
+    channel.onmessage = (event: MessageEvent<AuthBroadcast>) => {
+      if (event.data.type === 'session-expired') {
+        setSessionExpired(true);
+      } else if (event.data.type === 'session-restored') {
+        setSessionExpired(false);
+        router.refresh();
+        getQueryClient().invalidateQueries();
+      }
+    };
 
     // ── Real-time auth events ──────────────────────────────────────────
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         setSessionExpired(true);
+        channelRef.current?.postMessage({ type: 'session-expired' } satisfies AuthBroadcast);
       }
       // Successful refresh or sign-in clears the expired flag
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setSessionExpired(false);
+        channelRef.current?.postMessage({ type: 'session-restored' } satisfies AuthBroadcast);
       }
     });
 
@@ -103,6 +134,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     return () => {
       subscription.unsubscribe();
+      channel.close();
+      channelRef.current = null;
       document.removeEventListener('visibilitychange', handleVisibility);
       interactionEvents.forEach((ev) =>
         document.removeEventListener(ev, handleInteraction)

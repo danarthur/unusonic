@@ -50,7 +50,7 @@ export default async function ClaimPage({
   if (!validation.ok) {
     return (
       <div className={claimLayoutClass} style={safeAreaStyle} data-surface="void" data-density="spacious">
-        <ClaimError message="Invalid or expired link." />
+        <ClaimError message="This invite link has expired." token={token} />
       </div>
     );
   }

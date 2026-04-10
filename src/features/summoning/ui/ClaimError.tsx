@@ -1,20 +1,42 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { resendInviteAction } from '@/features/team-invite/api/actions';
 
 interface ClaimErrorProps {
   title?: string;
   message: string;
+  /** Original token — enables the "Request new link" button. */
+  token?: string;
 }
 
 export function ClaimError({
   title = 'Link invalid or expired',
   message,
+  token,
 }: ClaimErrorProps) {
+  const [resendState, setResendState] = useState<'idle' | 'sent' | 'error'>('idle');
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleResend() {
+    if (!token) return;
+    startTransition(async () => {
+      const result = await resendInviteAction(token);
+      if (result.ok) {
+        setResendState('sent');
+      } else {
+        setResendState('error');
+        setResendError(result.error);
+      }
+    });
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -33,7 +55,37 @@ export function ClaimError({
       <p className="mt-2 text-sm text-[var(--stage-text-secondary)]">
         {message}
       </p>
-      <Button asChild className="mt-6 w-full" size="lg">
+
+      {token && resendState === 'idle' && (
+        <Button
+          onClick={handleResend}
+          disabled={isPending}
+          variant="outline"
+          className="mt-4 w-full"
+          size="lg"
+        >
+          {isPending ? (
+            <><Loader2 className="size-4 animate-spin mr-2" /> Sending...</>
+          ) : (
+            'Request new link'
+          )}
+        </Button>
+      )}
+
+      {resendState === 'sent' && (
+        <div className="mt-4 flex items-center justify-center gap-2 text-sm text-[var(--stage-text-secondary)]">
+          <Check className="size-4 text-green-500" />
+          <span>New link sent to your email</span>
+        </div>
+      )}
+
+      {resendState === 'error' && resendError && (
+        <p className="mt-4 text-sm text-[var(--color-unusonic-error)]">
+          {resendError}
+        </p>
+      )}
+
+      <Button asChild className="mt-4 w-full" size="lg">
         <Link href="/login">Go to sign in</Link>
       </Button>
     </motion.div>
