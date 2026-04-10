@@ -33,7 +33,7 @@ Run **6 specialist auditors** in **2 waves of 3** (to stay within the 4-agent li
 - `docs/reference/design/responsive-and-breakpoint-system.md` (full)
 
 **Check every target file for:**
-1. Parent-child surface gap — every child element with a bg must differ from its parent by ≥ 0.04 L. Check `bg-[var(--stage-surface-*)]` against parent `data-surface` or `bg-` value. Items at the same level as their container is a violation.
+1. Parent-child surface gap — every child element with a bg must differ from its parent by ≥ 0.04 L. Check any `bg-` class using `var(--stage-surface-<tier>)` against parent `data-surface` or `bg-` value. Items at the same level as their container is a violation.
 2. `data-surface` attribute correctness — must match the actual bg token used
 3. `--ctx-well` on form inputs (not hardcoded `--stage-surface-nested`)
 4. `--ctx-card` on cards inside panels (not same level as parent)

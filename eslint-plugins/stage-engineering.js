@@ -350,7 +350,7 @@ const FORBIDDEN_CLASSNAMES = [
   [/\bring-destructive\b/, "ring-[var(--color-unusonic-error)]", "Use --color-unusonic-error"],
 
   // ── Raw Tailwind color scales (bg, text, border) ──
-  [/\b(bg|text|border)-(gray|slate|zinc|neutral|stone)-\d+\b/, null, "Use --stage-surface-* or OKLCH tokens instead of raw gray scales"],
+  [/\b(bg|text|border)-(gray|slate|zinc|neutral|stone)-\d+\b/, null, "Use --stage-surface-<tier> or OKLCH tokens instead of raw gray scales"],
   [/\b(bg|text|border)-(red|rose)-\d+\b/, null, "Use --color-unusonic-error or OKLCH instead of raw red/rose"],
   [/\b(bg|text|border)-(green|emerald|teal)-\d+\b/, null, "Use --color-unusonic-success or OKLCH instead of raw green"],
   [/\b(bg|text|border)-(yellow|amber|orange)-\d+\b/, null, "Use --color-unusonic-warning or OKLCH instead of raw yellow/amber/orange"],
