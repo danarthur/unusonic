@@ -28,8 +28,8 @@ export const INACTIVITY_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes
 export const TRUSTED_DEVICE_COOKIE_NAME = 'unusonic_trusted_device';
 /** Max age for trusted-device cookie (1 year). */
 export const TRUSTED_DEVICE_COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+/** Cookie name for active workspace selection (multi-workspace support). */
+export const ACTIVE_WORKSPACE_COOKIE_NAME = 'unusonic_active_workspace_id';
+/** Max age for active workspace cookie (1 year). */
+export const ACTIVE_WORKSPACE_COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
-/** Cookie name for cached onboarding-completed flag (avoids DB query per navigation). */
-export const ONBOARDING_COOKIE_NAME = 'unusonic_onboarding';
-/** Max age for onboarding cache cookie (1 hour). */
-export const ONBOARDING_COOKIE_MAX_AGE_SECONDS = 60 * 60;

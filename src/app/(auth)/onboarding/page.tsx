@@ -24,6 +24,22 @@ async function getOnboardingState() {
     redirect('/login');
   }
   
+  // Check for pending employee invite — redirect to claim before onboarding
+  if (user.email) {
+    const { data: invite } = await supabase
+      .from('invitations')
+      .select('token')
+      .eq('status', 'pending')
+      .ilike('email', user.email)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+      .maybeSingle();
+
+    if (invite?.token) {
+      redirect(`/claim/${invite.token}`);
+    }
+  }
+
   // Fetch profile - resilient when table missing or RLS blocks (e.g. no row yet)
   let profile: { full_name?: string | null; avatar_url?: string | null; onboarding_completed?: boolean | null; onboarding_step?: number | null } | null = null;
   const { data: profileData, error: profileError } = await supabase
@@ -31,15 +47,15 @@ async function getOnboardingState() {
     .select('full_name, avatar_url, onboarding_completed, onboarding_step')
     .eq('id', user.id)
     .maybeSingle();
-  
+
   if (!profileError) {
     profile = profileData;
   }
   // When profile fetch fails (table missing, RLS, or no row), treat as no profile and use auth metadata
-  
-  // If onboarding is already complete, redirect to dashboard
+
+  // If onboarding is already complete, redirect to role-based home (middleware resolves)
   if (profile?.onboarding_completed) {
-    redirect('/lobby');
+    redirect('/');
   }
   
   // Fetch existing workspaces
@@ -85,7 +101,7 @@ export default async function OnboardingPage() {
   return (
     <div className="min-h-screen w-full relative">
       {/* Match login: spotlight + grain — no colored orbs */}
-      <div className="fixed inset-0 z-0 bg-unusonic-void pointer-events-none" aria-hidden>
+      <div className="fixed inset-0 z-0 bg-[var(--stage-void)] pointer-events-none" aria-hidden>
         <div className="absolute inset-0 grain-overlay" aria-hidden />
       </div>
       <div className="relative z-10">

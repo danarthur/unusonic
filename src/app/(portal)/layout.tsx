@@ -7,35 +7,56 @@
 
 import { redirect } from 'next/navigation';
 import { unstable_rethrow } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { createClient } from '@/shared/api/supabase/server';
+import { ACTIVE_WORKSPACE_COOKIE_NAME } from '@/shared/lib/constants';
 import { WorkspaceProvider, type WorkspaceRole } from '@/shared/ui/providers/WorkspaceProvider';
 import { PreferencesProvider } from '@/shared/ui/providers/PreferencesContext';
 import { PortalProfileProvider } from '@/shared/ui/providers/PortalProfileProvider';
 import { AuthGuard } from '@/shared/ui/providers/AuthGuard';
 import { SessionExpiredOverlay } from '@/shared/ui/overlays/SessionExpiredOverlay';
 import { InactivityLogoutProvider } from '@/shared/ui/providers/InactivityLogoutProvider';
+import { DensitySync } from '@/shared/ui/layout/DensitySync';
 import { resolvePortalProfile, getDefaultNavItems } from '@/shared/lib/portal-profiles';
+import { ReducedMotionProvider } from '@/shared/ui/providers/ReducedMotionProvider';
+import { PortalSidebar } from './components/portal-sidebar';
 import { PortalShell } from './components/portal-shell';
 
 export const dynamic = 'force-dynamic';
 
 async function getPortalContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data: membership, error } = await supabase
-    .from('workspace_members')
-    .select(`
-      workspace_id,
-      role,
-      role_id,
-      workspaces:workspace_id (
-        id,
-        name
-      )
-    `)
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle();
+  const cookieStore = await cookies();
+  const preferredWsId = cookieStore.get(ACTIVE_WORKSPACE_COOKIE_NAME)?.value;
 
-  if (error || !membership) return null;
+  const portalSelect = `workspace_id, role, role_id, workspaces:workspace_id (id, name)`;
+
+  // Try preferred workspace first
+  let membership: { workspace_id: string; role: string; role_id: string | null; workspaces: unknown } | null = null;
+
+  if (preferredWsId) {
+    const { data } = await supabase
+      .from('workspace_members')
+      .select(portalSelect)
+      .eq('user_id', userId)
+      .eq('workspace_id', preferredWsId)
+      .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (data) membership = data as any;
+  }
+
+  if (!membership) {
+    const { data, error } = await supabase
+      .from('workspace_members')
+      .select(portalSelect)
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    membership = data as any;
+  }
+
+  if (!membership) return null;
 
   // Resolve role slug via role_id → ops.workspace_roles
   let roleSlug: string | null = null;
@@ -59,6 +80,26 @@ async function getPortalContext(supabase: Awaited<ReturnType<typeof createClient
     role: membership.role as WorkspaceRole,
     roleSlug,
   };
+}
+
+/** Fetch all workspace memberships for the switcher UI. */
+async function getAllWorkspaces(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, role, workspaces:workspace_id (id, name)')
+    .eq('user_id', userId);
+
+  if (!data) return [];
+
+  return data.map((row) => {
+    const rawWs = row.workspaces;
+    const ws = (Array.isArray(rawWs) ? rawWs[0] : rawWs) as { id: string; name: string } | null;
+    return {
+      id: row.workspace_id as string,
+      name: ws?.name ?? 'Unnamed',
+      role: row.role as string,
+    };
+  });
 }
 
 /** Fetch entity_capabilities + crew_skills for portal profile resolution */
@@ -102,6 +143,7 @@ export default async function PortalLayout({
   let workspaceId: string | null = null;
   let workspaceName: string | null = null;
   let role: WorkspaceRole | null = null;
+  let allWorkspaces: { id: string; name: string; role: string }[] = [];
   let profileData = { personEntityId: null as string | null, capabilities: [] as string[], skillTags: [] as string[], adminOverride: null as string | null };
 
   try {
@@ -114,9 +156,10 @@ export default async function PortalLayout({
 
     const ctx = await getPortalContext(supabase, user.id);
 
-    // Non-employee roles should use the dashboard, not the portal
-    if (ctx && ctx.roleSlug !== 'employee') {
-      redirect('/lobby');
+    // Dashboard roles (owner/admin/member) should not access the portal
+    const DASHBOARD_ROLES = ['owner', 'admin', 'member'];
+    if (ctx && ctx.roleSlug && DASHBOARD_ROLES.includes(ctx.roleSlug)) {
+      redirect('/');
     }
 
     if (ctx) {
@@ -125,11 +168,13 @@ export default async function PortalLayout({
       role = ctx.role;
     }
 
-    // Fetch profile + portal profile data in parallel
-    const [profileResult, profileDataResult] = await Promise.all([
+    // Fetch profile, portal profile data, and all workspaces in parallel
+    const [profileResult, profileDataResult, workspacesResult] = await Promise.all([
       supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).maybeSingle(),
       getProfileData(supabase, user.id, workspaceId),
+      getAllWorkspaces(supabase, user.id),
     ]);
+    allWorkspaces = workspacesResult;
 
     userData = {
       email: user.email || '',
@@ -150,11 +195,23 @@ export default async function PortalLayout({
     adminOverride: profileData.adminOverride,
   });
 
+  // Strip non-serializable fields (RegExp, LucideIcon) for client transport
+  const serializeProfile = (p: typeof resolved.primary) => ({
+    key: p.key,
+    label: p.label,
+    matchCapabilities: p.matchCapabilities,
+    matchSkillTags: p.matchSkillTags,
+    matchGigRolePatterns: p.matchGigRolePatterns.map(r => r.source),
+    navItemIds: p.navItemIds,
+    defaultLanding: p.defaultLanding,
+    hasGigWorkspace: p.hasGigWorkspace,
+  });
+
   const portalProfileValue = {
     personEntityId: profileData.personEntityId,
-    primary: resolved.primary,
-    all: resolved.all,
-    navItems: resolved.navItems,
+    primary: serializeProfile(resolved.primary),
+    all: resolved.all.map(serializeProfile),
+    navItems: resolved.navItems.map(({ icon, ...rest }) => rest),
     capabilities: profileData.capabilities,
     skillTags: profileData.skillTags,
   };
@@ -170,23 +227,42 @@ export default async function PortalLayout({
           <AuthGuard>
             <SessionExpiredOverlay />
             <InactivityLogoutProvider>
+              <DensitySync />
+              <ReducedMotionProvider>
               <div className="min-h-screen h-full flex flex-col min-w-0 overscroll-none">
                 <div className="fixed inset-0 z-0 bg-stage-void pointer-events-none" aria-hidden>
                   <div className="absolute inset-0 grain-overlay" aria-hidden />
                 </div>
-                <div className="relative z-10 flex flex-1 flex-col min-h-0 w-full min-w-0">
+                <a
+                  href="#main-content"
+                  className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[var(--stage-surface-elevated)] focus:text-[var(--stage-text-primary)]"
+                >
+                  Skip to main content
+                </a>
+                <div className="relative z-10 flex flex-1 min-h-0 w-full min-w-0">
+                  {/* Desktop: sidebar */}
+                  <div className="hidden lg:flex shrink-0 h-full">
+                    <PortalSidebar
+                      user={userData}
+                      workspaceName={workspaceName}
+                      workspaces={allWorkspaces}
+                      activeWorkspaceId={workspaceId}
+                      navItems={resolved.navItems.map(({ icon, ...rest }) => rest)}
+                    />
+                  </div>
+                  {/* Mobile: bottom tab bar */}
                   <PortalShell
-                    user={userData}
-                    workspaceName={workspaceName}
-                    navItems={resolved.navItems}
+                    navItems={resolved.navItems.map(({ icon, ...rest }) => rest)}
                   />
-                  <main className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-auto pt-[env(safe-area-inset-top)] pb-[max(env(safe-area-inset-bottom),5rem)] sm:pb-[max(env(safe-area-inset-bottom),1rem)]">
-                    <div className="flex-1 min-h-0 min-w-0 flex flex-col px-4 sm:px-6 lg:px-8 py-6">
+                  {/* Content */}
+                  <main id="main-content" className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-auto pt-[env(safe-area-inset-top)] pb-[max(env(safe-area-inset-bottom),5rem)] lg:pb-0" data-surface="void">
+                    <div className="flex-1 min-h-0 min-w-0 flex flex-col px-4 sm:px-6 lg:px-8 py-6 max-w-2xl lg:max-w-5xl mx-auto w-full gap-6">
                       {children}
                     </div>
                   </main>
                 </div>
               </div>
+            </ReducedMotionProvider>
             </InactivityLogoutProvider>
           </AuthGuard>
         </PortalProfileProvider>

@@ -14,6 +14,7 @@ import { Settings, LogOut, User, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { useSession } from '@/shared/ui/providers/SessionContext';
 import { useSystemHeart } from '@/shared/ui/providers/SystemHeartContext';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
+import { Lockup } from '@/shared/ui/branding/lockup';
 import { cn } from '@/shared/lib/utils';
 import { signOutAction } from '@/shared/api/auth/sign-out';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
@@ -22,6 +23,8 @@ import { navSections, isNavActive } from './nav-items';
 import { useSidebarStore } from './sidebar-store';
 import { useDensityStore, type DensityTier } from './density-store';
 
+import { WorkspaceSwitcher, type WorkspaceEntry } from './WorkspaceSwitcher';
+
 interface SidebarWithUserProps {
   user: {
     email: string;
@@ -29,11 +32,14 @@ interface SidebarWithUserProps {
     avatarUrl: string | null;
   } | null;
   workspaceName?: string | null;
+  workspaces?: WorkspaceEntry[];
+  activeWorkspaceId?: string | null;
 }
 
-const pillSpring = { type: 'spring', stiffness: 500, damping: 35 } as const;
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
+const pillSpring = STAGE_LIGHT;
 
-export function SidebarWithUser({ user, workspaceName }: SidebarWithUserProps) {
+export function SidebarWithUser({ user, workspaceName, workspaces, activeWorkspaceId }: SidebarWithUserProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { setViewState } = useSession();
@@ -98,22 +104,32 @@ export function SidebarWithUser({ user, workspaceName }: SidebarWithUserProps) {
             type="button"
             onClick={() => handleNavigation('overview', '/lobby')}
             className={cn(
-              'flex items-center w-full rounded-xl p-2 hover:bg-[var(--stage-surface-hover)] cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
+              'stage-hover overflow-hidden flex items-center w-full rounded-xl p-2 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
               collapsed ? 'justify-center' : 'gap-2.5'
             )}
             aria-label="Unusonic home"
           >
-            <LivingLogo size="sm" status={systemStatus} />
-            {!collapsed && (
-              <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">Unusonic</span>
-            )}
+            {collapsed
+              ? <LivingLogo size="sm" status={systemStatus} />
+              : <Lockup variant="horizontal" size="sm" status={systemStatus} />
+            }
           </button>
         </div>
 
-        {/* Workspace Indicator — expanded only */}
-        {!collapsed && workspaceName && (
-          <div className="px-5 mb-4">
-            <p className="text-[10px] text-[var(--stage-text-tertiary)] truncate">{workspaceName}</p>
+        {/* Workspace Indicator / Switcher */}
+        {workspaceName && (
+          <div className={cn('mb-4', collapsed ? 'px-1.5' : 'px-3')}>
+            {workspaces && workspaces.length > 0 ? (
+              <WorkspaceSwitcher
+                workspaces={workspaces}
+                activeWorkspaceId={activeWorkspaceId ?? null}
+                collapsed={collapsed}
+              />
+            ) : !collapsed ? (
+              <div className="px-2">
+                <p className="text-label text-[var(--stage-text-tertiary)] truncate">{workspaceName}</p>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -127,7 +143,7 @@ export function SidebarWithUser({ user, workspaceName }: SidebarWithUserProps) {
               <div key={section.label}>
                 {/* Section header — expanded only */}
                 {!collapsed && (
-                  <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-tertiary)] font-medium px-3 mb-1.5 select-none">
+                  <p className="stage-label text-[var(--stage-text-tertiary)] px-3 mb-1.5 select-none">
                     {section.label}
                   </p>
                 )}
@@ -209,14 +225,14 @@ export function SidebarWithUser({ user, workspaceName }: SidebarWithUserProps) {
 
           {/* Density selector — segmented control, same surface as sidebar */}
           {!collapsed && (
-            <div className="relative flex items-center h-8 rounded-[var(--stage-radius-input)] mx-1 p-0.5 border border-[var(--stage-edge-subtle)]" style={{ background: 'var(--stage-surface-hover)' }}>
+            <div className="relative flex items-center h-8 rounded-[var(--stage-radius-input)] mx-1 p-0.5 border border-[var(--stage-edge-subtle)]" style={{ background: 'var(--stage-surface-elevated)' }}>
               {(['spacious', 'balanced', 'dense'] as DensityTier[]).map((tier) => (
                 <button
                   key={tier}
                   type="button"
                   onClick={() => setDensity(tier)}
                   className={cn(
-                    'relative flex-1 h-full text-[10px] font-medium tracking-wide transition-all duration-150 capitalize rounded-[calc(var(--stage-radius-input)-2px)] z-10',
+                    'relative flex-1 h-full text-[10px] font-medium tracking-normal transition-colors duration-100 capitalize rounded-[calc(var(--stage-radius-input)-2px)] z-10',
                     density === tier
                       ? 'text-[var(--stage-text-primary)] bg-[var(--stage-surface-raised)] shadow-sm'
                       : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]'
@@ -263,7 +279,7 @@ export function SidebarWithUser({ user, workspaceName }: SidebarWithUserProps) {
                   collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                   isAccountOpen
                     ? 'stage-panel active-glass !rounded-xl'
-                    : 'hover:bg-[var(--stage-surface-hover)]'
+                    : 'stage-hover overflow-hidden'
                 )}
               >
                 <div className={cn(
@@ -319,7 +335,7 @@ export function SidebarWithUser({ user, workspaceName }: SidebarWithUserProps) {
 
                 {workspaceName && (
                   <div className="mt-3 px-2 py-1.5 rounded-lg bg-[var(--stage-accent)]/[0.03] border border-[var(--stage-edge-subtle)]">
-                    <p className="text-[10px] text-[var(--stage-text-tertiary)] uppercase tracking-wider mb-0.5">
+                    <p className="stage-label text-[var(--stage-text-tertiary)] mb-0.5">
                       Workspace
                     </p>
                     <p className="text-xs font-medium text-[var(--stage-text-primary)] truncate">{workspaceName}</p>

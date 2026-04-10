@@ -10,6 +10,8 @@ import { motion } from 'framer-motion';
 import { useSidebarStore } from './sidebar-store';
 import { SidebarWithUser } from './SidebarWithUser';
 
+import type { WorkspaceEntry } from './WorkspaceSwitcher';
+
 interface SidebarContainerProps {
   user: {
     email: string;
@@ -17,14 +19,17 @@ interface SidebarContainerProps {
     avatarUrl: string | null;
   } | null;
   workspaceName?: string | null;
+  workspaces?: WorkspaceEntry[];
+  activeWorkspaceId?: string | null;
 }
 
-const collapseSpring = { type: 'spring', stiffness: 300, damping: 30 } as const;
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const collapseSpring = STAGE_MEDIUM;
 
 export const SIDEBAR_EXPANDED = 220;
 export const SIDEBAR_COLLAPSED = 56;
 
-export function SidebarContainer({ user, workspaceName }: SidebarContainerProps) {
+export function SidebarContainer({ user, workspaceName, workspaces, activeWorkspaceId }: SidebarContainerProps) {
   const collapsed = useSidebarStore((s) => s.collapsed);
 
   return (
@@ -33,7 +38,7 @@ export function SidebarContainer({ user, workspaceName }: SidebarContainerProps)
       animate={{ width: collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED }}
       transition={collapseSpring}
     >
-      <SidebarWithUser user={user} workspaceName={workspaceName} />
+      <SidebarWithUser user={user} workspaceName={workspaceName} workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} />
     </motion.div>
   );
 }

@@ -3,7 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { TRUSTED_DEVICE_COOKIE_NAME, ONBOARDING_COOKIE_NAME } from '@/shared/lib/constants';
+import { TRUSTED_DEVICE_COOKIE_NAME, ACTIVE_WORKSPACE_COOKIE_NAME } from '@/shared/lib/constants';
 
 /**
  * Signs out the current user and redirects to login.
@@ -17,7 +17,7 @@ export async function signOutAction(
   await supabase.auth.signOut();
   const cookieStore = await cookies();
   cookieStore.delete(TRUSTED_DEVICE_COOKIE_NAME);
-  cookieStore.delete(ONBOARDING_COOKIE_NAME);
+  cookieStore.delete(ACTIVE_WORKSPACE_COOKIE_NAME);
   cookieStore.delete('unusonic_role_slug');
   const reason =
     payload &&
