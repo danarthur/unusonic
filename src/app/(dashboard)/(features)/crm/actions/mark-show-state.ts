@@ -8,30 +8,35 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { instrument } from '@/shared/lib/instrumentation';
 
 /**
- * Show-state transitions for ops.events.
+ * Show-state transitions for ops.events — CANONICAL WRITER (Pass 3 Phase 2).
  *
- * Why this file exists:
- *   `ops.events.status` defaults to 'planned' and is read by
- *   `shared/lib/client-portal/event-lock.ts::computeEventLock` to drive the
- *   client portal song-edit lock. But prior to 2026-04-11 nothing ever wrote
- *   the column post-default, so the lock never activated. These actions wire
- *   the missing transitions.
+ * This file and `delete-event.ts::cancelEvent` are the two canonical writers
+ * of the `(status, lifecycle_status)` pair on `ops.events`. Phase 0's DB
+ * trigger `events_status_pair_check` enforces that the pair stays co-valid
+ * at the database layer, so the dual-write pattern here is load-bearing
+ * rather than a band-aid — any future writer that touches status or
+ * lifecycle_status must update BOTH columns in the same statement or be
+ * rejected by the trigger.
+ *
+ * Read-side consumers should use `readEventStatus()` from
+ * `@/shared/lib/event-status/read-event-status.ts` rather than touching the
+ * columns directly.
  *
  * Column pair we touch:
- *   - `status`: canonical lock signal read by computeEventLock.
- *     'planned' → 'in_progress' → 'completed'. Free-form text at the DB level.
- *   - `lifecycle_status`: parallel state column read by some CRM surfaces and
- *     by Aion / cortex memory. Kept in sync by these actions: 'live' while the
- *     show is in_progress, 'post' once completed. Merging status and
- *     lifecycle_status into one column is Pass 3 schema-drift work.
+ *   - `status`: canonical lock signal read by `computeEventLock` for the
+ *     client portal song-edit lock. Values: 'planned' | 'in_progress' |
+ *     'completed' | 'cancelled' | 'archived'.
+ *   - `lifecycle_status`: parallel state column read by CRM stream surfaces,
+ *     Lobby PipelineVelocity, and Aion. Values: 'lead' | 'tentative' |
+ *     'confirmed' | 'production' | 'live' | 'post' | 'cancelled' | 'archived'.
+ *     Phase 0's `ops.event_status_pair_valid()` defines the legal pairings.
  *   - `show_started_at` / `show_ended_at`: audit trail; set atomically with
  *     status. Editable from the wrap report for late-press scenarios.
  *
  * Out of scope here:
  *   - 'cancelled' → see `delete-event.ts::cancelEvent` which writes both
- *     `lifecycle_status='cancelled'` and `status='cancelled'` so
- *     computeEventLock locks cancelled events.
- *   - 'archived' → set by the wrap-report close-out flow (Pass 3).
+ *     columns so computeEventLock locks cancelled events.
+ *   - 'archived' → will be set by the wrap-report close-out flow (Phase 4).
  */
 
 const EventIdSchema = z.string().uuid();

@@ -13,6 +13,7 @@ import { archiveDeal } from '../actions/archive-deal';
 import { reopenDeal } from '../actions/reopen-deal';
 import { rescheduleEvent } from '../actions/reschedule-event';
 import { updateDealStatus } from '../actions/update-deal-status';
+import { readEventStatusFromLifecycle } from '@/shared/lib/event-status/read-event-status';
 
 export type StreamCardItem = {
   id: string;
@@ -43,6 +44,8 @@ export type StreamCardItem = {
   followUpReason?: string | null;
   followUpPriority?: number | null;
   followUpStatus?: 'pending' | 'snoozed' | 'acted' | 'dismissed' | null;
+  followUpCategory?: 'sales' | 'ops' | 'nurture' | null;
+  followUpReasonType?: string | null;
   /** Production readiness signals — present for won deals with events. */
   readiness?: ReadinessData | null;
 };
@@ -82,6 +85,11 @@ export function StreamCard({
   const mode = item.mode ?? (item.source === 'deal' ? 'sales' : 'ops');
   const needsAttention = item.followUpStatus === 'pending' && !!item.followUpReason;
   const borderColor = modeBorderColor[mode];
+  // Pass 3 Phase 2 — route lifecycle_status reads through the canonical helper
+  // so every display check ("is cancelled", "show actions") goes through one
+  // place. Phase 0's DB invariant guarantees this maps losslessly from the
+  // lifecycle_status column alone for event-sourced CRMQueueItems.
+  const itemPhase = item.source === 'event' ? readEventStatusFromLifecycle(item.lifecycle_status ?? null) : null;
 
   // Hover state for showing action buttons
   const [hovered, setHovered] = useState(false);
@@ -204,7 +212,7 @@ export function StreamCard({
         onClick={onClick}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
         className={cn(
-          'w-full text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]',
+          'w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
           'transition-[box-shadow] duration-75',
           selected && 'ring-1 ring-[var(--stage-accent)]/60 ring-offset-1 ring-offset-[var(--stage-void)]',
         )}
@@ -214,7 +222,7 @@ export function StreamCard({
           className={cn(
             'relative px-4 py-3 transition-colors duration-100',
             'bg-[var(--stage-surface-elevated)] hover:bg-[var(--stage-surface-raised)]',
-            item.lifecycle_status === 'cancelled' && 'opacity-[0.45]',
+            itemPhase === 'cancelled' && 'opacity-[0.45]',
           )}
           style={{
             borderRadius: 'var(--stage-radius-panel, 12px)',
@@ -223,7 +231,7 @@ export function StreamCard({
         >
           {/* Row 1: Title + Status */}
           <div className="flex items-baseline justify-between gap-3 min-w-0">
-            <h3 className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight truncate leading-none flex items-center gap-1.5">
+            <h3 className="stage-readout truncate leading-none flex items-center gap-1.5">
               {item.show_health_status && (
                 <span
                   className="size-2 rounded-full shrink-0 inline-block"
@@ -246,13 +254,13 @@ export function StreamCard({
                   style={{ backgroundColor: 'var(--stage-text-primary)' }}
                 />
               )}
-              {item.lifecycle_status === 'cancelled' && (
-                <span className="text-[10px] uppercase tracking-widest text-[var(--stage-text-tertiary)] font-medium">
+              {itemPhase === 'cancelled' && (
+                <span className="stage-label text-[var(--stage-text-tertiary)]">
                   cancelled
                 </span>
               )}
-              {!item.lifecycle_status?.includes('cancelled') && statusLabel && (
-                <span className="text-[10px] uppercase tracking-widest text-[var(--stage-text-tertiary)] font-medium">
+              {itemPhase !== 'cancelled' && statusLabel && (
+                <span className="stage-label text-[var(--stage-text-tertiary)]">
                   {statusLabel}
                 </span>
               )}
@@ -260,7 +268,7 @@ export function StreamCard({
           </div>
 
           {/* Row 2: Client + Meta */}
-          <div className="flex items-center gap-3 mt-2 text-[12px] text-[var(--stage-text-secondary)] leading-none">
+          <div className="flex items-center gap-3 mt-2 text-xs text-[var(--stage-text-secondary)] leading-none">
             {item.client_name && (
               <span className="flex items-center gap-1 truncate min-w-0">
                 <User size={11} className="shrink-0 opacity-45" aria-hidden />
@@ -282,7 +290,7 @@ export function StreamCard({
             {/* Payment status pill — visible on hover/selected only */}
             {item.paymentStatusLabel && item.paymentStatusColor && (hovered || selected) && (
               <span
-                className="ml-auto shrink-0 text-[9px] font-semibold uppercase tracking-wider px-1.5 py-px leading-tight transition-opacity"
+                className="ml-auto shrink-0 stage-micro px-1.5 py-px leading-tight transition-opacity"
                 style={{
                   color: item.paymentStatusColor,
                   backgroundColor: `color-mix(in oklch, ${item.paymentStatusColor} 10%, transparent)`,
@@ -348,7 +356,7 @@ export function StreamCard({
                   )}
 
                   {/* Event: Reschedule */}
-                  {isEvent && item.lifecycle_status !== 'cancelled' && (
+                  {isEvent && itemPhase !== 'cancelled' && (
                     <ActionBtn
                       icon={<CalendarClock size={11} />}
                       label="Reschedule show"
@@ -360,7 +368,7 @@ export function StreamCard({
                   )}
 
                   {/* Event: Cancel */}
-                  {isEvent && item.lifecycle_status !== 'cancelled' && (
+                  {isEvent && itemPhase !== 'cancelled' && (
                     <ActionBtn
                       icon={<XCircle size={11} />}
                       label={confirmAction === 'cancel' ? 'Confirm?' : 'Cancel show'}
@@ -401,7 +409,7 @@ export function StreamCard({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleRescheduleConfirm(); }}
                     disabled={isPending || !rescheduleDate}
-                    className="flex items-center justify-center size-6 text-[var(--color-unusonic-info)] bg-[oklch(0.55_0.15_250_/_0.10)] text-xs font-medium transition-colors hover:bg-[oklch(0.55_0.15_250_/_0.20)] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="flex items-center justify-center size-6 text-[var(--color-unusonic-info)] bg-[oklch(0.55_0.15_250_/_0.10)] text-xs font-medium transition-colors hover:bg-[oklch(0.55_0.15_250_/_0.20)] disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
                   >
                     ✓
@@ -452,7 +460,7 @@ function ActionBtn({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-40',
+        'flex items-center gap-1 px-1.5 py-0.5 text-label font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45',
         active && colorVar
           ? 'border'
           : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',

@@ -22,6 +22,7 @@ import {
 import type { OptimisticUpdate } from './crm-production-queue';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
+import { readEventStatusFromLifecycle } from '@/shared/lib/event-status/read-event-status';
 
 export type StreamMode = 'inquiry' | 'active' | 'past';
 
@@ -46,30 +47,40 @@ function filterByMode(items: StreamCardItem[], mode: StreamMode): StreamCardItem
     return items.filter(
       (i) =>
         (i.source === 'event' &&
-          i.lifecycle_status !== 'cancelled' &&
+          readEventStatusFromLifecycle(i.lifecycle_status) !== 'cancelled' &&
           (i.event_date == null || i.event_date >= today)) ||
         (i.source === 'deal' &&
           (i.status === 'contract_sent' || i.status === 'contract_signed' || i.status === 'deposit_received') &&
+          (i.event_date == null || i.event_date >= today)) ||
+        // Won deals with future dates stay active (still need handoff/production work)
+        (i.source === 'deal' &&
+          i.status === 'won' &&
           (i.event_date == null || i.event_date >= today))
     );
   }
   if (mode === 'past') {
     return items.filter(
-      (i) =>
-        // Won or lost deals
-        (i.source === 'deal' && (i.status === 'won' || i.status === 'lost')) ||
-        // Past-dated deals that never converted (any pre-handover status)
-        (i.source === 'deal' &&
-          (i.status === 'inquiry' || i.status === 'proposal' || i.status === 'contract_sent' || i.status === 'contract_signed' || i.status === 'deposit_received') &&
-          i.event_date != null &&
-          i.event_date < today) ||
-        // Cancelled events (regardless of date)
-        (i.source === 'event' && i.lifecycle_status === 'cancelled') ||
-        // Past-dated events (must have a date — dateless events stay in Active)
-        (i.source === 'event' &&
-          i.lifecycle_status !== 'cancelled' &&
-          i.event_date != null &&
-          i.event_date < today)
+      (i) => {
+        const eventPhase = i.source === 'event' ? readEventStatusFromLifecycle(i.lifecycle_status) : null;
+        return (
+          // Lost deals always past
+          (i.source === 'deal' && i.status === 'lost') ||
+          // Won deals with past dates go to past
+          (i.source === 'deal' && i.status === 'won' && i.event_date != null && i.event_date < today) ||
+          // Past-dated deals that never converted (any pre-handover status)
+          (i.source === 'deal' &&
+            (i.status === 'inquiry' || i.status === 'proposal' || i.status === 'contract_sent' || i.status === 'contract_signed' || i.status === 'deposit_received') &&
+            i.event_date != null &&
+            i.event_date < today) ||
+          // Cancelled events (regardless of date)
+          (i.source === 'event' && eventPhase === 'cancelled') ||
+          // Past-dated events (must have a date — dateless events stay in Active)
+          (i.source === 'event' &&
+            eventPhase !== 'cancelled' &&
+            i.event_date != null &&
+            i.event_date < today)
+        );
+      }
     );
   }
   return items;
@@ -251,7 +262,7 @@ export function Stream({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search productions…"
-                className="w-full pl-8 pr-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]/30"
+                className="w-full pl-8 pr-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/30"
                 style={{
                   background: 'var(--stage-surface-elevated)',
                   borderRadius: 'var(--stage-radius-input, 6px)',
@@ -264,7 +275,7 @@ export function Stream({
 
           {/* Layer 3: Result count */}
           {(q || filtersActive) && (
-            <p className="text-[10px] tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
+            <p className="text-label tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
               {filtered.length} result{filtered.length !== 1 ? 's' : ''}
               {filtersActive && !q && ' (filtered)'}
             </p>
@@ -385,7 +396,7 @@ function DateGroupedList({
           {group.date && (
             <div className="flex items-center justify-between gap-2 px-1 pt-1">
               <span
-                className="text-[10px] font-medium uppercase tracking-wider"
+                className="stage-label"
                 style={{ color: 'var(--stage-text-tertiary)' }}
               >
                 {formatGroupDate(group.date)}
@@ -394,7 +405,7 @@ function DateGroupedList({
                 <button
                   type="button"
                   onClick={() => onOpenDayView(group.date!)}
-                  className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium tracking-wide transition-colors hover:bg-[var(--stage-surface-elevated)]"
+                  className="flex items-center gap-1 px-1.5 py-0.5 text-label font-medium tracking-wide transition-colors stage-hover overflow-hidden"
                   style={{
                     color: 'var(--stage-text-secondary)',
                     borderRadius: 'var(--stage-radius-input, 6px)',

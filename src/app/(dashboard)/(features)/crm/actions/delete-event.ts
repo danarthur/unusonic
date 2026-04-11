@@ -135,11 +135,14 @@ export async function cancelEvent(eventId: string): Promise<CancelEventResult> {
       return { success: false, error: 'Not authorised.' };
     }
 
-    // Step 3: update — write BOTH columns. `lifecycle_status` is the CRM
-    // stream filter column; `status` is the computeEventLock signal read by
-    // the client portal. Until the two parallel state columns are merged
-    // (Pass 3 schema-drift work), cancel flows must touch both or the
-    // client portal will remain unlocked for a cancelled event.
+    // Step 3: update — Pass 3 CANONICAL WRITER. Writes BOTH `status` and
+    // `lifecycle_status` in one statement. Phase 0's `events_status_pair_check`
+    // trigger enforces that the pair stays valid; any single-column update
+    // here would be rejected by the trigger. `delete-event.ts::cancelEvent`
+    // is one of two canonical writers — the other is
+    // `mark-show-state.ts::{markShowStarted, markShowEnded, undoMarkShowStarted}`.
+    // Read-side consumers should use `readEventStatus()` instead of touching
+    // either column directly.
     const { error: updateError } = await supabase
       .schema('ops')
       .from('events')
