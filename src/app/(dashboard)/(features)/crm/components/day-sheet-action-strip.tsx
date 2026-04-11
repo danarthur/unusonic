@@ -33,15 +33,27 @@ export function DaySheetActionStrip({
 
     startTransition(async () => {
       const result = await compileAndSendDaySheet({ eventId, dealId });
-      if (result.success) {
-        const parts = [`Day sheet sent to ${result.sentCount} crew`];
-        if (result.skippedCount > 0) {
-          parts.push(`${result.skippedCount} skipped (no email): ${result.skippedNames.join(', ')}`);
-        }
-        toast.success(parts.join('. '));
-      } else {
+      if (!result.success) {
         toast.error(result.error);
+        return;
       }
+      // Partial-delivery case: some emails landed, some didn't. Surface the
+      // failure in a warning-style toast so the PM can retry manually instead
+      // of seeing a false-positive "all sent" confirmation.
+      if (result.failedCount > 0) {
+        const failedNames = result.failedRecipients.map((f) => f.name).join(', ');
+        const description =
+          `${result.sentCount} sent, ${result.failedCount} failed${
+            result.skippedCount > 0 ? `, ${result.skippedCount} skipped` : ''
+          }${failedNames ? ` — failed: ${failedNames}` : ''}`;
+        toast.warning('Day sheet partially sent', { description });
+        return;
+      }
+      const parts = [`Day sheet sent to ${result.sentCount} crew`];
+      if (result.skippedCount > 0) {
+        parts.push(`${result.skippedCount} skipped (no email): ${result.skippedNames.join(', ')}`);
+      }
+      toast.success(parts.join('. '));
     });
   };
 
@@ -51,7 +63,7 @@ export function DaySheetActionStrip({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Mail size={16} strokeWidth={1.5} className="shrink-0" style={{ color: 'var(--stage-text-secondary)' }} aria-hidden />
-            <p className="text-sm font-medium tracking-tight" style={{ color: 'var(--stage-text-primary)' }}>
+            <p className="stage-readout">
               Day sheet
             </p>
           </div>
@@ -70,7 +82,7 @@ export function DaySheetActionStrip({
             <button
               onClick={handleSend}
               disabled={isPending || crewWithEmailCount === 0}
-              className="stage-btn stage-btn-primary text-xs px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="stage-btn stage-btn-primary text-xs px-3 py-1.5 disabled:opacity-45 disabled:cursor-not-allowed"
             >
               {isPending ? 'Sending\u2026' : 'Send'}
             </button>

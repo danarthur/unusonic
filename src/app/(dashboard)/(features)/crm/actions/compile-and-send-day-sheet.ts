@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod/v4';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
@@ -15,8 +16,29 @@ const InputSchema = z.object({
   dealId: z.string().uuid(),
 });
 
+/**
+ * Result of a day-sheet compile+send run.
+ *
+ * `sentCount`    — emails that Resend accepted
+ * `skippedCount` — crew with no email on file (pre-send filter)
+ * `skippedNames` — names of the above, surfaced to the PM in the toast
+ * `failedCount`  — emails that Resend rejected or threw on (post-send)
+ * `failedRecipients` — list of { name, error } for the above. Named so the
+ *                 PM can retry manually or check Resend logs.
+ *
+ * Note: `success: true` is returned even when `failedCount > 0` — partial
+ * delivery is still a meaningful send. The caller displays a warning when
+ * `failedCount > 0` so the PM doesn't see a false-positive "all sent" toast.
+ */
 export type DaySheetResult =
-  | { success: true; sentCount: number; skippedCount: number; skippedNames: string[] }
+  | {
+      success: true;
+      sentCount: number;
+      skippedCount: number;
+      skippedNames: string[];
+      failedCount: number;
+      failedRecipients: { name: string; error: string }[];
+    }
   | { success: false; error: string };
 
 function getResend() {
@@ -80,10 +102,23 @@ export async function compileAndSendDaySheet(input: {
     const workspaceName = (workspace?.name as string) ?? 'Unusonic';
 
     // 4. Get crew with emails
-    const { data: crewData } = await supabase.rpc('get_deal_crew_enriched', {
-      p_deal_id: parsed.data.dealId,
-      p_workspace_id: workspaceId,
-    });
+    const { data: crewData, error: crewRpcErr } = await supabase.rpc(
+      'get_deal_crew_enriched',
+      {
+        p_deal_id: parsed.data.dealId,
+        p_workspace_id: workspaceId,
+      },
+    );
+
+    if (crewRpcErr) {
+      Sentry.logger.error('crm.daySheet.getDealCrewEnrichedFailed', {
+        dealId: parsed.data.dealId,
+        workspaceId,
+        error: crewRpcErr.message,
+        code: crewRpcErr.code ?? null,
+      });
+      return { success: false, error: 'Could not load crew for this deal.' };
+    }
 
     const crewRows = Array.isArray(crewData) ? crewData : crewData ? [crewData] : [];
     const typedCrew = (crewRows as Record<string, unknown>[]).map((r) => ({
@@ -99,11 +134,28 @@ export async function compileAndSendDaySheet(input: {
 
     const emailMap = new Map<string, string | null>();
     if (entityIds.length > 0) {
-      const { data: entities } = await supabase
+      // Defense-in-depth: scope by owner_workspace_id even though the RPC
+      // above should already filter. Directory reads without an explicit
+      // workspace filter are a recurring class of bug; better to be redundant.
+      const { data: entities, error: entityLookupErr } = await supabase
         .schema('directory')
         .from('entities')
         .select('id, type, attributes')
-        .in('id', entityIds);
+        .in('id', entityIds)
+        .eq('owner_workspace_id', workspaceId);
+
+      if (entityLookupErr) {
+        Sentry.logger.error('crm.daySheet.entityLookupFailed', {
+          dealId: parsed.data.dealId,
+          workspaceId,
+          entityIdCount: entityIds.length,
+          error: entityLookupErr.message,
+          code: entityLookupErr.code ?? null,
+        });
+        // Non-fatal: continue with whatever we have. Missing entities will
+        // fall through to skippedNames below, which is surfaced to the PM.
+      }
+
       for (const e of (entities ?? []) as { id: string; type: string | null; attributes: unknown }[]) {
         let email: string | null = null;
         const t = e.type ?? 'person';
@@ -181,20 +233,47 @@ export async function compileAndSendDaySheet(input: {
     const from = await getWorkspaceFrom(workspaceId);
     const subject = `Day Sheet: ${eventTitle} — ${eventDate}`;
 
-    // 6. Send to each crew member individually
+    // 6. Send to each crew member individually.
+    // Per-crew failures are captured to Sentry with recipient context and
+    // aggregated into `failedRecipients` so the caller can surface them
+    // in the toast. Previously a failure here was swallowed with
+    // console.error and reported as part of a false-positive success.
     let sentCount = 0;
+    const failedRecipients: { name: string; error: string }[] = [];
     for (const recipient of sendable) {
       try {
-        await resend.emails.send({
+        const sendResult = await resend.emails.send({
           from,
           to: recipient.email,
           subject,
           html,
           text,
         });
+        // Resend can return a result object with an `error` field without throwing.
+        const resendError = (sendResult as { error?: { message?: string } | null } | null)?.error ?? null;
+        if (resendError) {
+          const message = resendError.message ?? 'Resend returned an error';
+          Sentry.logger.error('crm.daySheet.perCrewSendRejected', {
+            eventId: parsed.data.eventId,
+            workspaceId,
+            recipient: recipient.email,
+            recipientName: recipient.name,
+            error: message,
+          });
+          failedRecipients.push({ name: recipient.name, error: message });
+          continue;
+        }
         sentCount++;
       } catch (err) {
-        console.error(`[day-sheet] Failed to send to ${recipient.email}:`, err);
+        const message = err instanceof Error ? err.message : String(err);
+        Sentry.logger.error('crm.daySheet.perCrewSendThrew', {
+          eventId: parsed.data.eventId,
+          workspaceId,
+          recipient: recipient.email,
+          recipientName: recipient.name,
+          error: message,
+        });
+        failedRecipients.push({ name: recipient.name, error: message });
       }
     }
 
@@ -203,9 +282,17 @@ export async function compileAndSendDaySheet(input: {
       sentCount,
       skippedCount: skippedNames.length,
       skippedNames,
+      failedCount: failedRecipients.length,
+      failedRecipients,
     };
   } catch (err) {
-    console.error('[day-sheet] compile-and-send failed:', err);
-    return { success: false, error: err instanceof Error ? err.message : 'Failed to send day sheet.' };
+    const message = err instanceof Error ? err.message : String(err);
+    Sentry.logger.error('crm.daySheet.compileAndSendThrew', {
+      eventId: input.eventId,
+      dealId: input.dealId,
+      error: message,
+    });
+    Sentry.captureException(err);
+    return { success: false, error: message };
   }
 }
