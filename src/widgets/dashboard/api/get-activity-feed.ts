@@ -130,6 +130,13 @@ export async function getActivityFeed(): Promise<ActivityItem[]> {
   }
 
   // ── Crew confirmed ───────────────────────────────────────────────────
+  // TODO(Pass 3 Phase 1 follow-up): this feed reads deal_crew.confirmed_at
+  // directly, so portal-confirmed crew (which respondToCrewAssignment
+  // mirrors into deal_crew via the Phase 1 trigger) will appear here, but
+  // any direct writes to crew_assignments that bypass the mirror would be
+  // invisible. The overlay in getDealCrew is the canonical per-deal path;
+  // this feed is cross-workspace aggregation and needs a resolver variant
+  // that queries both tables and merges by timestamp.
   type CrewRow = { id: string; deal_id: string; entity_id: string; confirmed_at: string };
   for (const c of (crewRes.data ?? []) as CrewRow[]) {
     const dealTitle = dealTitleMap.get(c.deal_id) ?? 'Untitled deal';

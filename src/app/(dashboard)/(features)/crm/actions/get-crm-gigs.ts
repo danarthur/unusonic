@@ -221,7 +221,14 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
         if (ev.deal_id) eventByDealId.set(ev.deal_id as string, { id: ev.id as string, run_of_show_data: ev.run_of_show_data as Record<string, unknown> | null });
       }
 
-      // Batch-fetch crew counts per deal
+      // Batch-fetch crew counts per deal.
+      // TODO(Pass 3 Phase 1 follow-up): this is a direct read of
+      // deal_crew.confirmed_at that bypasses resolveCrewConfirmationBatch.
+      // For per-deal (per-event) contexts getDealCrew already overlays the
+      // resolver, but this stream-level aggregation batches across many
+      // events and would need a new cross-event resolver variant. Until
+      // then, portal-confirmed crew may under-count in the CRM stream
+      // readiness ribbon. Pre-existing behavior; not made worse by Pass 3.
       const wonDealIdsWithEvents = [...eventByDealId.keys()];
       const { data: crewRows } = await (supabase as any)
         .schema('ops')

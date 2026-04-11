@@ -6,6 +6,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import * as Sentry from '@sentry/nextjs';
 import { instrument } from '@/shared/lib/instrumentation';
+import { resolveCrewConfirmationBatch } from '@/shared/lib/crew/resolve-crew-confirmation';
 import { DealIds, EntityIds, DealCrewIds, WorkspaceIds, type DealId, type EntityId, type DealCrewId, type WorkspaceId } from '@/shared/types/branded-ids';
 
 // =============================================================================
@@ -377,14 +378,57 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
       }
     }
 
-    return (rows as Record<string, unknown>[]).map((r) => ({
+    // Pass 3 Phase 1 — overlay crew confirmation from the resolver.
+    // Post-handoff the portal writes to crew_assignments and the Plan lens
+    // reads confirmed_at/declined_at off this shape. Without the overlay,
+    // a portal-confirmed crew member shows as pending on the Plan lens even
+    // though Phase 1's mirror in respondToCrewAssignment writes both rows.
+    // The overlay is the read-side guarantee that "one user-level fact,
+    // every surface agrees". Pre-handoff (no event row) the lookup skips.
+    let confirmationOverlay: Awaited<ReturnType<typeof resolveCrewConfirmationBatch>> | null = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: eventRow } = await (supabase as any)
+        .schema('ops')
+        .from('events')
+        .select('id')
+        .eq('deal_id', dealId)
+        .limit(1)
+        .maybeSingle();
+      const eventId = (eventRow as { id?: string | null } | null)?.id ?? null;
+      if (eventId) {
+        const entityIds = (rows as Record<string, unknown>[])
+          .map((r) => r.entity_id as string | null)
+          .filter((id): id is string => !!id);
+        if (entityIds.length > 0) {
+          confirmationOverlay = await resolveCrewConfirmationBatch(supabase, eventId, entityIds);
+        }
+      }
+    } catch (overlayErr) {
+      // Non-fatal: if the resolver blows up we fall back to the raw RPC value.
+      Sentry.logger.error('crm.getDealCrew.confirmationOverlayFailed', {
+        dealId,
+        error: overlayErr instanceof Error ? overlayErr.message : String(overlayErr),
+      });
+    }
+
+    return (rows as Record<string, unknown>[]).map((r) => {
+      const entityId = (r.entity_id as string | null) ?? null;
+      const rawConfirmed = (r.confirmed_at as string | null) ?? null;
+      const rawDeclined = (r.declined_at as string | null) ?? null;
+      const overlaid = entityId ? confirmationOverlay?.get(entityId) ?? null : null;
+      // Prefer the resolver result when present — it already picks the
+      // freshest non-null timestamp between deal_crew and crew_assignments.
+      const confirmedAt = overlaid?.confirmedAt ?? rawConfirmed;
+      const declinedAt = overlaid?.declinedAt ?? rawDeclined;
+      return {
       id: r.id as string,
       deal_id: r.deal_id as string,
-      entity_id: (r.entity_id as string | null) ?? null,
+      entity_id: entityId,
       role_note: (r.role_note as string | null) ?? null,
       source: r.source as 'manual' | 'proposal',
       catalog_item_id: (r.catalog_item_id as string | null) ?? null,
-      confirmed_at: (r.confirmed_at as string | null) ?? null,
+      confirmed_at: confirmedAt,
       created_at: r.created_at as string,
       entity_name: (r.entity_name as string | null) ?? null,
       entity_type: (r.entity_type as string | null) ?? null,
@@ -418,14 +462,15 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
       day_rate: r.day_rate != null ? Number(r.day_rate) : null,
       crew_notes: (r.notes as string | null) ?? null,
       department: (r.department as string | null) ?? null,
-      declined_at: (r.declined_at as string | null) ?? null,
+      declined_at: declinedAt,
       payment_status: (r.payment_status as string | null) ?? null,
       travel_stipend: r.travel_stipend != null ? Number(r.travel_stipend) : null,
       per_diem: r.per_diem != null ? Number(r.per_diem) : null,
       kit_fee: r.kit_fee != null ? Number(r.kit_fee) : null,
       brings_own_gear: Boolean(r.brings_own_gear),
       gear_notes: (r.gear_notes as string | null) ?? null,
-    }));
+      };
+    });
   } catch (err) {
     console.error('[getDealCrew] CAUGHT ERROR:', err);
     Sentry.captureException(err, { tags: { module: 'crm', action: 'getDealCrew' } });
