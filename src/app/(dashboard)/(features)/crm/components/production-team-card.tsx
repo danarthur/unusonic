@@ -156,16 +156,23 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
 
   const handleRemindAll = async () => {
     setReminding(true);
-    const { sent, skipped } = await remindAllUnconfirmed(dealId);
+    const result = await remindAllUnconfirmed(dealId);
     setReminding(false);
+    const { sent, skipped, notHandedOff } = result;
     if (sent === 0 && skipped === 0) {
       toast('No pending crew to remind');
-    } else {
-      const parts: string[] = [];
-      if (sent > 0) parts.push(`${sent} crew ready to remind (email flow coming soon)`);
-      if (skipped > 0) parts.push(`${skipped} skipped (no email)`);
-      toast(parts.join(' \u2014 '));
+      return;
     }
+    if (notHandedOff) {
+      toast('Reminders unavailable — hand over to production first.', {
+        description: `${skipped} pending crew waiting.`,
+      });
+      return;
+    }
+    const parts: string[] = [];
+    if (sent > 0) parts.push(`Reminded ${sent} crew`);
+    if (skipped > 0) parts.push(`${skipped} skipped`);
+    toast(parts.join(' \u2014 '));
   };
 
   const toggleDept = (dept: string) => {

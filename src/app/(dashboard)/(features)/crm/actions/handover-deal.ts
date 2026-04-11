@@ -3,6 +3,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
+import * as Sentry from '@sentry/nextjs';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { syncGearFromProposalToEvent } from './sync-gear-from-proposal';
 import { seedAdvancingChecklist } from './advancing-checklist';
@@ -200,22 +201,54 @@ export async function handoverDeal(
     syncCrewRatesToAssignments(eventId, dealId),
   ]);
   if (crewSyncResult.status === 'rejected') {
-    console.error('[handoff] crew sync failed:', crewSyncResult.reason);
+    const reason = crewSyncResult.reason instanceof Error
+      ? crewSyncResult.reason.message
+      : String(crewSyncResult.reason);
+    Sentry.logger.error('crm.handoverDeal.crewSyncFailed', {
+      dealId,
+      eventId,
+      workspaceId,
+      error: reason,
+    });
     warnings.push('Crew sync failed — you may need to re-add crew on the Plan tab.');
   }
 
-  // Non-critical: gear + checklist + DJ client seed (fire-and-forget)
-  syncGearFromProposalToEvent(eventId).catch((err) =>
-    console.error('[CRM] handoverDeal gear sync:', err)
-  );
-  seedAdvancingChecklist(eventId, archetype).catch((err) =>
-    console.error('[CRM] handoverDeal checklist seed:', err)
-  );
+  // Non-critical: gear + checklist + DJ client seed (fire-and-forget).
+  // These were previously `.catch(console.error)` — failures were invisible and the
+  // user saw a half-built event (empty gear flight check, missing advancing checklist,
+  // blank DJ prep) with no indication anything went wrong. Now captured to Sentry.
+  syncGearFromProposalToEvent(eventId).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    Sentry.logger.error('crm.handoverDeal.gearSyncFailed', {
+      dealId,
+      eventId,
+      workspaceId,
+      error: message,
+    });
+  });
+  seedAdvancingChecklist(eventId, archetype).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    Sentry.logger.error('crm.handoverDeal.advancingChecklistSeedFailed', {
+      dealId,
+      eventId,
+      workspaceId,
+      archetype,
+      error: message,
+    });
+  });
   // Seed DJ client info from client entity (couple names → dj_client_details)
   if (clientEntityId) {
-    seedDjClientInfo(supabase, eventId, clientEntityId, archetype).catch((err) =>
-      console.error('[CRM] handoverDeal DJ client seed:', err)
-    );
+    seedDjClientInfo(supabase, eventId, clientEntityId, archetype).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      Sentry.logger.error('crm.handoverDeal.djClientSeedFailed', {
+        dealId,
+        eventId,
+        workspaceId,
+        clientEntityId,
+        archetype,
+        error: message,
+      });
+    });
   }
 
   const { error: updateErr } = await supabase

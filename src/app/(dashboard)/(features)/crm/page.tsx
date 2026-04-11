@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { getCurrentOrgId } from '@/features/network/api/actions';
@@ -272,7 +273,20 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
       }
     }
   } catch (err) {
-    console.error('[CRM] page load error:', err);
+    // The CRM page wraps its entire data load (currentOrg, deals, events,
+    // stakeholders, directory lookups, follow-up queue) in one try/catch. On
+    // failure the user sees an empty grid with no indication anything went
+    // wrong — "no deals yet" is indistinguishable from "workspace_id null" or
+    // "RLS rejected my query". Surface the failure to Sentry so the team can
+    // diagnose. (Fully fixing the UX — showing an inline error in
+    // ProductionGridShell — is still tracked separately.)
+    const message = err instanceof Error ? err.message : String(err);
+    Sentry.logger.error('crm.page.dataLoadFailed', {
+      selectedId,
+      streamMode,
+      error: message,
+    });
+    Sentry.captureException(err);
   }
 
   const effectiveSelectedId =

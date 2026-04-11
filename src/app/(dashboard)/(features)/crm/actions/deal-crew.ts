@@ -1039,13 +1039,26 @@ export async function searchCrewMembers(
 
 // =============================================================================
 // remindAllUnconfirmed — batch remind all pending (unconfirmed, not declined) crew
-// Returns counts for toast display. Actual email sending to be wired once
-// deal_crew has its own confirmation token flow (currently crew_assignments only).
+// Post-handoff only: reminders go via sendCrewReminderByEntity which looks up the
+// matching crew_assignments row (workspace-scoped, status='requested') and delegates
+// to sendCrewReminder. Returns counts for toast display.
+//
+// Pre-handoff (no deal.event_id yet): returns { sent: 0, skipped: pending.length,
+// notHandedOff: true } so the caller can tell the user reminders are unavailable
+// until the deal is handed over to production. Pre-handoff reminders would require
+// a separate token flow on deal_crew which does not exist yet.
 // =============================================================================
+
+export type RemindAllResult = {
+  sent: number;
+  skipped: number;
+  /** True if the deal has not been handed off yet — no crew_assignments exist. */
+  notHandedOff?: boolean;
+};
 
 export async function remindAllUnconfirmed(
   dealId: string,
-): Promise<{ sent: number; skipped: number }> {
+): Promise<RemindAllResult> {
   return instrument('remindAllUnconfirmed', async () => {
   const parsed = z.string().uuid().safeParse(dealId);
   if (!parsed.success) return { sent: 0, skipped: 0 };
@@ -1055,6 +1068,16 @@ export async function remindAllUnconfirmed(
 
   try {
     const supabase = await createClient();
+
+    // Resolve event_id from deal — required because sendCrewReminderByEntity looks
+    // up crew_assignments by event_id, and crew_assignments only exists post-handoff.
+    const { data: dealRow } = await supabase
+      .from('deals')
+      .select('event_id')
+      .eq('id', dealId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    const eventId = (dealRow as { event_id?: string | null } | null)?.event_id ?? null;
 
     // Fetch all pending crew (assigned but not confirmed, not declined)
     const { data: pendingRows } = await (supabase as any)
@@ -1068,35 +1091,23 @@ export async function remindAllUnconfirmed(
       .is('declined_at', null);
 
     if (!pendingRows?.length) return { sent: 0, skipped: 0 };
+    const pending = pendingRows as { id: string; entity_id: string }[];
 
-    // Resolve emails from directory.entities
-    const entityIds = (pendingRows as { id: string; entity_id: string }[]).map((r) => r.entity_id);
-    const { data: entities } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('id, type, attributes')
-      .in('id', entityIds);
-
-    const emailMap = new Map<string, string | null>();
-    for (const e of (entities ?? []) as { id: string; type: string | null; attributes: unknown }[]) {
-      const t = e.type ?? 'person';
-      let email: string | null = null;
-      if (t === 'person') {
-        email = readEntityAttrs(e.attributes, 'person').email ?? null;
-      } else if (t === 'individual') {
-        email = readEntityAttrs(e.attributes, 'individual').email ?? null;
-      } else if (t === 'company') {
-        email = readEntityAttrs(e.attributes, 'company').support_email ?? null;
-      }
-      emailMap.set(e.id, email);
+    if (!eventId) {
+      // Pre-handoff: no crew_assignments exist, so the token-based reminder path
+      // can't reach these crew members yet. Surface the state honestly instead of
+      // silently pretending the reminders went out.
+      return { sent: 0, skipped: pending.length, notHandedOff: true };
     }
+
+    // Dynamic import to avoid server-action circular type issues.
+    const { sendCrewReminderByEntity } = await import('./send-crew-reminder-by-entity');
 
     let sent = 0;
     let skipped = 0;
-    for (const row of pendingRows as { id: string; entity_id: string }[]) {
-      const email = emailMap.get(row.entity_id);
-      if (email) {
-        // TODO: Wire to actual deal_crew reminder email when token flow is ready
+    for (const row of pending) {
+      const result = await sendCrewReminderByEntity(eventId, row.entity_id);
+      if (result.success) {
         sent++;
       } else {
         skipped++;

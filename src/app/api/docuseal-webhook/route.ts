@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHmac } from 'crypto';
+import * as Sentry from '@sentry/nextjs';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { revalidatePath } from 'next/cache';
 import { sendProposalAcceptedEmail, sendProposalSignedNotificationEmail } from '@/shared/api/email/send';
@@ -92,7 +93,11 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
   const completedAt = submitter?.completed_at ?? new Date().toISOString();
 
   if (!proposalId || !metaWorkspaceId) {
-    console.error('[docuseal-webhook] Missing proposal_id or workspace_id in metadata');
+    Sentry.logger.error('docuseal.webhook.missingMetadata', {
+      submissionId: payload.id,
+      hasProposalId: !!proposalId,
+      hasWorkspaceId: !!metaWorkspaceId,
+    });
     return;
   }
 
@@ -104,7 +109,11 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     .maybeSingle();
 
   if (fetchErr || !proposal) {
-    console.error('[docuseal-webhook] Proposal not found:', proposalId);
+    Sentry.logger.error('docuseal.webhook.proposalNotFound', {
+      proposalId,
+      error: fetchErr?.message ?? null,
+      submissionId: payload.id,
+    });
     return;
   }
 
@@ -119,7 +128,13 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
 
   // Cross-workspace protection
   if (p.workspace_id !== metaWorkspaceId) {
-    console.error('[docuseal-webhook] workspace_id mismatch — possible forgery');
+    // This is a potential forgery attempt — log prominently.
+    Sentry.logger.error('docuseal.webhook.workspaceMismatch', {
+      proposalId,
+      proposalWorkspaceId: p.workspace_id,
+      metadataWorkspaceId: metaWorkspaceId,
+      submissionId: payload.id,
+    });
     return;
   }
 
@@ -129,8 +144,14 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     return;
   }
 
-  // Upload signed PDF to Supabase Storage (best-effort)
+  // Upload signed PDF to Supabase Storage (best-effort).
+  // SECURITY NOTE: on upload failure we currently persist `signedDocUrl` (a raw
+  // docuseal.com URL) as `signed_pdf_path`. That URL is externally reachable and
+  // the PDF contains signed contract content — so every failure here is a
+  // compliance-sensitive event. Escalate to Sentry at logger.error so the team
+  // can investigate storage health and retry manually.
   let signedPdfPath: string | null = signedDocUrl; // fallback to DocuSeal URL
+  let storageUploadSucceeded = false;
   if (signedDocUrl) {
     try {
       // Validate DocuSeal domain before fetching (SSRF guard)
@@ -147,13 +168,39 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
           .upload(storagePath, pdfBuffer, { contentType: 'application/pdf', upsert: true });
         if (!uploadErr) {
           signedPdfPath = storagePath;
+          storageUploadSucceeded = true;
         } else {
-          console.error('[docuseal-webhook] Storage upload failed:', uploadErr.message);
+          Sentry.logger.error('docuseal.webhook.storageUploadFailed', {
+            proposalId,
+            workspaceId: p.workspace_id,
+            dealId: p.deal_id,
+            storagePath,
+            error: uploadErr.message,
+            fallback: 'persisting raw docuseal.com URL as signed_pdf_path',
+          });
         }
+      } else {
+        Sentry.logger.error('docuseal.webhook.pdfDownloadFailed', {
+          proposalId,
+          status: pdfResponse.status,
+          fallback: 'persisting raw docuseal.com URL',
+        });
       }
     } catch (e) {
-      console.error('[docuseal-webhook] PDF download/upload failed:', e);
+      const message = e instanceof Error ? e.message : String(e);
+      Sentry.logger.error('docuseal.webhook.pdfFetchThrew', {
+        proposalId,
+        workspaceId: p.workspace_id,
+        error: message,
+        fallback: 'persisting raw docuseal.com URL',
+      });
     }
+  }
+  if (!storageUploadSucceeded && signedDocUrl) {
+    Sentry.logger.warn('docuseal.webhook.usingRawDocusealUrlFallback', {
+      proposalId,
+      workspaceId: p.workspace_id,
+    });
   }
 
   // Update proposal
@@ -229,7 +276,15 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     totalFormatted,
     depositAmount,
     depositDueDays,
-  }).catch((e) => console.error('[docuseal-webhook] Client confirmation email failed:', e));
+  }).catch((e) => {
+    const message = e instanceof Error ? e.message : String(e);
+    Sentry.logger.error('docuseal.webhook.clientConfirmationEmailFailed', {
+      proposalId,
+      workspaceId: p.workspace_id,
+      recipient: submitter.email,
+      error: message,
+    });
+  });
 
   // Send internal notification to workspace admin (best-effort — look up admin email)
   const { data: adminRows } = await supabase
@@ -261,7 +316,15 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
           totalFormatted,
           signerEmail,
           eventDate,
-        }).catch((e) => console.error('[docuseal-webhook] Admin notification email failed:', e));
+        }).catch((e) => {
+          const message = e instanceof Error ? e.message : String(e);
+          Sentry.logger.error('docuseal.webhook.adminNotificationEmailFailed', {
+            proposalId,
+            workspaceId: p.workspace_id,
+            recipient: adminEmail,
+            error: message,
+          });
+        });
       }
     }
   }
@@ -298,7 +361,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     await handleSubmissionCompleted(payload.data);
   } catch (e) {
-    console.error('[docuseal-webhook] Handler threw:', e);
+    const message = e instanceof Error ? e.message : String(e);
+    Sentry.logger.error('docuseal.webhook.handlerThrew', {
+      submissionId: payload.data?.id,
+      error: message,
+    });
+    // Capture the full exception too so we get a stack trace.
+    Sentry.captureException(e);
     // Return 500 so DocuSeal retries
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }

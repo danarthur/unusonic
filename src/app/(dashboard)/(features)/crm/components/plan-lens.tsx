@@ -31,6 +31,7 @@ import { computeReadiness } from '../lib/compute-readiness';
 import { getProposalForDeal, getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
 import type { ProposalWithItems } from '@/features/sales/model/types';
 import { getDealCrew, getDealCrewForEvent, type DealCrewRow } from '../actions/deal-crew';
+import { getEventGearItems, type EventGearItem } from '../actions/event-gear-items';
 import { getEventLoadDates } from '../actions/get-event-summary';
 import { getContractForEvent } from '../actions/get-contract-for-event';
 import { updateDealScalars } from '../actions/update-deal-scalars';
@@ -118,8 +119,25 @@ export function PlanLens({
   }, [dealId, eventId]);
   useEffect(() => { fetchCrew(); }, [fetchCrew]);
 
+  // Live gear items from ops.event_gear_items — feeds the readiness ribbon with
+  // the real source of truth instead of the stale event.run_of_show_data.gear_items
+  // JSONB snapshot that only ever gets populated at handoff via
+  // syncGearFromProposalToEvent. Prior behavior: the ribbon's gear counts froze at
+  // handoff and never reflected Gear Flight Check mutations.
+  const [gearItemsLive, setGearItemsLive] = useState<EventGearItem[]>([]);
+  const fetchGearItems = useCallback(async () => {
+    if (!eventId) {
+      setGearItemsLive([]);
+      return;
+    }
+    const items = await getEventGearItems(eventId);
+    setGearItemsLive(items);
+  }, [eventId]);
+  useEffect(() => { fetchGearItems(); }, [fetchGearItems]);
+
   const handleCrewUpdated = () => {
     fetchCrew();
+    fetchGearItems();
     onEventUpdated?.();
   };
 
@@ -240,17 +258,20 @@ export function PlanLens({
     : undefined;
 
   // ── Readiness ribbon (post-handoff only) ──
+  // gear counts come from the live ops.event_gear_items table via `gearItemsLive`
+  // state, not from event.run_of_show_data.gear_items (the handoff-time snapshot).
+  // Everything else still reads from event.run_of_show_data because logistics/transport
+  // are authored directly in that JSONB today.
   const readiness = useMemo(() => {
     if (!isPostHandoff) return null;
-    const gearItems = event?.run_of_show_data?.gear_items ?? [];
     const loadedStatuses = ['loaded', 'on_site', 'returned'];
     return computeReadiness({
       crewAssigned: crewRows.filter((r) => r.entity_id).length,
       crewConfirmed: crewRows.filter((r) => r.confirmed_at).length,
       crewDeclined: crewRows.filter((r) => r.declined_at).length,
-      gearTotal: gearItems.length,
-      gearLoaded: gearItems.filter((g) => loadedStatuses.includes(g.status)).length,
-      gearAllocatedOnly: gearItems.filter((g) => g.status === 'allocated' || g.status === 'pending').length,
+      gearTotal: gearItemsLive.length,
+      gearLoaded: gearItemsLive.filter((g) => loadedStatuses.includes(g.status)).length,
+      gearAllocatedOnly: gearItemsLive.filter((g) => g.status === 'allocated').length,
       hasVenueStakeholder: stakeholders.some((s) => s.role === 'venue_contact'),
       venueAccessConfirmed: event?.run_of_show_data?.logistics?.venue_access_confirmed ?? false,
       hasTransportMode: !!(event?.run_of_show_data?.transport_mode || event?.run_of_show_data?.logistics?.transport_mode),
@@ -258,7 +279,7 @@ export function PlanLens({
       transportMode: event?.run_of_show_data?.transport_mode ?? null,
       hasClientStakeholder: stakeholders.some((s) => s.role === 'bill_to'),
     });
-  }, [crewRows, event, stakeholders, isPostHandoff]);
+  }, [crewRows, gearItemsLive, event, stakeholders, isPostHandoff]);
 
   const hasVenue = stakeholders.some((s) => s.role === 'venue_contact') || !!deal?.venue_id;
 

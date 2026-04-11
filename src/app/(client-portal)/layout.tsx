@@ -20,6 +20,7 @@ import 'server-only';
 
 import { redirect } from 'next/navigation';
 import { headers as nextHeaders } from 'next/headers';
+import * as Sentry from '@sentry/nextjs';
 
 import {
   getClientPortalContext,
@@ -44,7 +45,15 @@ export default async function ClientPortalLayout({
       null;
     const ua = h.get('user-agent');
     // Fire-and-forget — don't block the render on rotation.
-    rotateClientPortalSession({ ip, userAgent: ua }).catch(() => {});
+    // Repeated rotation failures would silently expire the session into the
+    // dead-end /client/sign-in page, so capture to Sentry for observability.
+    rotateClientPortalSession({ ip, userAgent: ua }).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      Sentry.logger.error('clientPortal.layout.sessionRotationFailed', {
+        contextKind: context.kind,
+        error: message,
+      });
+    });
   }
 
   const isSignInRoute =

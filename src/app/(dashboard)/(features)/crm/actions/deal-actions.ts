@@ -2,6 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
+import * as Sentry from '@sentry/nextjs';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { INDIVIDUAL_ATTR, COUPLE_ATTR } from '@/features/network-data/model/attribute-keys';
 import { canCreateShow } from '@/shared/lib/show-limits';
@@ -280,15 +281,31 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       stakeholderRows.push({ deal_id: deal.id, organization_id: plannerEntityId, entity_id: null, role: 'planner', is_primary: false });
     }
     if (stakeholderRows.length > 0) {
-      await supabase.schema('ops').from('deal_stakeholders').insert(stakeholderRows);
-      // silent — deal is already saved; stakeholder insert failure is non-fatal
+      const { error: stakeholderErr } = await supabase
+        .schema('ops')
+        .from('deal_stakeholders')
+        .insert(stakeholderRows);
+      // Non-fatal: the deal row is already saved and useful without stakeholders,
+      // but the Prism Deal lens reads client/venue display from deal_stakeholders
+      // — so a failure here produces a silently-broken Deal lens. Escalate to
+      // Sentry so the team can reconcile manually.
+      if (stakeholderErr) {
+        Sentry.logger.error('crm.createDeal.stakeholderInsertFailed', {
+          dealId: deal.id,
+          workspaceId,
+          rowCount: stakeholderRows.length,
+          error: stakeholderErr.message,
+          code: stakeholderErr.code ?? null,
+        });
+      }
     }
 
     // If notes were provided, seed them as the first diary entry
     if (notes?.trim()) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await (supabase as any)
+
+        const { error: noteErr } = await (supabase as any)
           .schema('ops')
           .from('deal_notes')
           .insert({
@@ -299,7 +316,16 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
             attachments: [],
             phase_tag: 'general',
           });
-        // Non-fatal — deal is already saved
+        // Non-fatal — deal is already saved, diary entry is a convenience
+        if (noteErr) {
+          Sentry.logger.error('crm.createDeal.noteSeedFailed', {
+            dealId: deal.id,
+            workspaceId,
+            userId: user.id,
+            error: noteErr.message,
+            code: noteErr.code ?? null,
+          });
+        }
       }
     }
 
