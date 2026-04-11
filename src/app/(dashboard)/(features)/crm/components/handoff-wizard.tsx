@@ -83,7 +83,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
       const entityId = billTo.entity_id ?? '';
       if (entityId) setClientEntityId(entityId);
     }
-   
+
   }, []);
 
   // Resolve venue display name when deal already has a venue_id pre-populated
@@ -235,8 +235,8 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
           <span
             key={label}
             className={cn(
-              'text-xs font-medium uppercase tracking-widest',
-              i === stepIndex ? 'text-[var(--stage-text-primary)]' : i < stepIndex ? 'text-[var(--stage-text-secondary)]' : 'text-[var(--stage-text-secondary)]/50'
+              'stage-label',
+              i === stepIndex ? 'text-[var(--stage-text-primary)]' : i < stepIndex ? '' : 'text-[var(--stage-text-tertiary)]'
             )}
           >
             {i + 1}. {label}
@@ -256,7 +256,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
               className="flex flex-col gap-5"
             >
               <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Date & time</p>
+                <p className="stage-label">Date & time</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="handoff-start" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Start</label>
@@ -281,7 +281,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                 </div>
               </div>
               <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Venue & client</p>
+                <p className="stage-label">Venue & client</p>
 
                 {/* Venue search */}
                 <div>
@@ -433,7 +433,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
               className="flex flex-col gap-5"
             >
               <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Tech & gear</p>
+                <p className="stage-label">Tech & gear</p>
                 <div>
                   <label htmlFor="handoff-gear" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Tech specs / gear requirements</label>
                   <textarea
@@ -470,7 +470,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
               className="flex flex-col gap-5"
             >
               <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Required roles</p>
+                <p className="stage-label">Required roles</p>
                 <p className="text-sm text-[var(--stage-text-secondary)]">Specify roles (e.g. Lead DJ, Lighting Tech, FOH).</p>
                 <ul className="space-y-2">
                   {crewRoles.map((role, i) => (
@@ -531,7 +531,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
           type="button"
           onClick={handleNext}
           disabled={submitting}
-          className="bg-[var(--stage-void)] text-[var(--stage-text-primary)] px-5 py-2.5 rounded-full stage-panel flex items-center gap-2 text-sm font-medium tracking-tight disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors hover:bg-[var(--stage-surface-hover)]"
+          className="bg-[var(--stage-void)] text-[var(--stage-text-primary)] px-5 py-2.5 rounded-full stage-panel flex items-center gap-2 text-sm font-medium tracking-tight disabled:opacity-45 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors stage-hover overflow-hidden"
         >
           {submitting ? 'Handing over…' : isLast ? 'Hand over' : 'Next'}
           {!submitting && !isLast && <ChevronRight size={18} strokeWidth={1.5} aria-hidden />}

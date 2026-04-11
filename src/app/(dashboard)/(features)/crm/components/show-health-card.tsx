@@ -84,7 +84,7 @@ export function ShowHealthCard({ dealId, health, onSaved, inline }: ShowHealthCa
                     key={key}
                     type="button"
                     onClick={() => setStatus(key)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-tight transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     style={{
                       borderRadius: 'var(--stage-radius-input, 6px)',
                       color: status === key ? color : 'var(--stage-text-tertiary)',
@@ -112,7 +112,7 @@ export function ShowHealthCard({ dealId, health, onSaved, inline }: ShowHealthCa
               placeholder="Brief status update..."
               maxLength={500}
               rows={2}
-              className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.20)] resize-none tracking-tight"
+              className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)] resize-none tracking-tight"
               style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
             />
 
@@ -122,7 +122,7 @@ export function ShowHealthCard({ dealId, health, onSaved, inline }: ShowHealthCa
                 type="button"
                 onClick={handleSave}
                 disabled={isPending}
-                className="stage-btn stage-btn-secondary px-3 py-1 text-xs disabled:opacity-40"
+                className="stage-btn stage-btn-secondary px-3 py-1 text-xs disabled:opacity-45"
               >
                 {isPending ? 'Saving...' : 'Save'}
               </button>
@@ -158,7 +158,7 @@ export function ShowHealthCard({ dealId, health, onSaved, inline }: ShowHealthCa
                     className="size-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: cfg.color }}
                   />
-                  <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">
+                  <span className="stage-readout">
                     {cfg.label}
                   </span>
                 </div>

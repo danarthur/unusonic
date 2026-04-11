@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { ArrowLeft } from 'lucide-react';
+import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 export default async function DealDetailPage({
   params,
@@ -26,16 +27,17 @@ export default async function DealDetailPage({
   const r = deal as Record<string, unknown>;
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <AionPageContextSetter type="deal" entityId={dealId} label={(r.title as string) ?? null} />
       <header className="shrink-0 flex items-center gap-4 p-4 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]">
         <Link
           href="/crm"
-          className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+          className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label="Back to Production Queue"
         >
           <ArrowLeft size={20} strokeWidth={1.5} />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
+          <p className="stage-label">
             Deal
           </p>
           <p className="text-sm text-[var(--stage-text-primary)] truncate">
@@ -48,30 +50,30 @@ export default async function DealDetailPage({
         <div className="stage-panel p-6 max-w-xl rounded-[var(--stage-radius-panel)]">
           <dl className="grid gap-4 text-sm">
             <div>
-              <dt className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">Status</dt>
+              <dt className="stage-label mb-1">Status</dt>
               <dd className="text-[var(--stage-text-primary)]">{(r.status as string) ?? '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">Proposed date</dt>
+              <dt className="stage-label mb-1">Proposed date</dt>
               <dd className="text-[var(--stage-text-primary)]">
                 {r.proposed_date ? new Date(r.proposed_date as string).toLocaleDateString() : '—'}
               </dd>
             </div>
             {r.event_archetype != null ? (
               <div>
-                <dt className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">Show type</dt>
+                <dt className="stage-label mb-1">Show type</dt>
                 <dd className="text-[var(--stage-text-primary)]">{String(r.event_archetype).replace(/_/g, ' ')}</dd>
               </div>
             ) : null}
             {r.notes != null && r.notes !== '' ? (
               <div>
-                <dt className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">Notes</dt>
+                <dt className="stage-label mb-1">Notes</dt>
                 <dd className="text-[var(--stage-text-secondary)] whitespace-pre-wrap">{String(r.notes)}</dd>
               </div>
             ) : null}
             {r.budget_estimated != null && (
               <div>
-                <dt className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1">Budget (est.)</dt>
+                <dt className="stage-label mb-1">Budget (est.)</dt>
                 <dd className="text-[var(--stage-text-primary)]">{Number(r.budget_estimated).toLocaleString()}</dd>
               </div>
             )}

@@ -6,9 +6,11 @@ import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { syncGearFromProposalToEvent } from './sync-gear-from-proposal';
 import { seedAdvancingChecklist } from './advancing-checklist';
+import { syncCrewRatesToAssignments } from './sync-crew-rates-to-assignments';
+import { instrument } from '@/shared/lib/instrumentation';
 
 export type HandoverResult =
-  | { success: true; eventId: string }
+  | { success: true; eventId: string; warnings?: string[] }
   | { success: false; error: string };
 
 /** Vitals from the handoff wizard: date/time, venue, client. */
@@ -44,6 +46,7 @@ export async function handoverDeal(
   dealId: string,
   payload?: HandoverPayload | null
 ): Promise<HandoverResult> {
+  return instrument('handoverDeal', async () => {
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) {
     return { success: false, error: 'No active workspace.' };
@@ -89,7 +92,7 @@ export async function handoverDeal(
   }
 
   const status = (r.status as string) ?? '';
-  if (!['contract_signed', 'deposit_received'].includes(status as string)) {
+  if (!['contract_signed', 'deposit_received', 'won'].includes(status as string)) {
     return { success: false, error: 'Contract must be signed before handover.' };
   }
 
@@ -172,6 +175,7 @@ export async function handoverDeal(
       ends_at: endAt,
       venue_entity_id: venueEntityId,
       client_entity_id: clientEntityId,
+      event_archetype: (deal as Record<string, unknown>).event_archetype as string | null,
       run_of_show_data: runOfShowData,
     })
     .select('id')
@@ -192,16 +196,32 @@ export async function handoverDeal(
       .eq('id', projectId);
   }
 
-  // C1: Auto-map proposal gear → event gear items (fire-and-forget, non-blocking)
+  // Post-handoff sync tasks — crew sync is awaited (critical for portal),
+  // gear + checklist are fire-and-forget (non-critical enrichment)
+  const archetype = (deal as Record<string, unknown>).event_archetype as string | null;
+  const warnings: string[] = [];
+
+  const [crewSyncResult] = await Promise.allSettled([
+    syncCrewRatesToAssignments(eventId, dealId),
+  ]);
+  if (crewSyncResult.status === 'rejected') {
+    console.error('[handoff] crew sync failed:', crewSyncResult.reason);
+    warnings.push('Crew sync failed — you may need to re-add crew on the Plan tab.');
+  }
+
+  // Non-critical: gear + checklist + DJ client seed (fire-and-forget)
   syncGearFromProposalToEvent(eventId).catch((err) =>
     console.error('[CRM] handoverDeal gear sync:', err)
   );
-
-  // Seed advancing checklist with archetype template
-  const archetype = (deal as Record<string, unknown>).event_archetype as string | null;
   seedAdvancingChecklist(eventId, archetype).catch((err) =>
     console.error('[CRM] handoverDeal checklist seed:', err)
   );
+  // Seed DJ client info from client entity (couple names → dj_client_details)
+  if (clientEntityId) {
+    seedDjClientInfo(supabase, eventId, clientEntityId, archetype).catch((err) =>
+      console.error('[CRM] handoverDeal DJ client seed:', err)
+    );
+  }
 
   const { error: updateErr } = await supabase
     .from('deals')
@@ -238,5 +258,74 @@ export async function handoverDeal(
   revalidatePath('/crm');
   revalidatePath('/');
   revalidatePath('/network');
-  return { success: true, eventId };
+  return { success: true, eventId, warnings: warnings.length > 0 ? warnings : undefined };
+  });
+}
+
+/**
+ * Seed dj_client_details from the client entity.
+ * Writes archetype-aware fields so the DJ starts with context.
+ * Also writes legacy dj_client_info for backward compat.
+ */
+async function seedDjClientInfo(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventId: string,
+  clientEntityId: string,
+  archetype: string | null,
+) {
+  const { data: entity } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('display_name, type, attributes')
+    .eq('id', clientEntityId)
+    .maybeSingle();
+
+  if (!entity) return;
+
+  const attrs = (entity.attributes ?? {}) as Record<string, unknown>;
+  const displayName = entity.display_name ?? '';
+
+  // Build archetype-aware client details
+  const { emptyClientDetails, archetypeToGroup } = await import('@/features/ops/lib/dj-prep-schema');
+  const details = emptyClientDetails(archetype);
+
+  if (details.archetype === 'wedding' && entity.type === 'couple') {
+    const a = (attrs.first_name_a as string) ?? '';
+    const b = (attrs.first_name_b as string) ?? '';
+    details.couple_name_a = a;
+    details.couple_name_b = b;
+  } else if (details.archetype === 'wedding') {
+    // Non-couple entity on a wedding — use display name as couple_name_a
+    details.couple_name_a = displayName;
+  } else if (details.archetype === 'corporate') {
+    details.company_name = displayName;
+  } else if (details.archetype === 'social') {
+    details.honoree_name = displayName;
+  } else if (details.archetype === 'performance') {
+    details.headliner = displayName;
+  } else {
+    details.primary_contact_name = displayName;
+  }
+
+  // Also build legacy couple names for backward compat
+  let coupleNames = displayName;
+  if (entity.type === 'couple') {
+    const a = (attrs.first_name_a as string) ?? '';
+    const b = (attrs.first_name_b as string) ?? '';
+    if (a && b) coupleNames = `${a} & ${b}`;
+  }
+
+  // Merge into existing run_of_show_data without clobbering other keys
+  await supabase.rpc('patch_event_ros_data', {
+    p_event_id: eventId,
+    p_patch: {
+      dj_client_details: details,
+      dj_client_info: {
+        couple_names: coupleNames,
+        pronunciation: '',
+        wedding_party: '',
+        special_requests: '',
+      },
+    },
+  });
 }

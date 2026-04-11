@@ -159,9 +159,9 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
     (searchResults.events.length > 0 || searchResults.invoices.length > 0);
 
   const itemClass =
-    'flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[var(--stage-text-primary)] text-sm transition-colors duration-200 data-[selected=true]:bg-[var(--stage-surface-hover)] data-[selected=true]:text-[var(--stage-text-primary)] [&[data-selected=true]_svg]:text-[var(--stage-text-primary)]';
+    'flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[var(--stage-text-primary)] text-sm transition-colors duration-200 data-[selected=true]:bg-[oklch(1_0_0_/_0.08)] data-[selected=true]:text-[var(--stage-text-primary)] [&[data-selected=true]_svg]:text-[var(--stage-text-primary)]';
   const groupHeadingClass =
-    '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-[var(--stage-text-secondary)]/80';
+    '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:stage-label [&_[cmdk-group-heading]]:text-[var(--stage-text-secondary)]/80';
 
   return (
     <Command.Dialog

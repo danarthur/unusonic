@@ -303,14 +303,14 @@ export function CatalogTimeline({ packages, workspaceId }: CatalogTimelineProps)
                         weekend && !today && 'bg-[oklch(1_0_0_/_0.02)]'
                       )}
                     >
-                      <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
+                      <div className="stage-label">
                         {dayName(d)}
                       </div>
                       <div
                         className={cn(
                           'text-xs tabular-nums mt-0.5',
                           today
-                            ? 'text-[var(--stage-text-primary)] font-semibold'
+                            ? 'text-[var(--stage-text-primary)] font-medium'
                             : 'text-[var(--stage-text-secondary)]'
                         )}
                       >
@@ -345,7 +345,7 @@ export function CatalogTimeline({ packages, workspaceId }: CatalogTimelineProps)
                         <div className="text-sm font-medium text-[var(--stage-text-primary)] group-hover:text-[var(--stage-accent)] transition-colors truncate">
                           {pkg.name}
                         </div>
-                        <div className="text-[10px] text-[var(--stage-text-secondary)] tabular-nums mt-0.5">
+                        <div className="text-label text-[var(--stage-text-secondary)] tabular-nums mt-0.5">
                           {stock} in stock
                         </div>
                       </td>
@@ -366,16 +366,16 @@ export function CatalogTimeline({ packages, workspaceId }: CatalogTimelineProps)
                           const ratio = cell.total / (stock || 1);
                           if (ratio >= 1) {
                             statusClass = 'shortage';
-                            barBg = 'bg-red-500/20';
-                            textColor = 'text-red-400';
+                            barBg = 'bg-[var(--color-unusonic-error)]/20';
+                            textColor = 'text-[var(--color-unusonic-error)]';
                           } else if (ratio >= 0.5) {
                             statusClass = 'tight';
-                            barBg = 'bg-amber-500/20';
-                            textColor = 'text-amber-400';
+                            barBg = 'bg-[var(--color-unusonic-warning)]/20';
+                            textColor = 'text-[var(--color-unusonic-warning)]';
                           } else {
                             statusClass = 'available';
-                            barBg = 'bg-emerald-500/20';
-                            textColor = 'text-emerald-400';
+                            barBg = 'bg-[var(--color-unusonic-success)]/20';
+                            textColor = 'text-[var(--color-unusonic-success)]';
                           }
                         }
 
@@ -418,8 +418,7 @@ export function CatalogTimeline({ packages, workspaceId }: CatalogTimelineProps)
                                   )}
                                 >
                                   {cell.total}
-                                  {statusClass === 'shortage' && '!'}
-                                </span>
+                                                                  </span>
                               </motion.div>
                             )}
                           </td>
@@ -440,7 +439,7 @@ export function CatalogTimeline({ packages, workspaceId }: CatalogTimelineProps)
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="absolute inset-0 flex items-center justify-center bg-[var(--stage-void)]/60 backdrop-blur-sm z-20 rounded-[var(--stage-radius-panel)]"
+                className="absolute inset-0 flex items-center justify-center bg-[var(--stage-void)]/75 z-20 rounded-[var(--stage-radius-panel)]"
               >
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-5 h-5 border-2 border-[var(--stage-text-secondary)] border-t-transparent rounded-full animate-spin" />
@@ -470,7 +469,7 @@ export function CatalogTimeline({ packages, workspaceId }: CatalogTimelineProps)
             }}
           >
             <div className="bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0_/_0.12)] rounded-[var(--stage-radius-nested)] shadow-lg px-3 py-2 max-w-[240px]">
-              <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1.5">
+              <div className="stage-label mb-1.5">
                 {tooltip.itemName} — {tooltip.dateLabel}
               </div>
               {tooltip.cell.deals.map((deal, i) => (

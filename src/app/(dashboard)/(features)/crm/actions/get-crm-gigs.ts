@@ -174,13 +174,13 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
     const { data: queueItems } = await (supabase as any)
       .schema('ops')
       .from('follow_up_queue')
-      .select('deal_id, reason, priority_score, status')
+      .select('deal_id, reason, reason_type, priority_score, status, follow_up_category')
       .eq('workspace_id', workspaceId)
       .in('status', ['pending', 'snoozed']);
 
     if (queueItems && queueItems.length > 0) {
-      const followUpMap = new Map<string, { reason: string; priority_score: number; status: string }>();
-      for (const q of queueItems as { deal_id: string; reason: string; priority_score: number; status: string }[]) {
+      const followUpMap = new Map<string, { reason: string; reason_type: string; priority_score: number; status: string; follow_up_category: string }>();
+      for (const q of queueItems as { deal_id: string; reason: string; reason_type: string; priority_score: number; status: string; follow_up_category: string }[]) {
         // Keep highest priority entry per deal
         const existing = followUpMap.get(q.deal_id);
         if (!existing || q.priority_score > existing.priority_score) {
@@ -193,6 +193,8 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
           gig.followUpReason = fu.reason;
           gig.followUpPriority = fu.priority_score;
           gig.followUpStatus = fu.status as 'pending' | 'snoozed';
+          gig.followUpCategory = fu.follow_up_category as 'sales' | 'ops' | 'nurture';
+          gig.followUpReasonType = fu.reason_type;
         }
       }
     }
@@ -277,6 +279,7 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
           venueAccessConfirmed: logistics?.venue_access_confirmed ?? false,
           hasTransportMode: !!(ros?.transport_mode || logistics?.transport_mode),
           truckLoaded: logistics?.truck_loaded ?? false,
+          transportMode: (ros?.transport_mode ?? logistics?.transport_mode ?? null) as string | null,
           hasClientStakeholder: roles.has('bill_to'),
           clientBriefConfirmed: false,
         });

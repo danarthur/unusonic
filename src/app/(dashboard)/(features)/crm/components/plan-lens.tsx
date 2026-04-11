@@ -10,16 +10,21 @@ import { DealHeaderStrip } from './deal-header-strip';
 import { DealDiaryCard } from './deal-diary-card';
 import { CompletionIndicators } from './completion-indicators';
 import { HandoffConfirmStrip } from './handoff-confirm-strip';
-import { LaborCostSummary } from './labor-cost-summary';
+import { FinancialSummaryCard } from './financial-summary-card';
 import { ProductionTeamCard } from './production-team-card';
 import { AdvancingChecklist } from './advancing-checklist';
 import { ShowHealthCard } from './show-health-card';
 import { ReadinessRibbon } from './readiness-ribbon';
 import { ShowDayContactsCard } from './show-day-contacts-card';
 import { VenueIntelCard } from './venue-intel-card';
+import { DjPrepSummaryCard } from './dj-prep-summary-card';
 import { WrapReportCard } from './wrap-report-card';
 import { DaySheetActionStrip } from './day-sheet-action-strip';
+import { ClientUpdateStrip } from './client-update-strip';
+import { PlanVitalsStrip } from './plan-vitals-strip';
+import { getEventLedger, type EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
+import { RunOfShowIndexCard } from '@/widgets/run-of-show/ui/run-of-show-mini';
 import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
 import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-milestones';
 import { computeReadiness } from '../lib/compute-readiness';
@@ -187,6 +192,16 @@ export function PlanLens({
     getEventLoadDates(eid).then(setEventDates);
   }, [eventId, deal?.event_id]);
 
+  // Fetch ledger data for unified financial summary
+  const [ledger, setLedger] = useState<EventLedgerDTO | null>(null);
+  useEffect(() => {
+    const eid = eventId ?? deal?.event_id;
+    if (!eid) return;
+    let cancelled = false;
+    getEventLedger(eid).then((l) => { if (!cancelled) setLedger(l); });
+    return () => { cancelled = true; };
+  }, [eventId, deal?.event_id]);
+
   // Payment milestones for timeline
   const paymentMilestones = proposalData
     ? computePaymentMilestones({
@@ -240,6 +255,7 @@ export function PlanLens({
       venueAccessConfirmed: event?.run_of_show_data?.logistics?.venue_access_confirmed ?? false,
       hasTransportMode: !!(event?.run_of_show_data?.transport_mode || event?.run_of_show_data?.logistics?.transport_mode),
       truckLoaded: event?.run_of_show_data?.logistics?.truck_loaded ?? false,
+      transportMode: event?.run_of_show_data?.transport_mode ?? null,
       hasClientStakeholder: stakeholders.some((s) => s.role === 'bill_to'),
       clientBriefConfirmed: false,
     });
@@ -301,6 +317,8 @@ export function PlanLens({
               runOfShowData={event.run_of_show_data}
               contractStatus={contract?.status ?? null}
               archetype={deal?.event_archetype ?? null}
+              eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null}
+              transportMode={event.run_of_show_data?.transport_mode ?? null}
             />
 
             {/* Prepare: Crew */}
@@ -328,28 +346,36 @@ export function PlanLens({
                 crewWithEmailCount={crewRows.filter((r) => r.entity_id && r.email).length}
               />
             )}
+            {/* Client update email */}
+            {dealId && eventId && (
+              <ClientUpdateStrip
+                eventId={eventId}
+                dealId={dealId}
+                clientName={client?.organization?.name ?? null}
+              />
+            )}
 
             {/* Merge 3: Agreed scope with contract info collapsed into header */}
             {dealId && deal?.workspace_id && (
               <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
                 <div className="flex items-center justify-between">
-                  <p className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
+                  <p className="stage-label">
                     Agreed scope
                   </p>
                   <div className="flex items-center" style={{ gap: 'var(--stage-gap, 6px)' }}>
                     {contract?.status === 'signed' && (
-                      <span className="flex items-center gap-1 text-[10px] tracking-tight px-2 py-0.5 rounded-full" style={{ background: 'oklch(0.7 0.17 145 / 0.15)', color: 'var(--color-unusonic-success)', border: '1px solid oklch(0.7 0.17 145 / 0.2)' }}>
+                      <span className="flex items-center gap-1 text-label tracking-tight px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in oklch, var(--color-unusonic-success) 15%, transparent)', color: 'var(--color-unusonic-success)', border: '1px solid color-mix(in oklch, var(--color-unusonic-success) 20%, transparent)' }}>
                         <FileCheck size={10} aria-hidden />
                         Signed{contract.signed_at ? ` ${new Date(contract.signed_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
                       </span>
                     )}
                     {contract?.pdf_url && (
-                      <a href={contract.pdf_url} target="_blank" rel="noopener noreferrer" className="text-[10px] tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+                      <a href={contract.pdf_url} target="_blank" rel="noopener noreferrer" className="text-label tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
                         PDF
                       </a>
                     )}
                     {publicProposalUrl && (
-                      <a href={publicProposalUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+                      <a href={publicProposalUrl} target="_blank" rel="noopener noreferrer" className="text-label tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
                         View proposal
                       </a>
                     )}
@@ -381,23 +407,34 @@ export function PlanLens({
           </div>
 
           {/* ── Sidebar: context + financials + timeline ── */}
-          <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col lg:sticky lg:top-0 lg:self-start" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-            <LaborCostSummary crewRows={crewRows} proposalTotal={proposalData?.total ?? null} />
+          <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+            <FinancialSummaryCard
+              crewRows={crewRows}
+              proposalTotal={proposalData?.total ?? null}
+              budgetEstimated={deal?.budget_estimated ?? null}
+              ledgerActual={ledger?.totalCost ?? null}
+              ledgerCollected={ledger?.collected ?? null}
+            />
+            <PlanVitalsStrip
+              guestCountExpected={event.guest_count_expected}
+              guestCountActual={event.guest_count_actual}
+              techRequirements={event.tech_requirements}
+              logisticsDockInfo={event.logistics_dock_info}
+              logisticsPowerInfo={event.logistics_power_info}
+            />
             <ShowDayContactsCard
               eventId={eventId}
               initialContacts={(event.show_day_contacts ?? []) as { role: string; name: string; phone: string | null; email: string | null }[]}
               onSaved={onEventUpdated}
             />
+            <DjPrepSummaryCard rosData={event.run_of_show_data as Record<string, unknown> | null} />
             {event.venue_entity_id && (
               <VenueIntelCard venueEntityId={event.venue_entity_id} />
             )}
             {proposalData && proposalData.status !== 'draft' && (
               <ProductionTimelineWidget eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null} eventTitle={deal?.title ?? event.title} paymentMilestones={paymentMilestones} dealMilestones={dealMilestones} />
             )}
-            <Link href={`/events/g/${eventId}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center min-h-[100px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] stage-panel-elevated p-6 text-center transition-colors hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]">
-              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none">Launch show studio</p>
-              <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2">Run of show, crewing, and full studio</p>
-            </Link>
+            <RunOfShowIndexCard eventId={eventId} startsAt={event?.starts_at} />
           </div>
         </div>
       </div>

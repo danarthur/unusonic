@@ -30,6 +30,8 @@ type ComputeReadinessParams = {
   venueAccessConfirmed: boolean;
   hasTransportMode: boolean;
   truckLoaded: boolean;
+  /** Transport mode value — 'none' means self-equipped (always green). */
+  transportMode?: string | null;
   hasClientStakeholder: boolean;
   clientBriefConfirmed: boolean;
 };
@@ -72,7 +74,10 @@ export function computeReadiness(p: ComputeReadinessParams): ReadinessData {
 
   // ── Transport ──
   let transportStatus: ReadinessStatus = 'grey';
-  if (p.hasTransportMode) {
+  if (p.transportMode === 'none') {
+    // Self-equipped — no transport logistics to track, always green
+    transportStatus = 'green';
+  } else if (p.hasTransportMode) {
     transportStatus = p.truckLoaded ? 'green' : 'amber';
   }
 

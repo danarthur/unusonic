@@ -5,7 +5,13 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { DealStakeholderRole } from '../lib/stakeholder-roles';
 
-export type { DealStakeholderRole };
+// NOTE: do NOT re-export `DealStakeholderRole` from this file.
+// Next.js 16 bundles 'use server' files through a server-action
+// registry that tries to produce a value-level re-export for every
+// symbol listed in an `export { X }` / `export type { X }` block.
+// Type-only re-exports fail the production build with:
+//   "Export DealStakeholderRole doesn't exist in target module"
+// Consumers should import the type directly from `../lib/stakeholder-roles`.
 
 export type DealStakeholderDisplay = {
   id: string;
