@@ -257,7 +257,6 @@ export function PlanLens({
       truckLoaded: event?.run_of_show_data?.logistics?.truck_loaded ?? false,
       transportMode: event?.run_of_show_data?.transport_mode ?? null,
       hasClientStakeholder: stakeholders.some((s) => s.role === 'bill_to'),
-      clientBriefConfirmed: false,
     });
   }, [crewRows, event, stakeholders, isPostHandoff]);
 

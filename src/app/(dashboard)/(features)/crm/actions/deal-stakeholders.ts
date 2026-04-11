@@ -188,7 +188,8 @@ export async function getDealStakeholders(dealId: string): Promise<DealStakehold
         .select('id')
         .eq('owner_workspace_id', workspaceId)
         .eq('type', 'company')
-        .neq('attributes->>is_ghost', 'true')
+        // NULL-safe: .neq() alone treats NULL as excluded, silently dropping pre-ghost-protocol orgs.
+        .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
         .maybeSingle();
       if (wsOrg?.id) {
         const { data: cortexRels } = await supabase

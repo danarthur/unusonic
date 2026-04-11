@@ -281,7 +281,6 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
           truckLoaded: logistics?.truck_loaded ?? false,
           transportMode: (ros?.transport_mode ?? logistics?.transport_mode ?? null) as string | null,
           hasClientStakeholder: roles.has('bill_to'),
-          clientBriefConfirmed: false,
         });
       }
     }

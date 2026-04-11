@@ -169,7 +169,9 @@ export async function createGhostVenueEntity(name: string): Promise<string | nul
       .select('id')
       .eq('owner_workspace_id', workspaceId)
       .eq('type', 'company')
-      .neq('attributes->>is_ghost', 'true')
+      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
+      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
+      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
       .maybeSingle();
 
     if (workspaceOrgEntity?.id) {
@@ -220,7 +222,9 @@ export async function createGhostPlannerEntity(name: string): Promise<string | n
       .select('id')
       .eq('owner_workspace_id', workspaceId)
       .eq('type', 'company')
-      .neq('attributes->>is_ghost', 'true')
+      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
+      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
+      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
       .maybeSingle();
 
     if (workspaceOrgEntity?.id) {
@@ -274,7 +278,9 @@ export async function createGhostReferrerEntity(name: string): Promise<{ id: str
       .select('id')
       .eq('owner_workspace_id', workspaceId)
       .eq('type', 'company')
-      .neq('attributes->>is_ghost', 'true')
+      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
+      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
+      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
       .maybeSingle();
 
     if (workspaceOrgEntity?.id) {
@@ -325,7 +331,9 @@ export async function createGhostClientEntity(name: string): Promise<string | nu
       .select('id')
       .eq('owner_workspace_id', workspaceId)
       .eq('type', 'company')
-      .neq('attributes->>is_ghost', 'true')
+      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
+      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
+      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
       .maybeSingle();
 
     if (workspaceOrgEntity?.id) {
@@ -376,7 +384,9 @@ export async function createGhostVendorEntity(name: string): Promise<string | nu
       .select('id')
       .eq('owner_workspace_id', workspaceId)
       .eq('type', 'company')
-      .neq('attributes->>is_ghost', 'true')
+      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
+      // `.neq(...)` alone treats NULL as excluded and silently drops pre-ghost-protocol orgs.
+      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
       .maybeSingle();
 
     if (workspaceOrgEntity?.id) {

@@ -43,10 +43,20 @@ const STATIC_NAV = [
 ] as const;
 
 function extractGigIdFromPath(pathname: string): string | null {
-  const crmMatch = pathname.match(/^\/crm\/([a-zA-Z0-9_-]+)/);
-  if (crmMatch) return crmMatch[1];
+  // /events/g/[gigId]/... — legacy alias for the Event Studio. The capturing segment is AFTER /g/.
+  const eventsAliasMatch = pathname.match(/^\/events\/g\/([a-zA-Z0-9_-]+)/);
+  if (eventsAliasMatch) return eventsAliasMatch[1];
+
+  // /events/[eventId]/... — current Event Studio route.
   const eventsMatch = pathname.match(/^\/events\/([a-zA-Z0-9_-]+)/);
   if (eventsMatch) return eventsMatch[1];
+
+  // /crm/[eventId]/... — Run of Show full page. Excludes /crm/deal/[dealId] sub-routes
+  // (proposal-builder etc.), which don't have a gig in context and would otherwise capture
+  // "deal" as the gigId and break the "This Event" command-spine group.
+  const crmMatch = pathname.match(/^\/crm\/(?!deal\b)([a-zA-Z0-9_-]+)/);
+  if (crmMatch) return crmMatch[1];
+
   return null;
 }
 

@@ -13,7 +13,6 @@ const empty = {
   hasTransportMode: false,
   truckLoaded: false,
   hasClientStakeholder: false,
-  clientBriefConfirmed: false,
 };
 
 describe('computeReadiness', () => {
@@ -124,13 +123,8 @@ describe('computeReadiness', () => {
       expect(computeReadiness(empty).client.status).toBe('grey');
     });
 
-    it('returns amber when client stakeholder but no brief', () => {
+    it('returns green when client stakeholder present', () => {
       const r = computeReadiness({ ...empty, hasClientStakeholder: true });
-      expect(r.client.status).toBe('amber');
-    });
-
-    it('returns green when client brief confirmed', () => {
-      const r = computeReadiness({ ...empty, hasClientStakeholder: true, clientBriefConfirmed: true });
       expect(r.client.status).toBe('green');
     });
   });
@@ -161,7 +155,6 @@ describe('computeReadiness', () => {
       hasTransportMode: true,
       truckLoaded: true,
       hasClientStakeholder: true,
-      clientBriefConfirmed: true,
     });
     const statuses = Object.values(r).map((s) => s.status);
     expect(statuses).toEqual(['green', 'green', 'green', 'green', 'green']);

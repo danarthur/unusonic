@@ -80,7 +80,11 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       .select('id')
       .eq('owner_workspace_id', workspaceId)
       .eq('type', 'company')
-      .neq('attributes->>is_ghost', 'true')
+      // NULL-safe: match entities where is_ghost is absent OR explicitly not 'true'.
+      // `.neq(...)` alone treats NULL as excluded (NULL != 'true' → NULL → WHERE-falsy),
+      // silently dropping workspace orgs predating the ghost-protocol attribute and
+      // breaking all downstream cortex CLIENT / VENUE_PARTNER edge creation.
+      .or('attributes->>is_ghost.is.null,attributes->>is_ghost.neq.true')
       .maybeSingle();
     const workspaceOrgEntityId = workspaceOrgEntity?.id ?? null;
 

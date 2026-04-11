@@ -57,9 +57,40 @@ export async function updateDealScalars(
 
     if (!deal) return { success: false, error: 'Not authorised' };
 
+    // show_health: overwrite author metadata server-side. The client cannot be trusted
+    // to supply updated_by_name — historically hardcoded to 'PM' for every user — and
+    // we want the real display name to appear in audit reads. Resolve from the signed-in
+    // user's directory entity, then fall back to auth user metadata, then to 'PM'.
+    const dataToWrite: UpdateDealScalarsInput = { ...parsed.data };
+    if (dataToWrite.show_health) {
+      let authoredBy = 'PM';
+      const { data: authResult } = await supabase.auth.getUser();
+      const authUser = authResult.user;
+      if (authUser) {
+        const { data: claimedEntity } = await supabase
+          .schema('directory')
+          .from('entities')
+          .select('display_name')
+          .eq('claimed_by_user_id', authUser.id)
+          .limit(1)
+          .maybeSingle();
+        const entityName = (claimedEntity as { display_name?: string | null } | null)?.display_name ?? null;
+        const metaName =
+          (authUser.user_metadata?.full_name as string | undefined) ??
+          (authUser.user_metadata?.display_name as string | undefined) ??
+          null;
+        authoredBy = entityName ?? metaName ?? authUser.email ?? 'PM';
+      }
+      dataToWrite.show_health = {
+        ...dataToWrite.show_health,
+        updated_by_name: authoredBy,
+        updated_at: new Date().toISOString(),
+      };
+    }
+
     const { error } = await supabase
       .from('deals')
-      .update(parsed.data)
+      .update(dataToWrite)
       .eq('id', dealId)
       .eq('workspace_id', workspaceId);
 

@@ -155,13 +155,8 @@ export async function handoverDeal(
     eventName = title;
   }
 
-  // Crew is managed via deal_crew table — Plan tab reads from it directly.
-  // No need to copy crew into run_of_show_data JSONB during handoff.
-  // Strip any wizard-supplied crew_items/crew_roles from runOfShowData to avoid stale JSONB.
-  if (runOfShowData) {
-    const { crew_items: _ci, crew_roles: _cr, ...nonCrewData } = runOfShowData;
-    runOfShowData = nonCrewData;
-  }
+  // Crew is managed via ops.deal_crew — Plan tab reads from it directly and the
+  // handoff wizard no longer collects crew_roles, so runOfShowData passes through unchanged.
 
   const { data: event, error: eventErr } = await supabase
     .schema('ops')

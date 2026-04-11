@@ -47,12 +47,14 @@ export function ShowHealthCard({ dealId, health, onSaved, inline }: ShowHealthCa
 
   const handleSave = () => {
     startTransition(async () => {
+      // updated_at and updated_by_name are overwritten server-side in updateDealScalars
+      // using the signed-in user's directory entity. Client-supplied values are ignored.
       const result = await updateDealScalars(dealId, {
         show_health: {
           status,
           note,
           updated_at: new Date().toISOString(),
-          updated_by_name: 'PM',
+          updated_by_name: '',
         },
       });
       if (result.success) {

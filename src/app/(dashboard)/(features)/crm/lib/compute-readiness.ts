@@ -33,7 +33,6 @@ type ComputeReadinessParams = {
   /** Transport mode value — 'none' means self-equipped (always green). */
   transportMode?: string | null;
   hasClientStakeholder: boolean;
-  clientBriefConfirmed: boolean;
 };
 
 export function computeReadiness(p: ComputeReadinessParams): ReadinessData {
@@ -82,10 +81,11 @@ export function computeReadiness(p: ComputeReadinessParams): ReadinessData {
   }
 
   // ── Client ──
-  let clientStatus: ReadinessStatus = 'grey';
-  if (p.hasClientStakeholder) {
-    clientStatus = p.clientBriefConfirmed ? 'green' : 'amber';
-  }
+  // Simplest honest signal: do we have a client stakeholder on this deal?
+  // There's no finer gradation we can compute generically today — the legacy
+  // `clientBriefConfirmed` input was always hardcoded to `false`, producing a pillar
+  // that could never turn green. Removed until a real "brief confirmed" feature ships.
+  const clientStatus: ReadinessStatus = p.hasClientStakeholder ? 'green' : 'grey';
 
   return {
     crew: { status: crewStatus, fraction: crewFraction, label: 'Crew' },

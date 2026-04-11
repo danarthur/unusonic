@@ -2,17 +2,16 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronRight, ChevronLeft, Plus, Trash2, MapPin, Building2, User } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Plus, MapPin, Building2, User } from 'lucide-react';
 import { Command } from 'cmdk';
 import { handoverDeal, type HandoverPayload, type HandoverVitals } from '../actions/handover-deal';
 import { getVenueSuggestions, searchOmni, getEntityDisplayName, createGhostVenueEntity, type VenueSuggestion, type OmniResult } from '../actions/lookup';
-import { STAGE_HEAVY, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
+import { STAGE_HEAVY, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
 
-const STEPS = ['Vitals', 'Gear & inventory', 'Crew'] as const;
-type StepKey = (typeof STEPS)[number];
+const STEPS = ['Vitals', 'Gear & inventory'] as const;
 
 type HandoffWizardProps = {
   dealId: string;
@@ -42,17 +41,6 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
   const [gearRequirements, setGearRequirements] = useState('');
   const [venueRestrictions, setVenueRestrictions] = useState(deal.notes ?? '');
 
-  const initialCrewRoles = (() => {
-    const pc = deal.preferred_crew;
-    if (Array.isArray(pc) && pc.length > 0) {
-      return (pc as Array<string | { role?: string }>)
-        .map((item) => (typeof item === 'string' ? item : item.role ?? ''))
-        .filter(Boolean);
-    }
-    return [];
-  })();
-  const [crewRoles, setCrewRoles] = useState<string[]>(initialCrewRoles);
-
   // Venue search state
   const [venueQuery, setVenueQuery] = useState('');
   const [venueResults, setVenueResults] = useState<VenueSuggestion[]>([]);
@@ -74,13 +62,18 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
 
   const billTo = stakeholders.find((s) => s.role === 'bill_to');
 
-  // Pre-populate client from bill_to stakeholder on mount
+  // Pre-populate client from bill_to stakeholder on mount.
+  // deal_stakeholders uses a dual-node pattern (20260227100000_deal_stakeholders_dual_node):
+  //   - Individual/couple clients: organization_id holds the person entity, entity_id is null
+  //   - Company clients: organization_id is the company, entity_id is the billing-contact person
+  // The client portal filters ops.events.client_entity_id by the signed-in person, so in both
+  // cases we want the person entity — prefer entity_id (company case) and fall back to
+  // organization_id (individual case).
   useEffect(() => {
     if (billTo && !clientEntityId) {
       const name = billTo.organization_name ?? billTo.name ?? '';
       if (name) setSelectedClientName(name);
-      // Also set the entity ID so the submit has it even if user doesn't re-touch the field
-      const entityId = billTo.entity_id ?? '';
+      const entityId = billTo.entity_id ?? billTo.organization_id ?? '';
       if (entityId) setClientEntityId(entityId);
     }
 
@@ -136,22 +129,6 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
     return () => clearTimeout(t);
   }, [clientQuery]);
 
-  const addCrewRole = useCallback(() => {
-    setCrewRoles((prev) => [...prev, '']);
-  }, []);
-
-  const updateCrewRole = useCallback((i: number, value: string) => {
-    setCrewRoles((prev) => {
-      const next = [...prev];
-      next[i] = value;
-      return next;
-    });
-  }, []);
-
-  const removeCrewRole = useCallback((i: number) => {
-    setCrewRoles((prev) => prev.filter((_, idx) => idx !== i));
-  }, []);
-
   const buildPayload = useCallback((): HandoverPayload => {
     const vitals: HandoverVitals = {
       start_at: fromLocalDatetime(startAt),
@@ -162,18 +139,15 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
     const run_of_show_data = {
       gear_requirements: gearRequirements.trim() || null,
       venue_restrictions: venueRestrictions.trim() || null,
-      crew_roles: crewRoles.filter(Boolean).length ? crewRoles.filter(Boolean) : null,
     };
     const hasData =
-      !!run_of_show_data.gear_requirements ||
-      !!run_of_show_data.venue_restrictions ||
-      (Array.isArray(run_of_show_data.crew_roles) && run_of_show_data.crew_roles.length > 0);
+      !!run_of_show_data.gear_requirements || !!run_of_show_data.venue_restrictions;
     return {
       name: deal.title ?? undefined,
       vitals,
       run_of_show_data: hasData ? run_of_show_data : null,
     };
-  }, [startAt, endAt, venueEntityId, clientEntityId, gearRequirements, venueRestrictions, crewRoles, deal.title]);
+  }, [startAt, endAt, venueEntityId, clientEntityId, gearRequirements, venueRestrictions, deal.title]);
 
   const handleNext = useCallback(() => {
     setError(null);
@@ -460,50 +434,6 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
             </motion.div>
           )}
 
-          {step === 'Crew' && (
-            <motion.div
-              key="crew"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={STAGE_NAV_CROSSFADE}
-              className="flex flex-col gap-5"
-            >
-              <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
-                <p className="stage-label">Required roles</p>
-                <p className="text-sm text-[var(--stage-text-secondary)]">Specify roles (e.g. Lead DJ, Lighting Tech, FOH).</p>
-                <ul className="space-y-2">
-                  {crewRoles.map((role, i) => (
-                    <li key={i} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={role}
-                        onChange={(e) => updateCrewRole(i, e.target.value)}
-                        placeholder="Role name"
-                        className="flex-1 rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeCrewRole(i)}
-                        className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                        aria-label="Remove role"
-                      >
-                        <Trash2 size={18} strokeWidth={1.5} aria-hidden />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  onClick={addCrewRole}
-                  className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-xl py-2 px-1 -mx-1 transition-colors"
-                >
-                  <Plus size={18} strokeWidth={1.5} aria-hidden />
-                  Add role
-                </button>
-              </div>
-            </motion.div>
-          )}
         </AnimatePresence>
 
         {error && (
