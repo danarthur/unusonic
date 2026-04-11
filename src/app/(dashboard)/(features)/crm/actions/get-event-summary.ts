@@ -21,6 +21,14 @@ export type EventSummaryForPrism = {
   venue_address?: string | null;
   run_of_show_data: RunOfShowData | null;
   show_day_contacts: { role: string; name: string; phone: string | null; email: string | null }[] | null;
+  guest_count_expected: number | null;
+  guest_count_actual: number | null;
+  tech_requirements: Record<string, unknown> | null;
+  logistics_dock_info: string | null;
+  logistics_power_info: string | null;
+  status: string | null;
+  show_started_at: string | null;
+  show_ended_at: string | null;
 };
 
 export type { RunOfShowData };
@@ -44,6 +52,14 @@ export async function getEventSummaryForPrism(
     venue_address: s.location_address,
     run_of_show_data: s.run_of_show_data ?? null,
     show_day_contacts: s.show_day_contacts ?? null,
+    guest_count_expected: s.guest_count_expected ?? null,
+    guest_count_actual: s.guest_count_actual ?? null,
+    tech_requirements: s.tech_requirements ?? null,
+    logistics_dock_info: s.logistics_dock_info ?? null,
+    logistics_power_info: s.logistics_power_info ?? null,
+    status: s.status,
+    show_started_at: s.show_started_at,
+    show_ended_at: s.show_ended_at,
   };
 }
 

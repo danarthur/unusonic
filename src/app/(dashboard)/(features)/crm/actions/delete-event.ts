@@ -135,11 +135,15 @@ export async function cancelEvent(eventId: string): Promise<CancelEventResult> {
       return { success: false, error: 'Not authorised.' };
     }
 
-    // Step 3: update
+    // Step 3: update — write BOTH columns. `lifecycle_status` is the CRM
+    // stream filter column; `status` is the computeEventLock signal read by
+    // the client portal. Until the two parallel state columns are merged
+    // (Pass 3 schema-drift work), cancel flows must touch both or the
+    // client portal will remain unlocked for a cancelled event.
     const { error: updateError } = await supabase
       .schema('ops')
       .from('events')
-      .update({ lifecycle_status: 'cancelled' })
+      .update({ lifecycle_status: 'cancelled', status: 'cancelled' })
       .eq('id', eventId);
 
     if (updateError) {

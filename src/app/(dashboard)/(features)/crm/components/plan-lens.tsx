@@ -21,6 +21,7 @@ import { DjPrepSummaryCard } from './dj-prep-summary-card';
 import { WrapReportCard } from './wrap-report-card';
 import { DaySheetActionStrip } from './day-sheet-action-strip';
 import { ClientUpdateStrip } from './client-update-strip';
+import { ShowControlStrip } from './show-control-strip';
 import { PlanVitalsStrip } from './plan-vitals-strip';
 import { getEventLedger, type EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
@@ -372,6 +373,19 @@ export function PlanLens({
                 eventId={eventId}
                 dealId={dealId}
                 clientName={client?.organization?.name ?? null}
+              />
+            )}
+            {/* T-0 lifecycle transition — Start / End show. Date-gated to
+                render only within ~24h of starts_at; hidden otherwise. */}
+            {eventId && (
+              <ShowControlStrip
+                eventId={eventId}
+                status={event.status}
+                startsAt={event.starts_at}
+                endsAt={event.ends_at}
+                showStartedAt={event.show_started_at}
+                showEndedAt={event.show_ended_at}
+                onStateChanged={onEventUpdated}
               />
             )}
 
