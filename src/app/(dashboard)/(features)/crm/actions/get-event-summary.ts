@@ -29,6 +29,7 @@ export type EventSummaryForPrism = {
   status: string | null;
   show_started_at: string | null;
   show_ended_at: string | null;
+  archived_at: string | null;
 };
 
 export type { RunOfShowData };
@@ -60,6 +61,7 @@ export async function getEventSummaryForPrism(
     status: s.status,
     show_started_at: s.show_started_at,
     show_ended_at: s.show_ended_at,
+    archived_at: s.archived_at,
   };
 }
 

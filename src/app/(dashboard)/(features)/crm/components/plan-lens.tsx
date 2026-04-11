@@ -376,7 +376,7 @@ export function PlanLens({
               />
             )}
             {/* T-0 lifecycle transition — Start / End show. Date-gated to
-                render only within ~24h of starts_at; hidden otherwise. */}
+                render only within ~24h of starts_at; hidden once wrapped. */}
             {eventId && (
               <ShowControlStrip
                 eventId={eventId}
@@ -385,6 +385,7 @@ export function PlanLens({
                 endsAt={event.ends_at}
                 showStartedAt={event.show_started_at}
                 showEndedAt={event.show_ended_at}
+                archivedAt={event.archived_at}
                 onStateChanged={onEventUpdated}
               />
             )}
@@ -436,6 +437,7 @@ export function PlanLens({
                 eventStartsAt={event.starts_at}
                 crewRows={crewRows}
                 gearItems={(event.run_of_show_data?.gear_items ?? []) as { id: string; name: string; status: string }[]}
+                archivedAt={event.archived_at}
               />
             )}
           </div>

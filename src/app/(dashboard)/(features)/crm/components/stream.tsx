@@ -46,7 +46,10 @@ function filterByMode(items: StreamCardItem[], mode: StreamMode): StreamCardItem
   if (mode === 'active') {
     return items.filter(
       (i) =>
+        // Pass 3 Phase 4: archived events are out of the active pile. The
+        // "past" tab below still includes them so users can look back.
         (i.source === 'event' &&
+          i.archived_at == null &&
           readEventStatusFromLifecycle(i.lifecycle_status) !== 'cancelled' &&
           (i.event_date == null || i.event_date >= today)) ||
         (i.source === 'deal' &&

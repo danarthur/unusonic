@@ -51,11 +51,16 @@ export function useLobbyEvents() {
 
     async function run() {
       try {
+        // Pass 3 Phase 4: explicitly exclude archived events. The Lobby is
+        // the canonical "active piles" surface — archived shows belong in
+        // history, not here. See src/shared/lib/event-status/get-active-events-filter.ts
+        // for the allowlist rationale.
         let query = supabase
           .schema('ops')
           .from('events')
           .select('id, title, starts_at, location_name, lifecycle_status, show_started_at, show_ended_at')
-          .in('lifecycle_status', ['lead', 'tentative', 'confirmed', 'production', 'live']);
+          .in('lifecycle_status', ['lead', 'tentative', 'confirmed', 'production', 'live'])
+          .is('archived_at', null);
 
         if (workspaceId) query = query.eq('workspace_id', workspaceId);
 

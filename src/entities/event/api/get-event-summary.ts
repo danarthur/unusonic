@@ -72,6 +72,8 @@ export type EventSummary = {
   show_started_at: string | null;
   /** Set by markShowEnded when the PM explicitly ends the show. Null until then. */
   show_ended_at: string | null;
+  /** Pass 3 Phase 4: set by markShowWrapped on close-out. Null = event is still in active piles. */
+  archived_at: string | null;
 };
 
 export async function getEventSummary(eventId: string): Promise<EventSummary | null> {
@@ -95,7 +97,7 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     const res = await supabase
       .schema('ops')
       .from('events')
-      .select('title, starts_at, ends_at, location_name, location_address, venue_entity_id, deal_id, run_of_show_data, show_day_contacts, client_entity_id, guest_count_expected, guest_count_actual, tech_requirements, logistics_dock_info, logistics_power_info, status, show_started_at, show_ended_at')
+      .select('title, starts_at, ends_at, location_name, location_address, venue_entity_id, deal_id, run_of_show_data, show_day_contacts, client_entity_id, guest_count_expected, guest_count_actual, tech_requirements, logistics_dock_info, logistics_power_info, status, show_started_at, show_ended_at, archived_at')
       .eq('id', eventId)
       .eq('workspace_id', workspaceId)
       .maybeSingle();
@@ -146,5 +148,6 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     status: (r.status as string) ?? null,
     show_started_at: (r.show_started_at as string) ?? null,
     show_ended_at: (r.show_ended_at as string) ?? null,
+    archived_at: (r.archived_at as string) ?? null,
   };
 }

@@ -12,9 +12,11 @@ import type {
   WrapCrewEntry,
   WrapGearEntry,
   GearCondition,
+  CrewRating,
 } from '../lib/wrap-report-types';
 import { GEAR_CONDITIONS } from '../lib/wrap-report-types';
 import { getWrapReport, saveWrapReport, prefillWrapReport } from '../actions/wrap-report';
+import { markShowWrapped, undoMarkShowWrapped } from '../actions/mark-show-wrapped';
 
 // =============================================================================
 // Props
@@ -25,6 +27,8 @@ type WrapReportCardProps = {
   eventStartsAt: string;
   crewRows: DealCrewRow[];
   gearItems: { id: string; name: string; status: string }[];
+  /** Pass 3 Phase 4: wrap state from ops.events.archived_at. */
+  archivedAt: string | null;
 };
 
 // =============================================================================
@@ -47,18 +51,20 @@ export function WrapReportCard({
   eventStartsAt,
   crewRows,
   gearItems,
+  archivedAt,
 }: WrapReportCardProps) {
   // Only render if event is in the past
   const isPast = new Date(eventStartsAt) < new Date();
   if (!isPast) return null;
 
-  return <WrapReportInner eventId={eventId} crewRows={crewRows} gearItems={gearItems} />;
+  return <WrapReportInner eventId={eventId} crewRows={crewRows} gearItems={gearItems} archivedAt={archivedAt} />;
 }
 
 function WrapReportInner({
   eventId,
   crewRows,
   gearItems,
+  archivedAt,
 }: Omit<WrapReportCardProps, 'eventStartsAt'>) {
   const [mode, setMode] = useState<'loading' | 'empty' | 'edit' | 'view'>('loading');
   const [report, setReport] = useState<WrapReport | null>(null);
@@ -110,6 +116,47 @@ function WrapReportInner({
     });
   };
 
+  // Pass 3 Phase 4 — the deliberate close-out moment. Confirms (PMs have
+  // 72h to undo) and stamps archived_at via markShowWrapped. No checklist
+  // gate (User Advocate: "mandatory checklist gate is the worst way to
+  // solve this"). Single confirm dialog, short factual message.
+  const handleWrap = () => {
+    const confirmed = window.confirm(
+      'Wrap this show? It will leave your active pile. You have 72 hours to undo.',
+    );
+    if (!confirmed) return;
+    startTransition(async () => {
+      const result = await markShowWrapped(eventId);
+      if (result.success) {
+        toast.success('Show wrapped', {
+          description: 'You can undo from here for the next 72 hours.',
+        });
+      } else {
+        toast.error(result.error ?? 'Failed to wrap show');
+      }
+    });
+  };
+
+  const handleUndoWrap = () => {
+    startTransition(async () => {
+      const result = await undoMarkShowWrapped(eventId);
+      if (result.success) {
+        toast.success('Wrap undone');
+      } else {
+        toast.error(result.error ?? 'Failed to undo wrap');
+      }
+    });
+  };
+
+  // "Can we still undo this wrap?" — User Advocate's 72-hour window.
+  const isWrapped = archivedAt !== null;
+  const isUndoAvailable = (() => {
+    if (!archivedAt) return false;
+    const ms = Date.parse(archivedAt);
+    if (Number.isNaN(ms)) return false;
+    return Date.now() - ms < 72 * 60 * 60 * 1000;
+  })();
+
   if (mode === 'loading') return null;
 
   return (
@@ -140,6 +187,48 @@ function WrapReportInner({
           <ViewState key="view" report={report} onEdit={() => setMode('edit')} hasGear={gearItems.length > 0} />
         )}
       </AnimatePresence>
+
+      {/* Pass 3 Phase 4 — Wrap show action strip. Only visible when the
+          wrap report has been saved (mode === 'view'). PMs edit first,
+          wrap second. */}
+      {mode === 'view' && (
+        <div
+          className="flex items-center justify-between gap-3 pt-3 mt-3"
+          style={{ borderTop: '1px solid oklch(1 0 0 / 0.06)' }}
+        >
+          <div className="min-w-0 flex-1">
+            {isWrapped ? (
+              <p className="text-xs text-[var(--stage-text-secondary)] tracking-tight truncate">
+                Wrapped {archivedAt ? new Date(archivedAt).toLocaleDateString() : ''}
+                {isUndoAvailable && ' — undo available for 72 hours'}
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--stage-text-secondary)] tracking-tight">
+                Ready to close out?
+              </p>
+            )}
+          </div>
+          {isWrapped && isUndoAvailable ? (
+            <button
+              type="button"
+              onClick={handleUndoWrap}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)] transition-colors stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
+            >
+              Undo wrap
+            </button>
+          ) : !isWrapped ? (
+            <button
+              type="button"
+              onClick={handleWrap}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
+            >
+              {isPending ? 'Wrapping\u2026' : 'Wrap show'}
+            </button>
+          ) : null}
+        </div>
+      )}
     </StagePanel>
   );
 }
@@ -255,7 +344,7 @@ function EditState({
           >
             {/* Table header */}
             <div
-              className="grid grid-cols-[1fr_0.8fr_80px_80px] px-3 py-2 text-xs tracking-tight font-medium"
+              className="grid grid-cols-[1fr_0.7fr_64px_64px_80px] px-3 py-2 text-xs tracking-tight font-medium"
               style={{
                 color: 'var(--stage-text-tertiary)',
                 backgroundColor: 'var(--ctx-well, var(--stage-surface))',
@@ -266,40 +355,64 @@ function EditState({
               <span>Role</span>
               <span className="text-right tabular-nums">Planned</span>
               <span className="text-right tabular-nums">Actual</span>
+              <span className="text-center">Rating</span>
             </div>
             {/* Rows */}
             {report.actual_crew_hours.map((entry, idx) => (
               <div
                 key={entry.entity_id ?? `crew-${idx}`}
-                className="grid grid-cols-[1fr_0.8fr_80px_80px] px-3 py-2 items-center text-sm tracking-tight"
+                className="flex flex-col"
                 style={{
-                  color: 'var(--stage-text-primary)',
                   borderBottom: idx < report.actual_crew_hours.length - 1 ? '1px solid oklch(1 0 0 / 0.04)' : undefined,
                 }}
               >
-                <span className="truncate">{entry.name}</span>
-                <span className="truncate text-[var(--stage-text-secondary)]">
-                  {entry.role ?? '\u2014'}
-                </span>
-                <span className="text-right tabular-nums text-[var(--stage-text-tertiary)]">
-                  {entry.planned_hours != null ? `${entry.planned_hours}h` : '\u2014'}
-                </span>
-                <div className="flex justify-end">
-                  <input
-                    type="number"
-                    min={0}
-                    max={999}
-                    step={0.5}
-                    value={entry.actual_hours ?? ''}
-                    onChange={(e) => {
-                      const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                      updateCrewEntry(idx, { actual_hours: val });
-                    }}
-                    placeholder="\u2014"
-                    className="w-16 text-right tabular-nums bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.20)]"
-                    style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
-                  />
+                <div
+                  className="grid grid-cols-[1fr_0.7fr_64px_64px_80px] px-3 py-2 items-center text-sm tracking-tight"
+                  style={{ color: 'var(--stage-text-primary)' }}
+                >
+                  <span className="truncate">{entry.name}</span>
+                  <span className="truncate text-[var(--stage-text-secondary)]">
+                    {entry.role ?? '\u2014'}
+                  </span>
+                  <span className="text-right tabular-nums text-[var(--stage-text-tertiary)]">
+                    {entry.planned_hours != null ? `${entry.planned_hours}h` : '\u2014'}
+                  </span>
+                  <div className="flex justify-end">
+                    <input
+                      type="number"
+                      min={0}
+                      max={999}
+                      step={0.5}
+                      value={entry.actual_hours ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        updateCrewEntry(idx, { actual_hours: val });
+                      }}
+                      placeholder="\u2014"
+                      className="w-14 text-right tabular-nums bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)]"
+                      style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
+                    />
+                  </div>
+                  <div className="flex justify-center">
+                    <StarRating
+                      value={entry.rating ?? null}
+                      onChange={(r) => updateCrewEntry(idx, { rating: r })}
+                    />
+                  </div>
                 </div>
+                {/* Crew note — expands below the row when rating is set */}
+                {entry.rating != null && (
+                  <div className="px-3 pb-2">
+                    <input
+                      type="text"
+                      value={entry.crew_note ?? ''}
+                      onChange={(e) => updateCrewEntry(idx, { crew_note: e.target.value || null })}
+                      placeholder="Note about this crew member..."
+                      className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-2.5 py-1 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)] tracking-tight"
+                      style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -343,7 +456,7 @@ function EditState({
                     value={entry.notes ?? ''}
                     onChange={(e) => updateGearEntry(idx, { notes: e.target.value || null })}
                     placeholder="Describe the issue..."
-                    className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.20)] tracking-tight"
+                    className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)] tracking-tight"
                     style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
                   />
                 )}
@@ -375,7 +488,7 @@ function EditState({
           placeholder="Observations about the venue for future shows..."
           rows={2}
           maxLength={2000}
-          className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.20)] resize-none tracking-tight"
+          className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)] resize-none tracking-tight"
           style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
         />
       </div>
@@ -391,7 +504,7 @@ function EditState({
           placeholder="How was the client experience?"
           rows={2}
           maxLength={2000}
-          className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.20)] resize-none tracking-tight"
+          className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)] resize-none tracking-tight"
           style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
         />
       </div>
@@ -405,7 +518,7 @@ function EditState({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="stage-btn stage-btn-secondary px-4 py-1.5 text-xs disabled:opacity-40"
+          className="stage-btn stage-btn-secondary px-4 py-1.5 text-xs disabled:opacity-45"
         >
           {saving ? 'Saving...' : 'Complete wrap report'}
         </button>
@@ -490,7 +603,7 @@ function ViewState({
             style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
           >
             <div
-              className="grid grid-cols-[1fr_0.8fr_80px_80px] px-3 py-2 text-xs tracking-tight font-medium"
+              className="grid grid-cols-[1fr_0.7fr_64px_64px_80px] px-3 py-2 text-xs tracking-tight font-medium"
               style={{
                 color: 'var(--stage-text-tertiary)',
                 backgroundColor: 'var(--ctx-well, var(--stage-surface))',
@@ -501,26 +614,39 @@ function ViewState({
               <span>Role</span>
               <span className="text-right tabular-nums">Planned</span>
               <span className="text-right tabular-nums">Actual</span>
+              <span className="text-center">Rating</span>
             </div>
             {report.actual_crew_hours.map((entry, idx) => (
               <div
                 key={entry.entity_id ?? `crew-${idx}`}
-                className="grid grid-cols-[1fr_0.8fr_80px_80px] px-3 py-2 text-sm tracking-tight"
+                className="flex flex-col"
                 style={{
-                  color: 'var(--stage-text-primary)',
                   borderBottom: idx < report.actual_crew_hours.length - 1 ? '1px solid oklch(1 0 0 / 0.04)' : undefined,
                 }}
               >
-                <span className="truncate">{entry.name}</span>
-                <span className="truncate text-[var(--stage-text-secondary)]">
-                  {entry.role ?? '\u2014'}
-                </span>
-                <span className="text-right tabular-nums text-[var(--stage-text-tertiary)]">
-                  {entry.planned_hours != null ? `${entry.planned_hours}h` : '\u2014'}
-                </span>
-                <span className="text-right tabular-nums">
-                  {entry.actual_hours != null ? `${entry.actual_hours}h` : '\u2014'}
-                </span>
+                <div
+                  className="grid grid-cols-[1fr_0.7fr_64px_64px_80px] px-3 py-2 text-sm tracking-tight"
+                  style={{ color: 'var(--stage-text-primary)' }}
+                >
+                  <span className="truncate">{entry.name}</span>
+                  <span className="truncate text-[var(--stage-text-secondary)]">
+                    {entry.role ?? '\u2014'}
+                  </span>
+                  <span className="text-right tabular-nums text-[var(--stage-text-tertiary)]">
+                    {entry.planned_hours != null ? `${entry.planned_hours}h` : '\u2014'}
+                  </span>
+                  <span className="text-right tabular-nums">
+                    {entry.actual_hours != null ? `${entry.actual_hours}h` : '\u2014'}
+                  </span>
+                  <div className="flex justify-center">
+                    <StarRating value={entry.rating ?? null} readOnly />
+                  </div>
+                </div>
+                {entry.crew_note && (
+                  <p className="px-3 pb-2 text-xs text-[var(--stage-text-secondary)] tracking-tight">
+                    {entry.crew_note}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -605,7 +731,7 @@ function ConditionDropdown({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2 py-1 text-xs tracking-tight border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well,var(--stage-surface))] text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] transition-colors"
+        className="flex items-center gap-1.5 px-2 py-1 text-xs tracking-tight border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well,var(--stage-surface))] text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
         style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
       >
         <span
@@ -653,6 +779,65 @@ function ConditionDropdown({
           </>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// =============================================================================
+// Star rating (1-5)
+// =============================================================================
+
+function StarRating({
+  value,
+  onChange,
+  readOnly,
+}: {
+  value: CrewRating | null;
+  onChange?: (r: CrewRating | null) => void;
+  readOnly?: boolean;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+
+  return (
+    <div
+      className="flex items-center"
+      style={{ gap: '1px' }}
+      onMouseLeave={() => !readOnly && setHover(null)}
+    >
+      {([1, 2, 3, 4, 5] as const).map((star) => {
+        const filled = hover != null ? star <= hover : value != null && star <= value;
+        return (
+          <button
+            key={star}
+            type="button"
+            disabled={readOnly}
+            onMouseEnter={() => !readOnly && setHover(star)}
+            onClick={() => {
+              if (readOnly || !onChange) return;
+              // Toggle off if clicking the same value
+              onChange(value === star ? null : star);
+            }}
+            className="p-0 focus:outline-none disabled:cursor-default transition-colors"
+            aria-label={`${star} star${star !== 1 ? 's' : ''}`}
+          >
+            <svg
+              width={12}
+              height={12}
+              viewBox="0 0 24 24"
+              fill={filled ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              strokeWidth={1.5}
+              style={{
+                color: filled
+                  ? 'oklch(0.82 0.12 85)' // warm gold
+                  : 'var(--stage-text-tertiary)',
+              }}
+            >
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -49,6 +49,8 @@ export type ShowControlStripProps = {
   endsAt: string | null;
   showStartedAt: string | null;
   showEndedAt: string | null;
+  /** Pass 3 Phase 4: when set, the event has been wrapped and the strip hides. */
+  archivedAt: string | null;
   /** Called after any successful transition so the parent can refetch event data. */
   onStateChanged?: () => void;
 };
@@ -90,6 +92,7 @@ export function ShowControlStrip({
   endsAt,
   showStartedAt,
   showEndedAt,
+  archivedAt,
   onStateChanged,
 }: ShowControlStripProps) {
   const [isPending, startTransition] = useTransition();
@@ -100,9 +103,12 @@ export function ShowControlStrip({
   // ── Visibility gating ─────────────────────────────────────────────────────
   // Render nothing when:
   //  - status is 'cancelled' (cancel surface is elsewhere)
+  //  - status is 'archived' OR archived_at is set (Pass 3 Phase 4 — wrap
+  //    flow has taken over, strip is done)
   //  - status is still 'planned' AND starts_at is more than 24h away
   //  - starts_at is missing entirely (no schedule context)
   if (localStatus === 'cancelled') return null;
+  if (localStatus === 'archived' || archivedAt) return null;
   if (!startsAt) return null;
 
   const startsAtMs = Date.parse(startsAt);

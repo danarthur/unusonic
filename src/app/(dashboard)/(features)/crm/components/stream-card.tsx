@@ -24,6 +24,8 @@ export type StreamCardItem = {
   client_name: string | null;
   source: 'deal' | 'event';
   lifecycle_status?: string | null;
+  /** Pass 3 Phase 4: set when the event has been wrapped. Used by stream.tsx filters. */
+  archived_at?: string | null;
   /** Sales = amber, Ops = blue, Finance = rose */
   mode?: 'sales' | 'ops' | 'finance';
   /** Payment health signal — computed from proposal data. */
