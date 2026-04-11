@@ -6,6 +6,7 @@ import { computePaymentStatus, paymentStatusLabel, paymentStatusColor } from '@/
 import { NetworkDetailSheetWithSuspense } from '@/widgets/network-detail';
 import { ProductionGridShell } from './components/production-grid-shell';
 import type { StreamCardItem } from './components/stream-card';
+import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 /** CRM queue item: deal or event row mapped for Production Grid UI. */
 export type CRMQueueItem = {
@@ -60,6 +61,7 @@ export default async function CRMPage({
 
   return (
     <>
+      <AionPageContextSetter type="crm" entityId={selectedId} label={null} />
       <Suspense fallback={<CRMSkeleton />}>
         <CRMDataShell selectedId={selectedId} streamMode={streamMode} />
       </Suspense>

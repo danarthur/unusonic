@@ -4,6 +4,9 @@ import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import * as Sentry from '@sentry/nextjs';
+import { instrument } from '@/shared/lib/instrumentation';
+import { DealIds, EntityIds, DealCrewIds, WorkspaceIds, type DealId, type EntityId, type DealCrewId, type WorkspaceId } from '@/shared/types/branded-ids';
 
 // =============================================================================
 // Types
@@ -60,6 +63,14 @@ export type DealCrewRow = {
   // Department grouping + confirmation
   department: string | null;
   declined_at: string | null;
+  // Payment tracking
+  payment_status: string | null;
+  travel_stipend: number | null;
+  per_diem: number | null;
+  kit_fee: number | null;
+  // Gear awareness (Phase 1)
+  brings_own_gear: boolean;
+  gear_notes: string | null;
 };
 
 // =============================================================================
@@ -76,22 +87,21 @@ async function syncDealCrewFromProposal(
   workspaceId: string,
 ): Promise<void> {
   try {
-    // Get the most recent non-draft proposal for this deal
+    // Get the most recent proposal for this deal (including drafts — user assigns crew while drafting)
     const { data: proposal } = await supabase
       .from('proposals')
       .select('id')
       .eq('deal_id', dealId)
-      .neq('status', 'draft')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (!proposal) return;
 
-    // Get all proposal items — package reference lives in origin_package_id
+    // Get all proposal items — include definition_snapshot for proposal-level crew overrides
     const { data: proposalItems } = await supabase
       .from('proposal_items')
-      .select('id, origin_package_id')
+      .select('id, origin_package_id, definition_snapshot')
       .eq('proposal_id', proposal.id)
       .not('origin_package_id', 'is', null);
 
@@ -140,12 +150,34 @@ async function syncDealCrewFromProposal(
       }
     }
 
-    // Also read required_roles from package definitions (e.g. DJ service with role: "DJ")
+    // Read crew assignments from proposal-level definition_snapshot first (user overrides).
+    // These take priority over catalog defaults — if a proposal item has crew_meta.required_roles
+    // with entity_id set, that's the user's explicit assignment (e.g. assigned a specific DJ).
+    const proposalCrewPackageIds = new Set<string>();
+    for (const item of (proposalItems ?? []) as { id: string; origin_package_id: string | null; definition_snapshot: unknown }[]) {
+      const snap = item.definition_snapshot as { crew_meta?: { required_roles?: { role?: string; entity_id?: string | null; assignee_name?: string | null; quantity?: number }[] } } | null;
+      const roles = snap?.crew_meta?.required_roles;
+      if (roles?.length && item.origin_package_id) {
+        proposalCrewPackageIds.add(item.origin_package_id);
+        for (const r of roles) {
+          if (r.role) {
+            const qty = r.quantity ?? 1;
+            for (let i = 0; i < qty; i++) {
+              assigneeRows.push({ entity_id: r.entity_id ?? null, role_note: r.role, package_id: item.origin_package_id });
+            }
+          }
+        }
+      }
+    }
+
+    // Also read required_roles from package definitions — but skip packages already handled
+    // by proposal-level overrides above (proposal assignments take priority)
     const { data: allPkgs } = await supabase
       .from('packages')
       .select('id, definition')
       .in('id', [...allPackageIds]);
     for (const pkg of (allPkgs ?? []) as { id: string; definition: unknown }[]) {
+      if (proposalCrewPackageIds.has(pkg.id)) continue; // proposal override takes priority
       const def = pkg.definition as { required_roles?: { role?: string; entity_id?: string | null; quantity?: number }[] } | null;
       for (const r of def?.required_roles ?? []) {
         if (r.role) {
@@ -158,12 +190,12 @@ async function syncDealCrewFromProposal(
     }
 
     // Fetch existing deal_crew rows
-     
-    const { data: existingCrew } = await (supabase as any)
+    const { data: existingCrew, error: existingError } = await (supabase as any)
       .schema('ops')
       .from('deal_crew')
       .select('id, entity_id, role_note, catalog_item_id, confirmed_at, source')
       .eq('deal_id', dealId);
+    if (existingError) return; // Can't sync without existing state
 
     type ExistingRow = { id: string; entity_id: string | null; role_note: string | null; catalog_item_id: string | null; confirmed_at: string | null; source: string };
     const existing: ExistingRow[] = existingCrew ?? [];
@@ -185,8 +217,23 @@ async function syncDealCrewFromProposal(
       (a) => a.entity_id == null && a.role_note != null && !existingRoleNotes.has(a.role_note)
     );
 
+    // Deduplicate: one row per entity_id (named) and one per role_note (open slots)
+    const seenEntities = new Set<string>();
+    const dedupedNamed = namedToInsert.filter((a) => {
+      if (seenEntities.has(a.entity_id)) return false;
+      seenEntities.add(a.entity_id);
+      return true;
+    });
+    const seenRoles = new Set<string>();
+    const dedupedRoles = roleToInsert.filter((a) => {
+      const key = a.role_note!;
+      if (seenRoles.has(key)) return false;
+      seenRoles.add(key);
+      return true;
+    });
+
     const toInsert = [
-      ...namedToInsert.map((a) => ({
+      ...dedupedNamed.map((a) => ({
         deal_id: dealId,
         workspace_id: workspaceId,
         entity_id: a.entity_id,
@@ -195,7 +242,7 @@ async function syncDealCrewFromProposal(
         catalog_item_id: a.package_id,
         confirmed_at: null,
       })),
-      ...roleToInsert.map((a) => ({
+      ...dedupedRoles.map((a) => ({
         deal_id: dealId,
         workspace_id: workspaceId,
         entity_id: null,
@@ -206,12 +253,16 @@ async function syncDealCrewFromProposal(
       })),
     ];
 
-    if (toInsert.length > 0) {
-       
-      await (supabase as any)
+    // Insert one at a time to handle partial unique constraints gracefully
+    for (const row of toInsert) {
+      const { error: insertError } = await (supabase as any)
         .schema('ops')
         .from('deal_crew')
-        .insert(toInsert, { ignoreDuplicates: true });
+        .insert(row);
+      if (insertError && insertError.code !== '23505') {
+        // Log non-duplicate errors; 23505 = unique violation (already exists, skip)
+        console.error('[syncDealCrew] INSERT failed:', insertError.message, insertError.code);
+      }
     }
 
     // Delete stale unconfirmed proposal rows whose package is no longer in the proposal.
@@ -223,15 +274,17 @@ async function syncDealCrewFromProposal(
       .map((r) => r.id);
 
     if (staleIds.length > 0) {
-       
+      console.warn('[syncDealCrew] Deleting stale rows:', staleIds, 'activePackageIds:', [...activePackageIdSet]);
       await (supabase as any)
         .schema('ops')
         .from('deal_crew')
         .delete()
         .in('id', staleIds);
     }
-  } catch {
+  } catch (err) {
     // Non-fatal — sync failure should not break the card load
+    console.error('[syncDealCrewFromProposal] Error:', err);
+    Sentry.captureException(err, { tags: { module: 'crm', action: 'syncDealCrewFromProposal' } });
   }
 }
 
@@ -241,6 +294,7 @@ async function syncDealCrewFromProposal(
 // =============================================================================
 
 export async function syncCrewFromProposal(dealId: string): Promise<void> {
+  return instrument('syncCrewFromProposal', async () => {
   const parsed = z.string().uuid().safeParse(dealId);
   if (!parsed.success) return;
 
@@ -253,6 +307,7 @@ export async function syncCrewFromProposal(dealId: string): Promise<void> {
   } catch (err) {
     console.error('[syncCrewFromProposal] Failed:', err);
   }
+  });
 }
 
 // =============================================================================
@@ -260,6 +315,7 @@ export async function syncCrewFromProposal(dealId: string): Promise<void> {
 // =============================================================================
 
 export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
+  return instrument('getDealCrew', async () => {
   const parsed = z.string().uuid().safeParse(dealId);
   if (!parsed.success) return [];
 
@@ -270,14 +326,27 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
     const supabase = await createClient();
 
     // Sync suggestions from proposal before fetching
-    await syncDealCrewFromProposal(supabase, dealId, workspaceId);
+    try {
+      await syncDealCrewFromProposal(supabase, dealId, workspaceId);
+    } catch (syncErr) {
+      // Log sync errors but don't block the fetch
+      console.error('[getDealCrew] sync error:', syncErr instanceof Error ? syncErr.message : syncErr);
+      Sentry.captureException(syncErr, { tags: { module: 'crm', action: 'getDealCrew.sync' } });
+    }
 
     const { data, error } = await supabase.rpc('get_deal_crew_enriched', {
       p_deal_id: dealId,
       p_workspace_id: workspaceId,
     });
 
-    if (error || !data) return [];
+    if (error) {
+      console.error('[getDealCrew] RPC error:', error.message, error.code, error.details);
+      return [];
+    }
+    if (!data) {
+      console.warn('[getDealCrew] RPC returned null/empty for deal:', dealId);
+      return [];
+    }
 
     // RPC returns a JSONB array — PostgREST may return it as a single object or array
     const rows = Array.isArray(data) ? data : [data];
@@ -350,10 +419,19 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
       crew_notes: (r.notes as string | null) ?? null,
       department: (r.department as string | null) ?? null,
       declined_at: (r.declined_at as string | null) ?? null,
+      payment_status: (r.payment_status as string | null) ?? null,
+      travel_stipend: r.travel_stipend != null ? Number(r.travel_stipend) : null,
+      per_diem: r.per_diem != null ? Number(r.per_diem) : null,
+      kit_fee: r.kit_fee != null ? Number(r.kit_fee) : null,
+      brings_own_gear: Boolean(r.brings_own_gear),
+      gear_notes: (r.gear_notes as string | null) ?? null,
     }));
-  } catch {
+  } catch (err) {
+    console.error('[getDealCrew] CAUGHT ERROR:', err);
+    Sentry.captureException(err, { tags: { module: 'crm', action: 'getDealCrew' } });
     return [];
   }
+  });
 }
 
 // =============================================================================
@@ -364,15 +442,18 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
 // =============================================================================
 
 export async function addManualDealCrew(
-  dealId: string,
-  entityId: string,
+  rawDealId: string,
+  rawEntityId: string,
   roleNote?: string,
 ): Promise<{ success: true; id: string; conflict?: string } | { success: false; error: string }> {
-  const parsed = z.object({ dealId: z.string().uuid(), entityId: z.string().uuid() }).safeParse({ dealId, entityId });
-  if (!parsed.success) return { success: false, error: 'Invalid input' };
+  return instrument('addManualDealCrew', async () => {
+  let dealId: DealId, entityId: EntityId;
+  try { dealId = DealIds.parse(rawDealId); entityId = EntityIds.parse(rawEntityId); }
+  catch { return { success: false, error: 'Invalid input' }; }
 
-  const workspaceId = await getActiveWorkspaceId();
-  if (!workspaceId) return { success: false, error: 'Not authorised' };
+  const wsRaw = await getActiveWorkspaceId();
+  if (!wsRaw) return { success: false, error: 'Not authorised' };
+  const workspaceId = WorkspaceIds.as(wsRaw);
 
   try {
     const supabase = await createClient();
@@ -402,6 +483,7 @@ export async function addManualDealCrew(
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
+  });
 }
 
 // =============================================================================
@@ -411,6 +493,7 @@ export async function addManualDealCrew(
 export async function confirmDealCrew(
   dealCrewRowId: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
+  return instrument('confirmDealCrew', async () => {
   const parsed = z.string().uuid().safeParse(dealCrewRowId);
   if (!parsed.success) return { success: false, error: 'Invalid ID' };
 
@@ -434,6 +517,7 @@ export async function confirmDealCrew(
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
+  });
 }
 
 // =============================================================================
@@ -442,7 +526,8 @@ export async function confirmDealCrew(
 
 export async function removeDealCrew(
   dealCrewRowId: string,
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<{ success: true; revertedGearCount: number } | { success: false; error: string }> {
+  return instrument('removeDealCrew', async () => {
   const parsed = z.string().uuid().safeParse(dealCrewRowId);
   if (!parsed.success) return { success: false, error: 'Invalid ID' };
 
@@ -451,6 +536,18 @@ export async function removeDealCrew(
 
   try {
     const supabase = await createClient();
+
+    // Read the row first to capture entity_id and deal_id for gear cascade
+    const { data: crewRow } = await (supabase as any)
+      .schema('ops')
+      .from('deal_crew')
+      .select('entity_id, deal_id')
+      .eq('id', dealCrewRowId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+
+    const removedEntityId = (crewRow?.entity_id as string) ?? null;
+    const dealId = (crewRow?.deal_id as string) ?? null;
 
     const { error, count } = await (supabase as any)
       .schema('ops')
@@ -461,10 +558,44 @@ export async function removeDealCrew(
 
     if (error) return { success: false, error: error.message };
     if (count === 0) return { success: false, error: 'Not found' };
-    return { success: true };
+
+    // ── Cascade: revert crew-sourced gear items for the removed entity ─────
+    let revertedGearCount = 0;
+    if (removedEntityId && dealId) {
+      // Find all events linked to this deal
+      const { data: events } = await (supabase as any)
+        .schema('ops')
+        .from('events')
+        .select('id')
+        .eq('deal_id', dealId)
+        .eq('workspace_id', workspaceId);
+
+      const eventIds = ((events ?? []) as { id: string }[]).map((e) => e.id);
+
+      if (eventIds.length > 0) {
+        // Revert gear items sourced from this crew member back to company
+        const { count: revertCount } = await (supabase as any)
+          .schema('ops')
+          .from('event_gear_items')
+          .update({
+            source: 'company',
+            supplied_by_entity_id: null,
+            kit_fee: null,
+          }, { count: 'exact' })
+          .in('event_id', eventIds)
+          .eq('workspace_id', workspaceId)
+          .eq('source', 'crew')
+          .eq('supplied_by_entity_id', removedEntityId);
+
+        revertedGearCount = revertCount ?? 0;
+      }
+    }
+
+    return { success: true, revertedGearCount };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
+  });
 }
 
 // =============================================================================
@@ -475,6 +606,7 @@ export async function addManualOpenRole(
   dealId: string,
   roleNote: string,
 ): Promise<{ success: true; id: string } | { success: false; error: string }> {
+  return instrument('addManualOpenRole', async () => {
   const parsed = z.object({
     dealId: z.string().uuid(),
     roleNote: z.string().min(1).max(100),
@@ -486,7 +618,7 @@ export async function addManualOpenRole(
 
   try {
     const supabase = await createClient();
-     
+
     const { data, error } = await (supabase as any)
       .schema('ops')
       .from('deal_crew')
@@ -506,6 +638,7 @@ export async function addManualOpenRole(
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
+  });
 }
 
 // =============================================================================
@@ -516,23 +649,23 @@ export async function addManualOpenRole(
 // =============================================================================
 
 export async function assignDealCrewEntity(
-  dealCrewRowId: string,
-  entityId: string,
+  rawDealCrewRowId: string,
+  rawEntityId: string,
 ): Promise<{ success: true; conflict?: string } | { success: false; error: string }> {
-  const parsed = z.object({
-    dealCrewRowId: z.string().uuid(),
-    entityId: z.string().uuid(),
-  }).safeParse({ dealCrewRowId, entityId });
-  if (!parsed.success) return { success: false, error: 'Invalid input' };
+  return instrument('assignDealCrewEntity', async () => {
+  let dealCrewRowId: DealCrewId, entityId: EntityId;
+  try { dealCrewRowId = DealCrewIds.parse(rawDealCrewRowId); entityId = EntityIds.parse(rawEntityId); }
+  catch { return { success: false, error: 'Invalid input' }; }
 
-  const workspaceId = await getActiveWorkspaceId();
-  if (!workspaceId) return { success: false, error: 'Not authorised' };
+  const wsRaw = await getActiveWorkspaceId();
+  if (!wsRaw) return { success: false, error: 'Not authorised' };
+  const workspaceId = WorkspaceIds.as(wsRaw);
 
   try {
     const supabase = await createClient();
 
     // Verify the row belongs to a deal in the caller's workspace before mutating.
-     
+
     const { data: row } = await (supabase as any)
       .schema('ops')
       .from('deal_crew')
@@ -545,9 +678,9 @@ export async function assignDealCrewEntity(
     }
 
     // Check for scheduling conflicts
-    const conflict = await checkCrewConflict(supabase, row.deal_id, entityId, workspaceId);
+    const conflict = await checkCrewConflict(supabase, DealIds.as(row.deal_id), entityId, workspaceId);
 
-     
+
     const { error, count } = await (supabase as any)
       .schema('ops')
       .from('deal_crew')
@@ -564,6 +697,7 @@ export async function assignDealCrewEntity(
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
+  });
 }
 
 // =============================================================================
@@ -573,9 +707,9 @@ export async function assignDealCrewEntity(
 
 async function checkCrewConflict(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  dealId: string,
-  entityId: string,
-  workspaceId: string,
+  dealId: DealId,
+  entityId: EntityId,
+  workspaceId: WorkspaceId,
 ): Promise<string | null> {
   try {
     // Get the deal's proposed date
@@ -665,6 +799,7 @@ export type CrewSearchResult = {
   is_ghost: boolean;
   employment_status: 'internal_employee' | 'external_contractor' | null;
   skills: string[];        // denormalized tag array for display only
+  equipment: string[];     // equipment names from ops.crew_equipment (Phase 4)
   _section: 'team' | 'network';
 };
 
@@ -681,6 +816,7 @@ export async function searchCrewMembers(
   /** When set, returns crew whose job_title or skills match this role — even if query is empty. */
   roleFilter?: string | null,
 ): Promise<CrewSearchResult[]> {
+  return instrument('searchCrewMembers', async () => {
   const parsed = z.object({
     orgId: z.string().uuid(),
     query: z.string().max(200),
@@ -728,8 +864,8 @@ export async function searchCrewMembers(
   // Fetch crew skills from ops.crew_skills (source of truth) — keyed by entity_id
   const crewSkillsByEntityId = new Map<string, string[]>();
   if (rosterEntityIds.length > 0) {
-    // Fetch roster entities and crew skills in parallel
-    const [rosterEntResult, crewSkillsResult] = await Promise.all([
+    // Fetch roster entities, crew skills, and equipment in parallel
+    const [rosterEntResult, crewSkillsResult, crewEquipmentResult] = await Promise.all([
       supabase
         .schema('directory')
         .from('entities')
@@ -741,6 +877,12 @@ export async function searchCrewMembers(
         .select('entity_id, skill_tag')
         .in('entity_id', rosterEntityIds)
         .eq('workspace_id', workspaceId),
+      supabase
+        .schema('ops')
+        .from('crew_equipment')
+        .select('entity_id, name')
+        .in('entity_id', rosterEntityIds)
+        .eq('workspace_id', workspaceId),
     ]);
 
     const allRosterEntities = rosterEntResult.data ?? [];
@@ -749,6 +891,13 @@ export async function searchCrewMembers(
       const list = crewSkillsByEntityId.get(row.entity_id) ?? [];
       list.push(row.skill_tag);
       crewSkillsByEntityId.set(row.entity_id, list);
+    }
+
+    const crewEquipmentByEntityId = new Map<string, string[]>();
+    for (const row of crewEquipmentResult.data ?? []) {
+      const list = crewEquipmentByEntityId.get(row.entity_id) ?? [];
+      list.push(row.name);
+      crewEquipmentByEntityId.set(row.entity_id, list);
     }
 
     for (const e of allRosterEntities) {
@@ -788,6 +937,7 @@ export async function searchCrewMembers(
         is_ghost: e.claimed_by_user_id == null,
         employment_status: (ctx.employment_status as 'internal_employee' | 'external_contractor' | null) ?? null,
         skills: crewSkillsByEntityId.get(e.id) ?? [],
+        equipment: crewEquipmentByEntityId.get(e.id) ?? [],
         _section: 'team' as const,
       };
     });
@@ -877,12 +1027,14 @@ export async function searchCrewMembers(
           is_ghost: e.claimed_by_user_id == null,
           employment_status: null,
           skills: networkSkillsByEntityId.get(e.id) ?? [],
+          equipment: [],  // Network results don't include equipment (workspace-scoped)
           _section: 'network' as const,
         };
       });
   }
 
   return [...teamResults.slice(0, 10), ...networkResults];
+  });
 }
 
 // =============================================================================
@@ -894,6 +1046,7 @@ export async function searchCrewMembers(
 export async function remindAllUnconfirmed(
   dealId: string,
 ): Promise<{ sent: number; skipped: number }> {
+  return instrument('remindAllUnconfirmed', async () => {
   const parsed = z.string().uuid().safeParse(dealId);
   if (!parsed.success) return { sent: 0, skipped: 0 };
 
@@ -954,6 +1107,7 @@ export async function remindAllUnconfirmed(
   } catch {
     return { sent: 0, skipped: 0 };
   }
+  });
 }
 
 // =============================================================================
@@ -962,6 +1116,7 @@ export async function remindAllUnconfirmed(
 // =============================================================================
 
 export async function getDealCrewForEvent(eventId: string): Promise<DealCrewRow[]> {
+  return instrument('getDealCrewForEvent', async () => {
   const parsed = z.string().uuid().safeParse(eventId);
   if (!parsed.success) return [];
 
@@ -983,6 +1138,99 @@ export async function getDealCrewForEvent(eventId: string): Promise<DealCrewRow[
   if (!dealId) return [];
 
   return getDealCrew(dealId);
+  });
+}
+
+// =============================================================================
+// getCrewGearSummary — lightweight crew gear counts for transport auto-suggestion
+// Returns total assigned crew and how many bring their own gear.
+// =============================================================================
+
+export type CrewGearSummary = { total: number; selfEquipped: number };
+
+export async function getCrewGearSummary(eventId: string): Promise<CrewGearSummary> {
+  const parsed = z.string().uuid().safeParse(eventId);
+  if (!parsed.success) return { total: 0, selfEquipped: 0 };
+
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return { total: 0, selfEquipped: 0 };
+
+  try {
+    const supabase = await createClient();
+
+    // Resolve deal_id from event
+    const { data: evt } = await (supabase as any)
+      .schema('ops')
+      .from('events')
+      .select('deal_id')
+      .eq('id', eventId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+
+    const dealId = (evt?.deal_id as string) ?? null;
+    if (!dealId) return { total: 0, selfEquipped: 0 };
+
+    // Count assigned crew (entity_id not null) and how many bring own gear
+    const { data, error } = await (supabase as any)
+      .schema('ops')
+      .from('deal_crew')
+      .select('brings_own_gear')
+      .eq('deal_id', dealId)
+      .eq('workspace_id', workspaceId)
+      .not('entity_id', 'is', null);
+
+    if (error || !data) return { total: 0, selfEquipped: 0 };
+
+    const rows = data as { brings_own_gear: boolean }[];
+    return {
+      total: rows.length,
+      selfEquipped: rows.filter((r) => r.brings_own_gear).length,
+    };
+  } catch {
+    return { total: 0, selfEquipped: 0 };
+  }
+}
+
+// =============================================================================
+// getDealCrewEquipmentNames — equipment names from all crew assigned to a deal.
+// Used by Proposal Builder for internal source annotations.
+// =============================================================================
+
+export async function getDealCrewEquipmentNames(dealId: string): Promise<string[]> {
+  const parsed = z.string().uuid().safeParse(dealId);
+  if (!parsed.success) return [];
+
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return [];
+
+  try {
+    const supabase = await createClient();
+
+    // Get entity IDs of assigned crew
+    const { data: crewRows } = await (supabase as any)
+      .schema('ops')
+      .from('deal_crew')
+      .select('entity_id')
+      .eq('deal_id', dealId)
+      .eq('workspace_id', workspaceId)
+      .not('entity_id', 'is', null);
+
+    const entityIds = (crewRows ?? []).map((r: { entity_id: string }) => r.entity_id);
+    if (entityIds.length === 0) return [];
+
+    // Fetch all equipment names for these entities
+    const { data: equipment } = await (supabase as any)
+      .schema('ops')
+      .from('crew_equipment')
+      .select('name')
+      .in('entity_id', entityIds)
+      .eq('workspace_id', workspaceId);
+
+    const names: string[] = (equipment ?? []).map((r: { name: string }) => r.name.toLowerCase());
+    return Array.from(new Set(names));
+  } catch {
+    return [];
+  }
 }
 
 // =============================================================================
@@ -999,8 +1247,16 @@ export async function updateCrewDispatch(
     arrival_location?: string | null;
     day_rate?: number | null;
     notes?: string | null;
+    payment_status?: 'pending' | 'completed' | 'submitted' | 'approved' | 'processing' | 'paid' | null;
+    payment_date?: string | null;
+    travel_stipend?: number | null;
+    per_diem?: number | null;
+    kit_fee?: number | null;
+    brings_own_gear?: boolean;
+    gear_notes?: string | null;
   },
 ): Promise<{ success: true } | { success: false; error: string }> {
+  return instrument('updateCrewDispatch', async () => {
   const parsed = z.string().uuid().safeParse(dealCrewRowId);
   if (!parsed.success) return { success: false, error: 'Invalid ID' };
 
@@ -1031,4 +1287,5 @@ export async function updateCrewDispatch(
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
+  });
 }
