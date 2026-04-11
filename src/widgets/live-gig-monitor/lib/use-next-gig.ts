@@ -9,11 +9,20 @@ export type NextGig = {
   starts_at: string;
   location_name: string | null;
   lifecycle_status: string | null;
+  /** Pass 3 Phase 3: real show-live signal. */
+  show_started_at: string | null;
+  /** Pass 3 Phase 3: real show-ended signal. */
+  show_ended_at: string | null;
 };
 
 /**
  * Next upcoming gig in the next 72h (confirmed, production, or live) for State B hero.
  * Derives from the shared lobby events query — no independent fetch.
+ *
+ * Pass 3 Phase 3: a gig that has been explicitly Started (show_started_at set,
+ * show_ended_at null) is treated as "live right now" and remains the current
+ * gig regardless of whether its starts_at has passed. This is the real-time
+ * signal that the Lobby uses to flip into Critical/Focus layout.
  */
 export function useNextGig(): { gig: NextGig | null; loading: boolean; error: string | null } {
   const { events, loading, error } = useLobbyEvents();
@@ -21,6 +30,10 @@ export function useNextGig(): { gig: NextGig | null; loading: boolean; error: st
   const gig = useMemo<NextGig | null>(() => {
     const now = Date.now();
     const in72h = now + 72 * 60 * 60 * 1000;
+
+    // Live now takes precedence over upcoming.
+    const liveNow = events.find((e) => !!e.show_started_at && !e.show_ended_at);
+    if (liveNow) return liveNow;
 
     const upcoming = events
       .filter((e) => {

@@ -41,7 +41,13 @@ export function useLobbyTopology(): {
   const urgency = useMemo((): LobbyUrgency => {
     if (!isActiveMode || !gig) return 'growth';
     const m = minutes ?? (gig.starts_at ? minutesUntil(gig.starts_at) : Infinity);
-    const isLive = gig.lifecycle_status === 'live';
+    // Pass 3 Phase 3: prefer the explicit show_started_at / show_ended_at
+    // signal (written by markShowStarted / markShowEnded) over the legacy
+    // date-math heuristic. A show is "live right now" if and only if the
+    // PM pressed Start Show and hasn't pressed End yet. Falls back to the
+    // 15-min countdown when no explicit state is set, so scheduled shows
+    // still flip to Critical mode naturally.
+    const isLive = !!gig.show_started_at && !gig.show_ended_at;
 
     if (isLive || m < CRITICAL_THRESHOLD_MIN) return 'critical';
     if (m < 60) return 'levitation';

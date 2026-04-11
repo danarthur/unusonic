@@ -10,6 +10,10 @@ export type LobbyEvent = {
   starts_at: string;
   location_name: string | null;
   lifecycle_status: string;
+  /** Pass 3 Phase 3: real show-live signal. Non-null means the PM pressed Start Show. */
+  show_started_at: string | null;
+  /** Pass 3 Phase 3: real show-ended signal. Non-null means the PM pressed End Show. */
+  show_ended_at: string | null;
 };
 
 /**
@@ -50,7 +54,7 @@ export function useLobbyEvents() {
         let query = supabase
           .schema('ops')
           .from('events')
-          .select('id, title, starts_at, location_name, lifecycle_status')
+          .select('id, title, starts_at, location_name, lifecycle_status, show_started_at, show_ended_at')
           .in('lifecycle_status', ['lead', 'tentative', 'confirmed', 'production', 'live']);
 
         if (workspaceId) query = query.eq('workspace_id', workspaceId);
