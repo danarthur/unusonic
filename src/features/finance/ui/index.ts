@@ -1,1 +1,1 @@
-export { RevenueRing, InvoiceList, QuickActions, SetupBilling } from './widgets';
+export { RevenueRing, InvoiceList, InvoiceListWidget, QuickActions, SetupBilling, PaymentModal } from './widgets';

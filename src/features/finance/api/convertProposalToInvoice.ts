@@ -1,12 +1,16 @@
 /**
- * Finance feature – Convert a signed proposal to a draft invoice
- * Calls Supabase RPC create_draft_invoice_from_proposal, revalidates finance page.
+ * Finance feature – Convert a signed proposal to draft invoices
+ *
+ * Legacy wrapper around spawnInvoicesFromProposal. Kept for backward
+ * compatibility with callers that import generateInvoice from this module
+ * (e.g., QuickActions.tsx, SetupBilling.tsx). New code should import
+ * spawnInvoicesFromProposal from invoice-actions.ts directly.
+ *
  * @module features/finance/api/convertProposalToInvoice
  */
 
 import 'server-only';
-import { revalidatePath } from 'next/cache';
-import { createClient } from '@/shared/api/supabase/server';
+import { spawnInvoicesFromProposal } from './invoice-actions';
 
 export interface GenerateInvoiceResult {
   invoiceId: string | null;
@@ -14,31 +18,20 @@ export interface GenerateInvoiceResult {
 }
 
 /**
- * Create a draft invoice from a proposal (header + line items).
- * Call after proposal is signed or from "Generate from Proposal" in the UI.
- * @param proposalId – Proposal UUID
- * @param eventId – Optional event ID to revalidate the event finance page
+ * Create draft invoices from a proposal (deposit + final or standalone).
+ * Delegates to spawnInvoicesFromProposal and returns the first invoice ID
+ * for backward compat with callers that expect a single invoiceId.
  */
 export async function generateInvoice(
   proposalId: string,
-  eventId?: string
+  eventId?: string,
 ): Promise<GenerateInvoiceResult> {
-  const supabase = await createClient();
+  const result = await spawnInvoicesFromProposal(proposalId, eventId);
 
-  const { data: invoiceId, error } = await supabase.rpc(
-    'create_draft_invoice_from_proposal',
-    { p_proposal_id: proposalId }
-  );
-
-  if (error) {
-    return { invoiceId: null, error: error.message };
+  if (result.error) {
+    return { invoiceId: null, error: result.error };
   }
 
-  const id = typeof invoiceId === 'string' ? invoiceId : invoiceId?.[0];
-  if (id) {
-    if (eventId) revalidatePath(`/events/${eventId}/finance`);
-    revalidatePath('/crm');
-  }
-
-  return { invoiceId: id ?? null, error: null };
+  const firstInvoice = result.invoices[0];
+  return { invoiceId: firstInvoice?.invoice_id ?? null, error: null };
 }

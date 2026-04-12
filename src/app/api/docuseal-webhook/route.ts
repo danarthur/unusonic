@@ -84,7 +84,7 @@ function verifyWebhookSignature(rawBody: string, headers: Headers): boolean {
 async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<void> {
   const supabase = getSystemClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   const submitter = payload.submitters?.[0];
   const proposalId = submitter?.metadata?.proposal_id;
@@ -219,6 +219,24 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     .update({ status: 'contract_signed' })
     .eq('id', p.deal_id)
     .in('status', ['inquiry', 'proposal', 'contract_sent']); // only advance, never regress
+
+  // Spawn draft invoices from the accepted proposal (PR-CLIENT-1).
+  // Idempotent: returns existing invoices if already spawned for this proposal.
+  // Non-blocking: failure here should not prevent the rest of the webhook from completing.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
+    await (supabase as any).schema('finance').rpc('spawn_invoices_from_proposal', {
+      p_proposal_id: proposalId,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    Sentry.logger.error('docuseal.webhook.spawnInvoicesFailed', {
+      proposalId,
+      workspaceId: p.workspace_id,
+      dealId: p.deal_id,
+      error: message,
+    });
+  }
 
   // Revalidate public proposal page
   if (p.public_token) {

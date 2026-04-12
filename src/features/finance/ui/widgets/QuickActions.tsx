@@ -42,7 +42,7 @@ export function QuickActions({
       setError(result.error);
       return;
     }
-    if (result.invoiceId) {
+    if (result.invoices.length > 0) {
       router.refresh();
     }
   }
@@ -56,7 +56,7 @@ export function QuickActions({
 
   return (
     <StagePanel className={`flex flex-col gap-4 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+      <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Actions
       </h2>
       <div className="relative">
@@ -80,7 +80,7 @@ export function QuickActions({
               <li>
                 <button
                   type="button"
-                  className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors flex items-center gap-3"
+                  className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] transition-colors flex items-center gap-3 stage-hover overflow-hidden"
                   onClick={handleBlank}
                 >
                   <FilePlus className="size-4 text-[var(--stage-text-secondary)]" />
@@ -90,7 +90,7 @@ export function QuickActions({
               <li>
                 <button
                   type="button"
-                  className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors flex items-center justify-between gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] transition-colors flex items-center justify-between gap-3 disabled:opacity-45 disabled:cursor-not-allowed stage-hover overflow-hidden"
                   onClick={handleFromProposal}
                   disabled={!hasProposals || loadingProposalId !== null}
                 >

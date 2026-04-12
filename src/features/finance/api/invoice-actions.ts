@@ -1,84 +1,194 @@
+'use server';
+
 /**
- * Finance feature – Invoice server actions: generate from proposal, record payment
+ * Finance feature – Invoice server actions
+ *
+ * Canonical entry points for invoice generation and payment recording.
+ * Both functions validate the caller's workspace membership via the session
+ * client (RLS), then call the finance.* RPCs via the system client (service
+ * role). This pattern matches the DocuSeal webhook and ensures the RPCs'
+ * SECURITY DEFINER posture is exercised through a single code path.
+ *
  * @module features/finance/api/invoice-actions
  */
 
-'use server';
-
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
-type PaymentMethod = 'credit_card' | 'wire' | 'check' | 'cash' | 'stripe';
+import { getSystemClient } from '@/shared/api/supabase/system';
 
 // =============================================================================
-// Generate invoice from proposal
+// Generate invoices from accepted proposal
 // =============================================================================
 
-export interface GenerateInvoiceFromProposalResult {
-  invoiceId: string | null;
+export interface SpawnInvoicesResult {
+  invoices: Array<{ invoice_id: string; invoice_kind: string }>;
   error: string | null;
 }
 
 /**
- * Calls DB function create_draft_invoice_from_proposal(proposal_id).
- * Revalidates event finance page when eventId is provided.
+ * Calls finance.spawn_invoices_from_proposal(proposal_id).
+ * Idempotent: returns existing invoices if already spawned.
+ *
+ * Auth: verifies the caller can read the proposal (RLS workspace check),
+ * then calls the RPC via system client (service role).
  */
-export async function generateInvoiceFromProposal(
+export async function spawnInvoicesFromProposal(
   proposalId: string,
-  eventId?: string
-): Promise<GenerateInvoiceFromProposalResult> {
-  const supabase = await createClient();
+  eventId?: string,
+): Promise<SpawnInvoicesResult> {
+  const sessionClient = await createClient();
 
-  const { data: invoiceId, error } = await supabase.rpc(
-    'create_draft_invoice_from_proposal',
-    { p_proposal_id: proposalId }
-  );
+  // Verify caller has workspace access to this proposal (RLS enforces membership)
+  const { data: proposal, error: authErr } = await sessionClient
+    .from('proposals')
+    .select('id, workspace_id')
+    .eq('id', proposalId)
+    .maybeSingle();
+
+  if (authErr || !proposal) {
+    return { invoices: [], error: authErr?.message ?? 'Proposal not found or access denied' };
+  }
+
+  // Call the RPC via system client (service role — required for SECURITY DEFINER)
+  const system = getSystemClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
+  const { data, error } = await (system as any)
+    .schema('finance')
+    .rpc('spawn_invoices_from_proposal', { p_proposal_id: proposalId });
 
   if (error) {
-    return { invoiceId: null, error: error.message };
+    return { invoices: [], error: error.message };
   }
 
-  const id = typeof invoiceId === 'string' ? invoiceId : invoiceId?.[0];
-  if (id) {
-    if (eventId) revalidatePath(`/events/${eventId}/finance`);
-    revalidatePath('/crm');
-  }
+  if (eventId) revalidatePath(`/events/${eventId}/finance`);
+  revalidatePath('/crm');
 
-  return { invoiceId: id ?? null, error: null };
+  return {
+    invoices: (data as Array<{ invoice_id: string; invoice_kind: string }>) ?? [],
+    error: null,
+  };
+}
+
+// Keep legacy export name for callers that haven't migrated yet
+export const generateInvoiceFromProposal = spawnInvoicesFromProposal;
+
+// Proxy for sendInvoice — delegates to send-invoice.ts which uses server-only
+// imports (generate-invoice-pdf). Can't re-export directly because tsc would
+// trace the server-only chain and block client-side module resolution.
+export interface SendInvoiceResult {
+  success: boolean;
+  invoiceNumber: string | null;
+  error: string | null;
+}
+
+export async function sendInvoice(
+  invoiceId: string,
+  eventId?: string,
+): Promise<SendInvoiceResult> {
+  // @ts-expect-error -- send-invoice.ts uses server-only imports (PDF gen); tsc traces the chain from client context. Runtime is correct: this file has 'use server' so Next.js handles the boundary.
+  const mod = await import('./send-invoice');
+  return mod.sendInvoice(invoiceId, eventId);
 }
 
 // =============================================================================
-// Record manual payment
+// Record payment (manual or webhook-sourced)
 // =============================================================================
 
-export interface RecordManualPaymentResult {
+export type PaymentMethod =
+  | 'stripe_card'
+  | 'stripe_ach'
+  | 'check'
+  | 'wire'
+  | 'cash'
+  | 'bill_dot_com'
+  | 'other';
+
+export interface RecordPaymentInput {
+  invoiceId: string;
+  amount: number;
+  method: PaymentMethod;
+  receivedAt?: string;
+  reference?: string | null;
+  notes?: string | null;
+  stripePaymentIntentId?: string | null;
+  stripeChargeId?: string | null;
+  status?: 'pending' | 'succeeded' | 'failed' | 'refunded';
+  parentPaymentId?: string | null;
+  attachmentStoragePath?: string | null;
+}
+
+export interface RecordPaymentResult {
   paymentId: string | null;
   error: string | null;
 }
 
 /**
- * Inserts a payment row: invoice_id, amount, method, status='succeeded', reference_id.
- * @param eventId – Optional; when provided, revalidates /events/{eventId}/finance
+ * Canonical payment write path. Routes through finance.record_payment RPC.
+ * Both the Stripe webhook and the manual "Record Payment" modal call this.
+ *
+ * Auth: verifies the caller can read the invoice (RLS workspace check),
+ * then calls the RPC via system client. For webhook paths (no session user),
+ * call recordPaymentFromWebhook instead.
  */
 export async function recordManualPayment(
-  invoiceId: string,
-  amount: number,
-  method: PaymentMethod,
-  reference?: string | null,
-  eventId?: string
-): Promise<RecordManualPaymentResult> {
-  const supabase = await createClient();
+  input: RecordPaymentInput,
+  eventId?: string,
+): Promise<RecordPaymentResult> {
+  const sessionClient = await createClient();
 
-  const { data: row, error } = await supabase
-    .from('payments')
-    .insert({
-      invoice_id: invoiceId,
-      amount: Number(amount),
-      method,
-      status: 'succeeded',
-      reference_id: reference ?? null,
-    })
+  // Verify caller has workspace access to this invoice
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
+  const { data: invoice, error: authErr } = await (sessionClient as any)
+    .schema('finance')
+    .from('invoices')
     .select('id')
-    .single();
+    .eq('id', input.invoiceId)
+    .maybeSingle();
+
+  if (authErr || !invoice) {
+    return { paymentId: null, error: authErr?.message ?? 'Invoice not found or access denied' };
+  }
+
+  // Get the calling user's ID for the audit trail
+  const { data: { user } } = await sessionClient.auth.getUser();
+
+  return callRecordPaymentRpc(input, user?.id ?? null, eventId);
+}
+
+/**
+ * Payment recording without session auth — for use by webhook handlers
+ * that have already verified the Stripe signature.
+ */
+export async function recordPaymentFromWebhook(
+  input: RecordPaymentInput,
+): Promise<RecordPaymentResult> {
+  return callRecordPaymentRpc(input, null);
+}
+
+async function callRecordPaymentRpc(
+  input: RecordPaymentInput,
+  userId: string | null,
+  eventId?: string,
+): Promise<RecordPaymentResult> {
+  const system = getSystemClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
+  const { data: paymentId, error } = await (system as any)
+    .schema('finance')
+    .rpc('record_payment', {
+      p_invoice_id: input.invoiceId,
+      p_amount: input.amount,
+      p_method: input.method,
+      p_received_at: input.receivedAt ?? new Date().toISOString(),
+      p_reference: input.reference ?? null,
+      p_notes: input.notes ?? null,
+      p_stripe_payment_intent_id: input.stripePaymentIntentId ?? null,
+      p_stripe_charge_id: input.stripeChargeId ?? null,
+      p_status: input.status ?? 'succeeded',
+      p_recorded_by_user_id: userId,
+      p_parent_payment_id: input.parentPaymentId ?? null,
+      p_attachment_storage_path: input.attachmentStoragePath ?? null,
+    });
 
   if (error) {
     return { paymentId: null, error: error.message };
@@ -86,6 +196,7 @@ export async function recordManualPayment(
 
   if (eventId) revalidatePath(`/events/${eventId}/finance`);
   revalidatePath('/crm');
+  revalidatePath('/finance');
 
-  return { paymentId: row?.id ?? null, error: null };
+  return { paymentId: paymentId as string, error: null };
 }

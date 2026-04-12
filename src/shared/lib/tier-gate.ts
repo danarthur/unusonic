@@ -78,7 +78,11 @@ export function getMinimumTierForCapability(capabilityKey: TierCapabilityKey): T
 }
 
 /**
- * Throws if the workspace's tier does not include the given capability.
+ * Throws if the workspace's tier does not include the given capability,
+ * or if the workspace's billing status blocks tier-gated features
+ * (past_due after grace period, canceled).
+ *
+ * This is the combined two-gate check: tier capability + billing status.
  * Error message includes the current tier and the minimum required tier.
  */
 export async function requireTierCapability(
@@ -86,14 +90,19 @@ export async function requireTierCapability(
   capabilityKey: TierCapabilityKey
 ): Promise<void> {
   const tier = await getWorkspaceTier(workspaceId);
-  if (TIER_CAPABILITIES[tier].includes(capabilityKey)) return;
+  if (!TIER_CAPABILITIES[tier].includes(capabilityKey)) {
+    const minimumTier = getMinimumTierForCapability(capabilityKey);
+    const minimumLabel = minimumTier
+      ? minimumTier.charAt(0).toUpperCase() + minimumTier.slice(1)
+      : 'unknown';
 
-  const minimumTier = getMinimumTierForCapability(capabilityKey);
-  const minimumLabel = minimumTier
-    ? minimumTier.charAt(0).toUpperCase() + minimumTier.slice(1)
-    : 'unknown';
+    throw new Error(
+      `Tier capability '${capabilityKey}' requires ${minimumLabel} plan (current: ${tier})`
+    );
+  }
 
-  throw new Error(
-    `Tier capability '${capabilityKey}' requires ${minimumLabel} plan (current: ${tier})`
-  );
+  // Second gate: billing status. If past_due after grace or canceled,
+  // tier-gated features are blocked even if the tier itself includes them.
+  const { requireBillingActive } = await import('./billing-gate');
+  await requireBillingActive(workspaceId);
 }
