@@ -34,9 +34,19 @@ export default function AionVoice({ className }: AionVoiceProps) {
       setStatus('recording');
       setErrorMessage('');
     } catch (error) {
-      console.error('Mic Error:', error);
+      // getUserMedia error names are standardised — surface the distinction so
+      // owners know to check browser permissions vs replace a broken mic.
+      const name = error instanceof Error ? error.name : '';
+      let label = 'Mic unavailable';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        label = 'Mic permission denied';
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        label = 'No mic detected';
+      } else if (name === 'NotReadableError' || name === 'AbortError') {
+        label = 'Mic in use by another app';
+      }
       setStatus('error');
-      setErrorMessage('Mic blocked');
+      setErrorMessage(label);
     }
   };
 

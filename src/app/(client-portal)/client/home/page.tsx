@@ -18,6 +18,7 @@
 import 'server-only';
 
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import * as Sentry from '@sentry/nextjs';
 import { FileText, Music, Receipt, Sparkles } from 'lucide-react';
 
@@ -60,9 +61,11 @@ function computeCountdownLabel(startsAt: string | null): string {
 export default async function ClientPortalHomePage() {
   const context = await getClientPortalContext();
 
-  // Layout redirects kind='none' to /client/sign-in.
+  // Layout redirects kind='none' to /client/sign-in. If we get here without an
+  // active entity, the redirect failed — surface a 404 rather than a blank page
+  // so the user sees something actionable and Sentry/Vercel logs pick it up.
   if (context.kind === 'none' || !context.activeEntity) {
-    return null;
+    notFound();
   }
 
   const data = await getClientHomeData(context.activeEntity.id);
@@ -276,7 +279,11 @@ function HomeDockCard({
 }) {
   const inner = (
     <div
-      className="flex items-center gap-3 rounded-[var(--portal-card-radius,12px)] p-4 transition-opacity"
+      className={`flex items-center gap-3 rounded-[var(--portal-card-radius,12px)] p-4 transition-opacity ${
+        href ? '' : 'cursor-not-allowed'
+      }`}
+      aria-disabled={href ? undefined : true}
+      title={href ? undefined : 'Not yet available'}
       style={{
         backgroundColor: 'var(--portal-surface, var(--stage-surface))',
         border: '1px solid var(--portal-border-subtle, var(--stage-border))',
