@@ -51,6 +51,16 @@ export const PERSON_ATTR = {
   availability_blackouts: 'availability_blackouts',
   /** Instagram handle (without @) */
   instagram: 'instagram',
+  /** Spotify user ID (set by OAuth callback) */
+  spotify_user_id: 'spotify_user_id',
+  /** Spotify display name (set by OAuth callback) */
+  spotify_display_name: 'spotify_display_name',
+  /** Spotify refresh token — sensitive, never expose to client or Aion */
+  spotify_refresh_token: 'spotify_refresh_token',
+  /** Root folder path for DJ software (Serato/Rekordbox) music library */
+  music_library_path: 'music_library_path',
+  /** Whether Apple Music is connected (session-level, MusicKit JS) */
+  apple_music_connected: 'apple_music_connected',
 } as const;
 
 // ─── Company (ghost org) entity keys ──────────────────────────────────────
@@ -97,23 +107,22 @@ export const COMPANY_ATTR = {
 } as const;
 
 // ─── Venue entity keys (top-level) ────────────────────────────────────────
+// All venue operational fields are now top-level attributes. The venue_ops
+// sub-object is preserved for backwards compat reads but new writes should
+// target top-level keys directly via patch_entity_attributes.
 export const VENUE_ATTR = {
   /** Venue type — e.g. 'theater', 'arena', 'club', 'festival' */
   venue_type: 'venue_type',
   /** Venue capacity (seated or standing) */
   capacity: 'capacity',
+
   /**
-   * Venue ops sub-object. Structured operational fields live here (time windows,
-   * individual dimensions, contacts). Read by getVenueOps() in the CRM Logistics flight check.
-   * Structured fields belong here; free-text note fields below are top-level.
+   * @deprecated Read from top-level keys instead. Kept for backwards compat reads.
+   * The venue_ops sub-object is no longer the canonical location for these fields.
    */
   venue_ops: 'venue_ops',
 
-  // ── Address fields (top-level) ──────────────────────────────────────────
-  // These are read by crm/actions/lookup.ts and crm/actions/update-event-venue.ts.
-  // Stored at top-level (not inside venue_ops) so patch_entity_attributes can merge
-  // them without clobbering the venue_ops sub-object.
-
+  // ── Address fields ─────────────────────────────────────────────────────
   /**
    * Full address object — { street, city, state, postal_code, country }.
    * Prefer this over individual fields when writing a complete address in one patch.
@@ -133,40 +142,20 @@ export const VENUE_ATTR = {
   /** Postal / ZIP code */
   postal_code: 'postal_code',
 
-  // ── Free-text note fields (top-level) — written by Entity Studio VenueTechSpecsCard ──
-  // Distinct from the structured VENUE_OPS fields (time windows, numeric dimensions).
-  // Top-level storage is intentional: patch_entity_attributes uses shallow || merge,
-  // which can only safely write top-level keys without clobbering the venue_ops sub-object.
-
-  /** General load-in / access notes (free text). Distinct from VENUE_OPS.load_in_window. */
+  // ── Free-text note fields ──────────────────────────────────────────────
+  /** General load-in / access notes (free text). */
   load_in_notes: 'load_in_notes',
-  /** Power / electrical notes (free text). Distinct from VENUE_OPS.house_power_amps. */
+  /** Power / electrical notes (free text). */
   power_notes: 'power_notes',
-  /**
-   * Combined stage dimensions note (free text, e.g. "40ft W × 30ft D × 20ft H").
-   * Distinct from the structured VENUE_OPS.stage_width / stage_depth / trim_height fields.
-   */
+  /** Combined stage dimensions note (free text, e.g. "40ft W x 30ft D x 20ft H"). */
   stage_notes: 'stage_notes',
   /** Public website URL for the venue. */
   website: 'website',
-} as const;
 
-// ─── Venue ops sub-object keys (attributes.venue_ops.*) ───────────────────
-/**
- * These are nested under attributes.venue_ops, NOT top-level attributes.
- * Usage: attrs[VENUE_ATTR.venue_ops][VENUE_OPS.dock_address]
- *
- * Read by: src/app/(dashboard)/(features)/crm/actions/get-venue-ops.ts
- * Written by: EntityStudioClient (venue form — Step 4 of network rebuild)
- *
- * ⚠ WARNING: Any key added here must also be handled in getVenueOps().
- * A mismatch silently nulls the CRM Logistics flight check — no error, just missing data.
- */
-export const VENUE_OPS = {
-  // ── Existing keys (already read by getVenueOps) ──
+  // ── Promoted from venue_ops (now top-level) ────────────────────────────
   /** Parking notes for production vehicles */
   parking_notes: 'parking_notes',
-  /** Loading dock hours — e.g. "8am–6pm Mon–Fri" */
+  /** Loading dock hours — e.g. "8am-6pm Mon-Fri" */
   dock_hours: 'dock_hours',
   /** General access notes (gate codes, security contacts) */
   access_notes: 'access_notes',
@@ -174,15 +163,7 @@ export const VENUE_OPS = {
   venue_contact_name: 'venue_contact_name',
   /** House production manager direct cell */
   venue_contact_phone: 'venue_contact_phone',
-  /** Venue capacity (if stored under venue_ops rather than top-level) */
-  capacity: 'capacity',
-
-  // ── New keys (Step 4 / Step 12 of network rebuild) ──
-  /**
-   * Truck / loading dock address — NOT the main venue address.
-   * This is the #1 field missing from every venue database.
-   * Format: full street address string (e.g. "123 Loading Dock Rd, rear entrance")
-   */
+  /** Truck / loading dock address — NOT the main venue address */
   dock_address: 'dock_address',
   /** Stage width in feet */
   stage_width: 'stage_width',
@@ -190,9 +171,9 @@ export const VENUE_OPS = {
   stage_depth: 'stage_depth',
   /** Maximum trim height in feet (how high you can fly) */
   trim_height: 'trim_height',
-  /** Load-in time window — e.g. "8:00 AM – 2:00 PM" */
+  /** Load-in time window — e.g. "8:00 AM - 2:00 PM" */
   load_in_window: 'load_in_window',
-  /** Load-out time window — e.g. "11:00 PM – 2:00 AM" */
+  /** Load-out time window — e.g. "11:00 PM - 2:00 AM" */
   load_out_window: 'load_out_window',
   /** Hard curfew time — e.g. "11:00 PM" */
   curfew: 'curfew',
@@ -209,6 +190,81 @@ export const VENUE_OPS = {
   /** Green room count */
   green_room_count: 'green_room_count',
   /** Additional notes for the green room / backstage */
+  green_room_notes: 'green_room_notes',
+
+  // ── New fields ─────────────────────────────────────────────────────────
+  /** Power voltage — e.g. "120V", "208V", "480V" */
+  power_voltage: 'power_voltage',
+  /** Power phase — e.g. "single", "3-phase" */
+  power_phase: 'power_phase',
+  /** Rigging type — e.g. "fly_system", "grid", "ground_support", "none" */
+  rigging_type: 'rigging_type',
+  /** Number of rigging points available */
+  rigging_points_count: 'rigging_points_count',
+  /** Maximum weight per rigging point (lbs) */
+  rigging_weight_per_point: 'rigging_weight_per_point',
+  /** Ceiling height in feet */
+  ceiling_height: 'ceiling_height',
+  /** Freight elevator details — e.g. "max 4000 lbs, key from security" */
+  freight_elevator: 'freight_elevator',
+  /** Dock door height */
+  dock_door_height: 'dock_door_height',
+  /** Dock door width */
+  dock_door_width: 'dock_door_width',
+  /** Noise ordinance details */
+  noise_ordinance: 'noise_ordinance',
+  /** Weather exposure — e.g. "indoor", "outdoor", "covered", "tent" */
+  weather_exposure: 'weather_exposure',
+  /** Crew-specific parking instructions */
+  crew_parking_notes: 'crew_parking_notes',
+  /** Whether a forklift is available on site */
+  forklift_available: 'forklift_available',
+  /** Number of dressing rooms */
+  dressing_room_count: 'dressing_room_count',
+  /** Production office details — toggle with notes */
+  production_office: 'production_office',
+  /** Catering kitchen availability — toggle with notes */
+  catering_kitchen: 'catering_kitchen',
+  /** Nearest hospital name and address */
+  nearest_hospital: 'nearest_hospital',
+  /** ISO timestamp of last venue data verification */
+  last_verified_at: 'last_verified_at',
+  /** Entity ID or name of who last verified the data */
+  verified_by: 'verified_by',
+  /** IANA timezone — e.g. "America/New_York". Used by resolveEventTimezone fallback chain. */
+  timezone: 'timezone',
+} as const;
+
+// ─── Venue ops sub-object keys (DEPRECATED) ──────────────────────────────
+/**
+ * @deprecated All venue_ops keys have been promoted to top-level attributes.
+ * Use VENUE_ATTR instead. This export is kept only for backwards compatibility
+ * with existing imports. The string values are identical to the corresponding
+ * VENUE_ATTR keys, so code using VENUE_OPS.parking_notes will still resolve
+ * to 'parking_notes' — but new code should use VENUE_ATTR.parking_notes.
+ *
+ * Remove after all consumers are updated to use VENUE_ATTR.
+ */
+export const VENUE_OPS = {
+  parking_notes: 'parking_notes',
+  dock_hours: 'dock_hours',
+  access_notes: 'access_notes',
+  venue_contact_name: 'venue_contact_name',
+  venue_contact_phone: 'venue_contact_phone',
+  capacity: 'capacity',
+  dock_address: 'dock_address',
+  stage_width: 'stage_width',
+  stage_depth: 'stage_depth',
+  trim_height: 'trim_height',
+  load_in_window: 'load_in_window',
+  load_out_window: 'load_out_window',
+  curfew: 'curfew',
+  house_power_amps: 'house_power_amps',
+  union_local: 'union_local',
+  house_pa_included: 'house_pa_included',
+  house_lighting_included: 'house_lighting_included',
+  wifi_credentials: 'wifi_credentials',
+  green_room_count: 'green_room_count',
   green_room_notes: 'green_room_notes',
 } as const;
 

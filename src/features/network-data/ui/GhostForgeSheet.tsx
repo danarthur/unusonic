@@ -171,7 +171,9 @@ export function GhostForgeSheet({
       }
       toast.success('Added.');
       onOpenChange(false);
-      router.push(`/network?nodeId=${encodeURIComponent(result.relationshipId)}&kind=external_partner`);
+      if (result.relationshipId) {
+        router.push(`/network?nodeId=${encodeURIComponent(result.relationshipId)}&kind=external_partner`);
+      }
     });
   };
 
@@ -191,7 +193,7 @@ export function GhostForgeSheet({
             Ask Aion to scout a website for details, or add them manually.
           </p>
 
-          <div className="mt-4 flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] p-1">
+          <div className="mt-4 flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] p-1">
             <button
               type="button"
               onClick={() => setMode('scout')}
@@ -241,7 +243,7 @@ export function GhostForgeSheet({
                 onEnrich={handleScoutApply}
               />
               {isScoutPending && (
-                <p className="text-[10px] uppercase tracking-wider text-[var(--stage-accent)]/90">
+                <p className="stage-label text-[var(--stage-accent)]/90">
                   Creating connection…
                 </p>
               )}
@@ -251,7 +253,7 @@ export function GhostForgeSheet({
           {mode === 'manual' && (
             <>
               {/* Type toggle */}
-              <div className="flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] p-1">
+              <div className="flex gap-1 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] p-1">
                 <button
                   type="button"
                   onClick={() => setType('organization')}
@@ -526,7 +528,7 @@ export function GhostForgeSheet({
             >
               {isPending ? 'Adding…' : 'Add & open'}
             </Button>
-            <p className="mt-3 text-center text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)]">
+            <p className="mt-3 text-center stage-label">
               You can add notes and details next.
             </p>
           </div>

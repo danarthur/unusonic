@@ -151,7 +151,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
               maxLength={80}
             />
             {labelInput.trim() && (
-              <p className="text-[10px] text-[var(--stage-text-secondary)]/70 pl-1">
+              <p className="text-label text-[var(--stage-text-secondary)]/70 pl-1">
                 Key: <code className="font-mono">{derivedKey}</code>
               </p>
             )}
@@ -198,7 +198,7 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
 
       {/* Merge panel — shown when mergeFrom is set */}
       {mergeFrom && (
-        <div className="rounded-xl border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/5 p-4 space-y-3 transition-all">
+        <div className="rounded-xl border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/5 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm text-[var(--stage-text-primary)]">
               Merge <strong>&ldquo;{mergeFrom.label}&rdquo;</strong> into:
@@ -226,10 +226,10 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
                     type="button"
                     onClick={() => handleMerge(entry)}
                     disabled={merging}
-                    className="w-full flex items-center gap-2 rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--stage-surface-nested)] px-3 py-2 text-left hover:bg-[var(--stage-accent)]/10 transition-colors disabled:opacity-40"
+                    className="w-full flex items-center gap-2 rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--ctx-well)] px-3 py-2 text-left hover:bg-[var(--stage-accent)]/10 transition-colors disabled:opacity-45"
                   >
                     <span className="text-sm text-[var(--stage-text-primary)]">{entry.label}</span>
-                    <span className="ml-1 font-mono text-[10px] text-[var(--stage-text-secondary)]/60">
+                    <span className="ml-1 font-mono text-label text-[var(--stage-text-secondary)]/60">
                       {entry.tag}
                     </span>
                   </button>
@@ -250,11 +250,11 @@ export function IndustryTagManager({ workspaceId, initialTags }: IndustryTagMana
             return (
               <li
                 key={entry.id}
-                className="flex items-center justify-between rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--stage-surface-nested)] px-3 py-2.5"
+                className="flex items-center justify-between rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--ctx-well)] px-3 py-2.5"
               >
                 <div className="min-w-0">
                   <span className="text-sm text-[var(--stage-text-primary)]">{entry.label}</span>
-                  <span className="ml-2 font-mono text-[10px] text-[var(--stage-text-secondary)]/60">
+                  <span className="ml-2 font-mono text-label text-[var(--stage-text-secondary)]/60">
                     {entry.tag}
                   </span>
                 </div>

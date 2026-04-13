@@ -58,7 +58,7 @@ export function IndustryTagPicker({
         {Array.from({ length: 5 }).map((_, i) => (
           <span
             key={i}
-            className="h-6 w-16 stage-skeleton rounded-full bg-[var(--stage-surface-nested)]"
+            className="h-6 w-16 stage-skeleton rounded-full bg-[var(--ctx-well)]"
           />
         ))}
       </div>
@@ -104,7 +104,7 @@ export function IndustryTagPicker({
         })}
       </div>
       {showManageLink && (
-        <p className="text-[10px] text-[var(--stage-text-secondary)]/60">
+        <p className="text-label text-[var(--stage-text-secondary)]/60">
           <Link href="/settings/network-tags" className="hover:text-[var(--stage-text-secondary)] transition-colors">
             Manage categories →
           </Link>
