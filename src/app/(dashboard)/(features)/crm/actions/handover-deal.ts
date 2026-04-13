@@ -85,8 +85,20 @@ export async function handoverDeal(
     .maybeSingle();
 
   if (existingEvent) {
-    // Fix the orphan: link the existing event to the deal
+    // Fix the orphan: link the existing event to the deal. Re-verify the
+    // event belongs to this workspace before re-linking — deal_id alone
+    // could theoretically collide across tenants without the guard.
     const eid = (existingEvent as { id: string }).id;
+    const { data: eventWorkspaceCheck } = await supabase
+      .schema('ops')
+      .from('events')
+      .select('id')
+      .eq('id', eid)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (!eventWorkspaceCheck) {
+      return { success: false, error: 'Orphan event belongs to a different workspace.' };
+    }
     await supabase
       .from('deals')
       .update({ status: 'won', event_id: eid, won_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -152,6 +164,20 @@ export async function handoverDeal(
     endAt = payload.vitals.end_at;
     eventName = (payload.name ?? title).trim() || title;
     runOfShowData = payload.run_of_show_data ?? null;
+
+    // Defense-in-depth: the handoff wizard already guards fromLocalDatetime
+    // against unparseable input, but this is the server contract and nothing
+    // else validates before we write to ops.events.starts_at / ends_at.
+    // Reject anything that doesn't parse to a finite Date so we never persist
+    // "Invalid Date" ISOs.
+    const startMs = Date.parse(startAt);
+    const endMs = Date.parse(endAt);
+    if (!startAt || Number.isNaN(startMs)) {
+      return { success: false, error: 'Invalid start_at in handoff payload.' };
+    }
+    if (!endAt || Number.isNaN(endMs)) {
+      return { success: false, error: 'Invalid end_at in handoff payload.' };
+    }
   } else {
     eventName = title;
   }
@@ -259,6 +285,13 @@ export async function handoverDeal(
       error: reason,
     });
     warnings.push('Crew sync failed — you may need to re-add crew on the Plan tab.');
+  } else if (crewSyncResult.value.emptySource) {
+    // deal_crew had zero assigned rows — the Plan tab will show an empty
+    // crew grid. Surface this as a warning so the PM knows they need to
+    // add crew rather than thinking handoff "worked" with no roster.
+    warnings.push(
+      'No crew was assigned on the deal — add crew on the Plan tab before the show.',
+    );
   }
 
   // Non-critical: gear + checklist + DJ client seed (fire-and-forget).

@@ -2,6 +2,13 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 
+export type SyncCrewRatesResult = {
+  /** True when deal_crew had zero rows with an assigned entity — caller can surface a "no crew" warning. */
+  emptySource: boolean;
+  inserted: number;
+  updated: number;
+};
+
 /**
  * Syncs deal_crew day_rate values to crew_assignments at handoff.
  * For each deal_crew row with an entity_id, checks if a matching
@@ -9,12 +16,15 @@ import { createClient } from '@/shared/api/supabase/server';
  * - If yes: updates pay_rate only if currently null.
  * - If no: inserts a new crew_assignments row.
  *
- * Non-blocking — catches all errors and logs them.
+ * Non-blocking — catches all errors and logs them. Returns a summary so
+ * the handover can tell the PM "no crew was synced" instead of leaving
+ * them with a silently empty Plan tab crew grid.
  */
 export async function syncCrewRatesToAssignments(
   eventId: string,
   dealId: string
-): Promise<void> {
+): Promise<SyncCrewRatesResult> {
+  const empty: SyncCrewRatesResult = { emptySource: true, inserted: 0, updated: 0 };
   try {
     // Guard against callers that invoke this before the ops.events row exists.
     // Without this, the function would still insert crew_assignments rows —
@@ -24,7 +34,7 @@ export async function syncCrewRatesToAssignments(
         eventId,
         dealId,
       });
-      return;
+      return empty;
     }
 
     const supabase = await createClient();
@@ -39,10 +49,10 @@ export async function syncCrewRatesToAssignments(
 
     if (crewErr) {
       console.error('[handoff] sync-crew-rates query deal_crew:', crewErr.message);
-      return;
+      return empty;
     }
 
-    if (!crewRows || crewRows.length === 0) return;
+    if (!crewRows || crewRows.length === 0) return empty;
 
     // 2. Get the workspace_id from the event
     const { data: event, error: eventErr } = await supabase
@@ -54,7 +64,7 @@ export async function syncCrewRatesToAssignments(
 
     if (eventErr || !event) {
       console.error('[handoff] sync-crew-rates query event:', eventErr?.message ?? 'event not found');
-      return;
+      return { emptySource: false, inserted: 0, updated: 0 };
     }
 
     const workspaceId = (event as { workspace_id: string }).workspace_id;
@@ -103,6 +113,8 @@ export async function syncCrewRatesToAssignments(
       .maybeSingle();
 
     let nextSort = ((maxRow as { sort_order?: number } | null)?.sort_order ?? -1) + 1;
+    let inserted = 0;
+    let updated = 0;
 
     // 5. Process each deal_crew row
     for (const raw of crewRows) {
@@ -124,6 +136,7 @@ export async function syncCrewRatesToAssignments(
             .from('crew_assignments')
             .update({ pay_rate: dc.day_rate, pay_rate_type: 'flat' })
             .eq('id', existing.id);
+          updated++;
         }
       } else {
         // Insert a new crew_assignments row.
@@ -151,9 +164,12 @@ export async function syncCrewRatesToAssignments(
             scheduled_hours: null,
           });
         nextSort++;
+        inserted++;
       }
     }
+    return { emptySource: false, inserted, updated };
   } catch (err) {
     console.error('[handoff] sync-crew-rates unexpected error:', err);
+    return { emptySource: false, inserted: 0, updated: 0 };
   }
 }

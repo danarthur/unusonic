@@ -5,9 +5,11 @@
  */
 
 import { Suspense } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import * as Sentry from '@sentry/nextjs';
+import { createClient } from '@/shared/api/supabase/server';
 import { getEventCommand } from '@/entities/event';
 import { EventCommandGrid } from '@/widgets/event-dashboard';
 import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
@@ -49,6 +51,21 @@ async function EventContent({ id }: { id: string }) {
   const event = await getEventCommand(id);
 
   if (!event) {
+    // Distinguish unauthenticated / wrong-workspace / genuinely missing so
+    // operators can tell 403s from 404s in Sentry instead of seeing a sea of
+    // identical notFound() calls.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      redirect(`/login?redirect=${encodeURIComponent(`/events/${id}`)}`);
+    }
+    Sentry.captureMessage('Event Studio: event not visible to current user', {
+      level: 'info',
+      extra: { eventId: id, userId: user.id },
+      tags: { area: 'event-studio', reason: 'forbidden-or-missing' },
+    });
     notFound();
   }
 
