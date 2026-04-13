@@ -33,6 +33,10 @@ import {
 import { assignOrAddCrewMember } from '@/app/(dashboard)/(features)/crm/actions/assign-or-add-crew-member';
 import { removeCrewItem } from '@/app/(dashboard)/(features)/crm/actions/remove-crew-item';
 import { getDealCrewForEvent, type DealCrewRow } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import {
+  getCrewAssignmentsForEvent,
+  type CrewAssignmentRow,
+} from '@/app/(dashboard)/(features)/crm/actions/get-crew-assignments-for-event';
 import type { InternalTeamMember } from '@/app/(dashboard)/(features)/crm/actions/get-internal-team-for-role';
 import type { EventCommandDTO, EventLifecycleStatus } from '@/entities/event';
 import type { EventSummaryForPrism } from '@/app/(dashboard)/(features)/crm/actions/get-event-summary';
@@ -123,14 +127,23 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
   }, [event.id]);
   useEffect(() => { void fetchCrewRows(); }, [fetchCrewRows]);
 
-  // The Team panel below (lead-role quick-slots + additional crew) reads from
-  // run_of_show_data.crew_items while its assign/remove actions write to
-  // ops.crew_assignments — a pre-existing read/write mismatch outside the scope
-  // of this wave. Left as-is; a follow-up should migrate this panel to read from
-  // ops.crew_assignments to match its own writes.
-  const crewItems = (Array.isArray(runOfShowData?.crew_items) ? runOfShowData.crew_items : []).map((c, i) => ({
-    ...c,
-    id: (c as { id?: string }).id ?? `crew-${i}`,
+  // Team panel (lead-role quick-slots + additional crew) reads from
+  // ops.crew_assignments — the same table its assign/remove actions write to.
+  // Previously read run_of_show_data.crew_items JSONB, which created a
+  // read/write mismatch where assignments never surfaced on the UI.
+  const [crewAssignments, setCrewAssignments] = useState<CrewAssignmentRow[]>([]);
+  const fetchCrewAssignments = useCallback(async () => {
+    const rows = await getCrewAssignmentsForEvent(event.id);
+    setCrewAssignments(rows);
+  }, [event.id]);
+  useEffect(() => { void fetchCrewAssignments(); }, [fetchCrewAssignments]);
+
+  // Shape-compatible shim for the panel JSX — role / assignee_name / entity_id / id.
+  const crewItems = crewAssignments.map((c) => ({
+    role: c.role,
+    assignee_name: c.assignee_name,
+    entity_id: c.entity_id,
+    id: c.id,
   }));
 
   // Assign sheet state
@@ -149,18 +162,22 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
   const handleCrewAssign = useCallback(
     async (member: InternalTeamMember) => {
       const result = await assignOrAddCrewMember(event.id, assigningRole, member.entity_id, member.name);
-      if (result.success) refresh();
+      if (result.success) {
+        await fetchCrewAssignments();
+        refresh();
+      }
       return result;
     },
-    [event.id, assigningRole, refresh]
+    [event.id, assigningRole, refresh, fetchCrewAssignments]
   );
 
   const handleRemoveCrew = useCallback(
     async (assignmentId: string) => {
       await removeCrewItem(event.id, assignmentId);
+      await fetchCrewAssignments();
       refresh();
     },
-    [event.id, refresh]
+    [event.id, refresh, fetchCrewAssignments]
   );
 
   const handleAddRoleSubmit = () => {
@@ -527,7 +544,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
                       {c.entity_id ? (c.assignee_name ?? '—') : (
                         <button
                           type="button"
-                          onClick={() => openAssignSheet(c.role)}
+                          onClick={() => openAssignSheet(c.role ?? '')}
                           className="text-sm text-[var(--stage-text-secondary)]/60 hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none"
                         >
                           Unassigned

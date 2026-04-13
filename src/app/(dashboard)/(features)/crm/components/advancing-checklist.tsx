@@ -108,16 +108,34 @@ export function AdvancingChecklist({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let list = await getAdvancingChecklist(eventId);
-      if (!cancelled && list.length === 0) {
-        list = await seedAdvancingChecklist(eventId, archetype, transportMode);
-      }
-      if (!cancelled) {
-        setItems(list);
-        setLoading(false);
+      try {
+        let list = await getAdvancingChecklist(eventId);
+        if (!cancelled && list.length === 0) {
+          // Seed failures (e.g. unknown archetype on a grandfathered deal) used
+          // to bubble out of the effect and leave the checklist spinning forever.
+          // Fall back to an empty list so the UI settles; the seeder captures
+          // its own errors to Sentry.
+          try {
+            list = await seedAdvancingChecklist(eventId, archetype, transportMode);
+          } catch (seedErr) {
+            console.error('[advancing-checklist] seed failed:', seedErr);
+            list = [];
+          }
+        }
+        if (!cancelled) {
+          setItems(list);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('[advancing-checklist] fetch failed:', err);
+        if (!cancelled) {
+          setItems([]);
+          setLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
   // ── Auto-state sync ──

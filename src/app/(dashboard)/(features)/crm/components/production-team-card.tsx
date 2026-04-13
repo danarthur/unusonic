@@ -252,14 +252,17 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
         />
       )}
 
-      {/* Empty state — only when all tiers are empty */}
+      {/* Empty state — only when all tiers are empty. Copy branches post-handoff
+       *  because the "Build a proposal" nudge is stale once the deal is won. */}
       {!loading && isEmpty && (
         <div className="mb-4">
           <p className="stage-field-label text-[var(--stage-text-secondary)] mb-1">
             No crew yet
           </p>
           <p className="stage-badge-text text-[var(--stage-text-tertiary)] leading-relaxed">
-            Build a proposal with packages to get crew suggestions, or add crew directly.
+            {isLocked
+              ? 'No crew was carried over from the deal. Add crew here — all assignments will flow to the Plan tab.'
+              : 'Build a proposal with packages to get crew suggestions, or add crew directly.'}
           </p>
         </div>
       )}
@@ -287,6 +290,11 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
       )}
 
       {/* ── Add crew / Add role ─────────────────────────────────────────────── */}
+      {/* Post-handoff (isLocked=true) the scalar confirmation lives in Plan Lens;
+       *  hide the add-crew / add-role affordances entirely so a PM can't bypass
+       *  the confirmation modal by adding fresh rows here. Rate editing stays
+       *  gated by rateReadOnly on existing rows. */}
+      {!isLocked && (
       <div className={cn(!isEmpty && 'mt-4 pt-4 border-t border-[oklch(1_0_0_/_0.04)]')}>
         <div className="flex items-center gap-3">
           {sourceOrgId && (
@@ -361,6 +369,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
           </>
         )}
       </div>
+      )}
 
       {/* CrossShowResourceModal — portaled to body */}
       {eventDate && (
