@@ -82,7 +82,7 @@ function PaymentForm({ depositCents, onSuccess }: PaymentFormProps) {
         className={cn(
           'w-full h-11 font-medium text-sm tracking-tight',
           'hover:opacity-90 transition-opacity',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
+          'disabled:opacity-45 disabled:cursor-not-allowed',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-accent)]'
         )}
         style={{
@@ -124,16 +124,22 @@ export function DepositPaymentStep({ token, total, depositPercent }: DepositPaym
   const depositCents = Math.round((total * depositPercent) / 100) * 100;
 
   useEffect(() => {
-    createProposalDepositIntent(token).then((result: CreateDepositIntentResult) => {
-      if (result.alreadyPaid) {
-        setAlreadyPaid(true);
-      } else if (result.error) {
-        setError(result.error);
-      } else if (result.clientSecret) {
-        setClientSecret(result.clientSecret);
-      }
-      setLoading(false);
-    });
+    createProposalDepositIntent(token)
+      .then((result: CreateDepositIntentResult) => {
+        if (result.alreadyPaid) {
+          setAlreadyPaid(true);
+        } else if (result.error) {
+          setError(result.error);
+        } else if (result.clientSecret) {
+          setClientSecret(result.clientSecret);
+        }
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Failed to initialize payment';
+        setError(message);
+        setLoading(false);
+      });
   }, [token]);
 
   const handleSuccess = useCallback(() => {
@@ -204,7 +210,7 @@ export function DepositPaymentStep({ token, total, depositPercent }: DepositPaym
 
       {/* Secure payment notice */}
       <p
-        className="mt-4 text-[11px] leading-relaxed"
+        className="mt-4 text-field-label leading-relaxed"
         style={{ color: 'var(--portal-text-secondary)' }}
       >
         Payments are processed securely by Stripe. Your card details are never stored by Unusonic.

@@ -1,8 +1,10 @@
 'use server';
 
+import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 
 // =============================================================================
 // Types
@@ -10,7 +12,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
 export type CrewDecisionData = {
   entityId: string;
-  availability: 'available' | 'conflict' | 'unknown';
+  availability: 'available' | 'conflict' | 'blackout' | 'unknown';
   conflictEventName: string | null;
   dayRate: number | null;
   skillMatchScore: number; // 0-100
@@ -52,7 +54,7 @@ export async function getCrewDecisionData(
     // ── 1. Past shows: count distinct deal_ids + latest event date ──────────
     const pastShowMap = new Map<string, { count: number; lastDate: string | null }>();
 
-    const { data: crewHistory } = await (supabase as any)
+    const { data: crewHistory } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('entity_id, deal_id')
@@ -96,12 +98,59 @@ export async function getCrewDecisionData(
     // ── 2. Availability: conflict check against eventDate ──────────────────
     const availabilityMap = new Map<
       string,
-      { status: 'available' | 'conflict' | 'unknown'; conflictName: string | null }
+      { status: 'available' | 'conflict' | 'blackout' | 'unknown'; conflictName: string | null }
     >();
 
     if (eventDate) {
-      // Find other deals on same date with these entities assigned
-      const { data: otherCrew } = await (supabase as any)
+      // 2a. Check blackouts from entity attributes
+      const { data: entities } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('id, attributes')
+        .in('id', entityIds);
+
+      if (entities) {
+        for (const ent of entities as { id: string; attributes: Record<string, unknown> | null }[]) {
+          const attrs = readEntityAttrs(ent.attributes, 'person');
+          for (const range of attrs.availability_blackouts) {
+            if (eventDate >= range.start && eventDate <= range.end) {
+              availabilityMap.set(ent.id, { status: 'blackout', conflictName: 'Unavailable (blackout)' });
+              break;
+            }
+          }
+        }
+      }
+
+      // 2b. Check event bookings from crew_assignments
+      const dateStart = `${eventDate}T00:00:00`;
+      const dateEnd = `${eventDate}T23:59:59`;
+      const { data: eventBookings } = await supabase
+        .schema('ops')
+        .from('crew_assignments')
+        .select('entity_id, role, event:events!inner(title, starts_at, ends_at)')
+        .in('entity_id', entityIds)
+        .in('status', ['confirmed', 'dispatched'])
+        .lte('events.starts_at', dateEnd)
+        .gte('events.ends_at', dateStart);
+
+      if (eventBookings) {
+        // `event:events!inner(...)` returns `event` as an array in narrowed
+        // types even with !inner, because the typegen can't prove cardinality
+        // from FK metadata alone. We know there's at least one row per match
+        // (that's what !inner guarantees), so read the first element.
+        for (const b of eventBookings) {
+          if (!availabilityMap.has(b.entity_id)) {
+            const eventRow = Array.isArray(b.event) ? b.event[0] : b.event;
+            availabilityMap.set(b.entity_id, {
+              status: 'conflict',
+              conflictName: eventRow?.title ?? 'another event',
+            });
+          }
+        }
+      }
+
+      // 2c. Check deal holds on same date
+      const { data: otherCrew } = await supabase
         .schema('ops')
         .from('deal_crew')
         .select('entity_id, deal_id')
@@ -109,12 +158,10 @@ export async function getCrewDecisionData(
         .eq('workspace_id', workspaceId);
 
       if (otherCrew?.length) {
-        // Gather all deal_ids from these assignments
         const otherDealIds = [
           ...new Set((otherCrew as { deal_id: string }[]).map((r) => r.deal_id)),
         ];
 
-        // Check which deals fall on the same date
         const { data: conflictDeals } = await supabase
           .from('deals')
           .select('id, title, proposed_date')
@@ -133,9 +180,8 @@ export async function getCrewDecisionData(
           ]),
         );
 
-        // Map entity → conflicting deal
         for (const row of otherCrew as { entity_id: string; deal_id: string }[]) {
-          if (conflictDealIds.has(row.deal_id)) {
+          if (!availabilityMap.has(row.entity_id) && conflictDealIds.has(row.deal_id)) {
             availabilityMap.set(row.entity_id, {
               status: 'conflict',
               conflictName: conflictTitleMap.get(row.deal_id) ?? 'another show',
@@ -161,7 +207,7 @@ export async function getCrewDecisionData(
     const rateMap = new Map<string, number | null>();
     const skillScoreMap = new Map<string, number>();
 
-    const { data: skillRows } = await (supabase as any)
+    const { data: skillRows } = await supabase
       .schema('ops')
       .from('crew_skills')
       .select('entity_id, skill_tag, hourly_rate')
@@ -234,6 +280,7 @@ export async function getCrewDecisionData(
     });
   } catch (err) {
     console.error('[getCrewDecisionData] Failed:', err);
+    Sentry.captureException(err, { tags: { module: 'crm', action: 'getCrewDecisionData' } });
     return [];
   }
 }

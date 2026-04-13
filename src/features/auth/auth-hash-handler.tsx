@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { createClient } from '@/shared/api/supabase/client';
 
 /**
@@ -35,6 +36,7 @@ export function AuthHashHandler() {
       })
       .catch((err) => {
         console.error('[AuthHashHandler] setSession failed', err);
+        toast.error('Sign-in link could not be verified. Please request a new link.');
         handled.current = false;
       });
   }, []);

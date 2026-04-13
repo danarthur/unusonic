@@ -39,7 +39,7 @@ function resolveCallTimeDisplay(
 export async function getCrewTokenDetails(token: string): Promise<TokenDetails | null> {
   const supabase = getSystemClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   const { data: row, error } = await db
     .schema('ops')
@@ -145,7 +145,7 @@ export async function consumeCrewToken(
 ): Promise<ConsumeTokenResult> {
   const supabase = getSystemClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   const { data: row, error: fetchErr } = await db
     .schema('ops')
@@ -160,6 +160,7 @@ export async function consumeCrewToken(
     event_id: string;
     crew_index: number | null;
     assignment_id: string | null;
+    entity_id: string | null;
     expires_at: string;
     used_at: string | null;
   };
@@ -175,47 +176,42 @@ export async function consumeCrewToken(
     .eq('token', token);
 
   const newStatus = action === 'confirmed' ? 'confirmed' : 'requested';
+  const nowIso = new Date().toISOString();
 
+  // Normalized event-level dispatch: ops.crew_assignments
   if (r.assignment_id) {
-    // Normalized path: update ops.crew_assignments directly
     await db
       .schema('ops')
       .from('crew_assignments')
       .update({
         status: newStatus,
-        status_updated_at: new Date().toISOString(),
+        status_updated_at: nowIso,
         status_updated_by: 'Self',
       })
       .eq('id', r.assignment_id);
-  } else {
-    // Legacy path: update crew_items array in run_of_show_data JSONB
-    const { data: event } = await db
+  }
+
+  // Deal-level confirmation: ops.deal_crew.confirmed_at is the canonical answer
+  // to "is this crew member coming?" — Plan tab and CRM stream both read from it.
+  // Replaces the legacy run_of_show_data.crew_items JSONB write.
+  if (r.entity_id) {
+    const { data: dealRow } = await db
       .schema('ops')
       .from('events')
-      .select('run_of_show_data')
+      .select('deal_id')
       .eq('id', r.event_id)
       .maybeSingle();
-
-    if (event) {
-      const ros = (event as { run_of_show_data: Record<string, unknown> | null }).run_of_show_data ?? {};
-      const crewItems = Array.isArray(ros.crew_items) ? [...(ros.crew_items as Record<string, unknown>[])] : [];
-      const idx = r.crew_index ?? -1;
-
-      if (idx >= 0 && idx < crewItems.length) {
-        crewItems[idx] = {
-          ...crewItems[idx],
-          status: newStatus,
-          status_updated_at: new Date().toISOString(),
-          status_updated_by: 'Self',
-        };
-      }
-
+    const dealId = (dealRow as { deal_id: string | null } | null)?.deal_id ?? null;
+    if (dealId) {
       await db
         .schema('ops')
-        .from('events')
-         
-        .update({ run_of_show_data: { ...ros, crew_items: crewItems } as any })
-        .eq('id', r.event_id);
+        .from('deal_crew')
+        .update({
+          confirmed_at: action === 'confirmed' ? nowIso : null,
+          declined_at: action === 'declined' ? nowIso : null,
+        })
+        .eq('deal_id', dealId)
+        .eq('entity_id', r.entity_id);
     }
   }
 

@@ -2,7 +2,9 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { applyActiveEventsFilter } from '@/shared/lib/event-status/get-active-events-filter';
 import { computePaymentStatus, paymentStatusLabel, paymentStatusColor } from '@/features/sales/lib/compute-payment-status';
+import { resolveCrewConfirmationForDeals } from '@/shared/lib/crew/resolve-crew-confirmation';
 import { computeReadiness } from '../lib/compute-readiness';
 import type { StreamCardItem } from '../components/stream-card';
 
@@ -24,11 +26,13 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
           .order('proposed_date', { ascending: true })
       : { data: [] as Record<string, unknown>[] },
     workspaceId
-      ? supabase
-          .schema('ops')
-          .from('events')
-          .select('id, title, starts_at, lifecycle_status, client_entity_id, venue_entity_id, deal_id, created_at')
-          .eq('workspace_id', workspaceId)
+      ? applyActiveEventsFilter(
+          supabase
+            .schema('ops')
+            .from('events')
+            .select('id, title, starts_at, lifecycle_status, client_entity_id, venue_entity_id, deal_id, created_at')
+            .eq('workspace_id', workspaceId)
+        )
           .order('starts_at', { ascending: true })
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
   ]);
@@ -53,7 +57,7 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
 
   if (dealIds.length > 0) {
     const [stakeholdersRes, proposalsRes] = await Promise.all([
-      (supabase as any)
+      supabase
         .schema('ops')
         .from('deal_stakeholders')
         .select('deal_id, role, organization_id')
@@ -171,7 +175,7 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
 
   // Merge follow-up queue signals into stream items
   if (workspaceId) {
-    const { data: queueItems } = await (supabase as any)
+    const { data: queueItems } = await supabase
       .schema('ops')
       .from('follow_up_queue')
       .select('deal_id, reason, reason_type, priority_score, status, follow_up_category')
@@ -221,36 +225,30 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
         if (ev.deal_id) eventByDealId.set(ev.deal_id as string, { id: ev.id as string, run_of_show_data: ev.run_of_show_data as Record<string, unknown> | null });
       }
 
-      // Batch-fetch crew counts per deal.
-      // TODO(Pass 3 Phase 1 follow-up): this is a direct read of
-      // deal_crew.confirmed_at that bypasses resolveCrewConfirmationBatch.
-      // For per-deal (per-event) contexts getDealCrew already overlays the
-      // resolver, but this stream-level aggregation batches across many
-      // events and would need a new cross-event resolver variant. Until
-      // then, portal-confirmed crew may under-count in the CRM stream
-      // readiness ribbon. Pre-existing behavior; not made worse by Pass 3.
+      // Batch-resolve crew confirmation counts per deal, overlaying portal
+      // (ops.crew_assignments) confirmations on top of ops.deal_crew so
+      // portal-confirmed crew is counted correctly on the stream readiness ribbon.
       const wonDealIdsWithEvents = [...eventByDealId.keys()];
-      const { data: crewRows } = await (supabase as any)
-        .schema('ops')
-        .from('deal_crew')
-        .select('deal_id, entity_id, confirmed_at, declined_at')
-        .in('deal_id', wonDealIdsWithEvents);
+      const dealEventPairs = wonDealIdsWithEvents.map((dealId) => ({
+        dealId,
+        eventId: eventByDealId.get(dealId)!.id,
+      }));
+      const confirmationByDeal = await resolveCrewConfirmationForDeals(supabase, dealEventPairs);
 
-      // Aggregate crew counts per deal
       type CrewCounts = { assigned: number; confirmed: number; declined: number };
       const crewCountsByDeal = new Map<string, CrewCounts>();
-      for (const row of (crewRows ?? []) as { deal_id: string; entity_id: string | null; confirmed_at: string | null; declined_at: string | null }[]) {
-        const c = crewCountsByDeal.get(row.deal_id) ?? { assigned: 0, confirmed: 0, declined: 0 };
-        if (row.entity_id) {
+      for (const [dealId, perEntity] of confirmationByDeal) {
+        const c: CrewCounts = { assigned: 0, confirmed: 0, declined: 0 };
+        for (const state of perEntity.values()) {
           c.assigned++;
-          if (row.confirmed_at) c.confirmed++;
-          if (row.declined_at) c.declined++;
+          if (state.confirmedAt) c.confirmed++;
+          if (state.declinedAt) c.declined++;
         }
-        crewCountsByDeal.set(row.deal_id, c);
+        crewCountsByDeal.set(dealId, c);
       }
 
       // Batch-fetch stakeholders for won deals (venue + client presence)
-      const { data: wonStakeholders } = await (supabase as any)
+      const { data: wonStakeholders } = await supabase
         .schema('ops')
         .from('deal_stakeholders')
         .select('deal_id, role')

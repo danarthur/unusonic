@@ -7,18 +7,17 @@ import { Download } from 'lucide-react';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { ProposalHero } from './ProposalHero';
 import { LineItemGrid } from './LineItemGrid';
-import { AcceptanceBar } from './AcceptanceBar';
-import { SignProposalDialog } from './SignProposalDialog';
 import { DocuSealSignPanel } from './DocuSealSignPanel';
 import { ProposalSummaryBlock } from './ProposalSummaryBlock';
 import { ProposalTOC } from './ProposalTOC';
+import { SectionTrim } from './SectionTrim';
 import { TrackView } from './TrackView';
 import { DepositPaymentStep } from './DepositPaymentStep';
 import type { PublicProposalDTO } from '../../model/public-proposal';
 import { saveClientSelections } from '../../api/save-client-selections';
 import { cn } from '@/shared/lib/utils';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+const spring = STAGE_LIGHT;
 
 const containerVariants = {
   hidden: {},
@@ -124,7 +123,7 @@ function SignedConfirmation({
             })()}
           </p>
         )}
-        <p className="text-sm font-semibold tabular-nums" style={{ color: 'var(--portal-text)' }}>
+        <p className="text-sm font-medium tabular-nums" style={{ color: 'var(--portal-text)' }}>
           {formatCurrency(data.total)}
         </p>
       </motion.div>
@@ -152,7 +151,7 @@ function SignedConfirmation({
               style={{ color: 'var(--portal-text-secondary)' }}
             >
               <span
-                className="font-semibold tabular-nums shrink-0 w-4"
+                className="font-medium tabular-nums shrink-0 w-4"
                 style={{ color: 'oklch(0.40 0.12 145)' }}
               >
                 {i + 1}
@@ -207,11 +206,15 @@ export interface PublicProposalViewProps {
   data: PublicProposalDTO;
   token: string;
   className?: string;
+  itemLayout?: 'card' | 'row' | 'minimal';
+  sectionBgAlternate?: boolean;
+  heroImageUrl?: string | null;
+  sectionTrim?: 'none' | 'wave' | 'angle' | 'dots' | 'straight';
+  accentBand?: 'none' | 'top' | 'bottom';
 }
 
-export function PublicProposalView({ data, token, className }: PublicProposalViewProps) {
+export function PublicProposalView({ data, token, className, itemLayout = 'card', sectionBgAlternate = false, heroImageUrl, sectionTrim = 'none', accentBand = 'none' }: PublicProposalViewProps) {
   const router = useRouter();
-  const [signOpen, setSignOpen] = useState(false);
   const [signed, setSigned] = useState(data.proposal.status === 'accepted');
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
@@ -219,7 +222,6 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
     () => Object.fromEntries(data.items.map((i) => [i.id, i.clientSelected]))
   );
   const [liveTotal, setLiveTotal] = useState(data.total);
-  const [selectionsDirty, setSelectionsDirty] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recomputeTotal = useCallback((sels: Record<string, boolean>) => {
@@ -235,7 +237,6 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
     setSelections((prev) => {
       const next = { ...prev, [itemId]: selected };
       setLiveTotal(recomputeTotal(next));
-      setSelectionsDirty(true);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         const selArray = Object.entries(next).map(([id, sel]) => ({ itemId: id, selected: sel }));
@@ -280,9 +281,6 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
     return () => observer.disconnect();
   }, [data.items]);
 
-  const openSign = useCallback(() => setSignOpen(true), []);
-  const closeSign = useCallback(() => setSignOpen(false), []);
-  const onSignSuccess = useCallback(() => setSigned(true), []);
 
   const handleDone = useCallback(() => {
     if (window.history.length > 1) {
@@ -304,9 +302,6 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
     clientSelected: selections[item.id] ?? item.clientSelected,
   }));
 
-  const hasOptionalItems = data.items.some((i) => i.isOptional);
-  const selectionsConfirmed = !hasOptionalItems || selectionsDirty;
-
   const hasGroups = data.items.some((i) => (i as { display_group_name?: string | null }).display_group_name);
   const sections = hasGroups
     ? [...new Set(data.items.map((i) => (i as { display_group_name?: string | null }).display_group_name ?? 'Included'))]
@@ -316,10 +311,11 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
   return (
     <div
       className={cn(
-        'flex flex-col min-h-dvh w-full max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 overflow-visible',
+        'flex flex-col min-h-dvh w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-8 overflow-visible',
         className
       )}
       style={{
+        maxWidth: 'var(--portal-content-max-width, 56rem)',
         paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
       }}
     >
@@ -330,7 +326,7 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
         onSectionChange={setActiveSection}
       />
 
-      <ProposalHero data={data} className="mb-8 sm:mb-10" />
+      <ProposalHero data={data} className="mb-8 sm:mb-10" heroImageUrl={heroImageUrl} accentBand={accentBand} />
 
       {!signed && (
         <ProposalSummaryBlock
@@ -347,6 +343,8 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
           className="mb-8"
         />
       )}
+
+      <SectionTrim variant={sectionTrim} className="my-6 sm:my-8" />
 
       <motion.section
         initial={{ opacity: 0 }}
@@ -374,6 +372,9 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
           disabled={signed}
           eventStartTime={data.event.eventStartTime ?? null}
           eventEndTime={data.event.eventEndTime ?? null}
+          layout={itemLayout}
+          sectionBgAlternate={sectionBgAlternate}
+          sectionTrim={sectionTrim}
         />
       </motion.section>
 
@@ -401,7 +402,7 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
       ) : data.embedSrc ? (
         <div className="mt-6">
           <h2
-            className="text-xs font-semibold uppercase tracking-widest mb-4"
+            className="text-xs font-medium uppercase tracking-widest mb-4"
             style={{ color: 'var(--portal-text-secondary)' }}
           >
             Sign your proposal
@@ -409,26 +410,27 @@ export function PublicProposalView({ data, token, className }: PublicProposalVie
           <DocuSealSignPanel embedSrc={data.embedSrc} onComplete={handleDocuSealComplete} />
         </div>
       ) : (
-        <AcceptanceBar
-          total={liveTotal}
-          onReviewAndSign={openSign}
-          className="mt-8"
-          blockedMessage={!selectionsConfirmed ? 'Review your selections before signing' : undefined}
-        />
-      )}
-
-      {!data.embedSrc && (
-        <SignProposalDialog
-          open={signOpen}
-          onClose={closeSign}
-          token={token}
-          onSuccess={onSignSuccess}
-        />
+        <div
+          className="mt-8 p-5 rounded-[var(--portal-radius)] text-sm"
+          style={{
+            backgroundColor: 'var(--portal-surface)',
+            border: 'var(--portal-border-width) solid var(--portal-border)',
+            color: 'var(--portal-text-secondary)',
+          }}
+        >
+          <p style={{ color: 'var(--portal-text-primary)', fontWeight: 500, marginBottom: '0.5rem' }}>
+            Online signing not yet enabled
+          </p>
+          <p>
+            Reach out to your contact to complete this proposal. Once eSignature is configured for
+            this account, you’ll be able to sign here directly.
+          </p>
+        </div>
       )}
 
       {/* Attribution */}
       <p
-        className="text-center text-[12px] mt-12 pb-4 tracking-[0.08em] uppercase"
+        className="text-center text-xs mt-12 pb-4 tracking-[0.08em] uppercase"
         style={{ color: 'var(--portal-text-secondary)', opacity: 0.5 }}
       >
         Powered by Unusonic

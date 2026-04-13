@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useTransition } from 'react';
+import { useState, useCallback, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -32,6 +32,7 @@ import {
 } from '@/app/(dashboard)/(features)/crm/components/flight-checks';
 import { assignOrAddCrewMember } from '@/app/(dashboard)/(features)/crm/actions/assign-or-add-crew-member';
 import { removeCrewItem } from '@/app/(dashboard)/(features)/crm/actions/remove-crew-item';
+import { getDealCrewForEvent, type DealCrewRow } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
 import type { InternalTeamMember } from '@/app/(dashboard)/(features)/crm/actions/get-internal-team-for-role';
 import type { EventCommandDTO, EventLifecycleStatus } from '@/entities/event';
 import type { EventSummaryForPrism } from '@/app/(dashboard)/(features)/crm/actions/get-event-summary';
@@ -110,7 +111,23 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
 
   const runOfShowData = summary.run_of_show_data ?? null;
 
-  // Crew items are the canonical team source — from ops.crew_assignments (normalized), each has an `id` UUID.
+  // Live crew rows from ops.deal_crew via event→deal join (canonical source of truth
+  // per CLAUDE.md). Replaces CrewFlightCheck's legacy run_of_show_data.crew_items read.
+  const [crewRows, setCrewRows] = useState<DealCrewRow[]>([]);
+  const [crewLoading, setCrewLoading] = useState(true);
+  const fetchCrewRows = useCallback(async () => {
+    setCrewLoading(true);
+    const rows = await getDealCrewForEvent(event.id);
+    setCrewRows(rows);
+    setCrewLoading(false);
+  }, [event.id]);
+  useEffect(() => { void fetchCrewRows(); }, [fetchCrewRows]);
+
+  // The Team panel below (lead-role quick-slots + additional crew) reads from
+  // run_of_show_data.crew_items while its assign/remove actions write to
+  // ops.crew_assignments — a pre-existing read/write mismatch outside the scope
+  // of this wave. Left as-is; a follow-up should migrate this panel to read from
+  // ops.crew_assignments to match its own writes.
   const crewItems = (Array.isArray(runOfShowData?.crew_items) ? runOfShowData.crew_items : []).map((c, i) => ({
     ...c,
     id: (c as { id?: string }).id ?? `crew-${i}`,
@@ -160,7 +177,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
       <header className="sticky top-0 z-20 flex items-center gap-3 px-6 py-3 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]">
         <Link
           href="/crm"
-          className="shrink-0 p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+          className="stage-hover overflow-hidden shrink-0 p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label="Back to CRM"
         >
           <ArrowLeft size={18} />
@@ -178,7 +195,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
                   if (e.key === 'Enter') saveTitle();
                   if (e.key === 'Escape') cancelTitle();
                 }}
-                className="min-w-0 flex-1 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.15)] rounded-lg px-2 py-1 text-sm font-medium text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                className="min-w-0 flex-1 bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.15)] rounded-lg px-2 py-1 text-sm font-medium text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               />
               <button
                 type="button"
@@ -193,7 +210,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
                 type="button"
                 onClick={cancelTitle}
                 aria-label="Cancel"
-                className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[var(--ctx-well)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 <XIcon size={14} />
               </button>
@@ -226,7 +243,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
           {event.client_entity_id && event.client_name && (
             <Link
               href={`/network/entity/${event.client_entity_id}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--ctx-well)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               <Building2 size={13} />
               {event.client_name}
@@ -235,7 +252,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
           {event.venue_entity_id && event.venue_name && (
             <Link
               href={`/network/entity/${event.venue_entity_id}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--ctx-well)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               <MapPin size={13} />
               {event.venue_name}
@@ -243,21 +260,21 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
           )}
           <Link
             href={`/events/${event.id}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--ctx-well)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             <Pencil size={13} />
             Edit details
           </Link>
           <Link
             href={`/events/${event.id}/deal`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--ctx-well)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             <FileText size={13} />
             Deal room
           </Link>
           <Link
             href={`/events/g/${event.id}/pull-sheet`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--ctx-well)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             <ClipboardList size={13} />
             Pull sheet
@@ -280,7 +297,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={STAGE_HEAVY}
-            className="rounded-[var(--stage-radius-panel)] border border-[var(--color-unusonic-warning)]/50 bg-[var(--color-unusonic-warning)]/10 p-4 flex items-start gap-4"
+            className="rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-warning)] bg-[var(--stage-surface)] p-4 flex items-start gap-4"
             role="alert"
           >
             <AlertTriangle size={20} className="shrink-0 text-[var(--color-unusonic-warning)] mt-0.5" aria-hidden />
@@ -307,7 +324,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={STAGE_HEAVY}
         >
-          <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/60 mb-4">
+          <p className="stage-label text-[var(--stage-text-secondary)]/60 mb-4">
             Vitals
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
@@ -327,14 +344,15 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...STAGE_HEAVY, delay: 0.04 }}
         >
-          <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/60 mb-4">
+          <p className="stage-label text-[var(--stage-text-secondary)]/60 mb-4">
             Operations
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <CrewFlightCheck
               eventId={event.id}
-              runOfShowData={runOfShowData}
-              onUpdated={refresh}
+              crewRows={crewRows}
+              crewLoading={crewLoading}
+              onUpdated={() => { void fetchCrewRows(); refresh(); }}
               defaultCollapsed={false}
               maxVisible={10}
             />
@@ -363,7 +381,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
         >
           <Link
             href={`/crm/${event.id}`}
-            className="flex items-center justify-between min-h-[80px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] p-6 transition-all hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] group"
+            className="flex items-center justify-between min-h-[80px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] p-6 transition-colors hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] group"
           >
             <div>
               <p className="text-[var(--stage-text-primary)] font-medium tracking-tight group-hover:text-[var(--stage-accent)] transition-colors">
@@ -383,7 +401,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
         >
           <StagePanel className="p-6 sm:p-7 flex items-center gap-6">
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/80 mb-2">
+              <p className="stage-label text-[var(--stage-text-secondary)]/80 mb-2">
                 Expected guests
               </p>
               <InlineEditNumber
@@ -406,7 +424,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
         >
           {/* Notes */}
           <StagePanel className="p-6 sm:p-7 flex flex-col gap-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/80">
+            <p className="stage-label text-[var(--stage-text-secondary)]/80">
               Notes
             </p>
             <textarea
@@ -418,14 +436,14 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
               className="w-full min-w-0 bg-transparent border-0 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/40 focus:outline-none resize-none leading-relaxed"
             />
             {savingNotes && (
-              <p className="text-[10px] text-[var(--stage-text-secondary)]/60">Saving…</p>
+              <p className="text-label text-[var(--stage-text-secondary)]/60">Saving…</p>
             )}
           </StagePanel>
 
           {/* Team */}
           <StagePanel className="p-6 sm:p-7 flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/80">
+              <p className="stage-label text-[var(--stage-text-secondary)]/80">
                 Team
               </p>
               {!addingRole && (
@@ -541,20 +559,20 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
                     if (e.key === 'Escape') { setAddingRole(false); setNewRoleInput(''); }
                   }}
                   placeholder="Role name…"
-                  className="min-w-0 flex-1 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.15)] rounded-lg px-2 py-1 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="min-w-0 flex-1 bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.15)] rounded-lg px-2 py-1 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 />
                 <button
                   type="button"
                   onClick={handleAddRoleSubmit}
                   disabled={!newRoleInput.trim()}
-                  className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <Check size={14} />
                 </button>
                 <button
                   type="button"
                   onClick={() => { setAddingRole(false); setNewRoleInput(''); }}
-                  className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[var(--ctx-well)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <XIcon size={14} />
                 </button>

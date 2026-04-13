@@ -135,8 +135,14 @@ export async function createBlankInvoice(
       .insert(rows);
 
     if (liErr) {
-      // Invoice was created but line items failed — non-fatal, log it
-      console.error('[createBlankInvoice] Line items insert failed:', liErr.message);
+      console.error('[createBlankInvoice] Line items insert failed, rolling back invoice:', liErr.message);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
+      await (system as any)
+        .schema('finance')
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId);
+      return { invoiceId: null, error: `Failed to insert line items: ${liErr.message}` };
     }
   }
 

@@ -89,10 +89,11 @@ export function PaymentModal({
   // Server action via useActionState
   const [state, formAction, isPending] = useActionState(
     async (_prev: FormState, _formData: FormData): Promise<FormState> => {
-      const parsedAmount = parseFloat(amount);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      const rawAmount = parseFloat(amount);
+      if (isNaN(rawAmount) || rawAmount <= 0) {
         return { error: 'Enter a valid amount', success: false };
       }
+      const parsedAmount = Math.round(rawAmount * 100) / 100;
 
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore -- tsc misresolves server action arity through 'use server' boundary

@@ -19,7 +19,6 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
-import { getWorkspaceFrom } from '@/shared/api/email/send';
 import { parseBillToSnapshot, parseFromSnapshot } from '../schemas/invoice-snapshots';
 import type { BillToSnapshotV1, FromSnapshotV1 } from '../schemas/invoice-snapshots';
 
@@ -145,13 +144,15 @@ export async function sendInvoice(
   const nowIso = today.toISOString();
   const newPdfVersion = (invoice.pdf_version ?? 0) + 1;
 
+  // ── 5a. Persist snapshots + numbering, but keep status='draft' until PDF
+  //       and email both succeed. This makes the "sent" flip atomic — clients
+  //       never receive a "sent" invoice with a 404 PDF or no email delivery.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: updateErr } = await (system as any)
+  const { error: stageErr } = await (system as any)
     .schema('finance')
     .from('invoices')
     .update({
       invoice_number: invoiceNumber,
-      status: 'sent',
       subtotal_amount: subtotal,
       tax_amount: taxAmount,
       tax_rate_snapshot: taxRate,
@@ -159,18 +160,17 @@ export async function sendInvoice(
       issue_date: issueDate,
       due_date: dueDate,
       issued_at: nowIso,
-      sent_at: nowIso,
       bill_to_snapshot: billToSnapshot,
       from_snapshot: fromSnapshot,
       pdf_version: newPdfVersion,
     })
     .eq('id', invoiceId);
 
-  if (updateErr) {
-    return { success: false, invoiceNumber: null, error: updateErr.message };
+  if (stageErr) {
+    return { success: false, invoiceNumber: null, error: stageErr.message };
   }
 
-  // ── 6. Generate PDF + upload ───────────────────────────────────────────────
+  // ── 6. Generate PDF + upload (must succeed; otherwise invoice stays draft) ──
   try {
     const { generateInvoicePdf } = await import('./generate-invoice-pdf');
     const pdfBuffer = await generateInvoicePdf({
@@ -197,43 +197,56 @@ export async function sendInvoice(
       publicToken: invoice.public_token,
     });
 
-    // Upload to storage (versioned path)
     const dealPath = invoice.deal_id ?? 'standalone';
     const storagePath = `${invoice.workspace_id}/${dealPath}/invoices/${invoiceNumber}/v${newPdfVersion}.pdf`;
 
-    await system.storage
+    const { error: uploadErr } = await system.storage
       .from('documents')
       .upload(storagePath, pdfBuffer, {
         contentType: 'application/pdf',
         upsert: true,
       });
+    if (uploadErr) throw uploadErr;
   } catch (e) {
-    // PDF generation failure is non-fatal — the invoice is already marked sent.
-    // The user can regenerate the PDF later. Log for monitoring.
     const message = e instanceof Error ? e.message : String(e);
-    console.error('[sendInvoice] PDF generation failed:', message);
+    console.error('[sendInvoice] PDF generation failed — leaving invoice in draft:', message);
+    return { success: false, invoiceNumber: null, error: `Failed to generate invoice PDF: ${message}` };
   }
 
-  // ── 7. Send email ──────────────────────────────────────────────────────────
+  // ── 7. Send email (must succeed; otherwise invoice stays draft) ─────────────
   const recipientEmail = billToSnapshot.email;
-  if (recipientEmail) {
-    try {
-      const { sendInvoiceEmail } = await import('./send-invoice-email');
-      await sendInvoiceEmail({
-        to: recipientEmail,
-        workspaceId: invoice.workspace_id,
-        invoiceNumber: invoiceNumber as string,
-        totalAmount,
-        dueDate,
-        publicToken: invoice.public_token,
-        billToName: billToSnapshot.display_name,
-        workspaceName: fromSnapshot.workspace_name,
-      });
-    } catch (e) {
-      // Email failure is non-fatal — invoice is sent, payment link works.
-      const message = e instanceof Error ? e.message : String(e);
-      console.error('[sendInvoice] Email send failed:', message);
-    }
+  if (!recipientEmail) {
+    return { success: false, invoiceNumber: null, error: 'Bill-to entity has no email — add one before sending.' };
+  }
+
+  try {
+    const { sendInvoiceEmail } = await import('./send-invoice-email');
+    await sendInvoiceEmail({
+      to: recipientEmail,
+      workspaceId: invoice.workspace_id,
+      invoiceNumber: invoiceNumber as string,
+      totalAmount,
+      dueDate,
+      publicToken: invoice.public_token,
+      billToName: billToSnapshot.display_name,
+      workspaceName: fromSnapshot.workspace_name,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error('[sendInvoice] Email send failed — leaving invoice in draft:', message);
+    return { success: false, invoiceNumber: null, error: `Failed to send invoice email: ${message}` };
+  }
+
+  // ── 7a. Atomic flip: only now mark as sent ─────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: flipErr } = await (system as any)
+    .schema('finance')
+    .from('invoices')
+    .update({ status: 'sent', sent_at: nowIso })
+    .eq('id', invoiceId);
+
+  if (flipErr) {
+    return { success: false, invoiceNumber: null, error: flipErr.message };
   }
 
   // ── 8. Enqueue QBO push (if connected) ─────────────────────────────────────

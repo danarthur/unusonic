@@ -12,6 +12,7 @@ import 'server-only';
 
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getStripe } from '@/shared/api/stripe/server';
+import { calculateDepositTotal, calculateDepositCents } from '../lib/calculate-deposit';
 
 export interface CreateDepositIntentResult {
   clientSecret: string | null;
@@ -77,21 +78,8 @@ export async function createProposalDepositIntent(
     .eq('proposal_id', p.id);
   const selectionsMap = new Map((selectionsRows ?? []).map((s) => [s.item_id, s.selected]));
 
-  const total = itemList
-    .filter((row) => row.is_client_visible !== false)
-    .reduce((sum, row) => {
-      // Honour client selection state for optional items (default: included)
-      if (row.is_optional) {
-        const selected = selectionsMap.has(row.id) ? selectionsMap.get(row.id) : true;
-        if (!selected) return sum;
-      }
-      const price = Number(row.override_price ?? row.unit_price ?? 0);
-      const multiplier = Number(row.unit_multiplier ?? 1) || 1;
-      return sum + (row.quantity ?? 1) * multiplier * price;
-    }, 0);
-
-  // Convert to cents, round to nearest dollar-cent
-  const depositCents = Math.round((total * depositPercent) / 100) * 100;
+  const total = calculateDepositTotal(itemList, selectionsMap);
+  const depositCents = calculateDepositCents(total, depositPercent);
 
   if (depositCents <= 0) return { clientSecret: null, error: 'Deposit amount is zero' };
 
@@ -119,16 +107,22 @@ export async function createProposalDepositIntent(
   }
 
   // Create a new PaymentIntent
-  const intent = await stripe.paymentIntents.create({
-    amount: depositCents,
-    currency: 'usd',
-    metadata: {
-      proposal_id: p.id,
-      public_token: token.trim(),
-      type: 'proposal_deposit',
-    },
-    automatic_payment_methods: { enabled: true },
-  });
+  let intent;
+  try {
+    intent = await stripe.paymentIntents.create({
+      amount: depositCents,
+      currency: 'usd',
+      metadata: {
+        proposal_id: p.id,
+        public_token: token.trim(),
+        type: 'proposal_deposit',
+      },
+      automatic_payment_methods: { enabled: true },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Stripe payment intent creation failed';
+    return { clientSecret: null, error: message };
+  }
 
   // Persist the intent ID for idempotency on subsequent calls
   await supabase

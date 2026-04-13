@@ -6,13 +6,15 @@
 
 'use client';
 
-import { useState, useTransition, useRef, useCallback } from 'react';
+import { useState, useTransition, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as Sentry from '@sentry/nextjs';
 import { User, Camera, Loader2, X, Check } from 'lucide-react';
 import {
   updateProfile,
   updateOnboardingStep,
   uploadAvatar,
+  claimGhostEntities,
 } from '@/features/identity-hydration';
 import { GenesisOrchestrator } from '@/features/onboarding';
 import { AionOnboardingShell } from '@/features/onboarding/ui/aion-onboarding-shell';
@@ -21,7 +23,7 @@ import { WebsiteStep } from '@/features/onboarding/ui/website-step';
 import type { ScoutOnboardingPayload } from '@/features/onboarding/ui/website-step';
 import type { UserPersona } from '@/features/onboarding/model/subscription-types';
 import type { LivingLogoStatus } from '@/shared/ui/branding/living-logo';
-import { M3_EASING_ENTER, M3_EASING_EXIT } from '@/shared/lib/motion-constants';
+import { M3_EASING_ENTER, M3_EASING_EXIT, STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
 interface OnboardingState {
   user: { id: string; email: string };
@@ -61,6 +63,16 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
       setSlideX((next > prev ? 1 : -1) * 24);
     }
     setCurrentStep(next);
+  }, []);
+
+  // Silent ghost entity claim — fire-and-forget on mount.
+  // If this user's email matches any ghost CLIENT entities, claim them and
+  // create workspace memberships. The workspaces appear in the switcher
+  // after onboarding completes. No UI interruption (Phase 2).
+  useEffect(() => {
+    claimGhostEntities().catch((err: unknown) => {
+      Sentry.captureException(err, { tags: { area: 'onboarding.ghost-claim' } });
+    });
   }, []);
 
   const [fullName, setFullName] = useState(initialState.profile.fullName);
@@ -187,7 +199,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={avatarUploading}
                 className="w-24 h-24 rounded-2xl border-2 border-dashed border-[oklch(1_0_0_/_0.12)]
-                  hover:border-[oklch(1_0_0_/_0.20)] bg-[oklch(1_0_0_/_0.03)] hover:brightness-[1.03] transition-[filter,border-color] flex items-center justify-center overflow-hidden"
+                  hover:border-[oklch(1_0_0_/_0.20)] bg-[oklch(1_0_0_/_0.03)] transition-[border-color] flex items-center justify-center overflow-hidden"
               >
                 {avatarUrl ? (
                   <>
@@ -209,7 +221,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setAvatarUrl(null); }}
-                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-unusonic-error text-[var(--stage-text-primary)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-unusonic-error)] text-[var(--stage-text-primary)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -225,7 +237,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: [0, 1.2, 1], opacity: 1 }}
                   exit={{ scale: 0, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 20, duration: 0.3 }}
+                  transition={STAGE_HEAVY}
                   className="flex items-center justify-center"
                 >
                   <Check className="w-6 h-6 text-[var(--color-unusonic-success)]" strokeWidth={1.5} />

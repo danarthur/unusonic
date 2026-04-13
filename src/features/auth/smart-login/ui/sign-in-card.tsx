@@ -162,7 +162,7 @@ export function SignInCard({
   }, [email, isPending, trustDevice, redirectTo, onPasskeyPendingChange]);
 
   return (
-    <AnimatePresence mode="popLayout" onExitComplete={() => {}}>
+    <AnimatePresence mode="popLayout">
       <motion.div
         key="signin"
         layout
@@ -474,6 +474,9 @@ export function SignInCard({
                     <div className="space-y-4">
                       <p className="text-sm text-[var(--stage-text-secondary)] text-center">
                         Enter the code sent to <span className="text-[var(--stage-text-primary)]">{email}</span>
+                      </p>
+                      <p className="text-xs text-[var(--stage-text-tertiary)] text-center">
+                        Check your spam folder. You can request a new code in 30 seconds.
                       </p>
                       <input
                         ref={otpInputRef}

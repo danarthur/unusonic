@@ -102,10 +102,10 @@ export async function resolveCrewConfirmationBatch(
   // 1) Lookup event.deal_id so we can join deal_crew by (deal_id, entity_id).
   //    The resolver is called from post-handoff paths; if eventId doesn't
   //    resolve to a deal, we gracefully return empty states.
-  //    Uses `(supabase as any).schema('ops')` because ops types are not
+  //    Uses `supabase.schema('ops')` because ops types are not
   //    generated (see CLAUDE.md D2 drift).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: eventRow } = await (supabase as any)
+  const { data: eventRow } = await supabase
     .schema('ops')
     .from('events')
     .select('deal_id')
@@ -116,7 +116,7 @@ export async function resolveCrewConfirmationBatch(
 
   // 2) Portal side: crew_assignments rows for this event.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: portalRows } = await (supabase as any)
+  const { data: portalRows } = await supabase
     .schema('ops')
     .from('crew_assignments')
     .select('entity_id, status, status_updated_at')
@@ -139,7 +139,7 @@ export async function resolveCrewConfirmationBatch(
   let dealCrewRows: DcRow[] = [];
   if (dealId) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: dcData } = await (supabase as any)
+    const { data: dcData } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('entity_id, confirmed_at, declined_at')
@@ -178,6 +178,118 @@ export async function resolveCrewConfirmationBatch(
       declinedAt: mergedDeclined,
       source,
     });
+  }
+
+  return result;
+}
+
+/**
+ * Cross-deal resolver — used by the CRM stream readiness ribbon, which needs
+ * aggregated "confirmed crew count" per deal across many deals at once.
+ *
+ * Input: a list of { dealId, eventId } pairs. Output: a Map<dealId, Map<entityId, state>>
+ * that overlays portal (ops.crew_assignments) confirmations on top of the raw
+ * `ops.deal_crew` rows, picking the freshest non-null for each.
+ *
+ * Use this over direct `deal_crew.confirmed_at` reads whenever portal
+ * confirmations might have landed but not yet mirrored to deal_crew.
+ */
+export async function resolveCrewConfirmationForDeals(
+  supabase: ServerSupabase,
+  pairs: { dealId: string; eventId: string }[],
+): Promise<Map<string, Map<string, CrewConfirmationState>>> {
+  const result = new Map<string, Map<string, CrewConfirmationState>>();
+  if (pairs.length === 0) return result;
+
+  const dealIds = Array.from(new Set(pairs.map((p) => p.dealId)));
+  const eventIds = Array.from(new Set(pairs.map((p) => p.eventId)));
+  const eventIdToDealId = new Map(pairs.map((p) => [p.eventId, p.dealId]));
+
+  // 1) Deal-crew rows across all deals.
+  type DcRow = {
+    deal_id: string;
+    entity_id: string | null;
+    confirmed_at: string | null;
+    declined_at: string | null;
+  };
+  const { data: dcData } = await supabase
+    .schema('ops')
+    .from('deal_crew')
+    .select('deal_id, entity_id, confirmed_at, declined_at')
+    .in('deal_id', dealIds);
+  const dealCrewRows = (dcData ?? []) as DcRow[];
+
+  // 2) Portal assignments across all events.
+  type PortalRow = {
+    event_id: string;
+    entity_id: string | null;
+    status: string | null;
+    status_updated_at: string | null;
+  };
+  const { data: portalData } = await supabase
+    .schema('ops')
+    .from('crew_assignments')
+    .select('event_id, entity_id, status, status_updated_at')
+    .in('event_id', eventIds);
+  const portalRows = (portalData ?? []) as PortalRow[];
+
+  // Group portal rows by deal_id (via event→deal map).
+  const portalByDeal = new Map<string, PortalRow[]>();
+  for (const p of portalRows) {
+    const dealId = eventIdToDealId.get(p.event_id);
+    if (!dealId) continue;
+    const arr = portalByDeal.get(dealId) ?? [];
+    arr.push(p);
+    portalByDeal.set(dealId, arr);
+  }
+
+  // Collect all entity_ids per deal from both sides.
+  const entityIdsByDeal = new Map<string, Set<string>>();
+  for (const r of dealCrewRows) {
+    if (!r.entity_id) continue;
+    const set = entityIdsByDeal.get(r.deal_id) ?? new Set();
+    set.add(r.entity_id);
+    entityIdsByDeal.set(r.deal_id, set);
+  }
+  for (const [dealId, rows] of portalByDeal) {
+    const set = entityIdsByDeal.get(dealId) ?? new Set();
+    for (const r of rows) if (r.entity_id) set.add(r.entity_id);
+    entityIdsByDeal.set(dealId, set);
+  }
+
+  // Merge per deal, per entity.
+  for (const [dealId, entityIdSet] of entityIdsByDeal) {
+    const perDeal = new Map<string, CrewConfirmationState>();
+    for (const entityId of entityIdSet) {
+      const dc = dealCrewRows.find((r) => r.deal_id === dealId && r.entity_id === entityId) ?? null;
+      const portal = (portalByDeal.get(dealId) ?? []).find((r) => r.entity_id === entityId) ?? null;
+
+      const dcConfirmed = dc?.confirmed_at ?? null;
+      const dcDeclined = dc?.declined_at ?? null;
+      const portalConfirmed = portal?.status === 'confirmed' ? portal.status_updated_at : null;
+      const portalDeclined = portal?.status === 'declined' ? portal.status_updated_at : null;
+
+      const mergedConfirmed = freshest(dcConfirmed, portalConfirmed);
+      const mergedDeclined = freshest(dcDeclined, portalDeclined);
+
+      let source: CrewConfirmationSource = 'none';
+      if (mergedConfirmed) {
+        if (dcConfirmed && portalConfirmed) {
+          source = dcConfirmed >= portalConfirmed ? 'deal_crew' : 'portal';
+        } else if (dcConfirmed) {
+          source = 'deal_crew';
+        } else {
+          source = 'portal';
+        }
+      }
+
+      perDeal.set(entityId, {
+        confirmedAt: mergedConfirmed,
+        declinedAt: mergedDeclined,
+        source,
+      });
+    }
+    result.set(dealId, perDeal);
   }
 
   return result;

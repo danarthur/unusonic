@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { FileCheck, FileText, ExternalLink } from 'lucide-react';
@@ -10,6 +11,7 @@ import { DealHeaderStrip } from './deal-header-strip';
 import { DealDiaryCard } from './deal-diary-card';
 import { CompletionIndicators } from './completion-indicators';
 import { HandoffConfirmStrip } from './handoff-confirm-strip';
+import { HandoffWizard } from './handoff-wizard';
 import { FinancialSummaryCard } from './financial-summary-card';
 import { ProductionTeamCard } from './production-team-card';
 import { AdvancingChecklist } from './advancing-checklist';
@@ -71,21 +73,20 @@ export function PlanLens({
 }: PlanLensProps) {
   const isPostHandoff = !!eventId && !!event;
 
+  const [handoffWizardOpen, setHandoffWizardOpen] = useState(false);
+
   // ── Scalar editing (same pattern as DealLens, with confirmation for post-handoff) ──
   const [localTitle, setLocalTitle] = useState(deal?.title ?? '');
   const [scalarsSaving, setScalarsSaving] = useState(false);
+  const [confirmingPostHandoffSave, setConfirmingPostHandoffSave] = useState(false);
+  const [pendingPatch, setPendingPatch] = useState<Parameters<typeof updateDealScalars>[1] | null>(null);
 
   useEffect(() => {
     setLocalTitle(deal?.title ?? '');
   }, [deal?.id, deal?.title]);
 
-  const handleSaveScalar = async (patch: Parameters<typeof updateDealScalars>[1]) => {
+  const doSaveScalar = async (patch: Parameters<typeof updateDealScalars>[1]) => {
     if (!dealId) return;
-    // Post-handoff: confirm before saving
-    if (isPostHandoff) {
-      const confirmed = window.confirm('This show has been handed off to production. Save this change?');
-      if (!confirmed) return;
-    }
     setScalarsSaving(true);
     const result = await updateDealScalars(dealId, patch);
     setScalarsSaving(false);
@@ -94,6 +95,29 @@ export function PlanLens({
     } else {
       onDealUpdated?.();
     }
+  };
+
+  const handleSaveScalar = async (patch: Parameters<typeof updateDealScalars>[1]) => {
+    if (!dealId) return;
+    // Post-handoff: confirm before saving
+    if (isPostHandoff) {
+      setPendingPatch(patch);
+      setConfirmingPostHandoffSave(true);
+      return;
+    }
+    await doSaveScalar(patch);
+  };
+
+  const handleConfirmPostHandoffSave = async () => {
+    if (!pendingPatch) return;
+    setConfirmingPostHandoffSave(false);
+    await doSaveScalar(pendingPatch);
+    setPendingPatch(null);
+  };
+
+  const handleCancelPostHandoffSave = () => {
+    setConfirmingPostHandoffSave(false);
+    setPendingPatch(null);
   };
 
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -311,6 +335,14 @@ export function PlanLens({
   if (isPostHandoff) {
     content = (
       <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+        {/* Post-handoff save confirmation */}
+        {confirmingPostHandoffSave && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.03)]">
+            <span className="stage-label">This show has been handed off. Save this change?</span>
+            <button className="stage-btn stage-btn-primary text-sm px-3 py-1.5" onClick={handleConfirmPostHandoffSave}>Save</button>
+            <button className="stage-btn stage-btn-secondary text-sm px-3 py-1.5" onClick={handleCancelPostHandoffSave}>Cancel</button>
+          </div>
+        )}
         {/* ── Layer 1: Identity + Show Status ── */}
         {headerStrip}
         {/* Merge 1: ShowHealthCard with ReadinessRibbon nested inside */}
@@ -358,22 +390,19 @@ export function PlanLens({
               hideVitals
               sourceOrgId={sourceOrgId ?? null}
             />
-            {/* Merge 2: Day sheet action moved here as execution step after dispatch */}
+            {/* Crew comms — Day sheet send (lives with the crew cluster) */}
             {dealId && eventId && (
-              <DaySheetActionStrip
-                eventId={eventId}
-                dealId={dealId}
-                crewCount={crewRows.filter((r) => r.entity_id).length}
-                crewWithEmailCount={crewRows.filter((r) => r.entity_id && r.email).length}
-              />
-            )}
-            {/* Client update email */}
-            {dealId && eventId && (
-              <ClientUpdateStrip
-                eventId={eventId}
-                dealId={dealId}
-                clientName={client?.organization?.name ?? null}
-              />
+              <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
+                <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+                  <p className="stage-label">Crew comms</p>
+                  <DaySheetActionStrip
+                    eventId={eventId}
+                    dealId={dealId}
+                    crewCount={crewRows.filter((r) => r.entity_id).length}
+                    crewWithEmailCount={crewRows.filter((r) => r.entity_id && r.email).length}
+                  />
+                </div>
+              </StagePanel>
             )}
             {/* T-0 lifecycle transition — Start / End show. Date-gated to
                 render only within ~24h of starts_at; hidden once wrapped. */}
@@ -392,37 +421,53 @@ export function PlanLens({
 
             {/* Merge 3: Agreed scope with contract info collapsed into header */}
             {dealId && deal?.workspace_id && (
-              <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-                <div className="flex items-center justify-between">
-                  <p className="stage-label">
-                    Agreed scope
-                  </p>
-                  <div className="flex items-center" style={{ gap: 'var(--stage-gap, 6px)' }}>
-                    {contract?.status === 'signed' && (
-                      <span className="flex items-center gap-1 text-label tracking-tight px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in oklch, var(--color-unusonic-success) 15%, transparent)', color: 'var(--color-unusonic-success)', border: '1px solid color-mix(in oklch, var(--color-unusonic-success) 20%, transparent)' }}>
-                        <FileCheck size={10} aria-hidden />
-                        Signed{contract.signed_at ? ` ${new Date(contract.signed_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
-                      </span>
-                    )}
-                    {contract?.pdf_url && (
-                      <a href={contract.pdf_url} target="_blank" rel="noopener noreferrer" className="text-label tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
-                        PDF
-                      </a>
-                    )}
-                    {publicProposalUrl && (
-                      <a href={publicProposalUrl} target="_blank" rel="noopener noreferrer" className="text-label tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
-                        View proposal
-                      </a>
-                    )}
+              <StagePanel style={{ padding: 'var(--stage-padding, 16px)' }}>
+                <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+                  <div className="flex items-center justify-between">
+                    <p className="stage-label">
+                      Agreed scope
+                    </p>
+                    <div className="flex items-center" style={{ gap: 'var(--stage-gap, 6px)' }}>
+                      {contract?.status === 'signed' && (
+                        <span className="flex items-center gap-1 text-label tracking-tight px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in oklch, var(--color-unusonic-success) 15%, transparent)', color: 'var(--color-unusonic-success)', border: '1px solid color-mix(in oklch, var(--color-unusonic-success) 20%, transparent)' }}>
+                          <FileCheck size={10} aria-hidden />
+                          Signed{contract.signed_at ? ` ${new Date(contract.signed_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                        </span>
+                      )}
+                      {contract?.pdf_url && (
+                        <a href={contract.pdf_url} target="_blank" rel="noopener noreferrer" className="text-label tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+                          PDF
+                        </a>
+                      )}
+                      {publicProposalUrl && (
+                        <a href={publicProposalUrl} target="_blank" rel="noopener noreferrer" className="text-label tracking-tight px-2 py-0.5 rounded-full transition-colors hover:bg-[oklch(1_0_0_/_0.06)]" style={{ color: 'var(--stage-text-tertiary)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+                          View proposal
+                        </a>
+                      )}
+                    </div>
                   </div>
+                  <ProposalBuilder
+                    dealId={dealId}
+                    workspaceId={deal.workspace_id}
+                    initialProposal={initialProposal}
+                    readOnly
+                  />
                 </div>
-                <ProposalBuilder
-                  dealId={dealId}
-                  workspaceId={deal.workspace_id}
-                  initialProposal={initialProposal}
-                  readOnly
-                />
-              </div>
+              </StagePanel>
+            )}
+
+            {/* Client comms — Client update send (lives with the client cluster) */}
+            {dealId && eventId && (
+              <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
+                <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+                  <p className="stage-label">Client comms</p>
+                  <ClientUpdateStrip
+                    eventId={eventId}
+                    dealId={dealId}
+                    clientName={client?.organization?.name ?? null}
+                  />
+                </div>
+              </StagePanel>
             )}
 
             {/* Journal */}
@@ -436,7 +481,7 @@ export function PlanLens({
                 eventId={eventId!}
                 eventStartsAt={event.starts_at}
                 crewRows={crewRows}
-                gearItems={(event.run_of_show_data?.gear_items ?? []) as { id: string; name: string; status: string }[]}
+                gearItems={gearItemsLive}
                 archivedAt={event.archived_at}
               />
             )}
@@ -479,7 +524,7 @@ export function PlanLens({
     // Event ID known but summary still loading (async fetch in progress)
     content = (
       <div className="stage-panel-elevated p-6 text-[var(--stage-text-secondary)] text-sm leading-relaxed">
-        Loading event data...
+        Loading show data...
       </div>
     );
   } else if (!deal) {
@@ -497,7 +542,13 @@ export function PlanLens({
         <div className="flex flex-col lg:flex-row gap-6 min-h-0">
           <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
             <CompletionIndicators deal={deal} stakeholders={stakeholders} crewRows={crewRows} hasProposal={!!proposalData?.hasItems} />
-            {onHandoverSuccess && <HandoffConfirmStrip deal={deal} stakeholders={stakeholders} onSuccess={onHandoverSuccess} />}
+            {onHandoverSuccess && (
+              <HandoffConfirmStrip
+                deal={deal}
+                stakeholders={stakeholders}
+                onOpenWizard={() => setHandoffWizardOpen(true)}
+              />
+            )}
             {deal.workspace_id && <DealDiaryCard dealId={deal.id} workspaceId={deal.workspace_id} phaseTag="plan" />}
           </div>
 
@@ -511,5 +562,24 @@ export function PlanLens({
     );
   }
 
-  return content;
+  return (
+    <>
+      {content}
+      <AnimatePresence>
+        {handoffWizardOpen && deal && dealId && (
+          <HandoffWizard
+            key="handoff-wizard"
+            dealId={dealId}
+            deal={deal}
+            stakeholders={stakeholders}
+            onSuccess={(eventId) => {
+              setHandoffWizardOpen(false);
+              onHandoverSuccess?.(eventId);
+            }}
+            onDismiss={() => setHandoffWizardOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
 }

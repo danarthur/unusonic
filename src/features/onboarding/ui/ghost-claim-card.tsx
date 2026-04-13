@@ -27,7 +27,7 @@ export function GhostClaimCard({ data, isPending }: GhostClaimCardProps) {
     >
       <div className="w-full rounded-2xl border border-[var(--stage-text-primary)]/10 bg-[var(--stage-text-primary)]/5 p-6">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--stage-accent)]/20 font-bold text-[var(--stage-accent)]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--stage-accent)]/20 font-medium text-[var(--stage-accent)]">
             {data.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
@@ -40,14 +40,14 @@ export function GhostClaimCard({ data, isPending }: GhostClaimCardProps) {
 
         <form
           action={(formData: FormData): Promise<void> =>
-            claimGhostOrganizationBySlug(undefined as unknown, formData).then(() => {})}
+            claimGhostOrganizationBySlug(null, formData).then(() => {})}
           className="mt-6"
         >
           <input type="hidden" name="slug" value={data.slug} />
           <button
             type="submit"
             disabled={isPending}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--stage-text-primary)] py-3 font-semibold text-[var(--stage-text-on-accent)] transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--stage-text-primary)] py-3 font-medium text-[var(--stage-text-on-accent)] transition-colors hover:bg-[oklch(1_0_0_/_0.08)] disabled:cursor-not-allowed disabled:opacity-45"
           >
             {isPending ? (
               <>

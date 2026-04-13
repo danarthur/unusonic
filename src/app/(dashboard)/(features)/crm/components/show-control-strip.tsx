@@ -30,9 +30,7 @@ import { toast } from 'sonner';
  *        (Cancelled and pre-window states render nothing.)
  *
  *   4. Single-click Start with 10-second undo toast (sonner action).
- *      Single confirmation prompt on End (browser confirm — no type-to-confirm,
- *      per Field Expert: the industry universally treats that as friction on a
- *      time-critical action).
+ *      Inline confirmation on End (no browser confirm dialog).
  *
  *   5. "LIVE" vocabulary borrows from broadcast tally-light conventions —
  *      industry-standard for "this is on air right now".
@@ -99,6 +97,7 @@ export function ShowControlStrip({
   const [localStatus, setLocalStatus] = useState<string | null>(status);
   const [localStartedAt, setLocalStartedAt] = useState<string | null>(showStartedAt);
   const [localEndedAt, setLocalEndedAt] = useState<string | null>(showEndedAt);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
 
   // ── Visibility gating ─────────────────────────────────────────────────────
   // Render nothing when:
@@ -155,13 +154,6 @@ export function ShowControlStrip({
   };
 
   const handleEnd = () => {
-    // Single confirm, no type-to-confirm. PMs don't have time for bureaucratic
-    // theatre mid-show or during load-out. Keep the prompt short and factual.
-    const confirmed = window.confirm(
-      'End show? Client portal will lock and the wrap report will open.',
-    );
-    if (!confirmed) return;
-
     startTransition(async () => {
       const result = await markShowEnded(eventId);
       if (!result.success) {
@@ -170,6 +162,7 @@ export function ShowControlStrip({
       }
       setLocalStatus('completed');
       setLocalEndedAt('endedAt' in result ? result.endedAt : new Date().toISOString());
+      setConfirmingEnd(false);
       onStateChanged?.();
       toast.success('Show ended', {
         description: 'Wrap report is now available.',
@@ -194,19 +187,22 @@ export function ShowControlStrip({
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="stage-label mb-1">Show ended</p>
-              <p className="text-sm text-[var(--stage-text-secondary)] truncate tracking-tight">
+              <p className="stage-readout-sm text-[var(--stage-text-secondary)] truncate">
                 {localEndedAt
                   ? `Ended ${formatClockWithDate(localEndedAt)}`
                   : 'Ended'}
               </p>
             </div>
-            <a
-              href="#wrap-report"
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById('wrap-report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               <FileCheck size={12} strokeWidth={1.5} aria-hidden />
               Open wrap report
-            </a>
+            </button>
           </div>
         </StagePanel>
       </motion.div>
@@ -234,10 +230,10 @@ export function ShowControlStrip({
               {/* Tally-light pill — borrowed from broadcast red-on-air convention */}
               <motion.span
                 aria-label="Show is live"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-wider uppercase"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full stage-badge-text tracking-wider uppercase"
                 style={{
                   background: 'var(--color-unusonic-error)',
-                  color: 'oklch(0.99 0 0)',
+                  color: 'var(--stage-accent)',
                 }}
                 animate={{ opacity: [1, 0.7, 1] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
@@ -245,21 +241,31 @@ export function ShowControlStrip({
                 <span className="size-1.5 rounded-full bg-current shrink-0" />
                 Live
               </motion.span>
-              <p className="text-sm text-[var(--stage-text-secondary)] truncate tracking-tight">
+              <p className="stage-readout-sm text-[var(--stage-text-secondary)] truncate">
                 {localStartedAt
                   ? `Started ${formatClock(localStartedAt)}`
                   : 'Show is in progress'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleEnd}
-              disabled={isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
-            >
-              <Square size={12} strokeWidth={1.5} aria-hidden />
-              {isPending ? 'Ending...' : 'End show'}
-            </button>
+            {confirmingEnd ? (
+              <div className="flex items-center gap-2">
+                <span className="stage-label">Client portal will lock</span>
+                <button className="stage-btn stage-btn-danger text-xs px-3 py-1.5" onClick={handleEnd} disabled={isPending}>
+                  {isPending ? 'Ending...' : 'End show'}
+                </button>
+                <button className="stage-btn stage-btn-secondary text-xs px-3 py-1.5" onClick={() => setConfirmingEnd(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingEnd(true)}
+                disabled={isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
+              >
+                <Square size={12} strokeWidth={1.5} aria-hidden />
+                End show
+              </button>
+            )}
           </div>
         </StagePanel>
       </motion.div>
@@ -280,8 +286,8 @@ export function ShowControlStrip({
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="stage-label mb-1">Show control</p>
-            <p className="flex items-center gap-1.5 text-sm text-[var(--stage-text-secondary)] truncate tracking-tight">
-              <Clock size={12} strokeWidth={1.5} className="shrink-0 opacity-60" aria-hidden />
+            <p className="flex items-center gap-1.5 stage-readout-sm text-[var(--stage-text-secondary)] truncate">
+              <Clock size={12} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
               {`Ready when you are${startsAt ? ` · ${formatClock(startsAt)}` : ''}`}
             </p>
           </div>

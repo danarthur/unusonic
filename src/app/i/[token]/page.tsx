@@ -12,6 +12,7 @@ import 'server-only';
 
 import type { Metadata } from 'next';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { PayNowButton } from './PayNowButton';
 
 // ---------------------------------------------------------------------------
 // Types for the RPC response
@@ -74,6 +75,8 @@ interface PublicInvoiceData {
   bill_to_snapshot: BillToSnapshot;
   from_snapshot: FromSnapshot;
   line_items: LineItem[];
+  workspace_id: string;
+  accept_online_payments: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -434,20 +437,13 @@ export default async function PublicInvoicePage({
             </div>
           </div>
 
-          {/* ── Pay now button (disabled — Stripe wiring is PR-CLIENT-9b) */}
+          {/* ── Pay now (Stripe Checkout) ─────────────────────── */}
           {!isPaid && (
             <div className="border-t border-gray-100 px-6 py-5 sm:px-8">
-              <button
-                type="button"
-                disabled
-                title="Online payment coming soon"
-                className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white opacity-50 cursor-not-allowed"
-              >
-                Pay now
-              </button>
-              <p className="mt-2 text-center text-xs text-gray-400">
-                Online payment coming soon
-              </p>
+              <PayNowButton
+                token={token}
+                acceptOnlinePayments={invoice.accept_online_payments}
+              />
             </div>
           )}
 

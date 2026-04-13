@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Calendar, Clock, Truck, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Check, Loader2, X } from 'lucide-react';
+import { MapPin, Calendar, Clock, Truck, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Check, Loader2, X, Package } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { useConflictDetection } from '@/features/ops/hooks/use-conflict-detection';
@@ -19,6 +19,7 @@ import type { EventSummaryForPrism } from '../actions/get-event-summary';
 
 // Transport mode display labels
 const TRANSPORT_MODE_LABELS: Record<string, string> = {
+  none: 'Self-equipped',
   personal_vehicle: 'Personal vehicle',
   company_van: 'Company van',
   rental_truck: 'Rental truck',
@@ -138,15 +139,16 @@ function SwapPicker({
               doSearch(e.target.value);
             }}
             placeholder={roleHint ? `Search ${roleHint} alternatives\u2026` : 'Search crew\u2026'}
-            className="flex-1 bg-transparent px-3 py-2.5 text-sm tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none"
+            className="flex-1 bg-transparent px-3 py-2.5 text-sm tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             onKeyDown={(e) => e.key === 'Escape' && onClose()}
           />
           <button
             type="button"
             onClick={onClose}
             className="px-2.5 py-2.5 text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors"
+            aria-label="Close"
           >
-            <X size={14} strokeWidth={1.5} />
+            <X size={14} strokeWidth={1.5} aria-hidden />
           </button>
         </div>
         {loading && (
@@ -166,16 +168,16 @@ function SwapPicker({
               type="button"
               disabled={selecting === r.id}
               onClick={() => handleSelect(r)}
-              className="w-full text-left px-3 py-2.5 flex items-center gap-3 border-t border-[oklch(1_0_0_/_0.06)] hover:bg-[var(--stage-surface-hover,oklch(1_0_0_/_0.04))] transition-colors disabled:opacity-50"
+              className="w-full text-left px-3 py-2.5 flex items-center gap-3 border-t border-[oklch(1_0_0_/_0.06)] stage-hover overflow-hidden transition-colors disabled:opacity-45"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight truncate">{r.name}</p>
+                <p className="stage-readout truncate">{r.name}</p>
                 {r.jobTitle && (
-                  <p className="text-xs text-[var(--stage-text-tertiary)] tracking-tight truncate">{r.jobTitle}</p>
+                  <p className="stage-badge-text text-[var(--stage-text-tertiary)] truncate">{r.jobTitle}</p>
                 )}
               </div>
               {r.dayRate != null && (
-                <span className="text-xs text-[var(--stage-text-tertiary)] tracking-tight shrink-0">
+                <span className="stage-badge-text text-[var(--stage-text-tertiary)] shrink-0">
                   ${r.dayRate}/day
                 </span>
               )}
@@ -258,8 +260,8 @@ function ConflictRow({
   return (
     <div className="py-2.5 first:pt-0 last:pb-0">
       <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1 text-sm">
-          <span className="font-medium text-[var(--stage-text-primary)]">{conflict.resourceName}</span>
+        <div className="min-w-0 flex-1">
+          <span className="stage-readout">{conflict.resourceName}</span>
           {isCrew ? ' (crew)' : ' (gear)'} —{' '}
           <span className="text-[var(--color-unusonic-warning)]">{conflict.eventName}</span>
         </div>
@@ -268,7 +270,7 @@ function ConflictRow({
             <button
               type="button"
               onClick={() => setSwapOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium tracking-tight rounded-[var(--stage-radius-input,6px)] bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover,oklch(1_0_0_/_0.06))] transition-colors border border-[oklch(1_0_0_/_0.08)]"
+              className="inline-flex items-center gap-1.5 stage-badge-text text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
             >
               <ArrowLeftRight size={12} strokeWidth={1.5} />
               Swap
@@ -278,7 +280,7 @@ function ConflictRow({
             <button
               type="button"
               onClick={() => setAcceptingGear(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium tracking-tight rounded-[var(--stage-radius-input,6px)] bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover,oklch(1_0_0_/_0.06))] transition-colors border border-[oklch(1_0_0_/_0.08)]"
+              className="inline-flex items-center gap-1.5 stage-badge-text text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
             >
               <Check size={12} strokeWidth={1.5} />
               Accept
@@ -312,8 +314,9 @@ function ConflictRow({
               <input
                 value={gearNote}
                 onChange={(e) => setGearNote(e.target.value)}
+                maxLength={500}
                 placeholder="Note (e.g. using backup unit)"
-                className="flex-1 bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] border border-[oklch(1_0_0_/_0.08)] rounded-[var(--stage-radius-input,6px)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+                className="flex-1 bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] border border-[oklch(1_0_0_/_0.08)] rounded-[var(--stage-radius-input,6px)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAcceptGearConflict();
                   if (e.key === 'Escape') setAcceptingGear(false);
@@ -323,7 +326,7 @@ function ConflictRow({
                 type="button"
                 onClick={handleAcceptGearConflict}
                 disabled={submittingGearAccept}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium tracking-tight rounded-[var(--stage-radius-input,6px)] bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors border border-[oklch(1_0_0_/_0.08)] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 stage-badge-text rounded-[var(--stage-radius-input,6px)] bg-[var(--stage-surface-raised)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors disabled:opacity-45"
               >
                 {submittingGearAccept ? <Loader2 className="size-3 animate-spin" /> : <Check size={12} strokeWidth={1.5} />}
                 Accept
@@ -361,11 +364,11 @@ export function DispatchSummary({
 
   const truckLabel = truckStatusProp
     ? truckStatusProp === 'in_transit'
-      ? 'In Transit'
-      : 'Not Loaded'
+      ? 'In transit'
+      : 'Not loaded'
     : logistics.truck_loaded
       ? 'Loaded'
-      : 'Not Loaded';
+      : 'Not loaded';
 
   const displayDate = event.starts_at
     ? new Date(event.starts_at).toLocaleDateString(undefined, {
@@ -442,15 +445,21 @@ export function DispatchSummary({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}
     >
+      <StagePanel style={{ padding: 'var(--stage-padding, 16px)' }}>
+      <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+        <div className="flex items-center gap-3">
+          <Package size={18} strokeWidth={1.5} className="shrink-0" style={{ color: 'var(--stage-text-secondary)' }} aria-hidden />
+          <p className="stage-label">Gear &amp; dispatch</p>
+        </div>
+
       {/* Conflict alert — actionable banner when resources are double-booked */}
       {conflicts.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={STAGE_LIGHT}
-          className="rounded-[var(--stage-radius-panel)] border border-[var(--color-unusonic-warning)]/50 bg-[var(--color-unusonic-warning)]/10 p-4"
+          className="rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-warning)] bg-[var(--stage-surface)] p-4"
           role="alert"
         >
           <div className="flex items-start gap-4">
@@ -489,19 +498,19 @@ export function DispatchSummary({
           <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] flex items-center gap-5">
             <Calendar size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">Show date</p>
-              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none truncate">{displayDate}</p>
+              <p className="stage-label mb-1.5">Show date</p>
+              <p className="stage-readout leading-none truncate">{displayDate}</p>
             </div>
           </StagePanel>
           <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] flex items-center gap-5">
             <MapPin size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">Location</p>
+              <p className="stage-label mb-1.5">Location</p>
               <a
                 href={googleMapsUrl(locationAddress)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none truncate block hover:text-[var(--stage-accent)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
+                className="stage-readout leading-none truncate block hover:text-[var(--stage-accent)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
               >
                 {location}
               </a>
@@ -510,15 +519,15 @@ export function DispatchSummary({
           <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] flex items-center gap-5">
             <Clock size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">Call time</p>
-              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none truncate">{callTime}</p>
+              <p className="stage-label mb-1.5">Call time</p>
+              <p className="stage-readout leading-none truncate">{callTime}</p>
             </div>
           </StagePanel>
           <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] flex items-center gap-5">
             <Truck size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">Truck status</p>
-              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none truncate">{truckLabel}</p>
+              <p className="stage-label mb-1.5">Truck status</p>
+              <p className="stage-readout leading-none truncate">{truckLabel}</p>
             </div>
           </StagePanel>
           {/* Transport mode/status — shown when set in run_of_show_data */}
@@ -526,18 +535,18 @@ export function DispatchSummary({
             <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] flex items-center gap-5">
               <Truck size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">Transport</p>
+                <p className="stage-label mb-1.5">Transport</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   {transportMode && (
                     <span
-                      className="stage-panel-nested text-[var(--stage-text-primary)] font-medium tracking-tight text-sm px-2 py-0.5"
+                      className="stage-panel-nested stage-readout px-2 py-0.5"
                       style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
                     >
                       {TRANSPORT_MODE_LABELS[transportMode] ?? transportMode}
                     </span>
                   )}
                   {transportStatus && (
-                    <span className="text-xs text-[var(--stage-text-secondary)] tracking-tight">
+                    <span className="stage-badge-text text-[var(--stage-text-secondary)]">
                       {TRANSPORT_STATUS_LABELS[transportStatus] ?? transportStatus}
                     </span>
                   )}
@@ -550,17 +559,17 @@ export function DispatchSummary({
             <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] flex items-center gap-5">
               <ArrowDownToLine size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">Load-in</p>
+                <p className="stage-label mb-1.5">Load-in</p>
                 {loadIn ? (
-                  <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none truncate">{formatShortDate(loadIn)}</p>
+                  <p className="stage-readout leading-none truncate">{formatShortDate(loadIn)}</p>
                 ) : (
-                  <p className="text-[var(--stage-text-tertiary)] text-sm tracking-tight leading-none">Not set</p>
+                  <p className="stage-field-label text-[var(--stage-text-tertiary)] leading-none">Not set</p>
                 )}
                 <input
                   type="datetime-local"
                   value={isoToDatetimeLocal(loadIn)}
                   onChange={(e) => handleLoadDateChange('loadIn', e.target.value)}
-                  className="mt-1.5 w-full bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-xs text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+                  className="mt-1.5 w-full bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-xs text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   style={{ borderRadius: 'var(--stage-radius-input, 6px)', colorScheme: 'dark' }}
                 />
               </div>
@@ -571,17 +580,17 @@ export function DispatchSummary({
             <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] flex items-center gap-5">
               <ArrowUpFromLine size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1.5">Load-out</p>
+                <p className="stage-label mb-1.5">Load-out</p>
                 {loadOut ? (
-                  <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none truncate">{formatShortDate(loadOut)}</p>
+                  <p className="stage-readout leading-none truncate">{formatShortDate(loadOut)}</p>
                 ) : (
-                  <p className="text-[var(--stage-text-tertiary)] text-sm tracking-tight leading-none">Not set</p>
+                  <p className="stage-field-label text-[var(--stage-text-tertiary)] leading-none">Not set</p>
                 )}
                 <input
                   type="datetime-local"
                   value={isoToDatetimeLocal(loadOut)}
                   onChange={(e) => handleLoadDateChange('loadOut', e.target.value)}
-                  className="mt-1.5 w-full bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-xs text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+                  className="mt-1.5 w-full bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] border border-[oklch(1_0_0_/_0.08)] px-2 py-1 text-xs text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   style={{ borderRadius: 'var(--stage-radius-input, 6px)', colorScheme: 'dark' }}
                 />
               </div>
@@ -619,6 +628,8 @@ export function DispatchSummary({
         maxVisible={5}
       />
 
+      </div>
+      </StagePanel>
     </motion.div>
   );
 }

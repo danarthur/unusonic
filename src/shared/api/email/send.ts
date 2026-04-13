@@ -20,6 +20,8 @@ import { ProposalReminderEmail } from './templates/ProposalReminderEmail';
 import { EmployeeInviteEmail } from './templates/EmployeeInviteEmail';
 import { createClient } from '@/shared/api/supabase/server';
 import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
+import { resolvePortalTheme, type PortalThemeConfig } from '@/shared/lib/portal-theme';
+import { portalThemeToEmailPalette, type EmailPalette } from '@/shared/lib/email-palette';
 
 /** Read at send-time so env is available when server actions run (not only at module load). */
 function getResend() {
@@ -38,6 +40,28 @@ function fromEmailPart(fromStr: string): string {
 }
 
 /**
+ * Resolve the portal theme for a workspace as a hex email palette.
+ * Returns null on failure — callers fall back to DEFAULT_EMAIL_PALETTE via template defaults.
+ */
+async function resolveWorkspaceEmailPalette(workspaceId: string): Promise<EmailPalette | null> {
+  try {
+    const supabase = await createClient();
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('portal_theme_preset, portal_theme_config')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    if (!ws) return null;
+    const preset = (ws as { portal_theme_preset?: string | null }).portal_theme_preset ?? null;
+    const config = (ws as { portal_theme_config?: PortalThemeConfig | null }).portal_theme_config ?? null;
+    const { tokens } = resolvePortalTheme(preset, config);
+    return portalThemeToEmailPalette(tokens);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resolve the From address for a workspace-branded email.
  * If the workspace has a verified custom sending domain, uses it.
  * Otherwise falls back to the global EMAIL_FROM.
@@ -48,6 +72,9 @@ export async function getWorkspaceFrom(
   workspaceId: string,
   senderName?: string | null
 ): Promise<string> {
+  if (!workspaceId) {
+    throw new Error('getWorkspaceFrom: workspaceId is required. Auth emails must call getFrom() instead.');
+  }
   try {
     const supabase = await createClient();
     const { data: ws } = await supabase
@@ -251,6 +278,9 @@ export async function sendProposalLinkEmail(
   }
   const fromStr = getFrom();
   const firstName = senderOptions?.clientFirstName?.trim() || null;
+  const theme = senderOptions?.workspaceId
+    ? await resolveWorkspaceEmailPalette(senderOptions.workspaceId)
+    : null;
   const element = ProposalLinkEmail({
     proposalUrl,
     dealTitle,
@@ -265,6 +295,7 @@ export async function sendProposalLinkEmail(
     eventArchetype: senderOptions?.eventArchetype ?? null,
     eventStartTime: senderOptions?.eventStartTime ?? null,
     eventEndTime: senderOptions?.eventEndTime ?? null,
+    theme,
   });
   const html = await render(element);
   const text = toPlainText(html);
@@ -322,7 +353,8 @@ export async function sendProposalAcceptedEmail(opts: {
   const resend = getResend();
   if (!resend) return { ok: false, error: 'Email not configured.' };
   const { to, signerName, dealTitle, signedAt, portalUrl, workspaceName, workspaceId, eventDate, totalFormatted, depositAmount, depositDueDays } = opts;
-  const element = ProposalAcceptedEmail({ signerName, dealTitle, signedAt, portalUrl, workspaceName, eventDate, totalFormatted, depositAmount, depositDueDays });
+  const theme = workspaceId ? await resolveWorkspaceEmailPalette(workspaceId) : null;
+  const element = ProposalAcceptedEmail({ signerName, dealTitle, signedAt, portalUrl, workspaceName, eventDate, totalFormatted, depositAmount, depositDueDays, theme });
   const html = await render(element);
   const text = toPlainText(html);
   const fromAddress = workspaceId ? await getWorkspaceFrom(workspaceId) : getFrom();
@@ -357,14 +389,18 @@ export async function sendProposalReminderEmail(opts: {
   if (!resend) return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
   const senderDisplayName = opts.senderName?.trim() ?? null;
   const fromAddress = await getWorkspaceFrom(opts.workspaceId, senderDisplayName);
-  // Resolve workspace name for the email footer
+  // Resolve workspace name + theme for the email
   const supabase = await createClient();
   const { data: ws } = await supabase
     .from('workspaces')
-    .select('name')
+    .select('name, portal_theme_preset, portal_theme_config')
     .eq('id', opts.workspaceId)
     .maybeSingle();
-  const workspaceName = (ws as { name?: string } | null)?.name ?? 'Unusonic';
+  const wsRow = ws as { name?: string; portal_theme_preset?: string | null; portal_theme_config?: PortalThemeConfig | null } | null;
+  const workspaceName = wsRow?.name ?? 'Unusonic';
+  const theme = wsRow
+    ? portalThemeToEmailPalette(resolvePortalTheme(wsRow.portal_theme_preset ?? null, wsRow.portal_theme_config ?? null).tokens)
+    : null;
   const element = ProposalReminderEmail({
     proposalUrl: opts.proposalUrl,
     eventTitle: opts.eventTitle,
@@ -373,6 +409,7 @@ export async function sendProposalReminderEmail(opts: {
     clientFirstName: opts.clientFirstName ?? null,
     eventDate: opts.eventDate ?? null,
     proposalTotal: opts.proposalTotal ?? null,
+    theme,
   });
   const html = await render(element);
   const text = toPlainText(html);
@@ -414,7 +451,10 @@ export async function sendProposalSignedNotificationEmail(opts: {
   const resend = getResend();
   if (!resend) return { ok: false, error: 'Email not configured.' };
   const { to, signerName, dealTitle, signedAt, crmUrl, workspaceName, workspaceId, totalFormatted, signerEmail, eventDate } = opts;
-  const element = ProposalSignedEmail({ signerName, dealTitle, signedAt, crmUrl, workspaceName, totalFormatted, signerEmail, eventDate });
+  const accentHex = workspaceId
+    ? (await resolveWorkspaceEmailPalette(workspaceId))?.accentHex ?? null
+    : null;
+  const element = ProposalSignedEmail({ signerName, dealTitle, signedAt, crmUrl, workspaceName, totalFormatted, signerEmail, eventDate, accentHex });
   const html = await render(element);
   const text = toPlainText(html);
   const fromAddress = workspaceId ? await getWorkspaceFrom(workspaceId) : getFrom();
@@ -459,9 +499,8 @@ export async function sendEmployeeInviteEmail(opts: {
   });
   const html = await render(element);
   const text = toPlainText(html);
-  const fromAddress = await getWorkspaceFrom(opts.workspaceId);
   const { error } = await resend.emails.send({
-    from: fromAddress,
+    from: getFrom(),
     to: [opts.to],
     subject: `${opts.workspaceName} invited you to join their team`,
     html,
@@ -516,6 +555,71 @@ export async function sendPaymentReminderEmail(opts: {
     from: fromAddress,
     to: [opts.to],
     subject,
+    html,
+    text,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// =============================================================================
+// Client portal magic-link + OTP emails — §1 Phase C
+// =============================================================================
+
+import { MagicLinkEmail } from './templates/MagicLinkEmail';
+import { OtpEmail } from './templates/OtpEmail';
+
+/**
+ * Send a magic-link sign-in email to a claimed client entity.
+ * Uses global EMAIL_FROM — auth emails must never be workspace-branded (spoof risk).
+ */
+export async function sendMagicLinkEmail(opts: {
+  to: string;
+  signInUrl: string;
+  workspaceId: string;
+  workspaceName?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const resend = getResend();
+  if (!resend) return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
+  const element = MagicLinkEmail({
+    signInUrl: opts.signInUrl,
+    workspaceName: opts.workspaceName,
+  });
+  const html = await render(element);
+  const text = toPlainText(html);
+  const { error } = await resend.emails.send({
+    from: getFrom(),
+    to: [opts.to],
+    subject: 'Sign in to your client portal',
+    html,
+    text,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Send a 6-digit OTP email to a ghost client entity.
+ * Used when the entity has no Supabase auth account (ghost protocol).
+ */
+export async function sendOtpEmail(opts: {
+  to: string;
+  code: string;
+  workspaceId: string;
+  workspaceName?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const resend = getResend();
+  if (!resend) return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
+  const element = OtpEmail({
+    code: opts.code,
+    workspaceName: opts.workspaceName,
+  });
+  const html = await render(element);
+  const text = toPlainText(html);
+  const { error } = await resend.emails.send({
+    from: getFrom(),
+    to: [opts.to],
+    subject: `${opts.code} is your sign-in code`,
     html,
     text,
   });

@@ -49,27 +49,6 @@ export type LogisticsState = {
   crew_confirmed?: boolean;
 };
 
-export function normalizeCrewItems(ros: RunOfShowData | null): CrewItem[] {
-  if (!ros) return [];
-  if (Array.isArray(ros.crew_items) && ros.crew_items.length > 0) {
-    return ros.crew_items.map((c) => ({
-      role: c.role,
-      status: (c.status ?? 'requested') as CrewStatus,
-      entity_id: c.entity_id ?? null,
-      assignee_name: c.assignee_name ?? null,
-    }));
-  }
-  if (Array.isArray(ros.crew_roles) && ros.crew_roles.length > 0) {
-    return ros.crew_roles.map((role) => ({
-      role: String(role),
-      status: 'requested' as CrewStatus,
-      entity_id: null,
-      assignee_name: null,
-    }));
-  }
-  return [];
-}
-
 /** Map any legacy status value to the current GearStatus enum. */
 function coerceGearStatus(raw: string | undefined | null): GearStatus {
   if (!raw || raw === 'pending') return 'allocated';

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useTransition, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { toast } from 'sonner';
 import { ClipboardCheck, ChevronDown, Pencil } from 'lucide-react';
 import type { DealCrewRow } from '../actions/deal-crew';
+import type { EventGearItem } from '../actions/event-gear-items';
 import type {
   WrapReport,
   WrapCrewEntry,
@@ -26,7 +27,8 @@ type WrapReportCardProps = {
   eventId: string;
   eventStartsAt: string;
   crewRows: DealCrewRow[];
-  gearItems: { id: string; name: string; status: string }[];
+  /** Live gear items from ops.event_gear_items (not the frozen JSONB snapshot). */
+  gearItems: EventGearItem[];
   /** Pass 3 Phase 4: wrap state from ops.events.archived_at. */
   archivedAt: string | null;
 };
@@ -120,11 +122,14 @@ function WrapReportInner({
   // 72h to undo) and stamps archived_at via markShowWrapped. No checklist
   // gate (User Advocate: "mandatory checklist gate is the worst way to
   // solve this"). Single confirm dialog, short factual message.
+  const [confirmingWrap, setConfirmingWrap] = useState(false);
+
   const handleWrap = () => {
-    const confirmed = window.confirm(
-      'Wrap this show? It will leave your active pile. You have 72 hours to undo.',
-    );
-    if (!confirmed) return;
+    setConfirmingWrap(true);
+  };
+
+  const handleConfirmWrap = () => {
+    setConfirmingWrap(false);
     startTransition(async () => {
       const result = await markShowWrapped(eventId);
       if (result.success) {
@@ -160,7 +165,7 @@ function WrapReportInner({
   if (mode === 'loading') return null;
 
   return (
-    <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
+    <StagePanel id="wrap-report" elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
       <AnimatePresence mode="wait" initial={false}>
         {mode === 'empty' && (
           <EmptyState key="empty" onStart={handleStart} />
@@ -218,14 +223,22 @@ function WrapReportInner({
               Undo wrap
             </button>
           ) : !isWrapped ? (
-            <button
-              type="button"
-              onClick={handleWrap}
-              disabled={isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
-            >
-              {isPending ? 'Wrapping\u2026' : 'Wrap show'}
-            </button>
+            confirmingWrap ? (
+              <div className="flex items-center gap-2">
+                <span className="stage-label">It will leave your active pile. 72 hours to undo.</span>
+                <button className="stage-btn stage-btn-primary text-sm px-3 py-1.5" onClick={handleConfirmWrap} disabled={isPending}>Wrap show</button>
+                <button className="stage-btn stage-btn-secondary text-sm px-3 py-1.5" onClick={() => setConfirmingWrap(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleWrap}
+                disabled={isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
+              >
+                {isPending ? 'Wrapping\u2026' : 'Wrap show'}
+              </button>
+            )
           ) : null}
         </div>
       )}
@@ -254,10 +267,7 @@ function EmptyState({ onStart }: { onStart: () => void }) {
         <ClipboardCheck size={24} className="text-[var(--stage-text-tertiary)]" aria-hidden />
       </div>
       <div className="min-w-0 flex-1">
-        <p
-          className="stage-readout tracking-tight leading-none"
-          style={{ color: 'var(--stage-text-primary)' }}
-        >
+        <p className="stage-label">
           Show complete
         </p>
         <p
@@ -324,10 +334,7 @@ function EditState({
       {/* Header */}
       <div className="flex items-center" style={{ gap: 'var(--stage-gap, 6px)' }}>
         <ClipboardCheck size={18} className="text-[var(--stage-text-secondary)]" aria-hidden />
-        <h3
-          className="stage-readout tracking-tight leading-none"
-          style={{ color: 'var(--stage-text-primary)' }}
-        >
+        <h3 className="stage-label">
           Wrap report
         </h3>
       </div>
@@ -561,10 +568,7 @@ function ViewState({
       <div className="flex items-center justify-between">
         <div className="flex items-center" style={{ gap: 'var(--stage-gap, 6px)' }}>
           <ClipboardCheck size={18} className="text-[var(--color-unusonic-success)]" aria-hidden />
-          <h3
-            className="stage-readout tracking-tight leading-none"
-            style={{ color: 'var(--stage-text-primary)' }}
-          >
+          <h3 className="stage-label">
             Wrap report
           </h3>
         </div>
@@ -766,7 +770,7 @@ function ConditionDropdown({
                     onChange(c.value);
                     setOpen(false);
                   }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs tracking-tight text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well-hover,oklch(1_0_0_/_0.04))] transition-colors text-left"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs tracking-tight text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors text-left"
                 >
                   <span
                     className="size-2 rounded-full shrink-0"
@@ -829,7 +833,7 @@ function StarRating({
               strokeWidth={1.5}
               style={{
                 color: filled
-                  ? 'oklch(0.82 0.12 85)' // warm gold
+                  ? 'var(--color-unusonic-warning)' // warm gold
                   : 'var(--stage-text-tertiary)',
               }}
             >

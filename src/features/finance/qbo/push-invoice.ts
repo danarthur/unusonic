@@ -99,10 +99,19 @@ export async function pushInvoiceToQbo(
     const qb = createQbClient(workspaceId, conn.realm_id);
     const requestId = makeRequestId(workspaceId, 'entity', invoice.bill_to_entity_id, 'query', attemptNumber);
 
+    // QBO SQL-like Query Language: escape apostrophes by doubling (`'` → `''`).
+    // Backslash escaping is NOT recognized by QBO and previously broke any name
+    // containing an apostrophe. Strip control chars and cap length to prevent
+    // pathological inputs from breaking the query.
+    const safeDisplayName = entity.display_name
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .slice(0, 100)
+      .replace(/'/g, "''");
+
     try {
       const queryResult = await qb.get<{ QueryResponse: { Customer?: Array<{ Id: string; DisplayName: string; SyncToken: string }> } }>(
         `/query`,
-        { query: `SELECT * FROM Customer WHERE DisplayName = '${entity.display_name.replace(/'/g, "\\'")}'` },
+        { query: `SELECT * FROM Customer WHERE DisplayName = '${safeDisplayName}'` },
       );
 
       const matches = queryResult?.QueryResponse?.Customer ?? [];

@@ -1,17 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, Users, RefreshCw, Bell } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
-import { updateFlightCheckStatus } from '../../actions/update-flight-check-status';
 import { syncCrewFromProposalToEvent } from '../../actions/sync-crew-from-proposal';
 import { sendCrewReminderByEntity } from '../../actions/send-crew-reminder-by-entity';
 import { confirmDealCrew, updateCrewDispatch, type DealCrewRow } from '../../actions/deal-crew';
 import type { CrewRolesDiagnostic } from '../../actions/get-crew-roles-from-proposal';
-import { normalizeCrewItems, type CrewItem, type CrewStatus } from './types';
-import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
 import { AssignCrewSheet } from './AssignCrewSheet';
 import { CrewIdentityRow, OpenRoleRow } from '../crew-identity-row';
 
@@ -19,29 +14,21 @@ type DispatchStatus = 'standby' | 'en_route' | 'on_site' | 'wrapped';
 const DISPATCH_ORDER: DispatchStatus[] = ['standby', 'en_route', 'on_site', 'wrapped'];
 const DISPATCH_LABELS: Record<DispatchStatus, string> = {
   standby: 'Standby',
-  en_route: 'En Route',
-  on_site: 'On Site',
+  en_route: 'En route',
+  on_site: 'On site',
   wrapped: 'Wrapped',
 };
 const DISPATCH_COLORS: Record<DispatchStatus, string> = {
-  standby: 'border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)]',
-  en_route: 'bg-[var(--color-unusonic-warning)]/15 text-[var(--stage-text-primary)] border-[var(--color-unusonic-warning)]/30',
-  on_site: 'bg-[var(--color-unusonic-info)]/15 text-[var(--stage-text-primary)] border-[var(--color-unusonic-info)]/30',
-  wrapped: 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40',
-};
-
-const CREW_STATUS_ORDER: CrewStatus[] = ['requested', 'confirmed', 'dispatched'];
-const CREW_LABELS: Record<CrewStatus, string> = {
-  requested: 'Requested',
-  confirmed: 'Confirmed',
-  dispatched: 'Dispatched',
+  standby: 'border-[oklch(1_0_0_/_0.06)] bg-[oklch(1_0_0_/_0.04)]',
+  en_route: 'bg-[var(--color-unusonic-warning)]/10 text-[var(--stage-text-secondary)] border-transparent',
+  on_site: 'bg-[var(--color-unusonic-info)]/10 text-[var(--stage-text-secondary)] border-transparent',
+  wrapped: 'bg-[var(--color-unusonic-success)]/12 text-[var(--stage-text-secondary)] border-transparent',
 };
 
 type CrewFlightCheckProps = {
   eventId: string;
-  crewRows?: DealCrewRow[];
+  crewRows: DealCrewRow[];
   crewLoading?: boolean;
-  runOfShowData: RunOfShowData | null;
   onUpdated?: () => void;
   defaultCollapsed?: boolean;
   maxVisible?: number;
@@ -49,9 +36,8 @@ type CrewFlightCheckProps = {
 
 export function CrewFlightCheck({
   eventId,
-  crewRows = [],
+  crewRows,
   crewLoading = false,
-  runOfShowData,
   onUpdated,
   defaultCollapsed = false,
   maxVisible = 5,
@@ -65,14 +51,10 @@ export function CrewFlightCheck({
   const [reminderSending, setReminderSending] = useState<string | null>(null);
   const [reminderResults, setReminderResults] = useState<Record<string, 'sent' | 'error'>>({});
 
-  const useDealCrew = crewRows.length > 0;
-  const legacyItems = normalizeCrewItems(runOfShowData);
-  const hasCrew = useDealCrew || legacyItems.length > 0;
-  const totalCount = useDealCrew ? crewRows.length : legacyItems.length;
+  const totalCount = crewRows.length;
   const showCollapse = totalCount > maxVisible;
   const visibleCount = collapsed && showCollapse ? maxVisible : totalCount;
 
-  // ── Dispatch status cycling ──
   const cycleDispatchStatus = async (row: DealCrewRow) => {
     const current = row.dispatch_status as DispatchStatus | null ?? 'standby';
     const idx = DISPATCH_ORDER.indexOf(current);
@@ -90,21 +72,6 @@ export function CrewFlightCheck({
     if (result.success) onUpdated?.();
   };
 
-  // ── Legacy JSONB cycling ──
-  const legacyCycleStatus = async (index: number) => {
-    const current = legacyItems[index]?.status ?? 'requested';
-    const idx = CREW_STATUS_ORDER.indexOf(current);
-    const next = CREW_STATUS_ORDER[(idx + 1) % CREW_STATUS_ORDER.length];
-    const nextItems: CrewItem[] = legacyItems.map((item, i) =>
-      i === index ? { ...item, status: next } : item
-    );
-    setUpdating(`legacy-${index}`);
-    const result = await updateFlightCheckStatus(eventId, { crew_items: nextItems });
-    setUpdating(null);
-    if (result.success) onUpdated?.();
-  };
-
-  // ── Reminder ──
   const handleSendReminder = async (entityId: string) => {
     setReminderSending(entityId);
     const result = await sendCrewReminderByEntity(eventId, entityId);
@@ -115,7 +82,6 @@ export function CrewFlightCheck({
     }, 4000);
   };
 
-  // ── Sync ──
   function formatDiagnostic(d: CrewRolesDiagnostic): string {
     if (d.step === 'no_proposal') return 'No proposal found for this deal.';
     if (d.step === 'no_items') return 'This proposal has no line items.';
@@ -146,14 +112,13 @@ export function CrewFlightCheck({
     }
   };
 
-  // ── Reminder button helper ──
   function ReminderButton({ entityId }: { entityId: string }) {
     if (reminderResults[entityId]) {
       return (
-        <span className={`text-[10px] font-medium px-2 py-1 rounded-lg border ${
+        <span className={`stage-badge-text px-1.5 py-0.5 rounded-md ${
           reminderResults[entityId] === 'sent'
-            ? 'text-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/10 border-[var(--color-unusonic-success)]/20'
-            : 'text-[var(--color-unusonic-error)] bg-[var(--color-unusonic-error)]/10 border-[var(--color-unusonic-error)]/20'
+            ? 'text-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/8'
+            : 'text-[var(--color-unusonic-error)] bg-[var(--color-unusonic-error)]/8'
         }`}>
           {reminderResults[entityId] === 'sent' ? 'Sent' : 'Error'}
         </span>
@@ -165,22 +130,33 @@ export function CrewFlightCheck({
         onClick={() => handleSendReminder(entityId)}
         disabled={reminderSending === entityId}
         title="Send reminder email"
-        className="p-2 rounded-xl text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.04)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)] disabled:opacity-60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+        className="p-1.5 rounded-md text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] disabled:opacity-45 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
       >
         <Bell size={13} strokeWidth={1.5} className={reminderSending === entityId ? 'animate-ping' : ''} aria-hidden />
       </button>
     );
   }
 
-  // ── Empty state ──
-  if (!hasCrew && !crewLoading) {
+  if (crewLoading) {
+    return (
+      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
+        <div className="flex items-center gap-3">
+          <Users size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+          <h3 className="stage-label">Crew</h3>
+          <span className="text-xs text-[var(--stage-text-secondary)]">Loading...</span>
+        </div>
+      </StagePanel>
+    );
+  }
+
+  if (totalCount === 0) {
     return (
       <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <Users size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
             <div>
-              <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Crew</h3>
+              <h3 className="stage-label">Crew</h3>
               <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">No roles requested yet</p>
             </div>
           </div>
@@ -188,7 +164,7 @@ export function CrewFlightCheck({
             type="button"
             onClick={handleSyncFromProposal}
             disabled={syncing}
-            className="inline-flex items-center gap-2 py-2 px-3 rounded-xl text-sm font-medium tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
+            className="inline-flex items-center gap-2 py-2 px-3 rounded-xl stage-readout border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors"
           >
             <RefreshCw size={14} strokeWidth={1.5} className={syncing ? 'animate-spin' : ''} aria-hidden />
             {syncing ? 'Syncing...' : 'Pull crew from proposal'}
@@ -200,30 +176,11 @@ export function CrewFlightCheck({
     );
   }
 
-  if (crewLoading) {
-    return (
-      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
-        <div className="flex items-center gap-3">
-          <Users size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
-          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Crew</h3>
-          <span className="text-xs text-[var(--stage-text-secondary)]">Loading...</span>
-        </div>
-      </StagePanel>
-    );
-  }
+  const assignSheetRole =
+    assignSheetIndex !== null ? crewRows[assignSheetIndex]?.role_note ?? '' : '';
 
-  // ── Assign sheet helpers ──
-  const assignSheetRole = (() => {
-    if (assignSheetIndex === null) return '';
-    if (useDealCrew) return crewRows[assignSheetIndex]?.role_note ?? '';
-    return legacyItems[assignSheetIndex]?.role ?? '';
-  })();
+  const assignedEntityIds = crewRows.map((r) => r.entity_id).filter((id): id is string => !!id);
 
-  const assignedEntityIds = useDealCrew
-    ? crewRows.map((r) => r.entity_id).filter((id): id is string => !!id)
-    : legacyItems.map((i) => i.entity_id).filter((id): id is string => !!id);
-
-  // ── Populated state ──
   return (
     <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
       <button
@@ -233,7 +190,7 @@ export function CrewFlightCheck({
       >
         <div className="flex items-center gap-3">
           <Users size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
-          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Crew</h3>
+          <h3 className="stage-label">Crew</h3>
         </div>
         {showCollapse && (
           <span className="text-[var(--stage-text-secondary)]">
@@ -243,85 +200,49 @@ export function CrewFlightCheck({
       </button>
 
       <div className="mt-4 space-y-0">
-        {useDealCrew ? (
-          crewRows.slice(0, visibleCount).map((row, index) => {
-            if (!row.entity_id) {
-              return <OpenRoleRow key={row.id} row={row} onAssign={() => setAssignSheetIndex(index)} />;
-            }
+        {crewRows.slice(0, visibleCount).map((row, index) => {
+          if (!row.entity_id) {
+            return <OpenRoleRow key={row.id} row={row} onAssign={() => setAssignSheetIndex(index)} />;
+          }
 
-            const isConfirmed = row.confirmed_at != null;
-            const dispatchStatus = row.dispatch_status as DispatchStatus | null;
+          const isConfirmed = row.confirmed_at != null;
+          const dispatchStatus = row.dispatch_status as DispatchStatus | null;
 
-            return (
-              <CrewIdentityRow
-                key={row.id}
-                row={row}
-                onClickName={row.employment_status === 'internal_employee' && row.roster_rel_id
-                  ? () => window.open(`/network/entity/${row.roster_rel_id}?kind=internal_employee`, '_blank')
-                  : undefined
-                }
-                actions={
-                  !isConfirmed ? (
-                    <>
-                      {row.entity_id && <ReminderButton entityId={row.entity_id} />}
-                      <button
-                        type="button"
-                        onClick={() => handleConfirm(row)}
-                        disabled={updating === row.id}
-                        className="px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
-                      >
-                        {updating === row.id ? '...' : 'Confirm'}
-                      </button>
-                    </>
-                  ) : (
+          return (
+            <CrewIdentityRow
+              key={row.id}
+              row={row}
+              onClickName={row.employment_status === 'internal_employee' && row.roster_rel_id
+                ? () => window.open(`/network/entity/${row.roster_rel_id}?kind=internal_employee`, '_blank')
+                : undefined
+              }
+              actions={
+                !isConfirmed ? (
+                  <>
+                    {row.entity_id && <ReminderButton entityId={row.entity_id} />}
                     <button
                       type="button"
-                      onClick={() => cycleDispatchStatus(row)}
+                      onClick={() => handleConfirm(row)}
                       disabled={updating === row.id}
-                      className={`px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 ${DISPATCH_COLORS[dispatchStatus ?? 'standby']}`}
+                      className="px-3 py-1.5 rounded-[22px] stage-badge-text tracking-tight border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
                     >
-                      {updating === row.id ? '...' : DISPATCH_LABELS[dispatchStatus ?? 'standby']}
+                      {updating === row.id ? '...' : 'Confirm'}
                     </button>
-                  )
-                }
-              />
-            );
-          })
-        ) : (
-          /* Legacy JSONB fallback */
-          legacyItems.slice(0, visibleCount).map((item, index) => (
-            <motion.div
-              key={`${item.role}-${index}`}
-              layout
-              initial={false}
-              animate={{ opacity: 1 }}
-              transition={STAGE_LIGHT}
-              className="flex items-center justify-between gap-4 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0"
-            >
-              <div className="min-w-0 flex-1">
-                <span className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)] truncate block">{item.role}</span>
-                {item.assignee_name && <span className="text-xs text-[var(--stage-text-secondary)] truncate block mt-0.5">{item.assignee_name}</span>}
-              </div>
-              {item.status === 'requested' ? (
-                <div className="flex items-center gap-2 shrink-0">
-                  {item.entity_id && <ReminderButton entityId={item.entity_id} />}
-                  <button type="button" onClick={() => setAssignSheetIndex(index)} className="px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] transition-colors hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]">
-                    Select from team
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => cycleDispatchStatus(row)}
+                    disabled={updating === row.id}
+                    className={`px-3 py-1.5 rounded-[22px] stage-badge-text tracking-tight border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 ${DISPATCH_COLORS[dispatchStatus ?? 'standby']}`}
+                  >
+                    {updating === row.id ? '...' : DISPATCH_LABELS[dispatchStatus ?? 'standby']}
                   </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => legacyCycleStatus(index)}
-                  disabled={updating === `legacy-${index}`}
-                  className={`shrink-0 px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 ${item.status === 'dispatched' ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40' : ''} ${item.status === 'confirmed' ? 'bg-[var(--color-unusonic-info)]/15 text-[var(--stage-text-primary)] border-[var(--color-unusonic-info)]/30' : ''}`}
-                >
-                  {updating === `legacy-${index}` ? '...' : CREW_LABELS[item.status]}
-                </button>
-              )}
-            </motion.div>
-          ))
-        )}
+                )
+              }
+            />
+          );
+        })}
       </div>
 
       <AssignCrewSheet

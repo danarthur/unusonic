@@ -17,6 +17,7 @@ import { getPublicProposal } from './get-public-proposal';
 import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../model/types';
 import { resolveRequiredRoles, type RequiredRole, type PackageDefinition } from './package-types';
+import { upsertEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
 
 /** Base URL for public links (proposal, claim, etc.). Prefer NEXT_PUBLIC_APP_URL; on Vercel fall back to VERCEL_URL so links in emails are always absolute. */
 function getPublicBaseUrl(): string {
@@ -104,11 +105,6 @@ export interface UpsertProposalResult {
 export interface PublishProposalResult {
   publicToken: string | null;
   publicUrl: string | null;
-  error?: string;
-}
-
-export interface SignProposalResult {
-  success: boolean;
   error?: string;
 }
 
@@ -783,6 +779,16 @@ export async function upsertProposal(
     );
   }
 
+  // Fire-and-forget: embed proposal content for Aion RAG
+  if (items.length > 0) {
+    const proposalText = items
+      .map((i) => `${i.name}${i.description ? ': ' + i.description : ''} (qty ${i.quantity}, $${i.unitPrice})`)
+      .join('\n');
+    const { data: dealRow } = await supabase.from('deals').select('title').eq('id', dealId).maybeSingle();
+    const header = buildContextHeader('proposal', { dealTitle: (dealRow as any)?.title });
+    upsertEmbedding(workspaceId, 'proposal', proposalId, proposalText, header).catch(console.error);
+  }
+
   return { proposalId, total };
 }
 
@@ -876,50 +882,13 @@ export async function sendProposalLinkToRecipients(
 }
 
 // =============================================================================
-// signProposal(token, signatureName): Public client signs proposal by token
-// Sets proposal status to 'accepted' and accepted_at. Contract is created at
-// handover (when event exists), not here.
+// signProposal — REMOVED 2026-04-12 (Wave 3 V5 deletion).
+// Reason: non-DocuSeal sign path was a pre-launch orphan that bypassed
+// finance.spawn_invoices_from_proposal — clients signed but no invoices spawned.
+// DocuSeal webhook (/api/docuseal-webhook) is now the canonical sign path per
+// billing rebuild commit 5edf5ff. SignProposalDialog and AcceptanceBar deleted.
+// Workspaces without DocuSeal show a "not yet enabled" notice in PublicProposalView.
 // =============================================================================
-
-export async function signProposal(
-  token: string,
-  signatureName: string
-): Promise<SignProposalResult> {
-  const trimmedName = signatureName?.trim();
-  if (!trimmedName) {
-    return { success: false, error: 'Please enter your full name to sign.' };
-  }
-
-  const supabase = getSystemClient();
-  const now = new Date().toISOString();
-
-  const { data: proposal, error: fetchError } = await supabase
-    .from('proposals')
-    .select('id, deal_id, workspace_id')
-    .eq('public_token', token.trim())
-    .in('status', ['sent', 'viewed'])
-    .maybeSingle();
-
-  if (fetchError || !proposal) {
-    return { success: false, error: 'Proposal not found or already signed.' };
-  }
-
-  const { error: updateError } = await supabase
-    .from('proposals')
-    .update({
-      status: 'accepted',
-      accepted_at: now,
-      updated_at: now,
-    })
-    .eq('id', proposal.id);
-
-  if (updateError) {
-    return { success: false, error: updateError.message };
-  }
-
-  // Contract is created at handover when the event is created (see handover-deal.ts)
-  return { success: true };
-}
 
 // =============================================================================
 // revertProposalToDraft(proposalId): Set status back to 'draft' (testing/admin)
@@ -1083,7 +1052,7 @@ export async function sendForSignature(
       const sys = getSystemClient();
       await sys
         .from('proposals')
-        .update({ resend_message_id: fallbackResult.messageId } as Record<string, unknown>)
+        .update({ resend_message_id: fallbackResult.messageId })
         .eq('id', draftProposalId)
         .eq('workspace_id', workspaceMembership);
     }
@@ -1108,10 +1077,16 @@ export async function sendForSignature(
   if (emailResult.ok && emailResult.messageId) {
     await systemClient
       .from('proposals')
-      .update({ resend_message_id: emailResult.messageId } as Record<string, unknown>)
+      .update({ resend_message_id: emailResult.messageId })
       .eq('id', draftProposalId)
       .eq('workspace_id', workspaceMembership);
   }
+
+  // 7. Create immediate follow-up queue item so the PM sees it on the Deal tab right away
+  try {
+    const { createProposalSentFollowUp } = await import('@/app/(dashboard)/(features)/crm/actions/follow-up-actions');
+    await createProposalSentFollowUp(dealId);
+  } catch { /* non-fatal */ }
 
   return { success: true, publicUrl };
 }

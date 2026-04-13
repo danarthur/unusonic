@@ -76,8 +76,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
       const entityId = billTo.entity_id ?? billTo.organization_id ?? '';
       if (entityId) setClientEntityId(entityId);
     }
-
-  }, []);
+  }, [billTo, clientEntityId]);
 
   // Resolve venue display name when deal already has a venue_id pre-populated
   useEffect(() => {
@@ -86,8 +85,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
         if (name) setSelectedVenueName(name);
       });
     }
-   
-  }, []);
+  }, [venueEntityId, selectedVenueName]);
 
   // Venue search effect
   useEffect(() => {
@@ -186,6 +184,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
       exit={{ x: '100%' }}
       transition={STAGE_HEAVY}
       className="fixed inset-y-0 right-0 z-50 w-full max-w-lg flex flex-col border-l border-[oklch(1_0_0_/_0.10)] shadow-2xl"
+      data-surface="raised"
       style={{ background: 'var(--stage-surface-raised)' }}
       aria-modal="true"
       aria-labelledby="handoff-wizard-title"
@@ -233,23 +232,23 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                 <p className="stage-label">Date & time</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="handoff-start" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Start</label>
+                    <label htmlFor="handoff-start" className="block stage-field-label mb-1.5">Start</label>
                     <input
                       id="handoff-start"
                       type="datetime-local"
                       value={startAt}
                       onChange={(e) => setStartAt(e.target.value)}
-                      className="w-full rounded-xl bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      className="w-full rounded-xl bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                   </div>
                   <div>
-                    <label htmlFor="handoff-end" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">End</label>
+                    <label htmlFor="handoff-end" className="block stage-field-label mb-1.5">End</label>
                     <input
                       id="handoff-end"
                       type="datetime-local"
                       value={endAt}
                       onChange={(e) => setEndAt(e.target.value)}
-                      className="w-full rounded-xl bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      className="w-full rounded-xl bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                   </div>
                 </div>
@@ -259,7 +258,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
 
                 {/* Venue search */}
                 <div>
-                  <label htmlFor="handoff-venue" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Venue</label>
+                  <label htmlFor="handoff-venue" className="block stage-field-label mb-1.5">Venue</label>
                   <div className="relative">
                     <input
                       id="handoff-venue"
@@ -273,7 +272,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
                       }}
                       onFocus={() => setVenueOpen(true)}
                       onBlur={() => setTimeout(() => setVenueOpen(false), 200)}
-                      className="w-full rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      className="w-full rounded-md bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                     {venueOpen && venueQuery.length >= 1 && venueResults.length > 0 && (
                       <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[180px] overflow-y-auto rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-void)]/95 shadow-xl">
@@ -335,11 +334,11 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
 
                 {/* Client search */}
                 <div>
-                  <label className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">
+                  <label className="block stage-field-label mb-1.5">
                     Client {billTo ? `— Bill-To: ${billTo.organization_name ?? billTo.name}` : ''}
                   </label>
                   <Command
-                    className="rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-void)]/80 overflow-hidden"
+                    className="rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] overflow-hidden"
                     loop
                   >
                     <Command.Input
@@ -409,25 +408,25 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
               <div className="stage-panel-elevated rounded-[var(--stage-radius-panel)] p-5 border border-[oklch(1_0_0_/_0.10)] space-y-4">
                 <p className="stage-label">Tech & gear</p>
                 <div>
-                  <label htmlFor="handoff-gear" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Tech specs / gear requirements</label>
+                  <label htmlFor="handoff-gear" className="block stage-field-label mb-1.5">Tech specs / gear requirements</label>
                   <textarea
                     id="handoff-gear"
                     rows={3}
                     placeholder="e.g. backline, power drops, rigging"
                     value={gearRequirements}
                     onChange={(e) => setGearRequirements(e.target.value)}
-                    className="w-full rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
+                    className="w-full rounded-md bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
                   />
                 </div>
                 <div>
-                  <label htmlFor="handoff-restrictions" className="block text-sm text-[var(--stage-text-secondary)] mb-1.5">Venue restrictions</label>
+                  <label htmlFor="handoff-restrictions" className="block stage-field-label mb-1.5">Venue restrictions</label>
                   <textarea
                     id="handoff-restrictions"
                     rows={3}
                     placeholder="e.g. stairs only, load-in window, noise curfew"
                     value={venueRestrictions}
                     onChange={(e) => setVenueRestrictions(e.target.value)}
-                    className="w-full rounded-md bg-[var(--stage-void)]/80 border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
+                    className="w-full rounded-md bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.10)] px-3 py-2 text-[var(--stage-text-primary)] text-sm placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
                   />
                 </div>
               </div>

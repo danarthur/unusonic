@@ -17,8 +17,8 @@ import type { ScoutResult } from '@/features/intelligence';
 import type { UserPersona } from '../model/subscription-types';
 import { PATHFINDING_PERSONAS } from '../model/subscription-types';
 
-/** Design system: Unusonic spring (20-design-system) */
-const springConfig = { type: 'spring' as const, stiffness: 200, damping: 20 };
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
+const springConfig = STAGE_HEAVY;
 
 /** Single-line status messages during Phase 2 (cycles to show Aion is working). */
 const THINKING_STATUSES = [
@@ -151,7 +151,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                     onChange={(e) => setUrl(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAutoBuild()}
                     placeholder="yourcompany.com"
-                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] text-base font-sans caret-[var(--stage-accent)]"
+                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-base font-sans caret-[var(--stage-accent)]"
                     data-lpignore="true"
                     data-form-type="other"
                     data-1p-ignore
@@ -164,8 +164,9 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                   type="button"
                   onClick={() => url.trim() && handleAutoBuild()}
                   transition={springConfig}
+                  disabled={!url.trim()}
                   aria-disabled={!url.trim()}
-                  className={`btn-sheen-hover relative overflow-hidden flex-1 min-w-[140px] py-3 rounded-full font-medium text-sm tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0/0.1)] shadow-[0_4px_24px_-1px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)] bg-[var(--stage-accent)] flex items-center justify-center transition-[filter] ${!url.trim() ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-[1.04] active:brightness-[0.98]'}`}
+                  className={`btn-sheen-hover relative overflow-hidden flex-1 min-w-[140px] py-3 rounded-full font-medium text-sm tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0/0.1)] shadow-[0_4px_24px_-1px_oklch(0_0_0/0.25),inset_0_1px_0_0_oklch(1_0_0/0.08)] bg-[var(--stage-accent)] flex items-center justify-center transition-colors ${!url.trim() ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[oklch(1_0_0_/_0.08)]'}`}
                 >
                   <span className="relative z-10">Build with Aion</span>
                 </motion.button>
@@ -173,7 +174,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                   type="button"
                   onClick={onSkip}
                   transition={springConfig}
-                  className="py-3 px-5 rounded-full font-medium text-sm text-[var(--stage-text-primary)]/90 border border-[oklch(1_0_0_/_0.08)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.08)]/60 hover:brightness-[1.03] transition-[background-color,border-color,filter]"
+                  className="py-3 px-5 rounded-full font-medium text-sm text-[var(--stage-text-primary)]/90 border border-[oklch(1_0_0_/_0.08)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.08)]/60 transition-[background-color,border-color]"
                 >
                   Configure manually
                 </motion.button>
@@ -263,7 +264,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                   )}
                 </div>
               </div>
-              <p className="mt-2 text-[11px] uppercase tracking-widest text-[var(--stage-text-tertiary)]/60">
+              <p className="mt-2 stage-label text-[var(--stage-text-tertiary)]/60">
                 Suggested for you: <span className="text-[var(--stage-accent)] normal-case">{personaLabel} · {tierLabel}</span>
               </p>
             </section>
@@ -284,7 +285,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                 type="button"
                 onClick={handleConfirm}
                 transition={springConfig}
-                className="flex-1 w-full py-3 rounded-full font-medium text-sm bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] active:brightness-[0.98] transition-[filter] flex items-center justify-center gap-2"
+                className="flex-1 w-full py-3 rounded-full font-medium text-sm bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors flex items-center justify-center gap-2"
               >
                 Confirm & Launch
                 <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
@@ -293,7 +294,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
                 type="button"
                 onClick={handleTryAnother}
                 transition={springConfig}
-                className="py-3 px-5 rounded-full font-medium text-sm text-[var(--stage-text-primary)]/90 border border-[oklch(1_0_0_/_0.08)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.08)]/60 hover:brightness-[1.03] transition-[background-color,border-color,filter]"
+                className="py-3 px-5 rounded-full font-medium text-sm text-[var(--stage-text-primary)]/90 border border-[oklch(1_0_0_/_0.08)]/40 hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.08)]/60 transition-[background-color,border-color]"
               >
                 Try another URL
               </motion.button>
