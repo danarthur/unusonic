@@ -40,11 +40,13 @@ export async function getFinancials(
     return null;
   }
 
-  // 2. Invoices for this event
+  // 2. Invoices for this event (finance schema post-rebuild).
+  //    public_token replaced legacy `token`; invoice_line_items replaced invoice_items.
   const { data: invoiceRows, error: invError } = await supabase
+    .schema('finance')
     .from('invoices')
     .select(
-      'id, event_id, proposal_id, invoice_number, status, total_amount, token, issue_date, due_date, created_at'
+      'id, event_id, proposal_id, invoice_number, status, total_amount, public_token, issue_date, due_date, created_at'
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
@@ -53,14 +55,26 @@ export async function getFinancials(
     return null;
   }
 
-  const invoices = invoiceRows ?? [];
+  const invoices = (invoiceRows ?? []) as Array<{
+    id: string;
+    event_id: string | null;
+    proposal_id: string | null;
+    invoice_number: string;
+    status: string;
+    total_amount: number | string;
+    public_token: string;
+    issue_date: string | null;
+    due_date: string | null;
+    created_at: string;
+  }>;
 
-  // 3. All invoice items for these invoices
+  // 3. All invoice line items for these invoices
   const invoiceIds = invoices.map((i) => i.id);
   const itemsByInvoice: Record<string, InvoiceItemDTO[]> = {};
   if (invoiceIds.length > 0) {
     const { data: itemRows } = await supabase
-      .from('invoice_items')
+      .schema('finance')
+      .from('invoice_line_items')
       .select('id, invoice_id, description, amount, cost, quantity')
       .in('invoice_id', invoiceIds)
       .order('id', { ascending: true });
@@ -86,6 +100,7 @@ export async function getFinancials(
   const paymentsByInvoice: Record<string, number> = {};
   if (invoiceIds.length > 0) {
     const { data: paymentRows } = await supabase
+      .schema('finance')
       .from('payments')
       .select('invoice_id, amount, status')
       .in('invoice_id', invoiceIds)
@@ -100,7 +115,6 @@ export async function getFinancials(
 
   // 5. Build InvoiceDTO[] with amountPaid (server-computed)
   const invoiceDTOs: InvoiceDTO[] = invoices.map((inv) => {
-    const totalAmount = Number(inv.total_amount);
     const amountPaid = paymentsByInvoice[inv.id] ?? 0;
     return {
       id: inv.id,
@@ -109,7 +123,7 @@ export async function getFinancials(
       invoice_number: inv.invoice_number ?? null,
       status: inv.status,
       total_amount: String(inv.total_amount),
-      token: inv.token,
+      token: inv.public_token,
       issue_date: inv.issue_date,
       due_date: inv.due_date,
       created_at: inv.created_at,
@@ -118,11 +132,12 @@ export async function getFinancials(
     };
   });
 
-  // 6. Summary: totalRevenue (excluding cancelled), collected, outstanding, progress
+  // 6. Summary: totalRevenue (excluding void), collected, outstanding, progress.
+  //    'void' is the post-rebuild equivalent of legacy 'cancelled'.
   let totalRevenue = 0;
   let collected = 0;
   for (const inv of invoiceDTOs) {
-    if (inv.status !== 'cancelled') {
+    if (inv.status !== 'void') {
       totalRevenue += Number(inv.total_amount);
     }
     collected += inv.amountPaid;
@@ -166,11 +181,11 @@ export async function getFinancials(
     status: p.status ?? '',
   }));
 
-  // 8. Profitability: totalCost, grossProfit, margin (exclude cancelled)
+  // 8. Profitability: totalCost, grossProfit, margin (exclude void)
   let totalCost = 0;
   const allItems: { amount: number; cost: number; description: string; id: string; invoice_number: string | null }[] = [];
   for (const inv of invoiceDTOs) {
-    if (inv.status === 'cancelled') continue;
+    if (inv.status === 'void') continue;
     for (const item of inv.invoiceItems) {
       totalCost += item.cost;
       allItems.push({
@@ -203,8 +218,8 @@ export async function getFinancials(
       invoice_number: item.invoice_number,
     }));
 
-  // 10. Payment timeline: first non-cancelled invoice issue/due + outstanding for overdue styling
-  const firstInvoice = invoiceDTOs.find((inv) => inv.status !== 'cancelled');
+  // 10. Payment timeline: first non-void invoice issue/due + outstanding for overdue styling
+  const firstInvoice = invoiceDTOs.find((inv) => inv.status !== 'void');
   const paymentTimeline: PaymentTimelineDTO | null = firstInvoice
     ? {
         issueDate: firstInvoice.issue_date,

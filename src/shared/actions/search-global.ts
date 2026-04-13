@@ -37,6 +37,7 @@ export async function searchGlobal(
       .order('starts_at', { ascending: true })
       .limit(8),
     supabase
+      .schema('finance')
       .from('invoices')
       .select('id, invoice_number, event_id, status')
       .ilike('invoice_number', pattern)

@@ -150,8 +150,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return json({ error: 'Missing metadata' }, 400);
   }
 
-  // Convert cents → dollars (per CLAUDE.md §6.4: cents only at Stripe boundary)
-  const amountDollars = (session.amount_total ?? 0) / 100;
+  // Convert cents → dollars (per CLAUDE.md §6.4: cents only at Stripe boundary).
+  // Guard against zero / missing amount_total (free-trial or wallet-credit edge
+  // cases) — recording a $0 payment would corrupt collected totals.
+  const amountTotal = session.amount_total;
+  if (amountTotal == null || amountTotal <= 0) {
+    Sentry.logger.warn('stripe.clientBilling.zeroOrMissingAmountTotal', {
+      sessionId: session.id,
+      invoiceId,
+      workspaceId,
+      amountTotal,
+    });
+    return json({ received: true, skipped: 'zero_amount_total' });
+  }
+  const amountDollars = amountTotal / 100;
 
   const { error } = await recordPaymentFromWebhook({
     invoiceId,

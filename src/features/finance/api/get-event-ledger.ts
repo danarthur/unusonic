@@ -147,8 +147,9 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
     }
   }
 
-  // ── Revenue: invoices ────────────────────────────────────────────────────
+  // ── Revenue: invoices (finance schema post-rebuild) ──────────────────────
   const { data: invoiceRows } = await supabase
+    .schema('finance')
     .from('invoices')
     .select('id, invoice_number, status, total_amount, issue_date')
     .eq('event_id', eventId)
@@ -161,6 +162,7 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
   const paymentsByInvoice: Record<string, number> = {};
   if (invoiceIds.length > 0) {
     const { data: payments } = await supabase
+      .schema('finance')
       .from('payments')
       .select('invoice_id, amount, status')
       .in('invoice_id', invoiceIds)
@@ -172,8 +174,10 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
 
   let totalRevenue = 0;
   let collected = 0;
+  // finance.invoices CHECK: draft|sent|viewed|partially_paid|paid|void|refunded.
+  // 'void' is the post-rebuild equivalent of legacy 'cancelled'.
   const invoiceTransactions: LedgerTransaction[] = invoices
-    .filter((inv) => inv.status !== 'cancelled')
+    .filter((inv) => inv.status !== 'void')
     .map((inv) => {
       const amount = Number(inv.total_amount);
       totalRevenue += amount;
