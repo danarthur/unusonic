@@ -6,6 +6,7 @@
 
 'use server';
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
@@ -325,9 +326,19 @@ async function checkProfileStatus(
     .from('profiles')
     .select('onboarding_completed, full_name')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
-  if (error || !profile) {
+  if (error) {
+    // A real error here (RLS block, connectivity, schema drift) must not be
+    // silently treated as "no profile" — that sends new users to /onboarding
+    // unnecessarily or, worse, masks a broken deploy.
+    Sentry.captureMessage('checkProfileStatus: profile read failed', {
+      level: 'warning',
+      extra: { userId, code: error.code, message: error.message },
+    });
+  }
+
+  if (!profile) {
     return {
       exists: false,
       onboardingCompleted: false,

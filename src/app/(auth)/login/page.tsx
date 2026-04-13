@@ -11,10 +11,15 @@ const SmartLoginForm = dynamic(
   {
     ssr: true,
     loading: () => (
-      <div className="w-full max-w-md mx-auto flex flex-col items-center gap-6 py-12" aria-hidden>
-        <div className="w-14 h-14 rounded-full bg-[var(--stage-text-primary)]/10 stage-skeleton" />
-        <div className="h-4 w-32 rounded-full bg-[var(--stage-text-primary)]/10 stage-skeleton" />
-        <div className="h-10 w-full max-w-[280px] rounded-xl bg-[var(--stage-text-primary)]/10 stage-skeleton" />
+      <div
+        className="w-full max-w-md mx-auto flex flex-col items-center gap-6 py-12"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading sign-in form"
+      >
+        <div className="w-14 h-14 rounded-full bg-[var(--stage-text-primary)]/10 stage-skeleton" aria-hidden />
+        <div className="h-4 w-32 rounded-full bg-[var(--stage-text-primary)]/10 stage-skeleton" aria-hidden />
+        <div className="h-10 w-full max-w-[280px] rounded-xl bg-[var(--stage-text-primary)]/10 stage-skeleton" aria-hidden />
       </div>
     ),
   }

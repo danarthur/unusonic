@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 export function RecoverRequestForm() {
   const [email, setEmail] = useState('');
@@ -27,8 +28,11 @@ export function RecoverRequestForm() {
         );
       } else {
         // Security: don't leak account existence — user-facing copy stays generic,
-        // but surface the actual response for operators via console + Sentry breadcrumb.
-        console.error('[recover] request failed', { status: res.status, body: data });
+        // but surface the actual response for operators via Sentry breadcrumb.
+        Sentry.captureMessage('Recovery request failed', {
+          level: 'warning',
+          extra: { status: res.status, body: data },
+        });
         setStatus('done');
         setMessage(
           data?.message ??
