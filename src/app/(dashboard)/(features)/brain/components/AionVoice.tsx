@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Square, Loader2, Volume2, AlertCircle } from 'lucide-react';
 import { useSession } from '@/shared/ui/providers/SessionContext';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
 interface AionVoiceProps {
   className?: string;
@@ -42,7 +43,7 @@ export default function AionVoice({ className }: AionVoiceProps) {
   const stopRecording = () => {
     if (mediaRecorderRef.current && status === 'recording') {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop()); // Release mic
+      mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
       setStatus('processing');
     }
   };
@@ -74,16 +75,16 @@ export default function AionVoice({ className }: AionVoiceProps) {
       <AnimatePresence>
         {(status !== 'idle') && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.9 }}
-            animate={{ opacity: 1, y: -50, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={STAGE_LIGHT}
             className={cn(
-              'absolute whitespace-nowrap text-[10px] px-3 py-1.5 rounded-full font-mono uppercase tracking-widest z-50 pointer-events-none stage-panel',
+              'absolute -translate-y-[50px] whitespace-nowrap stage-label px-3 py-1.5 rounded-full font-mono z-50 pointer-events-none',
+              'bg-[var(--stage-surface-raised)] border border-[var(--stage-edge-subtle)]',
               status === 'error'
-                ? '!bg-[oklch(0.35_0.05_20_/_0.15)] text-[var(--color-unusonic-error)] !border-[oklch(0.65_0.18_20_/_0.2)]'
-                : status === 'recording'
-                  ? '!bg-[oklch(0.35_0.05_20_/_0.15)] text-[var(--color-unusonic-error)] !border-[oklch(0.65_0.18_20_/_0.2)]'
-                  : 'text-[var(--stage-text-primary)]'
+                ? 'text-[var(--color-unusonic-error)]'
+                : 'text-[var(--stage-text-primary)]'
             )}
           >
             {status === 'recording' && "Listening..."}
@@ -98,24 +99,30 @@ export default function AionVoice({ className }: AionVoiceProps) {
       <motion.button
         onClick={status === 'recording' ? stopRecording : startRecording}
         disabled={status === 'processing' || status === 'playing'}
+        aria-label={
+          status === 'recording' ? 'Stop recording' :
+          status === 'processing' ? 'Processing' :
+          status === 'playing' ? 'Playing response' :
+          'Start recording'
+        }
         className={cn(
-          'p-3 rounded-full transition-[background-color,color,filter] duration-300 flex items-center justify-center enabled:hover:brightness-[1.05] enabled:active:brightness-[0.98]',
+          'p-2 rounded-[6px] transition-colors duration-[80ms] flex items-center justify-center',
           status === 'recording'
-            ? 'bg-[oklch(0.35_0.08_20_/_0.25)] text-[var(--color-unusonic-error)] animate-ping'
+            ? 'bg-[color-mix(in_oklch,var(--color-unusonic-error)_10%,transparent)] text-[var(--color-unusonic-error)] ring-2 ring-[var(--color-unusonic-error)]/30'
             : status === 'processing'
-              ? 'bg-[oklch(0.45_0.08_70_/_0.25)] text-[var(--color-unusonic-warning)]'
+              ? 'bg-[color-mix(in_oklch,var(--color-unusonic-warning)_10%,transparent)] text-[var(--color-unusonic-warning)]'
               : status === 'playing'
-                ? 'bg-[oklch(0.45_0.08_145_/_0.25)] text-[var(--color-unusonic-success)]'
+                ? 'bg-[color-mix(in_oklch,var(--color-unusonic-success)_10%,transparent)] text-[var(--color-unusonic-success)]'
                 : status === 'error'
-                  ? 'bg-[oklch(0.35_0.08_20_/_0.25)] text-[var(--color-unusonic-error)]'
-                  : 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-accent)] hover:text-[var(--stage-text-on-accent)]'
+                  ? 'bg-[color-mix(in_oklch,var(--color-unusonic-error)_10%,transparent)] text-[var(--color-unusonic-error)]'
+                  : 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)]'
         )}
       >
-        {status === 'recording' ? <Square className="w-5 h-5 fill-current" /> :
-         status === 'processing' ? <Loader2 className="w-5 h-5 animate-spin" /> :
-         status === 'playing' ? <Volume2 className="w-5 h-5 animate-bounce" /> :
-         status === 'error' ? <AlertCircle className="w-5 h-5" /> :
-         <Mic className="w-[22px] h-[22px]" strokeWidth={2} />}
+        {status === 'recording' ? <Square size={18} className="fill-current" /> :
+         status === 'processing' ? <Loader2 size={18} className="animate-spin" /> :
+         status === 'playing' ? <Volume2 size={18} /> :
+         status === 'error' ? <AlertCircle size={18} /> :
+         <Mic size={18} strokeWidth={1.5} />}
       </motion.button>
     </div>
   );
