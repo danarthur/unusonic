@@ -11,6 +11,7 @@
 import 'server-only';
 
 import type { Metadata } from 'next';
+import * as Sentry from '@sentry/nextjs';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { PayNowButton } from './PayNowButton';
 
@@ -112,7 +113,24 @@ async function fetchInvoice(token: string): Promise<PublicInvoiceData | null> {
     .schema('finance')
     .rpc('get_public_invoice', { p_token: token });
 
-  if (error || !data) return null;
+  if (error) {
+    // Previously swallowed silently — a 404 hid RPC permission drift, schema
+    // drift, or connectivity failures. Route to Sentry with structured context
+    // so we can tell "invalid token" apart from "service broken".
+    Sentry.captureMessage('public-invoice: get_public_invoice RPC failed', {
+      level: 'warning',
+      extra: {
+        tokenPresent: !!token,
+        tokenLength: token?.length ?? 0,
+        code: error.code,
+        message: error.message,
+      },
+      tags: { area: 'public-invoice', rpc: 'get_public_invoice' },
+    });
+    return null;
+  }
+
+  if (!data) return null;
 
   // RPC returns a single row or an array with one element
   const row = Array.isArray(data) ? data[0] : data;

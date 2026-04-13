@@ -113,19 +113,21 @@ export async function getFinancials(
     }
   }
 
-  // 5. Build InvoiceDTO[] with amountPaid (server-computed)
+  // 5. Build InvoiceDTO[] with amountPaid (server-computed).
+  //    event_id is non-null by construction (filtered .eq('event_id', eventId));
+  //    issue_date / due_date can legitimately be null before the invoice is sent.
   const invoiceDTOs: InvoiceDTO[] = invoices.map((inv) => {
     const amountPaid = paymentsByInvoice[inv.id] ?? 0;
     return {
       id: inv.id,
-      event_id: inv.event_id,
+      event_id: inv.event_id ?? eventId,
       proposal_id: inv.proposal_id ?? null,
       invoice_number: inv.invoice_number ?? null,
       status: inv.status,
       total_amount: String(inv.total_amount),
       token: inv.public_token,
-      issue_date: inv.issue_date,
-      due_date: inv.due_date,
+      issue_date: inv.issue_date ?? '',
+      due_date: inv.due_date ?? '',
       created_at: inv.created_at,
       invoiceItems: itemsByInvoice[inv.id] ?? [],
       amountPaid,

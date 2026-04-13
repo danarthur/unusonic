@@ -10,10 +10,40 @@ export type ContractForDeal = {
   pdf_url: string | null;
 };
 
+/** One-hour signed URL is enough for a click-through from the Plan tab — the
+ *  link regenerates on every page load. */
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+/** contracts.pdf_url carries one of three shapes:
+ *    1. absolute URL (https://…) — DocuSeal-hosted fallback when our storage
+ *       upload failed. Pass through untouched.
+ *    2. storage path (workspaceId/dealId/proposals/signed-*.pdf) in the
+ *       private 'documents' bucket — generate a signed URL so the link works.
+ *    3. null — no contract PDF yet. */
+async function resolvePdfUrl(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  raw: string | null,
+): Promise<string | null> {
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const { data, error } = await supabase.storage
+    .from('documents')
+    .createSignedUrl(raw, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) {
+    Sentry.captureMessage('getContractForEvent: createSignedUrl failed', {
+      level: 'warning',
+      extra: { path: raw, error: error?.message ?? null },
+      tags: { module: 'crm', action: 'getContractForEvent' },
+    });
+    return null;
+  }
+  return data.signedUrl;
+}
+
 /**
  * Fetches the latest contract for an event (created at handover when proposal was accepted).
- * Workspace-scoped via contracts.workspace_id.
- * Returns null on any error (e.g. contracts table has gig_id but no event_id).
+ * Workspace-scoped via contracts.workspace_id. pdf_url is resolved to an
+ * accessible URL (signed for private storage paths, pass-through for absolute URLs).
  */
 export async function getContractForEvent(
   eventId: string
@@ -33,18 +63,23 @@ export async function getContractForEvent(
       .maybeSingle();
 
     if (error) {
-      console.error('[CRM] getContractForEvent:', error.message);
+      Sentry.captureMessage('getContractForEvent: read failed', {
+        level: 'warning',
+        extra: { eventId, workspaceId, code: error.code, message: error.message },
+        tags: { module: 'crm', action: 'getContractForEvent' },
+      });
       return null;
     }
     if (!data) return null;
     const r = data as Record<string, unknown>;
+    const rawPdf = (r.pdf_url as string | null) ?? null;
+    const resolvedPdf = await resolvePdfUrl(supabase, rawPdf);
     return {
       status: (r.status as string) ?? 'draft',
       signed_at: (r.signed_at as string) ?? null,
-      pdf_url: (r.pdf_url as string) ?? null,
+      pdf_url: resolvedPdf,
     };
   } catch (err) {
-    console.error('[CRM] getContractForEvent:', err);
     Sentry.captureException(err, { tags: { module: 'crm', action: 'getContractForEvent' } });
     return null;
   }

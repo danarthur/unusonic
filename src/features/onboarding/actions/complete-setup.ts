@@ -44,14 +44,19 @@ export interface InitializeOrganizationResult {
 }
 
 /**
- * Initialize Organization: Transaction + Async Triggers
+ * Initialize Organization: Transaction
  * 1. Create Workspace (with subscription_tier + signalpay_enabled)
  * 2. Create directory.entities company (handle = slug)
  * 3. Create person entity (if missing) + ROSTER_MEMBER edge
  * 4. Add User as Owner (workspace_members)
  * 5. Update Profile (onboarding_completed)
  * 6. Create Agent Config
- * 7. Async Triggers (Venue: triggerVectorEmbeddings, Autonomous: registerAgent)
+ *
+ * NOTE on removed afterburners: earlier versions fired `triggerVectorEmbeddings`
+ * on venue tiers and `registerAgent` on studio tiers. Both were stubs blocked on
+ * external systems (Aion RAG ingestion endpoint + orchestrator). They have been
+ * removed — when those backends ship, wire the calls here directly with proper
+ * retry/DLQ handling rather than reinstating the no-op pattern.
  */
 export async function initializeOrganization(
   input: InitializeOrganizationInput
@@ -218,28 +223,6 @@ export async function initializeOrganization(
 
     revalidatePath('/');
 
-    // 7. Async Triggers (non-blocking; fire-and-forget)
-    const tier = input.subscriptionTier;
-
-    if (input.type === 'venue') {
-      triggerVectorEmbeddings(orgId).catch((err) => {
-        console.warn('[Onboarding] triggerVectorEmbeddings stub skipped:', err);
-        Sentry.captureMessage('Onboarding venue RAG stub skipped', {
-          level: 'info',
-          extra: { orgId, reason: err instanceof Error ? err.message : String(err) },
-        });
-      });
-    }
-    if (tier === 'studio') {
-      registerAgent(orgId).catch((err) => {
-        console.warn('[Onboarding] registerAgent stub skipped:', err);
-        Sentry.captureMessage('Onboarding studio agent stub skipped', {
-          level: 'info',
-          extra: { orgId, reason: err instanceof Error ? err.message : String(err) },
-        });
-      });
-    }
-
     // Client navigates via router.push(result.redirectPath) — server action
     // can't throw NEXT_REDIRECT here because it's awaited inside useActionState.
     return {
@@ -257,23 +240,3 @@ export async function initializeOrganization(
 }
 
 // Redirect path resolution removed — middleware handles all role-based routing via /.
-
-/**
- * @stub Venue afterburner — ingest floor plans / venue data via vector embeddings.
- * Blocked on: Aion RAG pipeline (cortex.memory ingestion endpoint).
- * When implemented: call server-to-server ingest endpoint with entityId + venue assets.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function triggerVectorEmbeddings(_entityId: string): Promise<void> {
-  // No-op until RAG pipeline is ready
-}
-
-/**
- * @stub Autonomous afterburner — register a LangGraph agent for the workspace.
- * Blocked on: Aion orchestrator deployment (autonomous agent provisioning).
- * When implemented: call orchestrator.registerAgent(entityId) to spin up dedicated agent.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function registerAgent(_entityId: string): Promise<void> {
-  // No-op until orchestrator is deployed
-}
