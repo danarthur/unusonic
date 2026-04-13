@@ -299,3 +299,98 @@ export async function getKitComplianceForEntity(
     missing,
   };
 }
+
+// =============================================================================
+// getKitComplianceBatch
+//
+// Batched version of getKitComplianceForEntity. Given a list of (entityId,
+// roleTag) pairs, fetches all templates + all equipment in two round trips and
+// computes compliance for every pair. Returns a Map keyed by
+// `${entityId}::${roleTag}` so callers can look up results without re-sorting.
+//
+// Used by production-team-card to avoid N parallel round trips when rendering
+// 20+ crew rows. Non-batched callers remain on getKitComplianceForEntity.
+// =============================================================================
+
+export async function getKitComplianceBatch(
+  pairs: Array<{ entityId: string; roleTag: string }>,
+): Promise<Map<string, KitComplianceResult | null>> {
+  const result = new Map<string, KitComplianceResult | null>();
+  if (pairs.length === 0) return result;
+
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return result;
+
+  const supabase = await createClient();
+
+  const uniqueRoles = [...new Set(pairs.map((p) => p.roleTag))];
+  const uniqueEntities = [...new Set(pairs.map((p) => p.entityId))];
+
+  // 1. Templates for every role in one query
+  const { data: templateRows } = await supabase
+    .schema('ops')
+    .from('kit_templates')
+    .select('role_tag, items')
+    .eq('workspace_id', workspaceId)
+    .in('role_tag', uniqueRoles);
+
+  const templatesByRole = new Map<string, KitTemplateItem[]>();
+  for (const row of (templateRows ?? []) as { role_tag: string; items: unknown }[]) {
+    templatesByRole.set(
+      row.role_tag,
+      Array.isArray(row.items) ? (row.items as KitTemplateItem[]) : [],
+    );
+  }
+
+  // 2. Approved equipment for every entity in one query
+  const { data: equipmentRows } = await supabase
+    .schema('ops')
+    .from('crew_equipment')
+    .select('entity_id, catalog_item_id, name')
+    .in('entity_id', uniqueEntities)
+    .eq('workspace_id', workspaceId)
+    .eq('verification_status', 'approved');
+
+  const equipmentByEntity = new Map<string, { catalog_item_id: string | null; name: string }[]>();
+  for (const eq of (equipmentRows ?? []) as {
+    entity_id: string;
+    catalog_item_id: string | null;
+    name: string;
+  }[]) {
+    const list = equipmentByEntity.get(eq.entity_id) ?? [];
+    list.push({ catalog_item_id: eq.catalog_item_id, name: eq.name });
+    equipmentByEntity.set(eq.entity_id, list);
+  }
+
+  // 3. Compute compliance per pair
+  for (const { entityId, roleTag } of pairs) {
+    const key = `${entityId}::${roleTag}`;
+    const templateItems = templatesByRole.get(roleTag);
+    if (!templateItems) {
+      result.set(key, null);
+      continue;
+    }
+    const requiredItems = templateItems.filter((i) => !i.optional);
+    if (requiredItems.length === 0) {
+      result.set(key, { total: 0, matched: 0, missing: [] });
+      continue;
+    }
+    const owned = equipmentByEntity.get(entityId) ?? [];
+    const missing: KitTemplateItem[] = [];
+    let matched = 0;
+    for (const item of requiredItems) {
+      let found = false;
+      if (item.catalog_item_id) {
+        found = owned.some((eq) => eq.catalog_item_id === item.catalog_item_id);
+      } else {
+        const needle = item.name.toLowerCase();
+        found = owned.some((eq) => eq.name.toLowerCase().includes(needle));
+      }
+      if (found) matched++;
+      else missing.push(item);
+    }
+    result.set(key, { total: requiredItems.length, matched, missing });
+  }
+
+  return result;
+}

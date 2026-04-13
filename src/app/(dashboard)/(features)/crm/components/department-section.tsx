@@ -7,6 +7,7 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { type DealCrewRow, type CrewSearchResult } from '../actions/deal-crew';
 import { ConfirmedCrewRow } from './confirmed-crew-row';
 import { OpenRoleSlotRow } from './open-role-slot-row';
+import type { KitComplianceResult } from '@/features/talent-management/api/kit-template-actions';
 
 // =============================================================================
 // Types
@@ -33,6 +34,7 @@ export function DepartmentSection({
   workspaceId,
   dealId,
   rateReadOnly = false,
+  kitComplianceByKey,
 }: {
   group: DepartmentGroup;
   collapsed: boolean;
@@ -45,6 +47,8 @@ export function DepartmentSection({
   workspaceId?: string | null;
   dealId?: string;
   rateReadOnly?: boolean;
+  /** Batch-fetched kit-compliance results keyed by `${entityId}::${roleTag}`. */
+  kitComplianceByKey?: Map<string, KitComplianceResult | null>;
 }) {
   const { department, rows } = group;
 
@@ -125,6 +129,11 @@ export function DepartmentSection({
                       proposedDate={eventDate}
                       dealId={dealId}
                       rateReadOnly={rateReadOnly}
+                      kitCompliancePrefetched={
+                        kitComplianceByKey && row.entity_id && row.role_note
+                          ? kitComplianceByKey.get(`${row.entity_id}::${row.role_note}`) ?? null
+                          : undefined
+                      }
                     />
                   ),
                 )}

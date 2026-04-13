@@ -63,6 +63,7 @@ export function ConfirmedCrewRow({
   proposedDate,
   dealId,
   rateReadOnly = false,
+  kitCompliancePrefetched,
 }: {
   row: DealCrewRow;
   onRemove: (id: string) => Promise<void>;
@@ -71,6 +72,10 @@ export function ConfirmedCrewRow({
   dealId?: string | null;
   /** When true, rate field is read-only (deal handed off to production). */
   rateReadOnly?: boolean;
+  /** Optional pre-fetched compliance result — when supplied, skips the per-row
+   *  getKitComplianceForEntity round trip. Used by ProductionTeamCard for batch
+   *  fetching. undefined means "not provided, fall back to per-row fetch". */
+  kitCompliancePrefetched?: KitComplianceResult | null;
 }) {
   const router = useRouter();
   const [notesExpanded, setNotesExpanded] = useState(false);
@@ -119,16 +124,24 @@ export function ConfirmedCrewRow({
     await updateCrewDispatch(row.id, { dispatch_status: next });
   };
 
-  // Kit compliance: fetch if the row has a role_note and an entity
-  const [kitCompliance, setKitCompliance] = useState<KitComplianceResult | null>(null);
+  // Kit compliance: prefer the batch-prefetched result when the parent supplied
+  // one, otherwise fall back to a per-row fetch so this component still works
+  // standalone. Batch path elides ~N round trips on the Production Team Card.
+  const [kitCompliance, setKitCompliance] = useState<KitComplianceResult | null>(
+    kitCompliancePrefetched ?? null,
+  );
   useEffect(() => {
+    if (kitCompliancePrefetched !== undefined) {
+      setKitCompliance(kitCompliancePrefetched);
+      return;
+    }
     if (!row.entity_id || !row.role_note) return;
     let cancelled = false;
     getKitComplianceForEntity(row.entity_id, row.role_note).then((result) => {
       if (!cancelled) setKitCompliance(result);
     });
     return () => { cancelled = true; };
-  }, [row.entity_id, row.role_note]);
+  }, [row.entity_id, row.role_note, kitCompliancePrefetched]);
 
   const hasOpsFields = !!(row.call_time || row.day_rate != null || row.crew_notes);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Loader2, CheckCheck } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
@@ -42,10 +42,12 @@ export function CrewPicker({
   const [roleFilterActive, setRoleFilterActive] = useState(!!roleHint);
   const [decisionData, setDecisionData] = useState<Map<string, CrewDecisionData>>(new Map());
   const [decisionLoading, setDecisionLoading] = useState(false);
+  const [listMaxHeight, setListMaxHeight] = useState<number>(280);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchGenRef = useRef(0);
   const decisionGenRef = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const doSearch = useCallback(
     (q: string, useRoleFilter: boolean) => {
@@ -102,6 +104,27 @@ export function CrewPicker({
     if (roleHint) doSearch('', true);
   }, []);
 
+  // Clamp the scrollable list height to the space actually available below the
+  // picker anchor. In split-pane Prism view the CrewPicker can land close to
+  // the viewport bottom — without this, the list's fixed max-h of 280 overflows
+  // the enclosing panel and forces awkward outer scrolling.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // The scrollable list starts after the input + optional role-filter bar.
+      const fixedHeaderPx = roleHint ? 92 : 48;
+      const bottomPadding = 16;
+      const available = window.innerHeight - rect.top - fixedHeaderPx - bottomPadding;
+      const clamped = Math.max(120, Math.min(280, available));
+      setListMaxHeight(clamped);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [roleHint]);
+
   const handleSearch = useCallback(
     (q: string) => {
       setQuery(q);
@@ -128,6 +151,7 @@ export function CrewPicker({
 
   return (
     <motion.div
+      ref={containerRef}
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
@@ -170,7 +194,7 @@ export function CrewPicker({
           <Loader2 className="size-3.5 animate-spin text-[var(--stage-text-tertiary)]" />
         </div>
       )}
-      <div className="max-h-[280px] overflow-y-auto">
+      <div className="overflow-y-auto" style={{ maxHeight: `${listMaxHeight}px` }}>
         {!loading &&
           results.map((r) => {
             const elements: React.ReactNode[] = [];

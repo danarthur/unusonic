@@ -23,6 +23,10 @@ import { CrewPicker } from './crew-picker';
 import { DepartmentSection, type DepartmentGroup } from './department-section';
 import { ConfirmationFunnel } from './confirmation-funnel';
 import { CrossShowResourceModal } from './cross-show-resource-modal';
+import {
+  getKitComplianceBatch,
+  type KitComplianceResult,
+} from '@/features/talent-management/api/kit-template-actions';
 
 // =============================================================================
 // ProductionTeamCard
@@ -50,6 +54,9 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   const [reminding, setReminding] = useState(false);
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [dayViewOpen, setDayViewOpen] = useState(false);
+  const [kitComplianceByKey, setKitComplianceByKey] = useState<Map<string, KitComplianceResult | null>>(
+    new Map(),
+  );
 
   // ── Computed aggregates ─────────────────────────────────────────────────────
 
@@ -91,6 +98,25 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   useEffect(() => {
     fetchCrew();
   }, [fetchCrew]);
+
+  // Batch-fetch kit compliance for every (entity, role_note) pair in one pass
+  // instead of N parallel per-row fetches. Keyed by \`${entityId}::${roleTag}\`.
+  useEffect(() => {
+    const pairs = crew
+      .filter((r): r is DealCrewRow & { entity_id: string; role_note: string } =>
+        !!r.entity_id && !!r.role_note,
+      )
+      .map((r) => ({ entityId: r.entity_id, roleTag: r.role_note }));
+    if (pairs.length === 0) {
+      setKitComplianceByKey(new Map());
+      return;
+    }
+    let cancelled = false;
+    getKitComplianceBatch(pairs).then((map) => {
+      if (!cancelled) setKitComplianceByKey(map);
+    });
+    return () => { cancelled = true; };
+  }, [crew]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -284,6 +310,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
               workspaceId={workspaceId}
               dealId={dealId}
               rateReadOnly={isLocked}
+              kitComplianceByKey={kitComplianceByKey}
             />
           ))}
         </div>

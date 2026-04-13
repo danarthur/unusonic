@@ -13,6 +13,7 @@
 
 'use server';
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { saveQboTokens } from '@/shared/api/quickbooks/server-env';
@@ -255,6 +256,17 @@ export async function exchangeCode(
   } catch {
     // QBO Item creation failure is non-fatal — connection is still valid.
     // User gets a "0 default items created" result and can set up manually.
+  }
+
+  // Audit finding: owner sees "Connected" with zero items and no indication
+  // anything's wrong. Raise a Sentry warning when the default-item seed returns
+  // 0 so we can spot accounts where invoice-sync categorization is broken.
+  if (defaultItemsCreated === 0) {
+    Sentry.captureMessage('qbo-connect: 0 default items created', {
+      level: 'warning',
+      extra: { workspaceId, realmId },
+      tags: { area: 'qbo.connect', phase: 'defaultItems' },
+    });
   }
 
   return { success: true, defaultItemsCreated };
