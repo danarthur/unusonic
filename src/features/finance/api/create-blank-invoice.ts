@@ -115,19 +115,26 @@ export async function createBlankInvoice(
 
   const invoiceId = (invoice as { id: string }).id;
 
-  // Insert line items
+  // Insert line items. `is_taxable` defaults to true except for negative-amount
+  // lines (discounts / adjustments) and explicit discount kinds — discount
+  // lines applied to a tax base would produce inverted tax. Future UI toggle
+  // can override per-line; for now this is the safe default.
   if (input.lineItems.length > 0) {
-    const rows = input.lineItems.map((li, idx) => ({
-      invoice_id: invoiceId,
-      position: idx + 1,
-      item_kind: li.itemKind,
-      description: li.description,
-      quantity: li.quantity,
-      unit_price: li.unitPrice,
-      amount: li.quantity * li.unitPrice,
-      cost: 0,
-      is_taxable: true,
-    }));
+    const rows = input.lineItems.map((li, idx) => {
+      const amount = li.quantity * li.unitPrice;
+      const isDiscountKind = li.itemKind === 'discount' || li.itemKind === 'adjustment';
+      return {
+        invoice_id: invoiceId,
+        position: idx + 1,
+        item_kind: li.itemKind,
+        description: li.description,
+        quantity: li.quantity,
+        unit_price: li.unitPrice,
+        amount,
+        cost: 0,
+        is_taxable: !(isDiscountKind || amount < 0),
+      };
+    });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
     const { error: liErr } = await (system as any)

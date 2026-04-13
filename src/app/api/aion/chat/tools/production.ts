@@ -311,7 +311,9 @@ export function createProductionTools(ctx: AionToolContext) {
     inputSchema: z.object({
       invoiceId: z.string().describe('The invoice ID'),
       amount: z.number().describe('Payment amount in dollars'),
-      method: z.enum(['credit_card', 'wire', 'check', 'cash', 'stripe']).describe('Payment method'),
+      method: z
+        .enum(['stripe_card', 'stripe_ach', 'check', 'wire', 'cash', 'bill_dot_com', 'other'])
+        .describe('Payment method (matches canonical PaymentMethod union in invoice-actions)'),
       reference: z.string().optional().describe('Reference number (check number, wire ref, etc.)'),
     }),
     execute: async (params) => {

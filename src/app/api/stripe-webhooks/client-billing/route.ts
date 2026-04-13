@@ -107,10 +107,20 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     Sentry.captureException(e);
+    // Processing failed — Stripe will retry with the same event.id.  Delete
+    // the dedup row we just inserted so the retry can re-run the routing;
+    // otherwise the unique constraint sends every retry into the silent
+    // `!dedupRow → deduplicated: true` branch and the event never processes.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any).schema('finance').from('stripe_webhook_events')
-      .update({ processing_error: message })
+      .delete()
       .eq('stripe_event_id', event.id);
+    Sentry.logger.error('stripe.clientBilling.routingFailed', {
+      event_id: event.id,
+      event_type: event.type,
+      workspace_id: workspaceId,
+      error: message,
+    });
     return json({ error: 'Internal error' }, 500);
   }
 

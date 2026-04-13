@@ -48,7 +48,13 @@ export interface InvoicePDFProps {
   publicToken: string;
 }
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://unusonic.com';
+// Fall back to the Vercel preview URL when NEXT_PUBLIC_APP_URL isn't set
+// (common on staging). Only default to https://unusonic.com when neither is
+// available — previously this always fell back to the prod domain, so
+// staging/dev PDFs embedded a prod checkout link.
+const baseUrl =
+  process.env.NEXT_PUBLIC_APP_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://unusonic.com');
 
 function fmtCurrency(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);

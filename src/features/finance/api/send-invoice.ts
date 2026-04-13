@@ -113,6 +113,21 @@ export async function sendInvoice(
   // Build snapshot with safe fallbacks (entities may have sparse attributes)
   const entityAttrs = (entity as any)?.attributes ?? {};
 
+  // contact_name precedence:
+  //   1. explicit attrs.contact_name
+  //   2. first_name + last_name joined (when either exists)
+  //   3. null
+  // Previous `(a ?? b) ? template : null` parsed with the ternary binding
+  // lower than `??`, so when contact_name was null and first_name was also
+  // null/"", the ternary fell through to the template and produced an empty
+  // concat that looked truthy — sent invoices ended up with a bogus " " name.
+  const explicitContactName =
+    typeof entityAttrs.contact_name === 'string' ? entityAttrs.contact_name.trim() : '';
+  const firstName = typeof entityAttrs.first_name === 'string' ? entityAttrs.first_name : '';
+  const lastName = typeof entityAttrs.last_name === 'string' ? entityAttrs.last_name : '';
+  const composedContactName = `${firstName} ${lastName}`.trim();
+  const resolvedContactName = explicitContactName || composedContactName || null;
+
   const billToSnapshot: BillToSnapshotV1 = parseBillToSnapshot({
     v: 1,
     display_name: (entity as any)?.display_name ?? 'Unknown',
@@ -120,9 +135,7 @@ export async function sendInvoice(
     email: invoice.billing_email ?? entityAttrs.email ?? entityAttrs.primary_email ?? null,
     phone: entityAttrs.phone ?? entityAttrs.primary_phone ?? null,
     address: entityAttrs.address ?? null,
-    contact_name: entityAttrs.contact_name ?? entityAttrs.first_name
-      ? `${entityAttrs.first_name ?? ''} ${entityAttrs.last_name ?? ''}`.trim() || null
-      : null,
+    contact_name: resolvedContactName,
   });
 
   const fromSnapshot: FromSnapshotV1 = parseFromSnapshot({
