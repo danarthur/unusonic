@@ -4521,6 +4521,7 @@ export type Database = {
         Args: { p_client_ip: unknown }
         Returns: boolean
       }
+      claim_ghost_entities_for_user: { Args: never; Returns: number }
       claim_ghost_entity_workspace: {
         Args: { p_entity_id: string; p_workspace_id: string }
         Returns: undefined

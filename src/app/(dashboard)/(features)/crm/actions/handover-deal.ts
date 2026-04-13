@@ -12,6 +12,7 @@ import { instrument } from '@/shared/lib/instrumentation';
 import { resolveEventTimezone, toVenueInstant } from '@/shared/lib/timezone';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import { COUPLE_ATTR } from '@/entities/directory/model/attribute-keys';
+import { publishDomainEvent } from '@/shared/lib/domain-events/publish-domain-event';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -217,6 +218,31 @@ export async function handoverDeal(
   // Post-handoff sync tasks — crew sync is awaited (critical for portal),
   // gear + checklist are fire-and-forget (non-critical enrichment)
   const archetype = (deal as Record<string, unknown>).event_archetype as string | null;
+
+  // Fire the show.created domain event so downstream consumers (Follow-Up
+  // Engine when it lands, audit-log readers today) see the handoff. Fire-and-
+  // forget: publishDomainEvent swallows errors to Sentry so a publish failure
+  // never rolls back the handoff itself.
+  publishDomainEvent({
+    workspaceId,
+    eventId,
+    type: 'show.created',
+    payload: {
+      eventId,
+      dealId,
+      clientEntityId,
+      archetype,
+      startsAt: startAt || null,
+      endsAt: endAt || null,
+    },
+  }).catch((err) => {
+    Sentry.logger.error('crm.handoverDeal.domainEventPublishFailed', {
+      dealId,
+      eventId,
+      workspaceId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
   const warnings: string[] = [];
 
   const [crewSyncResult] = await Promise.allSettled([
