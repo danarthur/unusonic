@@ -33,6 +33,10 @@ import {
 } from './types';
 import { DEPARTMENT_ORDER, DEFAULT_DEPARTMENT } from '../../lib/department-mapping';
 import type { DealCrewRow } from '../../actions/deal-crew';
+import {
+  getKitComplianceForEntity,
+  type KitComplianceResult,
+} from '@/features/talent-management/api/kit-template-actions';
 
 // =============================================================================
 // Helpers
@@ -100,6 +104,7 @@ export function GearFlightCheck({
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<Map<string, GearAvailability>>(new Map());
   const [crewMatches, setCrewMatches] = useState<Record<string, CrewGearMatch[]>>({});
+  const [kitCompliance, setKitCompliance] = useState<Record<string, KitComplianceResult>>({});
   const [sourcing, setSourcing] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -167,6 +172,43 @@ export function GearFlightCheck({
       .then((result) => setCrewMatches(result))
       .catch(() => setCrewMatches({}));
   }, [items, eventId]);
+
+  // ── Fetch kit compliance per assigned crew member ──────────────────────────
+  // Produces a map keyed by entity_id so DepartmentBlock can aggregate matched/
+  // total across the crew assigned to each department. Refetches whenever the
+  // (entity_id, role_note) set changes.
+  useEffect(() => {
+    const targets = crewRows
+      .filter((r): r is DealCrewRow & { entity_id: string; role_note: string } =>
+        !!r.entity_id && !!r.role_note,
+      )
+      .map((r) => ({ entityId: r.entity_id, roleNote: r.role_note }));
+
+    if (targets.length === 0) {
+      setKitCompliance({});
+      return;
+    }
+
+    let cancelled = false;
+    Promise.all(
+      targets.map((t) =>
+        getKitComplianceForEntity(t.entityId, t.roleNote).then((result) => ({
+          entityId: t.entityId,
+          result,
+        })),
+      ),
+    ).then((entries) => {
+      if (cancelled) return;
+      const map: Record<string, KitComplianceResult> = {};
+      for (const e of entries) {
+        if (e.result) map[e.entityId] = e.result;
+      }
+      setKitCompliance(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [crewRows]);
 
   // ── Handle sourcing from crew ──────────────────────────────────────────────
 
@@ -450,6 +492,7 @@ export function GearFlightCheck({
               collapsed={isCollapsed}
               onToggle={() => toggleDept(group.department)}
               deptCrew={deptCrew}
+              kitCompliance={kitCompliance}
               updating={updating}
               menuOpen={menuOpen}
               availability={availability}
@@ -509,6 +552,7 @@ function DepartmentSection({
   collapsed,
   onToggle,
   deptCrew,
+  kitCompliance,
   updating,
   menuOpen,
   availability,
@@ -528,6 +572,7 @@ function DepartmentSection({
   collapsed: boolean;
   onToggle: () => void;
   deptCrew: DealCrewRow[];
+  kitCompliance: Record<string, KitComplianceResult>;
   updating: string | null;
   menuOpen: string | null;
   availability: Map<string, GearAvailability>;
@@ -547,6 +592,19 @@ function DepartmentSection({
   const loadedCount = items.filter(
     (i) => !isBranchState(i.status) && getLifecycleIndex(i.status) >= 3,
   ).length;
+
+  // Aggregate kit compliance across everyone in this department who has a
+  // kit-template-backed role. Skipped entirely when nobody on this dept has
+  // kit expectations — avoids showing a 0/0 pill for untracked roles.
+  const kitAgg = deptCrew.reduce(
+    (acc, c) => {
+      const r = c.entity_id ? kitCompliance[c.entity_id] : undefined;
+      if (!r || r.total === 0) return acc;
+      return { matched: acc.matched + r.matched, total: acc.total + r.total };
+    },
+    { matched: 0, total: 0 },
+  );
+  const kitComplete = kitAgg.total > 0 && kitAgg.matched === kitAgg.total;
 
   return (
     <div className="border-b border-[oklch(1_0_0_/_0.06)] last:border-0">
@@ -593,6 +651,26 @@ function DepartmentSection({
         )}
 
         <span className="flex-1" />
+        {kitAgg.total > 0 && (
+          <span
+            className="shrink-0 stage-badge-text tabular-nums tracking-tight px-1.5 py-0.5 rounded-md mr-2"
+            style={{
+              color: kitComplete
+                ? 'var(--color-unusonic-success)'
+                : 'var(--color-unusonic-warning)',
+              background: kitComplete
+                ? 'color-mix(in oklch, var(--color-unusonic-success) 12%, transparent)'
+                : 'color-mix(in oklch, var(--color-unusonic-warning) 12%, transparent)',
+            }}
+            title={
+              kitComplete
+                ? 'Crew kit complete for this department'
+                : `${kitAgg.total - kitAgg.matched} kit item(s) missing across ${department} crew`
+            }
+          >
+            {kitAgg.matched}/{kitAgg.total} kit
+          </span>
+        )}
         <span className="text-label text-[var(--stage-text-tertiary)] tracking-tight tabular-nums">
           {loadedCount}/{items.length} loaded
         </span>
