@@ -18,6 +18,7 @@
 import 'server-only';
 
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 import { FileText, Music, Receipt, Sparkles } from 'lucide-react';
 
 import { getClientPortalContext } from '@/shared/lib/client-portal';
@@ -27,7 +28,10 @@ import {
   ClientPortalHeader,
   ClientPortalShell,
 } from '@/features/client-portal/ui';
-import { getClientHomeData } from '@/features/client-portal/api/get-client-home-data';
+import {
+  getClientHomeData,
+  type ClientHomeSongs,
+} from '@/features/client-portal/api/get-client-home-data';
 
 function formatEventDate(startsAt: string | null): string {
   if (!startsAt) return 'Date TBD';
@@ -66,6 +70,16 @@ export default async function ClientPortalHomePage() {
   // No linked event yet — show a minimal fallback shell so the portal still
   // renders something rather than 500ing.
   if (!data) {
+    // Pass 4 Phase 0.5 (rescan fix C15): this fallback masks handoff failures
+    // silently. When a deal has been handed over but getClientHomeData still
+    // returns null, the team never learns about it. Non-fatal — we still
+    // render the fallback shell — but surface the event to Sentry so we can
+    // reconcile. Post-B3 this should be rare, but it's not zero.
+    Sentry.logger.error('clientPortal.home.dataLoadNull', {
+      entityId: context.activeEntity.id,
+      workspaceId: context.activeEntity.ownerWorkspaceId,
+      displayName: context.activeEntity.displayName,
+    });
     const emptyWorkspace = {
       id: context.activeEntity.ownerWorkspaceId,
       name: 'Your team',
@@ -104,8 +118,12 @@ export default async function ClientPortalHomePage() {
     );
   }
 
-  const { workspace, event, proposal, invoice, contact } = data;
+  const { workspace, event, proposal, invoice, contact, dj, songs } = data;
   const countdown = computeCountdownLabel(event.startsAt);
+  // Songs card attribution uses the DJ, not the PM, per §0 A10 — mis-
+  // attributing song acknowledgements to the production manager breaks
+  // the trust contract on the first demo (Critic's flag).
+  const songsCard = buildSongsCard(songs, dj?.displayName.split(/\s+/)[0] ?? null);
 
   return (
     <ClientPortalShell
@@ -169,12 +187,14 @@ export default async function ClientPortalHomePage() {
             sublabel={formatShortDate(event.startsAt)}
             icon={<Sparkles className="h-4 w-4" />}
           />
-          <HomeDockCard
-            href={`/client/songs`}
-            label="Songs"
-            sublabel="Requests & timeline"
-            icon={<Music className="h-4 w-4" />}
-          />
+          {songsCard && (
+            <HomeDockCard
+              href="/client/songs"
+              label={songsCard.label}
+              sublabel={songsCard.sublabel}
+              icon={<Music className="h-4 w-4" />}
+            />
+          )}
         </section>
       </div>
     </ClientPortalShell>
@@ -187,6 +207,60 @@ function formatShortDate(input: string | null): string {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/**
+ * Build the label + sublabel for the home dock Songs card.
+ *
+ * Returns null when the archetype gate is closed (§0 A9) — the home
+ * page omits the card entirely rather than rendering a placeholder.
+ *
+ * Copy follows §0 A4 / A2: "Playlist" as the label, attributed warmth
+ * in the sublabel when the DJ has acknowledged any songs, quiet-morning
+ * states for locked events. The DJ's first name is threaded through
+ * for the "{Daniel} has the playlist" show-live copy — falls back to
+ * "your DJ" when the contact can't be resolved.
+ */
+function buildSongsCard(
+  songs: ClientHomeSongs | null,
+  djFirstName: string | null,
+): { label: string; sublabel: string } | null {
+  if (!songs) return null;
+
+  const dj = djFirstName ?? 'your DJ';
+
+  // Locked states — amended A1 morning-of copy, no padlock language
+  if (songs.isLocked) {
+    switch (songs.lockReason) {
+      case 'show_live':
+        return { label: 'Playlist', sublabel: `${dj} has the playlist` };
+      case 'completed':
+        return { label: 'Playlist', sublabel: 'What a night' };
+      case 'cancelled':
+        return { label: 'Playlist', sublabel: 'Read-only' };
+      case 'archived':
+        return { label: 'Playlist', sublabel: 'Archived' };
+      default:
+        return { label: 'Playlist', sublabel: 'Read-only' };
+    }
+  }
+
+  // Open states
+  if (songs.count === 0) {
+    return { label: 'Playlist', sublabel: 'Start the playlist' };
+  }
+
+  if (songs.acknowledgedCount > 0) {
+    return {
+      label: 'Playlist',
+      sublabel: `${songs.count} ${songs.count === 1 ? 'song' : 'songs'} · ${songs.acknowledgedCount} seen by ${dj}`,
+    };
+  }
+
+  return {
+    label: 'Playlist',
+    sublabel: `${songs.count} ${songs.count === 1 ? 'song' : 'songs'} so far`,
+  };
 }
 
 function HomeDockCard({

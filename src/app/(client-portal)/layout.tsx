@@ -19,6 +19,7 @@
 import 'server-only';
 
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { headers as nextHeaders } from 'next/headers';
 import * as Sentry from '@sentry/nextjs';
 
@@ -26,6 +27,30 @@ import {
   getClientPortalContext,
   rotateClientPortalSession,
 } from '@/shared/lib/client-portal';
+import { createClient } from '@/shared/api/supabase/server';
+import { ACTIVE_WORKSPACE_COOKIE_NAME } from '@/shared/lib/constants';
+import { WorkspaceSwitcher, type WorkspaceEntry } from '@/shared/ui/layout/WorkspaceSwitcher';
+
+/** Fetch all workspace memberships for a claimed client's switcher. */
+async function getClientWorkspaces(userId: string): Promise<WorkspaceEntry[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, role, workspaces:workspace_id (id, name)')
+    .eq('user_id', userId);
+
+  if (!data) return [];
+
+  return data.map((row) => {
+    const rawWs = row.workspaces;
+    const ws = (Array.isArray(rawWs) ? rawWs[0] : rawWs) as { id: string; name: string } | null;
+    return {
+      id: row.workspace_id as string,
+      name: ws?.name ?? 'Unnamed',
+      role: row.role as string,
+    };
+  });
+}
 
 export default async function ClientPortalLayout({
   children,
@@ -63,8 +88,31 @@ export default async function ClientPortalLayout({
     redirect('/client/sign-in');
   }
 
+  // For claimed clients with multiple workspaces, show the workspace switcher.
+  let workspaces: WorkspaceEntry[] = [];
+  let activeWorkspaceId: string | null = null;
+  if (context.kind === 'claimed' && context.userId) {
+    workspaces = await getClientWorkspaces(context.userId);
+    if (workspaces.length > 1) {
+      const cookieStore = await cookies();
+      activeWorkspaceId = cookieStore.get(ACTIVE_WORKSPACE_COOKIE_NAME)?.value ?? null;
+    }
+  }
+
+  const showSwitcher = workspaces.length > 1;
+
   return (
-    <div className="min-h-dvh bg-stage-canvas text-stage-text-primary">
+    <div className="min-h-dvh bg-stage-canvas" style={{ color: 'var(--stage-text-primary)' }}>
+      {showSwitcher && (
+        <div className="border-b border-[var(--stage-edge-subtle)] px-4 py-2">
+          <div className="mx-auto max-w-2xl">
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspaceId}
+            />
+          </div>
+        </div>
+      )}
       {children}
     </div>
   );

@@ -71,7 +71,7 @@ export default async function ClientEventPage({
   const workspaceId = context.activeEntity.ownerWorkspaceId;
   const supabase = getSystemClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const crossSchema = supabase as any;
+  const crossSchema = supabase;
 
   const { data: eventData } = await crossSchema
     .schema('ops')
