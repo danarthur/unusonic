@@ -172,7 +172,7 @@ export default async function ClientPortalHomePage() {
           <HomeDockCard
             href={proposal ? `/p/${proposal.publicToken}` : null}
             label="Proposal"
-            sublabel={proposal ? (proposal.signedAt ? 'Signed' : 'Review & sign') : 'Coming soon'}
+            sublabel={proposal ? (proposal.signedAt ? 'Signed' : 'Review & sign') : 'Not shared yet'}
             icon={<FileText className="h-4 w-4" />}
           />
           <HomeDockCard

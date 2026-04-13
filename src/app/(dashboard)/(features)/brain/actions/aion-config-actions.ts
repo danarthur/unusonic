@@ -63,7 +63,7 @@ export async function getAionConfig(): Promise<AionConfig> {
   if (!workspaceId) return {};
 
   const supabase = await createClient();
-  // aion_config not yet in generated types — select all and cast
+  // aion_config is typed as Json in generated types; cast to AionConfig shape.
   const { data, error } = await supabase
     .from('workspaces')
     .select('aion_config')
@@ -81,7 +81,7 @@ export async function getAionConfig(): Promise<AionConfig> {
 export async function getAionConfigForWorkspace(workspaceId: string): Promise<AionConfig> {
   const { getSystemClient } = await import('@/shared/api/supabase/system');
   const system = getSystemClient();
-  // aion_config not yet in generated types — select and cast
+  // aion_config is typed as Json in generated types; cast to AionConfig shape.
   const { data, error } = await system
     .from('workspaces')
     .select('aion_config')
@@ -111,7 +111,7 @@ export async function saveAionVoiceConfig(
 
     const { error } = await supabase
       .from('workspaces')
-      .update({ aion_config: updated } as any)
+      .update({ aion_config: updated })
       .eq('id', workspaceId);
 
     if (error) return { success: false, error: error.message };
@@ -171,7 +171,7 @@ export async function toggleAionKillSwitch(
 
     const { error } = await supabase
       .from('workspaces')
-      .update({ aion_config: updated } as any)
+      .update({ aion_config: updated })
       .eq('id', workspaceId);
 
     if (error) return { success: false, error: error.message };
