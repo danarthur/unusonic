@@ -20,6 +20,7 @@ import type Stripe from 'stripe';
 import * as Sentry from '@sentry/nextjs';
 import { getStripe } from '@/shared/api/stripe/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { sendTrialEndingEmail } from '@/shared/api/email/send';
 
 export const runtime = 'nodejs';
 
@@ -487,7 +488,52 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription, stripeEvent
     stripe_event_id: stripeEventId,
   });
 
-  // TODO (PR-SUB-4): send email to workspace admin warning about trial end
+  // Warn the workspace owner via email so the trial doesn't lapse silently.
+  // Resolve the primary owner's email via workspace_members → auth.users.
+  try {
+    const supabase = getSystemClient();
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    const workspaceName = (ws as { name?: string | null } | null)?.name ?? 'your workspace';
+
+    const { data: ownerMember } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .eq('role', 'owner')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const ownerId = (ownerMember as { user_id?: string | null } | null)?.user_id ?? null;
+    if (ownerId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- auth.admin types are loose
+      const { data: userResp } = await (supabase.auth as any).admin.getUserById(ownerId);
+      const email = userResp?.user?.email ?? null;
+      if (email) {
+        const sendResult = await sendTrialEndingEmail({
+          to: email,
+          workspaceName,
+          trialEndsAt: trialEnd,
+        });
+        if (!sendResult.ok) {
+          Sentry.captureMessage('stripe.subscription.trialEndEmailFailed', {
+            level: 'warning',
+            extra: { workspaceId, reason: sendResult.error },
+          });
+        }
+      }
+    }
+  } catch (err) {
+    // Email is best-effort — never block webhook ack.
+    Sentry.captureException(err, {
+      tags: { area: 'stripe.subscription.trialEndEmail' },
+      extra: { workspaceId },
+    });
+  }
 
   return json({ received: true });
 }

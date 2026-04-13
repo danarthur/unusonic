@@ -57,7 +57,7 @@ export type EventLedgerDTO = {
 
 /**
  * Loads the full financial picture for an event:
- * - Revenue from public.invoices (what clients owe/paid)
+ * - Revenue from finance.invoices (what clients owe/paid)
  * - Costs from ops.event_expenses (actual spend)
  * - Margin = revenue – costs
  * - Unified transaction stream for the Ledger Lens

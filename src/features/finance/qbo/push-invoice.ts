@@ -117,7 +117,8 @@ export async function pushInvoiceToQbo(
       const matches = queryResult?.QueryResponse?.Customer ?? [];
 
       if (matches.length === 1) {
-        // Exact match — auto-link silently
+        // Exact match — auto-link, and write an audit row to qbo_sync_log so
+        // the mapping is reviewable in case the wrong customer was matched.
         qboCustomerId = matches[0].Id;
         qboCustomerSyncToken = matches[0].SyncToken;
 
@@ -130,6 +131,23 @@ export async function pushInvoiceToQbo(
           qbo_id: qboCustomerId,
           qbo_sync_token: qboCustomerSyncToken,
           last_synced_at: new Date().toISOString(),
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (system as any).schema('finance').from('qbo_sync_log').insert({
+          workspace_id: workspaceId,
+          local_type: 'entity',
+          local_id: invoice.bill_to_entity_id,
+          qbo_type: 'Customer',
+          qbo_id: qboCustomerId,
+          operation: 'query',
+          direction: 'push',
+          request_id: requestId,
+          qbo_response_status: 200,
+          qbo_response_body: {
+            auto_linked: true,
+            display_name: entity.display_name,
+            matched_display_name: matches[0].DisplayName,
+          },
         });
       } else if (matches.length === 0) {
         // No match — create new customer in QBO

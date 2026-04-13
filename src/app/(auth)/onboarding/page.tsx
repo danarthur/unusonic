@@ -5,6 +5,7 @@
  */
 
 import { redirect } from 'next/navigation';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { OnboardingWizard } from './components/onboarding-wizard';
 
@@ -50,8 +51,13 @@ async function getOnboardingState() {
 
   if (!profileError) {
     profile = profileData;
+  } else {
+    // Surface RLS regressions / missing-table errors instead of silently treating as "no profile"
+    Sentry.captureMessage('Onboarding profile fetch failed', {
+      level: 'warning',
+      extra: { userId: user.id, error: profileError.message, code: profileError.code },
+    });
   }
-  // When profile fetch fails (table missing, RLS, or no row), treat as no profile and use auth metadata
 
   // If onboarding is already complete, redirect to role-based home (middleware resolves)
   if (profile?.onboarding_completed) {

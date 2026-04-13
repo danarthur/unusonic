@@ -52,12 +52,17 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
           type: PERSONA_TO_ORG_TYPE[persona],
           subscriptionTier: GENESIS_TO_SUBSCRIPTION[(formData.get('tier') as GenesisTierId) ?? 'scout'],
         });
-        if (result.success) return { ok: true };
+        if (result.success) {
+          router.push(result.redirectPath ?? '/');
+          router.refresh();
+          return { ok: true };
+        }
         return { ok: false, error: result.error };
       }
       const result = await createGenesisOrganization(null, formData);
       if (result.ok) {
         router.push('/');
+        router.refresh();
         return { ok: true };
       }
       return { ok: false, error: result.error };

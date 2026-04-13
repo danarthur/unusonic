@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { createInvoiceCheckoutSession } from '@/features/finance/api/create-invoice-checkout-session';
 
 interface PayNowButtonProps {
@@ -39,8 +40,13 @@ export function PayNowButton({ token, acceptOnlinePayments }: PayNowButtonProps)
         return;
       }
       setError(result.error ?? 'Could not start payment');
+      Sentry.captureMessage('Invoice Stripe Checkout session failed', {
+        level: 'warning',
+        extra: { token, resultError: result.error ?? null },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start payment');
+      Sentry.captureException(err, { tags: { area: 'invoice-checkout' }, extra: { token } });
     } finally {
       setLoading(false);
     }

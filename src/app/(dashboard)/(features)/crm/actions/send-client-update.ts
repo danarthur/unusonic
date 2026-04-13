@@ -106,14 +106,24 @@ export async function sendClientUpdate(input: {
       const { data: entity } = await supabase
         .schema('directory')
         .from('entities')
-        .select('display_name, attributes')
+        .select('display_name, type, attributes')
         .eq('id', orgId)
         .maybeSingle();
 
       if (entity) {
-        clientName = (entity as Record<string, unknown>).display_name as string | null;
-        const attrs = (entity as Record<string, unknown>).attributes as Record<string, unknown> | null;
-        clientEmail = (attrs?.email as string | null) ?? null;
+        const row = entity as { display_name?: string | null; type?: string | null; attributes?: unknown };
+        clientName = row.display_name ?? null;
+        if (row.type === 'company') {
+          const companyAttrs = readEntityAttrs(row.attributes, 'company');
+          clientEmail = companyAttrs.billing_email ?? companyAttrs.support_email ?? null;
+        } else if (row.type === 'individual') {
+          clientEmail = readEntityAttrs(row.attributes, 'individual').email ?? null;
+        } else if (row.type === 'couple') {
+          const coupleAttrs = readEntityAttrs(row.attributes, 'couple');
+          clientEmail = coupleAttrs.partner_a_email ?? coupleAttrs.partner_b_email ?? null;
+        } else {
+          clientEmail = readEntityAttrs(row.attributes, 'person').email ?? null;
+        }
       }
     }
 
@@ -132,15 +142,26 @@ export async function sendClientUpdate(input: {
           const { data: targetEntity } = await supabase
             .schema('directory')
             .from('entities')
-            .select('display_name, attributes')
+            .select('display_name, type, attributes')
             .eq('id', edge.target_entity_id)
             .maybeSingle();
           if (targetEntity) {
-            const attrs = (targetEntity as Record<string, unknown>).attributes as Record<string, unknown> | null;
-            const email = attrs?.email as string | null;
+            const row = targetEntity as { display_name?: string | null; type?: string | null; attributes?: unknown };
+            let email: string | null | undefined;
+            if (row.type === 'company') {
+              const a = readEntityAttrs(row.attributes, 'company');
+              email = a.billing_email ?? a.support_email;
+            } else if (row.type === 'individual') {
+              email = readEntityAttrs(row.attributes, 'individual').email;
+            } else if (row.type === 'couple') {
+              const a = readEntityAttrs(row.attributes, 'couple');
+              email = a.partner_a_email ?? a.partner_b_email;
+            } else {
+              email = readEntityAttrs(row.attributes, 'person').email;
+            }
             if (email) {
               clientEmail = email;
-              if (!clientName) clientName = (targetEntity as Record<string, unknown>).display_name as string | null;
+              if (!clientName) clientName = row.display_name ?? null;
               break;
             }
           }

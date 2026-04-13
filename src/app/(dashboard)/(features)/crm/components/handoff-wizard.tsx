@@ -21,8 +21,21 @@ type HandoffWizardProps = {
   onDismiss: () => void;
 };
 
+const LOCAL_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+/**
+ * Convert a `datetime-local` input value to a canonical ISO string.
+ * Throws on unparseable input so we never write "Invalid Date" to ops.events.
+ */
 function fromLocalDatetime(local: string): string {
-  return new Date(local).toISOString();
+  if (!local || !LOCAL_DATETIME_RE.test(local)) {
+    throw new Error(`Invalid date/time value: ${local || '(empty)'}. Expected YYYY-MM-DDTHH:MM.`);
+  }
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`Invalid date/time value: ${local}.`);
+  }
+  return d.toISOString();
 }
 
 export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss }: HandoffWizardProps) {
@@ -150,9 +163,23 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
   const handleNext = useCallback(() => {
     setError(null);
     if (isLast) {
+      // Warn when no client is resolvable — prevents handing off an event
+      // with a null client_entity_id, which breaks the client portal lookup.
+      if (!clientEntityId.trim()) {
+        setError('No client selected. Add a bill-to stakeholder before handing off.');
+        return;
+      }
       setSubmitting(true);
-      setError(null);
-      const payload = buildPayload();
+      let payload: HandoverPayload;
+      try {
+        payload = buildPayload();
+      } catch (err) {
+        // fromLocalDatetime rejects unparseable datetime-local input so the
+        // wizard never writes "Invalid Date" into ops.events.starts_at/ends_at.
+        setError(err instanceof Error ? err.message : 'Invalid date/time');
+        setSubmitting(false);
+        return;
+      }
       handoverDeal(dealId, payload)
         .then((result) => {
           if (result.success) {
@@ -170,7 +197,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
     } else {
       setStepIndex((i) => i + 1);
     }
-  }, [isLast, buildPayload, dealId, onSuccess, onDismiss]);
+  }, [isLast, buildPayload, dealId, clientEntityId, onSuccess, onDismiss]);
 
   const handleBack = useCallback(() => {
     setError(null);

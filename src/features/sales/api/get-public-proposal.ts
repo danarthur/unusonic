@@ -10,6 +10,7 @@ import 'server-only';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { calculateProposalTotal } from '../lib/calculate-proposal-total';
 import type { PublicProposalDTO } from '../model/public-proposal';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 
 export async function getPublicProposal(token: string): Promise<PublicProposalDTO | null> {
   if (!token?.trim()) return null;
@@ -123,16 +124,13 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
       .maybeSingle();
     if (venueEntity) {
       venueName = (venueEntity.display_name as string) ?? null;
-      const attrs = (venueEntity.attributes as Record<string, unknown>) ?? {};
-      const rawAddr = attrs.address;
-      if (typeof rawAddr === 'string') {
-        venueAddress = rawAddr || null;
-      } else if (rawAddr && typeof rawAddr === 'object') {
-        const a = rawAddr as Record<string, unknown>;
-        venueAddress = [a.street, a.city, a.state].filter(Boolean).join(', ') || null;
+      const venueAttrs = readEntityAttrs(venueEntity.attributes, 'venue');
+      const addrObj = venueAttrs.address;
+      if (addrObj && typeof addrObj === 'object') {
+        venueAddress = [addrObj.street, addrObj.city, addrObj.state].filter(Boolean).join(', ') || null;
       }
       if (!venueAddress) {
-        venueAddress = (attrs.formatted_address as string) ?? null;
+        venueAddress = venueAttrs.formatted_address ?? null;
       }
     }
   }

@@ -7,6 +7,7 @@
 'use client';
 
 import { useTransition, useRef, useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { signUpForPasskey } from '../api/actions';
@@ -59,6 +60,7 @@ export function SignUpFlow({
   onModeSwitch,
   prefersReducedMotion,
 }: SignUpFlowProps) {
+  const router = useRouter();
   const [isSignupPending, startTransition] = useTransition();
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [logoAcknowledging, setLogoAcknowledging] = useState(false);
@@ -136,13 +138,14 @@ export function SignUpFlow({
             setPasskeyError(passkeyResult.error || 'Passkey was not created. Please try again — you need a passkey to sign in.');
             return;
           }
-          window.location.href = postSignupDest;
+          router.push(postSignupDest);
+          router.refresh();
         } catch (e) {
           setPasskeyError(e instanceof Error ? e.message : 'Passkey registration failed. Try again.');
         }
       });
     }
-  }, [signupStep, isTransitionName, fullName, email, redirectTo, setSignupStep, setSignupTransitionPhase, startTransition]);
+  }, [signupStep, isTransitionName, fullName, email, redirectTo, router, setSignupStep, setSignupTransitionPhase, startTransition]);
 
   const isTransitionWelcome = fromSignIn && signupTransitionPhase === 'welcome';
   const effectivePrompt = isTransitionWelcome

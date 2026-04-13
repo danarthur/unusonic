@@ -11,13 +11,17 @@ export async function getEventCrew(eventId: string): Promise<AssignedCrewEntry[]
 
   const supabase = await createClient();
 
+  // Only surface crew that are actually coming to the show. Excludes
+  // declined/dropped assignments so the cue-assignment dropdown in the
+  // Run-of-Show editor cannot phantom-assign someone who said no.
   const { data: assignments, error } = await supabase
     .schema('ops' as any)
     .from('crew_assignments')
-    .select('entity_id, assignee_name, role')
+    .select('entity_id, assignee_name, role, status')
     .eq('event_id', eventId)
     .eq('workspace_id', workspaceId)
-    .not('entity_id', 'is', null);
+    .not('entity_id', 'is', null)
+    .not('status', 'in', '(declined,dropped)');
 
   if (error || !assignments) return [];
 

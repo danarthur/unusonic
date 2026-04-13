@@ -1,5 +1,5 @@
 /**
- * Deal Room page – Sales pipeline and deal info for a gig.
+ * Deal Room page – Sales pipeline and deal info for an event.
  * [id] = eventId. Fetches DealRoomDTO via getGigDealRoom.
  */
 
@@ -13,9 +13,9 @@ export default async function DealPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id: gigId } = await params;
+  const { id: eventId } = await params;
 
-  const data = await getGigDealRoom(gigId);
+  const data = await getGigDealRoom(eventId);
 
   if (!data) {
     return (

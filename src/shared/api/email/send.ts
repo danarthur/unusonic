@@ -13,6 +13,7 @@ import { render, toPlainText } from '@react-email/render';
 import { SummonEmail } from './templates/SummonEmail';
 import { GuardianInviteEmail } from './templates/GuardianInviteEmail';
 import { RecoveryVetoEmail } from './templates/RecoveryVetoEmail';
+import { TrialEndingEmail } from './templates/TrialEndingEmail';
 import { ProposalLinkEmail } from './templates/ProposalLinkEmail';
 import { ProposalAcceptedEmail } from './templates/ProposalAcceptedEmail';
 import { ProposalSignedEmail } from './templates/ProposalSignedEmail';
@@ -168,6 +169,39 @@ export async function sendRecoveryVetoEmail(
     from: getFrom(),
     to: [to],
     subject: "Unusonic: A recovery was started — cancel if this wasn’t you",
+    html,
+    text,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Warn a workspace admin that their trial ends soon.
+ * Fired from Stripe's customer.subscription.trial_will_end webhook (3 days before expiry).
+ * Auth-adjacent email: uses the global EMAIL_FROM, not getWorkspaceFrom().
+ */
+export async function sendTrialEndingEmail(opts: {
+  to: string;
+  workspaceName: string;
+  trialEndsAt: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const resend = getResend();
+  if (!resend) {
+    return { ok: false, error: 'Email not configured (RESEND_API_KEY missing).' };
+  }
+  const billingUrl = `${baseUrl.replace(/\/$/, '')}/settings/billing`;
+  const element = TrialEndingEmail({
+    workspaceName: opts.workspaceName,
+    trialEndsAt: opts.trialEndsAt,
+    billingUrl,
+  });
+  const html = await render(element);
+  const text = toPlainText(html);
+  const { error } = await resend.emails.send({
+    from: getFrom(),
+    to: [opts.to],
+    subject: `Your Unusonic trial for ${opts.workspaceName} ends soon`,
     html,
     text,
   });

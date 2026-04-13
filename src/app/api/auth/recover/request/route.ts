@@ -5,12 +5,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { sendRecoveryVetoEmail } from '@/shared/api/email/send';
 import { createHash, randomBytes } from 'crypto';
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 const TIMELOCK_HOURS = 48;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
@@ -42,6 +44,21 @@ export async function POST(request: NextRequest) {
   });
 
   if (rpcError || !ownerId) {
+    if (rpcError) {
+      Sentry.captureMessage('recover: get_user_id_by_email RPC failed', {
+        level: 'warning',
+        extra: { error: rpcError.message, code: rpcError.code },
+      });
+    }
+    return genericSuccess();
+  }
+
+  // Defensive: RPC contract returns auth.users.id (UUID). If shape drifts, bail without sending.
+  if (typeof ownerId !== 'string' || !UUID_RE.test(ownerId)) {
+    Sentry.captureMessage('recover: get_user_id_by_email returned non-UUID', {
+      level: 'error',
+      extra: { shape: typeof ownerId },
+    });
     return genericSuccess();
   }
 

@@ -97,6 +97,7 @@ export async function createBlankInvoice(
       notes_to_client: input.notesToClient ?? null,
       terms: input.terms ?? null,
       subtotal_amount: subtotal,
+      discount_amount: 0,
       tax_amount: 0,
       total_amount: subtotal,
       paid_amount: 0,
@@ -135,7 +136,10 @@ export async function createBlankInvoice(
       .insert(rows);
 
     if (liErr) {
-      console.error('[createBlankInvoice] Line items insert failed, rolling back invoice:', liErr.message);
+      console.error(
+        '[createBlankInvoice] Line items insert failed, rolling back invoice:',
+        { invoiceId, lineItemCount: input.lineItems.length, code: liErr.code, message: liErr.message },
+      );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
       await (system as any)
         .schema('finance')

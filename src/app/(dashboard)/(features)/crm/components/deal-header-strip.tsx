@@ -593,7 +593,7 @@ export function DealHeaderStrip({
         animate={{ opacity: 1, y: 0 }}
         transition={STAGE_MEDIUM}
       >
-        <StagePanel elevated className={cn("p-5", readOnly && "pointer-events-none opacity-45")}>
+        <StagePanel elevated className="p-5">
           <div className="flex items-center justify-between mb-4">
             <p className="stage-label">
               Deal

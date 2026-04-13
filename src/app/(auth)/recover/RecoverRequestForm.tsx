@@ -26,6 +26,9 @@ export function RecoverRequestForm() {
             'If an account exists with that email, you will receive a message with next steps. Check your inbox.'
         );
       } else {
+        // Security: don't leak account existence — user-facing copy stays generic,
+        // but surface the actual response for operators via console + Sentry breadcrumb.
+        console.error('[recover] request failed', { status: res.status, body: data });
         setStatus('done');
         setMessage(
           data?.message ??

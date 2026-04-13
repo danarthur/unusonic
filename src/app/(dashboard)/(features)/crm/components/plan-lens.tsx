@@ -75,6 +75,17 @@ export function PlanLens({
 
   const [handoffWizardOpen, setHandoffWizardOpen] = useState(false);
 
+  // Show a Retry affordance when event summary takes > 5s so owners don't
+  // sit in front of an indefinite spinner if the fetch has stalled.
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (eventId && !event) {
+      const t = setTimeout(() => setLoadTimedOut(true), 5000);
+      return () => clearTimeout(t);
+    }
+    setLoadTimedOut(false);
+  }, [eventId, event]);
+
   // ── Scalar editing (same pattern as DealLens, with confirmation for post-handoff) ──
   const [localTitle, setLocalTitle] = useState(deal?.title ?? '');
   const [scalarsSaving, setScalarsSaving] = useState(false);
@@ -376,7 +387,7 @@ export function PlanLens({
 
             {/* Prepare: Crew */}
             {dealId && (
-              <ProductionTeamCard dealId={dealId} sourceOrgId={sourceOrgId ?? null} eventDate={deal?.proposed_date} workspaceId={deal?.workspace_id} />
+              <ProductionTeamCard dealId={dealId} sourceOrgId={sourceOrgId ?? null} eventDate={deal?.proposed_date} workspaceId={deal?.workspace_id} isLocked={isPostHandoff} />
             )}
 
             {/* Prepare: Gear + logistics + day sheet send */}
@@ -523,8 +534,25 @@ export function PlanLens({
   } else if (eventId && !event) {
     // Event ID known but summary still loading (async fetch in progress)
     content = (
-      <div className="stage-panel-elevated p-6 text-[var(--stage-text-secondary)] text-sm leading-relaxed">
-        Loading show data...
+      <div className="stage-panel-elevated p-6 text-[var(--stage-text-secondary)] text-sm leading-relaxed flex flex-col gap-3">
+        <span>Loading show data...</span>
+        {loadTimedOut && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[var(--stage-text-tertiary)]">
+              This is taking longer than expected.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setLoadTimedOut(false);
+                onEventUpdated?.();
+              }}
+              className="stage-btn stage-btn-ghost text-xs px-3 py-1.5 rounded-lg"
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
     );
   } else if (!deal) {

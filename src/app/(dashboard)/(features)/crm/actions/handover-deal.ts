@@ -10,6 +10,8 @@ import { seedAdvancingChecklist } from './advancing-checklist';
 import { syncCrewRatesToAssignments } from './sync-crew-rates-to-assignments';
 import { instrument } from '@/shared/lib/instrumentation';
 import { resolveEventTimezone, toVenueInstant } from '@/shared/lib/timezone';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { COUPLE_ATTR } from '@/entities/directory/model/attribute-keys';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -287,6 +289,7 @@ export async function handoverDeal(
     .from('proposals')
     .select('id, signed_at')
     .eq('deal_id', dealId)
+    .eq('workspace_id', workspaceId)
     .eq('status', 'accepted')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -349,20 +352,29 @@ async function seedDjClientInfo(
 
   if (!entity) return;
 
-  const attrs = (entity.attributes ?? {}) as Record<string, unknown>;
   const displayName = entity.display_name ?? '';
 
   // Build archetype-aware client details
-  const { emptyClientDetails, archetypeToGroup } = await import('@/features/ops/lib/dj-prep-schema');
+  const { emptyClientDetails } = await import('@/features/ops/lib/dj-prep-schema');
   const details = emptyClientDetails(archetype);
 
+  // Resolve partner-name pair when entity is a couple; use canonical
+  // COUPLE_ATTR keys (partner_a_first_name / partner_b_first_name).
+  let partnerA = '';
+  let partnerB = '';
+  if (entity.type === 'couple') {
+    const coupleAttrs = readEntityAttrs(entity.attributes, 'couple');
+    partnerA = coupleAttrs[COUPLE_ATTR.partner_a_first] ?? '';
+    partnerB = coupleAttrs[COUPLE_ATTR.partner_b_first] ?? '';
+  }
+
   if (details.archetype === 'wedding' && entity.type === 'couple') {
-    const a = (attrs.first_name_a as string) ?? '';
-    const b = (attrs.first_name_b as string) ?? '';
-    details.couple_name_a = a;
-    details.couple_name_b = b;
+    details.couple_name_a = partnerA;
+    details.couple_name_b = partnerB;
   } else if (details.archetype === 'wedding') {
-    // Non-couple entity on a wedding — use display name as couple_name_a
+    // Non-couple entity (person, individual, company) on a wedding —
+    // fall back to display name so the DJ has a starting point rather
+    // than a blank prep sheet.
     details.couple_name_a = displayName;
   } else if (details.archetype === 'corporate') {
     details.company_name = displayName;
@@ -376,14 +388,13 @@ async function seedDjClientInfo(
 
   // Also build legacy couple names for backward compat
   let coupleNames = displayName;
-  if (entity.type === 'couple') {
-    const a = (attrs.first_name_a as string) ?? '';
-    const b = (attrs.first_name_b as string) ?? '';
-    if (a && b) coupleNames = `${a} & ${b}`;
+  if (entity.type === 'couple' && partnerA && partnerB) {
+    coupleNames = `${partnerA} & ${partnerB}`;
   }
 
-  // Merge into existing run_of_show_data without clobbering other keys
-  await supabase.rpc('patch_event_ros_data', {
+  // Merge into existing run_of_show_data without clobbering other keys.
+  // Surfaces RPC failures so DJ prep never silently lands blank.
+  const { error: rpcError } = await supabase.rpc('patch_event_ros_data', {
     p_event_id: eventId,
     p_patch: {
       dj_client_details: details,
@@ -395,4 +406,8 @@ async function seedDjClientInfo(
       },
     },
   });
+  if (rpcError) {
+    // Re-throw so the .catch handler at the call site captures to Sentry.
+    throw new Error(`patch_event_ros_data failed: ${rpcError.message}`);
+  }
 }

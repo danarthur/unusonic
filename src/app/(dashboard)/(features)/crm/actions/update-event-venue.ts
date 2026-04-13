@@ -3,7 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { revalidatePath } from 'next/cache';
-import { VENUE_ATTR } from '@/features/network-data/model/attribute-keys';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 
 export type UpdateEventVenueResult = { success: true } | { success: false; error: string };
 
@@ -31,16 +31,13 @@ export async function updateEventVenue(
       .eq('id', venueEntityId)
       .maybeSingle();
     if (entity) {
-      const v = entity as { display_name?: string | null; attributes?: Record<string, unknown> | null };
+      const v = entity as { display_name?: string | null; attributes?: unknown };
       venue_name = v.display_name ?? null;
-      const attrs = (v.attributes as Record<string, unknown>) ?? {};
-      const composed = [
-        attrs[VENUE_ATTR.street],
-        attrs[VENUE_ATTR.city],
-        attrs[VENUE_ATTR.state],
-        attrs[VENUE_ATTR.postal_code],
-      ].filter(Boolean).join(', ') || null;
-      venue_address = (attrs[VENUE_ATTR.formatted_address] as string | null) ?? composed;
+      const venueAttrs = readEntityAttrs(v.attributes, 'venue');
+      const composed = [venueAttrs.street, venueAttrs.city, venueAttrs.state, venueAttrs.postal_code]
+        .filter(Boolean)
+        .join(', ') || null;
+      venue_address = venueAttrs.formatted_address ?? composed;
     }
   }
 

@@ -159,7 +159,6 @@ function getTabsForProfile(profileKey: string, archetype?: string | null): TabDe
     case 'band_musical_act':
       return [
         { id: 'overview', label: 'Overview' },
-        { id: 'show-prep', label: 'Show Prep' },
         { id: 'details', label: 'Details' },
       ];
     case 'tech_stagehand':
@@ -410,12 +409,6 @@ export function GigDetailShell(props: GigDetailShellProps) {
           />
         )}
 
-        {/* Band show-prep placeholder — renders overview-like for now */}
-        {resolvedTab === 'show-prep' && props.gigProfileKey === 'band_musical_act' && (
-          <div className="text-sm text-[var(--stage-text-secondary)]">
-            Band show prep workspace coming soon.
-          </div>
-        )}
       </div>
     </motion.div>
   );

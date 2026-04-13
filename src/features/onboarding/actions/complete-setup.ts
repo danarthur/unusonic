@@ -8,7 +8,7 @@
 'use server';
 
 import 'server-only';
-import { redirect } from 'next/navigation';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { revalidatePath } from 'next/cache';
@@ -40,6 +40,7 @@ export interface InitializeOrganizationResult {
   organizationId?: string;
   workspaceId?: string;
   redirectPath?: string;
+  finalSlug?: string;
 }
 
 /**
@@ -171,6 +172,10 @@ export async function initializeOrganization(
 
     if (relError) {
       console.warn('[Onboarding] ROSTER_MEMBER edge failed (non-fatal):', relError.message);
+      Sentry.captureMessage('Onboarding ROSTER_MEMBER edge failed', {
+        level: 'warning',
+        extra: { userId: user.id, orgId, workspaceId: workspace.id, error: relError.message },
+      });
       // Non-fatal — workspace_members is the primary membership. Edge is for graph queries.
     }
 
@@ -217,19 +222,36 @@ export async function initializeOrganization(
     const tier = input.subscriptionTier;
 
     if (input.type === 'venue') {
-      triggerVectorEmbeddings(orgId).catch(console.warn);
+      triggerVectorEmbeddings(orgId).catch((err) => {
+        console.warn('[Onboarding] triggerVectorEmbeddings stub skipped:', err);
+        Sentry.captureMessage('Onboarding venue RAG stub skipped', {
+          level: 'info',
+          extra: { orgId, reason: err instanceof Error ? err.message : String(err) },
+        });
+      });
     }
     if (tier === 'studio') {
-      registerAgent(orgId).catch(console.warn);
+      registerAgent(orgId).catch((err) => {
+        console.warn('[Onboarding] registerAgent stub skipped:', err);
+        Sentry.captureMessage('Onboarding studio agent stub skipped', {
+          level: 'info',
+          extra: { orgId, reason: err instanceof Error ? err.message : String(err) },
+        });
+      });
     }
 
-    // Redirect to root — middleware resolves role-based destination
-    redirect('/');
+    // Client navigates via router.push(result.redirectPath) — server action
+    // can't throw NEXT_REDIRECT here because it's awaited inside useActionState.
+    return {
+      success: true,
+      organizationId: orgId,
+      workspaceId: workspace.id,
+      redirectPath: '/',
+      finalSlug,
+    };
   } catch (e) {
-    if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
-      throw e;
-    }
     console.error('[Onboarding] initializeOrganization:', e);
+    Sentry.captureException(e, { tags: { area: 'onboarding' } });
     return { success: false, error: e instanceof Error ? e.message : 'Setup failed' };
   }
 }

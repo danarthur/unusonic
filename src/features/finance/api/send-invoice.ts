@@ -17,6 +17,7 @@
  */
 
 import { revalidatePath } from 'next/cache';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { parseBillToSnapshot, parseFromSnapshot } from '../schemas/invoice-snapshots';
@@ -154,6 +155,7 @@ export async function sendInvoice(
     .update({
       invoice_number: invoiceNumber,
       subtotal_amount: subtotal,
+      discount_amount: 0,
       tax_amount: taxAmount,
       tax_rate_snapshot: taxRate,
       total_amount: totalAmount,
@@ -210,6 +212,10 @@ export async function sendInvoice(
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error('[sendInvoice] PDF generation failed — leaving invoice in draft:', message);
+    Sentry.captureException(e, {
+      tags: { area: 'finance.send-invoice', phase: 'pdf' },
+      extra: { invoiceId, invoiceNumber },
+    });
     return { success: false, invoiceNumber: null, error: `Failed to generate invoice PDF: ${message}` };
   }
 
@@ -234,6 +240,10 @@ export async function sendInvoice(
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error('[sendInvoice] Email send failed — leaving invoice in draft:', message);
+    Sentry.captureException(e, {
+      tags: { area: 'finance.send-invoice', phase: 'email' },
+      extra: { invoiceId, invoiceNumber, recipientEmail },
+    });
     return { success: false, invoiceNumber: null, error: `Failed to send invoice email: ${message}` };
   }
 

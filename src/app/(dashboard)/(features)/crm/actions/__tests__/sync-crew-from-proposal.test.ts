@@ -12,8 +12,11 @@ vi.mock('@/shared/lib/workspace', () => ({
   getActiveWorkspaceId: vi.fn(),
 }));
 
+vi.mock('../deal-crew', () => ({
+  syncCrewFromProposal: vi.fn(),
+}));
+
 vi.mock('../get-crew-roles-from-proposal', () => ({
-  getCrewRolesFromProposalForDeal: vi.fn(),
   getCrewRolesFromProposalDiagnostic: vi.fn(),
 }));
 
@@ -22,8 +25,8 @@ vi.mock('../get-crew-roles-from-proposal', () => ({
 // ---------------------------------------------------------------------------
 const { createClient } = await import('@/shared/api/supabase/server');
 const { getActiveWorkspaceId } = await import('@/shared/lib/workspace');
-const { getCrewRolesFromProposalForDeal, getCrewRolesFromProposalDiagnostic } =
-  await import('../get-crew-roles-from-proposal');
+const { syncCrewFromProposal } = await import('../deal-crew');
+const { getCrewRolesFromProposalDiagnostic } = await import('../get-crew-roles-from-proposal');
 const { syncCrewFromProposalToEvent } = await import('../sync-crew-from-proposal');
 
 // ---------------------------------------------------------------------------
@@ -32,32 +35,37 @@ const { syncCrewFromProposalToEvent } = await import('../sync-crew-from-proposal
 let mockClient: ReturnType<typeof createMockSupabaseClient>;
 let eventBuilder: ReturnType<typeof createQueryBuilder>;
 let dealBuilder: ReturnType<typeof createQueryBuilder>;
-let updateBuilder: ReturnType<typeof createQueryBuilder>;
+let crewBeforeBuilder: ReturnType<typeof createQueryBuilder>;
+let crewAfterBuilder: ReturnType<typeof createQueryBuilder>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockClient = createMockSupabaseClient();
-  vi.mocked(createClient).mockResolvedValue(mockClient as any);
+  vi.mocked(createClient).mockResolvedValue(mockClient as never);
   vi.mocked(getActiveWorkspaceId).mockResolvedValue('ws-1');
 
   eventBuilder = createQueryBuilder();
   dealBuilder = createQueryBuilder();
-  updateBuilder = createQueryBuilder();
+  crewBeforeBuilder = createQueryBuilder();
+  crewAfterBuilder = createQueryBuilder();
 
-  // schema('ops').from('events') — first call returns eventBuilder (select), second returns updateBuilder
-  let opsEventsCallCount = 0;
+  // ops.events is called once (event lookup); ops.deal_crew is called twice (before/after counts).
+  let opsFromCall = 0;
   const opsSchema = {
-    from: vi.fn().mockImplementation(() => {
-      opsEventsCallCount++;
-      return opsEventsCallCount === 1 ? eventBuilder : updateBuilder;
+    from: vi.fn().mockImplementation((table: string) => {
+      if (table === 'events') return eventBuilder;
+      if (table === 'deal_crew') {
+        opsFromCall++;
+        return opsFromCall === 1 ? crewBeforeBuilder : crewAfterBuilder;
+      }
+      return createQueryBuilder();
     }),
   };
-  mockClient.schema.mockReturnValue(opsSchema as any);
+  mockClient.schema.mockReturnValue(opsSchema as never);
 
-  // from('deals') for deal lookup
-  mockClient.from.mockReturnValue(dealBuilder as any);
+  mockClient.from.mockReturnValue(dealBuilder as never);
 
-  vi.mocked(getCrewRolesFromProposalForDeal).mockResolvedValue([]);
+  vi.mocked(syncCrewFromProposal).mockResolvedValue();
   vi.mocked(getCrewRolesFromProposalDiagnostic).mockResolvedValue({ step: 'no_roles' });
 });
 
@@ -78,10 +86,7 @@ describe('syncCrewFromProposalToEvent', () => {
   });
 
   it('returns error when no deal linked to event', async () => {
-    eventBuilder.maybeSingle.mockResolvedValue({
-      data: { id: 'evt-1', run_of_show_data: null },
-      error: null,
-    });
+    eventBuilder.maybeSingle.mockResolvedValue({ data: { id: 'evt-1' }, error: null });
     dealBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
 
     const result = await syncCrewFromProposalToEvent('evt-1');
@@ -91,73 +96,26 @@ describe('syncCrewFromProposalToEvent', () => {
     }
   });
 
-  it('returns success with 0 added and diagnostic when no roles found', async () => {
-    eventBuilder.maybeSingle.mockResolvedValue({
-      data: { id: 'evt-1', run_of_show_data: null },
-      error: null,
-    });
+  it('delegates to syncCrewFromProposal and reports 0 added (with diagnostic) when no rows were created', async () => {
+    eventBuilder.maybeSingle.mockResolvedValue({ data: { id: 'evt-1' }, error: null });
     dealBuilder.maybeSingle.mockResolvedValue({ data: { id: 'deal-1' }, error: null });
-    vi.mocked(getCrewRolesFromProposalForDeal).mockResolvedValue([]);
-    vi.mocked(getCrewRolesFromProposalDiagnostic).mockResolvedValue({ step: 'no_roles' });
-
-    const result = await syncCrewFromProposalToEvent('evt-1');
-    expect(result).toEqual({ success: true, added: 0, diagnostic: { step: 'no_roles' } });
-  });
-
-  it('merges new roles into existing run_of_show_data', async () => {
-    eventBuilder.maybeSingle.mockResolvedValue({
-      data: {
-        id: 'evt-1',
-        run_of_show_data: {
-          crew_roles: ['DJ'],
-          crew_items: [{ role: 'DJ', status: 'confirmed' }],
-        },
-      },
-      error: null,
-    });
-    dealBuilder.maybeSingle.mockResolvedValue({ data: { id: 'deal-1' }, error: null });
-    vi.mocked(getCrewRolesFromProposalForDeal).mockResolvedValue(['DJ', 'Lighting Tech', 'A1 Audio']);
-
-    const result = await syncCrewFromProposalToEvent('evt-1');
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.added).toBe(2); // Lighting Tech and A1 Audio (DJ already exists)
-    }
-  });
-
-  it('returns success with 0 when all roles already exist', async () => {
-    eventBuilder.maybeSingle.mockResolvedValue({
-      data: {
-        id: 'evt-1',
-        run_of_show_data: {
-          crew_roles: ['DJ'],
-          crew_items: [{ role: 'DJ', status: 'confirmed' }],
-        },
-      },
-      error: null,
-    });
-    dealBuilder.maybeSingle.mockResolvedValue({ data: { id: 'deal-1' }, error: null });
-    vi.mocked(getCrewRolesFromProposalForDeal).mockResolvedValue(['DJ']);
+    crewBeforeBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 2, error: null }));
+    crewAfterBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 2, error: null }));
     vi.mocked(getCrewRolesFromProposalDiagnostic).mockResolvedValue({ step: 'ok', rolesFound: ['DJ'] });
 
     const result = await syncCrewFromProposalToEvent('evt-1');
+    expect(syncCrewFromProposal).toHaveBeenCalledWith('deal-1');
     expect(result).toEqual({ success: true, added: 0, diagnostic: { step: 'ok', rolesFound: ['DJ'] } });
   });
 
-  it('returns error when update fails', async () => {
-    eventBuilder.maybeSingle.mockResolvedValue({
-      data: { id: 'evt-1', run_of_show_data: null },
-      error: null,
-    });
+  it('reports the number of newly added deal_crew rows', async () => {
+    eventBuilder.maybeSingle.mockResolvedValue({ data: { id: 'evt-1' }, error: null });
     dealBuilder.maybeSingle.mockResolvedValue({ data: { id: 'deal-1' }, error: null });
-    vi.mocked(getCrewRolesFromProposalForDeal).mockResolvedValue(['DJ']);
-
-    // Make the update call return an error
-    updateBuilder.then.mockImplementation((resolve: Function) =>
-      resolve({ data: null, error: { message: 'update failed' } }),
-    );
+    crewBeforeBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 1, error: null }));
+    crewAfterBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 4, error: null }));
 
     const result = await syncCrewFromProposalToEvent('evt-1');
-    expect(result).toEqual({ success: false, error: 'update failed' });
+    expect(syncCrewFromProposal).toHaveBeenCalledWith('deal-1');
+    expect(result).toEqual({ success: true, added: 3 });
   });
 });

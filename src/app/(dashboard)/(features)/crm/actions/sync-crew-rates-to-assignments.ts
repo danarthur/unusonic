@@ -16,6 +16,17 @@ export async function syncCrewRatesToAssignments(
   dealId: string
 ): Promise<void> {
   try {
+    // Guard against callers that invoke this before the ops.events row exists.
+    // Without this, the function would still insert crew_assignments rows —
+    // but their event_id FK would fail or orphan on rollback.
+    if (!eventId || !dealId) {
+      console.warn('[handoff] sync-crew-rates skipped: missing eventId or dealId', {
+        eventId,
+        dealId,
+      });
+      return;
+    }
+
     const supabase = await createClient();
 
     // 1. Get deal_crew rows with assigned entities

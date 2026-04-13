@@ -226,6 +226,7 @@ export default async function PublicInvoicePage({
     status,
     currency,
     subtotal_amount,
+    discount_amount,
     tax_amount,
     total_amount,
     paid_amount,
@@ -407,6 +408,15 @@ export default async function PublicInvoicePage({
                   {formatCurrency(subtotal_amount, currency)}
                 </span>
               </div>
+
+              {discount_amount > 0 && (
+                <div className="flex w-full max-w-xs justify-between text-sm">
+                  <span className="text-gray-500">Discount</span>
+                  <span className="tabular-nums text-gray-900">
+                    &minus;{formatCurrency(discount_amount, currency)}
+                  </span>
+                </div>
+              )}
 
               {tax_amount > 0 && (
                 <div className="flex w-full max-w-xs justify-between text-sm">

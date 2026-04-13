@@ -111,6 +111,7 @@ export function ShowControlStrip({
   if (!startsAt) return null;
 
   const startsAtMs = Date.parse(startsAt);
+  if (Number.isNaN(startsAtMs)) return null;
   const nowMs = Date.now();
   const withinWindow = nowMs >= startsAtMs - WITHIN_WINDOW_MS;
   const isLive = localStatus === 'in_progress';

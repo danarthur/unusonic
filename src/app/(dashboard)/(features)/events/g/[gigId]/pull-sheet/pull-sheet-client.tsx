@@ -17,8 +17,9 @@ import type { PullSheetGearItem, PullSheetCrewItem } from './get-pull-sheet-data
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-/** Pull sheet cycles through the first 3 linear states for quick field use. */
-const PULL_SHEET_CYCLE: GearStatus[] = ['allocated', 'pulled', 'packed', 'loaded'];
+/** Pull sheet cycles through the full linear lifecycle so field crew can
+ *  mark gear on_site and returned directly from the sheet. */
+const PULL_SHEET_CYCLE: GearStatus[] = [...GEAR_LIFECYCLE_ORDER];
 
 const CREW_STATUS_LABELS: Record<string, string> = {
   requested: 'Invited',

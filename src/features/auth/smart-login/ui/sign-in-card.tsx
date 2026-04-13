@@ -11,8 +11,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { signInAction, sendOtpAction, verifyOtpAction } from '../api/actions';
 import { authenticatePasskey } from '@/features/auth/passkey-authenticate/api/authenticate-passkey';
-import { setTrustedDeviceCookie } from '@/shared/lib/trusted-device';
-import { useConditionalMediation } from '../lib/use-conditional-mediation';
 import { AuthErrorBlock } from './auth-error-block';
 import type { AuthState, AuthMode } from '../model/types';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
@@ -61,7 +59,6 @@ export function SignInCard({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [trustDevice] = useState(false);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [passkeyFallbackHint, setPasskeyFallbackHint] = useState<string | null>(null);
   const [isPasskeyPending, setIsPasskeyPending] = useState(false);
@@ -91,18 +88,6 @@ export function SignInCard({
   const isCancellationError = (error: string) =>
     /canceled|cancelled|NotAllowedError|AbortError/i.test(error);
 
-  const handlePasskeyError = useCallback((error: string) => {
-    if (isCancellationError(error)) {
-      // Soft hint for cancellation — don't auto-expand password
-      setPasskeyFallbackHint('Try signing in with your password');
-      return;
-    }
-    // Non-cancellation failure — auto-expand password form
-    setPasskeyError(error);
-    setShowPasswordForm(true);
-    setPasskeyFallbackHint(null);
-  }, []);
-
   const handleSendOtp = useCallback(async () => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || isOtpPending) return;
@@ -130,18 +115,11 @@ export function SignInCard({
     }
   }, [email, otpCode, isOtpPending, redirectTo]);
 
-  // Conditional mediation disabled — browser-native autocomplete="webauthn" causes
-  // repeated passkey dialogs on focus in some browsers (especially incognito).
-  // Users sign in via the explicit "Continue" button instead.
-  const handleEmailFocus = useCallback(() => {}, []);
-  const handleEmailBlur = useCallback(() => {}, []);
-
   const handleContinueWithPasskey = useCallback(() => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || isPending) return;
     setPasskeyError(null);
     setPasskeyFallbackHint(null);
-    if (trustDevice) setTrustedDeviceCookie(true);
     setIsPasskeyPending(true);
     onPasskeyPendingChange(true);
     authenticatePasskey({ email: trimmed, redirectTo })
@@ -159,7 +137,7 @@ export function SignInCard({
         setIsPasskeyPending(false);
         onPasskeyPendingChange(false);
       });
-  }, [email, isPending, trustDevice, redirectTo, onPasskeyPendingChange]);
+  }, [email, isPending, redirectTo, onPasskeyPendingChange]);
 
   return (
     <AnimatePresence mode="popLayout">
@@ -260,8 +238,6 @@ export function SignInCard({
                 disabled={isPending}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onFocus={handleEmailFocus}
-                onBlur={handleEmailBlur}
                 data-lpignore="true"
                 data-form-type="other"
                 data-1p-ignore
@@ -367,7 +343,6 @@ export function SignInCard({
                       <input type="hidden" name="redirect" value={redirectTo} />
                     )}
                     <input type="hidden" name="email" value={email} />
-                    <input type="hidden" name="trustDevice" value={trustDevice ? '1' : ''} />
                     <div>
                       <label
                         htmlFor="password"

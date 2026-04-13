@@ -1009,7 +1009,13 @@ export async function sendForSignature(
         .eq('id', deal.organization_id)
         .maybeSingle()
     : null;
-  const entityType = (entityTypeRes?.data as { type?: string } | null)?.type ?? null;
+  const rawEntityType = (entityTypeRes?.data as { type?: string | null } | null)?.type ?? null;
+  const SUBJECT_ENTITY_TYPES = ['person', 'company', 'venue', 'couple'] as const;
+  type SubjectEntityType = typeof SUBJECT_ENTITY_TYPES[number];
+  const entityType: SubjectEntityType | null =
+    rawEntityType && (SUBJECT_ENTITY_TYPES as readonly string[]).includes(rawEntityType)
+      ? (rawEntityType as SubjectEntityType)
+      : null;
 
   const clientFirstName = clientName?.trim().split(/\s+/)[0] ?? null;
 
@@ -1038,7 +1044,7 @@ export async function sendForSignature(
     total: proposalData?.total ?? null,
     depositPercent: (proposalData?.proposal as { deposit_percent?: number | null } | undefined)?.deposit_percent ?? null,
     paymentDueDays: (proposalData?.proposal as { payment_due_days?: number | null } | undefined)?.payment_due_days ?? null,
-    entityType: entityType as 'person' | 'couple' | 'company' | 'venue' | null,
+    entityType,
     eventArchetype: deal?.event_archetype ?? null,
     eventStartTime: proposalData?.event.eventStartTime ?? null,
     eventEndTime: proposalData?.event.eventEndTime ?? null,

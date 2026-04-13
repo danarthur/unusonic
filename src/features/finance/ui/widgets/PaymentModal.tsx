@@ -95,8 +95,6 @@ export function PaymentModal({
       }
       const parsedAmount = Math.round(rawAmount * 100) / 100;
 
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore -- tsc misresolves server action arity through 'use server' boundary
       const result = await recordManualPayment(
         {
           invoiceId,

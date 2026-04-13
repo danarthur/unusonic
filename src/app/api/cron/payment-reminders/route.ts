@@ -11,6 +11,26 @@ import { NextResponse } from 'next/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { sendPaymentReminderEmail } from '@/shared/api/email/send';
 import type { PaymentReminderTone } from '@/shared/api/email/templates/PaymentReminderEmail';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+
+function resolveEntityEmail(
+  type: string | null | undefined,
+  rawAttrs: unknown,
+): string | null {
+  if (type === 'company') {
+    const companyAttrs = readEntityAttrs(rawAttrs, 'company');
+    return companyAttrs.billing_email ?? companyAttrs.support_email ?? null;
+  }
+  if (type === 'individual') {
+    return readEntityAttrs(rawAttrs, 'individual').email ?? null;
+  }
+  if (type === 'couple') {
+    const coupleAttrs = readEntityAttrs(rawAttrs, 'couple');
+    return coupleAttrs.partner_a_email ?? coupleAttrs.partner_b_email ?? null;
+  }
+  // Default: treat as person
+  return readEntityAttrs(rawAttrs, 'person').email ?? null;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -165,13 +185,19 @@ export async function GET(req: Request) {
         const { data: entity } = await supabase
           .schema('directory')
           .from('entities')
-          .select('display_name, attributes')
+          .select('display_name, type, attributes')
           .eq('id', billToEntityId)
-          .maybeSingle() as { data: { display_name: string | null; attributes: Record<string, unknown> | null } | null };
+          .maybeSingle() as {
+            data: {
+              display_name: string | null;
+              type: string | null;
+              attributes: Record<string, unknown> | null;
+            } | null;
+          };
 
         if (entity) {
           clientName = entity.display_name ?? null;
-          clientEmail = (entity.attributes as Record<string, unknown> | null)?.email as string ?? null;
+          clientEmail = resolveEntityEmail(entity.type, entity.attributes);
         }
       }
 
@@ -180,13 +206,19 @@ export async function GET(req: Request) {
         const { data: orgEntity } = await supabase
           .schema('directory')
           .from('entities')
-          .select('display_name, attributes')
+          .select('display_name, type, attributes')
           .eq('id', deal.organization_id)
-          .maybeSingle() as { data: { display_name: string | null; attributes: Record<string, unknown> | null } | null };
+          .maybeSingle() as {
+            data: {
+              display_name: string | null;
+              type: string | null;
+              attributes: Record<string, unknown> | null;
+            } | null;
+          };
 
         if (orgEntity) {
           if (!clientName) clientName = orgEntity.display_name ?? null;
-          clientEmail = (orgEntity.attributes as Record<string, unknown> | null)?.email as string ?? null;
+          clientEmail = resolveEntityEmail(orgEntity.type, orgEntity.attributes);
         }
       }
 
