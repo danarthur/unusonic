@@ -205,6 +205,10 @@ export function SignUpFlow({
               : () => {
                   setSignupStep((s) => s - 1);
                   setPasskeyError(null);
+                  // Clear the "account created" flag so going back to step 2
+                  // (email) and re-submitting doesn't skip signUpForPasskey and
+                  // surface a misleading "already created" error.
+                  accountCreatedRef.current = false;
                   if (logoAckTimeoutRef.current) {
                     clearTimeout(logoAckTimeoutRef.current);
                     setLogoAcknowledging(false);

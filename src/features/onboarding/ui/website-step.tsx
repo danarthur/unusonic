@@ -20,13 +20,18 @@ import { PATHFINDING_PERSONAS } from '../model/subscription-types';
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 const springConfig = STAGE_HEAVY;
 
-/** Single-line status messages during Phase 2 (cycles to show Aion is working). */
+/** Single-line status messages during Phase 2 (cycles to show Aion is working).
+ *  When the scan crosses `ESCALATION_MS` without returning we swap in the
+ *  "still thinking" tail so slow networks don't look like silent failures. */
 const THINKING_STATUSES = [
   'Scanning your site…',
   'Detecting industry…',
   'Extracting brand…',
   'Calibrating tier…',
 ];
+const ESCALATED_STATUS = 'Still thinking — slow network, hang on…';
+const ESCALATION_MS = 15_000;
+const TIMEOUT_MS = 30_000;
 
 export interface ScoutOnboardingPayload {
   data: ScoutResult;
@@ -46,10 +51,13 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
   const [result, setResult] = useState<ScoutOnboardingPayload | null>(null);
   const [selectedTier, setSelectedTier] = useState<GenesisTierId>('scout');
   const [statusIndex, setStatusIndex] = useState(0);
+  const [escalated, setEscalated] = useState(false);
   const statusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const escalationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     return () => {
       if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+      if (escalationTimeoutRef.current) clearTimeout(escalationTimeoutRef.current);
     };
   }, []);
 
@@ -62,17 +70,25 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
     setError(null);
     setPhase('thinking');
     setStatusIndex(0);
+    setEscalated(false);
     statusIntervalRef.current = setInterval(() => {
       setStatusIndex((i) => (i + 1) % THINKING_STATUSES.length);
     }, 1200);
+    escalationTimeoutRef.current = setTimeout(() => {
+      setEscalated(true);
+    }, ESCALATION_MS);
 
     const scoutPromise = scoutCompanyForOnboarding(trimmed);
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30_000));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), TIMEOUT_MS));
     const scoutResult = await Promise.race([scoutPromise, timeoutPromise]);
 
     if (statusIntervalRef.current) {
       clearInterval(statusIntervalRef.current);
       statusIntervalRef.current = null;
+    }
+    if (escalationTimeoutRef.current) {
+      clearTimeout(escalationTimeoutRef.current);
+      escalationTimeoutRef.current = null;
     }
 
     if (!scoutResult) {
@@ -197,7 +213,7 @@ export function WebsiteStep({ onUseScout, onSkip }: WebsiteStepProps) {
             <div className="stage-panel liquid-levitation rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] p-8 flex flex-col items-center gap-6 shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2),inset_0_1px_0_0_oklch(1_0_0/0.06)]">
               <LivingLogo status="loading" size="xl" className="text-[var(--stage-text-primary)]" />
               <p className="text-sm text-[var(--stage-text-tertiary)] min-h-[1.25rem] text-center max-w-xs">
-                {THINKING_STATUSES[statusIndex]}
+                {escalated ? ESCALATED_STATUS : THINKING_STATUSES[statusIndex]}
               </p>
             </div>
             <motion.div

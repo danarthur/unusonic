@@ -41,7 +41,13 @@ interface GenesisCreateCardProps {
 export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisCreateCardProps) {
   const router = useRouter();
   const [name, setName] = React.useState(prefill?.name ?? '');
-  const tier: GenesisTierId = prefill?.tier ?? 'scout';
+  // Bind tier to state so any future TierSelector UI can mutate it. Defaults
+  // to the prefill value and re-syncs if prefill changes (e.g. Aion website
+  // scout completes after the card mounts).
+  const [tier, setTier] = React.useState<GenesisTierId>(prefill?.tier ?? 'scout');
+  React.useEffect(() => {
+    if (prefill?.tier) setTier(prefill.tier);
+  }, [prefill?.tier]);
 
   const [state, submitAction, isPending] = useActionState(
     async (_prev: { ok: boolean; error?: string } | null, formData: FormData) => {

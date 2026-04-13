@@ -84,9 +84,13 @@ export function SignInCard({
   const signInEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const exitDuration = prefersReducedMotion ? 0.3 : 0.28;
 
-  /** Returns true if the error is a user-initiated cancellation (no fallback needed). */
+  /** Returns true if the error is a user-initiated cancellation (no fallback needed).
+   *  Handles the handful of WebAuthn error shapes browsers surface when the user
+   *  dismisses the prompt — anything not in this set auto-expands the password form. */
   const isCancellationError = (error: string) =>
-    /canceled|cancelled|NotAllowedError|AbortError/i.test(error);
+    /canceled|cancelled|NotAllowedError|AbortError|permission denied|user dismissed|user cancell?ed/i.test(
+      error,
+    );
 
   const handleSendOtp = useCallback(async () => {
     const trimmed = email.trim().toLowerCase();
