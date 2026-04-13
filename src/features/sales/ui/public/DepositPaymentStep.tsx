@@ -121,7 +121,10 @@ export function DepositPaymentStep({ token, total, depositPercent }: DepositPaym
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const depositCents = Math.round((total * depositPercent) / 100) * 100;
+  // Convert to cents first, then round — previous `Math.round(total * pct / 100) * 100`
+  // rounded at dollar granularity first, so 33.33% of $1000 produced $333.00 instead of
+  // $333.30. Now rounds to the nearest cent.
+  const depositCents = Math.round(total * depositPercent);
 
   useEffect(() => {
     createProposalDepositIntent(token)

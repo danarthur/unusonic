@@ -7,6 +7,7 @@
 'use server';
 
 import { unstable_noStore } from 'next/cache';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
@@ -1051,8 +1052,21 @@ export async function sendForSignature(
   };
 
   if (!submission.success) {
-    // Non-fatal: DocuSeal not configured — fall back to sending a plain proposal link
+    // Non-fatal: DocuSeal not configured or returned an error — fall back to
+    // sending a plain proposal link. Surface to Sentry so operators can see
+    // when a workspace is losing the e-signature path; this was previously
+    // a silent console.warn that hid DocuSeal outages.
     console.warn('[sendForSignature] DocuSeal step skipped:', submission.error);
+    Sentry.captureMessage('sendForSignature: DocuSeal fallback to plain email', {
+      level: 'warning',
+      extra: {
+        draftProposalId,
+        workspaceId: workspaceMembership,
+        dealId,
+        reason: submission.error,
+      },
+      tags: { area: 'sales.docuseal' },
+    });
     const fallbackResult = await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
     if (fallbackResult.ok && fallbackResult.messageId) {
       const sys = getSystemClient();
