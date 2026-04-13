@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, MapPin, Clock, ChevronDown, Phone, Users, UserPlus } from 'lucide-react';
+import { CalendarDays, MapPin, Clock, ChevronDown, Phone, Users, UserPlus, Check, Send } from 'lucide-react';
 import { STAGE_MEDIUM, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
 import type { EventCrewStatus, CrewMember } from '@/features/ops/actions/get-workspace-crew-status';
 
@@ -10,21 +11,17 @@ import type { EventCrewStatus, CrewMember } from '@/features/ops/actions/get-wor
 
 function formatDate(iso: string | null): string {
   if (!iso) return 'TBD';
-  return new Date(iso).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+  return format(new Date(iso), 'EEE, MMM d');
 }
 
 function formatTime(iso: string | null): string {
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return format(new Date(iso), 'h:mm a');
 }
 
 function formatCallTime(iso: string | null): string {
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return format(new Date(iso), 'h:mm a');
 }
 
 /* ── Status Badge ────────────────────────────────────────────────── */
@@ -35,10 +32,17 @@ function StatusBadge({ status }: { status: string }) {
     confirmed: 'bg-[oklch(0.75_0.15_145/0.2)] text-[oklch(0.75_0.15_145)]',
     dispatched: 'bg-[oklch(0.85_0.02_0/0.15)] text-[var(--stage-text-secondary)]',
   };
+  const icons: Record<string, typeof Clock> = {
+    requested: Clock,
+    confirmed: Check,
+    dispatched: Send,
+  };
+  const Icon = icons[status];
   return (
     <span
-      className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[status] ?? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'}`}
+      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${styles[status] ?? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'}`}
     >
+      {Icon && <Icon className="size-3" />}
       {status}
     </span>
   );
@@ -170,7 +174,8 @@ function EventCrewCard({ event, index }: { event: EventCrewStatus; index: number
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ ...STAGE_MEDIUM, delay: index * STAGE_STAGGER_CHILDREN }}
+      transition={STAGE_MEDIUM}
+      data-surface="surface"
       className="rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)] overflow-hidden"
     >
       {/* Header — always visible */}
@@ -181,13 +186,13 @@ function EventCrewCard({ event, index }: { event: EventCrewStatus; index: number
       >
         {/* Date block */}
         <div className="flex flex-col items-center justify-center w-12 shrink-0 pt-0.5">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+          <span className="stage-label text-[var(--stage-text-tertiary)]">
             {event.starts_at
-              ? new Date(event.starts_at).toLocaleDateString('en-US', { month: 'short' })
+              ? format(new Date(event.starts_at), 'MMM')
               : ''}
           </span>
           <span className="text-lg font-semibold text-[var(--stage-text-primary)] leading-none">
-            {event.starts_at ? new Date(event.starts_at).getDate() : '?'}
+            {event.starts_at ? format(new Date(event.starts_at), 'd') : '?'}
           </span>
         </div>
 
@@ -278,6 +283,7 @@ export function CrewStatusView({ events }: CrewStatusViewProps) {
 
   return (
     <div className="flex flex-col gap-3">
+      <h1 className="sr-only">Crew status</h1>
       <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
         Upcoming shows
       </h2>

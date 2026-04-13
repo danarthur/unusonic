@@ -1,6 +1,6 @@
 /**
  * My Pay — employee portal.
- * Read-only view of compensation rates and assignment pay history.
+ * Read-only view of compensation, payment status tracking, and earnings history.
  */
 
 import { createClient } from '@/shared/api/supabase/server';
@@ -57,41 +57,75 @@ export default async function PayPage() {
     .not('hourly_rate', 'is', null)
     .order('skill_tag');
 
-  // Get assignment pay history from crew_assignments (has event join for titles)
+  // Get assignment pay history with payment tracking columns
   const { data: crewAssignments } = await supabase
     .schema('ops')
     .from('entity_crew_schedule')
-    .select('assignment_id, role, status, pay_rate, pay_rate_type, scheduled_hours, event_title, starts_at')
+    .select(
+      'assignment_id, role, status, pay_rate, pay_rate_type, scheduled_hours, event_title, starts_at, payment_status, payment_date, travel_stipend, per_diem, kit_fee, overtime_hours, overtime_rate, bonus'
+    )
     .eq('entity_id', personEntity.id)
     .in('status', ['confirmed', 'dispatched'])
-    .not('pay_rate', 'is', null)
     .order('starts_at', { ascending: false })
     .limit(50);
 
-  const payAssignments = (crewAssignments ?? []).map(a => {
-    const rate = Number(a.pay_rate);
-    const total = a.pay_rate_type === 'hourly' && a.scheduled_hours
-      ? rate * Number(a.scheduled_hours)
-      : rate;
+  const payAssignments = (crewAssignments ?? []).map((a) => {
+    const baseRate = Number(a.pay_rate ?? 0);
+    const scheduledHours = a.scheduled_hours ? Number(a.scheduled_hours) : null;
+    const overtimeHours = a.overtime_hours ? Number(a.overtime_hours) : null;
+    const overtimeRate = a.overtime_rate ? Number(a.overtime_rate) : null;
+    const travelStipend = a.travel_stipend ? Number(a.travel_stipend) : null;
+    const perDiem = a.per_diem ? Number(a.per_diem) : null;
+    const kitFee = a.kit_fee ? Number(a.kit_fee) : null;
+    const bonus = a.bonus ? Number(a.bonus) : null;
+
+    // Compute base earnings
+    const baseEarnings =
+      a.pay_rate_type === 'hourly' && scheduledHours
+        ? baseRate * scheduledHours
+        : baseRate;
+
+    // Compute overtime
+    const otEarnings =
+      overtimeHours && overtimeRate ? overtimeHours * overtimeRate : 0;
+
+    // Gross total = base + OT + extras
+    const grossTotal =
+      baseEarnings +
+      otEarnings +
+      (travelStipend ?? 0) +
+      (perDiem ?? 0) +
+      (kitFee ?? 0) +
+      (bonus ?? 0);
+
     return {
-      id: a.assignment_id,
-      role: a.role ?? 'Crew',
-      dayRate: total,
-      date: a.starts_at as string | null,
+      id: a.assignment_id as string,
+      role: (a.role as string) ?? 'Crew',
       eventTitle: a.event_title as string | null,
+      date: a.starts_at as string | null,
+      baseRate,
+      baseRateType: a.pay_rate_type as string | null,
+      scheduledHours,
+      overtimeHours,
+      overtimeRate,
+      travelStipend,
+      perDiem,
+      kitFee,
+      bonus,
+      grossTotal,
+      paymentStatus: (a.payment_status as string) ?? 'pending',
+      paymentDate: a.payment_date as string | null,
     };
   });
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-      <PayView
-        defaultHourlyRate={defaultHourlyRate}
-        skillRates={(skills ?? []).map(s => ({
-          tag: s.skill_tag,
-          hourlyRate: s.hourly_rate as number,
-        }))}
-        assignments={payAssignments}
-      />
-    </div>
+    <PayView
+      defaultHourlyRate={defaultHourlyRate}
+      skillRates={(skills ?? []).map((s) => ({
+        tag: s.skill_tag,
+        hourlyRate: s.hourly_rate as number,
+      }))}
+      assignments={payAssignments}
+    />
   );
 }

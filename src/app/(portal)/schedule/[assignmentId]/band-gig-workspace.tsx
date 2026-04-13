@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Music, Clock, FileText, Save, Loader2, ListMusic } from 'lucide-react';
+import { toast } from 'sonner';
 import { saveBandGigData, type Setlist } from '@/features/ops/actions/save-band-data';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
@@ -26,8 +27,6 @@ export function BandGigWorkspace({
   initialGigNotes,
 }: BandGigWorkspaceProps) {
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
-
   const [selectedSetlistId, setSelectedSetlistId] = useState(initialSetlistId ?? '');
   const [setTime, setSetTime] = useState(initialSetTime ?? '');
   const [gigNotes, setGigNotes] = useState(initialGigNotes ?? '');
@@ -39,66 +38,71 @@ export function BandGigWorkspace({
   useEffect(() => { isDirty.current = true; }, [selectedSetlistId, setTime, gigNotes]);
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty.current && !saved) { e.preventDefault(); }
+      if (isDirty.current) { e.preventDefault(); }
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [saved]);
+  }, []);
 
   const handleSave = () => {
-    setSaved(false);
     startTransition(async () => {
       const result = await saveBandGigData(eventId, {
         band_setlist_id: selectedSetlistId || undefined,
         band_set_time: setTime || undefined,
         band_gig_notes: gigNotes || undefined,
       });
-      if (result.ok) { setSaved(true); isDirty.current = false; }
+      if (result.ok) {
+        isDirty.current = false;
+        toast.success('Saved');
+      } else {
+        toast.error(result.error ?? 'Failed to save', { duration: Infinity });
+      }
     });
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={STAGE_MEDIUM}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.12, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
       {/* Header + Save */}
-      <div className="sticky top-14 z-20 flex items-center justify-between gap-3 py-3 px-4 -mx-4 bg-[var(--stage-void)]/90 backdrop-blur-md border-b border-[oklch(1_0_0/0.06)]">
+      <div className="sticky top-14 z-20 flex items-center justify-between gap-3 py-3 px-4 -mx-4 bg-[var(--stage-void)] border-b border-[oklch(1_0_0/0.06)]">
         <div className="flex items-center gap-2">
-          <Music className="size-4 text-[var(--stage-text-tertiary)]" />
-          <h2 className="text-sm font-semibold text-[var(--stage-text-primary)]">Show prep</h2>
+          <Music className="size-4 text-[var(--stage-text-secondary)]" />
+          <h2 className="text-sm font-medium text-[var(--stage-text-primary)]">Show prep</h2>
         </div>
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-[oklch(1_0_0/0.1)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.15)] transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-[oklch(1_0_0/0.1)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.15)] transition-colors disabled:opacity-[0.45]"
         >
           {isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          {saved ? 'Saved' : 'Save'}
+          Save
         </button>
       </div>
 
       {/* Set time */}
-      <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+      <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
         <div className="flex items-center gap-2 mb-1">
-          <Clock className="size-4 text-[var(--stage-text-tertiary)]" />
-          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">Set time</h3>
+          <Clock className="size-4 text-[var(--stage-text-secondary)]" />
+          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Set time</h3>
         </div>
         <input
           value={setTime}
           onChange={(e) => setSetTime(e.target.value)}
           placeholder="e.g. 8:00 PM — 11:00 PM"
-          className="text-sm bg-[var(--stage-well)] rounded-lg px-3 py-2 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] border border-[oklch(1_0_0/0.06)] outline-none focus:border-[oklch(1_0_0/0.15)]"
+          aria-label="Set time"
+          className="text-sm bg-[var(--ctx-well)] rounded-lg px-3 py-2 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none focus-visible:border-[var(--stage-accent)]"
         />
       </div>
 
       {/* Setlist selector */}
-      <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+      <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
         <div className="flex items-center gap-2 mb-1">
-          <ListMusic className="size-4 text-[var(--stage-text-tertiary)]" />
-          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">Setlist</h3>
+          <ListMusic className="size-4 text-[var(--stage-text-secondary)]" />
+          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Setlist</h3>
         </div>
 
         {setlists.length > 0 ? (
@@ -106,7 +110,8 @@ export function BandGigWorkspace({
             <select
               value={selectedSetlistId}
               onChange={(e) => setSelectedSetlistId(e.target.value)}
-              className="text-sm bg-[var(--stage-well)] rounded-lg px-3 py-2 text-[var(--stage-text-primary)] border border-[oklch(1_0_0/0.06)] outline-none focus:border-[oklch(1_0_0/0.15)]"
+              aria-label="Setlist"
+              className="text-sm bg-[var(--ctx-well)] rounded-lg px-3 py-2 text-[var(--stage-text-primary)] border border-[oklch(1_0_0/0.06)] outline-none focus-visible:border-[var(--stage-accent)]"
             >
               <option value="">No setlist selected</option>
               {setlists.map(s => (
@@ -135,17 +140,18 @@ export function BandGigWorkspace({
       </div>
 
       {/* Gig notes */}
-      <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+      <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
         <div className="flex items-center gap-2 mb-1">
-          <FileText className="size-4 text-[var(--stage-text-tertiary)]" />
-          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">Show notes</h3>
+          <FileText className="size-4 text-[var(--stage-text-secondary)]" />
+          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Show notes</h3>
         </div>
         <textarea
           value={gigNotes}
           onChange={(e) => setGigNotes(e.target.value)}
           rows={3}
           placeholder="Sound check time, special requests, stage layout notes..."
-          className="text-sm bg-[var(--stage-well)] rounded-lg px-3 py-2 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] border border-[oklch(1_0_0/0.06)] outline-none focus:border-[oklch(1_0_0/0.15)] resize-none"
+          aria-label="Show notes"
+          className="text-sm bg-[var(--ctx-well)] rounded-lg px-3 py-2 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none focus-visible:border-[var(--stage-accent)] resize-none"
         />
       </div>
     </motion.div>

@@ -52,8 +52,6 @@ export default async function RidersPage() {
   const hospitalityRider = (attrs.band_hospitality_rider ?? []) as HospitalityRiderItem[];
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-      <RidersView initialTechRider={techRider} initialHospitalityRider={hospitalityRider} />
-    </div>
+    <RidersView initialTechRider={techRider} initialHospitalityRider={hospitalityRider} />
   );
 }

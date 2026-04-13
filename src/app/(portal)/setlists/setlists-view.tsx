@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ListMusic, Plus, X, Save, Loader2, Music, GripVertical, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 import { saveSetlists, type Setlist, type SetlistSong } from '@/features/ops/actions/save-band-data';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
@@ -16,15 +17,16 @@ export function SetlistsView({ initialSetlists }: SetlistsViewProps) {
   const [setlists, setSetlists] = useState<Setlist[]>(initialSetlists);
   const [activeId, setActiveId] = useState<string | null>(setlists[0]?.id ?? null);
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
-
   const activeSetlist = setlists.find(s => s.id === activeId) ?? null;
 
   const handleSave = () => {
-    setSaved(false);
     startTransition(async () => {
       const result = await saveSetlists(setlists);
-      if (result.ok) setSaved(true);
+      if (result.ok) {
+        toast.success('Saved');
+      } else {
+        toast.error(result.error ?? 'Failed to save setlists', { duration: Infinity });
+      }
     });
   };
 
@@ -87,10 +89,10 @@ export function SetlistsView({ initialSetlists }: SetlistsViewProps) {
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-[oklch(1_0_0/0.1)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.15)] transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-[oklch(1_0_0/0.1)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.15)] transition-colors disabled:opacity-[0.45]"
         >
           {isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          {saved ? 'Saved' : 'Save'}
+          Save
         </button>
       </div>
 
@@ -109,7 +111,7 @@ export function SetlistsView({ initialSetlists }: SetlistsViewProps) {
             `}
           >
             {s.name || 'Untitled'}
-            <span className="text-[10px] text-[var(--stage-text-tertiary)]">{s.songs.length}</span>
+            <span className="text-label text-[var(--stage-text-tertiary)]">{s.songs.length}</span>
           </button>
         ))}
         <button
@@ -136,7 +138,8 @@ export function SetlistsView({ initialSetlists }: SetlistsViewProps) {
               <input
                 value={activeSetlist.name}
                 onChange={(e) => updateSetlistName(activeSetlist.id, e.target.value)}
-                className="flex-1 text-sm font-medium bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none border-b border-[oklch(1_0_0/0.06)] focus:border-[oklch(1_0_0/0.15)] pb-1"
+                aria-label="Setlist name"
+                className="flex-1 text-sm font-medium bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none border border-[oklch(1_0_0/0.06)] focus-visible:border-[var(--stage-accent)] rounded px-2 py-1"
                 placeholder="Setlist name"
               />
               <button
@@ -150,7 +153,7 @@ export function SetlistsView({ initialSetlists }: SetlistsViewProps) {
             {/* Songs */}
             <div className="flex flex-col gap-1.5">
               {activeSetlist.songs.map((song, i) => (
-                <div key={song.id} className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--stage-surface)] border border-[oklch(1_0_0/0.06)]">
+                <div key={song.id} data-surface="elevated" className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0/0.06)]">
                   <span className="text-xs font-mono text-[var(--stage-text-tertiary)] w-5 text-right shrink-0">{i + 1}</span>
                   <GripVertical className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0 cursor-grab" />
                   <div className="flex-1 flex items-center gap-2 min-w-0">
@@ -158,18 +161,21 @@ export function SetlistsView({ initialSetlists }: SetlistsViewProps) {
                       value={song.title}
                       onChange={(e) => updateSong(activeSetlist.id, song.id, { title: e.target.value })}
                       placeholder="Song title"
-                      className="flex-1 text-sm bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none min-w-0"
+                      aria-label="Song title"
+                      className="flex-1 text-sm bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none min-w-0 rounded px-1.5 py-0.5 border border-[oklch(1_0_0/0.06)]"
                     />
                     <span className="text-[var(--stage-text-tertiary)]">—</span>
                     <input
                       value={song.artist}
                       onChange={(e) => updateSong(activeSetlist.id, song.id, { artist: e.target.value })}
                       placeholder="Artist"
-                      className="flex-1 text-sm bg-transparent text-[var(--stage-text-secondary)] placeholder:text-[var(--stage-text-tertiary)] outline-none min-w-0"
+                      aria-label="Artist"
+                      className="flex-1 text-sm bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] placeholder:text-[var(--stage-text-secondary)] outline-none min-w-0 rounded px-1.5 py-0.5 border border-[oklch(1_0_0/0.06)]"
                     />
                   </div>
                   <button
                     onClick={() => removeSong(activeSetlist.id, song.id)}
+                    aria-label="Remove song"
                     className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] shrink-0"
                   >
                     <X className="size-3.5" />

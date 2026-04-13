@@ -4,11 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
 import { savePushSubscription } from '@/features/ops/actions/save-push-subscription';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 const DISMISSED_KEY = 'unusonic_push_prompt_dismissed';
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-
-const spring = { type: 'spring' as const, stiffness: 400, damping: 35 };
 
 /**
  * Converts a base64 VAPID key to a Uint8Array for the pushManager subscribe call.
@@ -102,7 +101,7 @@ export function PushPrompt() {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          transition={spring}
+          transition={STAGE_MEDIUM}
           className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]"
         >
           <Bell className="size-4 shrink-0 text-[var(--stage-text-secondary)]" />
@@ -113,7 +112,7 @@ export function PushPrompt() {
             type="button"
             onClick={handleEnable}
             disabled={subscribing}
-            className="shrink-0 px-3 py-1 text-xs font-medium rounded-lg bg-[oklch(0.88_0_0)] text-[oklch(0.13_0_0)] hover:bg-[oklch(0.92_0_0)] transition-colors disabled:opacity-50"
+            className="shrink-0 px-3 py-1 text-xs font-medium rounded-lg bg-[oklch(0.88_0_0)] text-[oklch(0.13_0_0)] hover:bg-[oklch(0.92_0_0)] transition-colors disabled:opacity-[0.45]"
           >
             {subscribing ? 'Enabling...' : 'Enable'}
           </button>

@@ -95,8 +95,6 @@ export default async function PipelinePage() {
   }));
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-      <PipelineView deals={enrichedDeals} />
-    </div>
+    <PipelineView deals={enrichedDeals} />
   );
 }

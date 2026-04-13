@@ -9,6 +9,7 @@ import {
   DoorOpen,
   Wrench,
 } from 'lucide-react';
+import { format } from 'date-fns';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -42,8 +43,8 @@ export interface TechDaySheetProps {
 function SectionHeader({ icon: Icon, label }: { icon: typeof Package; label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <Icon className="size-4 text-[var(--stage-text-tertiary)]" />
-      <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+      <Icon className="size-4 text-[var(--stage-text-secondary)]" />
+      <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
         {label}
       </h3>
     </div>
@@ -51,7 +52,7 @@ function SectionHeader({ icon: Icon, label }: { icon: typeof Package; label: str
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return format(new Date(iso), 'h:mm a');
 }
 
 const GEAR_STATUS_STYLES: Record<string, string> = {
@@ -86,25 +87,25 @@ export function TechDaySheet({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={STAGE_MEDIUM}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.12, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
       {/* Section label */}
       <div className="flex items-center gap-2">
-        <Wrench className="size-4 text-[var(--stage-text-tertiary)]" />
-        <h2 className="text-sm font-semibold text-[var(--stage-text-primary)]">Production details</h2>
+        <Wrench className="size-4 text-[var(--stage-text-secondary)]" />
+        <h2 className="text-sm font-medium text-[var(--stage-text-primary)]">Production details</h2>
       </div>
 
       {/* ── Call Time Slots ───────────────────────────────────────── */}
       {callTimeSlots.length > 0 && (
-        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
           <SectionHeader icon={Clock} label="Call times" />
           <div className="flex flex-col gap-1.5">
             {callTimeSlots.map((slot) => (
               <div key={slot.id} className="flex items-baseline gap-3 text-sm">
-                <span className="w-20 shrink-0 text-right font-mono text-[var(--stage-text-tertiary)]">
+                <span className="w-20 shrink-0 text-right font-mono tabular-nums text-[var(--stage-text-secondary)]">
                   {formatTime(slot.time)}
                 </span>
                 <span className="text-[var(--stage-text-primary)]">{slot.label}</span>
@@ -116,7 +117,7 @@ export function TechDaySheet({
 
       {/* ── Gear List ────────────────────────────────────────────── */}
       {gearItems.length > 0 && (
-        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
           <SectionHeader icon={Package} label="Gear" />
           <div className="flex flex-col gap-2">
             {gearItems.map((item) => (
@@ -129,12 +130,12 @@ export function TechDaySheet({
                     x{item.quantity}
                   </span>
                   {item.is_sub_rental && (
-                    <span className="text-[10px] font-medium text-[var(--stage-text-tertiary)] ml-2 uppercase">
+                    <span className="text-label font-medium text-[var(--stage-text-tertiary)] ml-2 uppercase">
                       sub-rental
                     </span>
                   )}
                 </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${GEAR_STATUS_STYLES[item.status] ?? GEAR_STATUS_STYLES.pending}`}>
+                <span className={`stage-badge-text px-2 py-0.5 rounded-full ${GEAR_STATUS_STYLES[item.status] ?? GEAR_STATUS_STYLES.pending}`}>
                   {item.status}
                 </span>
               </div>
@@ -145,7 +146,7 @@ export function TechDaySheet({
 
       {/* ── Transport ────────────────────────────────────────────── */}
       {transportMode && (
-        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
           <SectionHeader icon={Truck} label="Transport" />
           <div className="flex items-center justify-between text-sm">
             <span className="text-[var(--stage-text-primary)]">
@@ -162,17 +163,17 @@ export function TechDaySheet({
 
       {/* ── Venue Logistics ──────────────────────────────────────── */}
       {(dockInfo || powerInfo) && (
-        <div className="flex flex-col gap-3 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+        <div className="flex flex-col gap-3 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
           <SectionHeader icon={DoorOpen} label="Venue logistics" />
           {dockInfo && (
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)] mb-1">Loading dock</p>
+              <p className="stage-label text-[var(--stage-text-tertiary)] mb-1">Loading dock</p>
               <p className="text-sm text-[var(--stage-text-secondary)] whitespace-pre-wrap">{dockInfo}</p>
             </div>
           )}
           {powerInfo && (
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)] mb-1 flex items-center gap-1">
+              <p className="stage-label text-[var(--stage-text-tertiary)] mb-1 flex items-center gap-1">
                 <Zap className="size-3" /> Power
               </p>
               <p className="text-sm text-[var(--stage-text-secondary)] whitespace-pre-wrap">{powerInfo}</p>
@@ -183,7 +184,7 @@ export function TechDaySheet({
 
       {/* ── Tech Requirements ────────────────────────────────────── */}
       {techRequirements && Object.keys(techRequirements).length > 0 && (
-        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+        <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]" data-surface="elevated">
           <SectionHeader icon={Wrench} label="Technical requirements" />
           <div className="flex flex-col gap-1.5">
             {Object.entries(techRequirements).map(([key, val]) => (

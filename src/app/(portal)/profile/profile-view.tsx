@@ -3,11 +3,15 @@
 import { useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
 import { User, Phone, Mail, Briefcase, Shield, AlertCircle, Calendar, Copy, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import { getOrCreateIcalToken, rotateIcalToken, revokeIcalToken } from '@/features/ops/actions/get-ical-token';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { updateMyProfile } from './actions';
+import { ConnectedAccounts } from './components/connected-accounts';
+import { BridgePairing } from './components/bridge-pairing';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+const spring = STAGE_MEDIUM;
 
 interface ProfileViewProps {
   entityId: string;
@@ -42,18 +46,22 @@ function Field({
     <div className="flex items-start gap-3 py-3 border-b border-[oklch(1_0_0/0.04)] last:border-0">
       <Icon className="size-4 mt-0.5 text-[var(--stage-text-tertiary)] shrink-0" />
       <div className="flex-1 min-w-0">
-        <dt className="text-xs text-[var(--stage-text-tertiary)]">{label}</dt>
+        <dt className="text-xs text-[var(--stage-text-tertiary)]">
+          <label htmlFor={name ? `field-${name}` : undefined}>{label}</label>
+        </dt>
         {readOnly || !onChange ? (
           <dd className="text-sm text-[var(--stage-text-primary)] mt-0.5">
             {value || <span className="text-[var(--stage-text-tertiary)]">Not set</span>}
           </dd>
         ) : (
           <input
+            id={name ? `field-${name}` : undefined}
             name={name}
             type="text"
             defaultValue={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
-            className="mt-0.5 w-full bg-transparent text-sm text-[var(--stage-text-primary)] outline-none border-b border-[oklch(1_0_0/0.1)] focus:border-[oklch(1_0_0/0.3)] transition-colors py-0.5"
+            aria-label={label}
+            className="mt-0.5 w-full bg-[var(--ctx-well)] text-sm text-[var(--stage-text-primary)] outline-none border border-[oklch(1_0_0/0.08)] rounded-[var(--stage-radius-input)] focus-visible:border-[var(--stage-accent)] transition-colors px-2 py-1"
           />
         )}
       </div>
@@ -76,12 +84,10 @@ export function ProfileView({
   const ecDisplay = ecObj ? [ecObj.name, ecObj.phone].filter(Boolean).join(' — ') : '';
   const [emergencyContact, setEmergencyContact] = useState(ecDisplay);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    setSuccess(false);
     // emergency_contact is stored as {name, phone} object
     const ecParts = emergencyContact.split('—').map(s => s.trim());
     const ecPatch = emergencyContact
@@ -94,10 +100,10 @@ export function ProfileView({
     setSaving(false);
     if (result.ok) {
       setEditing(false);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      toast.success('Profile saved');
     } else {
       setError(result.error);
+      toast.error(result.error ?? 'Failed to save profile', { duration: Infinity });
     }
   }
 
@@ -108,8 +114,8 @@ export function ProfileView({
       transition={spring}
       className="flex flex-col gap-6"
     >
-      {/* Identity header */}
-      <div className="flex items-center gap-4">
+      {/* Identity hero card */}
+      <div className="flex items-center gap-4 p-5 rounded-2xl bg-[var(--stage-surface-elevated)]" data-surface="elevated">
         <div className="size-14 rounded-full bg-[oklch(1_0_0/0.08)] flex items-center justify-center overflow-hidden shrink-0">
           {avatarUrl ? (
             <img src={avatarUrl} alt="" className="size-full object-cover" />
@@ -118,9 +124,9 @@ export function ProfileView({
           )}
         </div>
         <div>
-          <h2 className="text-lg font-medium tracking-tight text-[var(--stage-text-primary)]">
+          <h1 className="text-lg font-semibold tracking-tight text-[var(--stage-text-primary)]">
             {displayName}
-          </h2>
+          </h1>
           {employmentContext.jobTitle && (
             <p className="text-sm text-[var(--stage-text-secondary)]">
               {employmentContext.jobTitle}
@@ -173,7 +179,7 @@ export function ProfileView({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="text-sm font-medium text-[var(--stage-text-primary)] bg-[oklch(1_0_0/0.08)] hover:bg-[oklch(1_0_0/0.12)] px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              className="text-sm font-medium text-[var(--stage-text-primary)] bg-[oklch(1_0_0/0.08)] hover:bg-[oklch(1_0_0/0.12)] px-4 py-1.5 rounded-lg transition-colors disabled:opacity-[0.45]"
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -189,8 +195,7 @@ export function ProfileView({
             </button>
           </>
         )}
-        {error && <p className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
-        {success && <p className="text-xs text-[oklch(0.75_0.15_145)]">Saved</p>}
+        {error && <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
       </div>
 
       {/* Skills */}
@@ -212,6 +217,18 @@ export function ProfileView({
           </div>
         </div>
       )}
+
+      {/* Connected accounts (Spotify, Apple Music, Serato path) */}
+      <ConnectedAccounts
+        entityId={entityId}
+        spotifyUserId={attrs.spotify_user_id ?? null}
+        spotifyDisplayName={attrs.spotify_display_name ?? null}
+        appleMusicConnected={attrs.apple_music_connected}
+        musicLibraryPath={attrs.music_library_path ?? null}
+      />
+
+      {/* Unusonic Bridge pairing */}
+      <BridgePairing />
 
       {/* Calendar sync */}
       <CalendarSyncSection />
@@ -259,7 +276,7 @@ function CalendarSyncSection() {
               <button
                 onClick={generateLink}
                 disabled={isPending}
-                className="text-sm font-medium text-[var(--stage-text-primary)] bg-[oklch(1_0_0/0.08)] hover:bg-[oklch(1_0_0/0.12)] px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 w-fit"
+                className="text-sm font-medium text-[var(--stage-text-primary)] bg-[oklch(1_0_0/0.08)] hover:bg-[oklch(1_0_0/0.12)] px-4 py-1.5 rounded-lg transition-colors disabled:opacity-[0.45] w-fit"
               >
                 {isPending ? 'Generating...' : 'Get calendar link'}
               </button>
@@ -269,7 +286,8 @@ function CalendarSyncSection() {
                   <input
                     readOnly
                     value={icalUrl}
-                    className="flex-1 text-xs font-mono bg-[var(--stage-well)] rounded-lg px-3 py-1.5 text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none truncate"
+                    aria-label="Calendar sync URL"
+                    className="flex-1 text-xs font-mono bg-[var(--ctx-well)] rounded-lg px-3 py-1.5 text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none truncate"
                   />
                   <button
                     onClick={copyUrl}
@@ -291,7 +309,7 @@ function CalendarSyncSection() {
                       });
                     }}
                     disabled={isPending}
-                    className="text-xs text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-50"
+                    className="text-xs text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-[0.45]"
                   >
                     Regenerate link
                   </button>
@@ -304,7 +322,7 @@ function CalendarSyncSection() {
                       });
                     }}
                     disabled={isPending}
-                    className="text-xs text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-50"
+                    className="text-xs text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-[0.45]"
                   >
                     Revoke access
                   </button>

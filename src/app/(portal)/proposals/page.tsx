@@ -53,9 +53,7 @@ export default async function ProposalsPage() {
 
   if (dealIds.length === 0) {
     return (
-      <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-        <ProposalsView proposals={[]} />
-      </div>
+      <ProposalsView proposals={[]} />
     );
   }
 
@@ -85,8 +83,6 @@ export default async function ProposalsPage() {
   }));
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-      <ProposalsView proposals={enriched} />
-    </div>
+    <ProposalsView proposals={enriched} />
   );
 }

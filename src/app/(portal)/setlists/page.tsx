@@ -53,8 +53,6 @@ export default async function SetlistsPage() {
   const setlists = (attrs.band_setlists ?? []) as Setlist[];
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-      <SetlistsView initialSetlists={setlists} />
-    </div>
+    <SetlistsView initialSetlists={setlists} />
   );
 }

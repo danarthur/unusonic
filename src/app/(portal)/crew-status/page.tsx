@@ -53,13 +53,13 @@ export default async function CrewStatusPage() {
 
   // Get capabilities and skills for profile resolution
   const [capResult, skillResult] = await Promise.all([
-    (supabase as any)
+    supabase
       .schema('ops')
       .from('entity_capabilities')
       .select('capability')
       .eq('entity_id', personEntity.id)
       .eq('workspace_id', workspaceId),
-    (supabase as any)
+    supabase
       .schema('ops')
       .from('crew_skills')
       .select('skill_tag')
@@ -82,13 +82,13 @@ export default async function CrewStatusPage() {
   const events = await getWorkspaceCrewStatus(workspaceId);
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
+    <>
       <div className="flex items-center gap-2">
         <h1 className="text-lg font-semibold tracking-tight text-[var(--stage-text-primary)]">
           Crew status
         </h1>
       </div>
       <CrewStatusView events={events} />
-    </div>
+    </>
   );
 }

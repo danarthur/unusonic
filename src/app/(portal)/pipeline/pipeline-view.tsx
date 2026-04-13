@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, Calendar, MapPin, DollarSign, ChevronDown } from 'lucide-react';
+import { TrendingUp, Calendar, MapPin, DollarSign, ChevronDown, Clock, Send, MessageSquare, Check, X as XIcon } from 'lucide-react';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -48,6 +49,15 @@ const STATUS_STYLES: Record<string, string> = {
   lost: 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-tertiary)]',
 };
 
+const STATUS_ICONS: Record<string, typeof Clock> = {
+  inquiry: Clock,
+  qualifying: MessageSquare,
+  proposal_sent: Send,
+  negotiating: MessageSquare,
+  won: Check,
+  lost: XIcon,
+};
+
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -59,7 +69,7 @@ function formatCurrency(amount: number): string {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return format(new Date(iso), 'MMM d, yyyy');
 }
 
 /* ── Component ───────────────────────────────────────────────────── */
@@ -103,6 +113,7 @@ export function PipelineView({ deals }: PipelineViewProps) {
       transition={STAGE_MEDIUM}
       className="flex flex-col gap-6"
     >
+      <h1 className="sr-only">Pipeline</h1>
       {/* Summary card */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Active deals" value={String(totalActive)} />
@@ -166,8 +177,8 @@ export function PipelineView({ deals }: PipelineViewProps) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 p-3 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">{label}</span>
+    <div data-surface="elevated" className="flex flex-col gap-1 p-3 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]">
+      <span className="stage-label text-[var(--stage-text-tertiary)]">{label}</span>
       <span className="text-lg font-semibold tracking-tight text-[var(--stage-text-primary)]">{value}</span>
     </div>
   );
@@ -177,7 +188,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 function DealCard({ deal }: { deal: Deal }) {
   return (
-    <div className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+    <div data-surface="elevated" className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
@@ -187,7 +198,8 @@ function DealCard({ deal }: { deal: Deal }) {
             <p className="text-xs text-[var(--stage-text-tertiary)] mt-0.5">{deal.clientName}</p>
           )}
         </div>
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[deal.status] ?? STATUS_STYLES.inquiry}`}>
+        <span className={`inline-flex items-center gap-1 stage-badge-text px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[deal.status] ?? STATUS_STYLES.inquiry}`}>
+          {STATUS_ICONS[deal.status] && (() => { const I = STATUS_ICONS[deal.status]; return <I className="size-2.5" />; })()}
           {STATUS_LABELS[deal.status] ?? deal.status}
         </span>
       </div>

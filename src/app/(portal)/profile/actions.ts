@@ -4,7 +4,7 @@ import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 
 /** Employee self-service profile fields. Admin-controlled fields are excluded. */
-const ALLOWED_FIELDS = new Set(['phone', 'emergency_contact', 'instagram']);
+const ALLOWED_FIELDS = new Set(['phone', 'emergency_contact', 'instagram', 'music_library_path', 'apple_music_connected']);
 
 export async function updateMyProfile(
   entityId: string,

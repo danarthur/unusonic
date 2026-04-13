@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
 import { ClipboardList, Plus, X, Save, Loader2, Mic, Coffee } from 'lucide-react';
+import { toast } from 'sonner';
 import { saveTechRider, saveHospitalityRider, type TechRiderItem, type HospitalityRiderItem } from '@/features/ops/actions/save-band-data';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
@@ -36,16 +37,20 @@ export function RidersView({ initialTechRider, initialHospitalityRider }: Riders
   const [techItems, setTechItems] = useState<TechRiderItem[]>(initialTechRider);
   const [hospItems, setHospItems] = useState<HospitalityRiderItem[]>(initialHospitalityRider);
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
-
   const handleSave = () => {
-    setSaved(false);
     startTransition(async () => {
       const [techResult, hospResult] = await Promise.all([
         saveTechRider(techItems),
         saveHospitalityRider(hospItems),
       ]);
-      if (techResult.ok && hospResult.ok) setSaved(true);
+      if (techResult.ok && hospResult.ok) {
+        toast.success('Riders saved');
+      } else {
+        const msg = (!techResult.ok ? techResult.error : undefined)
+          ?? (!hospResult.ok ? hospResult.error : undefined)
+          ?? 'Failed to save riders';
+        toast.error(msg, { duration: Infinity });
+      }
     });
   };
 
@@ -87,15 +92,15 @@ export function RidersView({ initialTechRider, initialHospitalityRider }: Riders
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-[oklch(1_0_0/0.1)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.15)] transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-[oklch(1_0_0/0.1)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.15)] transition-colors disabled:opacity-[0.45]"
         >
           {isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          {saved ? 'Saved' : 'Save'}
+          Save
         </button>
       </div>
 
       {/* ── Tech Rider ───────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+      <div data-surface="surface" className="flex flex-col gap-4 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
         <div className="flex items-center gap-2">
           <Mic className="size-4 text-[var(--stage-text-tertiary)]" />
           <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">Technical rider</h2>
@@ -109,6 +114,7 @@ export function RidersView({ initialTechRider, initialHospitalityRider }: Riders
                 <span className="text-xs font-medium text-[var(--stage-text-secondary)]">{CATEGORY_LABELS[category]}</span>
                 <button
                   onClick={() => addTechItem(category)}
+                  aria-label={`Add ${CATEGORY_LABELS[category]} item`}
                   className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]"
                 >
                   <Plus className="size-3.5" />
@@ -120,16 +126,18 @@ export function RidersView({ initialTechRider, initialHospitalityRider }: Riders
                     value={item.item}
                     onChange={(e) => updateTechItem(item.id, { item: e.target.value })}
                     placeholder="Item description"
-                    className="flex-1 text-sm bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none min-w-0"
+                    aria-label="Item description"
+                    className="flex-1 text-sm bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none min-w-0 rounded px-1.5 py-0.5 border border-[oklch(1_0_0/0.06)]"
                   />
                   <input
                     type="number"
                     value={item.quantity}
                     onChange={(e) => updateTechItem(item.id, { quantity: Number(e.target.value) || 1 })}
                     min={1}
-                    className="w-12 text-sm text-center bg-[var(--stage-well)] rounded px-1 py-0.5 text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none"
+                    aria-label="Quantity"
+                    className="w-12 text-sm text-center bg-[var(--ctx-well)] rounded px-1 py-0.5 text-[var(--stage-text-secondary)] border border-[oklch(1_0_0/0.06)] outline-none"
                   />
-                  <button onClick={() => removeTechItem(item.id)} className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] shrink-0">
+                  <button onClick={() => removeTechItem(item.id)} aria-label="Remove item" className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] shrink-0">
                     <X className="size-3.5" />
                   </button>
                 </div>
@@ -143,7 +151,7 @@ export function RidersView({ initialTechRider, initialHospitalityRider }: Riders
       </div>
 
       {/* ── Hospitality Rider ────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+      <div data-surface="surface" className="flex flex-col gap-4 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
         <div className="flex items-center gap-2">
           <Coffee className="size-4 text-[var(--stage-text-tertiary)]" />
           <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">Hospitality rider</h2>
@@ -157,6 +165,7 @@ export function RidersView({ initialTechRider, initialHospitalityRider }: Riders
                 <span className="text-xs font-medium text-[var(--stage-text-secondary)]">{CATEGORY_LABELS[category]}</span>
                 <button
                   onClick={() => addHospItem(category)}
+                  aria-label={`Add ${CATEGORY_LABELS[category]} item`}
                   className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]"
                 >
                   <Plus className="size-3.5" />
@@ -168,15 +177,17 @@ export function RidersView({ initialTechRider, initialHospitalityRider }: Riders
                     value={item.item}
                     onChange={(e) => updateHospItem(item.id, { item: e.target.value })}
                     placeholder="Item"
-                    className="flex-1 text-sm bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none min-w-0"
+                    aria-label="Item"
+                    className="flex-1 text-sm bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none min-w-0 rounded px-1.5 py-0.5 border border-[oklch(1_0_0/0.06)]"
                   />
                   <input
                     value={item.notes}
                     onChange={(e) => updateHospItem(item.id, { notes: e.target.value })}
                     placeholder="Notes"
-                    className="flex-1 text-sm bg-transparent text-[var(--stage-text-tertiary)] placeholder:text-[var(--stage-text-tertiary)] outline-none min-w-0"
+                    aria-label="Notes"
+                    className="flex-1 text-sm bg-[var(--ctx-well)] text-[var(--stage-text-tertiary)] placeholder:text-[var(--stage-text-secondary)] outline-none min-w-0 rounded px-1.5 py-0.5 border border-[oklch(1_0_0/0.06)]"
                   />
-                  <button onClick={() => removeHospItem(item.id)} className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] shrink-0">
+                  <button onClick={() => removeHospItem(item.id)} aria-label="Remove item" className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] shrink-0">
                     <X className="size-3.5" />
                   </button>
                 </div>

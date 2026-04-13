@@ -59,7 +59,7 @@ export default async function ProfilePage() {
     .order('skill_tag');
 
   return (
-    <div className="flex flex-col gap-8 max-w-2xl mx-auto w-full">
+    <>
       <div>
         <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
           My profile
@@ -84,6 +84,6 @@ export default async function ProfilePage() {
           proficiency: s.proficiency,
         }))}
       />
-    </div>
+    </>
   );
 }

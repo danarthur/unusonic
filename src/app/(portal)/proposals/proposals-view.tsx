@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { motion } from 'framer-motion';
-import { FileText, Eye, Clock, Check, Copy, ExternalLink } from 'lucide-react';
+import { FileText, Eye, Clock, Check, Copy, ExternalLink, Send, Pen, X as XIcon, AlertTriangle } from 'lucide-react';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -49,9 +50,19 @@ const STATUS_STYLES: Record<string, string> = {
   declined: 'bg-[oklch(0.65_0.15_25/0.2)] text-[oklch(0.65_0.15_25)]',
 };
 
+const STATUS_ICONS: Record<string, typeof Clock> = {
+  draft: Pen,
+  sent: Send,
+  viewed: Eye,
+  accepted: Check,
+  signed: Check,
+  expired: AlertTriangle,
+  declined: XIcon,
+};
+
 function formatDate(iso: string | null): string {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return format(new Date(iso), 'MMM d');
 }
 
 function timeAgo(iso: string | null): string {
@@ -95,6 +106,7 @@ export function ProposalsView({ proposals }: ProposalsViewProps) {
       transition={STAGE_MEDIUM}
       className="flex flex-col gap-6"
     >
+      <h1 className="sr-only">Proposals</h1>
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Sent" value={String(sent)} />
@@ -117,8 +129,8 @@ export function ProposalsView({ proposals }: ProposalsViewProps) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 p-3 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">{label}</span>
+    <div data-surface="elevated" className="flex flex-col gap-1 p-3 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]">
+      <span className="stage-label text-[var(--stage-text-tertiary)]">{label}</span>
       <span className="text-lg font-semibold tracking-tight text-[var(--stage-text-primary)]">{value}</span>
     </div>
   );
@@ -136,7 +148,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   };
 
   return (
-    <div className="flex flex-col gap-3 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface)]">
+    <div data-surface="elevated" className="flex flex-col gap-3 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
@@ -146,7 +158,8 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
             Created {formatDate(proposal.createdAt)}
           </p>
         </div>
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[proposal.status] ?? STATUS_STYLES.draft}`}>
+        <span className={`inline-flex items-center gap-1 stage-badge-text px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[proposal.status] ?? STATUS_STYLES.draft}`}>
+          {STATUS_ICONS[proposal.status] && (() => { const I = STATUS_ICONS[proposal.status]; return <I className="size-2.5" />; })()}
           {STATUS_LABELS[proposal.status] ?? proposal.status}
         </span>
       </div>
