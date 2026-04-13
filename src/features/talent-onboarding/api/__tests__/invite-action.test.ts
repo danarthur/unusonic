@@ -369,8 +369,8 @@ describe('inviteTalent', () => {
         qb.maybeSingle.mockResolvedValue({ data: null, error: null }) },
       // capabilities insert
       { schema: 'ops', table: 'entity_capabilities', configure: (qb) => {
-        const origInsert = qb.insert;
-        qb.insert = vi.fn().mockImplementation((payload: any) => {
+        const origInsert = qb.insert as (payload: unknown) => unknown;
+        qb.insert = vi.fn().mockImplementation((payload: unknown) => {
           capInsertPayload = payload;
           return origInsert(payload);
         });

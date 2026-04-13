@@ -4,11 +4,9 @@ import type { CalendarEvent } from '@/features/calendar/model/types';
 
 function makeEvent(overrides: Partial<CalendarEvent> & { start: string; end: string }): CalendarEvent {
   return {
-    id: overrides.id ?? 'evt-1',
-    title: overrides.title ?? 'Test Event',
-    start: overrides.start,
-    end: overrides.end,
-    status: overrides.status ?? 'confirmed',
+    id: 'evt-1',
+    title: 'Test Event',
+    status: 'confirmed',
     projectTitle: null,
     location: null,
     color: 'emerald',
