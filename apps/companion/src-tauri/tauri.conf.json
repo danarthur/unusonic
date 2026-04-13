@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/niceda/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "Unusonic Bridge",
+  "version": "0.1.0",
+  "identifier": "com.unusonic.bridge",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Unusonic Bridge",
+        "width": 380,
+        "height": 520,
+        "resizable": false,
+        "visible": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "UNUSONIC_BRIDGE_UPDATER_PUBKEY_PLACEHOLDER_REPLACE_BEFORE_PHASE_1_5_RELEASE",
+      "endpoints": [
+        "https://github.com/danarthur/unusonic/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

@@ -62,7 +62,7 @@ Matte opaque surfaces, single light source, OKLCH tokens only, achromatic accent
 - New features: `stage-panel`
 - Existing migration-in-progress: `liquid-card` (acceptable only in already-migrating files)
 - Surface context system: `--ctx-well` / `--ctx-card` / `--ctx-dropdown` (not `--stage-input-bg`)
-- Tailwind v4 landmine: never use the `bg-[var(--token-<tier>)]` form with a literal wildcard character — Tailwind's content scanner walks this file and generates broken CSS. Use `<tier>` or `{tier}` as the placeholder in docs.
+- Tailwind v4 landmine: never write a literal arbitrary-value utility that references an interpolated CSS custom property in any repo file (including docs and comments). Tailwind v4's content scanner grabs the raw string, tries to generate a CSS class from it, and the broken class breaks the CSS parser. Talk about these patterns in prose only.
 
 ## Voice
 

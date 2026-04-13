@@ -1,0 +1,357 @@
+/* Unusonic Bridge — Stage Engineering Design Tokens */
+/* Companion app uses "balanced" density tier */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Surfaces */
+  --stage-void: oklch(0.13 0.004 50);
+  --stage-surface: oklch(0.18 0.004 50);
+  --stage-surface-nested: oklch(0.09 0.004 50);
+  --stage-surface-elevated: oklch(0.22 0.004 50);
+  --stage-surface-raised: oklch(0.26 0.004 50);
+
+  /* Text */
+  --stage-accent: oklch(1 0 0);
+  --stage-text-primary: oklch(0.88 0 0);
+  --stage-text-secondary: oklch(0.64 0 0);
+  --stage-text-tertiary: oklch(0.45 0 0);
+  --stage-text-on-accent: oklch(0.13 0.004 50);
+
+  /* Edges */
+  --stage-edge-top: oklch(1 0 0 / 0.08);
+  --stage-edge-subtle: oklch(1 0 0 / 0.03);
+
+  /* Semantic */
+  --color-unusonic-success: oklch(0.75 0.18 145);
+  --color-unusonic-warning: oklch(0.80 0.16 85);
+  --color-unusonic-error: oklch(0.65 0.18 20);
+
+  /* Spacing (balanced) */
+  --stage-gap: 6px;
+  --stage-gap-wide: 10px;
+  --stage-radius-panel: 12px;
+  --stage-radius-nested: 8px;
+  --stage-radius-button: 8px;
+  --stage-radius-input: 6px;
+  --stage-padding: 16px;
+  --stage-padding-sm: 12px;
+
+  /* Typography */
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  --stage-label-size: 11px;
+  --stage-label-tracking: 0.05em;
+  --stage-label-weight: 500;
+  --stage-data-size: 14px;
+  --stage-input-height: 34px;
+  --stage-input-font-size: 13px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--stage-void);
+  color: var(--stage-text-primary);
+  -webkit-user-select: none;
+  user-select: none;
+  font-size: var(--stage-data-size);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Nav ──────────────────────────────────────────────────── */
+
+.nav {
+  display: flex;
+  border-bottom: 1px solid var(--stage-edge-top);
+  padding: 0 var(--stage-padding);
+  background: var(--stage-surface);
+}
+
+.nav-tab {
+  padding: 10px var(--stage-padding);
+  font-size: var(--stage-label-size);
+  font-weight: var(--stage-label-weight);
+  letter-spacing: var(--stage-label-tracking);
+  color: var(--stage-text-tertiary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.nav-tab:hover {
+  color: var(--stage-text-secondary);
+}
+
+.nav-tab[data-active="true"] {
+  color: var(--stage-text-primary);
+  border-bottom-color: var(--stage-accent);
+}
+
+/* ── Cards ────────────────────────────────────────────────── */
+
+.card {
+  padding: var(--stage-padding-sm);
+  border-radius: var(--stage-radius-panel);
+  background: var(--stage-surface);
+  border-top: 1px solid var(--stage-edge-top);
+}
+
+.card-elevated {
+  padding: var(--stage-padding-sm);
+  border-radius: var(--stage-radius-panel);
+  background: var(--stage-surface-elevated);
+  border-top: 1px solid var(--stage-edge-top);
+}
+
+/* ── Section headers ──────────────────────────────────────── */
+
+.section-label {
+  font-size: var(--stage-label-size);
+  font-weight: 600;
+  letter-spacing: var(--stage-label-tracking);
+  color: var(--stage-text-tertiary);
+  text-transform: none;
+}
+
+/* ── Text ─────────────────────────────────────────────────── */
+
+.text-primary { color: var(--stage-text-primary); }
+.text-secondary { color: var(--stage-text-secondary); }
+.text-tertiary { color: var(--stage-text-tertiary); }
+.text-sm { font-size: 12px; }
+.text-xs { font-size: 11px; }
+.text-xxs { font-size: 10px; }
+
+.data-hero {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Inputs ───────────────────────────────────────────────── */
+
+.input {
+  height: var(--stage-input-height);
+  padding: 0 var(--stage-padding-sm);
+  font-size: var(--stage-input-font-size);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--stage-text-primary);
+  background: var(--stage-surface-nested);
+  border: 1px solid var(--stage-edge-top);
+  border-radius: var(--stage-radius-input);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.input:focus {
+  border-color: var(--stage-accent);
+}
+
+.input::placeholder {
+  color: var(--stage-text-tertiary);
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--stage-input-height);
+  padding: 0 var(--stage-padding);
+  font-size: var(--stage-label-size);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  letter-spacing: var(--stage-label-tracking);
+  color: var(--stage-text-primary);
+  background: var(--stage-surface-elevated);
+  border: 1px solid var(--stage-edge-top);
+  border-radius: var(--stage-radius-button);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.btn:hover {
+  background: var(--stage-surface-raised);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn-accent {
+  background: oklch(1 0 0 / 0.10);
+  color: var(--stage-text-primary);
+}
+
+.btn-accent:hover {
+  background: oklch(1 0 0 / 0.14);
+}
+
+.btn-ghost {
+  background: none;
+  border: none;
+  color: var(--stage-text-tertiary);
+  padding: 0;
+  height: auto;
+}
+
+.btn-ghost:hover {
+  color: var(--stage-text-secondary);
+}
+
+/* ── Status dot ───────────────────────────────────────────── */
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot[data-status="connected"] { background: var(--color-unusonic-success); }
+.status-dot[data-status="synced"] { background: var(--color-unusonic-success); }
+.status-dot[data-status="warning"] { background: var(--color-unusonic-warning); }
+.status-dot[data-status="error"] { background: var(--color-unusonic-error); }
+.status-dot[data-status="idle"] { background: var(--stage-text-tertiary); }
+
+/* ── Utility ──────────────────────────────────────────────── */
+
+.stack { display: flex; flex-direction: column; gap: var(--stage-gap-wide); }
+.stack-tight { display: flex; flex-direction: column; gap: var(--stage-gap); }
+.row { display: flex; align-items: center; gap: var(--stage-gap); }
+.between { justify-content: space-between; }
+.flex-1 { flex: 1; min-width: 0; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shrink-0 { flex-shrink: 0; }
+.center { text-align: center; }
+
+/* ── Folder row ───────────────────────────────────────────── */
+
+.folder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px var(--stage-padding-sm);
+  border-radius: var(--stage-radius-nested);
+  background: var(--stage-surface-nested);
+}
+
+.folder-add {
+  padding: 10px;
+  border-radius: var(--stage-radius-nested);
+  background: none;
+  border: 1px dashed oklch(1 0 0 / 0.08);
+  color: var(--stage-text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+  width: 100%;
+  text-align: center;
+}
+
+.folder-add:hover {
+  border-color: oklch(1 0 0 / 0.15);
+  color: var(--stage-text-secondary);
+}
+
+/* ── Software picker ──────────────────────────────────────── */
+
+.software-option {
+  flex: 1;
+  padding: 8px;
+  border-radius: var(--stage-radius-button);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s;
+  background: var(--stage-surface-nested);
+  color: var(--stage-text-tertiary);
+  text-align: center;
+}
+
+.software-option[data-active="true"] {
+  background: var(--stage-surface-elevated);
+  color: var(--stage-text-primary);
+  border-color: var(--stage-edge-top);
+}
+
+/* ── Sync status row ──────────────────────────────────────── */
+
+.sync-row {
+  padding: var(--stage-padding-sm);
+  border-radius: var(--stage-radius-panel);
+  background: var(--stage-surface);
+  border-left: 3px solid var(--color-unusonic-success);
+}
+
+.sync-row[data-partial="true"] {
+  border-left-color: var(--color-unusonic-warning);
+}
+
+/* ── Empty state ──────────────────────────────────────────── */
+
+.empty-state {
+  padding: 32px var(--stage-padding);
+  text-align: center;
+  color: var(--stage-text-tertiary);
+  font-size: 13px;
+}
+
+/* ── Pairing code display ─────────────────────────────────── */
+
+.pairing-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--stage-radius-nested);
+  background: var(--stage-surface-nested);
+  border: 1px solid var(--stage-edge-top);
+}
+
+.pairing-char {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--stage-text-primary);
+}
+
+/* ── Scan progress ────────────────────────────────────────── */
+
+.scan-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--stage-accent);
+  animation: pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Version footer ───────────────────────────────────────── */
+
+.version {
+  font-size: 10px;
+  color: var(--stage-text-tertiary);
+  text-align: center;
+  padding-top: 8px;
+  opacity: 0.6;
+}

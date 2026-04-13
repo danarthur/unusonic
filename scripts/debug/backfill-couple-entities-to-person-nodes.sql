@@ -116,7 +116,7 @@ VALUES (
     'partner_b_last_name',   '<partner_b_last>',
     'partner_b_email',       '<partner_b_email_or_null>'
   ),
-  NULL,  -- ghost: no Signal account
+  NULL,  -- ghost: no Unusonic account
   now(),
   now()
 )

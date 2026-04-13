@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
   <!-- Phase Mark: Two offset pills. Coniunctio oppositorum. -->
-  <!-- Left pill (higher) -->
+  <!-- Left pill (higher): x=5, y=15, 14×6, rx=3 -->
   <rect x="5" y="15" width="14" height="6" rx="3" fill="currentColor"/>
-  <!-- Right pill (lower) -->
+  <!-- Right pill (lower): x=21, y=19, 14×6, rx=3 -->
   <rect x="21" y="19" width="14" height="6" rx="3" fill="currentColor"/>
 </svg>

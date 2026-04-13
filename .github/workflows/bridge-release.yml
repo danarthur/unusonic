@@ -1,0 +1,93 @@
+name: Bridge Release
+
+# Builds, signs, and publishes the Unusonic Bridge companion app to a
+# GitHub Release. Triggered by pushing a `bridge-v*` tag (e.g. `bridge-v0.1.1`)
+# or via manual workflow_dispatch. Producing a successful release requires
+# all signing secrets to exist in repo settings — see
+# `docs/reference/bridge-release-setup.md` for the full checklist.
+#
+# Until those secrets are configured, a workflow run will produce unsigned
+# artifacts and the updater manifest signing step will fail. That's expected
+# during Phase 1.0 internal alpha.
+
+on:
+  push:
+    tags:
+      - 'bridge-v*'
+  workflow_dispatch:
+
+concurrency:
+  group: bridge-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            rust-target: aarch64-apple-darwin,x86_64-apple-darwin
+            tauri-args: '--target universal-apple-darwin'
+          - platform: windows-latest
+            rust-target: ''
+            tauri-args: ''
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/companion/package-lock.json
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/companion/src-tauri -> target
+
+      - name: Install frontend dependencies
+        working-directory: apps/companion
+        run: npm ci
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # Updater signing (Ed25519 — generated via `tauri signer generate`).
+          # Public key lives in apps/companion/src-tauri/tauri.conf.json.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS code signing + notarization.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows code signing. Either SSL.com/Certum OV cert (WINDOWS_*)
+          # or Azure Trusted Signing (AZURE_*) — pick one, leave the other
+          # unset. tauri-action reads these via `bundler.windows.certificateThumbprint`
+          # set from env.
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        with:
+          projectPath: apps/companion
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Unusonic Bridge ${{ github.ref_name }}'
+          releaseBody: |
+            See the assets below for download links.
+
+            Install guide: https://unusonic.com/bridge/install
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.tauri-args }}

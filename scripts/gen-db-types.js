@@ -43,6 +43,33 @@ if (!projectRef || projectRef.length < 10) {
 }
 
 const cmd = `npx supabase gen types typescript --project-id ${projectRef} --schema public,directory,cortex,ops,finance`;
-const result = execSync(cmd, { encoding: 'utf-8', cwd: root });
-fs.writeFileSync(outFile, result, 'utf8');
-console.log('Wrote src/types/supabase.ts');
+
+// Forward loaded env vars (esp. SUPABASE_ACCESS_TOKEN from .env.local) to the
+// supabase CLI child process. Without this, the CLI sees only process.env and
+// fails with "Unauthorized" even when .env.local has a valid token. Fixed
+// 2026-04-11 as part of rescan §6.0 (PR 6.5).
+const generated = execSync(cmd, { encoding: 'utf-8', cwd: root, env: envVars });
+
+// Auto-append convenience aliases so callers don't have to re-add them after
+// every regen. Previously this was a manual step documented in CLAUDE.md;
+// automating it here removes the entire failure mode (PR 11a, 2026-04-11).
+const conveniences = `
+// =============================================================================
+// Convenience aliases — auto-appended by scripts/gen-db-types.js.
+// If you regenerate manually via \`supabase gen types ...\`, the aliases will
+// be missing. Use \`npm run db:types\` to ensure they're present.
+//
+// These stay in \`public\` schema because the backing tables are grandfathered
+// in public per the CLAUDE.md Legacy & Grandfathered Tables section. They
+// will migrate to \`finance\` in a future project.
+// =============================================================================
+
+export type Proposal = Database['public']['Tables']['proposals']['Row'];
+export type ProposalItem = Database['public']['Tables']['proposal_items']['Row'];
+export type Package = Database['public']['Tables']['packages']['Row'];
+export type CueType = Database['public']['Enums']['cue_type'];
+export type PaymentMethod = Database['public']['Enums']['payment_method'];
+`;
+
+fs.writeFileSync(outFile, generated + conveniences, 'utf8');
+console.log('Wrote src/types/supabase.ts (with convenience aliases appended)');
