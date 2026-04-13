@@ -163,10 +163,14 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
   const handleNext = useCallback(() => {
     setError(null);
     if (isLast) {
-      // Warn when no client is resolvable — prevents handing off an event
-      // with a null client_entity_id, which breaks the client portal lookup.
+      // Hard-block when no client is resolvable. A null ops.events.client_entity_id
+      // breaks the client portal lookup entirely — the client will see nothing at
+      // /client/home. Users must add a bill-to stakeholder (or pick one in step 1)
+      // before handoff so the portal works on day one.
       if (!clientEntityId.trim()) {
-        setError('No client selected. Add a bill-to stakeholder before handing off.');
+        setError(
+          'No client linked. The client portal cannot open this event without a bill-to stakeholder — pick one above or add one on the deal before handing off.',
+        );
         return;
       }
       setSubmitting(true);

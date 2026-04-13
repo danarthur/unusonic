@@ -186,7 +186,21 @@ export async function handoverDeal(
   // column AND (in the legacy path) to convert local times to proper UTC instants.
   // Resolution: venue attrs → workspace → 'UTC'. Before this fix, the legacy path
   // hardcoded T08:00:00.000Z, making "8am" mean 8:00 UTC regardless of venue location.
+  // resolveEventTimezone reads the venue entity via venue_entity_id — new standard.
   const eventTimezone = await resolveEventTimezone({ venueId: venueEntityId, workspaceId });
+
+  // Denormalize venue display_name onto ops.events.location_name so event detail
+  // surfaces keep working if the venue entity is later soft-deleted / renamed.
+  let locationName: string | null = null;
+  if (venueEntityId) {
+    const { data: venueEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('id', venueEntityId)
+      .maybeSingle();
+    locationName = (venueEntity as { display_name?: string | null } | null)?.display_name ?? null;
+  }
 
   // Legacy path (no handoff wizard payload): convert deal's local times to UTC via venue tz
   if (!payload?.vitals) {
@@ -220,6 +234,7 @@ export async function handoverDeal(
       timezone: eventTimezone,
       venue_entity_id: venueEntityId,
       client_entity_id: clientEntityId,
+      location_name: locationName,
       event_archetype: (deal as Record<string, unknown>).event_archetype as string | null,
       run_of_show_data: runOfShowData,
     })
@@ -366,6 +381,14 @@ export async function handoverDeal(
 
   if (acceptedProposal?.id) {
     const signedAt = (acceptedProposal as { signed_at?: string | null }).signed_at ?? new Date().toISOString();
+    // Pull the signed-PDF path from the proposal so contract.pdf_url carries the
+    // audit trail forward (audit finding: legal/audit trail was always null).
+    const { data: proposalRow } = await supabase
+      .from('proposals')
+      .select('signed_pdf_path')
+      .eq('id', acceptedProposal.id)
+      .maybeSingle();
+    const signedPath = (proposalRow as { signed_pdf_path?: string | null } | null)?.signed_pdf_path ?? null;
     // Pass 4 Phase 0.5 (rescan fix C9): the naked insert swallowed RLS/FK errors silently.
     // Now captured to Sentry + surfaced as a warning. Non-fatal: the event still exists
     // and the PM can recreate the contract row manually if this fails. Mirrors the
@@ -377,7 +400,7 @@ export async function handoverDeal(
         event_id: eventId,
         status: 'signed',
         signed_at: signedAt,
-        pdf_url: null,
+        pdf_url: signedPath,
       })
       .select('id')
       .maybeSingle();
