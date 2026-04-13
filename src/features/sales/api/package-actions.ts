@@ -9,7 +9,11 @@ import { createClient } from '@/shared/api/supabase/server';
 import type { Package } from '@/types/supabase';
 import { generateAndUpsertEmbedding } from './catalog-embeddings';
 
-export type { Package };
+// NOTE: do NOT re-export `Package` from this 'use server' file.
+// Next 16's server-action bundler produces a value-level re-export for
+// every type re-export block and fails the production build with
+// "ReferenceError: Package is not defined" at page-data collection.
+// Consumers should import the type directly from '@/types/supabase'.
 
 /** Tag shape when hydrated on a package (from workspace_tags via package_tags). */
 export interface PackageTag {

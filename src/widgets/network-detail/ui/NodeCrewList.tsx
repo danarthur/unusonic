@@ -59,12 +59,12 @@ export function NodeCrewList({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
+      <h3 className="stage-label text-[var(--stage-text-secondary)]">
         Crew
       </h3>
       <ul className="space-y-3">
         {crew.length === 0 && !showForm && (
-          <li className="text-sm text-[var(--stage-text-secondary)]">
+          <li className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">
             No contacts yet.
           </li>
         )}
@@ -74,18 +74,18 @@ export function NodeCrewList({
             className="flex items-center gap-3 rounded-xl border border-[var(--stage-edge-top)] bg-[var(--stage-surface-elevated)] px-4 py-3"
           >
             <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface)] border border-[var(--stage-edge-top)]">
-              <User className="size-5 text-[var(--stage-text-secondary)]" />
+              <User className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--stage-text-primary)]">{m.name?.trim() || 'Contact'}</p>
+              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{m.name?.trim() || 'Contact'}</p>
               {(m.email?.trim() || null) && (
-                <p className="flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] mt-0.5">
-                  <Mail className="size-3" />
+                <p className="flex items-center gap-1.5 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
+                  <Mail className="size-3" strokeWidth={1.5} />
                   {m.email}
                 </p>
               )}
               {m.role && (
-                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{m.role}</p>
+                <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">{m.role}</p>
               )}
             </div>
           </li>
@@ -110,7 +110,7 @@ export function NodeCrewList({
               onClick={() => setShowForm(true)}
               className="gap-2"
             >
-              <UserPlus className="size-4" />
+              <UserPlus className="size-4" strokeWidth={1.5} />
               Add contact
             </Button>
             </motion.div>
@@ -122,7 +122,7 @@ export function NodeCrewList({
               exit={{ height: 0, opacity: 0 }}
               transition={{ ...STAGE_MEDIUM, opacity: { duration: 0.12, ease: 'easeOut' } }}
               onSubmit={handleSubmit}
-              className="overflow-hidden stage-panel rounded-2xl p-4 space-y-3"
+              className="overflow-hidden rounded-xl border border-[var(--stage-edge-subtle)] p-4 space-y-3"
             >
               <div className="grid grid-cols-2 gap-3">
                 <Input
@@ -147,7 +147,7 @@ export function NodeCrewList({
                 className="stage-input text-[var(--stage-text-primary)]"
               />
               {error && (
-                <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
+                <p role="alert" className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-error)]">{error}</p>
               )}
               <div className="flex gap-2">
                 <Button

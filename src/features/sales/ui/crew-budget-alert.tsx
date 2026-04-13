@@ -27,8 +27,8 @@ export function CrewBudgetAlert({
       className={cn(
         'flex items-center gap-2 rounded-[var(--stage-radius-input)] px-4 py-3 text-sm',
         isRed
-          ? 'bg-[oklch(0.35_0.06_25)] text-red-300'
-          : 'bg-[oklch(0.35_0.06_80)] text-amber-300'
+          ? 'bg-[oklch(0.35_0.06_25)] text-[var(--color-unusonic-error)]'
+          : 'bg-[oklch(0.35_0.06_80)] text-[var(--color-unusonic-warning)]'
       )}
     >
       <span className="shrink-0" aria-hidden>&#9888;</span>

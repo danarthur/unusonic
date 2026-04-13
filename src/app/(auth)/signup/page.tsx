@@ -22,7 +22,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative">
       {/* Spotlight / Cove Light — single light source from top, no colored orbs */}
-      <div className="fixed inset-0 z-0 bg-unusonic-void pointer-events-none" aria-hidden>
+      <div className="fixed inset-0 z-0 bg-[var(--stage-void)] pointer-events-none" aria-hidden>
         <div className="absolute inset-0 grain-overlay" aria-hidden />
       </div>
 

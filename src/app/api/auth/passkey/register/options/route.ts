@@ -11,6 +11,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { checkPasskeyOptionsRate } from '@/shared/api/auth/passkey-rate-limit';
 import { cookies } from 'next/headers';
+import * as Sentry from '@sentry/nextjs';
 
 const rpName = 'Unusonic';
 
@@ -18,19 +19,21 @@ const CHALLENGE_COOKIE = 'webauthn_reg_challenge';
 const CHALLENGE_MAX_AGE = 300;
 
 function getRpId(request: NextRequest): string {
-  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
-    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
-  }
   const origin =
     request.headers.get('origin') ||
     request.nextUrl.origin ||
     process.env.NEXT_PUBLIC_APP_URL ||
     'http://localhost:3000';
-  try {
-    return new URL(origin).hostname || 'localhost';
-  } catch {
+  const hostname = (() => {
+    try { return new URL(origin).hostname || 'localhost'; }
+    catch { return 'localhost'; }
+  })();
+
+  // On localhost, ignore the production RP ID — it won't validate
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'localhost';
   }
+  return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID || hostname;
 }
 
 export async function POST(request: NextRequest) {
@@ -90,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(options);
   } catch (e) {
-    console.error('[passkey/options]', e);
+    Sentry.logger.error('auth.passkey.registerOptionsFailed', { error: e instanceof Error ? e.message : String(e) });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to generate options' },
       { status: 500 }

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
+import { AccordionSection } from './entity-studio-panels';
 import { softDeleteGhostRelationship } from '@/features/network-data';
 import { updatePreferredPerson } from '@/features/network-data/api/update-preferred-person';
 import {
@@ -41,62 +42,9 @@ const PROFICIENCY_LEVELS: { value: SkillLevel; label: string }[] = [
   { value: 'lead',   label: 'Lead'   },
 ];
 
-function AccordionSection({
-  label,
-  icon: Icon,
-  defaultOpen = false,
-  children,
-}: {
-  label: string;
-  icon: React.ElementType;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(defaultOpen);
-  return (
-    <motion.div
-      className="stage-panel rounded-2xl overflow-hidden"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={STAGE_MEDIUM}
-    >
-      <motion.button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0/0.05)] transition-[background-color]"
-      >
-        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-          <Icon className="size-3.5" />
-          {label}
-        </span>
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={STAGE_MEDIUM}>
-          <svg className="size-4 text-[var(--stage-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-          </svg>
-        </motion.div>
-      </motion.button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={STAGE_MEDIUM}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">
-              {children}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-const LABEL = 'text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest';
+const LABEL = 'stage-label';
 const INPUT_BASE =
-  'h-9 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/50 focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none shadow-xs transition-[color,box-shadow]';
+  'h-9 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none shadow-xs transition-[color,box-shadow]';
 
 interface FreelancerEntityFormProps {
   details: NodeDetail;
@@ -246,32 +194,39 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="min-h-screen bg-[var(--stage-void)]">
       {/* Header */}
-      <header className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[oklch(1_0_0_/_0.08)]">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          onClick={() => router.push(returnPath)}
-          aria-label="Back"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-base font-medium tracking-tight text-[var(--stage-text-primary)] truncate">
-            {[firstName, lastName].filter(Boolean).join(' ') || details.identity.name}
-          </h1>
-          <p className="text-xs text-[var(--stage-text-secondary)]">Preferred partner</p>
+      <header className="sticky top-0 z-20 bg-[var(--stage-void)] border-b border-[var(--stage-edge-subtle)] px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
+            <ArrowLeft className="size-5" strokeWidth={1.5} />
+          </Button>
+          <div>
+            <p className="stage-label">
+              Preferred freelancer
+            </p>
+            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
+              {[firstName, lastName].filter(Boolean).join(' ') || details.identity.name}
+            </h1>
+          </div>
         </div>
-        <span className="shrink-0 rounded-full border border-[oklch(1_0_0/0.12)] bg-[oklch(1_0_0/0.08)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-          Preferred
-        </span>
+        <AnimatePresence>
+          {isPending && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={STAGE_MEDIUM}
+              className="flex items-center gap-3"
+            >
+              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Saving...</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-2xl px-4 py-6 pb-32 space-y-3">
+      <div className="mx-auto max-w-2xl px-6 py-8 pb-32 space-y-3">
 
           {/* Profile */}
           <AccordionSection label="Profile" icon={User} defaultOpen>
@@ -343,14 +298,11 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                     transition={STAGE_MEDIUM}
                     className="flex items-center gap-2 overflow-hidden"
                   >
-                    <span className="flex-1 truncate text-sm text-[var(--stage-text-primary)]">{skill.skill_tag}</span>
+                    <span className="flex-1 truncate text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{skill.skill_tag}</span>
                     <select
                       value={skill.proficiency ?? ''}
                       onChange={(e) => handleUpdateProficiency(skill.id, e.target.value as SkillLevel)}
-                      className={cn(
-                        'h-7 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 text-xs text-[var(--stage-text-secondary)]',
-                        'focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus:outline-none shadow-xs transition-[color,box-shadow]'
-                      )}
+                      className="stage-input h-7 px-2 text-xs"
                     >
                       <option value="">Level</option>
                       {PROFICIENCY_LEVELS.map((l) => (
@@ -361,19 +313,19 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                       type="button"
                       onClick={() => handleRemoveSkill(skill.id)}
                       disabled={removingSkillId === skill.id}
-                      className="p-1 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-[color,background-color] disabled:opacity-40"
+                      className="p-1 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-[color,background-color] duration-[80ms] disabled:opacity-45"
                       aria-label={`Remove ${skill.skill_tag}`}
                     >
                       {removingSkillId === skill.id
-                        ? <Loader2 className="size-3.5 animate-spin" />
-                        : <X className="size-3.5" />
+                        ? <Loader2 className="size-3.5 animate-spin" strokeWidth={1.5} />
+                        : <X className="size-3.5" strokeWidth={1.5} />
                       }
                     </motion.button>
                   </motion.div>
                 ))}
               </AnimatePresence>
               {skills.length === 0 && (
-                <p className="text-xs text-[var(--stage-text-secondary)]">No skills yet.</p>
+                <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">No skills yet.</p>
               )}
             </div>
 
@@ -392,9 +344,9 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                 size="sm"
                 onClick={handleAddSkill}
                 disabled={addingSkill || !skillInput.trim()}
-                className="h-9 rounded-xl border-[oklch(1_0_0_/_0.08)]"
+                className="h-9 rounded-xl border-[var(--stage-edge-subtle)]"
               >
-                {addingSkill ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                {addingSkill ? <Loader2 className="size-3.5 animate-spin" strokeWidth={1.5} /> : <Plus className="size-3.5" strokeWidth={1.5} />}
               </Button>
             </div>
 
@@ -417,7 +369,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                         toast.error(result.error);
                       }
                     }}
-                    className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.08)] px-2.5 py-1 text-[11px] text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0/0.15)] hover:text-[var(--stage-text-primary)] transition-colors"
+                    className="rounded-full border border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.08)] px-2.5 py-1 text-field-label text-[var(--stage-text-secondary)] hover:border-[var(--stage-edge-subtle)] hover:text-[var(--stage-text-primary)] transition-colors duration-[80ms]"
                   >
                     + {preset}
                   </button>
@@ -442,20 +394,20 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                 {capabilities.map((cap) => (
                   <motion.span
                     key={cap.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={STAGE_MEDIUM}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(1_0_0_/_0.08)]/30 bg-[oklch(1_0_0_/_0.10)]/15 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stage-edge-subtle)]/30 bg-[oklch(1_0_0_/_0.10)]/15 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)]"
                   >
                     {cap.capability}
                     <button
                       type="button"
                       onClick={() => handleRemoveCapability(cap.id)}
-                      className="ml-0.5 text-[var(--stage-text-secondary)]/60 hover:text-[var(--color-unusonic-error)] transition-colors"
+                      className="ml-0.5 text-[var(--stage-text-tertiary)] hover:text-[var(--color-unusonic-error)] transition-colors duration-[80ms]"
                       aria-label={`Remove ${cap.capability}`}
                     >
-                      <X className="size-3" />
+                      <X className="size-3" strokeWidth={1.5} />
                     </button>
                   </motion.span>
                 ))}
@@ -471,7 +423,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                       type="button"
                       onClick={() => handleAddCapability(preset)}
                       disabled={capLoading}
-                      className="rounded-full border border-dashed border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.06)] px-2.5 py-1 text-[11px] text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0/0.15)] hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-40"
+                      className="rounded-full border border-dashed border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.08)] px-2.5 py-1 text-field-label text-[var(--stage-text-secondary)] hover:border-[var(--stage-edge-subtle)] hover:text-[var(--stage-text-primary)] transition-colors duration-[80ms] disabled:opacity-45"
                     >
                       + {preset}
                     </button>
@@ -481,10 +433,9 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
           </AccordionSection>
 
         </div>
-      </div>
 
       {/* Footer */}
-      <div className="shrink-0 border-t border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)] px-4 py-3 flex items-center justify-between gap-3">
+      <div className="border-t border-[var(--stage-edge-subtle)] bg-[var(--stage-void)] px-6 py-4 flex items-center justify-between gap-3">
         {/* Remove from preferred */}
         <AnimatePresence mode="wait">
           {confirmRemove ? (
@@ -496,7 +447,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
               transition={STAGE_MEDIUM}
               className="flex items-center gap-2"
             >
-              <span className="text-xs text-[var(--stage-text-secondary)]">Remove from preferred?</span>
+              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Remove from preferred?</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -504,7 +455,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                 disabled={removing}
                 className="h-7 px-2.5 text-xs text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
               >
-                {removing ? <Loader2 className="size-3 animate-spin" /> : 'Confirm'}
+                {removing ? <Loader2 className="size-3 animate-spin" strokeWidth={1.5} /> : 'Confirm'}
               </Button>
               <Button
                 variant="ghost"
@@ -529,7 +480,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
                 onClick={() => setConfirmRemove(true)}
                 className="h-8 gap-1.5 px-2.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
               >
-                <Trash2 className="size-3.5" />
+                <Trash2 className="size-3.5" strokeWidth={1.5} />
                 Remove from preferred
               </Button>
             </motion.div>
@@ -539,9 +490,9 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
         <Button
           onClick={handleSave}
           disabled={isPending}
-          className="h-9 gap-2 rounded-xl bg-[var(--stage-accent)] px-4 text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90 disabled:opacity-[0.45]"
+          className="h-9 gap-2 rounded-xl px-4 text-sm font-medium stage-btn stage-btn-primary disabled:opacity-[0.45]"
         >
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          {isPending ? <Loader2 className="size-4 animate-spin" strokeWidth={1.5} /> : <Save className="size-4" strokeWidth={1.5} />}
           Save
         </Button>
       </div>

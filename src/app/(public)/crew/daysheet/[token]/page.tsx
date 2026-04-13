@@ -32,7 +32,7 @@ export default async function PublicDaySheetPage({
   const system = getSystemClient();
 
   // 1. Look up the token
-  const { data: tokenRow, error: tokenError } = await (system as any)
+  const { data: tokenRow, error: tokenError } = await system
     .schema('ops')
     .from('day_sheet_tokens')
     .select('token, event_id, workspace_id, deal_crew_id, entity_id, email, expires_at')
@@ -57,7 +57,7 @@ export default async function PublicDaySheetPage({
   }
 
   // 3. Fetch event
-  const { data: evt } = await (system as any)
+  const { data: evt } = await system
     .schema('ops')
     .from('events')
     .select('title, starts_at, ends_at, location_name, location_address, show_day_contacts, run_of_show_data, dates_load_in, dates_load_out')
@@ -89,7 +89,7 @@ export default async function PublicDaySheetPage({
 
   // 5. Fetch all deal crew for this event (via deal_crew rows linked to event)
   // Find the deal from the event's project
-  const { data: eventForDeal } = await (system as any)
+  const { data: eventForDeal } = await system
     .schema('ops')
     .from('events')
     .select('deal_id')
@@ -123,7 +123,7 @@ export default async function PublicDaySheetPage({
     const phoneMap = new Map<string, string | null>();
 
     if (entityIds.length > 0) {
-      const { data: entities } = await (system as any)
+      const { data: entities } = await system
         .schema('directory')
         .from('entities')
         .select('id, type, attributes')

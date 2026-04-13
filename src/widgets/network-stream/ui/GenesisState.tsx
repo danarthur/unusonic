@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { GenesisCore } from './GenesisCore';
 import { GenesisGrid } from './GenesisGrid';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 export type GenesisReaction = 'focus' | 'pulse' | 'mass';
 
@@ -56,8 +57,8 @@ export function GenesisState({ hasIdentity = false, hasTeam = false, brandColor 
       <div className="relative z-10 flex flex-col items-center w-full">
         <GenesisCore reaction={reaction} />
         <div className="mt-8 w-full max-w-5xl px-5 sm:px-6 md:px-8">
-          <h2 className="text-center text-2xl font-normal text-[var(--stage-text-primary)] tracking-tight mb-8">
-            Network Architecture
+          <h2 className="text-center text-2xl font-medium tracking-tight text-[var(--stage-text-primary)] mb-8">
+            Network architecture
           </h2>
           <GenesisGrid
             reaction={reaction}

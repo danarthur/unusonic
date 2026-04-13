@@ -57,9 +57,9 @@ export async function respondToCrewAssignment(
     const nowIso = new Date().toISOString();
 
     // Resolve event.deal_id so we can find the partner deal_crew row.
-    // Use (supabase as any) casts for ops schema reads (see CLAUDE.md D2 drift).
+    // Use supabase casts for ops schema reads (see CLAUDE.md D2 drift).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: eventRow } = await (supabase as any)
+    const { data: eventRow } = await supabase
       .schema('ops')
       .from('events')
       .select('deal_id')
@@ -86,7 +86,7 @@ export async function respondToCrewAssignment(
         : { confirmed_at: null, declined_at: nowIso };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: mirrorResult, error: mirrorErr } = await (supabase as any)
+    const { data: mirrorResult, error: mirrorErr } = await supabase
       .schema('ops')
       .from('deal_crew')
       .update(mirrorPatch)

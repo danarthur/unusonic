@@ -4,8 +4,11 @@ import { createClient } from '@/shared/api/supabase/server';
 import type { PortalThemePreset, PortalThemeConfig } from '@/shared/lib/portal-theme';
 
 const VALID_PRESETS = new Set<string>([
-  'default', 'minimalist', 'dark-stage', 'editorial', 'civic',
-  'neo-brutalist', 'tactile-warm', 'retro-future', 'custom',
+  // Current preset slugs
+  'paper', 'clean', 'blackout', 'editorial', 'civic',
+  'linen', 'poster', 'terminal', 'marquee', 'broadcast', 'gallery', 'custom',
+  // Legacy aliases — accepted on save so migrating workspaces don't break
+  'default', 'minimalist', 'dark-stage', 'neo-brutalist', 'tactile-warm', 'retro-future',
 ]);
 
 export async function getPortalTheme(): Promise<{
@@ -34,7 +37,7 @@ export async function getPortalTheme(): Promise<{
   if (!workspace) return null;
 
   return {
-    preset: (workspace.portal_theme_preset ?? 'default') as PortalThemePreset,
+    preset: (workspace.portal_theme_preset ?? 'paper') as PortalThemePreset,
     config: (workspace.portal_theme_config ?? {}) as PortalThemeConfig,
   };
 }

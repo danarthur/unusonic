@@ -8,6 +8,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { FileText, Clock, AlertCircle, CheckCircle, ArrowUpRight, CloudCheck } from 'lucide-react';
 import type { OutstandingInvoice } from '@/features/finance-sync';
 
@@ -18,7 +19,7 @@ interface InvoiceCardProps {
 }
 
 export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
-  const springConfig = { type: 'spring', stiffness: 300, damping: 30 } as const;
+  const springConfig = STAGE_MEDIUM;
   
   // Format currency (uses USD for now, could be extended with invoice.currency)
   const formatCurrency = (amount: number) => {
@@ -76,7 +77,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springConfig, delay: index * 0.05 }}
-      className="w-full text-left group hover:brightness-[1.02] transition-[filter]"
+      className="w-full text-left group"
     >
       <div className="stage-panel stage-panel-nested stage-panel-interactive p-4 relative overflow-hidden">
         {/* Subtle gradient on hover */}
@@ -84,7 +85,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
           initial={{ opacity: 0 }}
           whileHover={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
-          className="absolute inset-0 bg-gradient-to-br from-walnut/3 to-transparent pointer-events-none"
+          className="absolute inset-0 bg-gradient-to-br from-[oklch(1_0_0_/_0.03)] to-transparent pointer-events-none"
         />
         
         {/* Content */}
@@ -99,7 +100,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
             {/* Header Row */}
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="min-w-0">
-                <h4 className="text-sm font-medium text-[var(--stage-text-primary)] truncate group-hover:text-walnut transition-colors">
+                <h4 className="text-sm font-medium text-[var(--stage-text-primary)] truncate group-hover:text-[var(--stage-text-primary)] transition-colors">
                   {invoice.invoiceNumber}
                 </h4>
                 <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
@@ -109,11 +110,11 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
               
               {/* Amount */}
               <div className="text-right shrink-0">
-                <p className="text-sm font-semibold text-[var(--stage-text-primary)] tabular-nums">
+                <p className="text-sm font-medium text-[var(--stage-text-primary)] tabular-nums">
                   {formatCurrency(invoice.balanceDue)}
                 </p>
                 {invoice.amountPaid > 0 && (
-                  <p className="text-[10px] text-[var(--stage-text-secondary)] mt-0.5">
+                  <p className="text-label text-[var(--stage-text-secondary)] mt-0.5">
                     of {formatCurrency(invoice.totalAmount)}
                   </p>
                 )}
@@ -134,7 +135,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
               <div className="flex items-center gap-2">
                 {/* QB Sync Status */}
                 {invoice.quickbooksSyncStatus === 'synced' && (
-                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--color-qb-green)]/10 text-[10px] font-medium text-[var(--color-qb-green)]">
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--color-qb-green)]/10 stage-badge-text text-[var(--color-qb-green)]">
                     <CloudCheck className="w-3 h-3" />
                     <span>QB</span>
                   </div>
@@ -142,7 +143,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
                 
                 {/* Urgency Badge */}
                 <div className={`
-                  flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium
+                  flex items-center gap-1.5 px-2 py-1 rounded-full stage-badge-text
                   ${urgency.bg} ${urgency.border} border
                 `}>
                   <UrgencyIcon className={`w-3 h-3 ${urgency.color}`} />
@@ -159,7 +160,7 @@ export function InvoiceCard({ invoice, index, onSelect }: InvoiceCardProps) {
             transition={springConfig}
             className="absolute right-3 top-1/2 -translate-y-1/2"
           >
-            <ArrowUpRight className="w-4 h-4 text-[var(--stage-text-secondary)] group-hover:text-walnut transition-colors" />
+            <ArrowUpRight className="w-4 h-4 text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] transition-colors" />
           </motion.div>
         </div>
       </div>
@@ -175,13 +176,13 @@ export function EmptyInvoiceState() {
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      transition={STAGE_MEDIUM}
       className="stage-panel stage-panel-nested p-8 text-center"
     >
       <div className="w-12 h-12 rounded-2xl bg-[var(--color-unusonic-success)]/10 flex items-center justify-center mx-auto mb-4">
         <CheckCircle className="w-6 h-6 text-[var(--color-unusonic-success)]" />
       </div>
-      <h4 className="text-sm font-medium text-[var(--stage-text-primary)] mb-1">All caught up!</h4>
+      <h4 className="text-sm font-medium text-[var(--stage-text-primary)] mb-1">No outstanding invoices</h4>
       <p className="text-xs text-[var(--stage-text-secondary)]">No outstanding invoices at the moment.</p>
     </motion.div>
   );

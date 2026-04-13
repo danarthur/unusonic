@@ -43,14 +43,14 @@ export function ProfitabilityCard({
 
   return (
     <StagePanel padding="none" className={`p-6 flex flex-col gap-4 border border-[oklch(1_0_0_/_0.10)] ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+      <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Budget vs Actuals
       </h2>
 
       <div className="grid grid-cols-3 gap-4 items-center">
         {/* Left: Internal Budget */}
         <div className="text-center">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
+          <p className="stage-label mb-1">
             Budget
           </p>
           <motion.p
@@ -65,7 +65,7 @@ export function ProfitabilityCard({
 
         {/* Center: Profit Margin */}
         <div className="text-center">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
+          <p className="stage-label mb-1">
             Margin
           </p>
           <motion.span
@@ -86,7 +86,7 @@ export function ProfitabilityCard({
 
         {/* Right: QBO Actuals */}
         <div className="text-center">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">
+          <p className="stage-label mb-1">
             Actuals
           </p>
           <motion.p

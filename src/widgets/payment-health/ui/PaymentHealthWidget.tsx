@@ -70,7 +70,7 @@ export function PaymentHealthWidget() {
             <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums">
               {metrics.overdueCount} overdue
             </p>
-            <p className="text-[11px] text-[var(--stage-text-secondary)]/50 tabular-nums">
+            <p className="text-field-label text-[var(--stage-text-secondary)]/50 tabular-nums">
               {formatCurrency(metrics.overdueAmount)} at risk
             </p>
           </div>
@@ -92,7 +92,7 @@ export function PaymentHealthWidget() {
             <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight truncate">
               {metrics.nextPayment.dealTitle}
             </p>
-            <p className="text-[11px] text-[var(--stage-text-secondary)]/50 tabular-nums">
+            <p className="text-field-label text-[var(--stage-text-secondary)]/50 tabular-nums">
               {metrics.nextPayment.amount ? formatCurrency(metrics.nextPayment.amount) : 'Payment'} · {formatShortDate(metrics.nextPayment.dueDate)}
             </p>
           </div>

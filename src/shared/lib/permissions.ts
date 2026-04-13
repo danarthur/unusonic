@@ -5,7 +5,7 @@
  * Permission Registry (permission-registry.ts). Legacy path: hasPermission(..., PermissionKey).
  *
  * Future: Auth Hooks can inject permission_bundle into JWT app_metadata so RLS
- * can check without a DB read per row — see docs/design/capabilities-based-roles-and-role-builder.md §4.4.
+ * can check without a DB read per row — see docs/reference/permissions/capabilities-based-roles-and-role-builder.md §4.4.
  * @module lib/permissions
  */
 

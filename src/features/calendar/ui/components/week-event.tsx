@@ -41,9 +41,8 @@ export function WeekEvent({ position, onClick, variant = 'absolute' }: WeekEvent
   const baseClass = `
     group rounded-lg border-l-4 text-left overflow-hidden
     shadow-md hover:shadow-lg
-    hover:brightness-[1.02]
-    transition-all duration-300
-    focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-1 focus:ring-offset-transparent
+    transition-colors duration-100
+    focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-transparent
     ${colorClass}
   `.trim().replace(/\s+/g, ' ');
 
@@ -51,7 +50,7 @@ export function WeekEvent({ position, onClick, variant = 'absolute' }: WeekEvent
   const pillContent = (
     <span className="flex flex-col min-w-0 text-left px-2.5 py-2 gap-1">
       <span className="text-xs font-medium text-[var(--stage-text-primary)] truncate">{event.title}</span>
-      <span className="text-[10px] font-normal text-[var(--stage-text-primary)]/80 tabular-nums truncate">{timeRange}</span>
+      <span className="text-label font-normal text-[var(--stage-text-primary)]/80 tabular-nums truncate">{timeRange}</span>
     </span>
   );
 
@@ -102,14 +101,14 @@ export function CollapsedBar({ summary }: CollapsedBarProps) {
 
   return (
     <div
-      className="absolute left-[3px] right-[3px] rounded-xl border border-[oklch(1_0_0_/_0.08)] stage-panel-nested flex items-center px-3 z-0 overflow-hidden shadow-md hover:shadow-lg hover:bg-[var(--stage-surface-hover)] transition-all duration-300"
+      className="absolute left-[3px] right-[3px] rounded-xl border border-[oklch(1_0_0_/_0.08)] stage-panel-nested flex items-center px-3 z-0 overflow-hidden shadow-md transition-colors duration-100"
       style={{
         top: `${top}%`,
         height: `${height}%`,
         minHeight: 24,
       }}
     >
-      <span className="text-[10px] font-medium text-[var(--stage-text-primary)]/80 truncate tracking-tight">
+      <span className="text-label font-medium text-[var(--stage-text-primary)]/80 truncate tracking-tight">
         {label}
       </span>
     </div>

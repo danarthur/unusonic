@@ -122,7 +122,7 @@ function WarningBanner({ warning }: { warning: BillingWarning }) {
 
         <Link
           href={warning.href}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] transition-[filter] shrink-0"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors shrink-0"
         >
           {warning.cta}
           <ArrowRight className="w-3 h-3" strokeWidth={1.5} />
@@ -190,7 +190,7 @@ export function PlanPromptBanner(props: PlanPromptBannerProps) {
                 <Link
                   href="/settings/plan"
                   onClick={dismissPromo}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] transition-[filter]"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors"
                 >
                   Review plan
                   <ArrowRight className="w-3 h-3" strokeWidth={1.5} />

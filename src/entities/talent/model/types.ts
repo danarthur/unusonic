@@ -67,6 +67,23 @@ export interface CrewSkillDTO {
   notes?: string | null;
 }
 
+/** Equipment category for ops.crew_equipment. */
+export type EquipmentCategory = 'audio' | 'lighting' | 'video' | 'staging' | 'power' | 'misc';
+
+export type EquipmentVerificationStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+/** Equipment record from ops.crew_equipment — Phase 2 crew gear profiles + Verified Kit System. */
+export interface CrewEquipmentDTO {
+  id: string;
+  category: EquipmentCategory;
+  name: string;
+  quantity: number;
+  notes: string | null;
+  catalog_item_id: string | null;
+  verification_status: EquipmentVerificationStatus;
+  photo_url: string | null;
+}
+
 /** Org member with skills (expanded card). Ghost members have profile_id null. */
 export interface OrgMemberWithSkillsDTO {
   id: string;

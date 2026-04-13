@@ -36,7 +36,7 @@ async function PortalThemeData() {
 
   return (
     <PortalThemeClient
-      initialPreset={theme?.preset ?? 'default'}
+      initialPreset={theme?.preset ?? 'paper'}
       initialConfig={theme?.config ?? {}}
     />
   );

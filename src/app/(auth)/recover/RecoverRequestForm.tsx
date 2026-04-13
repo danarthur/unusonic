@@ -34,7 +34,7 @@ export function RecoverRequestForm() {
       }
     } catch {
       setStatus('error');
-      setMessage('Something went wrong. Please try again.');
+      setMessage('Unable to send recovery email. Try again.');
     }
   }
 
@@ -62,12 +62,12 @@ export function RecoverRequestForm() {
         data-lpignore="true"
         data-form-type="other"
         data-1p-ignore
-        className="w-full px-4 py-2.5 rounded-xl bg-[var(--stage-void)]/50 border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]/40"
+        className="w-full px-4 py-2.5 rounded-xl bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40"
       />
       <button
         type="submit"
         disabled={status === 'loading'}
-        className="w-full py-2.5 rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] border border-[oklch(1_0_0_/_0.22)] font-medium hover:brightness-[1.06] disabled:opacity-50 transition-[filter]"
+        className="w-full py-2.5 rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] border border-[oklch(1_0_0_/_0.22)] font-medium hover:bg-[oklch(1_0_0_/_0.08)] disabled:opacity-45 transition-colors"
       >
         {status === 'loading' ? 'Sending…' : 'Continue'}
       </button>

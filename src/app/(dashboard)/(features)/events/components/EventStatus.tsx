@@ -67,14 +67,14 @@ export function EventStatus() {
               initial={{ opacity: 0, x: -5 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="!p-3 transition-all"
+              className="!p-3 transition-colors"
             >
               <div className="flex items-start justify-between">
                 <div>
                   <h4 className="text-sm font-medium text-[var(--stage-text-primary)]">
                     {evt.title}
                   </h4>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider">
+                  <div className="mt-1 flex items-center gap-2 stage-label text-[var(--stage-text-secondary)]">
                     <Calendar size={10} />
                     {new Date(evt.starts_at).toLocaleDateString(undefined, {
                       month: 'short',
@@ -86,7 +86,7 @@ export function EventStatus() {
               </div>
 
               {evt.location_name && (
-                <div className="flex items-center gap-1.5 text-[10px] text-[var(--stage-text-secondary)]">
+                <div className="flex items-center gap-1.5 text-label text-[var(--stage-text-secondary)]">
                   <MapPin size={10} />
                   <span className="truncate">{evt.location_name}</span>
                 </div>
@@ -109,7 +109,7 @@ function StatusBadge({ status }: { status: string }) {
   const activeStyle = styles[status as keyof typeof styles] || styles.planned;
 
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${activeStyle}`}>
+    <span className={`px-2 py-0.5 rounded-full stage-micro font-medium border ${activeStyle}`}>
       {status}
     </span>
   );

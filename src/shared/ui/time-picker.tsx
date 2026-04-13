@@ -194,7 +194,7 @@ export function TimePicker({
           className={cn(
             '[font-variant-numeric:tabular-nums]',
             variant === 'ghost'
-              ? 'w-[4.75rem] text-center bg-transparent text-sm text-[var(--stage-text-primary)] tracking-tight focus:outline-none placeholder:text-[var(--stage-text-tertiary)] px-0.5 py-0.5 hover:bg-[oklch(1_0_0_/_0.05)] rounded-[var(--stage-radius-input)] transition-colors'
+              ? 'w-[4.75rem] text-center bg-transparent text-sm text-[var(--stage-text-primary)] tracking-tight focus:outline-none placeholder:text-[var(--stage-text-secondary)] px-0.5 py-0.5 hover:bg-[oklch(1_0_0_/_0.05)] rounded-[var(--stage-radius-input)] transition-colors'
               : 'w-full min-w-0 stage-input pr-8',
           )}
         />

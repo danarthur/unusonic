@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { NetworkCard } from '@/entities/network';
 import { GenesisState } from './GenesisState';
-import { TheMembrane } from './TheMembrane';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import type { NetworkNode } from '@/entities/network';
@@ -137,6 +136,8 @@ export function StreamLayout({
   const [crewSearch, setCrewSearch] = useState('');
   const [innerCircleSearch, setInnerCircleSearch] = useState('');
   const [networkSearch, setNetworkSearch] = useState('');
+  const [crewExpanded, setCrewExpanded] = useState(true);
+  const [innerCircleExpanded, setInnerCircleExpanded] = useState(true);
   const [networkExpanded, setNetworkExpanded] = useState(false);
   const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
 
@@ -213,119 +214,161 @@ export function StreamLayout({
       {crewNodes.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium tracking-wide text-[var(--stage-text-secondary)]">
-              Crew
-            </h2>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search crew…"
-                aria-label="Search crew"
-                value={crewSearch}
-                onChange={(e) => setCrewSearch(e.target.value)}
+            <button
+              type="button"
+              onClick={() => setCrewExpanded((v) => !v)}
+              className="flex items-center gap-2 text-left group"
+            >
+              <h2 className="stage-label text-[var(--stage-text-secondary)]">
+                Crew
+              </h2>
+              <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
+                {crewNodes.length}
+              </span>
+              <ChevronDown
                 className={cn(
-                  'stage-input h-8 pl-7 pr-3 text-xs',
-                  'focus-visible:outline-none',
-                  crewSearch ? 'w-40' : 'w-28 focus:w-40'
+                  'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
+                  crewExpanded && 'rotate-180'
                 )}
               />
-            </div>
+            </button>
+            {crewExpanded && (
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search crew…"
+                  aria-label="Search crew"
+                  value={crewSearch}
+                  onChange={(e) => setCrewSearch(e.target.value)}
+                  className={cn(
+                    'stage-input h-8 !pl-7 pr-3 text-xs',
+                    'focus-visible:outline-none',
+                    crewSearch ? 'w-40' : 'w-28 focus:w-40'
+                  )}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Role filter pills */}
-          {allRoleKeys.length > 1 && (
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setActiveRoleFilter(null)}
-                className={cn(
-                  'rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-150',
-                  !activeRoleFilter
-                    ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                    : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                )}
+          <AnimatePresence>
+            {crewExpanded && (
+              <motion.div
+                key="crew-content"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={STAGE_MEDIUM}
+                className="overflow-hidden"
               >
-                All
-              </button>
-              {allRoleKeys.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActiveRoleFilter(activeRoleFilter === key ? null : key)}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-150',
-                    activeRoleFilter === key
-                      ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                      : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                  )}
-                >
-                  {key}
-                  <span
-                    className={cn(
-                      'rounded-full px-1.5 py-px text-[10px] tabular-nums leading-4',
-                      activeRoleFilter === key
-                        ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
-                        : 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
-                    )}
-                  >
-                    {roleGroups.get(key)?.length ?? 0}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+                {/* Role filter pills */}
+                {allRoleKeys.length > 1 && (
+                  <div className="mb-4 flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveRoleFilter(null)}
+                      className={cn(
+                        'rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
+                        !activeRoleFilter
+                          ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
+                          : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
+                      )}
+                    >
+                      All
+                    </button>
+                    {allRoleKeys.map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setActiveRoleFilter(activeRoleFilter === key ? null : key)}
+                        className={cn(
+                          'flex items-center gap-1.5 rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
+                          activeRoleFilter === key
+                            ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
+                            : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
+                        )}
+                      >
+                        {key}
+                        <span
+                          className={cn(
+                            'rounded-full px-1.5 py-px stage-badge-text tabular-nums',
+                            activeRoleFilter === key
+                              ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
+                              : 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
+                          )}
+                        >
+                          {roleGroups.get(key)?.length ?? 0}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-          {/* Role-grouped cards */}
-          {filteredCrewNodes.length > 0 ? (
-            <div className="flex flex-col gap-6">
-              {[...filteredRoleGroups.entries()].map(([role, groupNodes]) => (
-                <div key={role}>
-                  {/* Only show role header if there are multiple groups and no active filter */}
-                  {allRoleKeys.length > 1 && !activeRoleFilter && (
-                    <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/60">
-                      {role}
-                    </p>
-                  )}
-                  <div className="grid grid-cols-2 gap-[var(--stage-gap)] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 auto-rows-[84px]">
-                    {groupNodes.map((node) => (
-                      <div key={node.id} className="h-full">
-                        <NetworkCard
-                          node={node}
-                          layoutId={`node-${node.id}`}
-                          onClick={() => onNodeClick?.(node)}
-                        />
+                {/* Role-grouped cards */}
+                {filteredCrewNodes.length > 0 ? (
+                  <div className="flex flex-col gap-6">
+                    {[...filteredRoleGroups.entries()].map(([role, groupNodes]) => (
+                      <div key={role}>
+                        {/* Only show role header if there are multiple groups and no active filter */}
+                        {allRoleKeys.length > 1 && !activeRoleFilter && (
+                          <p className="mb-2 stage-label text-[var(--stage-text-secondary)]/60">
+                            {role}
+                          </p>
+                        )}
+                        <div className="grid grid-cols-2 gap-[var(--stage-gap)] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                          {groupNodes.map((node) => (
+                            <div key={node.id} className="h-full">
+                              <NetworkCard
+                                node={node}
+                                layoutId={`node-${node.id}`}
+                                onClick={() => onNodeClick?.(node)}
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-sm text-[var(--stage-text-secondary)]">
-                No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{crewSearch}&rdquo;</span>
-              </p>
-              <button type="button" onClick={() => { setCrewSearch(''); setActiveRoleFilter(null); }} className="mt-2 text-xs text-[var(--stage-accent)] hover:underline">
-                Clear filter
-              </button>
-            </div>
-          )}
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <p className="stage-label text-[var(--stage-text-secondary)]">
+                      No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{crewSearch}&rdquo;</span>
+                    </p>
+                    <button type="button" onClick={() => { setCrewSearch(''); setActiveRoleFilter(null); }} className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline">
+                      Clear filter
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
       )}
 
       {/* ── Zone 2: Inner Circle (preferred companies + venues) ── */}
       {innerCircleNodes.length > 0 && (
         <>
-          {crewNodes.length > 0 && <TheMembrane label="Inner Circle" />}
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
-              {crewNodes.length === 0 ? (
-                <h2 className="text-sm font-medium tracking-wide text-[var(--stage-text-secondary)]">
+              <button
+                type="button"
+                onClick={() => setInnerCircleExpanded((v) => !v)}
+                className="flex items-center gap-2 text-left group"
+              >
+                <h2 className="stage-label text-[var(--stage-text-secondary)]">
                   Inner Circle
                 </h2>
-              ) : <div />}
-              {innerCircleNodes.length > 3 && (
+                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
+                  {innerCircleNodes.length}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
+                    innerCircleExpanded && 'rotate-180'
+                  )}
+                />
+              </button>
+              {innerCircleExpanded && innerCircleNodes.length > 3 && (
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
                   <input
@@ -335,7 +378,7 @@ export function StreamLayout({
                     value={innerCircleSearch}
                     onChange={(e) => setInnerCircleSearch(e.target.value)}
                     className={cn(
-                      'stage-input h-8 pl-7 pr-3 text-xs',
+                      'stage-input h-8 !pl-7 pr-3 text-xs',
                       'focus-visible:outline-none',
                       innerCircleSearch ? 'w-40' : 'w-28 focus:w-40'
                     )}
@@ -343,29 +386,42 @@ export function StreamLayout({
                 </div>
               )}
             </div>
-            {displayedInnerCircle.length > 0 ? (
-              <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[124px]">
-                {displayedInnerCircle.map((node) => (
-                  <div key={node.id} className="h-full">
-                    <NetworkCard
-                      node={node}
-                      layoutId={`node-${node.id}`}
-                      onClick={() => onNodeClick?.(node)}
-                      onTogglePreferred={(onPin || onUnpin) ? () => handleTogglePreferred(node) : undefined}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <p className="text-sm text-[var(--stage-text-secondary)]">
-                  No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{innerCircleSearch}&rdquo;</span>
-                </p>
-                <button type="button" onClick={() => setInnerCircleSearch('')} className="mt-2 text-xs text-[var(--stage-accent)] hover:underline">
-                  Clear filter
-                </button>
-              </div>
-            )}
+            <AnimatePresence>
+              {innerCircleExpanded && (
+                <motion.div
+                  key="inner-circle-content"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={STAGE_MEDIUM}
+                  className="overflow-hidden"
+                >
+                  {displayedInnerCircle.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                      {displayedInnerCircle.map((node) => (
+                        <div key={node.id} className="h-full">
+                          <NetworkCard
+                            node={node}
+                            layoutId={`node-${node.id}`}
+                            onClick={() => onNodeClick?.(node)}
+                            onTogglePreferred={(onPin || onUnpin) ? () => handleTogglePreferred(node) : undefined}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <p className="stage-label text-[var(--stage-text-secondary)]">
+                        No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{innerCircleSearch}&rdquo;</span>
+                      </p>
+                      <button type="button" onClick={() => setInnerCircleSearch('')} className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline">
+                        Clear filter
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
         </>
       )}
@@ -397,13 +453,15 @@ export function StreamLayout({
                 onClick={() => setNetworkExpanded((v) => !v)}
                 className="flex items-center gap-2 text-left group"
               >
-                <TheMembrane label="Network" />
-                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 text-[10px] font-medium tabular-nums text-[var(--stage-text-secondary)]">
+                <h2 className="stage-label text-[var(--stage-text-secondary)]">
+                  Network
+                </h2>
+                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
                   {networkNodes.length}
                 </span>
                 <ChevronDown
                   className={cn(
-                    'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-200',
+                    'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
                     networkExpanded && 'rotate-180'
                   )}
                 />
@@ -430,7 +488,7 @@ export function StreamLayout({
                           type="button"
                           onClick={() => setActiveFilter(f.id)}
                           className={cn(
-                            'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-150',
+                            'flex items-center gap-1.5 rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
                             activeFilter === f.id
                               ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
                               : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
@@ -440,7 +498,7 @@ export function StreamLayout({
                           {f.id !== 'all' && (
                             <span
                               className={cn(
-                                'rounded-full px-1.5 py-px text-[10px] tabular-nums leading-4',
+                                'rounded-full px-1.5 py-px stage-badge-text tabular-nums',
                                 activeFilter === f.id
                                   ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
                                   : 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
@@ -464,7 +522,7 @@ export function StreamLayout({
                           value={networkSearch}
                           onChange={(e) => setNetworkSearch(e.target.value)}
                           className={cn(
-                            'stage-input h-8 pl-7 pr-3 text-xs',
+                            'stage-input h-8 !pl-7 pr-3 text-xs',
                             'focus-visible:outline-none',
                             networkSearch ? 'w-40' : 'w-28 focus:w-40'
                           )}
@@ -476,7 +534,7 @@ export function StreamLayout({
                         type="button"
                         onClick={() => setSort((s) => (s === 'relationship' ? 'name' : 'relationship'))}
                         title={sort === 'relationship' ? 'Sorted: default' : 'Sorted: A–Z'}
-                        className="flex h-8 items-center gap-1.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0/0.05)] px-2.5 text-xs text-[var(--stage-text-secondary)] transition-colors hover:border-[var(--stage-accent)]/30 hover:text-[var(--stage-text-primary)]"
+                        className="flex h-8 items-center gap-1.5 rounded-xl border border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.05)] px-2.5 stage-badge-text text-[var(--stage-text-secondary)] transition-colors hover:border-[var(--stage-accent)]/30 hover:text-[var(--stage-text-primary)]"
                       >
                         <ArrowUpDown className="size-3" />
                         {sort === 'relationship' ? 'Default' : 'A–Z'}
@@ -492,7 +550,7 @@ export function StreamLayout({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[124px]"
+                        className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                       >
                         {displayedNetwork.map((node) => (
                           <div key={node.id} className="h-full">
@@ -513,7 +571,7 @@ export function StreamLayout({
                         exit={{ opacity: 0 }}
                         className="flex flex-col items-center justify-center py-16 text-center"
                       >
-                        <p className="text-sm text-[var(--stage-text-secondary)]">
+                        <p className="stage-label text-[var(--stage-text-secondary)]">
                           {networkSearch ? (
                             <>No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{networkSearch}&rdquo;</span></>
                           ) : (
@@ -524,7 +582,7 @@ export function StreamLayout({
                           <button
                             type="button"
                             onClick={() => setNetworkSearch('')}
-                            className="mt-2 text-xs text-[var(--stage-accent)] hover:underline"
+                            className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline"
                           >
                             Clear filter
                           </button>

@@ -134,7 +134,7 @@ export function ProposalLineInspector({
                 value={item.name ?? ''}
                 onChange={(e) => onUpdateName(lineIndex, e.target.value)}
                 placeholder="e.g. Special confetti cannon"
-                className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
+                className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus-visible:border-[var(--stage-accent)] focus-visible:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
               />
             </div>
 
@@ -260,7 +260,7 @@ export function ProposalLineInspector({
                     step={0.25}
                     value={item.unitMultiplier ?? 1}
                     onChange={(e) => onUpdateUnitMultiplier(lineIndex, e.target.valueAsNumber)}
-                    className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] tabular-nums hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] tabular-nums hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus-visible:border-[var(--stage-accent)] focus-visible:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 )}
               </div>
@@ -293,7 +293,7 @@ export function ProposalLineInspector({
                 <button
                   type="button"
                   onClick={onShowAlternatives}
-                  className="text-xs font-medium px-3 py-1.5 rounded-[var(--stage-radius-input)] border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 transition-colors focus:outline-none w-fit"
+                  className="text-xs font-medium px-3 py-1.5 rounded-[var(--stage-radius-input)] border border-[var(--color-unusonic-warning)]/30 text-[var(--color-unusonic-warning)] hover:bg-[var(--color-unusonic-warning)]/10 transition-colors focus:outline-none w-fit"
                 >
                   {alternativesOpen ? 'Hide alternatives' : 'Show alternatives'}
                 </button>
@@ -353,7 +353,7 @@ export function ProposalLineInspector({
                             value={item.displayGroupName ?? ''}
                             onChange={(e) => onUpdateDisplayGroupName(lineIndex, e.target.value || null)}
                             placeholder="e.g. Entertainment, Production"
-                            className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
+                            className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus-visible:border-[var(--stage-accent)] focus-visible:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
                           />
                           {existingSections.length > 0 && (
                             <datalist id="inspector-section-list">

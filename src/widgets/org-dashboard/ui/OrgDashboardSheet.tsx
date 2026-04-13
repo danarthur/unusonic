@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useActionState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { User, Building2, Settings, Users, X, Palette, MapPin, Globe, Network, Plus } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
@@ -83,7 +84,7 @@ function RosterList({
                   <Badge
                     variant={isGhost ? 'outline' : 'secondary'}
                     className={cn(
-                      'text-[10px] font-medium',
+                      'stage-badge-text',
                       isGhost && 'border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]'
                     )}
                   >
@@ -95,13 +96,13 @@ function RosterList({
                     {member.skill_tags.slice(0, 4).map((tag) => (
                       <span
                         key={tag}
-                        className="rounded bg-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                        className="rounded bg-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 stage-badge-text text-[var(--stage-text-secondary)]"
                       >
                         {tag}
                       </span>
                     ))}
                     {member.skill_tags.length > 4 && (
-                      <span className="text-[10px] text-[var(--stage-text-secondary)]">
+                      <span className="text-label text-[var(--stage-text-secondary)]">
                         +{member.skill_tags.length - 4}
                       </span>
                     )}
@@ -222,11 +223,11 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
           <>
             <motion.div
               role="presentation"
-              className="fixed inset-0 z-50 bg-black/60 "
+              className="fixed inset-0 z-50 bg-[oklch(0.06_0_0/0.75)] "
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              transition={STAGE_MEDIUM}
               onClick={() => onOpenChange(false)}
               aria-hidden
             />
@@ -237,7 +238,7 @@ export function OrgDashboardSheet({ org, open, onOpenChange }: OrgDashboardSheet
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              transition={STAGE_MEDIUM}
               className={cn(
                 'fixed inset-4 z-50 flex flex-col overflow-hidden rounded-[var(--stage-radius-panel)]',
                 'bg-[oklch(1_0_0_/_0.05)] bg-[var(--stage-surface)] border border-[oklch(1_0_0_/_0.10)] shadow-2xl',

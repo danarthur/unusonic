@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/shared/api/supabase/client';
+import { useAuthStatusStore } from '@/shared/lib/auth/auth-status-store';
 
 /**
  * Client-only CRM queue with realtime subscription.
@@ -20,6 +21,7 @@ export type Gig = {
 export function useGigs() {
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
+  const sessionExpired = useAuthStatusStore((s) => s.sessionExpired);
   const supabase = createClient();
 
   const fetchGigs = async () => {
@@ -86,6 +88,9 @@ export function useGigs() {
   };
 
   useEffect(() => {
+    // Don't fetch or subscribe when session is expired
+    if (sessionExpired) return;
+
     fetchGigs();
 
     const channel = supabase
@@ -98,7 +103,7 @@ export function useGigs() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [sessionExpired]);
 
   return { gigs, loading, refresh: fetchGigs };
 }

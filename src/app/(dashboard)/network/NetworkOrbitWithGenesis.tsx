@@ -34,17 +34,17 @@ function AddMenuItem({ icon: Icon, label, description, onClick, accent }: MenuIt
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.06)]"
+      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)]"
     >
       <div
-        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] group-hover:border-[oklch(1_0_0/0.15)]"
+        className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised)] group-hover:border-[var(--stage-edge-default)]"
         style={accent ? { color: accent } : undefined}
       >
-        <Icon className="size-3.5 text-[var(--stage-text-secondary)] transition-colors group-hover:text-[var(--stage-text-primary)]" style={accent ? { color: accent } : undefined} />
+        <Icon className="size-3.5 text-[var(--stage-text-secondary)] transition-colors group-hover:text-[var(--stage-text-primary)]" strokeWidth={1.5} style={accent ? { color: accent } : undefined} />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-medium text-[var(--stage-text-primary)]">{label}</p>
-        <p className="text-xs text-[var(--stage-text-secondary)]">{description}</p>
+        <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{label}</p>
+        <p className="stage-label text-[var(--stage-text-secondary)]">{description}</p>
       </div>
     </button>
   );
@@ -104,13 +104,13 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
           exit={{ opacity: 0, y: 12 }}
           transition={STAGE_HEAVY}
           onClick={(e) => e.stopPropagation()}
-          className="relative z-10 mx-4 w-full max-w-sm rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-[0_24px_64px_-8px_oklch(0_0_0/0.5)]"
+          className="relative z-10 mx-4 w-full max-w-sm rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised)] p-6 shadow-[0_24px_64px_-8px_oklch(0_0_0/0.5)]"
           data-surface="raised"
         >
           <h2 className="mb-1 text-base font-medium tracking-tight text-[var(--stage-text-primary)]">
             Add freelancer
           </h2>
-          <p className="mb-5 text-xs text-[var(--stage-text-secondary)]">
+          <p className="mb-5 stage-label text-[var(--stage-text-secondary)]">
             Occasional hires available in the crew picker. Not on your roster.
           </p>
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -125,7 +125,7 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
                   placeholder="First"
                   required
                   autoFocus
-                  className="stage-input h-9 text-sm"
+                  className="stage-input h-9"
                 />
               </div>
               <div className="space-y-1">
@@ -136,11 +136,11 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Last"
-                  className="stage-input h-9 text-sm"
+                  className="stage-input h-9"
                 />
               </div>
             </div>
-            <p className="text-[10px] text-[var(--stage-text-secondary)]">
+            <p className="stage-label text-[var(--stage-text-secondary)]">
               You can add contact details, skills, and job title on their profile page.
             </p>
             <div className="flex gap-2 pt-1">
@@ -148,16 +148,16 @@ function AddFreelancerSheet({ open, onOpenChange, orgId }: AddFreelancerSheetPro
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="flex-1 rounded-xl border-[oklch(1_0_0_/_0.08)] text-sm"
+                className="flex-1 rounded-xl border-[var(--stage-edge-subtle)]"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={pending || !firstName.trim()}
-                className="flex-1 rounded-xl bg-[var(--stage-accent)] text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90 disabled:opacity-[0.45]"
+                className="stage-btn stage-btn-primary flex-1 rounded-xl disabled:opacity-[0.45]"
               >
-                {pending ? <Loader2 className="size-4 animate-spin" /> : 'Add'}
+                {pending ? <Loader2 className="size-4 animate-spin" strokeWidth={1.5} /> : 'Add'}
               </Button>
             </div>
           </form>
@@ -234,7 +234,7 @@ export function NetworkOrbitWithGenesis({
             <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">
               Network
             </h1>
-            <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
+            <p className="mt-1 text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">
               Your team and partners.
             </p>
             {orgName?.trim() && (
@@ -260,14 +260,14 @@ export function NetworkOrbitWithGenesis({
             <Popover open={menuOpen} onOpenChange={setMenuOpen}>
               <PopoverTrigger asChild>
                 <Button
-                  className="gap-2 rounded-xl bg-[var(--stage-accent)] px-4 text-sm font-medium text-[oklch(0.10_0_0)] hover:bg-[var(--stage-accent)]/90"
+                  className="stage-btn stage-btn-primary gap-2 rounded-xl px-4"
                 >
-                  <Plus className="size-4" />
+                  <Plus className="size-4" strokeWidth={1.5} />
                   Add
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 p-2">
-                <p className="px-3 pb-2 pt-1 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                <p className="px-3 pb-2 pt-1 stage-label">
                   Add to network
                 </p>
                 <AddMenuItem
@@ -282,7 +282,7 @@ export function NetworkOrbitWithGenesis({
                   description="Regular 1099, on your roster"
                   onClick={() => openStaff('external_contractor')}
                 />
-                <div className="my-2 border-t border-[oklch(1_0_0_/_0.06)]" />
+                <div className="my-2 border-t border-[var(--stage-edge-subtle)]" />
                 <AddMenuItem
                   icon={User}
                   label="Freelancer"

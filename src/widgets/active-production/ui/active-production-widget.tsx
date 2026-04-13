@@ -99,10 +99,10 @@ export function ActiveProductionWidget() {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-sm font-medium text-[var(--stage-text-primary)]">{gig.title ?? 'Untitled Production'}</span>
-                          <span className="text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider leading-relaxed">run of show</span>
+                          <span className="stage-label leading-relaxed">run of show</span>
                         </div>
                       </div>
-                      <span className="text-[10px] text-[var(--stage-text-secondary)]">
+                      <span className="text-label text-[var(--stage-text-secondary)]">
                         {gig.event_date ? new Date(gig.event_date).toLocaleDateString() : 'TBD'}
                       </span>
                     </StagePanel>
@@ -117,7 +117,7 @@ export function ActiveProductionWidget() {
           <motion.button
             type="button"
             transition={M3_ENTER}
-            className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] py-2.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] transition-[color,background-color,filter] hover:bg-[var(--stage-text-primary)] hover:text-[var(--stage-text-on-accent)] hover:brightness-[1.02]"
+            className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] py-2.5 stage-label transition-[color,background-color] hover:bg-[var(--stage-text-primary)] hover:text-[var(--stage-text-on-accent)]"
           >
             View Production Queue
           </motion.button>

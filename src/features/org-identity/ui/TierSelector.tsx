@@ -58,17 +58,17 @@ export function TierSelector({
               type="button"
               onClick={() => onChange(tier.id)}
               className={cn(
-                'relative rounded-2xl p-4 border text-left transition-all duration-200',
+                'relative rounded-2xl p-4 border text-left transition-colors duration-[80ms]',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
                 isSelected
                   ? 'border-[oklch(1_0_0_/_0.20)] bg-[oklch(1_0_0_/_0.06)] shadow-[0_0_0_1px_oklch(1_0_0_/_0.14)]'
-                  : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)]/80 hover:border-[oklch(1_0_0_/_0.14)] hover:bg-[var(--stage-surface)]'
+                  : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)]/80 hover:border-[oklch(1_0_0_/_0.14)] stage-hover overflow-hidden'
               )}
               aria-pressed={isSelected}
               aria-label={`${tier.name}: ${tier.desc}, ${tier.price}${isSuggested ? ' (Suggested)' : ''}`}
             >
               {isSuggested && (
-                <span className="absolute top-2 right-2 rounded-full bg-[oklch(1_0_0_/_0.08)] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-[var(--stage-accent)]">
+                <span className="absolute top-2 right-2 rounded-full bg-[oklch(1_0_0_/_0.08)] px-1.5 py-0.5 stage-micro text-[var(--stage-accent)]">
                   Suggested
                 </span>
               )}
@@ -79,7 +79,7 @@ export function TierSelector({
               )}
               <div className={cn('text-sm font-medium text-[var(--stage-text-primary)] pr-6', isSuggested && 'pt-4')}>{tier.name}</div>
               <div className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{tier.desc}</div>
-              <div className="text-xs font-semibold mt-2 text-[var(--stage-accent)]">{tier.price}</div>
+              <div className="text-xs font-medium mt-2 text-[var(--stage-accent)]">{tier.price}</div>
             </button>
           );
         })}

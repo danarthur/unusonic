@@ -8,6 +8,7 @@
 
 import { useEffect, useRef } from 'react';
 import { motion, useSpring, useTransform, useInView } from 'framer-motion';
+import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
 interface AnimatedCounterProps {
   value: number;
@@ -62,7 +63,7 @@ export function AnimatedCounter({
       className={className}
       initial={{ opacity: 0, y: 8 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.1 }}
+      transition={{ ...STAGE_MEDIUM, delay: 0.1 }}
     >
       {display}
     </motion.span>
@@ -90,13 +91,13 @@ export function PercentageChange({ current, previous, className = '' }: Percenta
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.3 }}
+      transition={{ ...STAGE_MEDIUM, delay: 0.3 }}
       className={`inline-flex items-center gap-1 text-sm font-medium ${className}`}
     >
       <motion.span
         initial={{ y: isPositive ? 4 : -4 }}
         animate={{ y: 0 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+        transition={STAGE_LIGHT}
         className={isPositive ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--color-unusonic-error)]'}
       >
         {isPositive ? '↑' : '↓'}

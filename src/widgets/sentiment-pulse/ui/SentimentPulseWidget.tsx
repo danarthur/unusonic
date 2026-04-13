@@ -5,9 +5,7 @@ import { motion } from 'framer-motion';
 import { Activity } from 'lucide-react';
 import { WidgetShell } from '@/widgets/shared';
 import {
-  M3_FADE_THROUGH_ENTER,
-  M3_STAGGER_CHILDREN,
-  M3_STAGGER_DELAY,
+  STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
 
 /** Micro-chart stub: client emotional trends (neutral / accent positive / warning at risk). */
@@ -32,12 +30,7 @@ export function SentimentPulseWidget() {
         initial="hidden"
         animate="visible"
         variants={{
-          visible: {
-            transition: {
-              staggerChildren: M3_STAGGER_CHILDREN,
-              delayChildren: M3_STAGGER_DELAY,
-            },
-          },
+          visible: { transition: { staggerChildren: 0.03 } },
           hidden: {},
         }}
       >
@@ -45,7 +38,7 @@ export function SentimentPulseWidget() {
           <motion.div
             key={p.label}
             variants={{ hidden: { opacity: 0, scaleY: 0 }, visible: { opacity: 1, scaleY: 1 } }}
-            transition={M3_FADE_THROUGH_ENTER}
+            transition={STAGE_LIGHT}
             className="flex-1 flex flex-col items-center justify-end gap-1 h-full"
           >
             <div
@@ -61,7 +54,7 @@ export function SentimentPulseWidget() {
                 opacity: p.status === 'positive' ? 0.85 : p.status === 'at_risk' ? 0.55 : 0.65,
               }}
             />
-            <span className="text-[10px] text-[var(--stage-text-secondary)] font-medium shrink-0">{p.label}</span>
+            <span className="text-label text-[var(--stage-text-secondary)] font-medium shrink-0">{p.label}</span>
           </motion.div>
         ))}
       </motion.div>

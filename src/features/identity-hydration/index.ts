@@ -31,6 +31,7 @@ export {
   createWorkspace,
   joinWorkspace,
   uploadAvatar,
+  claimGhostEntities,
 } from './api/actions';
 
 // Types

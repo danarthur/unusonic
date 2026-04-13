@@ -30,7 +30,7 @@ export function TheMembrane({ label = 'Network' }: MembraneProps) {
           boxShadow: '0 0 12px oklch(0.88 0 0 / 0.3)',
         }}
       />
-      <span className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-4 py-1.5 text-xs font-medium tracking-wide text-[var(--stage-text-secondary)]">
+      <span className="rounded-full border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised)] px-4 py-1.5 stage-label text-[var(--stage-text-secondary)]">
         {label}
       </span>
     </motion.div>

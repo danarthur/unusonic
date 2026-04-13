@@ -83,7 +83,7 @@ export function OnboardingChatInput({
           data-1p-ignore
           className={cn(
             'w-full min-w-0 bg-transparent border-none outline-none text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/70 cursor-text caret-[var(--stage-accent)]',
-            'font-sans text-lg h-full min-h-[2rem] py-2 px-2 disabled:opacity-50'
+            'font-sans text-lg h-full min-h-[2rem] py-2 px-2 disabled:opacity-45'
           )}
         />
       </div>
@@ -106,7 +106,7 @@ export function OnboardingChatInput({
               onClick={handleSubmit}
               aria-busy={isLoading}
               aria-label="Submit"
-              className="p-3 rounded-full bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] transition-[filter] flex items-center justify-center"
+              className="p-3 rounded-full bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors flex items-center justify-center"
             >
               <ArrowUp size={20} strokeWidth={1.5} />
             </motion.button>

@@ -7,7 +7,6 @@ import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import type { WeekDay } from '@/widgets/dashboard/api';
 import {
   STAGE_LIGHT,
-  M3_SHARED_AXIS_X_VARIANTS,
 } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
@@ -19,7 +18,7 @@ function DayCell({ day }: { day: WeekDay }) {
 
   return (
     <motion.div
-      variants={M3_SHARED_AXIS_X_VARIANTS}
+      variants={{ hidden: { opacity: 0, x: -8 }, visible: { opacity: 1, x: 0 } }}
       transition={STAGE_LIGHT}
       className={cn(
         'flex flex-col items-center gap-1.5 py-3 px-2 rounded-[var(--stage-radius-input)] flex-1 min-w-0 transition-colors',
@@ -31,7 +30,7 @@ function DayCell({ day }: { day: WeekDay }) {
       {/* Day label */}
       <span
         className={cn(
-          'text-[10px] uppercase tracking-widest font-medium',
+          'stage-label',
           day.isToday
             ? 'text-[var(--stage-accent)]'
             : 'text-[var(--stage-text-secondary)]',
@@ -55,7 +54,7 @@ function DayCell({ day }: { day: WeekDay }) {
       {/* Event indicator */}
       {eventCount > 0 ? (
         <span
-          className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium"
+          className="flex items-center justify-center w-5 h-5 rounded-full stage-badge-text"
           style={{
             background: day.hasIssues
               ? 'var(--color-unusonic-warning)'

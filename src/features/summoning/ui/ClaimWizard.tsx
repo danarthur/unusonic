@@ -10,7 +10,8 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { signUpForClaim, finishPartnerClaim } from '../api/actions';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 type Step = 'hook' | 'identity' | 'keys';
 
@@ -161,7 +162,7 @@ export function ClaimWizard({ token, email, payload }: ClaimWizardProps) {
                 className="bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)]"
               />
             </div>
-            <p className="text-[10px] text-[var(--stage-text-secondary)]">
+            <p className="text-label text-[var(--stage-text-secondary)]">
               We’ll create your account and then link your organization.
             </p>
             <div className="flex gap-3">

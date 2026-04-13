@@ -57,13 +57,14 @@ export function StagePanel({
   const motionProps = { ...rest } as Record<string, unknown>;
   delete motionProps.static;
 
+  // CSS class is chosen by role (nested/interactive/default), NOT by the elevated
+  // prop. The background is driven by the computed data-surface attribute instead,
+  // so elevated panels correctly adapt to their parent context.
   const surfaceClass = nested
     ? 'stage-panel-nested'
-    : elevated
-      ? 'stage-panel-elevated'
-      : interactive
-        ? 'stage-panel-interactive'
-        : 'stage-panel';
+    : interactive
+      ? 'stage-panel-interactive'
+      : 'stage-panel';
 
   // Resolve this panel's surface level for child context.
   // Priority: explicit `surface` prop > nested/elevated props > parent-relative default.

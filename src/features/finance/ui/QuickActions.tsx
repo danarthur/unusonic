@@ -44,7 +44,7 @@ function DropdownProposals({
             <li key={p.id}>
               <button
                 type="button"
-                className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors flex items-center justify-between"
+                className="w-full px-4 py-3 text-left text-sm text-[var(--stage-text-primary)] transition-colors flex items-center justify-between stage-hover overflow-hidden"
                 onClick={() => {
                   onSelect(p.id);
                   setOpen(false);
@@ -98,7 +98,7 @@ export function QuickActions({
 
   return (
     <StagePanel className={`flex flex-col gap-4 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+      <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Actions
       </h2>
       <div className="flex flex-col gap-3">

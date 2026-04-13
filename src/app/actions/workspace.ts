@@ -336,6 +336,10 @@ export interface WorkspaceMemberData {
   permissions: WorkspacePermissions;
   primaryLocationId: string | null;
   joinedAt: string;
+  /** Cortex ROSTER_MEMBER edge ID (null if no roster entry). */
+  rosterEdgeId: string | null;
+  /** Admin override portal profile key (null = auto-detect). */
+  portalProfile: string | null;
 }
 
 /**
@@ -376,12 +380,53 @@ export async function getWorkspaceMembers(
     return { success: false, error: error.message };
   }
 
+  // Batch-fetch roster edge IDs + portal profile overrides for all members
+  const userIds = members.map(m => m.user_id);
+  const rosterMap = new Map<string, { edgeId: string; portalProfile: string | null }>();
+
+  if (userIds.length > 0) {
+    // Step 1: Find person entities claimed by these users
+    const { data: personEntities } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id, claimed_by_user_id')
+      .in('claimed_by_user_id', userIds)
+      .eq('type', 'person');
+
+    if (personEntities && personEntities.length > 0) {
+      const entityIds = personEntities.map(e => e.id);
+      const entityToUser = new Map(personEntities.map(e => [e.id, e.claimed_by_user_id!]));
+
+      // Step 2: Find ROSTER_MEMBER edges for these entities
+      const { data: rosterEdges } = await supabase
+        .schema('cortex')
+        .from('relationships')
+        .select('id, source_entity_id, context_data')
+        .in('source_entity_id', entityIds)
+        .eq('relationship_type', 'ROSTER_MEMBER');
+
+      if (rosterEdges) {
+        for (const edge of rosterEdges) {
+          const userId = entityToUser.get(edge.source_entity_id);
+          if (userId) {
+            const ctx = (edge.context_data ?? {}) as Record<string, unknown>;
+            rosterMap.set(userId, {
+              edgeId: edge.id,
+              portalProfile: (ctx.primary_portal_profile as string) ?? null,
+            });
+          }
+        }
+      }
+    }
+  }
+
   const formattedMembers: WorkspaceMemberData[] = members.map((m) => {
     const rawProfile = m.profiles;
     const profile = (Array.isArray(rawProfile) ? rawProfile[0] : rawProfile) as { email: string; full_name: string | null; avatar_url: string | null } | null;
     const rawRole = m.workspace_roles;
     const roleRow = Array.isArray(rawRole) ? rawRole[0] : rawRole;
     const roleName = roleRow && typeof roleRow === 'object' && roleRow !== null && 'name' in roleRow ? (roleRow as { name: string }).name : null;
+    const roster = rosterMap.get(m.user_id);
     return {
       id: m.id,
       userId: m.user_id,
@@ -395,9 +440,11 @@ export async function getWorkspaceMembers(
       permissions: m.permissions as WorkspacePermissions,
       primaryLocationId: m.primary_location_id,
       joinedAt: m.created_at,
+      rosterEdgeId: roster?.edgeId ?? null,
+      portalProfile: roster?.portalProfile ?? null,
     };
   });
-  
+
   return { success: true, members: formattedMembers };
 }
 

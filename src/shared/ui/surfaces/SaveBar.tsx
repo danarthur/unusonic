@@ -55,7 +55,7 @@ export function SaveBar({
               type="button"
               onClick={onReset}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
             >
               <X className="size-4" strokeWidth={1.5} />
               Reset
@@ -64,7 +64,7 @@ export function SaveBar({
               type="button"
               onClick={onSubmit}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-on-accent)] bg-[var(--stage-accent)] hover:brightness-[1.06] transition-[filter] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-on-accent)] bg-[var(--stage-accent)] hover:bg-[oklch(0.90_0_0)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
             >
               {isSubmitting ? (
                 <span className="opacity-70">Locking…</span>

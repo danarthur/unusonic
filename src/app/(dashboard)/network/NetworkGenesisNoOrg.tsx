@@ -28,7 +28,7 @@ export function NetworkGenesisNoOrg() {
         <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)]">
           Network
         </h1>
-        <p className="mt-1 text-sm text-[var(--stage-text-secondary)]">
+        <p className="mt-1 text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">
           Your team and partners.
         </p>
         <p className="mt-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]" role="status">

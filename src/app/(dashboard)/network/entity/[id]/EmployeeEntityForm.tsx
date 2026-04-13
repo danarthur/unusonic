@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
   Contact,
   Instagram,
   Wrench,
@@ -45,6 +44,7 @@ import { deployInvites } from '@/features/team-invite/api/actions';
 import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
+import { AccordionSection } from './entity-studio-panels';
 import type { CrewSkillDTO, SkillLevel } from '@/entities/talent';
 import { coiStatus } from '@/shared/lib/crew-profile';
 
@@ -67,59 +67,8 @@ const FALLBACK_SKILL_PRESETS = [
 
 // ─── Label constant ────────────────────────────────────────────────────────────
 
-const LABEL = 'text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest';
+const LABEL = 'stage-label';
 
-// ─── AccordionSection ──────────────────────────────────────────────────────────
-
-function AccordionSection({
-  label,
-  icon: Icon,
-  defaultOpen = false,
-  children,
-}: {
-  label: string;
-  icon: React.ElementType;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(defaultOpen);
-  return (
-    <div className="stage-panel rounded-2xl overflow-hidden">
-      <motion.button
-        type="button"
-        onClick={() => setOpen(!open)}
-        transition={STAGE_MEDIUM}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[oklch(1_0_0/0.05)] transition-colors duration-[80ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-      >
-        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-          <Icon className="size-3.5" />
-          {label}
-        </span>
-        <motion.div
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={STAGE_MEDIUM}
-        >
-          <ChevronDown className="size-4 text-[var(--stage-text-secondary)]" />
-        </motion.div>
-      </motion.button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={STAGE_MEDIUM}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">
-              {children}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 // ─── TogglePill ────────────────────────────────────────────────────────────────
 
@@ -141,7 +90,7 @@ function TogglePill({
       ? 'bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)] border-[var(--color-unusonic-warning)]/30'
       : 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)] border-[var(--color-unusonic-success)]/30';
   const inactiveClass =
-    'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.08)]/20';
+    'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)] border-[var(--stage-edge-subtle)]/20';
 
   return (
     <motion.button
@@ -149,11 +98,11 @@ function TogglePill({
       onClick={onToggle}
       transition={STAGE_MEDIUM}
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[oklch(1_0_0/0.06)]',
+        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)]',
         active ? activeClass : inactiveClass
       )}
     >
-      <Icon className="size-3.5" />
+      <Icon className="size-3.5" strokeWidth={1.5} />
       {label}
     </motion.button>
   );
@@ -351,22 +300,22 @@ export function EmployeeEntityForm({
       <div className="flex flex-col items-center justify-center gap-6 p-8 py-24">
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={STAGE_MEDIUM}
-          className="stage-panel rounded-2xl p-8 max-w-sm text-center space-y-4"
+          className="stage-panel rounded-2xl p-8 max-w-sm text-center space-y-4" data-surface="surface"
         >
-          <div className="flex size-12 items-center justify-center rounded-full bg-[oklch(1_0_0_/_0.08)]/10 mx-auto">
-            <User className="size-6 text-[var(--stage-text-secondary)]" />
+          <div className="flex size-12 items-center justify-center rounded-full bg-[oklch(1_0_0_/_0.08)] mx-auto">
+            <User className="size-6 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
           </div>
           <div className="space-y-1.5">
-            <p className="text-sm font-medium text-[var(--stage-text-primary)]">Profile not linked</p>
-            <p className="text-xs text-[var(--stage-text-secondary)] leading-relaxed">
+            <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">Profile not linked</p>
+            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] leading-relaxed">
               This member hasn't linked their profile yet. Once they join Unusonic, their full profile will be available here.
             </p>
           </div>
           <Button variant="ghost" onClick={() => router.push(returnPath)} className="gap-2 mt-2">
-            <ArrowLeft className="size-4" />
+            <ArrowLeft className="size-4" strokeWidth={1.5} />
             Back to network
           </Button>
         </motion.div>
@@ -416,18 +365,18 @@ export function EmployeeEntityForm({
   };
 
   return (
-    <div className="relative pb-24">
+    <div className="min-h-screen bg-[var(--stage-void)] relative pb-24">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-[var(--stage-surface-raised)]/80 border-b border-[oklch(1_0_0_/_0.08)]/50 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-[var(--stage-void)] border-b border-[var(--stage-edge-subtle)]/50 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" />
+            <ArrowLeft className="size-5" strokeWidth={1.5} />
           </Button>
           <div>
-            <p className="text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
+            <p className="stage-label">
               Roster member
             </p>
-            <h1 className="text-xl font-light text-[var(--stage-text-primary)] tracking-tight">
+            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
               {displayName}
             </h1>
           </div>
@@ -441,15 +390,15 @@ export function EmployeeEntityForm({
               transition={STAGE_MEDIUM}
               className="flex items-center gap-3"
             >
-              <span className="hidden sm:block text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
+              <span className="hidden sm:block text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Unsaved changes</span>
               <Button
                 onClick={handleSave}
                 disabled={isPending}
                 variant="outline"
                 size="sm"
-                className="gap-2 border-[var(--stage-accent)]/40 text-[var(--stage-accent)] hover:bg-[var(--stage-accent)]/10"
+                className="gap-2 stage-btn stage-btn-primary"
               >
-                <Save className="size-4" />
+                <Save className="size-4" strokeWidth={1.5} />
                 Save
               </Button>
             </motion.div>
@@ -460,12 +409,12 @@ export function EmployeeEntityForm({
       {/* ── Invite banner ────────────────────────────────────────────────── */}
       {isGhostMember && (
         <div className="max-w-2xl mx-auto px-6 pt-6">
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-[oklch(1_0_0/0.08)] bg-[var(--stage-surface)] p-4">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-4">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--stage-text-primary)]">
+              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
                 {inviteSent ? 'Invite sent' : 'No portal access yet'}
               </p>
-              <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
+              <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
                 {inviteSent
                   ? 'Waiting for them to accept and set up their account.'
                   : 'Send an invite so they can access their schedule and profile.'}
@@ -479,12 +428,12 @@ export function EmployeeEntityForm({
                 disabled={inviteSending}
                 className="shrink-0"
               >
-                <Send className="size-3.5 mr-1.5" />
+                <Send className="size-3.5 mr-1.5" strokeWidth={1.5} />
                 {inviteSending ? 'Sending...' : 'Send invite'}
               </Button>
             )}
             {inviteSent && (
-              <span className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-[oklch(0.75_0.15_55/0.15)] text-[oklch(0.85_0.12_55)]">
+              <span className="shrink-0 stage-badge-text px-2.5 py-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]">
                 Pending
               </span>
             )}
@@ -496,13 +445,13 @@ export function EmployeeEntityForm({
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-4">
 
         {/* 0 — Avatar */}
-        <div className="stage-panel rounded-2xl flex flex-col items-center gap-3 py-6">
+        <div className="stage-panel rounded-2xl flex flex-col items-center gap-3 py-6" data-surface="surface">
           <AvatarUpload
             orgId={sourceOrgId}
             value={avatarUrl || null}
             onChange={handleAvatarChange}
           />
-          <p className="text-xs text-[var(--stage-text-secondary)]">Change photo</p>
+          <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Change photo</p>
         </div>
 
         {/* 1 — Identity */}
@@ -513,7 +462,7 @@ export function EmployeeEntityForm({
               <Input
                 value={firstName}
                 onChange={(e) => { setFirstName(e.target.value); mark(); }}
-                className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+                className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
               />
             </div>
             <div>
@@ -521,7 +470,7 @@ export function EmployeeEntityForm({
               <Input
                 value={lastName}
                 onChange={(e) => { setLastName(e.target.value); mark(); }}
-                className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+                className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
               />
             </div>
           </div>
@@ -532,7 +481,7 @@ export function EmployeeEntityForm({
               value={email ?? ''}
               onChange={(e) => { setEmail(e.target.value); mark(); }}
               placeholder="crew@example.com"
-              className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
             />
           </div>
           <div>
@@ -541,7 +490,7 @@ export function EmployeeEntityForm({
               value={phone ?? ''}
               onChange={(e) => { setPhone(e.target.value); mark(); }}
               placeholder="+1 (555) 000-0000"
-              className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
             />
           </div>
         </AccordionSection>
@@ -554,7 +503,7 @@ export function EmployeeEntityForm({
               value={jobTitle ?? ''}
               onChange={(e) => { setJobTitle(e.target.value); mark(); }}
               placeholder="Audio Engineer"
-              className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
             />
           </div>
           <div>
@@ -563,7 +512,7 @@ export function EmployeeEntityForm({
               value={market ?? ''}
               onChange={(e) => { setMarket(e.target.value); mark(); }}
               placeholder="Nashville, TN"
-              className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
             />
           </div>
           <div>
@@ -572,7 +521,7 @@ export function EmployeeEntityForm({
               value={unionStatus ?? ''}
               onChange={(e) => { setUnionStatus(e.target.value); mark(); }}
               placeholder="e.g. IATSE Local 33 / Non-union"
-              className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
             />
           </div>
         </AccordionSection>
@@ -592,15 +541,15 @@ export function EmployeeEntityForm({
                   transition={STAGE_MEDIUM}
                   className="overflow-hidden"
                 >
-                  <div className="flex items-center gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)]/50 bg-[var(--stage-surface-raised)] px-3 py-2">
-                    <span className="flex-1 text-sm text-[var(--stage-text-primary)]">{s.skill_tag}</span>
+                  <div className="flex items-center gap-2 rounded-xl border border-[var(--stage-edge-subtle)]/50 bg-[var(--ctx-card)] px-3 py-2">
+                    <span className="flex-1 text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{s.skill_tag}</span>
                     <select
                       value={s.proficiency ?? ''}
                       onChange={(e) => {
                         const val = e.target.value as SkillLevel;
                         if (val) handleUpdateProficiency(s.id, val);
                       }}
-                      className="rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-0.5 text-xs text-[var(--stage-text-secondary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none"
+                      className="stage-input px-2 py-0.5 text-xs"
                     >
                       <option value="">Level</option>
                       {PROFICIENCY_LEVELS.map((l) => (
@@ -611,10 +560,10 @@ export function EmployeeEntityForm({
                       type="button"
                       onClick={() => handleRemoveSkill(s.id)}
                       transition={STAGE_MEDIUM}
-                      className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors hover:bg-[oklch(1_0_0/0.06)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-unusonic-error)] rounded"
+                      className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-unusonic-error)] ring-offset-2 ring-offset-[var(--stage-void)] rounded"
                       aria-label={`Remove ${s.skill_tag}`}
                     >
-                      <X className="size-3.5" />
+                      <X className="size-3.5" strokeWidth={1.5} />
                     </motion.button>
                   </div>
                 </motion.div>
@@ -623,7 +572,7 @@ export function EmployeeEntityForm({
           </div>
 
           {crewSkills.length === 0 && (
-            <p className="text-xs text-[var(--stage-text-secondary)]">No skills yet.</p>
+            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">No skills yet.</p>
           )}
 
           {/* Add form */}
@@ -631,7 +580,7 @@ export function EmployeeEntityForm({
             <select
               value={addSkillTag}
               onChange={(e) => setAddSkillTag(e.target.value)}
-              className="flex-1 rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2 text-sm text-[var(--stage-text-primary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none"
+              className="stage-input flex-1"
             >
               <option value="">Add skill…</option>
               {skillPresets
@@ -641,7 +590,7 @@ export function EmployeeEntityForm({
             <select
               value={addSkillLevel}
               onChange={(e) => setAddSkillLevel(e.target.value as SkillLevel | '')}
-              className="rounded-md border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-2 text-sm text-[var(--stage-text-secondary)] shadow-xs transition-[color,box-shadow] focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] focus-visible:outline-none"
+              className="stage-input px-2"
             >
               <option value="">Level</option>
               {PROFICIENCY_LEVELS.map((l) => (
@@ -667,20 +616,20 @@ export function EmployeeEntityForm({
               {capabilities.map((cap) => (
                 <motion.span
                   key={cap.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={STAGE_MEDIUM}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[oklch(1_0_0_/_0.08)]/30 bg-[oklch(1_0_0_/_0.10)]/15 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)]"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stage-edge-subtle)]/30 bg-[oklch(1_0_0_/_0.10)]/15 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)]"
                 >
                   {cap.capability}
                   <button
                     type="button"
                     onClick={() => handleRemoveCapability(cap.id)}
-                    className="ml-0.5 text-[var(--stage-text-secondary)]/60 hover:text-[var(--color-unusonic-error)] transition-colors"
+                    className="ml-0.5 text-[var(--stage-text-tertiary)] hover:text-[var(--color-unusonic-error)] transition-colors duration-[80ms]"
                     aria-label={`Remove ${cap.capability}`}
                   >
-                    <X className="size-3" />
+                    <X className="size-3" strokeWidth={1.5} />
                   </button>
                 </motion.span>
               ))}
@@ -698,7 +647,7 @@ export function EmployeeEntityForm({
                     type="button"
                     onClick={() => handleAddCapability(preset)}
                     disabled={capLoading}
-                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-[oklch(1_0_0_/_0.08)]/40 px-2.5 py-1 text-[11px] font-medium text-[var(--stage-text-secondary)]/60 hover:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.08)]/60 transition-colors disabled:opacity-40"
+                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--stage-edge-subtle)]/40 px-2.5 py-1 text-field-label font-medium text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] hover:border-[var(--stage-edge-subtle)]/60 transition-colors duration-[80ms] disabled:opacity-45"
                   >
                     + {preset}
                   </button>
@@ -707,7 +656,7 @@ export function EmployeeEntityForm({
           )}
 
           {capabilities.length === 0 && capPresets.length === 0 && (
-            <p className="text-xs text-[var(--stage-text-secondary)]/50">No business functions configured.</p>
+            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">No business functions configured.</p>
           )}
         </AccordionSection>
 
@@ -715,7 +664,7 @@ export function EmployeeEntityForm({
         <AccordionSection label="Status" icon={ShieldCheck} defaultOpen>
           {details.memberRole && (
             <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center rounded-full border border-[oklch(1_0_0_/_0.08)]/50 bg-[oklch(1_0_0_/_0.10)]/20 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wide">
+              <span className="inline-flex items-center rounded-full border border-[var(--stage-edge-subtle)]/50 bg-[oklch(1_0_0_/_0.10)]/20 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wide">
                 {details.memberRole}
               </span>
             </div>
@@ -745,9 +694,9 @@ export function EmployeeEntityForm({
                   transition={STAGE_MEDIUM}
                   className="overflow-hidden"
                 >
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/10 px-3 py-2.5">
-                    <AlertTriangle className="size-3.5 text-[var(--color-unusonic-warning)] flex-shrink-0" />
-                    <p className="text-xs text-[var(--color-unusonic-warning)] flex-1">
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border-l-[3px] border-l-[var(--color-unusonic-warning)] bg-[var(--stage-surface)] px-3 py-2.5">
+                    <AlertTriangle className="size-3.5 text-[var(--color-unusonic-warning)] flex-shrink-0" strokeWidth={1.5} />
+                    <p className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-warning)] flex-1">
                       This member won't appear in scheduling suggestions.
                     </p>
                     <div className="flex gap-1">
@@ -779,7 +728,7 @@ export function EmployeeEntityForm({
               )}
             </AnimatePresence>
             {doNotRebook && !dnrConfirmPending && (
-              <p className="text-xs text-[var(--color-unusonic-warning)]">
+              <p className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-warning)]">
                 Member will not appear in scheduling suggestions.
               </p>
             )}
@@ -806,7 +755,7 @@ export function EmployeeEntityForm({
           </div>
           <div>
             <label className={LABEL}>COI expiry</label>
-            <p className="text-[10px] text-[var(--stage-text-secondary)]/60 mt-0.5 mb-1.5">
+            <p className="stage-label text-[var(--stage-text-tertiary)] mt-0.5 mb-1.5">
               Certificate of Insurance expiry date — used for compliance tracking.
             </p>
             <div className="flex items-center gap-2">
@@ -814,7 +763,7 @@ export function EmployeeEntityForm({
                 type="date"
                 value={coiExpiry ?? ''}
                 onChange={(e) => { setCoiExpiry(e.target.value); mark(); }}
-                className="bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+                className="bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
               />
               <AnimatePresence>
                 {(() => {
@@ -852,7 +801,7 @@ export function EmployeeEntityForm({
                 value={emergencyName}
                 onChange={(e) => { setEmergencyName(e.target.value); mark(); }}
                 placeholder="Full name"
-                className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+                className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
               />
             </div>
             <div>
@@ -861,7 +810,7 @@ export function EmployeeEntityForm({
                 value={emergencyPhone}
                 onChange={(e) => { setEmergencyPhone(e.target.value); mark(); }}
                 placeholder="+1 (555) 000-0000"
-                className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+                className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
               />
             </div>
           </div>
@@ -875,7 +824,7 @@ export function EmployeeEntityForm({
               value={instagram ?? ''}
               onChange={(e) => { setInstagram(e.target.value); mark(); }}
               placeholder="handle (without @)"
-              className="mt-1 bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]"
+              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
             />
           </div>
         </AccordionSection>

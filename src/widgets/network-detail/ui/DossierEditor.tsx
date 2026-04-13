@@ -59,14 +59,15 @@ function AccordionSection({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[oklch(1_0_0/0.05)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[oklch(1_0_0/0.08)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]"
       >
-        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-          <Icon className="size-3.5" />
+        <span className="flex items-center gap-2 stage-label text-[var(--stage-text-secondary)]">
+          <Icon className="size-3.5" strokeWidth={1.5} />
           {label}
         </span>
         <ChevronDown
           className={cn('size-4 text-[var(--stage-text-secondary)] transition-transform', open && 'rotate-180')}
+          strokeWidth={1.5}
         />
       </button>
       <AnimatePresence>
@@ -78,7 +79,7 @@ function AccordionSection({
             transition={{ ...STAGE_MEDIUM, opacity: { duration: 0.12, ease: 'easeOut' } }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 pt-1 space-y-4 border-t border-[oklch(1_0_0_/_0.08)]">{children}</div>
+            <div className="px-4 pb-4 pt-1 space-y-4 border-t border-[var(--stage-edge-subtle)]">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -256,7 +257,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
       data-surface="raised"
       className="flex flex-col flex-1 min-h-0 overflow-hidden"
     >
-      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[oklch(1_0_0_/_0.08)]">
+      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[var(--stage-edge-subtle)]">
         <Button
           type="button"
           variant="ghost"
@@ -264,7 +265,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
           onClick={() => onOpenChange(false)}
           className="gap-1.5 text-[var(--stage-text-secondary)]"
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-4" strokeWidth={1.5} />
           Done
         </Button>
       </div>
@@ -274,7 +275,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
         <div className="stage-panel rounded-xl p-4 space-y-4">
           <div className="flex items-center gap-4">
             <div
-              className="relative size-14 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[oklch(1_0_0_/_0.08)]"
+              className="relative size-14 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[var(--stage-edge-subtle)]"
               style={brandColor ? ({
                 '--brand-color': brandColor,
                 background: 'color-mix(in oklch, var(--brand-color) 12%, transparent)',
@@ -327,7 +328,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                         value={brandColor}
                         // eslint-disable-next-line stage-engineering/no-raw-colors -- color picker JS default
                         onChange={(e) => setBrandColor(e.target.value || 'oklch(0 0 0)')}
-                        className="flex-1 stage-input font-mono text-xs"
+                        className="flex-1 stage-input font-mono text-[length:var(--stage-label-size)]"
                       />
                     </div>
                   </div>
@@ -380,9 +381,9 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 name="website"
                 defaultValue={details.orgWebsite ?? ''}
                 placeholder="https://example.com"
-                className="mt-1 stage-input font-mono text-xs"
+                className="mt-1 stage-input font-mono text-[length:var(--stage-label-size)]"
               />
-              <p className="text-[10px] text-[var(--stage-text-secondary)] mt-1.5">
+              <p className="stage-label text-[var(--stage-text-secondary)] mt-1.5">
                 Paste a URL above, then use Aion to auto-fill identity and contact details.
               </p>
               <div className="mt-3">
@@ -483,21 +484,24 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                 <option value="blacklisted">Blacklisted</option>
               </select>
             </div>
-            {lifecycle === 'blacklisted' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="overflow-hidden"
-              >
-                <label className={LABEL}>Blacklist reason</label>
-                <Input
-                  value={blacklistReason}
-                  onChange={(e) => setBlacklistReason(e.target.value)}
-                  placeholder="Reason for blacklisting"
-                  className="mt-1 stage-input"
-                />
-              </motion.div>
-            )}
+            <AnimatePresence>
+              {lifecycle === 'blacklisted' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <label className={LABEL}>Blacklist reason</label>
+                  <Input
+                    value={blacklistReason}
+                    onChange={(e) => setBlacklistReason(e.target.value)}
+                    placeholder="Reason for blacklisting"
+                    className="mt-1 stage-input"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div>
               <label className={LABEL}>Tags / capabilities</label>
               <div className="mt-1 flex flex-wrap gap-2">
@@ -588,7 +592,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
 
         <AccordionSection id="notes" label="Private notes" icon={FileText}>
           <div>
-            <p className="text-[10px] text-[var(--stage-text-secondary)] mb-2">Internal only. Auto-saves.</p>
+            <p className="stage-label text-[var(--stage-text-secondary)] mb-2">Internal only. Auto-saves.</p>
             <Textarea
               name="notes"
               defaultValue={details.notes ?? ''}
@@ -602,8 +606,8 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
         <div className="pt-4 flex justify-end">
           <Button
             type="submit"
+            variant="outline"
             disabled={isPending}
-            className="bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)] border-[oklch(1_0_0/0.12)] hover:bg-[oklch(1_0_0/0.14)]"
           >
             {isPending ? 'Saving…' : 'Save'}
           </Button>
@@ -673,7 +677,7 @@ function DossierRosterSection({
             key={m.id}
             className="flex items-center gap-3 rounded-lg stage-panel-nested px-3 py-2"
           >
-            <div className="size-10 shrink-0 rounded-full bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0_/_0.08)] flex items-center justify-center overflow-hidden">
+            <div className="size-10 shrink-0 rounded-full bg-[var(--stage-surface-elevated)] border border-[var(--stage-edge-subtle)] flex items-center justify-center overflow-hidden">
               {m.avatarUrl ? (
                 <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" />
               ) : (
@@ -683,9 +687,9 @@ function DossierRosterSection({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--stage-text-primary)]">{m.name}</p>
+              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{m.name}</p>
               {(m.email || m.role || m.jobTitle) && (
-                <p className="text-xs text-[var(--stage-text-secondary)] truncate">
+                <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] truncate">
                   {[m.jobTitle, m.role, m.email].filter(Boolean).join(' · ')}
                 </p>
               )}
@@ -715,22 +719,27 @@ function DossierRosterSection({
         />
       )}
 
+      <AnimatePresence mode="wait">
       {!showAddCrew ? (
+        <motion.div key="add-btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => setShowAddCrew(true)}
-          className="gap-2 border-[oklch(1_0_0/0.12)] text-[var(--stage-text-primary)]"
+          className="gap-2 border-[var(--stage-edge-subtle)] text-[var(--stage-text-primary)]"
         >
-          <UserPlus className="size-4" />
+          <UserPlus className="size-4" strokeWidth={1.5} />
           Add contact
         </Button>
+        </motion.div>
       ) : (
         <motion.div
+          key="add-form"
           ref={addCrewRef}
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
           className="overflow-hidden stage-panel-nested p-4 space-y-3"
         >
           <div className="grid grid-cols-2 gap-3">
@@ -746,9 +755,9 @@ function DossierRosterSection({
             <Input name="addCrew_role" placeholder="Role (e.g. admin)" className="stage-input" />
             <Input name="addCrew_jobTitle" placeholder="Job title" className="stage-input" />
           </div>
-          {error && <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{error}</p>}
+          {error && <p role="alert" className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-error)]">{error}</p>}
           <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={status === 'loading'} onClick={handleAddCrew} className="bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]">
+            <Button type="button" variant="outline" size="sm" disabled={status === 'loading'} onClick={handleAddCrew}>
               {status === 'loading' ? 'Adding…' : 'Add contact'}
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddCrew(false)}>
@@ -757,6 +766,7 @@ function DossierRosterSection({
           </div>
         </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -796,9 +806,9 @@ function CrewMemberEditor({
       animate={{ opacity: 1 }}
       className="stage-panel-nested p-4 space-y-3"
     >
-      <p className="text-xs font-medium text-[var(--stage-text-secondary)]">Edit {member.name}</p>
+      <p className="stage-label text-[var(--stage-text-secondary)]">Edit {member.name}</p>
       <div className="flex items-center gap-3">
-        <div className="size-12 rounded-full bg-[var(--stage-surface-raised)] border border-[oklch(1_0_0_/_0.08)] overflow-hidden flex items-center justify-center">
+        <div className="size-12 rounded-full bg-[var(--stage-surface-raised)] border border-[var(--stage-edge-subtle)] overflow-hidden flex items-center justify-center">
           {avatarUrl ? (
             <img src={avatarUrl} alt="" className="size-full object-cover" loading="lazy" />
           ) : (
@@ -849,7 +859,7 @@ function CrewMemberEditor({
         />
       </div>
       <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={pending} className="bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]">
+        <Button size="sm" variant="outline" onClick={handleSave} disabled={pending}>
           {pending ? 'Saving…' : 'Save'}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>

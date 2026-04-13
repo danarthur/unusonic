@@ -210,9 +210,9 @@ function CreateViewInput({
         placeholder="View name..."
         className={cn(
           'w-32 px-3 py-1.5 rounded-full text-xs font-medium',
-          'border border-[oklch(1_0_0_/_0.16)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)]',
+          'border border-[oklch(1_0_0_/_0.16)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)]',
           'placeholder:text-[var(--stage-text-secondary)]',
-          'focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]'
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
         )}
       />
     </motion.div>

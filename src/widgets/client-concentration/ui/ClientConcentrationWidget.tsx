@@ -7,7 +7,6 @@ import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import {
   STAGE_MEDIUM,
   STAGE_STAGGER_CHILDREN,
-  M3_SHARED_AXIS_Y_VARIANTS,
 } from '@/shared/lib/motion-constants';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -56,7 +55,7 @@ export function ClientConcentrationWidget({
             transition={STAGE_MEDIUM}
           >
             <span
-              className="text-[10px] font-medium"
+              className="text-label font-medium"
               style={{ color: 'var(--color-unusonic-warning)' }}
             >
               High concentration risk
@@ -70,7 +69,7 @@ export function ClientConcentrationWidget({
             <motion.div
               key={client.name}
               className="flex items-center gap-2"
-              variants={M3_SHARED_AXIS_Y_VARIANTS}
+              variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
               transition={{
                 ...STAGE_MEDIUM,
                 delay: i * STAGE_STAGGER_CHILDREN,
@@ -78,7 +77,7 @@ export function ClientConcentrationWidget({
             >
               {/* Rank number */}
               <span
-                className="text-[10px] font-medium tabular-nums w-3 shrink-0 text-right"
+                className="text-label font-medium tabular-nums w-3 shrink-0 text-right"
                 style={{ color: 'var(--stage-text-secondary)' }}
               >
                 {i + 1}
@@ -86,7 +85,7 @@ export function ClientConcentrationWidget({
 
               {/* Name */}
               <span
-                className="text-[10px] font-medium truncate shrink-0 w-14"
+                className="text-label font-medium truncate shrink-0 w-14"
                 style={{ color: 'var(--stage-text-primary)' }}
               >
                 {client.name}
@@ -95,7 +94,7 @@ export function ClientConcentrationWidget({
               {/* Bar track */}
               <div
                 className="flex-1 h-3.5 relative rounded-sm overflow-hidden"
-                style={{ background: 'var(--ctx-well, var(--stage-input-bg))' }}
+                style={{ background: 'var(--ctx-well)' }}
               >
                 <motion.div
                   className="absolute inset-y-0 left-0 rounded-sm"
@@ -114,7 +113,7 @@ export function ClientConcentrationWidget({
 
               {/* Percentage */}
               <span
-                className="text-[10px] font-medium tabular-nums shrink-0 w-8 text-right"
+                className="text-label font-medium tabular-nums shrink-0 w-8 text-right"
                 style={{ color: 'var(--stage-text-secondary)' }}
               >
                 {client.percentage}%

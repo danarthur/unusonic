@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useQueryStates, parseAsString, parseAsStringLiteral } from 'nuqs';
 import { createPortal } from 'react-dom';
 import { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addYears, subYears } from 'date-fns';
@@ -21,10 +22,8 @@ const EVENT_STATUSES: { value: EventStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-const VIEW_PARAM = 'view';
-const DATE_PARAM = 'date';
-const BLADE_PARAM = 'blade'; // when set, day blade is open for this date (prev/next only change date, not blade)
-const EVENT_PARAM = 'event';
+const CALENDAR_VIEWS = ['year', 'month', 'week', 'day'] as const;
+
 const VIEWS: { value: CalendarViewType; label: string }[] = [
   { value: 'year', label: 'Year' },
   { value: 'month', label: 'Month' },
@@ -39,15 +38,20 @@ export interface CalendarShellProps {
 
 export function CalendarShell({ events, initialView, initialDate }: CalendarShellProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const filterRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const [filterPosition, setFilterPosition] = useState<{ top: number; left: number } | null>(null);
 
-  const view = (searchParams.get(VIEW_PARAM) as CalendarViewType) ?? initialView;
-  const dateStr = searchParams.get(DATE_PARAM) ?? initialDate;
+  const [params, setParams] = useQueryStates({
+    view: parseAsStringLiteral(CALENDAR_VIEWS).withDefault(initialView),
+    date: parseAsString.withDefault(initialDate),
+    blade: parseAsString,
+    event: parseAsString,
+  }, { shallow: false });
+
+  const view = params.view;
+  const dateStr = params.date;
   const viewDate = new Date(dateStr + 'T12:00:00');
   const headerLabel =
     view === 'year'
@@ -97,29 +101,6 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
       setFilterPosition(null);
     }
   }, [filterOpen]);
-
-  const setParams = useCallback(
-    (updates: {
-      view?: CalendarViewType;
-      date?: string;
-      blade?: string | null;
-      event?: string | null;
-    }) => {
-      const next = new URLSearchParams(searchParams.toString());
-      if (updates.view != null) next.set(VIEW_PARAM, updates.view);
-      if (updates.date != null) next.set(DATE_PARAM, updates.date);
-      if (updates.blade !== undefined) {
-        if (updates.blade) next.set(BLADE_PARAM, updates.blade);
-        else next.delete(BLADE_PARAM);
-      }
-      if (updates.event !== undefined) {
-        if (updates.event) next.set(EVENT_PARAM, updates.event);
-        else next.delete(EVENT_PARAM);
-      }
-      router.replace(`${pathname}?${next.toString()}`);
-    },
-    [pathname, router, searchParams]
-  );
 
   const onViewChange = useCallback(
     (v: CalendarViewType) => setParams({ view: v }),
@@ -194,7 +175,7 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
           <motion.button
             type="button"
             onClick={goPrev}
-            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             aria-label="Previous"
           >
             <ChevronLeft className="w-5 h-5" strokeWidth={1.5} />
@@ -205,7 +186,7 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
           <motion.button
             type="button"
             onClick={goNext}
-            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             aria-label="Next"
           >
             <ChevronRight className="w-5 h-5" strokeWidth={1.5} />
@@ -218,10 +199,10 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
                 key={value}
                 type="button"
                 onClick={() => onViewChange(value)}
-                className={`px-3.5 py-2 text-sm font-medium rounded-lg transition-[color,background-color,filter] duration-150 hover:brightness-[1.03] ${
+                className={`px-3.5 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
                   view === value
                     ? 'bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]'
-                    : 'text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)]'
+                    : 'text-[var(--stage-text-secondary)] stage-hover overflow-hidden hover:text-[var(--stage-text-primary)]'
                 }`}
               >
                 {label}
@@ -233,10 +214,10 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
               ref={filterButtonRef}
               type="button"
               onClick={() => setFilterOpen((o) => !o)}
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] text-sm font-medium transition-[color,background-color,filter] hover:brightness-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ${
                 filterOpen
                   ? 'bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]'
-                  : 'bg-[var(--stage-accent)]/[0.03] text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)]'
+                  : 'bg-[var(--stage-accent)]/[0.03] text-[var(--stage-text-secondary)] stage-hover overflow-hidden hover:text-[var(--stage-text-primary)]'
               }`}
               aria-label="Filter events"
               aria-expanded={filterOpen}
@@ -255,43 +236,43 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
                   role="dialog"
                   aria-label="Filter events by status"
                 >
-                  <p className="text-xs font-semibold text-[var(--stage-text-secondary)] uppercase tracking-wider mb-2">
+                  <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-2">
                     Show status
                   </p>
                   <div className="flex flex-col gap-1.5">
                     {EVENT_STATUSES.map(({ value, label }) => (
                       <label
                         key={value}
-                        className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer hover:bg-[var(--stage-surface-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5"
+                        className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer stage-hover overflow-hidden rounded-lg px-2 py-1.5 -mx-2 -my-0.5"
                       >
                         <input
                           type="checkbox"
                           checked={statusFilter.has(value)}
                           onChange={() => toggleStatus(value)}
-                          className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus:ring-[var(--stage-accent)]"
+                          className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus-visible:ring-[var(--stage-accent)]"
                         />
                         {label}
                       </label>
                     ))}
                   </div>
-                  <p className="text-xs font-semibold text-[var(--stage-text-secondary)] uppercase tracking-wider mt-3 mb-1.5">
+                  <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mt-3 mb-1.5">
                     Optional
                   </p>
-                  <label className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer hover:bg-[var(--stage-surface-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
+                  <label className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer stage-hover overflow-hidden rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
                     <input
                       type="checkbox"
                       checked={withProjectOnly}
                       onChange={(e) => setWithProjectOnly(e.target.checked)}
-                      className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus:ring-[var(--stage-accent)]"
+                      className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus-visible:ring-[var(--stage-accent)]"
                     />
                     With project only
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer hover:bg-[var(--stage-surface-hover)] rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
+                  <label className="flex items-center gap-2 text-sm text-[var(--stage-text-primary)] cursor-pointer stage-hover overflow-hidden rounded-lg px-2 py-1.5 -mx-2 -my-0.5">
                     <input
                       type="checkbox"
                       checked={withClientOnly}
                       onChange={(e) => setWithClientOnly(e.target.checked)}
-                      className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus:ring-[var(--stage-accent)]"
+                      className="rounded border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] focus-visible:ring-[var(--stage-accent)]"
                     />
                     With client only
                   </label>
@@ -304,7 +285,7 @@ export function CalendarShell({ events, initialView, initialDate }: CalendarShel
 
       {/* Grid area — fills remaining height, scrolls when content overflows */}
       <div
-        className="relative z-10 flex-1 min-h-0 p-4 md:p-6 bg-[var(--stage-surface-nested)] rounded-b-[var(--stage-radius-panel,12px)] flex flex-col overflow-auto"
+        className="relative z-10 flex-1 min-h-0 p-4 md:p-6 bg-[var(--ctx-well)] rounded-b-[var(--stage-radius-panel,12px)] flex flex-col overflow-auto"
       >
         {view === 'month' && (
           <div className="flex-1 min-h-0 flex flex-col">

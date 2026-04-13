@@ -48,7 +48,7 @@ export function SetupBilling({
     <StagePanel
       className={`flex flex-col items-center justify-center gap-6 p-8 text-center ${className ?? ''}`}
     >
-      <div className="rounded-2xl bg-[var(--stage-surface-hover)] p-6 flex flex-col items-center gap-4 max-w-sm">
+      <div className="rounded-2xl bg-[var(--stage-surface-elevated)] p-6 flex flex-col items-center gap-4 max-w-sm">
         <div className="rounded-full bg-[var(--stage-surface-elevated)] p-4">
           <FileText className="size-8 text-[var(--stage-text-secondary)]" aria-hidden />
         </div>

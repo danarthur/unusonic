@@ -17,14 +17,17 @@
 // =============================================================================
 
 export type PortalThemePreset =
-  | 'default'
-  | 'minimalist'
-  | 'dark-stage'
+  | 'paper'
+  | 'clean'
+  | 'blackout'
   | 'editorial'
   | 'civic'
-  | 'neo-brutalist'
-  | 'tactile-warm'
-  | 'retro-future'
+  | 'linen'
+  | 'poster'
+  | 'terminal'
+  | 'marquee'
+  | 'broadcast'
+  | 'gallery'
   | 'custom';
 
 /** CSS tokens that define a complete portal theme. */
@@ -62,6 +65,18 @@ export interface PortalThemeTokens {
   cardPadding: string;         // inner card padding
   gap: string;                 // gap between cards/sections
   divider: string;             // border-bottom on sections ('none' | '1px solid ...' | '2px solid ...')
+  // Structural — Phase 1 (changes document proportion/scale, not just cosmetics)
+  heroPadding: string;         // vertical padding inside hero section
+  heroTitleSize: string;       // hero H1 font-size — the biggest single differentiator
+  heroSurface: string;         // hero-specific background (can differ from card surface)
+  totalScale: string;          // font-size for the total amount display
+  contentMaxWidth: string;     // max-width for the page content column
+  // Structural — Phase 2 (layout variants)
+  itemLayout: string;          // 'card' | 'row' | 'minimal' — line item presentation
+  sectionBgAlternate: string;  // 'true' | 'false' — alternate bg/surface per section group
+  // Decorative — Phase 3
+  sectionTrim: string;         // 'none' | 'wave' | 'angle' | 'dots' | 'straight' — SVG divider between sections
+  accentBand: string;          // 'none' | 'top' | 'bottom' — accent-colored stripe on hero card
 }
 
 /** Partial overrides stored in portal_theme_config JSONB. */
@@ -78,6 +93,8 @@ export type PortalThemeConfig = Partial<{
   font_heading: string;
   font_body: string;
   radius: number;
+  /** Optional hero background image URL (stored in config, no schema change needed). */
+  hero_image_url: string;
 }>;
 
 /** Resolved theme ready for CSS injection. */
@@ -93,17 +110,18 @@ export interface ResolvedPortalTheme {
 /**
  * Font references use next/font CSS variables registered in root layout.
  * --font-geist-sans = Geist (Inter replacement, already loaded)
- * --font-playfair   = Playfair Display (serif, Tactile Warm)
- * --font-space-grotesk = Space Grotesk (sans, Neo-Brutalist)
- * --font-jetbrains  = JetBrains Mono (mono, Retro-Future)
+ * --font-playfair   = Playfair Display (serif, Linen + Marquee)
+ * --font-space-grotesk = Space Grotesk (sans, Poster)
+ * --font-jetbrains  = JetBrains Mono (mono, Terminal)
  */
 
 const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
-  /**
-   * Default — Warm white paper, almost-black accent, subtle warmth.
-   * Character: high-end print document. Soft shadows, gentle rounding.
-   */
-  default: {
+  // ---------------------------------------------------------------------------
+  // 1. Paper — warm white paper, near-black accent, general-purpose default.
+  //    Character: heavy-stock stationery with dark ink. Quiet and competent.
+  //    References: Muji stationery, Apple invoice receipts, Aesop product cards.
+  // ---------------------------------------------------------------------------
+  paper: {
     bg: 'oklch(0.985 0.003 80)',
     surface: 'oklch(0.97 0.003 80)',
     surfaceSubtle: 'oklch(0.94 0.003 80)',
@@ -131,13 +149,24 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '20px',
     gap: '20px',
     divider: 'none',
+    heroPadding: '36px',
+    heroTitleSize: '2rem',
+    heroSurface: 'oklch(0.97 0.003 80)',
+    totalScale: '1.5rem',
+    contentMaxWidth: '48rem',
+    itemLayout: 'card',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'none',
+    accentBand: 'none',
   },
 
-  /**
-   * Minimalist — Swiss-inspired. Pure white, black accents, zero radius.
-   * Character: typography does all the work. Grid-aligned, no softness, no shadows.
-   */
-  minimalist: {
+  // ---------------------------------------------------------------------------
+  // 2. Clean — pure white, pure black, zero radius, zero shadow. Typography
+  //    and grid do all the work.
+  //    Character: Swiss International Style. Disciplined, modern, no decoration.
+  //    References: Josef Muller-Brockmann, Linear changelog, Braun manuals.
+  // ---------------------------------------------------------------------------
+  clean: {
     bg: 'oklch(1.0 0 0)',
     surface: 'oklch(0.98 0 0)',
     surfaceSubtle: 'oklch(0.96 0 0)',
@@ -165,15 +194,23 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '16px',
     gap: '16px',
     divider: '1px solid oklch(0.88 0 0)',
+    heroPadding: '24px',
+    heroTitleSize: '1.75rem',
+    heroSurface: 'oklch(0.98 0 0)',
+    totalScale: '1.25rem',
+    contentMaxWidth: '48rem',
+    itemLayout: 'row',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'straight',
+    accentBand: 'top',
   },
 
-  /**
-   * Dark Stage — Deep near-black, cool cast, technical precision.
-   * Character: the proposal a production manager opens on a laptop in a dim venue.
-   * Luminance-based elevation (subtle glow) instead of shadow-based.
-   * Serves corporate AV integrators, touring production, LED/video vendors.
-   */
-  'dark-stage': {
+  // ---------------------------------------------------------------------------
+  // 3. Blackout — deep cool dark, technical precision, luminance-based elevation.
+  //    Character: a proposal opened on a laptop backstage in a dim venue.
+  //    References: Ableton Live, d&b audiotechnik, Tesla instrument cluster.
+  // ---------------------------------------------------------------------------
+  blackout: {
     bg: 'oklch(0.12 0.005 260)',
     surface: 'oklch(0.18 0.005 260)',
     surfaceSubtle: 'oklch(0.14 0.005 260)',
@@ -201,14 +238,22 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '20px',
     gap: '16px',
     divider: '1px solid oklch(0.25 0 0)',
+    heroPadding: '28px',
+    heroTitleSize: '1.75rem',
+    heroSurface: 'oklch(0.18 0.005 260)',
+    totalScale: '1.25rem',
+    contentMaxWidth: '48rem',
+    itemLayout: 'row',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'none',
+    accentBand: 'none',
   },
 
-  /**
-   * Editorial — High-contrast, photography-forward, magazine spread feel.
-   * Character: a Monocle spread or Acne Studios lookbook that happens to contain pricing.
-   * Uppercase section labels, aggressive tracking, minimal borders.
-   * Serves brand activation agencies, experiential marketing, fashion events.
-   */
+  // ---------------------------------------------------------------------------
+  // 4. Editorial — bold type, thick dividers, magazine spread feel.
+  //    Character: a Monocle spread that happens to contain pricing.
+  //    References: Bloomberg Businessweek, Acne Studios, Ssense editorial.
+  // ---------------------------------------------------------------------------
   editorial: {
     bg: 'oklch(1.0 0 0)',
     surface: 'oklch(0.97 0.002 60)',
@@ -237,14 +282,23 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '24px',
     gap: '24px',
     divider: '2px solid oklch(0 0 0)',
+    heroPadding: '32px',
+    heroTitleSize: '2.25rem',
+    heroSurface: 'oklch(0.97 0.002 60)',
+    totalScale: '1.25rem',
+    contentMaxWidth: '52rem',
+    itemLayout: 'minimal',
+    sectionBgAlternate: 'true',
+    sectionTrim: 'straight',
+    accentBand: 'bottom',
   },
 
-  /**
-   * Civic — Clean, trustworthy, warm but not luxurious.
-   * Character: a well-designed annual report. Credible, warm, clear.
-   * Blue-gray tint signals trust and institution. Muted teal accent.
-   * Serves nonprofit galas, government events, university productions.
-   */
+  // ---------------------------------------------------------------------------
+  // 5. Civic — clean, trustworthy, warm but not luxurious.
+  //    Character: a well-designed annual report. Credible, warm, clear.
+  //    Blue-gray tint signals trust and institution. Muted teal accent.
+  //    References: university press materials, nonprofit annual reports.
+  // ---------------------------------------------------------------------------
   civic: {
     bg: 'oklch(0.98 0.005 85)',
     surface: 'oklch(0.96 0.008 240)',
@@ -273,14 +327,67 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '24px',
     gap: '20px',
     divider: 'none',
+    heroPadding: '32px',
+    heroTitleSize: '1.875rem',
+    heroSurface: 'oklch(0.96 0.008 240)',
+    totalScale: '1.375rem',
+    contentMaxWidth: '48rem',
+    itemLayout: 'card',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'none',
+    accentBand: 'none',
   },
 
-  /**
-   * Neo-Brutalist — Bold, raw, high contrast.
-   * Character: black borders (2px) are THE signature. Hard offset shadows.
-   * White cards stamped on off-white. Vivid accent. Chunky.
-   */
-  'neo-brutalist': {
+  // ---------------------------------------------------------------------------
+  // 6. Linen — serif headings, cream tones, luxury stationery.
+  //    Character: a handwritten note on heavy cream paper. Warm and personal.
+  //    References: Smythson stationery, Cereal magazine, The Ned hotel menus.
+  // ---------------------------------------------------------------------------
+  linen: {
+    bg: 'oklch(0.96 0.012 70)',
+    surface: 'oklch(0.99 0.006 70)',
+    surfaceSubtle: 'oklch(0.93 0.012 70)',
+    text: 'oklch(0.20 0.02 50)',
+    textSecondary: 'oklch(0.50 0.02 50)',
+    accent: 'oklch(0.50 0.12 30)',
+    accentSubtle: 'oklch(0.94 0.03 30)',
+    border: 'oklch(0.88 0.02 70)',
+    borderSubtle: 'oklch(0.92 0.01 70)',
+    fontHeading: 'var(--font-playfair), serif',
+    fontBody: 'var(--font-geist-sans), sans-serif',
+    headingWeight: '400',
+    headingTracking: '0em',
+    radius: '12px',
+    borderWidth: '1px',
+    shadow: '0 2px 12px oklch(0.20 0.02 50 / 0.06)',
+    shadowStrong: '0 4px 20px oklch(0.20 0.02 50 / 0.08), 0 12px 40px -8px oklch(0.20 0.02 50 / 0.06)',
+    accentText: 'oklch(1.0 0 0)',
+    heroAlign: 'center',
+    btnRadius: '9999px',
+    labelSize: '11px',
+    labelTransform: 'none',
+    labelTracking: '0.02em',
+    labelWeight: '400',
+    cardPadding: '28px',
+    gap: '24px',
+    divider: 'none',
+    heroPadding: '48px',
+    heroTitleSize: '2.75rem',
+    heroSurface: 'oklch(0.99 0.006 70)',
+    totalScale: '2rem',
+    contentMaxWidth: '42rem',
+    itemLayout: 'card',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'wave',
+    accentBand: 'none',
+  },
+
+  // ---------------------------------------------------------------------------
+  // 7. Poster — 2px black borders, hard offset shadows, vivid accent.
+  //    Character: a gig flyer designed by a graphic designer. Bold and stamped.
+  //    References: Virgil Abloh / Off-White, Rough Trade, Figma marketing.
+  // ---------------------------------------------------------------------------
+  poster: {
     bg: 'oklch(0.97 0.01 90)',
     surface: 'oklch(1.0 0 0)',
     surfaceSubtle: 'oklch(0.94 0.01 90)',
@@ -308,49 +415,23 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '20px',
     gap: '16px',
     divider: '2px solid oklch(0 0 0)',
+    heroPadding: '28px',
+    heroTitleSize: '2.25rem',
+    heroSurface: 'oklch(1.0 0 0)',
+    totalScale: '1.5rem',
+    contentMaxWidth: '52rem',
+    itemLayout: 'card',
+    sectionBgAlternate: 'true',
+    sectionTrim: 'angle',
+    accentBand: 'top',
   },
 
-  /**
-   * Tactile Warm — Warm, textured, serif headings.
-   * Character: cream tones, soft warm shadows, generous radius.
-   * Feels like luxury stationery. The serif heading font is the differentiator.
-   */
-  'tactile-warm': {
-    bg: 'oklch(0.96 0.01 70)',
-    surface: 'oklch(0.99 0.005 70)',
-    surfaceSubtle: 'oklch(0.93 0.01 70)',
-    text: 'oklch(0.20 0.02 50)',
-    textSecondary: 'oklch(0.50 0.02 50)',
-    accent: 'oklch(0.50 0.12 30)',
-    accentSubtle: 'oklch(0.94 0.03 30)',
-    border: 'oklch(0.88 0.02 70)',
-    borderSubtle: 'oklch(0.92 0.01 70)',
-    fontHeading: 'var(--font-playfair), serif',
-    fontBody: 'var(--font-geist-sans), sans-serif',
-    headingWeight: '400',
-    headingTracking: '0em',
-    radius: '12px',
-    borderWidth: '1px',
-    shadow: '0 2px 12px oklch(0.20 0.02 50 / 0.06)',
-    shadowStrong: '0 4px 20px oklch(0.20 0.02 50 / 0.08), 0 12px 40px -8px oklch(0.20 0.02 50 / 0.06)',
-    accentText: 'oklch(1.0 0 0)',
-    heroAlign: 'center',
-    btnRadius: '9999px',
-    labelSize: '11px',
-    labelTransform: 'none',
-    labelTracking: '0.02em',
-    labelWeight: '400',
-    cardPadding: '28px',
-    gap: '24px',
-    divider: 'none',
-  },
-
-  /**
-   * Retro-Future — Vintage palette meets digital precision.
-   * Character: muted green-gray, monospace headings (the signature),
-   * slightly desaturated. Terminal crossed with modern design.
-   */
-  'retro-future': {
+  // ---------------------------------------------------------------------------
+  // 8. Terminal — monospace headings, green-gray palette, compact and data-dense.
+  //    Character: a vintage terminal crossed with modern design.
+  //    References: Bloomberg Terminal, TE OP-1, Braun ET66, VT100.
+  // ---------------------------------------------------------------------------
+  terminal: {
     bg: 'oklch(0.95 0.005 100)',
     surface: 'oklch(0.98 0.003 100)',
     surfaceSubtle: 'oklch(0.92 0.005 100)',
@@ -378,9 +459,154 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '16px',
     gap: '12px',
     divider: '1px solid oklch(0.86 0.005 100)',
+    heroPadding: '20px',
+    heroTitleSize: '1.5rem',
+    heroSurface: 'oklch(0.98 0.003 100)',
+    totalScale: '1.125rem',
+    contentMaxWidth: '52rem',
+    itemLayout: 'row',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'dots',
+    accentBand: 'none',
   },
 
-  /** Custom — falls back to default, overridden by portal_theme_config. */
+  // ---------------------------------------------------------------------------
+  // 9. Marquee — dark warm charcoal, serif headings, gold accent, theatrical.
+  //    Character: a playbill for a grand theater. The curtain is about to go up.
+  //    References: Lincoln Center signage, Criterion Collection, Cartier at night.
+  // ---------------------------------------------------------------------------
+  marquee: {
+    bg: 'oklch(0.14 0.01 50)',
+    surface: 'oklch(0.20 0.01 50)',
+    surfaceSubtle: 'oklch(0.16 0.008 50)',
+    text: 'oklch(0.90 0.005 70)',
+    textSecondary: 'oklch(0.58 0.005 50)',
+    accent: 'oklch(0.72 0.12 85)',
+    accentSubtle: 'oklch(0.22 0.02 85)',
+    border: 'oklch(0.28 0.01 50)',
+    borderSubtle: 'oklch(0.22 0.005 50)',
+    fontHeading: 'var(--font-playfair), serif',
+    fontBody: 'var(--font-geist-sans), sans-serif',
+    headingWeight: '700',
+    headingTracking: '-0.01em',
+    radius: '8px',
+    borderWidth: '1px',
+    shadow: '0 2px 8px oklch(0 0 0 / 0.3), 0 0 1px oklch(0.72 0.12 85 / 0.08)',
+    shadowStrong: '0 4px 16px oklch(0 0 0 / 0.4), 0 0 2px oklch(0.72 0.12 85 / 0.12)',
+    accentText: 'oklch(0.12 0.01 50)',
+    heroAlign: 'center',
+    btnRadius: '4px',
+    labelSize: '11px',
+    labelTransform: 'uppercase',
+    labelTracking: '0.10em',
+    labelWeight: '600',
+    cardPadding: '24px',
+    gap: '20px',
+    divider: 'none',
+    heroPadding: '40px',
+    heroTitleSize: '2.5rem',
+    heroSurface: 'oklch(0.20 0.01 50)',
+    totalScale: '1.75rem',
+    contentMaxWidth: '46rem',
+    itemLayout: 'minimal',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'none',
+    accentBand: 'bottom',
+  },
+
+  // ---------------------------------------------------------------------------
+  // 10. Broadcast — ultra-bold, ultra-compact, high-energy. Everything is taut
+  //     and forward-leaning.
+  //     Character: a dashboard at launch speed. F1 timing screen meets Nike SNKRS.
+  //     References: Nike SNKRS, Stripe Dashboard density, F1 race timing, Figma UI3.
+  // ---------------------------------------------------------------------------
+  broadcast: {
+    bg: 'oklch(1.0 0 0)',
+    surface: 'oklch(0.97 0 0)',
+    surfaceSubtle: 'oklch(0.94 0 0)',
+    text: 'oklch(0.05 0 0)',
+    textSecondary: 'oklch(0.40 0 0)',
+    accent: 'oklch(0.15 0 0)',
+    accentSubtle: 'oklch(0.94 0 0)',
+    border: 'oklch(0.82 0 0)',
+    borderSubtle: 'oklch(0.90 0 0)',
+    fontHeading: 'var(--font-geist-sans), sans-serif',
+    fontBody: 'var(--font-geist-sans), sans-serif',
+    headingWeight: '800',
+    headingTracking: '-0.04em',
+    radius: '2px',
+    borderWidth: '1.5px',
+    shadow: '0 1px 2px oklch(0 0 0 / 0.06)',
+    shadowStrong: '0 2px 6px oklch(0 0 0 / 0.10)',
+    accentText: 'oklch(0.98 0 0)',
+    heroAlign: 'left',
+    btnRadius: '2px',
+    labelSize: '10px',
+    labelTransform: 'uppercase',
+    labelTracking: '0.14em',
+    labelWeight: '800',
+    cardPadding: '14px',
+    gap: '10px',
+    divider: '1.5px solid oklch(0.82 0 0)',
+    heroPadding: '20px',
+    heroTitleSize: '1.625rem',
+    heroSurface: 'oklch(0.97 0 0)',
+    totalScale: '1.125rem',
+    contentMaxWidth: '56rem',
+    itemLayout: 'row',
+    sectionBgAlternate: 'true',
+    sectionTrim: 'straight',
+    accentBand: 'none',
+  },
+
+  // ---------------------------------------------------------------------------
+  // 11. Gallery — ultra-light weight, vast spacing, maximum restraint.
+  //     Character: walking through a white-walled art gallery. Three items in
+  //     a thousand square feet.
+  //     References: White Cube gallery, Cereal magazine, Jil Sander campaigns.
+  // ---------------------------------------------------------------------------
+  gallery: {
+    bg: 'oklch(0.99 0.002 240)',
+    surface: 'oklch(0.97 0.002 240)',
+    surfaceSubtle: 'oklch(0.95 0.002 240)',
+    text: 'oklch(0.15 0 0)',
+    textSecondary: 'oklch(0.55 0 0)',
+    accent: 'oklch(0.30 0 0)',
+    accentSubtle: 'oklch(0.96 0.002 240)',
+    border: 'oklch(0.94 0 0)',
+    borderSubtle: 'oklch(0.96 0 0)',
+    fontHeading: 'var(--font-geist-sans), sans-serif',
+    fontBody: 'var(--font-geist-sans), sans-serif',
+    headingWeight: '250',
+    headingTracking: '0.02em',
+    radius: '16px',
+    borderWidth: '0px',
+    shadow: '0 1px 4px oklch(0 0 0 / 0.03), 0 8px 32px -8px oklch(0 0 0 / 0.05)',
+    shadowStrong: '0 2px 8px oklch(0 0 0 / 0.04), 0 16px 48px -12px oklch(0 0 0 / 0.07)',
+    accentText: 'oklch(0.98 0 0)',
+    heroAlign: 'center',
+    btnRadius: '9999px',
+    labelSize: '12px',
+    labelTransform: 'none',
+    labelTracking: '0.06em',
+    labelWeight: '300',
+    cardPadding: '36px',
+    gap: '36px',
+    divider: 'none',
+    heroPadding: '56px',
+    heroTitleSize: '2.75rem',
+    heroSurface: 'oklch(0.97 0.002 240)',
+    totalScale: '2rem',
+    contentMaxWidth: '40rem',
+    itemLayout: 'minimal',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'none',
+    accentBand: 'none',
+  },
+
+  // ---------------------------------------------------------------------------
+  // Custom — falls back to Paper, overridden by portal_theme_config.
+  // ---------------------------------------------------------------------------
   custom: {
     bg: 'oklch(0.985 0.003 80)',
     surface: 'oklch(0.97 0.003 80)',
@@ -409,7 +635,33 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
     cardPadding: '20px',
     gap: '20px',
     divider: 'none',
+    heroPadding: '36px',
+    heroTitleSize: '2rem',
+    heroSurface: 'oklch(0.97 0.003 80)',
+    totalScale: '1.5rem',
+    contentMaxWidth: '48rem',
+    itemLayout: 'card',
+    sectionBgAlternate: 'false',
+    sectionTrim: 'none',
+    accentBand: 'none',
   },
+};
+
+// =============================================================================
+// Migration alias map — old slug → new slug
+// Ensures workspaces using legacy preset names continue to resolve correctly
+// after the rename. No DB migration required.
+// =============================================================================
+
+const PRESET_ALIASES: Record<string, PortalThemePreset> = {
+  'default': 'paper',
+  'minimalist': 'clean',
+  'dark-stage': 'blackout',
+  // 'editorial' unchanged
+  // 'civic' unchanged
+  'tactile-warm': 'linen',
+  'neo-brutalist': 'poster',
+  'retro-future': 'terminal',
 };
 
 // =============================================================================
@@ -422,13 +674,17 @@ const PRESETS: Record<PortalThemePreset, PortalThemeTokens> = {
  * Resolution priority:
  * 1. portal_theme_config overrides (highest)
  * 2. Preset defaults (from preset name)
- * 3. Default theme (lowest)
+ * 3. Paper theme (lowest — fallback for unknown presets)
+ *
+ * Supports legacy preset slugs via PRESET_ALIASES for migration safety.
  */
 export function resolvePortalTheme(
   preset: string | null | undefined,
   config: PortalThemeConfig | null | undefined
 ): ResolvedPortalTheme {
-  const presetName = (preset && preset in PRESETS ? preset : 'default') as PortalThemePreset;
+  // Resolve alias first (e.g. 'default' → 'paper', 'neo-brutalist' → 'poster')
+  const resolved = preset && PRESET_ALIASES[preset] ? PRESET_ALIASES[preset] : preset;
+  const presetName = (resolved && resolved in PRESETS ? resolved : 'paper') as PortalThemePreset;
   const base = PRESETS[presetName];
 
   const tokens: PortalThemeTokens = {
@@ -459,6 +715,15 @@ export function resolvePortalTheme(
     cardPadding: base.cardPadding,
     gap: base.gap,
     divider: base.divider,
+    heroPadding: base.heroPadding,
+    heroTitleSize: base.heroTitleSize,
+    heroSurface: base.heroSurface,
+    totalScale: base.totalScale,
+    contentMaxWidth: base.contentMaxWidth,
+    itemLayout: base.itemLayout,
+    sectionBgAlternate: base.sectionBgAlternate,
+    sectionTrim: base.sectionTrim,
+    accentBand: base.accentBand,
   };
 
   return { preset: presetName, tokens };
@@ -500,6 +765,15 @@ export function portalThemeToCssVars(tokens: PortalThemeTokens): Record<string, 
     '--portal-card-padding': tokens.cardPadding,
     '--portal-gap': tokens.gap,
     '--portal-divider': tokens.divider,
+    '--portal-hero-padding': tokens.heroPadding,
+    '--portal-hero-title-size': tokens.heroTitleSize,
+    '--portal-hero-surface': tokens.heroSurface,
+    '--portal-total-scale': tokens.totalScale,
+    '--portal-content-max-width': tokens.contentMaxWidth,
+    '--portal-item-layout': tokens.itemLayout,
+    '--portal-section-bg-alternate': tokens.sectionBgAlternate,
+    '--portal-section-trim': tokens.sectionTrim,
+    '--portal-accent-band': tokens.accentBand,
   };
 }
 
@@ -519,15 +793,50 @@ export function getPresetTokens(preset: PortalThemePreset): PortalThemeTokens {
   return { ...PRESETS[preset] };
 }
 
-/** All available preset names. */
+/** All available preset names (excludes 'custom'). */
 export const PORTAL_THEME_PRESETS: PortalThemePreset[] = [
-  'default',
-  'minimalist',
-  'dark-stage',
+  'paper',
+  'clean',
+  'blackout',
   'editorial',
   'civic',
-  'tactile-warm',
-  'neo-brutalist',
-  'retro-future',
+  'linen',
+  'poster',
+  'terminal',
+  'marquee',
+  'broadcast',
+  'gallery',
   'custom',
 ];
+
+/** Human-readable labels for the theme picker UI. */
+export const PORTAL_THEME_LABELS: Record<PortalThemePreset, string> = {
+  paper: 'Paper',
+  clean: 'Clean',
+  blackout: 'Blackout',
+  editorial: 'Editorial',
+  civic: 'Civic',
+  linen: 'Linen',
+  poster: 'Poster',
+  terminal: 'Terminal',
+  marquee: 'Marquee',
+  broadcast: 'Broadcast',
+  gallery: 'Gallery',
+  custom: 'Custom',
+};
+
+/** One-line descriptions for the theme picker. */
+export const PORTAL_THEME_DESCRIPTIONS: Record<PortalThemePreset, string> = {
+  paper: 'Warm white paper, near-black ink. Works for everyone.',
+  clean: 'Pure white, zero radius, zero shadow. Typography does the work.',
+  blackout: 'Deep cool dark. Technical precision for production companies.',
+  editorial: 'Bold type, thick dividers. Magazine spread confidence.',
+  civic: 'Blue-gray tint, teal accent. Trustworthy and institutional.',
+  linen: 'Serif headings, cream tones. Luxury stationery feel.',
+  poster: 'Black borders, offset shadows. Bold and graphic.',
+  terminal: 'Monospace headings, green-gray. Compact and data-dense.',
+  marquee: 'Dark warm charcoal, gold accent. Theatrical grandeur.',
+  broadcast: 'Ultra-bold, ultra-compact. High energy, no-nonsense.',
+  gallery: 'Ultra-light type, vast spacing. Maximum restraint.',
+  custom: 'Start from Paper, customize everything.',
+};

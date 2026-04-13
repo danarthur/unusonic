@@ -81,13 +81,13 @@ export default function CapturePage() {
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent className="bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.10)]">
-                  <SelectItem value="Task" className="text-[var(--stage-text-primary)] focus:bg-[var(--stage-surface-hover)]">
+                  <SelectItem value="Task" className="text-[var(--stage-text-primary)] focus:bg-[oklch(1_0_0_/_0.08)]">
                     Task
                   </SelectItem>
-                  <SelectItem value="Note" className="text-[var(--stage-text-primary)] focus:bg-[var(--stage-surface-hover)]">
+                  <SelectItem value="Note" className="text-[var(--stage-text-primary)] focus:bg-[oklch(1_0_0_/_0.08)]">
                     Note
                   </SelectItem>
-                  <SelectItem value="Project" className="text-[var(--stage-text-primary)] focus:bg-[var(--stage-surface-hover)]">
+                  <SelectItem value="Project" className="text-[var(--stage-text-primary)] focus:bg-[oklch(1_0_0_/_0.08)]">
                     Project
                   </SelectItem>
                 </SelectContent>
@@ -104,7 +104,7 @@ export default function CapturePage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Enter title"
-                className="bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)]"
+                className="bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]"
                 required
               />
             </div>
@@ -119,14 +119,14 @@ export default function CapturePage() {
                 onChange={(e) => setDetails(e.target.value)}
                 placeholder="Enter details or notes"
                 rows={6}
-                className="bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)]"
+                className="bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]"
               />
             </div>
 
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] transition-[filter] disabled:opacity-60"
+              className="w-full border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors disabled:opacity-45"
             >
               {isSubmitting ? 'Saving…' : 'Save'}
             </Button>

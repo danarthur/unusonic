@@ -59,7 +59,7 @@ export async function GET(req: Request) {
   }
 
   const supabase = getSystemClient();
-   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
   const now = Date.now();
   let sent = 0;
@@ -162,7 +162,7 @@ export async function GET(req: Request) {
       const billToEntityId = (stakeholders?.[0] as { entity_id?: string } | undefined)?.entity_id;
 
       if (billToEntityId) {
-        const { data: entity } = await (supabase as any)
+        const { data: entity } = await supabase
           .schema('directory')
           .from('entities')
           .select('display_name, attributes')
@@ -177,7 +177,7 @@ export async function GET(req: Request) {
 
       // Fallback: try organization entity
       if (!clientEmail && deal.organization_id) {
-        const { data: orgEntity } = await (supabase as any)
+        const { data: orgEntity } = await supabase
           .schema('directory')
           .from('entities')
           .select('display_name, attributes')
@@ -228,17 +228,20 @@ export async function GET(req: Request) {
 
           if (result.ok) {
             // Log to prevent re-send
+            // supabase-js 2.103 moved `ignoreDuplicates` off `.insert()` options
+            // and onto `.upsert()`. The partial unique constraint
+            // `(proposal_id, reminder_type, cadence_step)` is the conflict key.
             await db
               .schema('finance')
               .from('payment_reminder_log')
-              .insert({
+              .upsert({
                 workspace_id: ws.id,
                 proposal_id: proposal.id,
                 deal_id: deal.id,
                 reminder_type: 'deposit',
                 cadence_step: rule.step,
                 email_to: clientEmail,
-              }, { ignoreDuplicates: true });
+              }, { onConflict: 'proposal_id,reminder_type,cadence_step', ignoreDuplicates: true });
             sentSet.add(key);
             sent++;
           } else {
@@ -281,14 +284,14 @@ export async function GET(req: Request) {
             await db
               .schema('finance')
               .from('payment_reminder_log')
-              .insert({
+              .upsert({
                 workspace_id: ws.id,
                 proposal_id: proposal.id,
                 deal_id: deal.id,
                 reminder_type: 'balance',
                 cadence_step: rule.step,
                 email_to: clientEmail,
-              }, { ignoreDuplicates: true });
+              }, { onConflict: 'proposal_id,reminder_type,cadence_step', ignoreDuplicates: true });
             sentSet.add(key);
             sent++;
 
@@ -330,7 +333,7 @@ async function notifyDealOwner(
   if (!ownerEntityId) return;
 
   // Resolve email from the owner entity's attributes
-  const { data: entity } = await (supabase as any)
+  const { data: entity } = await supabase
     .schema('directory')
     .from('entities')
     .select('attributes')

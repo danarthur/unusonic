@@ -10,7 +10,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, Link2Off, Loader2, CheckCircle2, Building2 } from 'lucide-react';
 import { initiateConnection, disconnectQbo } from '../api/actions';
 
-const springConfig = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const springConfig = STAGE_MEDIUM;
 
 export interface QboConnectCardProps {
   workspaceId: string;
@@ -77,7 +78,7 @@ export function QboConnectCard({
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-unusonic-success)]" />
               Active
               {realmId && (
-                <span className="font-mono text-[10px] opacity-80 ml-1 truncate" title={realmId}>
+                <span className="font-mono text-label opacity-80 ml-1 truncate" title={realmId}>
                   {realmId}
                 </span>
               )}
@@ -91,8 +92,8 @@ export function QboConnectCard({
               text-[var(--color-unusonic-error)]
               bg-[var(--color-unusonic-error)]/10 hover:bg-[var(--color-unusonic-error)]/20
               border border-[var(--color-unusonic-error)]/20 hover:border-[var(--color-unusonic-error)]/30
-              transition-colors hover:brightness-[1.03]
-              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-colors
+              disabled:opacity-45 disabled:cursor-not-allowed
               flex items-center gap-2"
           >
             {isPending ? (
@@ -140,16 +141,16 @@ export function QboConnectCard({
         transition={springConfig}
         className="group relative overflow-hidden
           stage-panel-elevated p-5
-          hover:brightness-[1.04]
-          transition-[filter]
-          disabled:opacity-50 disabled:cursor-not-allowed
+          hover:bg-[oklch(1_0_0_/_0.08)]
+          transition-colors
+          disabled:opacity-45 disabled:cursor-not-allowed
           cursor-pointer"
       >
         <motion.div
           initial={{ opacity: 0 }}
           whileHover={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="absolute inset-0 bg-gradient-to-br from-walnut/5 to-transparent pointer-events-none"
+          className="absolute inset-0 bg-gradient-to-br from-[oklch(1_0_0_/_0.05)] to-transparent pointer-events-none"
         />
         <div
           className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay"
@@ -159,7 +160,7 @@ export function QboConnectCard({
         />
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl
-            bg-[var(--stage-surface-nested)] group-hover:bg-[var(--stage-surface)]
+            bg-[var(--ctx-well)] group-hover:bg-[oklch(1_0_0_/_0.08)]
             border border-[var(--stage-border)]
             flex items-center justify-center
             transition-colors shrink-0">
@@ -170,7 +171,7 @@ export function QboConnectCard({
             )}
           </div>
           <div className="flex-1 text-left">
-            <p className="text-base font-medium text-[var(--stage-text-primary)] group-hover:text-walnut transition-colors">
+            <p className="text-base font-medium text-[var(--stage-text-primary)] group-hover:text-[var(--stage-text-primary)] transition-colors">
               Connect QuickBooks
             </p>
             <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">

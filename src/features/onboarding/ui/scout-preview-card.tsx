@@ -15,6 +15,7 @@ import type { ScoutResult } from '@/features/intelligence';
 import {
   M3_DURATION_S,
   M3_EASING_ENTER,
+  STAGE_MEDIUM,
 } from '@/shared/lib/motion-constants';
 
 interface ScoutPreviewCardProps {
@@ -45,13 +46,13 @@ export function ScoutPreviewCard({
       layout
       initial={false}
       className={cn(
-        'stage-panel liquid-levitation relative flex w-full flex-col rounded-[var(--stage-radius-panel,12px)] p-4 sm:p-5 text-left transition-all duration-300',
+        'stage-panel liquid-levitation relative flex w-full flex-col rounded-[var(--stage-radius-panel,12px)] p-4 sm:p-5 text-left transition-colors duration-100',
         hero && 'sm:p-6',
         'border border-[oklch(1_0_0_/_0.08)] hover:border-[var(--stage-accent)]/50',
         'bg-[var(--stage-surface-raised)]',
         className
       )}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      transition={STAGE_MEDIUM}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -148,7 +149,7 @@ export function ScoutPreviewCard({
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded bg-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                    className="rounded bg-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 stage-badge-text text-[var(--stage-text-secondary)]"
                   >
                     {tag}
                   </span>
@@ -161,7 +162,7 @@ export function ScoutPreviewCard({
           initial={loading ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER, delay: STAGGER * 3 }}
-          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]"
+          className="shrink-0 rounded-full px-2 py-0.5 stage-badge-text bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]"
         >
           {loading ? '…' : 'Scout'}
         </motion.span>

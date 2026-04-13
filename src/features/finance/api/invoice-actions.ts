@@ -85,7 +85,6 @@ export async function sendInvoice(
   invoiceId: string,
   eventId?: string,
 ): Promise<SendInvoiceResult> {
-  // @ts-expect-error -- send-invoice.ts uses server-only imports (PDF gen); tsc traces the chain from client context. Runtime is correct: this file has 'use server' so Next.js handles the boundary.
   const mod = await import('./send-invoice');
   return mod.sendInvoice(invoiceId, eventId);
 }

@@ -23,6 +23,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { loginAndResolveWorkspace } from '../api/actions';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import type { LoginFormState, QueryDiagnostic } from '../model/types';
 import { useState } from 'react';
 
@@ -36,7 +37,7 @@ export function DiagnosticLoginForm() {
   const [showQueries, setShowQueries] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  const springConfig = { type: 'spring', stiffness: 300, damping: 30 } as const;
+  const springConfig = STAGE_MEDIUM;
   
   const getStatusIcon = (status: QueryDiagnostic['status']) => {
     switch (status) {
@@ -88,9 +89,9 @@ export function DiagnosticLoginForm() {
               className="w-full px-4 py-3 rounded-xl
                 bg-[var(--stage-text-primary)]/5 border border-[oklch(1_0_0_/_0.08)]
                 text-[var(--stage-text-primary)]placeholder:text-[var(--stage-text-secondary)]/50
-                focus:outline-none focus:border-[oklch(1_0_0_/_0.15)] focus:ring-2 focus:ring-[var(--stage-text-primary)]/5
-                disabled:opacity-50 disabled:cursor-not-allowed
-                transition-all duration-200"
+                focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.15)] focus-visible:ring-2 focus-visible:ring-[var(--stage-text-primary)]/5
+                disabled:opacity-45 disabled:cursor-not-allowed
+                transition-colors duration-[80ms]"
               placeholder="you@example.com"
             />
           </div>
@@ -111,9 +112,9 @@ export function DiagnosticLoginForm() {
                 className="w-full px-4 py-3 pr-12 rounded-xl
                   bg-[var(--stage-text-primary)]/5 border border-[oklch(1_0_0_/_0.08)]
                   text-[var(--stage-text-primary)]placeholder:text-[var(--stage-text-secondary)]/50
-                  focus:outline-none focus:border-[oklch(1_0_0_/_0.15)] focus:ring-2 focus:ring-[var(--stage-text-primary)]/5
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-all duration-200"
+                  focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.15)] focus-visible:ring-2 focus-visible:ring-[var(--stage-text-primary)]/5
+                  disabled:opacity-45 disabled:cursor-not-allowed
+                  transition-colors duration-[80ms]"
                 placeholder="••••••••"
               />
               <button
@@ -122,8 +123,8 @@ export function DiagnosticLoginForm() {
                 disabled={isPending}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg
                   text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-text-primary)]/5
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-all duration-200"
+                  disabled:opacity-45 disabled:cursor-not-allowed
+                  transition-colors duration-[80ms]"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
@@ -161,9 +162,9 @@ export function DiagnosticLoginForm() {
             className="w-full py-3.5 rounded-xl
               bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]
               font-medium text-sm
-              enabled:hover:brightness-[1.06]
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-[filter] duration-200
+              enabled:hover:bg-[oklch(1_0_0_/_0.08)]
+              disabled:opacity-45 disabled:cursor-not-allowed
+              transition-colors duration-200
               flex items-center justify-center gap-2"
           >
             {isPending ? (
@@ -258,7 +259,7 @@ export function DiagnosticLoginForm() {
                           {ws.name || 'Unnamed Workspace'}
                         </span>
                         {ws.role && (
-                          <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full bg-walnut/10 text-walnut">
+                          <span className="stage-badge-text uppercase tracking-wider px-2 py-0.5 rounded-full bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)]">
                             {ws.role}
                           </span>
                         )}
@@ -361,13 +362,13 @@ export function DiagnosticLoginForm() {
                               {query.name}
                             </p>
                             {query.message && (
-                              <p className="text-[10px] text-[var(--stage-text-secondary)] truncate">
+                              <p className="text-label text-[var(--stage-text-secondary)] truncate">
                                 {query.message}
                               </p>
                             )}
                           </div>
                           {query.rowCount !== undefined && (
-                            <span className="text-[10px] font-mono text-[var(--stage-text-secondary)]">
+                            <span className="text-label font-mono text-[var(--stage-text-secondary)]">
                               {query.rowCount} rows
                             </span>
                           )}

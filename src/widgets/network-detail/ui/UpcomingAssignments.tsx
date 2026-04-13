@@ -24,7 +24,7 @@ function StatusBadge({ status }: { status: CrewScheduleEntry['status'] }) {
   };
 
   return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[status]}`}>
+    <span className={`stage-badge-text px-2 py-0.5 rounded-full ${styles[status]}`}>
       {status}
     </span>
   );
@@ -34,10 +34,10 @@ function SkeletonRow() {
   return (
     <div className="flex items-center justify-between py-2 animate-pulse">
       <div className="space-y-1.5 flex-1 min-w-0">
-        <div className="h-3.5 w-32 rounded bg-[oklch(1_0_0/0.06)]" />
-        <div className="h-3 w-48 rounded bg-[oklch(1_0_0/0.04)]" />
+        <div className="h-3.5 w-32 rounded bg-[var(--stage-surface-elevated)]" />
+        <div className="h-3 w-48 rounded bg-[var(--stage-surface-elevated)]" />
       </div>
-      <div className="h-5 w-16 rounded-full bg-[oklch(1_0_0/0.06)]" />
+      <div className="h-5 w-16 rounded-full bg-[var(--stage-surface-elevated)]" />
     </div>
   );
 }
@@ -67,7 +67,7 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
   const count = entries.length;
 
   return (
-    <div className="stage-panel rounded-2xl p-4 md:col-span-3">
+    <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
       {/* Heading */}
       <button
         type="button"
@@ -75,11 +75,11 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
         className="flex w-full items-center justify-between"
       >
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
+          <h3 className="stage-label text-[var(--stage-text-secondary)]">
             Upcoming
           </h3>
           {!loading && count > 0 && (
-            <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] tabular-nums">
+            <span className="stage-badge-text px-1.5 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] tabular-nums">
               {count}
             </span>
           )}
@@ -88,7 +88,7 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
           animate={{ rotate: expanded ? 0 : -90 }}
           transition={STAGE_MEDIUM}
         >
-          <ChevronDown className="size-4 text-[var(--stage-text-secondary)]" />
+          <ChevronDown className="size-4 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
         </motion.span>
       </button>
 
@@ -113,8 +113,8 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
               )}
 
               {!loading && count === 0 && (
-                <div className="flex items-center gap-2 py-3 text-xs text-[var(--stage-text-secondary)]">
-                  <Calendar className="size-3.5" />
+                <div className="flex items-center gap-2 py-3 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
+                  <Calendar className="size-3.5" strokeWidth={1.5} />
                   No upcoming assignments
                 </div>
               )}
@@ -124,10 +124,10 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
                   {visible.map((entry) => (
                     <div key={entry.assignment_id} className="flex items-center justify-between py-2 first:pt-0">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--stage-text-primary)] truncate">
+                        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] truncate">
                           {entry.event_title ?? 'Untitled show'}
                         </p>
-                        <p className="text-xs text-[var(--stage-text-secondary)]">
+                        <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
                           {entry.role}
                           <span className="mx-1.5 text-[var(--stage-text-tertiary)]">·</span>
                           {formatShortDate(entry.starts_at)}
@@ -140,7 +140,7 @@ export function UpcomingAssignments({ entityId }: { entityId: string }) {
               )}
 
               {hasMore && (
-                <p className="pt-2 text-xs font-medium text-[var(--stage-text-secondary)] cursor-default">
+                <p className="pt-2 stage-label text-[var(--stage-text-secondary)] cursor-default">
                   +{entries.length - MAX_VISIBLE} more
                 </p>
               )}

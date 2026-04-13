@@ -8,7 +8,6 @@ import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import type { TodayScheduleResult, TodayEvent } from '@/widgets/dashboard/api';
 import {
   STAGE_LIGHT,
-  M3_SHARED_AXIS_Y_VARIANTS,
 } from '@/shared/lib/motion-constants';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -45,7 +44,7 @@ function EventRow({ event }: { event: TodayEvent }) {
   const location = event.venueName ?? event.locationName;
 
   return (
-    <motion.div variants={M3_SHARED_AXIS_Y_VARIANTS} transition={STAGE_LIGHT}>
+    <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }} transition={STAGE_LIGHT}>
       <Link
         href={`/events/${event.id}`}
         className="flex items-center gap-3 px-3 py-2.5 -mx-3 rounded-[var(--stage-radius-input)] hover:bg-[var(--ctx-well-hover)] transition-colors"
@@ -76,7 +75,7 @@ function EventRow({ event }: { event: TodayEvent }) {
 
         {/* Status pill */}
         <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider"
+          className="shrink-0 px-2 py-0.5 rounded-full stage-label"
           style={{
             color: statusColors[event.lifecycleStatus] ?? 'var(--stage-text-secondary)',
             background: 'var(--ctx-well, oklch(1 0 0 / 0.04))',
@@ -94,7 +93,7 @@ function EventRow({ event }: { event: TodayEvent }) {
 function NextUpBlock({ event }: { event: NonNullable<TodayScheduleResult['nextEvent']> }) {
   return (
     <motion.div
-      variants={M3_SHARED_AXIS_Y_VARIANTS}
+      variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
       transition={STAGE_LIGHT}
       className="flex flex-col items-center justify-center text-center gap-2 py-3"
     >

@@ -47,7 +47,7 @@ export async function getWorkspaceLeadSources(): Promise<WorkspaceLeadSource[]> 
 
   const supabase = await createClient();
    
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .select('id, label, category, is_referral, sort_order, archived_at')
@@ -74,7 +74,7 @@ export async function getAllWorkspaceLeadSources(): Promise<WorkspaceLeadSource[
 
   const supabase = await createClient();
    
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .select('id, label, category, is_referral, sort_order, archived_at')
@@ -102,7 +102,7 @@ export async function addWorkspaceLeadSource(
 
   const supabase = await createClient();
    
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .insert({
@@ -138,7 +138,7 @@ export async function renameWorkspaceLeadSource(
 
   const supabase = await createClient();
    
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .update({ label: parsed.data.label.trim() })
@@ -168,7 +168,7 @@ export async function archiveWorkspaceLeadSource(
 
   const supabase = await createClient();
    
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .update({ archived_at: new Date().toISOString() })
@@ -195,7 +195,7 @@ export async function restoreWorkspaceLeadSource(
 
   const supabase = await createClient();
    
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .update({ archived_at: null })
@@ -234,7 +234,7 @@ export async function removeWorkspaceLeadSource(
   }
 
    
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .delete()
@@ -261,7 +261,7 @@ export async function getLeadSourceLabel(
 
   const supabase = await createClient();
    
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
     .select('label')

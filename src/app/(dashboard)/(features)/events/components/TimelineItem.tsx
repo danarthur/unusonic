@@ -40,7 +40,7 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ item, isLast }) => {
         {/* The Dot/Icon */}
         <div
           className={cn(
-            'relative z-10 w-8 h-8 flex items-center justify-center group-hover:brightness-[1.08] transition-[filter] duration-300 stage-panel !rounded-full',
+            'relative z-10 w-8 h-8 flex items-center justify-center stage-panel !rounded-full',
             iconBg
           )}
         >
@@ -56,10 +56,10 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ item, isLast }) => {
       {/* RIGHT: CONTENT */}
       <div className="flex-1 pb-2 pt-1">
         <div className="flex justify-between items-start">
-           <h4 className="text-sm font-semibold text-[var(--stage-text-primary)] group-hover:text-[var(--stage-text-primary)] transition-colors leading-tight">
+           <h4 className="text-sm font-medium text-[var(--stage-text-primary)] group-hover:text-[var(--stage-text-primary)] transition-colors leading-tight">
              {displayText}
            </h4>
-           <span className="text-[10px] font-mono text-[var(--stage-text-secondary)] bg-[var(--stage-surface-nested)] px-1.5 py-0.5 rounded-md whitespace-nowrap ml-2">
+           <span className="text-label font-mono text-[var(--stage-text-secondary)] bg-[var(--ctx-well)] px-1.5 py-0.5 rounded-md whitespace-nowrap ml-2">
              {item.time}
            </span>
         </div>

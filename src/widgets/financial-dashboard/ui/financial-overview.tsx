@@ -20,6 +20,7 @@ import {
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { QuickBooksConnectButton, syncInvoiceToQuickBooks } from '@/features/finance-sync';
 import type { FinanceDashboardData, OutstandingInvoice } from '@/features/finance-sync';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { AnimatedCounter, PercentageChange } from './animated-counter';
 import { InvoiceCard, EmptyInvoiceState } from './invoice-card';
 import { RevenueChart } from './revenue-chart';
@@ -52,8 +53,7 @@ export function FinancialOverview({
     })
   );
   
-  // Spring config for all animations
-  const springConfig = { type: 'spring', stiffness: 300, damping: 30 } as const;
+  const springConfig = STAGE_MEDIUM;
   
   // Stagger children animation
   const containerVariants = {
@@ -137,7 +137,7 @@ export function FinancialOverview({
           transition={springConfig}
           className="p-2.5 rounded-xl bg-[var(--stage-text-primary)]/5 hover:bg-[var(--stage-text-primary)]/10
             text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]
-            transition-[color,background-color,filter] hover:brightness-[1.04] disabled:opacity-50"
+            transition-[color,background-color] disabled:opacity-45"
         >
           <RefreshCw className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
         </motion.button>
@@ -300,7 +300,7 @@ export function FinancialOverview({
                 )}
                 <div className="flex justify-between text-sm border-t border-[oklch(1_0_0_/_0.08)] pt-3">
                   <span className="text-[var(--stage-text-primary)] font-medium">Balance Due</span>
-                  <span className="text-[var(--stage-text-primary)] font-semibold text-lg">{formatCurrency(selectedInvoice.balanceDue)}</span>
+                  <span className="text-[var(--stage-text-primary)] font-medium text-lg">{formatCurrency(selectedInvoice.balanceDue)}</span>
                 </div>
               </div>
               
@@ -311,9 +311,9 @@ export function FinancialOverview({
                     disabled={syncingInvoiceId === selectedInvoice.id}
                     transition={springConfig}
                     className="flex-1 py-2.5 rounded-xl bg-[var(--color-qb-green)]/10 hover:bg-[var(--color-qb-green)]/20
-                      text-[var(--color-qb-green)] text-sm font-medium transition-[color,background-color,filter] hover:brightness-[1.03]
+                      text-[var(--color-qb-green)] text-sm font-medium transition-[color,background-color]
                       flex items-center justify-center gap-2
-                      disabled:opacity-50"
+                      disabled:opacity-45"
                   >
                     <CloudSync className={`w-4 h-4 ${syncingInvoiceId === selectedInvoice.id ? 'animate-spin' : ''}`} />
                     Sync to QuickBooks

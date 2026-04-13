@@ -9,6 +9,7 @@ import {
 } from '@/shared/lib/constants';
 
 const DASHBOARD_ROLES = ['owner', 'admin', 'member'];
+const CLIENT_ROLES = ['client'];
 
 /**
  * Switch the active workspace. Sets a cookie and redirects to the
@@ -45,7 +46,9 @@ export async function switchWorkspaceAction(workspaceId: string) {
 
   const destination = DASHBOARD_ROLES.includes(membership.role)
     ? '/lobby'
-    : '/schedule';
+    : CLIENT_ROLES.includes(membership.role)
+      ? '/client/home'
+      : '/schedule';
 
   redirect(destination);
 }

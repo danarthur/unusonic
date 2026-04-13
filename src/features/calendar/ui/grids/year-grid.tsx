@@ -89,7 +89,7 @@ function MonthCard({
         <button
           type="button"
           onClick={() => onMonthSelect(year, month)}
-          className="text-base font-semibold text-[var(--stage-text-primary)] hover:underline focus:outline-none focus:underline text-left tracking-tight"
+          className="text-base font-medium text-[var(--stage-text-primary)] hover:underline focus:outline-none focus:underline text-left tracking-tight"
         >
           {format(new Date(year, month - 1, 1), 'MMMM')}
         </button>
@@ -103,7 +103,7 @@ function MonthCard({
       {/* Weekday headers */}
       <div className="grid grid-cols-7 gap-0.5 mb-0.5 shrink-0">
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((letter, i) => (
-          <div key={i} className="text-[9px] font-medium text-[var(--stage-text-secondary)]/40 text-center tracking-widest">
+          <div key={i} className="stage-micro text-[var(--stage-text-secondary)]/40 text-center">
             {letter}
           </div>
         ))}
@@ -126,7 +126,7 @@ function MonthCard({
             return (
               <div
                 key={dayKey(day)}
-                className="flex flex-col items-center justify-center text-[10px] text-[var(--stage-text-primary)]/20 rounded"
+                className="flex flex-col items-center justify-center text-label text-[var(--stage-text-primary)]/20 rounded"
               >
                 {dayNum}
               </div>
@@ -143,14 +143,14 @@ function MonthCard({
               type="button"
               onClick={onClick}
               title={hasEvents ? `${count} event${count !== 1 ? 's' : ''}` : undefined}
-              className={`flex flex-col items-center justify-center rounded transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[oklch(1_0_0_/_0.08)] focus:ring-inset ${
+              className={`flex flex-col items-center justify-center rounded transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-[oklch(1_0_0_/_0.08)] focus-visible:ring-inset ${
                 isToday
-                  ? 'bg-[var(--color-unusonic-error)] text-[oklch(0.10_0_0)] text-[10px] font-medium'
+                  ? 'bg-[var(--color-unusonic-error)] text-[oklch(0.10_0_0)] text-label font-medium'
                   : isPast
-                    ? 'text-[10px] text-[var(--stage-text-primary)]/40 hover:bg-[var(--stage-surface)]/40'
+                    ? 'text-label text-[var(--stage-text-primary)]/40 stage-hover'
                     : hasEvents
-                      ? 'text-[10px] font-medium text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)]/60'
-                      : 'text-[10px] text-[var(--stage-text-primary)]/60 hover:bg-[var(--stage-surface)]/40'
+                      ? 'text-label font-medium text-[var(--stage-text-primary)] stage-hover'
+                      : 'text-label text-[var(--stage-text-primary)]/60 stage-hover'
               }`}
             >
               <span>{dayNum}</span>

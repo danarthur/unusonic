@@ -26,7 +26,7 @@ export async function GET(
 
   // Resolve person entity
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: person } = await (system as any)
+  const { data: person } = await system
     .schema('directory')
     .from('entities')
     .select('id')
@@ -38,7 +38,7 @@ export async function GET(
 
   // Fetch upcoming assignments (next 6 months)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: assignments } = await (system as any)
+  const { data: assignments } = await system
     .schema('ops')
     .from('entity_crew_schedule')
     .select('assignment_id, role, status, event_title, starts_at, ends_at, venue_name, venue_address, location_address')

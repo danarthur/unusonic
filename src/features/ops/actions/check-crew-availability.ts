@@ -81,7 +81,7 @@ export async function checkCrewAvailability(
   const dateStart = `${date}T00:00:00`;
   const dateEnd = `${date}T23:59:59`;
 
-  const { data: eventBookings } = await (supabase as any)
+  const { data: eventBookings } = await supabase
     .schema('ops')
     .from('crew_assignments')
     .select('id, role, status, event:events!inner(id, title, starts_at, ends_at)')
@@ -91,13 +91,11 @@ export async function checkCrewAvailability(
     .gte('events.ends_at', dateStart);
 
   if (eventBookings && Array.isArray(eventBookings)) {
-    for (const booking of eventBookings as {
-      id: string;
-      role: string;
-      status: string;
-      event: { id: string; title: string | null; starts_at: string; ends_at: string | null };
-    }[]) {
-      const eventTitle = booking.event?.title ?? 'Untitled event';
+    for (const booking of eventBookings) {
+      // `event:events!inner(...)` narrows to an array shape (typegen can't
+      // prove 1:1 cardinality from FK alone). `!inner` guarantees at least one.
+      const eventRow = Array.isArray(booking.event) ? booking.event[0] : booking.event;
+      const eventTitle = eventRow?.title ?? 'Untitled event';
       const role = booking.role ? ` · ${booking.role}` : '';
       conflicts.push({
         type: 'event',
@@ -109,7 +107,7 @@ export async function checkCrewAvailability(
   // ── 3. Deal holds ────────────────────────────────────────────────────────
   // Query deal_crew rows for this entity, joined to deals on proposed_date.
   // Exclude the current deal if provided.
-  const { data: dealCrewRows } = await (supabase as any)
+  const { data: dealCrewRows } = await supabase
     .schema('ops')
     .from('deal_crew')
     .select('id, deal_id, confirmed_at, declined_at, acknowledged_at')

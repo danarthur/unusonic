@@ -75,7 +75,7 @@ export function NetworkList({ sourceOrgId, emptyMessage }: NetworkListProps) {
                 </p>
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 stage-badge-text',
                     isGhost
                       ? 'bg-[oklch(1_0_0/0.1)] text-[var(--stage-text-secondary)]'
                       : 'bg-[var(--color-unusonic-success)]/20 text-[var(--color-unusonic-success)]'

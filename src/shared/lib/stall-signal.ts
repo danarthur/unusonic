@@ -37,8 +37,9 @@ export function computeStallSignalFromRaw(params: {
   proposalUpdatedAt: string | null;
   proposedDate: string | null;
   currentStage: number;
+  thresholdOverrides?: { inquiry?: number; proposal?: number; contract_sent?: number };
 }): StallSignal | null {
-  const { createdAt, proposalCreatedAt, proposalUpdatedAt, proposedDate, currentStage } = params;
+  const { createdAt, proposalCreatedAt, proposalUpdatedAt, proposedDate, currentStage, thresholdOverrides } = params;
   const now = Date.now();
   const eventDate = proposedDate ? new Date(proposedDate + 'T00:00:00').getTime() : null;
   const daysUntilEvent = eventDate ? Math.ceil((eventDate - now) / 86400000) : null;
@@ -51,17 +52,20 @@ export function computeStallSignalFromRaw(params: {
 
   if (currentStage === 0) {
     stageStartMs = new Date(createdAt).getTime();
-    threshold = urgent ? 4 : 7;
+    const base = thresholdOverrides?.inquiry ?? 7;
+    threshold = urgent ? Math.ceil(base / 2) : base;
     stageName = 'Inquiry';
     suggestion = 'Build a proposal to move this forward.';
   } else if (currentStage === 1) {
     stageStartMs = proposalCreatedAt ? new Date(proposalCreatedAt).getTime() : null;
-    threshold = urgent ? 7 : 14;
+    const base = thresholdOverrides?.proposal ?? 14;
+    threshold = urgent ? Math.ceil(base / 2) : base;
     stageName = 'Proposal';
     suggestion = 'Send the proposal to the client.';
   } else if (currentStage === 2) {
     stageStartMs = proposalUpdatedAt ? new Date(proposalUpdatedAt).getTime() : null;
-    threshold = urgent ? 3 : 5;
+    const base = thresholdOverrides?.contract_sent ?? 5;
+    threshold = urgent ? Math.max(1, Math.ceil(base / 2)) : base;
     stageName = 'Contract sent';
     suggestion = 'Follow up — the client may need a nudge.';
   } else {

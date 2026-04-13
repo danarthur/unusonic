@@ -16,7 +16,7 @@ export function GenesisRadar() {
       aria-hidden
     >
       <div
-        className="absolute -z-10 rounded-full border border-[oklch(1_0_0_/_0.05)]"
+        className="absolute -z-10 rounded-full border border-[var(--stage-edge-subtle)]"
         style={{
           width: size,
           height: size,

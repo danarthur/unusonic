@@ -95,7 +95,7 @@ export function JobTitleManager({ workspaceId, initialTitles }: JobTitleManagerP
           {titles.map((jt) => (
             <li
               key={jt.id}
-              className="flex items-center justify-between rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--stage-surface-nested)] px-3 py-2.5"
+              className="flex items-center justify-between rounded-[var(--stage-radius-nested)] border border-[var(--stage-border)]/50 bg-[var(--ctx-well)] px-3 py-2.5"
             >
               <span className="text-sm text-[var(--stage-text-primary)]">{jt.title}</span>
               <Button

@@ -69,10 +69,10 @@ export function CommandCenter() {
             placeholder="What is your command?"
             disabled={status === 'loading'}
             className="stage-panel !p-0 !rounded-2xl text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]
-                     focus:border-[oklch(1_0_0_/_0.12)] focus:ring-[oklch(1_0_0_/_0.20)] focus:ring-2
+                     focus-visible:border-[oklch(1_0_0_/_0.12)] focus-visible:ring-[oklch(1_0_0_/_0.20)] focus-visible:ring-2
                      h-14 px-6 text-base font-light
-                     transition-all duration-200
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+                     transition-colors duration-[80ms]
+                     disabled:opacity-45 disabled:cursor-not-allowed"
           />
           
           {/* Status Indicator */}

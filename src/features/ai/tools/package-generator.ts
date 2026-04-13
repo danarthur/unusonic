@@ -8,7 +8,7 @@
 
 import { z } from 'zod';
 import { generateObject } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
 import { getCatalogPackagesWithTags, createPackage } from '@/features/sales/api/package-actions';
 import {
   packageDefinitionSchema,
@@ -78,7 +78,7 @@ export async function generatePackageDefinition(
 
   try {
     const { object } = await generateObject({
-      model: openai('gpt-4o'),
+      model: anthropic('claude-sonnet-4-20250514'),
       schema: packageDefinitionSchema,
       system: systemPrompt,
       prompt: trimmed,
@@ -130,7 +130,7 @@ export async function createPackageWithION(
 
   try {
     const { object } = await generateObject({
-      model: openai('gpt-4o'),
+      model: anthropic('claude-sonnet-4-20250514'),
       schema: ionFullPackageSchema,
       system: systemPrompt,
       prompt: trimmed,

@@ -18,8 +18,6 @@ import { formatRelTime } from '@/shared/lib/format-currency';
 import {
   STAGE_MEDIUM,
   STAGE_LIGHT,
-  PILL_SLIDE_SPRING,
-  M3_SHARED_AXIS_Y_VARIANTS,
 } from '@/shared/lib/motion-constants';
 
 // ── Icon map ────────────────────────────────────────────────────────────────
@@ -86,12 +84,12 @@ export function ActivityFeedWidget({ data, loading = false }: ActivityFeedWidget
             <motion.button
               key={key}
               onClick={() => setFilter(key)}
-              className="px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider transition-colors"
+              className="px-2.5 py-1 rounded-full stage-label transition-colors"
               style={{
                 background:
                   filter === key
                     ? 'var(--stage-surface-raised)'
-                    : 'var(--ctx-well, var(--stage-input-bg))',
+                    : 'var(--ctx-well)',
                 color:
                   filter === key
                     ? 'var(--stage-text-primary)'
@@ -129,7 +127,7 @@ export function ActivityFeedWidget({ data, loading = false }: ActivityFeedWidget
                 return (
                   <motion.div
                     key={item.id}
-                    variants={M3_SHARED_AXIS_Y_VARIANTS}
+                    variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
                     transition={STAGE_MEDIUM}
                   >
                     <Link
@@ -160,7 +158,7 @@ export function ActivityFeedWidget({ data, loading = false }: ActivityFeedWidget
                           {item.title}
                         </p>
                         <p
-                          className="text-[10px] mt-0.5"
+                          className="text-label mt-0.5"
                           style={{ color: 'var(--stage-text-secondary)' }}
                         >
                           {formatRelTime(item.timestamp)}

@@ -1,5 +1,4 @@
 export { RevenueRing } from './RevenueRing';
-export { InvoiceList } from './InvoiceList';
 export { InvoiceListWidget } from './InvoiceListWidget';
 export { QuickActions } from './QuickActions';
 export { SetupBilling } from './SetupBilling';

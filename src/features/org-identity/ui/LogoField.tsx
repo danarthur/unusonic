@@ -140,8 +140,8 @@ export function LogoField({
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
             className={cn(
-              'relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border transition-colors disabled:opacity-50',
-              'border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)]/80 hover:bg-[var(--stage-surface)]'
+              'relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border transition-colors disabled:opacity-45',
+              'border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)]/80 stage-hover overflow-hidden'
             )}
             style={
               brandColor
@@ -184,7 +184,7 @@ export function LogoField({
             onBlur={handleLinkBlur}
             className="border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-void)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 text-sm"
           />
-          <p className="text-[10px] text-[var(--stage-text-secondary)]">
+          <p className="text-label text-[var(--stage-text-secondary)]">
             Paste a public image URL.
           </p>
         </div>

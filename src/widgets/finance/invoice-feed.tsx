@@ -12,7 +12,8 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { syncEventFinancials } from '@/features/finance/sync';
 import type { FinanceInvoiceRow } from '@/features/finance/sync';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -99,7 +100,7 @@ export function InvoiceFeed({
   return (
     <StagePanel className={`overflow-hidden flex flex-col ${className ?? ''}`}>
       <div className="flex items-center justify-between mb-4 shrink-0">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           QBO Invoices
         </h2>
         <motion.button
@@ -109,7 +110,7 @@ export function InvoiceFeed({
           transition={spring}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium
             bg-[oklch(1_0_0_/_0.05)] hover:bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]
-            disabled:opacity-50 disabled:cursor-not-allowed transition-[color,background-color,filter] hover:brightness-[1.03]"
+            disabled:opacity-45 disabled:cursor-not-allowed transition-[color,background-color]"
         >
           {isPending ? (
             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -146,16 +147,16 @@ export function InvoiceFeed({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[oklch(1_0_0_/_0.08)]">
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Doc #
                 </th>
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Due
                 </th>
-                <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Amount
                 </th>
-                <th className="pb-3 text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                <th className="pb-3 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
                   Status
                 </th>
               </tr>

@@ -11,7 +11,6 @@ import { getRangeForView } from '@/features/calendar/lib/date-ranges';
 import type { CalendarViewType } from '@/features/calendar/lib/date-ranges';
 import { CalendarShell } from '@/features/calendar/ui/calendar-shell';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import { getSession } from '@/shared/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +63,7 @@ async function CalendarData({ view, dateStr }: { view: CalendarViewType; dateStr
   try {
     const viewDate = new Date(dateStr + 'T12:00:00');
     const range = getRangeForView(viewDate, view);
-    const workspaceId = (await getActiveWorkspaceId()) ?? (await getSession()).workspace.id;
+    const workspaceId = await getActiveWorkspaceId();
     const events = workspaceId
       ? await getCalendarEvents({ start: range.start, end: range.end, workspaceId })
       : [];
@@ -80,7 +79,7 @@ async function CalendarData({ view, dateStr }: { view: CalendarViewType; dateStr
     console.error('[Calendar] Page error:', err);
     return (
       <div className="stage-panel rounded-2xl p-8 border border-[oklch(1_0_0_/_0.08)] max-w-lg border-l-4 border-l-[var(--color-unusonic-error)]">
-        <p className="text-[var(--stage-text-primary)] font-medium">Something went wrong</p>
+        <p className="text-[var(--stage-text-primary)] font-medium">Failed to load calendar</p>
         <p className="text-[var(--stage-text-secondary)] text-sm mt-1">
           {err instanceof Error ? err.message : 'Failed to load calendar'}
         </p>

@@ -10,8 +10,9 @@ import { getCurrentOrgId } from '@/features/network/api/actions';
 import { getNetworkNodeDetails } from '@/features/network-data';
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
-import type { IndividualAttrs, CoupleAttrs, PersonAttrs } from '@/shared/lib/entity-attrs';
+import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
 import { EntityStudioClient } from './EntityStudioClient';
+import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -61,17 +62,23 @@ async function EntityContent({ id, returnPath, kindParam }: { id: string; return
   let initialPersonAttrs: IndividualAttrs | null = null;
   let initialCoupleAttrs: CoupleAttrs | null = null;
   let initialEmployeeAttrs: PersonAttrs | null = null;
+  let initialVenueAttrs: VenueAttrs | null = null;
+
+  // Resolve workspace_id from the source org entity for document operations
+  let workspaceId: string | null = null;
 
   if (details.subjectEntityId) {
     const supabase = await createClient();
     const { data: entRow } = await supabase
       .schema('directory')
       .from('entities')
-      .select('attributes')
+      .select('attributes, owner_workspace_id')
       .eq('id', details.subjectEntityId)
       .maybeSingle();
 
     if (entRow) {
+      workspaceId = entRow.owner_workspace_id ?? null;
+
       if (kind === 'internal_employee' || kind === 'extended_team') {
         initialEmployeeAttrs = readEntityAttrs(entRow.attributes, 'person');
       } else if (kind === 'external_partner' && dirType === 'person') {
@@ -81,17 +88,38 @@ async function EntityContent({ id, returnPath, kindParam }: { id: string; return
       } else if (dirType === 'couple') {
         initialCoupleAttrs = readEntityAttrs(entRow.attributes, 'couple');
       }
+
+      if (dirType === 'venue') {
+        initialVenueAttrs = readEntityAttrs(entRow.attributes, 'venue');
+      }
     }
   }
 
+  // Fallback: resolve workspace_id from source org if not found on subject entity
+  if (!workspaceId) {
+    const supabase = await createClient();
+    const { data: srcEntity } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('owner_workspace_id')
+      .eq('legacy_org_id', sourceOrgId)
+      .maybeSingle();
+    workspaceId = srcEntity?.owner_workspace_id ?? null;
+  }
+
   return (
-    <EntityStudioClient
-      details={details}
-      sourceOrgId={sourceOrgId}
-      returnPath={returnPath}
-      initialPersonAttrs={initialPersonAttrs}
-      initialCoupleAttrs={initialCoupleAttrs}
-      initialEmployeeAttrs={initialEmployeeAttrs}
-    />
+    <>
+      <AionPageContextSetter type="entity" entityId={details.subjectEntityId ?? id} label={details.identity.name ?? null} />
+      <EntityStudioClient
+        details={details}
+        sourceOrgId={sourceOrgId}
+        returnPath={returnPath}
+        initialPersonAttrs={initialPersonAttrs}
+        initialCoupleAttrs={initialCoupleAttrs}
+        initialEmployeeAttrs={initialEmployeeAttrs}
+        initialVenueAttrs={initialVenueAttrs}
+        workspaceId={workspaceId}
+      />
+    </>
   );
 }

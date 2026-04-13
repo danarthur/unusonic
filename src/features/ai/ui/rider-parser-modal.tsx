@@ -262,9 +262,9 @@ export function RiderParserModal({
                   rows={12}
                   className={cn(
                     'w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)]',
-                    'bg-[var(--ctx-well,var(--stage-input-bg))] px-4 py-3',
+                    'bg-[var(--ctx-well)] px-4 py-3',
                     'text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-muted)]',
-                    'focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                     'resize-y min-h-[8rem]'
                   )}
                 />
@@ -505,13 +505,13 @@ function RequirementCard({
             </div>
 
             {/* Category badge */}
-            <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)]">
+            <span className="shrink-0 stage-label px-2 py-0.5 rounded-full bg-[oklch(1_0_0_/_0.06)]">
               {CATEGORY_LABELS[requirement.requirement.category] ?? requirement.requirement.category}
             </span>
 
             {/* Status badge */}
             <span
-              className="shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full"
+              className="shrink-0 stage-label px-2 py-0.5 rounded-full"
               style={{
                 background: statusColor.bg,
                 color: statusColor.text,
@@ -554,7 +554,7 @@ function RequirementCard({
                 <div className="pt-3 pl-8 space-y-3">
                   {/* Original text */}
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-muted)] mb-1">
+                    <p className="stage-label text-[var(--stage-text-muted)] mb-1">
                       From rider
                     </p>
                     <p className="text-xs text-[var(--stage-text-secondary)] italic leading-relaxed">
@@ -565,7 +565,7 @@ function RequirementCard({
                   {/* Match picker */}
                   {hasMatches && (
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-muted)] mb-1.5">
+                      <p className="stage-label text-[var(--stage-text-muted)] mb-1.5">
                         Catalog match
                       </p>
                       <div className="space-y-1">
@@ -599,7 +599,7 @@ function RequirementCard({
                             <span className="text-xs text-[var(--stage-text-muted)] tabular-nums">
                               ${match.price.toLocaleString()}
                             </span>
-                            <span className="text-[10px] text-[var(--stage-text-muted)] tabular-nums">
+                            <span className="text-label text-[var(--stage-text-muted)] tabular-nums">
                               {Math.round(match.similarity * 100)}%
                             </span>
                           </button>

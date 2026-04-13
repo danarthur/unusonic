@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import { getSession } from '@/shared/lib/auth/session';
+import { getSession, SessionError } from '@/shared/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +48,7 @@ export async function GET() {
 
     // 2. Ghost Data: events in workspaces we're NOT a member of
     const system = getSystemClient();
-    const { data: eventsByWorkspace } = await (system as any).schema('ops').from('events').select('workspace_id') as { data: { workspace_id: string }[] | null };
+    const { data: eventsByWorkspace } = await system.schema('ops').from('events').select('workspace_id') as { data: { workspace_id: string }[] | null };
 
     const eventWorkspaceCounts: Record<string, number> = {};
     for (const e of eventsByWorkspace ?? []) {
@@ -104,6 +104,9 @@ export async function GET() {
       ],
     });
   } catch (err) {
+    if (err instanceof SessionError) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }

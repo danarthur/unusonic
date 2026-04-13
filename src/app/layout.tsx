@@ -4,6 +4,8 @@ import "./globals.css";
 import { CommandPaletteProvider } from "@/shared/ui/providers/CommandPaletteContext";
 import { SessionProvider } from "@/shared/ui/providers/SessionContext";
 import { ThemeProvider } from "@/shared/ui/providers/ThemeProvider";
+import { QueryProvider } from "@/shared/ui/providers/QueryProvider";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { CommandSpineWithNetwork } from "./command-spine-with-network";
 import { ConditionalToaster } from "@/shared/ui/conditional-toaster";
 
@@ -88,7 +90,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased min-h-screen h-screen overflow-x-hidden overflow-y-auto bg-canvas text-ink`}
+        className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased min-h-screen h-screen overflow-x-hidden overflow-y-auto bg-canvas text-[var(--stage-text-primary)]`}
       >
         <div className="h-full min-h-screen min-w-0 w-full flex flex-col">
           <ThemeProvider
@@ -97,13 +99,17 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <CommandPaletteProvider>
-              <SessionProvider>
-                {children}
-              </SessionProvider>
-              <CommandSpineWithNetwork />
-              <ConditionalToaster />
-            </CommandPaletteProvider>
+            <NuqsAdapter>
+              <QueryProvider>
+                <CommandPaletteProvider>
+                  <SessionProvider>
+                    {children}
+                  </SessionProvider>
+                  <CommandSpineWithNetwork />
+                  <ConditionalToaster />
+                </CommandPaletteProvider>
+              </QueryProvider>
+            </NuqsAdapter>
           </ThemeProvider>
         </div>
       </body>

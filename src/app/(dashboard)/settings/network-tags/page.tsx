@@ -42,7 +42,7 @@ export default async function NetworkTagsSettingsPage() {
     <div className="flex-1 min-h-0 overflow-auto">
       <div className="p-6 max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center shrink-0">
             <Network className="w-5 h-5 text-[var(--stage-text-secondary)]" aria-hidden />
           </div>
           <div className="min-w-0">

@@ -223,9 +223,8 @@ export async function initializeOrganization(
       registerAgent(orgId).catch(console.warn);
     }
 
-    // Redirect path by tier
-    const redirectPath = getRedirectPath(tier, input.type);
-    redirect(redirectPath);
+    // Redirect to root — middleware resolves role-based destination
+    redirect('/');
   } catch (e) {
     if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
       throw e;
@@ -235,12 +234,7 @@ export async function initializeOrganization(
   }
 }
 
-/** Redirect path based on tier (Event-Driven UI). */
-function getRedirectPath(tier: SubscriptionTier, type: OrganizationType): string {
-  if (tier === 'studio') return '/dashboard/agent';
-  if (type === 'venue') return '/dashboard/venue';
-  return '/lobby';
-}
+// Redirect path resolution removed — middleware handles all role-based routing via /.
 
 /**
  * @stub Venue afterburner — ingest floor plans / venue data via vector embeddings.

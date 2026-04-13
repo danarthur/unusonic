@@ -4,7 +4,12 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { WorkspaceCallTimeRule } from '@/app/(dashboard)/(features)/crm/actions/apply-call-time-rules';
 
-export type { WorkspaceCallTimeRule };
+// NOTE: do NOT re-export `WorkspaceCallTimeRule` from this 'use server'
+// file. Next.js 16's server-action bundler produces a value-level
+// re-export for every `export type { X }` block and fails the
+// production build when the symbol is type-only. Consumers should
+// import the type directly from `apply-call-time-rules.ts` (or the
+// barrel re-export in `../index.ts` if one exists post-fix).
 
 export type UpsertCallTimeRulePayload = {
   id?: string;

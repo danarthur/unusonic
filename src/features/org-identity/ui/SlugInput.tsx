@@ -99,7 +99,7 @@ export function SlugInput({
             <Check className="size-4 text-[var(--color-unusonic-success)]" aria-hidden />
           )}
           {!isChecking && isAvailable === false && (
-            <span className="text-[10px] text-unusonic-error font-medium" id="slug-unavailable">
+            <span className="text-label text-unusonic-error font-medium" id="slug-unavailable">
               Taken
             </span>
           )}

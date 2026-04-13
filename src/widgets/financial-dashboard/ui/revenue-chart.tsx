@@ -8,6 +8,7 @@
 
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 import type { MonthlyRevenue } from '@/features/finance-sync';
 
 interface RevenueChartProps {
@@ -16,7 +17,7 @@ interface RevenueChartProps {
 }
 
 export function RevenueChart({ data, className = '' }: RevenueChartProps) {
-  const springConfig = { type: 'spring', stiffness: 100, damping: 20 } as const;
+  const springConfig = STAGE_HEAVY;
   
   // Prepare chart data (last 6 months)
   const chartData = useMemo(() => {
@@ -101,8 +102,8 @@ export function RevenueChart({ data, className = '' }: RevenueChartProps) {
         {/* Gradient Definition */}
         <defs>
           <linearGradient id="revenueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="var(--walnut)" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="var(--walnut)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--stage-accent)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--stage-accent)" stopOpacity="0" />
           </linearGradient>
         </defs>
         
@@ -122,7 +123,7 @@ export function RevenueChart({ data, className = '' }: RevenueChartProps) {
           <motion.path
             d={pathData}
             fill="none"
-            stroke="var(--walnut)"
+            stroke="var(--stage-accent)"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -150,7 +151,7 @@ export function RevenueChart({ data, className = '' }: RevenueChartProps) {
               cy={y}
               r="2"
               fill="var(--stage-surface)"
-              stroke="var(--walnut)"
+              stroke="var(--stage-accent)"
               strokeWidth="1.5"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -168,7 +169,7 @@ export function RevenueChart({ data, className = '' }: RevenueChartProps) {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springConfig, delay: 0.6 + i * 0.05 }}
-            className="text-[10px] text-[var(--stage-text-secondary)] font-medium"
+            className="text-label text-[var(--stage-text-secondary)] font-medium"
           >
             {point.label}
           </motion.span>

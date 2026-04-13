@@ -1,22 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React from 'react';
 import { useSession } from '@/shared/ui/providers/SessionContext';
+import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import {
-  M3_FADE_THROUGH_ENTER,
+  STAGE_LIGHT,
   M3_FADE_THROUGH_EXIT,
-  M3_STAGGER_CHILDREN,
-  M3_STAGGER_DELAY,
 } from '@/shared/lib/motion-constants';
-import { getDashboardData } from '@/widgets/dashboard/api';
-import type { DashboardData } from '@/widgets/dashboard/api';
 import { UrgencyStrip } from '@/widgets/urgency-strip';
 import { LobbyBentoGrid } from './LobbyBentoGrid';
 import { ChatInterface } from '@/app/(dashboard)/(features)/brain/components/ChatInterface';
 import { PlanPromptBanner } from './PlanPromptBanner';
-import { getWorkspaceUsage, type WorkspaceUsage } from '@/app/(dashboard)/settings/plan/actions';
+import { dashboardQueries } from '@/widgets/dashboard/api/queries';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -31,23 +28,14 @@ export default function LobbyPage() {
   const { workspaceId } = useWorkspace();
   const showOverview = viewState !== 'chat';
 
-  const [dashboardData, setDashboardData] = useState<DashboardData | undefined>();
-  const [usage, setUsage] = useState<WorkspaceUsage | null>(null);
-  const [, startTransition] = useTransition();
-
-  useEffect(() => {
-    startTransition(async () => {
-      try {
-        const data = await getDashboardData();
-        setDashboardData(data);
-      } catch (err) {
-        console.error('[lobby] failed to load dashboard data:', err);
-      }
-    });
-    if (workspaceId) {
-      getWorkspaceUsage(workspaceId).then((u) => setUsage(u)).catch(() => {});
-    }
-  }, [workspaceId]);
+  const { data: dashboardData } = useQuery({
+    ...dashboardQueries.all(workspaceId ?? ''),
+    enabled: !!workspaceId,
+  });
+  const { data: usage } = useQuery({
+    ...dashboardQueries.usage(workspaceId ?? ''),
+    enabled: !!workspaceId,
+  });
 
   return (
     <div className="flex-1 min-h-0 w-full flex flex-col font-sans relative">
@@ -74,10 +62,7 @@ export default function LobbyPage() {
                 exit="exit"
                 variants={{
                   visible: {
-                    transition: {
-                      staggerChildren: M3_STAGGER_CHILDREN,
-                      delayChildren: M3_STAGGER_DELAY,
-                    },
+                    transition: { staggerChildren: 0.03 },
                   },
                   hidden: {},
                   exit: {
@@ -110,7 +95,7 @@ export default function LobbyPage() {
               y: -4,
               transition: M3_FADE_THROUGH_EXIT,
             }}
-            transition={M3_FADE_THROUGH_ENTER}
+            transition={STAGE_LIGHT}
           >
             <StagePanel className="flex-1 overflow-hidden flex flex-col !p-0">
               <div className="flex-1">
@@ -121,7 +106,7 @@ export default function LobbyPage() {
             <motion.button
               type="button"
               onClick={() => setViewState('overview')}
-              transition={M3_FADE_THROUGH_ENTER}
+              transition={STAGE_LIGHT}
               className="mt-4 mx-auto flex items-center gap-2 stage-btn stage-btn-secondary text-xs uppercase tracking-widest"
             >
               <svg

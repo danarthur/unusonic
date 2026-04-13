@@ -9,23 +9,26 @@ import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { cookies } from 'next/headers';
+import * as Sentry from '@sentry/nextjs';
 
 const CHALLENGE_COOKIE = 'webauthn_reg_challenge';
 
 function getRpId(request: NextRequest): string {
-  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
-    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
-  }
   const origin =
     request.headers.get('origin') ||
     request.nextUrl.origin ||
     process.env.NEXT_PUBLIC_APP_URL ||
     'http://localhost:3000';
-  try {
-    return new URL(origin).hostname || 'localhost';
-  } catch {
+  const hostname = (() => {
+    try { return new URL(origin).hostname || 'localhost'; }
+    catch { return 'localhost'; }
+  })();
+
+  // On localhost, ignore the production RP ID — it won't validate
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'localhost';
   }
+  return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID || hostname;
 }
 
 function getExpectedOrigin(request: NextRequest): string {
@@ -134,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ verified: true });
   } catch (e) {
-    console.error('[passkey/verify]', e);
+    Sentry.logger.error('auth.passkey.registerVerifyFailed', { error: e instanceof Error ? e.message : String(e) });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Verification failed' },
       { status: 500 }

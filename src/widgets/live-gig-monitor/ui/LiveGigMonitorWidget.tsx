@@ -8,10 +8,7 @@ import { Radio, Cloud, Users } from 'lucide-react';
 import { WidgetShell } from '@/widgets/shared';
 import { useNextGig, minutesUntil, formatCountdown } from '../lib/use-next-gig';
 import {
-  M3_FADE_THROUGH_ENTER,
-  M3_SHARED_AXIS_Y_VARIANTS,
-  M3_STAGGER_CHILDREN,
-  M3_STAGGER_DELAY,
+  STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
 
 interface LiveGigMonitorWidgetProps {
@@ -58,22 +55,17 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
         initial="hidden"
         animate="visible"
         variants={{
-          visible: {
-            transition: {
-              staggerChildren: M3_STAGGER_CHILDREN,
-              delayChildren: M3_STAGGER_DELAY,
-            },
-          },
+          visible: { transition: { staggerChildren: 0.03 } },
           hidden: {},
         }}
       >
         {/* Countdown — large, tracking-tighter (reality anchor) */}
         <motion.div
-          variants={M3_SHARED_AXIS_Y_VARIANTS}
-          transition={M3_FADE_THROUGH_ENTER}
+          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          transition={STAGE_LIGHT}
           className="stage-panel-nested p-4 flex flex-col gap-1"
         >
-          <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+          <span className="stage-label">
             Countdown
           </span>
           <span className="text-3xl font-medium text-[var(--stage-text-primary)] tracking-tighter tabular-nums leading-none">
@@ -81,8 +73,8 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
           </span>
         </motion.div>
         <motion.div
-          variants={M3_SHARED_AXIS_Y_VARIANTS}
-          transition={M3_FADE_THROUGH_ENTER}
+          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          transition={STAGE_LIGHT}
         >
           <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight block">
             {gig.title ?? 'Untitled'}
@@ -90,8 +82,8 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
         </motion.div>
         {/* Weather / Location pill — environmental context (reality anchor) */}
         <motion.div
-          variants={M3_SHARED_AXIS_Y_VARIANTS}
-          transition={M3_FADE_THROUGH_ENTER}
+          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          transition={STAGE_LIGHT}
           className="flex flex-wrap gap-2"
         >
           <span className="inline-flex items-center gap-2 rounded-full border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 stage-panel-nested !rounded-full">
@@ -106,23 +98,23 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
         </motion.div>
         {/* Traffic light — crew arrival: Green = On time, Red = Delays */}
         <motion.div
-          variants={M3_SHARED_AXIS_Y_VARIANTS}
-          transition={M3_FADE_THROUGH_ENTER}
+          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          transition={STAGE_LIGHT}
           className="flex items-center gap-2"
         >
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-unusonic-success)]/50 bg-[var(--color-unusonic-success)]/20 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-primary)]">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-unusonic-success)]/50 bg-[var(--color-unusonic-success)]/20 px-2.5 py-1 stage-label text-[var(--stage-text-primary)]">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-unusonic-success)]" aria-hidden />
             On time
           </span>
-          <span className="text-[10px] text-[var(--stage-text-secondary)]">Crew arrival</span>
+          <span className="text-label text-[var(--stage-text-secondary)]">Crew arrival</span>
         </motion.div>
         {/* Crew Status — per-role detail */}
         <motion.div
-          variants={M3_SHARED_AXIS_Y_VARIANTS}
-          transition={M3_FADE_THROUGH_ENTER}
+          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          transition={STAGE_LIGHT}
           className="space-y-2"
         >
-          <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] flex items-center gap-2">
+          <span className="stage-label flex items-center gap-2">
             <Users className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
             Crew Status
           </span>
@@ -150,8 +142,8 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
           <Link
             href={`/crm/${gig.id}`}
             className={cn(
-              'flex-1 inline-flex items-center justify-center w-full m3-btn-outlined text-[10px] uppercase tracking-wider',
-              'transition-colors hover:brightness-[1.04]'
+              'flex-1 inline-flex items-center justify-center w-full m3-btn-outlined stage-label',
+              'transition-colors hover:bg-[oklch(1_0_0_/_0.08)]'
             )}
           >
             Run of Show
@@ -159,8 +151,8 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
           <Link
             href={`/events/${gig.id}`}
             className={cn(
-              'flex-1 inline-flex items-center justify-center w-full m3-btn-outlined text-[10px] uppercase tracking-wider',
-              'transition-colors hover:brightness-[1.04]'
+              'flex-1 inline-flex items-center justify-center w-full m3-btn-outlined stage-label',
+              'transition-colors hover:bg-[oklch(1_0_0_/_0.08)]'
             )}
           >
             Event

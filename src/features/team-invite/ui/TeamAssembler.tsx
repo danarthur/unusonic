@@ -87,7 +87,7 @@ export function TeamAssembler({ className }: TeamAssemblerProps) {
           className={cn(
             'w-full rounded-xl border bg-[oklch(1_0_0_/_0.05)] border-[oklch(1_0_0_/_0.08)] py-4 px-4 text-center text-lg font-light',
             'text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)/0.5]',
-            'focus:border-[var(--stage-accent)]/50 focus:ring-2 focus:ring-[var(--stage-accent)]/20 outline-none transition-colors'
+            'focus-visible:border-[var(--stage-accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/20 outline-none transition-colors'
           )}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">

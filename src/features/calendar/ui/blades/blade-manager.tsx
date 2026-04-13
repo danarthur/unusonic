@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 import type { CalendarEvent } from '@/features/calendar/model/types';
 import { DayBlade } from '@/features/calendar/ui/blades/day-blade';
 import { EventDetailBlade } from '@/features/calendar/ui/blades/event-detail-blade';
@@ -47,7 +48,7 @@ export function BladeManager({ events }: BladeManagerProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+            transition={STAGE_HEAVY}
             className="fixed inset-0 z-40 bg-[oklch(0.06_0_0_/_0.75)]"
             onClick={closeBlades}
             onKeyDown={(e) => e.key === 'Escape' && closeBlades()}

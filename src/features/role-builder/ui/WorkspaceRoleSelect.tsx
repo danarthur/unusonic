@@ -105,7 +105,7 @@ export function WorkspaceRoleSelect({
           size="default"
           className={cn(
             'w-full rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)]',
-            'hover:bg-[var(--stage-surface)]/80 focus:border-[var(--stage-accent)]/30 focus:ring-2 focus:ring-[var(--stage-accent)]/20',
+            'focus-visible:border-[var(--stage-accent)]/30 focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/20 stage-hover overflow-hidden',
             triggerClassName
           )}
         >
@@ -129,7 +129,7 @@ export function WorkspaceRoleSelect({
                 {r.is_system && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)]/80 border-[var(--stage-border)]"
+                    className="stage-label text-[var(--stage-text-secondary)]/80 border-[var(--stage-border)]"
                   >
                     System
                   </Badge>

@@ -25,7 +25,7 @@ export async function getEntityCapabilities(
 
   const supabase = await createClient();
    
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('entity_capabilities')
     .select('id, capability')
@@ -58,7 +58,7 @@ export async function addEntityCapability(
 
   const supabase = await createClient();
    
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('ops')
     .from('entity_capabilities')
     .insert({
@@ -98,7 +98,7 @@ export async function removeEntityCapability(
 
   // Verify the row belongs to the caller's workspace before deleting
    
-  const { data: row } = await (supabase as any)
+  const { data: row } = await supabase
     .schema('ops')
     .from('entity_capabilities')
     .select('workspace_id')
@@ -111,7 +111,7 @@ export async function removeEntityCapability(
   }
 
    
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('ops')
     .from('entity_capabilities')
     .delete()
@@ -131,7 +131,7 @@ export async function listWorkspaceCapabilityPresets(): Promise<string[]> {
 
   const supabase = await createClient();
    
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('workspace_capability_presets')
     .select('capability')
@@ -160,7 +160,7 @@ export async function addWorkspaceCapabilityPreset(
 
   const supabase = await createClient();
    
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('ops')
     .from('workspace_capability_presets')
     .insert({
@@ -197,7 +197,7 @@ export async function removeWorkspaceCapabilityPreset(
 
   const supabase = await createClient();
    
-  const { error, count } = await (supabase as any)
+  const { error, count } = await supabase
     .schema('ops')
     .from('workspace_capability_presets')
     .delete({ count: 'exact' })

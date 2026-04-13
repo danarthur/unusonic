@@ -1,13 +1,25 @@
 /**
  * Identity Bridge: returns the current user's session and workspace.
- * Resolves real session from Supabase Auth + workspace_members when logged in;
- * falls back to DEV_SESSION when unauthenticated (e.g. dev/demo).
+ * Resolves real session from Supabase Auth + workspace_members when logged in.
+ * In development, falls back to DEV_SESSION when unauthenticated.
+ * In production, throws SessionError so callers handle auth failures explicitly.
  */
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 
-export const DEV_SESSION = {
+/**
+ * Thrown when a valid session cannot be resolved in production.
+ * Callers should catch this to return 401 (API routes) or redirect (pages).
+ */
+export class SessionError extends Error {
+  constructor(reason: string) {
+    super(`[Session] ${reason}`);
+    this.name = 'SessionError';
+  }
+}
+
+const DEV_SESSION = {
   user: {
     id: 'dev-user-001',
     name: 'Daniel Arthur',
@@ -23,14 +35,23 @@ export const DEV_SESSION = {
 
 export type Session = typeof DEV_SESSION;
 
+const isDev = process.env.NODE_ENV === 'development';
+
+function devFallback(reason: string): Session {
+  if (isDev) {
+    console.warn(`[Session] ${reason} — returning DEV_SESSION fallback`);
+    return DEV_SESSION;
+  }
+  throw new SessionError(reason);
+}
+
 export async function getSession(): Promise<Session> {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      console.warn('[Session] No authenticated user — returning DEV_SESSION fallback');
-      return DEV_SESSION;
+      return devFallback('No authenticated user');
     }
 
     // Same ordering as dashboard layout and getActiveWorkspaceId() so session.workspace.id
@@ -43,8 +64,7 @@ export async function getSession(): Promise<Session> {
       .maybeSingle();
 
     if (memberError || !membership) {
-      console.warn('[Session] No workspace membership for user', user.id);
-      return DEV_SESSION;
+      return devFallback(`No workspace membership for user ${user.id}`);
     }
 
     const rawWs = membership.workspaces;
@@ -64,7 +84,8 @@ export async function getSession(): Promise<Session> {
       },
     };
   } catch (err) {
+    if (err instanceof SessionError) throw err;
     console.error('[Session] Failed to resolve session:', err);
-    return DEV_SESSION;
+    return devFallback('Failed to resolve session');
   }
 }

@@ -109,7 +109,7 @@ function DensityToggle({ value, onChange }: { value: DensityTier; onChange: (t: 
         <button
           key={tier.key}
           onClick={() => onChange(tier.key)}
-          className="relative px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200"
+          className="relative px-3 py-1.5 text-xs font-medium rounded-full transition-colors duration-[80ms]"
           style={{
             color: value === tier.key ? 'oklch(0.10 0 0)' : 'var(--stage-text-secondary)',
             background: value === tier.key ? 'var(--stage-accent)' : 'transparent',
@@ -163,7 +163,7 @@ function PulseStrip() {
               borderRadius: 'var(--stage-radius-nested, var(--stage-radius-panel))',
             }}
           >
-            <span className="stage-readout-sm text-[9px] px-1.5 leading-5 truncate block" style={{ color: 'var(--stage-accent)' }}>
+            <span className="stage-readout-sm text-micro px-1.5 leading-5 truncate block" style={{ color: 'var(--stage-accent)' }}>
               Volta — Denver
             </span>
           </div>

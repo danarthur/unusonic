@@ -29,7 +29,7 @@ export function AionLens({ insight = 'Aion insight will appear here once connect
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`inline-flex items-center justify-center rounded-lg p-1.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-accent)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]/30 ${className ?? ''}`}
+          className={`inline-flex items-center justify-center rounded-lg p-1.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-accent)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/30 ${className ?? ''}`}
           aria-label="Aion predictive insight"
         >
           <Sparkles className="w-4 h-4" />

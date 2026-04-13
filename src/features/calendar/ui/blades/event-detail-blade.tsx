@@ -11,7 +11,8 @@ import type { EventDetailDTO } from '@/features/calendar/model/event-detail';
 const EVENT_PARAM = 'event';
 const DRAWER_WIDTH = 400;
 const DETAIL_WIDTH = Math.round(DRAWER_WIDTH * 0.95);
-const springConfig = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const springConfig = STAGE_MEDIUM;
 
 const STATUS_LABELS: Record<EventDetailDTO['status'], string> = {
   confirmed: 'Confirmed',
@@ -92,7 +93,7 @@ export function EventDetailBlade({ eventId }: EventDetailBladeProps) {
         <button
           type="button"
           onClick={backToList}
-          className="flex items-center gap-2 p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.02] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] transition-[filter,background-color,color]"
+          className="flex items-center gap-2 p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
           aria-label="Back to list"
         >
           <ArrowLeft className="w-5 h-5" strokeWidth={1.5} />
@@ -136,14 +137,14 @@ export function EventDetailBlade({ eventId }: EventDetailBladeProps) {
             <div className="flex flex-wrap gap-3">
               <Link
                 href={`/events/${detail.id}`}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-accent)]/80 hover:bg-[var(--stage-accent)] text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-accent)]/80 hover:bg-[var(--stage-accent)] text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 Studio
               </Link>
               <Link
                 href={`/events/${detail.id}/deal`}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-accent)]/80 hover:bg-[var(--stage-accent)] text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-accent)]/80 hover:bg-[var(--stage-accent)] text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <FileText className="w-4 h-4" />
                   Open Deal room
@@ -151,7 +152,7 @@ export function EventDetailBlade({ eventId }: EventDetailBladeProps) {
               {detail.projectId && (
                 <Link
                   href={`/projects/${detail.projectId}`}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-accent)]/80 hover:bg-[var(--stage-accent)] text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-accent)]/80 hover:bg-[var(--stage-accent)] text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <ExternalLink className="w-4 h-4" />
                   Open Project Workspace
@@ -160,7 +161,7 @@ export function EventDetailBlade({ eventId }: EventDetailBladeProps) {
               {detail.leadContact && (
                 <a
                   href={`mailto:${detail.leadContact}`}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] font-medium text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   <Mail className="w-4 h-4" />
                   Contact Lead

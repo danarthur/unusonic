@@ -31,7 +31,7 @@ export function BrandColorPicker({ value, onChange, className }: BrandColorPicke
           title={label}
           onClick={() => onChange(colorValue)}
           className={cn(
-            'size-9 rounded-full border-2 transition-[border-color,filter] hover:brightness-[1.12]',
+            'size-9 rounded-full border-2 transition-[border-color] hover:ring-2 hover:ring-[oklch(1_0_0_/_0.10)]',
             value === colorValue
               ? 'border-[var(--stage-text-primary)] ring-2 ring-[oklch(1_0_0_/_0.20)]'
               : 'border-transparent hover:border-[oklch(1_0_0_/_0.20)]'

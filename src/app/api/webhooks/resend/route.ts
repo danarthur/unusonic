@@ -78,7 +78,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (emailId) {
       await supabase
         .from('proposals')
-        .update({ email_delivered_at: new Date().toISOString() } as Record<string, unknown>)
+        .update({ email_delivered_at: new Date().toISOString() })
         .eq('resend_message_id', emailId);
     }
     return NextResponse.json({ received: true });
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (emailId) {
       await supabase
         .from('proposals')
-        .update({ email_bounced_at: new Date().toISOString() } as Record<string, unknown>)
+        .update({ email_bounced_at: new Date().toISOString() })
         .eq('resend_message_id', emailId);
     }
     return NextResponse.json({ received: true });

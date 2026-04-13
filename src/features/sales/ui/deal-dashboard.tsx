@@ -19,7 +19,7 @@ export function DealDashboard({ data, className }: DealDashboardProps) {
     <div className={cn('flex flex-col gap-6', className)}>
       {/* Top: Pipeline */}
       <StagePanel className="p-6">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
+        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
           Deal pipeline
         </h2>
         <PipelineTracker
@@ -50,7 +50,7 @@ export function DealDashboard({ data, className }: DealDashboardProps) {
         <div className="flex flex-col gap-6">
           {/* Client Card */}
           <StagePanel className="p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
+            <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
               Client
             </h2>
             <div className="space-y-2">
@@ -70,7 +70,7 @@ export function DealDashboard({ data, className }: DealDashboardProps) {
 
           {/* Contract Status Card */}
           <StagePanel className="p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
+            <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
               Contract
             </h2>
             {contract ? (
@@ -111,7 +111,7 @@ export function DealDashboard({ data, className }: DealDashboardProps) {
 
           {/* Optional: Deal stats */}
           <StagePanel className="p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
+            <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
               Deal stats
             </h2>
             <div className="flex gap-6">

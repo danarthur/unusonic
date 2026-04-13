@@ -36,7 +36,7 @@ export function ContextualCardDrawer({ alert, onDismiss, className }: Contextual
           className={cn('mt-3', className)}
         >
           <div className="stage-panel-nested mt-2 rounded-2xl border border-[oklch(1_0_0_/_0.08)] p-4 flex flex-col gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+            <span className="stage-label">
               Contextual
             </span>
             <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">{alert.title}</p>
@@ -45,7 +45,7 @@ export function ContextualCardDrawer({ alert, onDismiss, className }: Contextual
               <button
                 type="button"
                 onClick={onDismiss}
-                className="mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-accent)] hover:underline self-start"
+                className="mt-2 stage-label text-[var(--stage-accent)] hover:underline self-start"
               >
                 Dismiss
               </button>

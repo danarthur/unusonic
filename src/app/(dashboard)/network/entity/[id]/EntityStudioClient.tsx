@@ -8,6 +8,8 @@ import {
   ArrowLeft,
   Save,
   Globe,
+  Building2,
+  Radar,
   Tag,
   DollarSign,
   Users,
@@ -42,8 +44,9 @@ import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
-const LABEL = 'text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest';
+const LABEL = 'stage-label';
 
 interface EntityStudioClientProps {
   details: NodeDetail;
@@ -365,13 +368,13 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
 
   return (
     <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)]  border-b border-[oklch(1_0_0_/_0.08)] px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-[var(--stage-void)]  border-b border-[var(--stage-edge-subtle)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" />
+            <ArrowLeft className="size-5" strokeWidth={1.5} />
           </Button>
           <div>
-            <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
+            <p className="stage-label">
               Profile
             </p>
             <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
@@ -385,15 +388,16 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
+              transition={STAGE_MEDIUM}
               className="flex items-center gap-3"
             >
-              <span className="text-xs text-[var(--stage-text-secondary)]">Unsaved changes</span>
+              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Unsaved changes</span>
               <Button
                 onClick={handleSave}
                 disabled={isPending}
-                className="gap-2 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/30"
+                className="gap-2 stage-btn stage-btn-primary"
               >
-                <Save className="size-4" />
+                <Save className="size-4" strokeWidth={1.5} />
                 Save
               </Button>
             </motion.div>
@@ -401,167 +405,162 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
         </AnimatePresence>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Column A: Identity (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          <section className="stage-panel rounded-2xl p-6 space-y-6">
-            <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
-              Core Identity
-            </h3>
-            <div className="flex items-center gap-4">
-              <div
-                className="relative size-16 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[oklch(1_0_0_/_0.08)]"
-                style={{ backgroundColor: brandColor && !logoUrl ? `${brandColor}20` : undefined }}
-              >
-                {logoUrl ? (
-                  <>
-                    {/* Cool neutral light base for dark logos — avoids warm/brown tint */}
-                    <div
-                      className="pointer-events-none absolute inset-0"
-                      style={{
-                        background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.97 0 0 / 0.7) 0%, oklch(0.91 0.01 250 / 0.4) 50%, transparent 100%)',
-                      }}
-                      aria-hidden
+      <div className="max-w-3xl mx-auto px-6 py-8 space-y-3">
+          <AccordionSection label="Identity" icon={Building2} defaultOpen>
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <div
+                  className="relative size-16 shrink-0 rounded-xl flex items-center justify-center overflow-hidden border border-[var(--stage-edge-subtle)]"
+                  style={{ backgroundColor: brandColor && !logoUrl ? `${brandColor}20` : undefined }}
+                >
+                  {logoUrl ? (
+                    <>
+                      <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background: 'radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.97 0 0 / 0.7) 0%, oklch(0.91 0.01 250 / 0.4) 50%, transparent 100%)',
+                        }}
+                        aria-hidden
+                      />
+                      <img
+                        src={logoUrl}
+                        alt=""
+                        className="relative z-10 size-full object-contain p-2"
+                      />
+                    </>
+                  ) : (
+                    <span className="text-2xl font-medium text-[var(--stage-text-secondary)]">
+                      {(name?.[0] ?? '?').toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div>
+                    <label className={LABEL}>Name</label>
+                    <Input
+                      value={name}
+                      onChange={(e) => { setName(e.target.value); markChanged(); }}
+                      className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
                     />
-                    <img
-                      src={logoUrl}
-                      alt=""
-                      className="relative z-10 size-full object-contain p-2"
+                  </div>
+                  <div>
+                    <label className={LABEL}>Logo URL</label>
+                    <Input
+                      value={logoUrl}
+                      onChange={(e) => { setLogoUrl(e.target.value); markChanged(); }}
+                      placeholder="https://..."
+                      className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)] text-xs"
                     />
-                  </>
-                ) : (
-                  <span className="text-2xl font-medium text-[var(--stage-text-secondary)]">
-                    {(name?.[0] ?? '?').toUpperCase()}
-                  </span>
-                )}
+                  </div>
+                </div>
               </div>
-              <div className="min-w-0 flex-1 space-y-3">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                 <div>
-                  <label className={LABEL}>Name</label>
+                  <label className={LABEL}>Doing business as</label>
                   <Input
-                    value={name}
-                    onChange={(e) => { setName(e.target.value); markChanged(); }}
-                    className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
+                    value={doingBusinessAs}
+                    onChange={(e) => { setDoingBusinessAs(e.target.value); markChanged(); }}
+                    placeholder="e.g. NV Productions LLC"
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
                   />
                 </div>
                 <div>
-                  <label className={LABEL}>Logo URL</label>
-                  <Input
-                    value={logoUrl}
-                    onChange={(e) => { setLogoUrl(e.target.value); markChanged(); }}
-                    placeholder="https://..."
-                    className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
-                  />
+                  <label className={LABEL}>Entity type</label>
+                  <select
+                    value={entityType}
+                    onChange={(e) => { setEntityType(e.target.value); markChanged(); }}
+                    className="stage-input mt-1 w-full"
+                  >
+                    <option value="organization">Organization</option>
+                    <option value="single_operator">Single operator</option>
+                  </select>
                 </div>
               </div>
+              <ColorTuner value={brandColor} onChange={(v) => { setBrandColor(v); markChanged(); }} />
             </div>
-            <div>
-              <label className={LABEL}>Doing business as</label>
-              <Input
-                value={doingBusinessAs}
-                onChange={(e) => { setDoingBusinessAs(e.target.value); markChanged(); }}
-                placeholder="e.g. NV Productions LLC"
-                className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
-              />
-            </div>
-            <div>
-              <label className={LABEL}>Entity type</label>
-              <select
-                value={entityType}
-                onChange={(e) => { setEntityType(e.target.value); markChanged(); }}
-                className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]"
-              >
-                <option value="organization">Organization</option>
-                <option value="single_operator">Single operator</option>
-              </select>
-            </div>
-            <ColorTuner value={brandColor} onChange={(v) => { setBrandColor(v); markChanged(); }} />
-          </section>
-        </div>
+          </AccordionSection>
 
-        {/* Column B: Intelligence + Classification (8 cols) */}
-        <div className="lg:col-span-8 space-y-6">
-          <section className="stage-panel rounded-2xl p-6 space-y-6">
-            <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest border-b border-[oklch(1_0_0_/_0.08)] pb-4">
-              Digital Intelligence
-            </h3>
-            <AionScoutInput
-              value={website}
-              onChange={(v) => { setWebsite(v); markChanged(); }}
-              onEnrich={handleEnrich}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={LABEL}>General email</label>
-                <Input
-                  value={supportEmail}
-                  onChange={(e) => { setSupportEmail(e.target.value); markChanged(); }}
-                  placeholder="booking@example.com"
-                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
-                />
-              </div>
-              <div>
-                <label className={LABEL}>Phone</label>
-                <Input
-                  value={phone}
-                  onChange={(e) => { setPhone(e.target.value); markChanged(); }}
-                  placeholder="Main office line"
-                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={LABEL}>Street</label>
-                <Input
-                  value={address.street}
-                  onChange={(e) => { setAddress((a) => ({ ...a, street: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
-                />
-              </div>
-              <div>
-                <label className={LABEL}>City</label>
-                <Input
-                  value={address.city}
-                  onChange={(e) => { setAddress((a) => ({ ...a, city: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
-                />
-              </div>
-              <div>
-                <label className={LABEL}>State</label>
-                <Input
-                  value={address.state}
-                  onChange={(e) => { setAddress((a) => ({ ...a, state: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
-                />
-              </div>
-              <div>
-                <label className={LABEL}>Postal code</label>
-                <Input
-                  value={address.postal_code}
-                  onChange={(e) => { setAddress((a) => ({ ...a, postal_code: e.target.value })); markChanged(); }}
-                  className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
-                />
-              </div>
-            </div>
-            <div>
-              <label className={LABEL}>Country</label>
-              <Input
-                value={address.country}
-                onChange={(e) => { setAddress((a) => ({ ...a, country: e.target.value })); markChanged(); }}
-                className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)] text-xs"
+          <AccordionSection label="Intelligence" icon={Radar} defaultOpen>
+            <div className="space-y-3">
+              <AionScoutInput
+                value={website}
+                onChange={(v) => { setWebsite(v); markChanged(); }}
+                onEnrich={handleEnrich}
               />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div>
+                  <label className={LABEL}>General email</label>
+                  <Input
+                    value={supportEmail}
+                    onChange={(e) => { setSupportEmail(e.target.value); markChanged(); }}
+                    placeholder="booking@example.com"
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
+                  />
+                </div>
+                <div>
+                  <label className={LABEL}>Phone</label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => { setPhone(e.target.value); markChanged(); }}
+                    placeholder="Main office line"
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
+                  />
+                </div>
+              </div>
+              <div className="h-px bg-[var(--stage-edge-subtle)]" />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div>
+                  <label className={LABEL}>Street</label>
+                  <Input
+                    value={address.street}
+                    onChange={(e) => { setAddress((a) => ({ ...a, street: e.target.value })); markChanged(); }}
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)] text-xs"
+                  />
+                </div>
+                <div>
+                  <label className={LABEL}>City</label>
+                  <Input
+                    value={address.city}
+                    onChange={(e) => { setAddress((a) => ({ ...a, city: e.target.value })); markChanged(); }}
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)] text-xs"
+                  />
+                </div>
+                <div>
+                  <label className={LABEL}>State</label>
+                  <Input
+                    value={address.state}
+                    onChange={(e) => { setAddress((a) => ({ ...a, state: e.target.value })); markChanged(); }}
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)] text-xs"
+                  />
+                </div>
+                <div>
+                  <label className={LABEL}>Postal code</label>
+                  <Input
+                    value={address.postal_code}
+                    onChange={(e) => { setAddress((a) => ({ ...a, postal_code: e.target.value })); markChanged(); }}
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)] text-xs"
+                  />
+                </div>
+                <div>
+                  <label className={LABEL}>Country</label>
+                  <Input
+                    value={address.country}
+                    onChange={(e) => { setAddress((a) => ({ ...a, country: e.target.value })); markChanged(); }}
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)] text-xs"
+                  />
+                </div>
+              </div>
             </div>
-          </section>
+          </AccordionSection>
 
           <AccordionSection label="Classification" icon={Tag} defaultOpen>
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div>
                 <label className={LABEL}>Relationship role</label>
                 <select
                   value={relType}
                   onChange={(e) => { setRelType(e.target.value as 'vendor' | 'partner' | 'client'); markChanged(); }}
-                  className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]"
+                  className="stage-input mt-1 w-full"
                 >
                   <option value="vendor">Vendor</option>
                   <option value="client">Client</option>
@@ -573,7 +572,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
                 <select
                   value={lifecycle}
                   onChange={(e) => { setLifecycle(e.target.value as 'prospect' | 'active' | 'dormant' | 'blacklisted'); markChanged(); }}
-                  className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]"
+                  className="stage-input mt-1 w-full"
                 >
                   <option value="prospect">Prospect</option>
                   <option value="active">Active</option>
@@ -587,7 +586,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
                   <Input
                     value={blacklistReason}
                     onChange={(e) => { setBlacklistReason(e.target.value); markChanged(); }}
-                    className="mt-1 bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
                   />
                 </div>
               )}
@@ -614,14 +613,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
 
           {(relType === 'vendor' || relType === 'partner') && (
             <AccordionSection label="Financial" icon={DollarSign}>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <div>
                   <label className={LABEL}>Tax ID</label>
                   <Input value={taxId} onChange={(e) => { setTaxId(e.target.value); markChanged(); }} className="mt-1 bg-[var(--ctx-well)]" />
                 </div>
                 <div>
                   <label className={LABEL}>Currency</label>
-                  <select value={defaultCurrency} onChange={(e) => { setDefaultCurrency(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]">
+                  <select value={defaultCurrency} onChange={(e) => { setDefaultCurrency(e.target.value); markChanged(); }} className="stage-input mt-1 w-full">
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
                     <option value="GBP">GBP</option>
@@ -629,7 +628,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
                 </div>
                 <div>
                   <label className={LABEL}>Payment terms</label>
-                  <select value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); markChanged(); }} className="mt-1 w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]">
+                  <select value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); markChanged(); }} className="stage-input mt-1 w-full">
                     <option value="">—</option>
                     <option value="immediate">Immediate</option>
                     <option value="net_15">Net 15</option>
@@ -641,45 +640,22 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             </AccordionSection>
           )}
 
-          <AccordionSection label="Private notes" icon={FileText} defaultOpen>
+          {details.entityDirectoryType === 'venue' && details.subjectEntityId && initialVenueAttrs && (
+            <VenueSpecsEditor
+              entityId={details.subjectEntityId}
+              initialAttributes={initialVenueAttrs}
+            />
+          )}
+
+          <AccordionSection label="Notes" icon={FileText} defaultOpen>
             <Textarea
               value={notes}
               onChange={(e) => { setNotes(e.target.value); markChanged(); }}
               placeholder="Internal notes about this partner…"
-              className="min-h-[100px] resize-y bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
+              className="min-h-[100px] resize-y bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
               rows={4}
             />
           </AccordionSection>
-
-          <section className="rounded-2xl border border-[oklch(1_0_0_/_0.08)]/80 bg-[oklch(1_0_0_/_0.02)] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
-              <h3 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
-                Danger zone
-              </h3>
-            </div>
-            <div className="px-5 py-4 flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setResetConfirmOpen(true)}
-                className="gap-2 border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well)]"
-              >
-                <RotateCcw className="size-4" />
-                Reset all fields
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteConfirmOpen(true)}
-                className="gap-2 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
-              >
-                <Trash2 className="size-4" />
-                Delete connection
-              </Button>
-            </div>
-          </section>
 
           <AccordionSection label="Roster" icon={Users}>
             <RosterSection
@@ -690,21 +666,12 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             />
           </AccordionSection>
 
-          {/* Cross-module context panels — use subjectEntityId (directory.entities.id),
-              NOT details.id which is the cortex relationship edge ID */}
           {details.subjectEntityId && (
             <>
               <AssignmentsPanel entityId={details.subjectEntityId} />
               <DealsPanel entityId={details.subjectEntityId} />
               <FinancePanel entityId={details.subjectEntityId} />
             </>
-          )}
-
-          {details.entityDirectoryType === 'venue' && details.subjectEntityId && initialVenueAttrs && (
-            <VenueSpecsEditor
-              entityId={details.subjectEntityId}
-              initialAttributes={initialVenueAttrs}
-            />
           )}
 
           {details.subjectEntityId && workspaceId && (
@@ -714,7 +681,36 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
               workspaceId={workspaceId}
             />
           )}
-        </div>
+
+          <section className="stage-panel rounded-2xl overflow-hidden" data-surface="surface">
+            <div className="px-5 py-4 border-b border-[var(--stage-edge-subtle)]">
+              <h3 className="stage-label">
+                Danger zone
+              </h3>
+            </div>
+            <div className="px-5 py-4 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setResetConfirmOpen(true)}
+                className="gap-2 border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well)]"
+              >
+                <RotateCcw className="size-4" strokeWidth={1.5} />
+                Reset all fields
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteConfirmOpen(true)}
+                className="gap-2 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
+              >
+                <Trash2 className="size-4" strokeWidth={1.5} />
+                Delete connection
+              </Button>
+            </div>
+          </section>
       </div>
 
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
@@ -723,14 +719,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             <DialogTitle>Reset all fields?</DialogTitle>
             <DialogClose />
           </DialogHeader>
-          <p className="px-6 pb-6 text-sm text-[var(--stage-text-secondary)]">
+          <p className="px-6 pb-6 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
             This will clear every field on this form. You can save afterward to persist the reset, or leave without saving to keep existing data.
           </p>
           <div className="flex gap-3 px-6 pb-6">
             <Button variant="outline" size="sm" onClick={() => setResetConfirmOpen(false)} className="flex-1">
               Cancel
             </Button>
-            <Button size="sm" onClick={resetToEmpty} className="flex-1 bg-[var(--stage-accent)]/20 text-[var(--stage-accent)] border border-[var(--stage-accent)]/40">
+            <Button size="sm" onClick={resetToEmpty} className="flex-1 bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)] border border-[var(--color-unusonic-warning)]/30 hover:bg-[var(--color-unusonic-warning)]/25">
               Reset
             </Button>
           </div>
@@ -743,7 +739,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             <DialogTitle>Delete this connection?</DialogTitle>
             <DialogClose />
           </DialogHeader>
-          <p className="px-6 pb-6 text-sm text-[var(--stage-text-secondary)]">
+          <p className="px-6 pb-6 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
             This connection will be removed from your network. You can restore it within 30 days from the Network page. After that it may be permanently deleted.
           </p>
           <div className="flex gap-3 px-6 pb-6">
@@ -805,17 +801,17 @@ function RosterSection({
     <div className="space-y-3">
       <ul className="space-y-2">
         {crew.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2">
+          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] px-3 py-2">
             <div className="size-10 rounded-full bg-[var(--stage-surface-raised)] flex items-center justify-center overflow-hidden">
-              {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" /> : <span className="text-sm text-[var(--stage-text-secondary)]">{(m.name?.[0] ?? '?').toUpperCase()}</span>}
+              {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" /> : <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">{(m.name?.[0] ?? '?').toUpperCase()}</span>}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[var(--stage-text-primary)]">{m.name}</p>
+              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{m.name}</p>
               {(() => {
                 const visibleEmail = m.email && !m.email.startsWith('ghost-') && !m.email.endsWith('.local') ? m.email : null;
                 const subtitle = [m.jobTitle, visibleEmail].filter(Boolean).join(' · ');
                 return subtitle ? (
-                  <p className="text-xs text-[var(--stage-text-secondary)] truncate">{subtitle}</p>
+                  <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] truncate">{subtitle}</p>
                 ) : null;
               })()}
             </div>
@@ -823,11 +819,11 @@ function RosterSection({
         ))}
       </ul>
       {!showAdd ? (
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2 border-[var(--stage-accent)]/40 text-[var(--stage-accent)]">
+        <Button type="button" variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2 border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)]">
           Add contact
         </Button>
       ) : (
-        <div ref={addRef} className="rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] p-4 space-y-3">
+        <div ref={addRef} className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <Input name="ac_firstName" placeholder="First name" className="bg-[var(--ctx-well)]" />
             <Input name="ac_lastName" placeholder="Last name" className="bg-[var(--ctx-well)]" />
@@ -838,7 +834,7 @@ function RosterSection({
             <Input name="ac_jobTitle" placeholder="Job title" className="bg-[var(--ctx-well)]" />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={handleAdd} disabled={saving} className="bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]">
+            <Button size="sm" onClick={handleAdd} disabled={saving} className="border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)]">
               {saving ? 'Saving…' : 'Add'}
             </Button>
             <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setShowAdd(false)}>Cancel</Button>

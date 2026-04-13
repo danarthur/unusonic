@@ -18,6 +18,7 @@ import {
   claimOrganizationSchema,
   createGenesisOrganizationSchema,
 } from '../model/schema';
+import { instrument } from '@/shared/lib/instrumentation';
 import type {
   CreateGhostOrganizationResult,
   ClaimOrganizationResult,
@@ -63,6 +64,7 @@ export async function checkSlugAvailability(
   slug: string,
   excludeOrgId?: string
 ): Promise<{ available: boolean }> {
+  return instrument('checkSlugAvailability', async () => {
   const normalized = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-|-$/g, '') || '';
   if (!normalized || normalized.length < 2) {
     return { available: false };
@@ -89,6 +91,7 @@ export async function checkSlugAvailability(
     .eq('slug', normalized);
 
   return { available: !count || count === 0 };
+  });
 }
 
 /**
@@ -97,6 +100,7 @@ export async function checkSlugAvailability(
  * Checks directory.entities (canonical) + workspaces for backward compat.
  */
 export async function checkNexusAvailability(slug: string): Promise<NexusResult> {
+  return instrument('checkNexusAvailability', async () => {
   const normalized = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-|-$/g, '') || '';
   if (!normalized || normalized.length < 2) {
     return { type: 'VOID' };
@@ -130,6 +134,7 @@ export async function checkNexusAvailability(slug: string): Promise<NexusResult>
   if (count && count > 0) return { type: 'TAKEN' };
 
   return { type: 'VOID' };
+  });
 }
 
 /**
@@ -140,6 +145,7 @@ export async function claimGhostOrganizationBySlug(
   _prev: unknown,
   formData: FormData
 ): Promise<ClaimOrganizationResult> {
+  return instrument('claimGhostOrganizationBySlug', async () => {
   const slug = (formData.get('slug') as string)?.trim()?.toLowerCase().replace(/[^a-z0-9-]/g, '') || '';
   if (!slug || slug.length < 2) {
     return { ok: false, error: 'Invalid slug.' };
@@ -256,6 +262,7 @@ export async function claimGhostOrganizationBySlug(
   revalidatePath('/network');
   revalidatePath('/onboarding');
   redirect('/network');
+  });
 }
 
 /**
@@ -266,6 +273,7 @@ export async function createGhostOrganization(
   _prev: unknown,
   formData: FormData
 ): Promise<CreateGhostOrganizationResult> {
+  return instrument('createGhostOrganization', async () => {
   const raw = {
     name: formData.get('name'),
     contact_email: formData.get('contact_email'),
@@ -424,6 +432,7 @@ export async function createGhostOrganization(
   }
 
   return { ok: true, organizationId: ghostOrgEntityId };
+  });
 }
 
 /**
@@ -434,6 +443,7 @@ export async function claimOrganization(
   _prev: unknown,
   formData: FormData
 ): Promise<ClaimOrganizationResult> {
+  return instrument('claimOrganization', async () => {
   const raw = { token: formData.get('token') };
   const parsed = claimOrganizationSchema.safeParse(raw);
   if (!parsed.success) {
@@ -523,6 +533,7 @@ export async function claimOrganization(
     .eq('id', invitation.id);
 
   return { ok: true, organizationId: invitation.organization_id };
+  });
 }
 
 /**
@@ -533,6 +544,7 @@ export async function createGenesisOrganization(
   _prev: unknown,
   formData: FormData
 ): Promise<CreateGenesisOrganizationResult> {
+  return instrument('createGenesisOrganization', async () => {
   const raw = {
     name: formData.get('name'),
     slug: formData.get('slug') || undefined,
@@ -637,4 +649,5 @@ export async function createGenesisOrganization(
   revalidatePath('/network');
   revalidatePath('/onboarding');
   redirect('/network');
+  });
 }

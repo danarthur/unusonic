@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import { getSession } from '@/shared/lib/auth/session';
 import { getSystemClient } from '@/shared/api/supabase/system';
 
 /** EventSnippet shape for EventStatus / Production Schedule */
@@ -23,11 +22,14 @@ interface EventsQueryRow {
 
 export async function GET() {
   try {
-    const workspaceId = (await getActiveWorkspaceId()) ?? (await getSession()).workspace.id;
+    const workspaceId = await getActiveWorkspaceId();
+    if (!workspaceId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const supabase = getSystemClient();
     // ops.events not in generated Database type for public schema client
      
-    const { data: eventsData, error: eventsError } = await (supabase as any)
+    const { data: eventsData, error: eventsError } = await supabase
       .schema('ops')
       .from('events')
       .select('id, title, status, starts_at, location_name')

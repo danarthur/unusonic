@@ -80,7 +80,7 @@ export function RecoveryBackupPrompt() {
         <div className="flex flex-wrap gap-2 mt-3">
           <Link
             href="/settings/security"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[oklch(1_0_0_/_0.12)] bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors text-sm font-medium"
+            className="stage-hover overflow-hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[oklch(1_0_0_/_0.12)] bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] transition-colors text-sm font-medium"
           >
             Back up now
           </Link>

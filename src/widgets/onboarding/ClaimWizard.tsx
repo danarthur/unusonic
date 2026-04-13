@@ -81,13 +81,13 @@ export function ClaimWizard({ invitation }: ClaimWizardProps) {
           >
             {targetLogoUrl ? (
               <div className="flex justify-center">
-                <div className="relative size-20 rounded-2xl overflow-hidden bg-[var(--stage-surface-nested)] border border-[var(--stage-edge-top)]">
+                <div className="relative size-20 rounded-2xl overflow-hidden bg-[var(--ctx-well)] border border-[var(--stage-edge-top)]">
                   { }
                   <img src={targetLogoUrl} alt="" className="size-full object-contain" />
                 </div>
               </div>
             ) : (
-              <div className="flex size-20 items-center justify-center rounded-2xl bg-[var(--stage-surface-nested)] border border-[var(--stage-edge-top)] mx-auto" />
+              <div className="flex size-20 items-center justify-center rounded-2xl bg-[var(--ctx-well)] border border-[var(--stage-edge-top)] mx-auto" />
             )}
             <h1 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
               {originName} wants to connect with {targetName}.

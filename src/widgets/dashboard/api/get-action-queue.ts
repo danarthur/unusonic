@@ -1,5 +1,6 @@
 'use server';
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
@@ -64,6 +65,7 @@ export async function getActionQueue(): Promise<ActionItem[]> {
     return all;
   } catch (err) {
     console.error('[dashboard] getActionQueue unexpected error:', err);
+    Sentry.captureException(err, { tags: { module: 'dashboard', action: 'getActionQueue' } });
     return [];
   }
 }
@@ -82,7 +84,7 @@ async function fetchFollowUpItems(
   workspaceId: string,
   now: Date,
 ): Promise<ActionItem[]> {
-  const db = supabase as any;
+  const db = supabase;
   const todayEnd = new Date(
     Date.UTC(
       now.getUTCFullYear(),

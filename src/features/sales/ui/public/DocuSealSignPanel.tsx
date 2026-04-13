@@ -86,7 +86,7 @@ export function DocuSealSignPanel({ embedSrc, onComplete }: DocuSealSignPanelPro
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => setClicked(true)}
-        className="inline-flex items-center gap-2 h-11 px-6 font-medium text-sm tracking-tight hover:brightness-[1.06] transition-[filter] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-accent)]"
+        className="inline-flex items-center gap-2 h-11 px-6 font-medium text-sm tracking-tight hover:bg-[oklch(1_0_0_/_0.08)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-accent)]"
         style={{
           backgroundColor: 'var(--portal-accent)',
           color: 'var(--portal-accent-text)',
@@ -111,7 +111,7 @@ export function DocuSealSignPanel({ embedSrc, onComplete }: DocuSealSignPanelPro
             type="button"
             onClick={handleManualRefresh}
             disabled={refreshing}
-            className="inline-flex items-center gap-1.5 text-xs transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 text-xs transition-colors disabled:opacity-45"
             style={{ color: 'var(--portal-text-secondary)' }}
           >
             <RefreshCw className={cn('w-3 h-3', refreshing && 'animate-spin')} strokeWidth={1.5} />

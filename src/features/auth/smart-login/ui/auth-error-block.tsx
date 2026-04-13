@@ -23,7 +23,7 @@ export function AuthErrorBlock({ error }: { error: string }) {
           type="button"
           onClick={() => setShowTechnical((s) => !s)}
           aria-expanded={showTechnical}
-          className="text-[11px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors flex items-center justify-center gap-1 mx-auto"
+          className="text-field-label text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors flex items-center justify-center gap-1 mx-auto"
         >
           {showTechnical ? 'Hide technical details' : 'See what went wrong'}
           <ChevronDown
@@ -33,7 +33,7 @@ export function AuthErrorBlock({ error }: { error: string }) {
         </button>
       )}
       {showToggle && showTechnical && (
-        <p className="text-[11px] text-[var(--stage-text-secondary)] font-mono break-all text-left px-2 py-1.5 rounded-lg bg-[oklch(1_0_0_/_0.10)]">
+        <p className="text-field-label text-[var(--stage-text-secondary)] font-mono break-all text-left px-2 py-1.5 rounded-lg bg-[oklch(1_0_0_/_0.10)]">
           {display.technical}
         </p>
       )}

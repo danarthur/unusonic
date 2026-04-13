@@ -32,10 +32,10 @@ export function CeramicSwitch({
       className={cn(
         'relative inline-flex shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-200',
         'focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--stage-accent)] focus-visible:outline-offset-2',
-        'disabled:pointer-events-none disabled:opacity-50',
+        'disabled:pointer-events-none disabled:opacity-45',
         checked
           ? 'border-transparent bg-[var(--stage-accent)]'
-          : 'border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]',
+          : 'border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]',
         className
       )}
       style={{

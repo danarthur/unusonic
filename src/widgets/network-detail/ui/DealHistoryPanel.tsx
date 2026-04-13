@@ -26,19 +26,19 @@ function DealRow({ deal }: { deal: EntityDeal }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-[var(--stage-text-primary)]">
+        <p className="truncate text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
           {deal.event_archetype
             ? `${stageBadgeLabel(deal.event_archetype)}${deal.proposed_date ? ` — ${new Date(deal.proposed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`
             : deal.proposed_date
               ? new Date(deal.proposed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
               : 'Untitled deal'}
         </p>
-        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] inline-block mt-1">
+        <span className="stage-badge-text px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] inline-block mt-1">
           {stageBadgeLabel(deal.status)}
         </span>
       </div>
       {deal.budget_estimated != null && (
-        <span className="shrink-0 text-sm font-mono tabular-nums text-[var(--stage-text-secondary)]">
+        <span className="shrink-0 text-[length:var(--stage-data-size)] font-mono tabular-nums text-[var(--stage-text-secondary)]">
           {formatCurrency(deal.budget_estimated)}
         </span>
       )}
@@ -50,10 +50,10 @@ function SkeletonRow() {
   return (
     <div className="flex items-center justify-between gap-3 py-2 animate-pulse">
       <div className="min-w-0 flex-1 space-y-2">
-        <div className="h-4 w-3/4 rounded bg-[oklch(1_0_0/0.06)]" />
-        <div className="h-4 w-16 rounded-full bg-[oklch(1_0_0/0.04)]" />
+        <div className="h-4 w-3/4 rounded bg-[var(--stage-surface-elevated)]" />
+        <div className="h-4 w-16 rounded-full bg-[var(--stage-surface-elevated)]" />
       </div>
-      <div className="h-4 w-16 rounded bg-[oklch(1_0_0/0.04)]" />
+      <div className="h-4 w-16 rounded bg-[var(--stage-surface-elevated)]" />
     </div>
   );
 }
@@ -84,8 +84,8 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
   // Loading
   if (deals === null) {
     return (
-      <div className="stage-panel rounded-2xl p-4 md:col-span-3">
-        <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-3">
+      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+        <h3 className="stage-label text-[var(--stage-text-secondary)] mb-3">
           Deals
         </h3>
         <div className="divide-y divide-[var(--stage-edge-subtle)]">
@@ -100,11 +100,11 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
   // Empty
   if (deals.length === 0) {
     return (
-      <div className="stage-panel rounded-2xl p-4 md:col-span-3">
-        <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-2">
+      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+        <h3 className="stage-label text-[var(--stage-text-secondary)] mb-2">
           Deals
         </h3>
-        <p className="text-sm text-[var(--stage-text-secondary)]">No deals</p>
+        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">No deals</p>
       </div>
     );
   }
@@ -113,11 +113,11 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
   const hiddenActiveCount = activeDeals.length - MAX_ACTIVE_VISIBLE;
 
   return (
-    <div className="stage-panel rounded-2xl p-4 md:col-span-3">
+    <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
       {/* Active deals */}
       {activeDeals.length > 0 && (
         <>
-          <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-1">
+          <h3 className="stage-label text-[var(--stage-text-secondary)] mb-1">
             Active deals
           </h3>
           <div className="divide-y divide-[var(--stage-edge-subtle)]">
@@ -126,7 +126,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
             ))}
           </div>
           {hiddenActiveCount > 0 && (
-            <p className="mt-1 text-xs text-[var(--stage-text-secondary)]">
+            <p className="mt-1 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
               +{hiddenActiveCount} more
             </p>
           )}
@@ -139,14 +139,14 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
           <button
             type="button"
             onClick={() => setPastExpanded((v) => !v)}
-            className="flex w-full items-center justify-between text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
+            className="flex w-full items-center justify-between stage-label text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
           >
             <span>Past deals ({pastDeals.length})</span>
             <motion.span
               animate={{ rotate: pastExpanded ? 180 : 0 }}
               transition={STAGE_MEDIUM}
             >
-              <ChevronDown className="size-4" />
+              <ChevronDown className="size-4" strokeWidth={1.5} />
             </motion.span>
           </button>
           <AnimatePresence initial={false}>
@@ -171,7 +171,7 @@ export function DealHistoryPanel({ entityId }: { entityId: string }) {
 
       {/* Edge case: only past deals, no active */}
       {activeDeals.length === 0 && pastDeals.length > 0 && !pastExpanded && (
-        <p className="text-sm text-[var(--stage-text-secondary)] mt-2">No active deals</p>
+        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)] mt-2">No active deals</p>
       )}
     </div>
   );

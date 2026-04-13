@@ -84,12 +84,12 @@ export function AvailabilityCheck({ entityId }: AvailabilityCheckProps) {
           aria-label="Check availability date"
         />
         {result.status === 'loading' && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] animate-pulse">
+          <span className="stage-badge-text px-2 py-0.5 rounded-full bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] animate-pulse">
             Checking…
           </span>
         )}
         {statusLabel && (
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusStyle}`}>
+          <span className={`stage-badge-text px-2 py-0.5 rounded-full ${statusStyle}`}>
             {statusLabel}
           </span>
         )}
@@ -97,7 +97,7 @@ export function AvailabilityCheck({ entityId }: AvailabilityCheckProps) {
       {result.status !== 'idle' && result.status !== 'loading' && result.conflicts && result.conflicts.length > 0 && (
         <div className="space-y-0.5">
           {result.conflicts.map((conflict, i) => (
-            <p key={i} className="text-xs text-[var(--stage-text-secondary)]">
+            <p key={i} className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
               {conflict.label}
             </p>
           ))}

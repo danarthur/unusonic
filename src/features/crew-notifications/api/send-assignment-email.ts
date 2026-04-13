@@ -5,6 +5,8 @@ import { Resend } from 'resend';
 import { render, toPlainText } from '@react-email/render';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { AssignmentEmail } from '../ui/emails/AssignmentEmail';
+import { instrument } from '@/shared/lib/instrumentation';
+import * as Sentry from '@sentry/nextjs';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM ?? 'Unusonic <noreply@unusonic.com>';
@@ -40,14 +42,15 @@ export async function sendCrewAssignmentEmail(
   assignmentId: string,
   entityId: string | null
 ): Promise<void> {
+  return instrument('sendCrewAssignmentEmail', async () => {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[crew-email] RESEND_API_KEY not set — skipping email');
+    Sentry.logger.warn('crew.emailSkipped', { reason: 'RESEND_API_KEY not set' });
     return;
   }
 
   const supabase = getSystemClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   // Fetch event + assignment in parallel
   const [eventRes, assignmentRes] = await Promise.all([
@@ -66,11 +69,11 @@ export async function sendCrewAssignmentEmail(
   ]);
 
   if (eventRes.error || !eventRes.data) {
-    console.error('[crew-email] event not found:', eventId);
+    Sentry.logger.error('crew.emailFailed', { reason: 'eventNotFound', eventId });
     return;
   }
   if (!assignmentRes.data) {
-    console.error('[crew-email] assignment not found:', assignmentId);
+    Sentry.logger.error('crew.emailFailed', { reason: 'assignmentNotFound', assignmentId });
     return;
   }
 
@@ -141,7 +144,7 @@ export async function sendCrewAssignmentEmail(
   }
 
   if (!recipientEmail) {
-    console.warn('[crew-email] no email for entity', entityId, '— skipping');
+    Sentry.logger.warn('crew.emailSkipped', { reason: 'noEmail', entityId: entityId ?? '' });
     return;
   }
 
@@ -161,7 +164,7 @@ export async function sendCrewAssignmentEmail(
     .single();
 
   if (tokenErr || !tokenRow) {
-    console.error('[crew-email] token creation failed:', tokenErr?.message);
+    Sentry.logger.error('crew.emailFailed', { reason: 'tokenCreationFailed', error: tokenErr?.message ?? 'unknown' });
     return;
   }
 
@@ -200,6 +203,7 @@ export async function sendCrewAssignmentEmail(
   });
 
   if (sendErr) {
-    console.error('[crew-email] send failed:', sendErr);
+    Sentry.logger.error('crew.emailSendFailed', { error: String(sendErr) });
   }
+  });
 }

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Minus, X, FileText, Send, Mail, BookMarked, Trash2, PackageOpen } from 'lucide-react';
+import { Plus, Minus, X, FileText, Trash2, PackageOpen } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetBody } from '@/shared/ui/sheet';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { upsertProposal, publishProposal, sendForSignature, deleteProposalItemsByPackageInstanceId, unpackPackageInstance } from '../api/proposal-actions';
@@ -16,45 +16,19 @@ import { ProposalLineInspector } from './proposal-line-inspector';
 import { ProposalProductionTeam } from './proposal-production-team';
 import { ProposalSummaryCard } from './proposal-summary-card';
 import { getCurrentOrgId } from '@/features/network/api/actions';
-import { syncCrewFromProposal } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import { syncCrewFromProposal, getDealCrewEquipmentNames, getDealCrew, type DealCrewRow } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
 
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { computeHoursBetween } from '@/shared/lib/parse-time';
-import type { ProposalLineItemInput } from '../api/proposal-actions';
 import { checkBatchAvailability, type ItemAvailability } from '../api/catalog-availability';
 import { getItemHistoryForClient, type ItemClientHistory } from '../api/catalog-customer-history';
 import { getAlternativesWithAvailability, type AlternativeWithAvailability } from '../api/catalog-alternatives';
 import { swapProposalLineItem } from '../api/proposal-swap-action';
 import { RiderParserModal } from '@/features/ai/ui/rider-parser-modal';
 
-/** Map a UI line item to the server action input shape. Single source of truth — no duplicates. */
-function toLineItemInput(item: ProposalBuilderLineItem): ProposalLineItemInput {
-  return {
-    packageId: item.packageId ?? null,
-    originPackageId: item.originPackageId ?? item.packageId ?? null,
-    packageInstanceId: item.packageInstanceId ?? null,
-    displayGroupName: item.displayGroupName ?? null,
-    isClientVisible: item.isClientVisible ?? true,
-    isPackageHeader: item.isPackageHeader ?? false,
-    originalBasePrice: item.originalBasePrice ?? null,
-    unitType: item.unitType ?? 'flat',
-    unitMultiplier: item.unitMultiplier ?? 1,
-    category: item.category ?? null,
-    name: item.name,
-    description: item.description ?? null,
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    overridePrice: item.overridePrice ?? null,
-    actualCost: item.actualCost ?? null,
-    isOptional: item.isOptional ?? false,
-    requiredRoles: item.requiredRoles ?? null,
-    floorPrice: item.floorPrice ?? null,
-    isTaxable: item.isTaxable ?? null,
-    timeStart: item.timeStart ?? null,
-    timeEnd: item.timeEnd ?? null,
-    showTimesOnProposal: item.showTimesOnProposal ?? true,
-  };
-}
+import { toLineItemInput, mapProposalItemsToLineItems, groupLineItemsByPackageInstance } from './proposal-utils';
+import { ProposalSendFlow } from './proposal-send-flow';
+import { ProposalActionsFooter } from './proposal-actions-footer';
 
 /** Contact with email (from deal stakeholders) for "Send to" picker. */
 export type ProposalContact = { id: string; name: string; email: string };
@@ -94,110 +68,6 @@ export interface ProposalBuilderProps {
   className?: string;
 }
 
-function mapProposalItemsToLineItems(
-  initialProposal: ProposalWithItems | null | undefined,
-  dealEventStartTime?: string | null,
-  dealEventEndTime?: string | null,
-): ProposalBuilderLineItem[] {
-  if (!initialProposal?.items?.length) return [];
-  return initialProposal.items.map((item) => {
-    const row = item as {
-      id?: string;
-      package_id?: string | null;
-      origin_package_id?: string | null;
-      package_instance_id?: string | null;
-      display_group_name?: string | null;
-      is_client_visible?: boolean | null;
-      is_package_header?: boolean | null;
-      is_optional?: boolean | null;
-      original_base_price?: number | null;
-      unit_type?: string | null;
-      unit_multiplier?: number | null;
-      override_price?: number | null;
-      actual_cost?: number | null;
-      internal_notes?: string | null;
-      unit_price?: number;
-      name: string;
-      description?: string | null;
-      quantity: number;
-      time_start?: string | null;
-      time_end?: string | null;
-      show_times_on_proposal?: boolean | null;
-      definition_snapshot?: {
-        margin_meta?: { category?: string };
-        price_meta?: { floor_price?: number | null };
-        tax_meta?: { is_taxable?: boolean | null };
-        crew_meta?: { required_roles?: unknown[] | null };
-      } | null;
-    };
-    const category = row.definition_snapshot?.margin_meta?.category as ProposalBuilderLineItem['category'] | undefined;
-    const floorPrice = row.definition_snapshot?.price_meta?.floor_price ?? null;
-    const isTaxable = row.definition_snapshot?.tax_meta?.is_taxable ?? null;
-     
-    const requiredRoles = (row.definition_snapshot?.crew_meta?.required_roles as any[] | null | undefined) ?? null;
-    const unitType = (row.unit_type === 'hour' || row.unit_type === 'day' ? row.unit_type : 'flat') as ProposalBuilderLineItem['unitType'];
-    const mapped: ProposalBuilderLineItem = {
-      id: row.id,
-      packageId: row.package_id ?? null,
-      originPackageId: row.origin_package_id ?? null,
-      packageInstanceId: row.package_instance_id ?? null,
-      displayGroupName: row.display_group_name ?? null,
-      isClientVisible: row.is_client_visible ?? true,
-      isPackageHeader: row.is_package_header ?? false,
-      isOptional: row.is_optional ?? false,
-      originalBasePrice: row.original_base_price != null && Number.isFinite(Number(row.original_base_price)) ? Number(row.original_base_price) : null,
-      unitType: unitType ?? 'flat',
-      unitMultiplier: row.unit_multiplier != null && Number.isFinite(Number(row.unit_multiplier)) ? Number(row.unit_multiplier) : 1,
-      category: category ?? null,
-      name: row.name,
-      description: row.description ?? null,
-      quantity: row.quantity,
-      unitPrice: Number(row.unit_price ?? 0),
-      overridePrice: row.override_price != null ? Number(row.override_price) : null,
-      actualCost: row.actual_cost != null ? Number(row.actual_cost) : null,
-      floorPrice: floorPrice != null && Number.isFinite(Number(floorPrice)) ? Number(floorPrice) : null,
-      isTaxable: isTaxable,
-      internalNotes: row.internal_notes ?? null,
-      requiredRoles: requiredRoles,
-      timeStart: row.time_start ?? null,
-      timeEnd: row.time_end ?? null,
-      showTimesOnProposal: row.show_times_on_proposal ?? true,
-    };
-
-    // Auto-inherit deal event times for hourly items with no saved times
-    if (unitType === 'hour' || unitType === 'day') {
-      if (!mapped.timeStart && dealEventStartTime) mapped.timeStart = dealEventStartTime;
-      if (!mapped.timeEnd && dealEventEndTime) mapped.timeEnd = dealEventEndTime;
-    }
-    // Auto-compute unitMultiplier from effective times for hourly items
-    if (unitType === 'hour' && mapped.timeStart && mapped.timeEnd) {
-      const hours = computeHoursBetween(mapped.timeStart, mapped.timeEnd);
-      if (hours != null && hours > 0) mapped.unitMultiplier = hours;
-    }
-
-    return mapped;
-  });
-}
-
-/** Group flat line items by package_instance_id for display (Tagged Bursting). */
-function groupLineItemsByPackageInstance(
-  lineItems: ProposalBuilderLineItem[]
-): { packageInstanceId: string | null; displayGroupName: string | null; indices: number[] }[] {
-  const byKey = new Map<string, { packageInstanceId: string | null; displayGroupName: string | null; indices: number[] }>();
-  lineItems.forEach((item, index) => {
-    const key = item.packageInstanceId ?? `ungrouped-${index}`;
-    if (!byKey.has(key)) {
-      byKey.set(key, {
-        packageInstanceId: item.packageInstanceId ?? null,
-        displayGroupName: item.displayGroupName ?? null,
-        indices: [],
-      });
-    }
-    byKey.get(key)!.indices.push(index);
-  });
-  return Array.from(byKey.values());
-}
-
 export function ProposalBuilder({
   dealId,
   workspaceId,
@@ -218,6 +88,15 @@ export function ProposalBuilder({
   clientEntityId,
   className,
 }: ProposalBuilderProps) {
+  const [crewEquipmentNames, setCrewEquipmentNames] = useState<string[]>([]);
+  // Rescan fix C6 (2026-04-11): manual Plan-tab crew additions are invisible
+  // in the proposal builder because the builder reads roles from line items
+  // only. `getDealCrew(dealId)` returns the full set including source='manual'
+  // rows (Production Team Card adds); we filter client-side to the ones whose
+  // entity is not already referenced by any line-item requiredRole, and
+  // surface them as a non-fatal banner in the Production Team panel so the
+  // PM knows they're there but not on the client proposal.
+  const [allDealCrew, setAllDealCrew] = useState<DealCrewRow[]>([]);
   const [lineItems, setLineItems] = useState<ProposalBuilderLineItem[]>(() =>
     mapProposalItemsToLineItems(initialProposal, dealEventStartTime, dealEventEndTime)
   );
@@ -258,6 +137,28 @@ export function ProposalBuilder({
     setProposalId(initialProposal?.id ?? null);
   }, [initialProposal, dealEventStartTime, dealEventEndTime]);
 
+  // Fetch crew equipment names for internal source annotations
+  useEffect(() => {
+    getDealCrewEquipmentNames(dealId).then(setCrewEquipmentNames);
+  }, [dealId]);
+
+  // Rescan fix C6: fetch full deal_crew so we can detect manual Plan-tab
+  // additions that the proposal builder wouldn't otherwise see. This is the
+  // "merge-on-load" half of the crew sync — syncCrewFromProposal handles the
+  // opposite direction (proposal → deal_crew).
+  const refreshDealCrew = useCallback(() => {
+    if (!dealId) return;
+    getDealCrew(dealId)
+      .then(setAllDealCrew)
+      .catch(() => {
+        // Non-fatal: worst case the banner doesn't show. The proposal is
+        // still usable without the reverse-sync view.
+      });
+  }, [dealId]);
+  useEffect(() => {
+    refreshDealCrew();
+  }, [refreshDealCrew]);
+
   // ── Auto-save: debounced persist after user edits ──────────────────────────
   // Skip the first render (initial load) — only save on user-initiated changes.
   const isInitialLoad = useRef(true);
@@ -285,8 +186,11 @@ export function ProposalBuilder({
           setProposalId(result.proposalId);
           onSaved?.(result.proposalId, result.total);
           setShowDraftSaved(true);
-          // Sync crew assignments from proposal to deal_crew so the deal page stays in sync
-          syncCrewFromProposal(dealId).catch(() => {});
+          // Sync crew assignments from proposal to deal_crew so the deal page stays in sync,
+          // then re-fetch so the C6 banner updates if sync resolved a previously-manual row.
+          syncCrewFromProposal(dealId)
+            .then(refreshDealCrew)
+            .catch(() => {});
         }
       });
     }, 1500);
@@ -294,7 +198,28 @@ export function ProposalBuilder({
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [lineItems, dealId, readOnly, saving, sending, onSaved]);
+  }, [lineItems, dealId, readOnly, saving, sending, onSaved, refreshDealCrew]);
+
+  // Rescan fix C6: compute the set of manual Plan-tab additions that are not
+  // represented by any line item's requiredRoles. These are crew members the
+  // PM added on the Deal / Plan tab outside the proposal builder — they
+  // won't appear on the client-facing proposal unless the PM adds a line
+  // item for them, and without this surfacing they'd be invisible here.
+  const planCrewAdditions = useMemo((): DealCrewRow[] => {
+    if (allDealCrew.length === 0) return [];
+    const proposalEntityIds = new Set<string>();
+    for (const li of lineItems) {
+      for (const r of li.requiredRoles ?? []) {
+        if (r.entity_id) proposalEntityIds.add(r.entity_id);
+      }
+    }
+    return allDealCrew.filter(
+      (row) =>
+        row.source === 'manual' &&
+        row.entity_id != null &&
+        !proposalEntityIds.has(row.entity_id)
+    );
+  }, [allDealCrew, lineItems]);
 
   // Reset initial load flag when proposal changes (e.g. after adding from catalog)
   useEffect(() => {
@@ -793,7 +718,7 @@ export function ProposalBuilder({
   const qtyStepperClass =
     'flex flex-col items-center shrink-0 w-10 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-transparent';
   const qtyBtnClass =
-    'p-1 w-full flex items-center justify-center text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] disabled:opacity-40 disabled:pointer-events-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset';
+    'p-1 w-full flex items-center justify-center text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] disabled:opacity-45 disabled:pointer-events-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset';
   const qtyInputClass =
     'w-full py-0.5 px-0 text-center text-sm font-medium tabular-nums bg-transparent border-0 text-[var(--stage-text-primary)] focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
@@ -808,7 +733,7 @@ export function ProposalBuilder({
         layout
         transition={STAGE_MEDIUM}
         className={cn(
-          'group flex items-center gap-3 py-2.5 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] transition-colors duration-[80ms] ease-out cursor-pointer',
+          'group flex items-center gap-3 py-2.5 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] transition-colors duration-[80ms] ease-out cursor-pointer stage-hover overflow-hidden',
           selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
         )}
         onClick={() => {
@@ -828,8 +753,8 @@ export function ProposalBuilder({
             <span
               className={cn(
                 'inline-block w-2 h-2 rounded-full shrink-0',
-                avail.status === 'available' ? 'bg-emerald-400' :
-                avail.status === 'tight' ? 'bg-amber-400' : 'bg-red-400'
+                avail.status === 'available' ? 'bg-[var(--color-unusonic-success)]' :
+                avail.status === 'tight' ? 'bg-[var(--color-unusonic-warning)]' : 'bg-[var(--color-unusonic-error)]'
               )}
               title={
                 avail.status === 'available'
@@ -841,23 +766,30 @@ export function ProposalBuilder({
             />
           )}
 
+          {/* Crew-covered annotation (internal only — Phase 4) */}
+          {item.category === 'rental' && crewEquipmentNames.some((eq) => item.name.toLowerCase().includes(eq) || eq.includes(item.name.toLowerCase())) && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[oklch(0.65_0.12_250/0.12)] text-[oklch(0.75_0.12_250)] stage-label" title="Assigned crew has matching equipment">
+              Crew covered
+            </span>
+          )}
+
           {/* Billing mode label (read-only pill — only shown for non-flat) */}
           {item.unitType && item.unitType !== 'flat' && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.06)] text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
+            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.06)] stage-label">
               {item.unitType === 'hour' ? 'Hourly' : 'Daily'}
             </span>
           )}
 
           {/* Optional badge */}
           {item.isOptional && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[var(--color-unusonic-info)]/10 text-[10px] font-medium text-[var(--color-unusonic-info)]">
+            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[var(--color-unusonic-info)]/10 stage-badge-text text-[var(--color-unusonic-info)]">
               Optional
             </span>
           )}
 
           {/* Click to edit hint — visible on hover, hidden when selected */}
           {selectedLineIndex !== index && (
-            <span className="shrink-0 text-[10px] text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">
+            <span className="shrink-0 text-label text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">
               Click to edit
             </span>
           )}
@@ -965,7 +897,7 @@ export function ProposalBuilder({
                           transition={STAGE_MEDIUM}
                           role="row"
                           className={cn(
-                            'py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] hover:bg-[var(--stage-surface-raised)] min-w-0 transition-colors duration-[80ms] ease-out cursor-pointer',
+                            'py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] min-w-0 transition-colors duration-[80ms] ease-out cursor-pointer stage-hover overflow-hidden',
                             selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
                           )}
                           onClick={() => {
@@ -1177,7 +1109,7 @@ export function ProposalBuilder({
                   trigger={
                     <button
                       type="button"
-                      className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[var(--stage-border-hover)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] hover:bg-[var(--ctx-well)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-void)]"
+                      className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[var(--stage-border-hover)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] hover:bg-[var(--ctx-well)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]"
                     >
                       <Plus className="w-4 h-4" aria-hidden />
                       Add from catalog
@@ -1209,162 +1141,57 @@ export function ProposalBuilder({
             </div>
 
             {/* Send to client */}
-            <div className="shrink-0 pt-4 mt-2 border-t border-[var(--stage-edge-subtle)] space-y-3">
-              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-                Send to
-              </p>
-
-              {/* Contact pills */}
-              {contacts.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {contacts.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        if (selectedSignerContactId === c.id) {
-                          setSelectedSignerContactId(null);
-                          setSigningName('');
-                          setSigningEmail('');
-                        } else {
-                          setSelectedSignerContactId(c.id);
-                          setSigningName(c.name);
-                          setSigningEmail(c.email);
-                          setShowCustomEmailForm(false);
-                        }
-                      }}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-                        selectedSignerContactId === c.id
-                          ? 'border-[var(--stage-accent)]/60 bg-[var(--stage-accent)]/10 text-[var(--stage-text-primary)]'
-                          : 'border-[var(--stage-border)] hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
-                      )}
-                    >
-                      <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                      {c.name}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !showCustomEmailForm;
-                      setShowCustomEmailForm(next);
-                      if (next) {
-                        setSelectedSignerContactId(null);
-                        setSigningName('');
-                        setSigningEmail('');
-                      }
-                    }}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-[var(--stage-radius-input)] border px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-                      showCustomEmailForm
-                        ? 'border-[var(--stage-border-focus)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)]'
-                        : 'border-[var(--stage-border)] hover:bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
-                    )}
-                  >
-                    <Plus className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                    Other email
-                  </button>
-                </div>
-              )}
-
-              {/* Email form — shown when "Other email" toggled or when no contacts exist */}
-              {(showCustomEmailForm || contacts.length === 0) && (
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={signingName}
-                    onChange={(e) => { setSelectedSignerContactId(null); setSigningName(e.target.value); }}
-                    placeholder="Recipient name"
-                    className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
-                  />
-                  <input
-                    type="email"
-                    value={signingEmail}
-                    onChange={(e) => { setSelectedSignerContactId(null); setSigningEmail(e.target.value); }}
-                    placeholder="Recipient email"
-                    className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] hover:border-[oklch(1_0_0_/_0.15)] focus:outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] transition-[border-color,box-shadow] duration-[80ms] ease-out"
-                  />
-                </div>
-              )}
-
-              {/* Send button */}
-              <button
-                type="button"
-                onClick={() => handleSendSubmit(signingEmail, signingName)}
-                disabled={!signingEmail.trim() || lineItems.length === 0 || sending || isPending || clientAttached === false}
-                className="w-full stage-btn stage-btn-primary py-2.5 h-auto disabled:opacity-30"
-              >
-                <Send className="w-4 h-4" />
-                {sending ? 'Sending…' : 'Send proposal'}
-              </button>
-              {clientAttached === false && (
-                <p className="text-xs text-[var(--color-unusonic-error)]">Attach a client to this deal before sending.</p>
-              )}
-            </div>
+            <ProposalSendFlow
+              contacts={contacts}
+              signingEmail={signingEmail}
+              signingName={signingName}
+              selectedSignerContactId={selectedSignerContactId}
+              showCustomEmailForm={showCustomEmailForm}
+              sending={sending}
+              isPending={isPending}
+              clientAttached={clientAttached}
+              lineItemCount={lineItems.length}
+              onSelectContact={(contactId, name, email) => {
+                setSelectedSignerContactId(contactId);
+                setSigningName(name);
+                setSigningEmail(email);
+                setShowCustomEmailForm(false);
+              }}
+              onDeselectContact={() => {
+                setSelectedSignerContactId(null);
+                setSigningName('');
+                setSigningEmail('');
+              }}
+              onToggleCustomEmail={() => {
+                const next = !showCustomEmailForm;
+                setShowCustomEmailForm(next);
+                if (next) {
+                  setSelectedSignerContactId(null);
+                  setSigningName('');
+                  setSigningEmail('');
+                }
+              }}
+              onSigningNameChange={(v) => { setSelectedSignerContactId(null); setSigningName(v); }}
+              onSigningEmailChange={(v) => { setSelectedSignerContactId(null); setSigningEmail(v); }}
+              onSend={() => handleSendSubmit(signingEmail, signingName)}
+            />
 
             {/* Total + actions */}
-            <div className="shrink-0 pt-6 mt-6 border-t border-[var(--stage-edge-subtle)]">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <span className="text-sm font-medium uppercase tracking-wide text-[var(--stage-text-secondary)]">
-                  Total
-                </span>
-                <span className="text-xl font-semibold text-[var(--stage-text-primary)] tabular-nums">
-                  ${total.toLocaleString()}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSaveToCatalog}
-                    disabled={lineItems.length === 0 || saveToCatalogPending}
-                    className="stage-btn stage-btn-secondary inline-flex items-center gap-2 disabled:opacity-45 disabled:pointer-events-none"
-                  >
-                    <BookMarked className="w-4 h-4" />
-                    {saveToCatalogPending ? 'Saving…' : 'Save to catalog'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    disabled={lineItems.length === 0 || saving || isPending}
-                    className="stage-btn stage-btn-secondary inline-flex items-center gap-2 disabled:opacity-45 disabled:pointer-events-none"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Save draft
-                  </button>
-                </div>
-                {saveToCatalogMessage && (
-                  <p className="mt-2 text-sm text-[var(--stage-text-secondary)]" role="status">
-                    {saveToCatalogMessage}
-                  </p>
-                )}
-                {showDraftSaved && (
-                  <p className="mt-2 text-sm text-[var(--stage-accent)]" role="status">
-                    Draft saved
-                  </p>
-                )}
-                {sendError && (
-                  <p className="mt-3 text-sm text-[var(--color-unusonic-error)]" role="alert">
-                    {sendError}
-                  </p>
-                )}
-                {sentUrl && (
-                  <div className="mt-4 space-y-2">
-                    <p className="text-sm text-[var(--stage-accent)]" role="status">
-                      Sent to {signingName || signingEmail}.
-                    </p>
-                    <a
-                      href={sentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] underline hover:text-[var(--stage-text-primary)]"
-                    >
-                      View proposal link
-                    </a>
-                  </div>
-                )}
-                </div>
+            <ProposalActionsFooter
+              total={total}
+              lineItemCount={lineItems.length}
+              saving={saving}
+              isPending={isPending}
+              saveToCatalogPending={saveToCatalogPending}
+              saveToCatalogMessage={saveToCatalogMessage}
+              showDraftSaved={showDraftSaved}
+              sendError={sendError}
+              sentUrl={sentUrl}
+              signingName={signingName}
+              signingEmail={signingEmail}
+              onSaveToCatalog={handleSaveToCatalog}
+              onSaveDraft={handleSaveDraft}
+            />
 
             </div>
           </div>
@@ -1403,6 +1230,9 @@ export function ProposalBuilder({
             onUpdateShowTimes={updateShowTimesOnProposal}
             dealEventStartTime={dealEventStartTime}
             dealEventEndTime={dealEventEndTime}
+            proposedDate={proposedDate}
+            dealId={dealId}
+            planCrewAdditions={planCrewAdditions}
           />
         </div>
 

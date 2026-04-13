@@ -127,7 +127,7 @@ export function InviteTeamMemberSheet({
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild className={triggerClassName}>
-        <Button variant="outline" size="sm" className="gap-2 border-[var(--stage-border)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)]">
+        <Button variant="outline" size="sm" className="gap-2 border-[var(--stage-border)] text-[var(--stage-text-primary)] stage-hover overflow-hidden">
           <Plus className="h-4 w-4" />
           Invite team member
         </Button>
@@ -153,19 +153,19 @@ export function InviteTeamMemberSheet({
             </div>
           )}
           {rootError && !seatLimitData && (
-            <div className="mb-4 rounded-xl border border-[var(--color-unusonic-error)]/20 bg-[var(--color-unusonic-error)]/10 px-3 py-2 text-sm text-[var(--color-unusonic-error)]">
+            <div className="mb-4 rounded-xl border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-error)] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--color-unusonic-error)]">
               {rootError}
             </div>
           )}
 
           {/* Section A: Roster details (required) */}
           <div className="space-y-4">
-            <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight">
+            <p className="stage-field-label">
               Roster details
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="invite-first_name" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">First name</label>
+                <label htmlFor="invite-first_name" className="block stage-field-label mb-1.5">First name</label>
                 <Input
                   id="invite-first_name"
                   {...form.register('first_name', { required: 'First name required' })}
@@ -177,7 +177,7 @@ export function InviteTeamMemberSheet({
                 )}
               </div>
               <div className="space-y-2">
-                <label htmlFor="invite-last_name" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Last name</label>
+                <label htmlFor="invite-last_name" className="block stage-field-label mb-1.5">Last name</label>
                 <Input
                   id="invite-last_name"
                   {...form.register('last_name', { required: 'Last name required' })}
@@ -190,7 +190,7 @@ export function InviteTeamMemberSheet({
               </div>
             </div>
             <div className="space-y-2">
-              <label htmlFor="invite-email" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Email</label>
+              <label htmlFor="invite-email" className="block stage-field-label mb-1.5">Email</label>
               <Input
                 id="invite-email"
                 type="email"
@@ -203,7 +203,7 @@ export function InviteTeamMemberSheet({
               )}
             </div>
             <div className="space-y-2">
-              <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Internal team role</label>
+              <label className="block stage-field-label mb-1.5">Internal team role</label>
               <Select
                 value={form.watch('internal_role')}
                 onValueChange={(v) => form.setValue('internal_role', v as InviteInternalRole)}
@@ -224,7 +224,7 @@ export function InviteTeamMemberSheet({
               </p>
             </div>
             <div className="space-y-2">
-              <label htmlFor="invite-job_title" className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1.5">Job title (optional)</label>
+              <label htmlFor="invite-job_title" className="block stage-field-label mb-1.5">Job title (optional)</label>
               <Input
                 id="invite-job_title"
                 {...form.register('job_title')}
@@ -236,7 +236,7 @@ export function InviteTeamMemberSheet({
 
           {/* Section B: Grant Unusonic login access */}
           <div className="mt-8 space-y-4 border-t border-[var(--stage-border)] pt-6">
-            <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight">
+            <p className="stage-field-label">
               System access
             </p>
             <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface)] p-4">
@@ -260,7 +260,7 @@ export function InviteTeamMemberSheet({
           {/* Section C: Workspace role (only when grant access is on) */}
           {grantAccess && (
             <div className="mt-6 space-y-4">
-              <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight">
+              <p className="stage-field-label">
                 Workspace role
               </p>
               {rolesLoading ? (

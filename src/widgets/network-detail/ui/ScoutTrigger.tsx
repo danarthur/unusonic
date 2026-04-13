@@ -29,8 +29,8 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
     }
 
     setScanning(true);
-    toast('Acquiring signal…', {
-      icon: <Loader2 className="size-3.5 animate-spin" />,
+    toast('Scanning…', {
+      icon: <Loader2 className="size-3.5 animate-spin" strokeWidth={1.5} />,
     });
 
     const result = await scoutEntity(trimmed);
@@ -63,10 +63,10 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
       disabled={!canScan}
       transition={STAGE_MEDIUM}
       className={cn(
-        'group relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 border transition-colors duration-[80ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+        'group relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 border transition-colors duration-[80ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
         canScan
-          ? 'border-[oklch(1_0_0/0.10)] bg-[oklch(1_0_0/0.06)] hover:bg-[oklch(1_0_0/0.08)] hover:border-[oklch(1_0_0/0.14)] text-[var(--stage-text-primary)] cursor-pointer'
-          : 'border-[oklch(1_0_0_/_0.08)]/50 bg-[oklch(0.20_0_0/0.05)] text-[var(--stage-text-secondary)]/60 cursor-not-allowed',
+          ? 'border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.06)] hover:bg-[oklch(1_0_0/0.08)] hover:border-[oklch(1_0_0/0.14)] text-[var(--stage-text-primary)] cursor-pointer'
+          : 'border-[var(--stage-edge-subtle)]/50 bg-[oklch(0.20_0_0/0.05)] text-[var(--stage-text-secondary)]/60 cursor-not-allowed',
       )}
     >
       <span
@@ -76,21 +76,21 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
         )}
       >
         {scanning ? (
-          <Loader2 className={cn('size-4 animate-spin', canScan ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]')} />
+          <Loader2 className={cn('size-4 animate-spin', canScan ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]')} strokeWidth={1.5} />
         ) : (
-          <ScanSearch className={cn('size-4', canScan ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]')} />
+          <ScanSearch className={cn('size-4', canScan ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]')} strokeWidth={1.5} />
         )}
       </span>
       <div className="flex flex-col items-start min-w-0">
-        <span className="text-[11px] font-medium uppercase tracking-widest leading-none">
+        <span className="stage-label leading-none">
           {scanning ? 'Scanning' : 'Aion'}
         </span>
-        <span className="text-[10px] text-[var(--stage-text-secondary)] mt-0.5 truncate max-w-[140px]">
+        <span className="stage-label text-[var(--stage-text-secondary)] mt-0.5 truncate max-w-[140px]">
           {scanning ? 'Acquiring intelligence…' : 'Auto-fill from website'}
         </span>
       </div>
       {canScan && (
-        <Sparkles className="size-3.5 shrink-0 text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] transition-colors" />
+        <Sparkles className="size-3.5 shrink-0 text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] transition-colors" strokeWidth={1.5} />
       )}
     </motion.button>
     </div>

@@ -108,7 +108,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
               </SheetTitle>
               <SheetClose />
             </SheetHeader>
-            <div role="tablist" className="flex gap-1 border-b border-[oklch(1_0_0_/_0.08)] px-6">
+            <div role="tablist" className="flex gap-1 border-b border-[var(--stage-edge-subtle)] px-6">
               {tabs.map((t) => (
                 <button
                   key={t.id}
@@ -116,7 +116,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                   role="tab"
                   aria-selected={tab === t.id}
                   onClick={() => setTab(t.id)}
-                  className={`px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ${
+                  className={`px-3 py-2 stage-badge-text font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)] ${
                     tab === t.id
                       ? 'text-[var(--stage-text-primary)] border-b-2 border-[var(--stage-accent)]'
                       : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
@@ -131,21 +131,21 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                 <div className="space-y-4">
                   {isOrg && (
                     <>
-                      <p className="text-sm text-[var(--stage-text-secondary)]">
+                      <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">
                         {org!.is_claimed ? 'Claimed' : 'Ghost'} · {org!.roster?.length ?? 0} people
                       </p>
                       {org!.slug && (
-                        <p className="text-xs text-[var(--stage-text-secondary)]">/{org!.slug}</p>
+                        <p className="stage-label text-[var(--stage-text-secondary)]">/{org!.slug}</p>
                       )}
                     </>
                   )}
                   {!isOrg && entity && (
                     <>
-                      {entity.email && <p className="text-sm text-[var(--stage-text-secondary)]">{entity.email}</p>}
+                      {entity.email && <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">{entity.email}</p>}
                       {entity.organization_names?.length ? (
                         <div className="flex flex-wrap gap-1">
                           {entity.organization_names.map((name) => (
-                            <Badge key={name} variant="secondary" className="text-xs">
+                            <Badge key={name} variant="secondary" className="stage-label">
                               {name}
                             </Badge>
                           ))}
@@ -158,7 +158,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
 
               {tab === 'private_notes' && isOrg && org && (
                 <div className="space-y-4">
-                  <p className="rounded-lg border-l-[3px] border-[oklch(1_0_0/0.12)] bg-[var(--stage-surface)] px-3 py-2 text-xs font-medium text-[var(--stage-text-primary)]">
+                  <p className="rounded-lg border-l-[3px] border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-2 stage-label text-[var(--stage-text-primary)]">
                     Internal only — visible to your organization.
                   </p>
                   <form
@@ -174,19 +174,19 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                   >
                     <input type="hidden" name="subject_org_id" value={org.id} />
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                      <label className="mb-1 block stage-label text-[var(--stage-text-secondary)]">
                         Notes
                       </label>
                       <Textarea
                         name="private_notes"
                         defaultValue={org.private_notes ?? ''}
                         placeholder="Internal notes about this org…"
-                        className="min-h-[120px] resize-y bg-[var(--ctx-well)] border-[oklch(1_0_0_/_0.08)]"
+                        className="min-h-[120px] resize-y bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
                         rows={4}
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--stage-text-secondary)]">
+                      <label className="mb-1 block stage-label text-[var(--stage-text-secondary)]">
                         Rating
                       </label>
                       <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                         <select
                           name="internal_rating"
                           defaultValue={org.internal_rating ?? ''}
-                          className="rounded-lg border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-2 py-1 text-sm text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                          className="rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-2 py-1 text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]"
                           onChange={(e) => {
                             const v = e.target.value ? Number(e.target.value) : null;
                             setOptimisticRating(v);
@@ -210,7 +210,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                       </div>
                     </div>
                     {notesState?.error && (
-                      <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{notesState.error}</p>
+                      <p role="alert" className="stage-label text-[var(--color-unusonic-error)]">{notesState.error}</p>
                     )}
                     <Button type="submit" variant="default" size="sm">
                       Save
@@ -261,18 +261,18 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                             : undefined
                         }
                         className={cn(
-                          'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-card)] px-4 py-3',
+                          'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] px-4 py-3',
                           hasMemberId && 'cursor-pointer overflow-hidden transition-colors'
                         )}
                       >
                         <div className="min-w-0 flex-1">
-                          <span className="text-sm font-medium text-[var(--stage-text-primary)]">
+                          <span className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
                             {person.email || 'Contact'}
                           </span>
                           {rosterPerson.skill_tags?.length ? (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {rosterPerson.skill_tags.map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-[10px] font-normal text-[var(--stage-text-secondary)]">
+                                <Badge key={tag} variant="outline" className="stage-label font-normal text-[var(--stage-text-secondary)]">
                                   {tag}
                                 </Badge>
                               ))}
@@ -280,7 +280,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                           ) : null}
                         </div>
                         {person.role_label && (
-                          <Badge variant="secondary" className="shrink-0 text-xs">
+                          <Badge variant="secondary" className="shrink-0 stage-label">
                             {person.role_label}
                           </Badge>
                         )}
@@ -288,7 +288,7 @@ export function EntitySheet({ subject, open, onOpenChange }: EntitySheetProps) {
                     );
                   })}
                   {(!org.roster || org.roster.length === 0) && (
-                    <p className="py-4 text-center text-sm text-[var(--stage-text-secondary)]">
+                    <p className="py-4 text-center text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">
                       No people linked yet.
                     </p>
                   )}

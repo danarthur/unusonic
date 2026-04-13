@@ -48,7 +48,7 @@ export async function sendCrewReminder(
 
   const supabase = getSystemClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   // Fetch assignment
   const { data: assignment, error: assignErr } = await db

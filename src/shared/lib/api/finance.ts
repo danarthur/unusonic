@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 
 export async function getDashboardFinances() {
@@ -20,6 +21,7 @@ export async function getDashboardFinances() {
     return data;
   } catch (error) {
     console.error('Error initializing finance client:', error);
+    Sentry.captureException(error, { tags: { module: 'finance', action: 'initClient' } });
     return [];
   }
 }

@@ -8,6 +8,7 @@
 import 'server-only';
 
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { calculateProposalTotal } from '../lib/calculate-proposal-total';
 import type { PublicProposalDTO } from '../model/public-proposal';
 
 export async function getPublicProposal(token: string): Promise<PublicProposalDTO | null> {
@@ -15,7 +16,7 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
 
   const supabase = getSystemClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- system client types don't include directory/ops/cortex schemas
-  const crossSchema = supabase as any;
+  const crossSchema = supabase;
 
   // 1. Proposal by public_token
   const { data: proposal, error: proposalError } = await supabase
@@ -239,17 +240,14 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
     (row) => (row as { is_client_visible?: boolean | null }).is_client_visible !== false
   );
 
-  const total = itemsWithImages.reduce((sum, row) => {
-    if (!row.clientSelected) return sum;
-    // Use override_price when set (proposal-level price lock), else unit_price from catalog
-    const price = parseFloat(String((row as { override_price?: number | null }).override_price ?? row.unit_price ?? 0));
-    // unit_multiplier only applies for hourly/daily billing; flat-rate items always use multiplier=1
-    const unitType = (row as { unit_type?: string | null }).unit_type;
-    const multiplier = (unitType === 'hour' || unitType === 'day')
-      ? (Number((row as { unit_multiplier?: number | null }).unit_multiplier ?? 1) || 1)
-      : 1;
-    return sum + (row.quantity ?? 1) * multiplier * price;
-  }, 0);
+  const total = calculateProposalTotal(itemsWithImages.map(row => ({
+    clientSelected: row.clientSelected,
+    unit_price: row.unit_price,
+    override_price: (row as { override_price?: number | null }).override_price,
+    unit_type: (row as { unit_type?: string | null }).unit_type,
+    unit_multiplier: (row as { unit_multiplier?: number | null }).unit_multiplier,
+    quantity: row.quantity,
+  })));
 
   // Resolve signed PDF download URL (storage path → signed URL; absolute URL → pass through)
   const rawPdfPath = (proposal as { signed_pdf_path?: string | null }).signed_pdf_path ?? null;

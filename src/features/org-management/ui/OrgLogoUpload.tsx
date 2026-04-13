@@ -91,7 +91,7 @@ export function OrgLogoUpload({ orgId, logoUrl, onSuccess, onError, className }:
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        className="flex items-center gap-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2 text-sm font-medium text-[var(--stage-text-primary)] transition-colors hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-50"
+        className="flex items-center gap-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2 text-sm font-medium text-[var(--stage-text-primary)] transition-colors hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-45"
       >
         <Upload className="size-4" />
         {logoUrl ? 'Replace logo' : 'Upload logo'}

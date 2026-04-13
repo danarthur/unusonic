@@ -58,7 +58,7 @@ export function ScoutThoughtLog({ steps, suggestion, className }: ScoutThoughtLo
           transition={{ duration: M3_DURATION_S, ease: M3_EASING_ENTER }}
           className="rounded-xl bg-[oklch(1_0_0_/_0.03)] border border-[oklch(1_0_0_/_0.10)] px-4 py-3 mb-4"
         >
-          <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/60 mb-1.5">
+          <p className="stage-label text-[var(--stage-text-secondary)]/60 mb-1.5">
             Recommendation
           </p>
           <p className="text-sm text-[var(--stage-text-primary)] leading-relaxed">
@@ -68,7 +68,7 @@ export function ScoutThoughtLog({ steps, suggestion, className }: ScoutThoughtLo
       )}
       {steps.length > 0 && (
         <>
-          <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/60 mb-2">
+          <p className="stage-label text-[var(--stage-text-secondary)]/60 mb-2">
             Thought log
           </p>
           <div

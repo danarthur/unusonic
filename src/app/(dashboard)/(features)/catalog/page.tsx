@@ -8,14 +8,17 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Fuse from 'fuse.js';
 import { Plus, RefreshCw } from 'lucide-react';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import { createPackageWithION } from '@/features/ai/tools/package-generator';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { getCatalogPackagesWithTags, createPackage, updatePackage } from '@/features/sales/api/package-actions';
-import { semanticSearchCatalog, backfillWorkspaceEmbeddings } from '@/features/sales/api/catalog-embeddings';
+import { createPackage, updatePackage } from '@/features/sales/api/package-actions';
+import { backfillWorkspaceEmbeddings } from '@/features/sales/api/catalog-embeddings';
+import { catalogQueries } from '@/features/sales/api/queries';
+import { queryKeys } from '@/shared/api/query-keys';
 import type { PackageWithTags } from '@/features/sales/api/package-actions';
 import type { PackageCategory } from '@/features/sales/api/package-actions';
 import type { WorkspaceTag } from '@/features/sales/api/workspace-tag-actions';
@@ -52,9 +55,17 @@ type CatalogTab = 'all' | PackageCategory;
 export default function CatalogPage() {
   const router = useRouter();
   const { workspaceId, hasWorkspace } = useWorkspace();
-  const [packages, setPackages] = useState<PackageWithTags[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: packagesResult, isLoading: loading, error: queryError } = useQuery({
+    ...catalogQueries.list(workspaceId ?? ''),
+    enabled: !!workspaceId,
+  });
+  const packages = packagesResult?.packages ?? [];
+  const error = packagesResult?.error ?? queryError?.message ?? null;
+  const invalidateCatalog = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.catalog.all(workspaceId ?? '') }),
+    [queryClient, workspaceId],
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -87,8 +98,7 @@ export default function CatalogPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const { views: smartViews, saveView: saveSmartView, deleteView: deleteSmartView } = useSmartViews(workspaceId);
-  const [semanticResults, setSemanticResults] = useState<PackageWithTags[]>([]);
-  const [semanticLoading, setSemanticLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [rebuildingIndex, setRebuildingIndex] = useState(false);
   const [rebuildProgress, setRebuildProgress] = useState<string | null>(null);
 
@@ -134,27 +144,7 @@ export default function CatalogPage() {
     return list;
   }, [packages, fuse, showArchived, activeCategoryTab, tagFilterId, searchQuery]);
 
-  const loadPackages = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!workspaceId) {
-      setPackages([]);
-      setLoading(false);
-      return;
-    }
-    if (!opts?.silent) {
-      setLoading(true);
-      setError(null);
-    }
-    const result = await getCatalogPackagesWithTags(workspaceId);
-    setPackages(result.packages ?? []);
-    setError(result.error ?? null);
-    if (!opts?.silent) setLoading(false);
-  }, [workspaceId]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void loadPackages();
-    });
-  }, [loadPackages]);
+  // No loadPackages — useQuery handles fetching and caching automatically
 
   // Smart defaults: Brochure (grid) for All/Packages, Ledger (table) for ingredients.
   // Do not override if user is in timeline mode — that's an explicit choice.
@@ -184,30 +174,25 @@ export default function CatalogPage() {
     setActiveViewId(null);
   }, [activeCategoryTab, searchQuery, tagFilterId]);
 
-  // Semantic search — runs async, never blocks fuzzy results
+  // Debounce search query for semantic search
   useEffect(() => {
-    if (!workspaceId || searchQuery.trim().length < 3) {
-      setSemanticResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setSemanticLoading(true);
-      try {
-        const results = await semanticSearchCatalog(workspaceId, searchQuery.trim(), 10);
-        const fuzzyIds = new Set(filteredPackages.map((p) => p.id));
-        const semanticPkgs = results
-          .filter((r) => !fuzzyIds.has(r.packageId))
-          .map((r) => packages.find((p) => p.id === r.packageId))
-          .filter(Boolean) as PackageWithTags[];
-        setSemanticResults(semanticPkgs);
-      } catch {
-        setSemanticResults([]);
-      } finally {
-        setSemanticLoading(false);
-      }
-    }, 400);
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(timer);
-  }, [searchQuery, workspaceId, packages, filteredPackages]);
+  }, [searchQuery]);
+
+  // Semantic search via useQuery — runs async, never blocks fuzzy results
+  const { data: semanticRawResults = [], isLoading: semanticLoading } = useQuery({
+    ...catalogQueries.semanticSearch(workspaceId ?? '', debouncedSearch),
+  });
+
+  const semanticResults = useMemo(() => {
+    if (!semanticRawResults.length) return [];
+    const fuzzyIds = new Set(filteredPackages.map((p) => p.id));
+    return semanticRawResults
+      .filter((r) => !fuzzyIds.has(r.packageId))
+      .map((r) => packages.find((p) => p.id === r.packageId))
+      .filter(Boolean) as PackageWithTags[];
+  }, [semanticRawResults, filteredPackages, packages]);
 
   const handleRebuildIndex = useCallback(async () => {
     if (!workspaceId || rebuildingIndex) return;
@@ -229,26 +214,26 @@ export default function CatalogPage() {
   const handleBulkArchive = useCallback(async () => {
     const ids = Array.from(selectedIds);
     const { error } = await bulkArchivePackages(ids);
-    if (!error) { setSelectedIds(new Set()); await loadPackages(); }
-  }, [selectedIds, loadPackages]);
+    if (!error) { setSelectedIds(new Set()); invalidateCatalog(); }
+  }, [selectedIds, invalidateCatalog]);
 
   const handleBulkRestore = useCallback(async () => {
     const ids = Array.from(selectedIds);
     const { error } = await bulkRestorePackages(ids);
-    if (!error) { setSelectedIds(new Set()); await loadPackages(); }
-  }, [selectedIds, loadPackages]);
+    if (!error) { setSelectedIds(new Set()); invalidateCatalog(); }
+  }, [selectedIds, invalidateCatalog]);
 
   const handleBulkAdjustPrice = useCallback(async (percent: number) => {
     const ids = Array.from(selectedIds);
     const { error } = await bulkAdjustPrice(ids, percent);
-    if (!error) { setSelectedIds(new Set()); await loadPackages(); }
-  }, [selectedIds, loadPackages]);
+    if (!error) { setSelectedIds(new Set()); invalidateCatalog(); }
+  }, [selectedIds, invalidateCatalog]);
 
   const handleBulkSetTaxable = useCallback(async (taxable: boolean) => {
     const ids = Array.from(selectedIds);
     const { error } = await bulkSetTaxStatus(ids, taxable);
-    if (!error) { setSelectedIds(new Set()); await loadPackages(); }
-  }, [selectedIds, loadPackages]);
+    if (!error) { setSelectedIds(new Set()); invalidateCatalog(); }
+  }, [selectedIds, invalidateCatalog]);
 
   // Smart view selection — apply saved filters and set activeViewId
   const handleSelectSmartView = useCallback((view: { id: string; filters: { categoryTab: 'all' | PackageCategory; tagFilterId: string | null; searchQuery: string } }) => {
@@ -263,8 +248,8 @@ export default function CatalogPage() {
   // Archived view restore handler
   const handleArchivedRestore = useCallback(async (ids: string[]) => {
     const { error } = await bulkRestorePackages(ids);
-    if (!error) await loadPackages();
-  }, [loadPackages]);
+    if (!error) invalidateCatalog();
+  }, [invalidateCatalog]);
 
   // Check if current filters are empty (for smart view save button visibility)
   const currentFiltersEmpty = activeCategoryTab === 'all' && !tagFilterId && !searchQuery.trim();
@@ -386,21 +371,21 @@ export default function CatalogPage() {
       setTagFilterId(null);
       if (result.package?.id) {
         const isBundle = category === 'package';
-        loadPackages({ silent: true });
+        invalidateCatalog();
         router.push(isBundle ? `/catalog/${result.package.id}/builder` : `/catalog/${result.package.id}/edit`);
         return;
       }
-      await loadPackages();
+      invalidateCatalog();
       return;
     }
     setSaving(false);
     closeModal();
-    await loadPackages();
+    invalidateCatalog();
   };
 
   const handleArchive = async (pkg: PackageWithTags) => {
     const result = await updatePackage(pkg.id, { is_active: !pkg.is_active });
-    if (!result.error) await loadPackages();
+    if (!result.error) invalidateCatalog();
   };
 
   const handleIonCreate = async () => {
@@ -416,7 +401,7 @@ export default function CatalogPage() {
     if (result.packageId) {
       setIonPrompt('');
       setIonModalOpen(false);
-      await loadPackages();
+      invalidateCatalog();
       router.push(`/catalog/${result.packageId}/builder`);
     }
   };
@@ -461,7 +446,7 @@ export default function CatalogPage() {
           <button
             type="button"
             onClick={() => { setIonError(null); setIonModalOpen(true); }}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.15)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.15)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             <LivingLogo size="sm" status="idle" />
             Ask Aion
@@ -469,7 +454,7 @@ export default function CatalogPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             <Plus size={18} strokeWidth={1.5} aria-hidden />
             New Item
@@ -492,7 +477,7 @@ export default function CatalogPage() {
               value={ionPrompt}
               onChange={(e) => setIonPrompt(e.target.value)}
               placeholder="e.g. Luxury wedding package for 150 guests. Full-day photography, 3-piece band, champagne toast. Around $12k."
-              className="w-full min-h-[120px] px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] resize-y"
+              className="w-full min-h-[120px] px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-y"
               disabled={ionLoading}
             />
             {ionError && (
@@ -502,7 +487,7 @@ export default function CatalogPage() {
               type="button"
               onClick={handleIonCreate}
               disabled={ionLoading || !ionPrompt.trim()}
-              className="w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="stage-hover overflow-hidden w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] font-medium text-sm disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               {ionLoading ? 'Creating...' : 'Create with Aion'}
             </button>
@@ -525,7 +510,7 @@ export default function CatalogPage() {
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               <Plus size={18} strokeWidth={1.5} /> Create your first item
             </button>
@@ -541,7 +526,7 @@ export default function CatalogPage() {
             <button
               type="button"
               onClick={() => { setIonError(null); setIonModalOpen(true); }}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.15)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="stage-hover overflow-hidden w-full inline-flex items-center justify-center gap-2 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.15)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               <LivingLogo size="sm" status="idle" /> Describe &amp; create
             </button>
@@ -552,7 +537,7 @@ export default function CatalogPage() {
         <ArchivedItemsView
           packages={packages}
           onRestore={handleArchivedRestore}
-          onDelete={async () => { await loadPackages(); }}
+          onDelete={() => { invalidateCatalog(); }}
           onBack={() => setShowArchived(false)}
         />
       ) : (
@@ -577,7 +562,7 @@ export default function CatalogPage() {
                 type="button"
                 onClick={handleRebuildIndex}
                 disabled={rebuildingIndex}
-                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
                 title="Rebuild search index"
               >
                 <RefreshCw size={14} strokeWidth={1.5} className={rebuildingIndex ? 'animate-spin' : ''} aria-hidden />
@@ -688,7 +673,7 @@ export default function CatalogPage() {
         open={csvImportOpen}
         onOpenChange={setCsvImportOpen}
         workspaceId={workspaceId}
-        onImported={() => loadPackages()}
+        onImported={() => invalidateCatalog()}
       />
     </div>
   );

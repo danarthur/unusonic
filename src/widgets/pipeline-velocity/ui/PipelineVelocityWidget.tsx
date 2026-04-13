@@ -7,8 +7,7 @@ import { TrendingUp } from 'lucide-react';
 import { WidgetShell } from '@/widgets/shared';
 import { usePipelineVelocity } from '../lib/use-pipeline-velocity';
 import {
-  M3_FADE_THROUGH_ENTER,
-  M3_SHARED_AXIS_X_VARIANTS,
+  STAGE_LIGHT,
   STAGE_MEDIUM,
 } from '@/shared/lib/motion-constants';
 
@@ -41,8 +40,8 @@ export function PipelineVelocityWidget({ ionHint = false }: PipelineVelocityWidg
         {stages.map((stage) => (
           <motion.div
             key={stage.key}
-            variants={M3_SHARED_AXIS_X_VARIANTS}
-            transition={M3_FADE_THROUGH_ENTER}
+            variants={{ hidden: { opacity: 0, x: -8 }, visible: { opacity: 1, x: 0 } }}
+            transition={STAGE_LIGHT}
             className="flex items-center gap-3"
           >
             <span className="text-xs font-medium text-[var(--stage-text-primary)] tracking-tight w-20 shrink-0">
@@ -65,7 +64,7 @@ export function PipelineVelocityWidget({ ionHint = false }: PipelineVelocityWidg
 
       <Link
         href="/crm"
-        className="mt-4 flex w-full items-center justify-center rounded-xl border border-[oklch(1_0_0_/_0.12)] bg-transparent px-3 py-2.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] transition-[filter] hover:brightness-[1.06] hover:text-[var(--stage-text-primary)]"
+        className="mt-4 flex w-full items-center justify-center rounded-xl border border-[oklch(1_0_0_/_0.12)] bg-transparent px-3 py-2.5 stage-label hover:bg-[oklch(1_0_0_/_0.08)] hover:text-[var(--stage-text-primary)] transition-[background-color,color]"
       >
         View Pipeline
       </Link>

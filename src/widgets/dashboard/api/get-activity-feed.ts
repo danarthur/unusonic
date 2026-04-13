@@ -61,7 +61,7 @@ export async function getActivityFeed(): Promise<ActivityItem[]> {
     // Recent crew confirmations (ops schema, not in generated types)
     // deal_crew has no `status` column — confirmed crew have confirmed_at IS NOT NULL.
     // deal_crew has no `updated_at` — use confirmed_at as the activity timestamp.
-    (supabase as any)
+    supabase
       .schema('ops')
       .from('deal_crew')
       .select('id, deal_id, entity_id, confirmed_at')

@@ -41,7 +41,7 @@ const CATEGORIES: { value: PackageCategory; label: string }[] = [
 
 
 const inputClass =
-  'w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
+  'w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]';
 const labelClass = 'block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1';
 
 export default function CatalogEditPage() {
@@ -736,7 +736,7 @@ export default function CatalogEditPage() {
           </div>
 
           {(category === 'service' || category === 'talent') && (
-            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">{category === 'talent' ? 'Talent' : 'Service'}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -791,7 +791,7 @@ export default function CatalogEditPage() {
           {category !== 'package' && (
             <div>
               <label className={cn(labelClass, 'mb-1.5')}>Billing type</label>
-              <div className="flex gap-1 p-1 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]">
+              <div className="flex gap-1 p-1 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]">
                 {([['flat', 'Flat rate'], ['hour', 'Hourly'], ['day', 'Daily']] as const).map(([val, label]) => (
                   <button
                     key={val}
@@ -832,7 +832,7 @@ export default function CatalogEditPage() {
           )}
 
           {category === 'rental' && (
-            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                 Inventory & Fulfillment
               </p>
@@ -861,7 +861,7 @@ export default function CatalogEditPage() {
                       type="checkbox"
                       checked={isSubRental}
                       onChange={(e) => setIsSubRental(e.target.checked)}
-                      className="rounded border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-nested)] text-[var(--stage-accent)] focus:ring-[var(--stage-accent)]"
+                      className="rounded border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] text-[var(--stage-accent)] focus-visible:ring-[var(--stage-accent)]"
                     />
                     <span className="text-sm text-[var(--stage-text-primary)]">We sub-rent this item from another vendor</span>
                   </label>
@@ -904,7 +904,7 @@ export default function CatalogEditPage() {
           )}
 
           {category === 'rental' && (
-            <div className="space-y-3 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+            <div className="space-y-3 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                   Alternative items
@@ -922,7 +922,7 @@ export default function CatalogEditPage() {
                     return (
                       <li
                         key={altId}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--stage-surface-nested)]"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--ctx-well)]"
                       >
                         <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">
                           {altPkg?.name ?? altId}
@@ -1011,7 +1011,7 @@ export default function CatalogEditPage() {
           )}
 
           {category === 'retail_sale' && (
-            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Retail</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1045,14 +1045,14 @@ export default function CatalogEditPage() {
           )}
 
           {isBundle && (
-            <div className="rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface-nested)] p-4">
+            <div className="rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--ctx-well)] p-4">
               <p className="text-sm text-[var(--stage-text-primary)] mb-2">Bundle (Package)</p>
               <p className="text-xs text-[var(--stage-text-secondary)] mb-3">
                 Drag ingredients from your catalog into this package in the Builder.
               </p>
               <Link
                 href={`/catalog/${id}/builder`}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.14)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)] font-medium text-sm hover:brightness-[1.06] transition-[filter]"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.14)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[oklch(1_0_0_/_0.08)] transition-colors"
               >
                 <LayoutGrid size={18} strokeWidth={1.5} aria-hidden />
                 Open in Builder
@@ -1063,14 +1063,14 @@ export default function CatalogEditPage() {
             <button
               type="button"
               onClick={() => router.push('/catalog')}
-              className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="stage-hover overflow-hidden flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:brightness-[1.06] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:bg-[oklch(1_0_0_/_0.08)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
@@ -1091,14 +1091,14 @@ export default function CatalogEditPage() {
             {/* Inherited from ingredients (bundles only) — read-only */}
             {inheritedAssignees.length > 0 && (
               <div className="flex flex-col gap-1.5 mb-3">
-                <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 mb-1">From ingredients</p>
+                <p className="stage-label text-[var(--stage-text-secondary)]/40 mb-1">From ingredients</p>
                 {inheritedAssignees.map((a) => (
-                  <div key={`${a.id}-inherited`} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.04)] bg-[var(--stage-surface-nested)] opacity-60">
+                  <div key={`${a.id}-inherited`} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.04)] bg-[var(--ctx-well)] opacity-60">
                     {a.entity_id === null && (
-                      <span className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
+                      <span className="stage-label text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
                     )}
                     <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{a.entity_id ? (a.entity_name ?? a.entity_id) : (a.role_note ?? '—')}</span>
-                    <span className="text-[10px] text-[var(--stage-text-secondary)]/40 shrink-0">{a.ingredient_name}</span>
+                    <span className="text-label text-[var(--stage-text-secondary)]/40 shrink-0">{a.ingredient_name}</span>
                   </div>
                 ))}
               </div>
@@ -1108,12 +1108,12 @@ export default function CatalogEditPage() {
             {assignees.length > 0 && (
               <div className="flex flex-col gap-1.5 mb-3">
                 {inheritedAssignees.length > 0 && (
-                  <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 mb-1">Added directly</p>
+                  <p className="stage-label text-[var(--stage-text-secondary)]/40 mb-1">Added directly</p>
                 )}
                 {assignees.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--stage-surface-nested)]">
+                  <div key={a.id} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--ctx-well)]">
                     {a.entity_id === null && (
-                      <span className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
+                      <span className="stage-label text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
                     )}
                     <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{a.entity_id ? (a.entity_name ?? a.entity_id) : (a.role_note ?? '—')}</span>
                     {a.entity_id && a.role_note && <span className="text-xs text-[var(--stage-text-secondary)]/50">{a.role_note}</span>}
@@ -1125,7 +1125,7 @@ export default function CatalogEditPage() {
               </div>
             )}
 
-            <div className="flex gap-1 mb-3 p-1 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface-nested)] border border-[oklch(1_0_0_/_0.06)] w-fit">
+            <div className="flex gap-1 mb-3 p-1 rounded-[var(--stage-radius-nested)] bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.06)] w-fit">
               <button
                 type="button"
                 onClick={() => setCrewMode('person')}
@@ -1171,7 +1171,7 @@ export default function CatalogEditPage() {
                         className="w-full text-left px-4 py-2.5 text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] transition-colors"
                       >
                         {r.name}
-                        {r.entity_type && <span className="ml-1.5 text-[10px] opacity-50 capitalize">{r.entity_type}</span>}
+                        {r.entity_type && <span className="ml-1.5 text-label opacity-50 capitalize">{r.entity_type}</span>}
                       </button>
                     ))}
                   </div>
@@ -1196,7 +1196,7 @@ export default function CatalogEditPage() {
                   type="button"
                   disabled={!roleInput.trim() || roleAdding}
                   onClick={handleAddRole}
-                  className="shrink-0 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] disabled:opacity-40 transition-colors focus:outline-none"
+                  className="shrink-0 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] disabled:opacity-45 transition-colors focus:outline-none"
                 >
                   {roleAdding ? 'Adding…' : 'Add'}
                 </button>

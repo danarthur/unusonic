@@ -110,7 +110,7 @@ export function PasskeyNudgeBanner() {
             type="button"
             onClick={handleSetup}
             disabled={state === 'registering'}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[oklch(1_0_0_/_0.12)] bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors text-sm font-medium disabled:opacity-50"
+            className="stage-hover overflow-hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[oklch(1_0_0_/_0.12)] bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] transition-colors text-sm font-medium disabled:opacity-45"
           >
             {state === 'registering' ? (
               <>

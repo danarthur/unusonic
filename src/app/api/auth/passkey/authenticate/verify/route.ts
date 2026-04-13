@@ -9,6 +9,7 @@ import { verifyAuthenticationResponse, type AuthenticatorTransportFuture } from 
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { createClient } from '@/shared/api/supabase/server';
 import { cookies } from 'next/headers';
+import * as Sentry from '@sentry/nextjs';
 
 const CHALLENGE_COOKIE = 'webauthn_assert_challenge';
 
@@ -28,14 +29,16 @@ function getOrigin(request: NextRequest): string {
 }
 
 function getRpId(request: NextRequest): string {
-  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
-    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
-  }
-  try {
-    return new URL(getOrigin(request)).hostname || 'localhost';
-  } catch {
+  const hostname = (() => {
+    try { return new URL(getOrigin(request)).hostname || 'localhost'; }
+    catch { return 'localhost'; }
+  })();
+
+  // On localhost, ignore the production RP ID — it won't validate
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'localhost';
   }
+  return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID || hostname;
 }
 
 export async function POST(request: NextRequest) {
@@ -171,7 +174,7 @@ export async function POST(request: NextRequest) {
     const nextPath =
       (body.redirectTo as string)?.trim()?.startsWith('/') === true
         ? (body.redirectTo as string).trim()
-        : '/lobby';
+        : '/';
 
     // Generate a magic link OTP to get a hashed_token, then verify it server-side.
     // This avoids the implicit vs PKCE redirect ambiguity — session is established
@@ -182,7 +185,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (linkError || !linkData?.properties?.hashed_token) {
-      console.error('[passkey/authenticate/verify] generateLink', linkError);
+      Sentry.logger.error('auth.passkey.generateLinkFailed', { error: String(linkError) });
       return NextResponse.json(
         { error: 'Could not create sign-in link' },
         { status: 500 }
@@ -197,7 +200,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (otpError) {
-      console.error('[passkey/authenticate/verify] verifyOtp', otpError);
+      Sentry.logger.error('auth.passkey.verifyOtpFailed', { error: String(otpError) });
       return NextResponse.json(
         { error: 'Could not establish session' },
         { status: 500 }
@@ -209,7 +212,7 @@ export async function POST(request: NextRequest) {
       redirectUrl: `${origin}${nextPath}`,
     });
   } catch (e) {
-    console.error('[passkey/authenticate/verify]', e);
+    Sentry.logger.error('auth.passkey.authenticateVerifyFailed', { error: e instanceof Error ? e.message : String(e) });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Verification failed' },
       { status: 500 }

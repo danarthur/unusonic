@@ -99,7 +99,7 @@ export function SummonPartnerModal({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={STAGE_HEAVY}
-            className="relative z-10 w-full max-w-md rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] p-6 shadow-2xl"
+            className="relative z-10 w-full max-w-md rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised)] p-6 shadow-2xl"
             data-surface="raised"
           >
           <motion.div
@@ -113,15 +113,15 @@ export function SummonPartnerModal({
             Invite to Unusonic
           </h2>
           <Button variant="ghost" size="icon" onClick={handleClose} aria-label="Close">
-            <X className="size-5" />
+            <X className="size-5" strokeWidth={1.5} />
           </Button>
         </div>
-        <p className="text-sm text-[var(--stage-text-secondary)] mb-4">
+        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)] mb-4">
           Send an invite to claim this organization. Enter their email.
         </p>
         {status === 'success' ? (
           <div className="py-4">
-            <p className="text-sm text-[var(--color-unusonic-success)]">{message}</p>
+            <p className="text-[length:var(--stage-data-size)] text-[var(--color-unusonic-success)]">{message}</p>
             <Button type="button" onClick={handleClose} className="mt-4 w-full">
               Done
             </Button>
@@ -142,7 +142,7 @@ export function SummonPartnerModal({
               />
             </div>
             {status === 'error' && message && (
-              <p role="alert" className="text-sm text-[var(--color-unusonic-error)]">{message}</p>
+              <p role="alert" className="text-[length:var(--stage-data-size)] text-[var(--color-unusonic-error)]">{message}</p>
             )}
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={handleClose} className="flex-1">

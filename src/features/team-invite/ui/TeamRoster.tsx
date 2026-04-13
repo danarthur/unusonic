@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { Button } from '@/shared/ui/button';
 import { GhostBadge } from './GhostBadge';
 import { MemberForge } from './MemberForge';
@@ -118,7 +119,7 @@ export function TeamRoster({
         }}
       />
       <div className="shrink-0 mb-3 sm:mb-4 lg:mb-4 text-center relative">
-        <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--stage-accent)]/80">
+        <span className="stage-label tracking-[0.2em] text-[var(--stage-accent)]/80">
           Assemble Core
         </span>
         <h2 className="mt-0.5 lg:mt-1 text-lg sm:text-xl font-light tracking-tight text-[var(--stage-text-primary)]">
@@ -140,7 +141,7 @@ export function TeamRoster({
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                transition={STAGE_MEDIUM}
               >
                 <GhostBadge
                   status={member.status}

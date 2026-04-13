@@ -142,7 +142,7 @@ export function CatalogImageUpload({
     <div className={cn('flex flex-col gap-1.5', className)}>
       {displayUrl ? (
         /* ---- Image thumbnail with remove button ---- */
-        <div className="relative group aspect-video w-full max-w-[240px] rounded-[var(--stage-radius-input)] overflow-hidden bg-[var(--stage-surface-nested)] border border-[oklch(1_0_0_/_0.08)]">
+        <div className="relative group aspect-video w-full max-w-[240px] rounded-[var(--stage-radius-input)] overflow-hidden bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={displayUrl}
@@ -192,7 +192,7 @@ export function CatalogImageUpload({
             'relative w-full max-w-[240px] aspect-video rounded-[var(--stage-radius-input)] border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer',
             isDragOver
               ? 'border-[var(--stage-accent)] bg-[var(--stage-surface-elevated)]'
-              : 'border-[oklch(1_0_0_/_0.12)] hover:border-[oklch(1_0_0_/_0.2)] bg-[var(--stage-surface-nested)]',
+              : 'border-[oklch(1_0_0_/_0.12)] hover:border-[oklch(1_0_0_/_0.2)] bg-[var(--ctx-well)]',
             uploading && 'opacity-60 pointer-events-none',
           )}
         >
@@ -201,7 +201,7 @@ export function CatalogImageUpload({
           ) : (
             <>
               <ImagePlus className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-              <span className="text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider">
+              <span className="stage-label text-[var(--stage-text-secondary)]">
                 Drop image or click
               </span>
             </>

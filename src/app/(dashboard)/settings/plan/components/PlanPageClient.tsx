@@ -174,7 +174,7 @@ export function PlanPageClient({
               <button
                 type="button"
                 onClick={() => handleSwitch(recommendedTier)}
-                className="text-[var(--stage-accent)] hover:brightness-[1.06] transition-[filter]"
+                className="text-[var(--stage-accent)] hover:underline transition-colors"
               >
                 Switch now
               </button>
@@ -219,12 +219,12 @@ export function PlanPageClient({
               {/* Badges */}
               <div className="flex items-center gap-2 mb-4 min-h-[1.5rem]">
                 {isCurrent && (
-                  <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-accent)] border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] px-2 py-0.5 rounded-full">
+                  <span className="stage-label text-[var(--stage-accent)] border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] px-2 py-0.5 rounded-full">
                     Current plan
                   </span>
                 )}
                 {isRecommended && !isCurrent && (
-                  <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-primary)]/60 border border-[var(--stage-border)] bg-[var(--stage-surface-elevated)] px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="stage-label text-[var(--stage-text-primary)]/60 border border-[var(--stage-border)] bg-[var(--stage-surface-elevated)] px-2 py-0.5 rounded-full flex items-center gap-1">
                     <Sparkles className="w-2.5 h-2.5" strokeWidth={1.5} />
                     Aion pick
                   </span>
@@ -324,7 +324,7 @@ export function PlanPageClient({
                         onClick={() => handleSwitch(tierId)}
                         disabled={isPending}
                         transition={STAGE_MEDIUM}
-                        className="flex-1 py-2 rounded-full text-xs font-medium border border-[var(--stage-border)] text-unusonic-warning hover:border-[var(--stage-border-focus)] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1.5"
+                        className="flex-1 py-2 rounded-full text-xs font-medium border border-[var(--stage-border)] text-unusonic-warning hover:border-[var(--stage-border-focus)] disabled:opacity-45 disabled:pointer-events-none flex items-center justify-center gap-1.5"
                       >
                         {isPending ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
@@ -348,7 +348,7 @@ export function PlanPageClient({
                     onClick={() => handleSwitch(tierId)}
                     disabled={isPending || !isOwner}
                     transition={STAGE_MEDIUM}
-                    className="w-full py-2.5 rounded-full text-sm font-medium border border-[var(--stage-border)] text-[var(--stage-text-primary)]/70 hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] hover:bg-[var(--stage-surface-hover)] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2"
+                    className="w-full py-2.5 rounded-full text-sm font-medium border border-[var(--stage-border)] text-[var(--stage-text-primary)]/70 hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden hover:border-[var(--stage-border-focus)] disabled:opacity-45 disabled:pointer-events-none flex items-center justify-center gap-2"
                   >
                     {isPending ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />

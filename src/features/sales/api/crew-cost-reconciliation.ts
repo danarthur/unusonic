@@ -70,7 +70,7 @@ export async function getCrewCostReconciliation(
   }
 
   // 3. Get actual crew costs from ops.deal_crew
-  const { data: crewRows } = await (supabase as any)
+  const { data: crewRows } = await supabase
     .schema('ops')
     .from('deal_crew')
     .select('role_note, day_rate')

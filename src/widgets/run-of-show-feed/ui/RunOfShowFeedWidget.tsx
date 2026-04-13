@@ -7,10 +7,7 @@ import { RunOfShow } from '@/shared/ui/icons';
 import { WidgetShell } from '@/widgets/shared';
 import { useRosFeed, isCueNow, isCueUpcoming, isCuePast, type CueRow } from '../lib/use-ros-feed';
 import {
-  M3_FADE_THROUGH_ENTER,
-  M3_SHARED_AXIS_X_VARIANTS,
-  M3_STAGGER_CHILDREN,
-  M3_STAGGER_DELAY,
+  STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
 
 /**
@@ -35,12 +32,7 @@ export function RunOfShowFeedWidget() {
         initial="hidden"
         animate="visible"
         variants={{
-          visible: {
-            transition: {
-              staggerChildren: M3_STAGGER_CHILDREN,
-              delayChildren: M3_STAGGER_DELAY,
-            },
-          },
+          visible: { transition: { staggerChildren: 0.03 } },
           hidden: {},
         }}
       >
@@ -59,8 +51,8 @@ function CueRowItem({ cue }: { cue: CueRow }) {
 
   return (
     <motion.div
-      variants={M3_SHARED_AXIS_X_VARIANTS}
-      transition={M3_FADE_THROUGH_ENTER}
+      variants={{ hidden: { opacity: 0, x: -8 }, visible: { opacity: 1, x: 0 } }}
+      transition={STAGE_LIGHT}
       className={`p-3 rounded-xl flex items-center gap-3 border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] ${
         now ? 'border-[oklch(1_0_0_/_0.14)] bg-[oklch(1_0_0_/_0.04)]' : ''
       }`}
@@ -77,7 +69,7 @@ function CueRowItem({ cue }: { cue: CueRow }) {
           {cue.title}
         </span>
         {cue.start_time && (
-          <span className="text-[10px] text-[var(--stage-text-secondary)]">
+          <span className="text-label text-[var(--stage-text-secondary)]">
             {new Date(cue.start_time).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
@@ -87,15 +79,15 @@ function CueRowItem({ cue }: { cue: CueRow }) {
         )}
       </div>
       {now && (
-        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-accent)] shrink-0">
+        <span className="stage-label text-[var(--stage-accent)] shrink-0">
           Now
         </span>
       )}
       {upcoming && !now && (
-        <span className="text-[10px] text-[var(--stage-text-secondary)] shrink-0">Up next</span>
+        <span className="text-label text-[var(--stage-text-secondary)] shrink-0">Up next</span>
       )}
       {past && (
-        <span className="text-[10px] text-[var(--stage-text-secondary)] shrink-0">Done</span>
+        <span className="text-label text-[var(--stage-text-secondary)] shrink-0">Done</span>
       )}
     </motion.div>
   );

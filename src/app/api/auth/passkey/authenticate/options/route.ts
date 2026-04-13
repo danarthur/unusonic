@@ -12,24 +12,27 @@ import { getSystemClient } from '@/shared/api/supabase/system';
 import { checkPasskeyOptionsRate } from '@/shared/api/auth/passkey-rate-limit';
 import { cookies } from 'next/headers';
 import { randomUUID } from 'crypto';
+import * as Sentry from '@sentry/nextjs';
 
 const CHALLENGE_COOKIE = 'webauthn_assert_challenge';
 const CHALLENGE_MAX_AGE = 300; // 5 minutes
 
 function getRpId(request: NextRequest): string {
-  if (process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID) {
-    return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID;
-  }
   const origin =
     request.headers.get('origin') ||
     request.nextUrl.origin ||
     process.env.NEXT_PUBLIC_APP_URL ||
     'http://localhost:3000';
-  try {
-    return new URL(origin).hostname || 'localhost';
-  } catch {
+  const hostname = (() => {
+    try { return new URL(origin).hostname || 'localhost'; }
+    catch { return 'localhost'; }
+  })();
+
+  // On localhost, ignore the production RP ID — it won't validate
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'localhost';
   }
+  return process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID || hostname;
 }
 
 export async function POST(request: NextRequest) {
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
       .insert({ id: challengeId, user_id: resolvedUserId, challenge: options.challenge });
 
     if (insertError) {
-      console.error('[passkey/authenticate/options] insert challenge', insertError);
+      Sentry.logger.error('auth.passkey.challengeInsertFailed', { error: String(insertError) });
       return NextResponse.json(
         { error: 'Failed to store challenge' },
         { status: 500 }
@@ -120,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(options);
   } catch (e) {
-    console.error('[passkey/authenticate/options]', e);
+    Sentry.logger.error('auth.passkey.authenticateOptionsFailed', { error: e instanceof Error ? e.message : String(e) });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to get options' },
       { status: 500 }

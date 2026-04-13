@@ -135,7 +135,7 @@ export async function updateMemberIdentity(input: UpdateMemberIdentityInput): Pr
   if (parsed.data.phone !== undefined) {
     await supabase.rpc('patch_entity_attributes', {
       p_entity_id: rel.source_entity_id,
-      p_patch: { phone: parsed.data.phone ?? null },
+      p_attributes: { phone: parsed.data.phone ?? null },
     });
   }
 

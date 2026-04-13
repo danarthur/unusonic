@@ -36,7 +36,7 @@ const directionConfig = {
     icon: ArrowUpRight,
     label: 'Client',
     sub: 'In',
-    className: 'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-primary)] border-[oklch(1_0_0/0.10)]',
+    className: 'bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-primary)] border-[var(--stage-edge-subtle)]',
   },
   partner: {
     icon: ArrowLeftRight,
@@ -68,7 +68,7 @@ export function IdentityHeader({
   const brandColor = isPartner ? details.orgBrandColor : null;
 
   return (
-    <div className="relative px-4 py-4 md:px-5 md:py-4">
+    <div className="relative px-6 py-5">
       <div
         className="absolute inset-0 pointer-events-none"
         style={
@@ -99,7 +99,7 @@ export function IdentityHeader({
                 className="size-full object-contain p-1.5"
               />
             ) : details.entityDirectoryType === 'venue' ? (
-              <MapPin className="size-6 text-[var(--stage-text-secondary)]" />
+              <MapPin className="size-6 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
             ) : (
               <span className="text-2xl font-medium text-[var(--stage-text-secondary)]">{initial}</span>
             )}
@@ -109,9 +109,9 @@ export function IdentityHeader({
               {isPartner && (
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium uppercase tracking-widest',
+                    'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 stage-badge-text',
                     isGhost
-                      ? 'border-[oklch(1_0_0/0.12)] bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)]'
+                      ? 'border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)]'
                       : 'border-[var(--color-unusonic-success)]/40 bg-[var(--color-unusonic-success)]/10 text-[var(--color-unusonic-success)]'
                   )}
                 >
@@ -120,17 +120,17 @@ export function IdentityHeader({
                 </span>
               )}
               {!isPartner && details.isGhost && (
-                <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium uppercase tracking-widest border-[var(--stage-text-secondary)]/20 bg-[var(--stage-text-secondary)]/5 text-[var(--stage-text-secondary)]">
-                  <Circle className="size-2.5" />
+                <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 stage-badge-text border-[var(--stage-text-secondary)]/20 bg-[var(--stage-text-secondary)]/5 text-[var(--stage-text-secondary)]">
+                  <Circle className="size-2.5" strokeWidth={1.5} />
                   Unclaimed
                 </span>
               )}
               {details.identity.label && (
-                <span className="text-xs text-[var(--stage-text-secondary)]">{details.identity.label}</span>
+                <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">{details.identity.label}</span>
               )}
             </div>
             {slug && (
-              <p className="font-mono text-xs text-[var(--stage-text-secondary)]">unusonic.com/{slug}</p>
+              <p className="font-mono text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">unusonic.com/{slug}</p>
             )}
           </div>
         </div>
@@ -139,16 +139,16 @@ export function IdentityHeader({
           {dir && (
             <span
               className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium',
+                'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 stage-badge-text',
                 dir.className
               )}
             >
-              <dir.icon className="size-3" />
+              <dir.icon className="size-3" strokeWidth={1.5} />
               {dir.label} · {dir.sub}
             </span>
           )}
           {details.relationshipTier && (
-            <span className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize border-[var(--stage-edge-top)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-primary)]">
+            <span className="inline-flex items-center rounded-full border px-2.5 py-1 stage-badge-text capitalize border-[var(--stage-edge-top)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-primary)]">
               {details.relationshipTier}
             </span>
           )}
@@ -159,16 +159,16 @@ export function IdentityHeader({
                 ? 'border-[var(--color-unusonic-error)]/30 bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)]'
                 : status === 'dormant'
                 ? 'border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)]'
-                : 'border-[oklch(1_0_0/0.08)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-secondary)]';
+                : 'border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-secondary)]';
             return (
-              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${style}`}>
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 stage-badge-text capitalize ${style}`}>
                 {status}
               </span>
             );
           })()}
           {Array.isArray(details.relationshipTags) && details.relationshipTags.slice(0, 3).map((tag: string) => (
-            <span key={tag} className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium
-              border-[oklch(1_0_0/0.08)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-primary)]">
+            <span key={tag} className="inline-flex items-center rounded-full border px-2.5 py-1 stage-badge-text
+              border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.04)] text-[var(--stage-text-primary)]">
               {tag}
             </span>
           ))}
@@ -184,7 +184,7 @@ export function IdentityHeader({
                 onClick={() => setSummonOpen(true)}
                 className="h-8 gap-1.5"
               >
-                <Send className="size-3.5" />
+                <Send className="size-3.5" strokeWidth={1.5} />
                 Invite to Unusonic
               </Button>
               <SummonPartnerModal

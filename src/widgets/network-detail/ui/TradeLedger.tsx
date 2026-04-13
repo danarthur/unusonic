@@ -14,22 +14,22 @@ export function TradeLedger({ details }: TradeLedgerProps) {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
+      <h3 className="stage-label text-[var(--stage-text-secondary)]">
         Ledger
       </h3>
-      <div className="flex justify-between text-sm mb-2">
+      <div className="flex justify-between text-[length:var(--stage-data-size)] mb-2">
         <span className="text-[var(--stage-text-secondary)]">In</span>
         <span className="font-mono tabular-nums text-[var(--stage-text-primary)]">
           ${inbound.toLocaleString()}
         </span>
       </div>
-      <div className="flex justify-between text-sm mb-3">
+      <div className="flex justify-between text-[length:var(--stage-data-size)] mb-3">
         <span className="text-[var(--stage-text-secondary)]">Out</span>
         <span className="font-mono tabular-nums text-[var(--stage-text-primary)]">
           ${outbound.toLocaleString()}
         </span>
       </div>
-      <div className="h-2 flex rounded-full overflow-hidden bg-[oklch(1_0_0/0.06)]">
+      <div className="h-2 flex rounded-full overflow-hidden bg-[var(--stage-surface-elevated)]">
         <div
           className="bg-[var(--stage-text-primary)]/40"
           style={{ width: `${inboundPct}%` }}
@@ -39,7 +39,7 @@ export function TradeLedger({ details }: TradeLedgerProps) {
           style={{ width: `${outboundPct}%` }}
         />
       </div>
-      <p className="text-xs text-[var(--stage-text-secondary)] mt-2">
+      <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-2">
         {total === 0 ? (
           'No activity'
         ) : (

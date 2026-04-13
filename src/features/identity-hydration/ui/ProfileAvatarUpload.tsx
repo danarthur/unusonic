@@ -214,7 +214,7 @@ export function ProfileAvatarUpload({
                   step={0.05}
                   value={crop.scale}
                   onChange={(e) => setCrop((p) => ({ ...p, scale: Number(e.target.value) }))}
-                  className="flex-1 h-2 rounded-full appearance-none bg-[var(--stage-surface-nested)] accent-[var(--stage-accent)]"
+                  className="flex-1 h-2 rounded-full appearance-none bg-[var(--ctx-well)] accent-[var(--stage-accent)]"
                 />
               </div>
             </>
@@ -257,27 +257,27 @@ export function ProfileAvatarUpload({
                 'relative w-24 h-24 flex items-center justify-center overflow-hidden transition-colors cursor-pointer group',
                 value
                   ? 'avatar-primary hover:shadow-[0_0_20px_oklch(0.88_0_0/0.2)]'
-                  : 'rounded-xl border-2 border-dashed border-[var(--stage-border)] hover:border-[var(--stage-border-hover)] hover:bg-[var(--stage-surface-elevated)]',
+                  : 'rounded-xl border-2 border-dashed border-[var(--stage-border)] hover:border-[var(--stage-border-hover)] stage-hover overflow-hidden',
                 uploading && 'opacity-60 pointer-events-none'
               )}
             >
               {value ? (
                 <>
                   <img src={value} alt="Avatar" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                  <div className="absolute inset-0 bg-[oklch(0.06_0_0/0.75)] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
                     <Camera className="w-6 h-6 text-[var(--stage-text-primary)]" />
                   </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-1">
                   <User className="w-8 h-8 text-[var(--stage-text-secondary)]/50 group-hover:text-[var(--stage-accent)]/50 transition-colors" />
-                  <span className="text-[9px] text-[var(--stage-text-secondary)]/50 uppercase tracking-wider">
+                  <span className="stage-micro text-[var(--stage-text-secondary)]/50">
                     Avatar
                   </span>
                 </div>
               )}
               {uploading && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50">
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-[oklch(0.06_0_0/0.75)]">
                   <span className="text-xs text-[var(--stage-text-primary)]">Uploading…</span>
                 </div>
               )}
@@ -295,7 +295,7 @@ export function ProfileAvatarUpload({
                     toast.error(result.error || 'Failed to remove avatar');
                   }
                 }}
-                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-unusonic-error)] text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity hover:brightness-110 z-10"
+                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-unusonic-error)] text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity z-10"
               >
                 <X className="w-3 h-3" />
               </button>

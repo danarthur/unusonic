@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useActionState, useOptimistic } from 'react';
 import { Textarea } from '@/shared/ui/textarea';
+import { Button } from '@/shared/ui/button';
 import { updateRelationshipNotes } from '@/features/network-data';
 
 interface PrivateNotesProps {
@@ -32,10 +33,10 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
   if (!relationshipId) {
     return (
       <div className="space-y-2">
-        <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
+        <h3 className="stage-label text-[var(--stage-text-secondary)]">
           Notes
         </h3>
-        <p className="text-xs text-[var(--stage-text-secondary)]">
+        <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
           Available for partners.
         </p>
       </div>
@@ -44,10 +45,10 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">
+      <h3 className="stage-label text-[var(--stage-text-secondary)]">
         Notes
       </h3>
-      <p className="text-xs text-[var(--stage-text-secondary)] mb-2">
+      <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mb-2">
         Private. Auto-saves.
       </p>
       <form
@@ -68,14 +69,11 @@ export function PrivateNotes({ relationshipId, initialNotes }: PrivateNotesProps
           rows={4}
         />
         {state?.error && (
-          <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{state.error}</p>
+          <p role="alert" className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-error)]">{state.error}</p>
         )}
-        <button
-          type="submit"
-          className="text-xs font-medium text-[var(--stage-text-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] rounded-sm"
-        >
+        <Button type="submit" variant="ghost" size="sm">
           Save
-        </button>
+        </Button>
       </form>
     </div>
   );

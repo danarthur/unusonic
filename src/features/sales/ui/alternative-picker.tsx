@@ -51,7 +51,7 @@ export function AlternativePicker({ alternatives, loading, onSwap, onClose }: Al
           {alternatives.map((alt) => (
             <li
               key={alt.id}
-              className="flex items-center gap-2 px-2.5 py-2 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:bg-[var(--stage-surface-raised)] transition-colors"
+              className="flex items-center gap-2 px-2.5 py-2 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] transition-colors stage-hover overflow-hidden"
             >
               {/* Availability dot */}
               {alt.availability && (
@@ -59,10 +59,10 @@ export function AlternativePicker({ alternatives, loading, onSwap, onClose }: Al
                   className={cn(
                     'inline-block w-2 h-2 rounded-full shrink-0',
                     alt.availability.status === 'available'
-                      ? 'bg-emerald-400'
+                      ? 'bg-[var(--color-unusonic-success)]'
                       : alt.availability.status === 'tight'
-                        ? 'bg-amber-400'
-                        : 'bg-red-400'
+                        ? 'bg-[var(--color-unusonic-warning)]'
+                        : 'bg-[var(--color-unusonic-error)]'
                   )}
                   title={
                     alt.availability.status === 'available'
@@ -86,8 +86,8 @@ export function AlternativePicker({ alternatives, loading, onSwap, onClose }: Al
                       className={cn(
                         'ml-1',
                         alt.priceDelta > 0
-                          ? 'text-amber-400'
-                          : 'text-emerald-400'
+                          ? 'text-[var(--color-unusonic-warning)]'
+                          : 'text-[var(--color-unusonic-success)]'
                       )}
                     >
                       ({alt.priceDelta > 0 ? '+' : ''}${alt.priceDelta.toLocaleString()})

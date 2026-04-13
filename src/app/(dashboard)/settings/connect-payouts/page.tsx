@@ -44,7 +44,7 @@ export default async function ConnectPayoutsPage() {
         </p>
 
         <div className="stage-panel p-4 rounded-xl mb-6">
-          <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-2">
+          <p className="stage-label text-field-label mb-2">
             Fee structure
           </p>
           <p className="text-sm text-[var(--stage-text-primary)]">

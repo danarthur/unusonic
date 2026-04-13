@@ -39,15 +39,15 @@ export function Shell({ children }: ShellProps) {
               <Link
                 key={route.path}
                 href={route.path}
-                className={`relative transition-all duration-300 ${
+                className={`relative transition-colors duration-100 ${
                   isActive ? 'cursor-default' : 'cursor-pointer hover:opacity-80'
                 }`}
                 aria-label={route.label}
               >
                 <div
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  className={`w-3 h-3 rounded-full transition-colors duration-100 ${
                     isActive
-                      ? 'bg-[var(--stage-accent)] shadow-[0_0_8px_oklch(0.88_0_0_/_0.5)] brightness-110'
+                      ? 'bg-[var(--stage-accent)] shadow-[0_0_8px_oklch(0.88_0_0_/_0.5)]'
                       : 'bg-[oklch(1_0_0_/_0.30)] opacity-60'
                   }`}
                 />

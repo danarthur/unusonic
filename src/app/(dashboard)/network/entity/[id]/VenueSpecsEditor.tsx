@@ -267,8 +267,8 @@ export function VenueSpecsEditor({ entityId, initialAttributes }: VenueSpecsEdit
   );
 
   return (
-    <div className="rounded-xl bg-[var(--stage-surface-elevated)] p-5" data-surface="elevated">
-      <h3 className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+    <div className="stage-panel-elevated rounded-xl p-5" data-surface="elevated">
+      <h3 className="mb-4 stage-label">
         Venue specs
       </h3>
       <div className="space-y-1">
@@ -305,23 +305,23 @@ function SpecSection({ section, values, saveStatuses, isExpanded, onToggle, onFi
   const summary = filledSummary(values, section.fields);
 
   return (
-    <div className="rounded-xl bg-[var(--stage-surface-nested)] overflow-hidden">
+    <div className="rounded-xl bg-[var(--ctx-well)] overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[oklch(1_0_0_/_0.04)]"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)]"
       >
         <motion.span
           animate={{ rotate: isExpanded ? 180 : 0 }}
           transition={STAGE_MEDIUM}
           className="flex shrink-0"
         >
-          <ChevronDown className="size-4 text-[var(--stage-text-secondary)]" />
+          <ChevronDown className="size-4 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
         </motion.span>
-        <span className="flex-1 text-sm font-medium text-[var(--stage-text-primary)]">
+        <span className="flex-1 text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
           {section.title}
         </span>
-        <span className="shrink-0 rounded-full bg-[oklch(1_0_0_/_0.08)] px-2 py-0.5 text-[10px] font-medium tabular-nums text-[var(--stage-text-secondary)]">
+        <span className="shrink-0 rounded-full bg-[oklch(1_0_0_/_0.08)] px-2 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
           {filled}/{total}
         </span>
       </button>
@@ -336,7 +336,7 @@ function SpecSection({ section, values, saveStatuses, isExpanded, onToggle, onFi
             transition={STAGE_MEDIUM}
             className="overflow-hidden"
           >
-            <p className="px-4 pb-3 text-xs leading-relaxed text-[var(--stage-text-secondary)] line-clamp-2">
+            <p className="px-4 pb-3 text-[length:var(--stage-label-size)] leading-relaxed text-[var(--stage-text-secondary)] line-clamp-2">
               {summary}
             </p>
           </motion.div>
@@ -384,7 +384,7 @@ function FieldRenderer({ field, value, saveStatus, onChange }: FieldRendererProp
   return (
     <div>
       <div className="mb-1 flex items-center gap-2">
-        <label className="block text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+        <label className="block stage-label">
           {field.label}
         </label>
         <SaveIndicator status={saveStatus} />
@@ -405,7 +405,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="text-[10px] text-[var(--stage-text-tertiary)]"
+          className="stage-label text-[var(--stage-text-tertiary)]"
         >
           Saving...
         </motion.span>
@@ -416,9 +416,9 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
-          className="flex items-center gap-0.5 text-[10px] text-[var(--color-unusonic-success)]"
+          className="flex items-center gap-0.5 stage-label text-[var(--color-unusonic-success)]"
         >
-          <Check className="size-3" />
+          <Check className="size-3" strokeWidth={1.5} />
         </motion.span>
       )}
       {status === 'error' && (
@@ -427,7 +427,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="text-[10px] text-[var(--color-unusonic-error)]"
+          className="stage-label text-[var(--color-unusonic-error)]"
         >
           Error
         </motion.span>
@@ -439,7 +439,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 // ─── Field inputs ───────────────────────────────────────────────────────────
 
 const INPUT_CLASS =
-  'w-full rounded-lg bg-[var(--ctx-well)] border border-[oklch(1_0_0/0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ring-offset-2 ring-offset-[var(--stage-void)]';
+  'stage-input w-full';
 
 function FieldInput({
   field,
@@ -508,7 +508,7 @@ function FieldInput({
 
     case 'readonly':
       return (
-        <p className="px-1 text-sm text-[var(--stage-text-secondary)]">
+        <p className="px-1 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
           {displayValue(value) || 'Not verified'}
         </p>
       );
@@ -629,18 +629,18 @@ function MaskedField({
       <button
         type="button"
         onClick={() => setRevealed((r) => !r)}
-        className="flex shrink-0 items-center justify-center rounded-lg p-2 text-[var(--stage-text-tertiary)] transition-colors hover:bg-[oklch(1_0_0_/_0.06)] hover:text-[var(--stage-text-secondary)]"
+        className="flex shrink-0 items-center justify-center rounded-lg p-2 text-[var(--stage-text-tertiary)] transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-secondary)]"
         aria-label={revealed ? 'Hide credentials' : 'Reveal credentials'}
       >
-        {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        {revealed ? <EyeOff className="size-4" strokeWidth={1.5} /> : <Eye className="size-4" strokeWidth={1.5} />}
       </button>
       <button
         type="button"
         onClick={handleCopy}
-        className="flex shrink-0 items-center justify-center rounded-lg p-2 text-[var(--stage-text-tertiary)] transition-colors hover:bg-[oklch(1_0_0_/_0.06)] hover:text-[var(--stage-text-secondary)]"
+        className="flex shrink-0 items-center justify-center rounded-lg p-2 text-[var(--stage-text-tertiary)] transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-secondary)]"
         aria-label="Copy credentials"
       >
-        {copied ? <Check className="size-3.5 text-[var(--color-unusonic-success)]" /> : <Copy className="size-3.5" />}
+        {copied ? <Check className="size-3.5 text-[var(--color-unusonic-success)]" strokeWidth={1.5} /> : <Copy className="size-3.5" strokeWidth={1.5} />}
       </button>
     </div>
   );

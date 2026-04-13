@@ -144,9 +144,9 @@ function TimeInput({
         onBlur={handleBlur}
         placeholder={militaryTime ? '9:00 or 14:30' : '9:00 AM or 2:30 PM'}
         maxLength={militaryTime ? 5 : 9}
-        className="w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+        className="w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
       />
-      <span className="text-[10px] text-[var(--stage-text-secondary)]">
+      <span className="text-label text-[var(--stage-text-secondary)]">
         {militaryTime ? '24h (14:30 = 2:30 PM)' : '12h (e.g. 2:30 PM)'}
       </span>
     </div>
@@ -299,7 +299,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
               <Clock size={14} className="text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
               <span className="text-sm text-[var(--stage-text-primary)]">Set by time</span>
               <span
-                className="relative inline-flex pb-28 -mb-28 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded-full cursor-help"
+                className="relative inline-flex pb-28 -mb-28 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-full cursor-help"
                 onMouseEnter={() => setShowSetByTimeHelp(true)}
                 onMouseLeave={() => setShowSetByTimeHelp(false)}
                 onFocus={() => setShowSetByTimeHelp(true)}
@@ -350,7 +350,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
             <button
               type="button"
               onClick={() => setVal('end_time', startTime || '00:00')}
-              className="text-xs font-medium underline hover:no-underline focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded px-1"
+              className="text-xs font-medium underline hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded px-1"
             >
               Set end = start
             </button>
@@ -564,7 +564,7 @@ export function TimeCapsule<T extends TimeCapsuleFormSlice>({ control, watch, se
               />
             )}
           </div>
-          <p className="mt-1 text-[10px] text-[var(--stage-text-secondary)]">
+          <p className="mt-1 text-label text-[var(--stage-text-secondary)]">
             Hover segments for duration. Gray = load-in/out, brand = event.
           </p>
         </div>

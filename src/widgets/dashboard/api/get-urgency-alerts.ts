@@ -1,5 +1,6 @@
 'use server';
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
@@ -44,6 +45,7 @@ export async function getUrgencyAlerts(): Promise<UrgencyAlert[]> {
     ];
   } catch (err) {
     console.error('[dashboard] getUrgencyAlerts unexpected error:', err);
+    Sentry.captureException(err, { tags: { module: 'dashboard', action: 'getUrgencyAlerts' } });
     return [];
   }
 }

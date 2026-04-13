@@ -195,7 +195,7 @@ export function CsvImportModal({ open, onOpenChange, workspaceId, onImported }: 
               <p className="text-sm text-[var(--stage-text-secondary)]">
                 Drop a .csv file or click to browse
               </p>
-              <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] cursor-pointer">
+              <label className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm cursor-pointer">
                 <Upload size={16} strokeWidth={1.5} />
                 Choose file
                 <input
@@ -235,7 +235,7 @@ export function CsvImportModal({ open, onOpenChange, workspaceId, onImported }: 
                         next[idx] = e.target.value as MappingTarget;
                         setMappings(next);
                       }}
-                      className="px-3 py-1.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                      className="px-3 py-1.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     >
                       {MAPPING_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -256,7 +256,7 @@ export function CsvImportModal({ open, onOpenChange, workspaceId, onImported }: 
                   <div className="overflow-x-auto rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)]">
                     <table className="w-full text-xs text-left">
                       <thead>
-                        <tr className="border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]">
+                        <tr className="border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]">
                           {headers.map((h, i) => (
                             <th key={i} className="px-2 py-1.5 text-[var(--stage-text-secondary)] font-medium">
                               {h}
@@ -288,14 +288,14 @@ export function CsvImportModal({ open, onOpenChange, workspaceId, onImported }: 
                 <button
                   type="button"
                   onClick={reset}
-                  className="px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] text-sm hover:bg-[var(--stage-surface-hover)]"
+                  className="stage-hover overflow-hidden px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-secondary)] text-sm"
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={handleImport}
-                  className="px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="stage-hover overflow-hidden px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   Import {rawRows.length} rows
                 </button>
@@ -315,8 +315,8 @@ export function CsvImportModal({ open, onOpenChange, workspaceId, onImported }: 
           {step === 'result' && result && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-emerald-400/10">
-                  <Check size={20} className="text-emerald-400" />
+                <div className="p-2 rounded-full bg-[var(--color-unusonic-success)]/10">
+                  <Check size={20} className="text-[var(--color-unusonic-success)]" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-[var(--stage-text-primary)]">
@@ -331,10 +331,10 @@ export function CsvImportModal({ open, onOpenChange, workspaceId, onImported }: 
               </div>
 
               {result.errors.length > 0 && (
-                <div className="max-h-40 overflow-y-auto rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-3">
+                <div className="max-h-40 overflow-y-auto rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-card)] p-3">
                   {result.errors.map((err, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs py-1">
-                      <AlertCircle size={12} className="text-amber-400 mt-0.5 shrink-0" />
+                      <AlertCircle size={12} className="text-[var(--color-unusonic-warning)] mt-0.5 shrink-0" />
                       <span className="text-[var(--stage-text-secondary)]">
                         Row {err.row}: {err.message}
                       </span>
@@ -346,7 +346,7 @@ export function CsvImportModal({ open, onOpenChange, workspaceId, onImported }: 
               <button
                 type="button"
                 onClick={() => handleOpenChange(false)}
-                className="w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)]"
+                className="stage-hover overflow-hidden w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.18)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)] font-medium text-sm"
               >
                 Done
               </button>

@@ -70,7 +70,7 @@ export function BulkActionBar({
                   value={priceInput}
                   onChange={(e) => setPriceInput(e.target.value)}
                   placeholder="+10 or -5"
-                  className="w-20 px-2 py-1.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                  className="w-20 px-2 py-1.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] text-xs tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handlePriceConfirm();
@@ -81,7 +81,7 @@ export function BulkActionBar({
                 <button
                   type="button"
                   onClick={handlePriceConfirm}
-                  className="p-1.5 rounded-[var(--stage-radius-nested)] text-emerald-400 hover:bg-[oklch(1_0_0_/_0.05)]"
+                  className="p-1.5 rounded-[var(--stage-radius-nested)] text-[var(--color-unusonic-success)] hover:bg-[oklch(1_0_0_/_0.05)]"
                   aria-label="Confirm price adjustment"
                 >
                   <Check size={14} strokeWidth={2} />

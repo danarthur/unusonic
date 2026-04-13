@@ -16,9 +16,11 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import {
   upsertCallTimeRule,
   deleteCallTimeRule,
-  type WorkspaceCallTimeRule,
   type UpsertCallTimeRulePayload,
 } from '../api/actions';
+// Type import goes directly to the lib module because api/actions is a
+// 'use server' file and Next 16 rejects type re-exports from those.
+import type { WorkspaceCallTimeRule } from '@/app/(dashboard)/(features)/crm/actions/apply-call-time-rules';
 
 const EVENT_ARCHETYPES = [
   'corporate',
@@ -74,7 +76,7 @@ function TagInput({ value, onChange, placeholder }: TagInputProps) {
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-2 min-h-[40px]">
+    <div className="flex flex-wrap gap-1.5 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] p-2 min-h-[40px]">
       {value.map((tag) => (
         <span
           key={tag}
@@ -100,7 +102,7 @@ function TagInput({ value, onChange, placeholder }: TagInputProps) {
         }}
         onBlur={add}
         placeholder={value.length === 0 ? placeholder : ''}
-        className="flex-1 min-w-[100px] bg-transparent text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none"
+        className="flex-1 min-w-[100px] bg-transparent text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none"
       />
     </div>
   );
@@ -207,7 +209,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               placeholder="e.g. DJs → Load-in"
-              className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             />
           </div>
 
@@ -266,7 +268,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                 className={`flex-1 py-1.5 rounded-[var(--stage-radius-button)] border text-xs font-medium transition-colors ${
                   form.action_type === 'slot'
                     ? 'border-[var(--color-unusonic-info)]/40 bg-[var(--color-unusonic-info)]/10 text-[var(--color-unusonic-info)]'
-                    : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface)]'
+                    : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] stage-hover overflow-hidden'
                 }`}
               >
                 Named slot
@@ -277,7 +279,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                 className={`flex-1 py-1.5 rounded-[var(--stage-radius-button)] border text-xs font-medium transition-colors ${
                   form.action_type === 'offset'
                     ? 'border-[var(--color-unusonic-info)]/40 bg-[var(--color-unusonic-info)]/10 text-[var(--color-unusonic-info)]'
-                    : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface)]'
+                    : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] stage-hover overflow-hidden'
                 }`}
               >
                 Offset from show
@@ -294,7 +296,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                   value={form.slot_label ?? ''}
                   onChange={(e) => set('slot_label', e.target.value)}
                   placeholder="Load-in"
-                  className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="w-full rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 />
               </div>
             )}
@@ -309,7 +311,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                       const s = e.target.value === 'before' ? -1 : 1;
                       set('offset_minutes', s * absOffset);
                     }}
-                    className="rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   >
                     <option value="before">Before</option>
                     <option value="after">After</option>
@@ -323,7 +325,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                       const h = Math.max(0, parseInt(e.target.value, 10) || 0);
                       set('offset_minutes', offsetSign * (h * 60 + offsetMins));
                     }}
-                    className="w-16 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="w-16 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   />
                   <span className="text-sm text-[var(--stage-text-secondary)]">h</span>
                   <input
@@ -335,7 +337,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
                       const m = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
                       set('offset_minutes', offsetSign * (offsetHours * 60 + m));
                     }}
-                    className="w-16 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="w-16 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-2 py-1.5 text-sm text-[var(--stage-text-primary)] text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   />
                   <span className="text-sm text-[var(--stage-text-secondary)]">min</span>
                   <span className="text-sm text-[var(--stage-text-secondary)]">show</span>
@@ -355,7 +357,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               min={0}
               value={form.priority}
               onChange={(e) => set('priority', parseInt(e.target.value, 10) || 0)}
-              className="w-24 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="w-24 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-3 py-2 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             />
           </div>
 
@@ -365,7 +367,7 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               type="checkbox"
               checked={form.apply_only_when_unset}
               onChange={(e) => set('apply_only_when_unset', e.target.checked)}
-              className="rounded border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--color-unusonic-info)] focus:ring-[var(--stage-accent)]"
+              className="rounded border-[var(--stage-border-hover)] bg-[var(--ctx-well)] text-[var(--color-unusonic-info)] focus-visible:ring-[var(--stage-accent)]"
             />
             <span className="text-sm text-[var(--stage-text-primary)]">Only apply when crew has no call time set</span>
           </label>
@@ -377,14 +379,14 @@ function RuleSheet({ open, rule, onClose, onSaved }: RuleSheetProps) {
               type="button"
               onClick={save}
               disabled={saving}
-              className="flex-1 py-2.5 rounded-xl bg-[var(--color-unusonic-info)]/20 text-[var(--color-unusonic-info)] font-medium text-sm hover:bg-[var(--color-unusonic-info)]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
+              className="flex-1 py-2.5 rounded-xl bg-[var(--color-unusonic-info)]/20 text-[var(--color-unusonic-info)] font-medium text-sm hover:bg-[var(--color-unusonic-info)]/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors"
             >
               {saving ? 'Saving…' : rule ? 'Update rule' : 'Add rule'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] text-sm hover:bg-[var(--stage-surface)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
+              className="px-4 py-2.5 rounded-xl border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors stage-hover overflow-hidden"
             >
               Cancel
             </button>
@@ -454,7 +456,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
         <button
           type="button"
           onClick={openNew}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--stage-edge-subtle)] text-sm font-medium text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--stage-edge-subtle)] text-sm font-medium text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors stage-hover overflow-hidden"
         >
           <Plus size={14} strokeWidth={1.5} aria-hidden />
           Add rule
@@ -495,7 +497,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                       type="button"
                       onClick={() => adjustPriority(rule.id, 'up')}
                       disabled={idx === 0}
-                      className="p-0.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-20 transition-colors focus:outline-none"
+                      className="p-0.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-45 transition-colors focus:outline-none"
                       title="Increase priority"
                     >
                       <ChevronUp size={14} strokeWidth={1.5} />
@@ -504,7 +506,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                       type="button"
                       onClick={() => adjustPriority(rule.id, 'down')}
                       disabled={idx === rules.length - 1}
-                      className="p-0.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-20 transition-colors focus:outline-none"
+                      className="p-0.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-45 transition-colors focus:outline-none"
                       title="Decrease priority"
                     >
                       <ChevronDown size={14} strokeWidth={1.5} />
@@ -518,7 +520,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                   </div>
 
                   {/* Priority badge */}
-                  <span className="shrink-0 text-[10px] font-mono text-[var(--stage-text-tertiary)] bg-[var(--stage-surface)] border border-[var(--stage-edge-subtle)] px-1.5 py-0.5 rounded">
+                  <span className="shrink-0 text-label font-mono text-[var(--stage-text-tertiary)] bg-[var(--stage-surface)] border border-[var(--stage-edge-subtle)] px-1.5 py-0.5 rounded">
                     P{rule.priority}
                   </span>
 
@@ -527,7 +529,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                     <button
                       type="button"
                       onClick={() => openEdit(rule)}
-                      className="p-1.5 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      className="p-1.5 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] stage-hover overflow-hidden"
                       title="Edit"
                     >
                       <Pencil size={13} strokeWidth={1.5} />
@@ -536,7 +538,7 @@ export function CallTimeRulesManager({ initialRules }: CallTimeRulesManagerProps
                       type="button"
                       onClick={() => handleDelete(rule.id)}
                       disabled={deletingId === rule.id}
-                      className="p-1.5 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
+                      className="p-1.5 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
                       title="Delete"
                     >
                       <Trash2 size={13} strokeWidth={1.5} />

@@ -232,7 +232,7 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
                 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors',
                 'text-[var(--color-unusonic-success)] hover:bg-[oklch(1_0_0_/_0.05)]',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-                'disabled:opacity-50'
+                'disabled:opacity-45'
               )}
             >
               <ArchiveRestore size={14} strokeWidth={1.5} />
@@ -264,7 +264,7 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]">
+                <tr className="border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]">
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
@@ -302,7 +302,7 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
                       animate={{ opacity: 1 }}
                       transition={STAGE_LIGHT}
                       className={cn(
-                        'border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 hover:bg-[var(--stage-surface-nested)] transition-colors',
+                        'border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 stage-hover overflow-hidden transition-colors',
                         selected && 'bg-[oklch(1_0_0_/_0.04)]'
                       )}
                     >
@@ -372,7 +372,7 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
                 <button
                   type="button"
                   onClick={() => { setDeleteDialogOpen(false); setDeleteChecks(null); setDeleteResult(null); }}
-                  className="w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="stage-hover overflow-hidden w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 >
                   Done
                 </button>
@@ -392,7 +392,7 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
                   {Object.entries(deleteChecks).map(([id, c]) => (
                     <div
                       key={id}
-                      className="flex items-center gap-2 px-3 py-2 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface-nested)]"
+                      className="flex items-center gap-2 px-3 py-2 rounded-[var(--stage-radius-nested)] bg-[var(--ctx-well)]"
                     >
                       <Trash2 size={14} strokeWidth={1.5} className="shrink-0 text-[oklch(0.65_0.2_25)]" />
                       <div className="flex flex-col min-w-0 flex-1">
@@ -409,9 +409,9 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
 
                 {/* Summary warning for items with proposal references */}
                 {totalProposalRefs > 0 && (
-                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-[var(--stage-radius-nested)] bg-[oklch(0.75_0.12_70_/_0.08)]">
-                    <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0 mt-0.5 text-[oklch(0.75_0.12_70)]" />
-                    <p className="text-xs text-[oklch(0.75_0.12_70)]">
+                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-[var(--stage-radius-nested)] bg-[var(--stage-surface)] border-l-[3px] border-l-[var(--color-unusonic-warning)]">
+                    <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0 mt-0.5 text-[var(--color-unusonic-warning)]" />
+                    <p className="text-xs text-[var(--color-unusonic-warning)]">
                       {itemsWithRefs} {itemsWithRefs === 1 ? 'item is' : 'items are'} referenced by proposals.
                       Those proposals will keep their line item data (name, price, snapshot) but lose the link back to the catalog.
                     </p>
@@ -423,7 +423,7 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
                   <button
                     type="button"
                     onClick={() => { setDeleteDialogOpen(false); setDeleteChecks(null); }}
-                    className="flex-1 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="stage-hover overflow-hidden flex-1 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   >
                     Cancel
                   </button>
@@ -436,7 +436,7 @@ export function ArchivedItemsView({ packages, onRestore, onDelete, onBack }: Arc
                       'focus:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.65_0.2_25)]',
                       'border-[oklch(0.65_0.2_25_/_0.3)] bg-[oklch(0.65_0.2_25_/_0.12)] text-[oklch(0.65_0.2_25)]',
                       'hover:bg-[oklch(0.65_0.2_25_/_0.2)]',
-                      'disabled:opacity-50'
+                      'disabled:opacity-45'
                     )}
                   >
                     {deleting

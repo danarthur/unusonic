@@ -44,15 +44,16 @@ export async function getPullSheetData(eventId: string): Promise<PullSheetData |
 
   const supabase = await createClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   const [gearResult, crewResult, eventResult] = await Promise.all([
     db
       .schema('ops')
       .from('event_gear_items')
-      .select('id, name, quantity, status, department, is_sub_rental, sort_order')
+      .select('id, name, quantity, status, department, is_sub_rental, sort_order, source')
       .eq('event_id', eventId)
       .eq('workspace_id', workspaceId)
+      .eq('source', 'company')
       .order('sort_order', { ascending: true }),
 
     db

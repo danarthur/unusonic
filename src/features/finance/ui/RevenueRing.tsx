@@ -11,7 +11,8 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { formatCurrency } from '../model/types';
 import type { FinancialSummaryDTO } from '../model/types';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 export interface RevenueRingProps {
   summary: FinancialSummaryDTO;
@@ -32,7 +33,7 @@ export function RevenueRing({ summary, className }: RevenueRingProps) {
 
   return (
     <StagePanel className={`flex flex-col items-center justify-center gap-4 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+      <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Revenue
       </h2>
       <div className="relative">

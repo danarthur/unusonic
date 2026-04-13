@@ -50,7 +50,7 @@ export function NexusInput({
         onChange={handleChange}
         disabled={disabled}
         placeholder={placeholder}
-        className="flex-1 min-w-0 bg-transparent text-left text-4xl font-light tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none caret-[var(--stage-accent)] border-b border-[oklch(1_0_0_/_0.10)] focus:border-[oklch(1_0_0_/_0.22)] transition-colors pb-2 disabled:opacity-50"
+        className="flex-1 min-w-0 bg-transparent text-left text-4xl font-light tracking-tight text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none caret-[var(--stage-accent)] border-b border-[oklch(1_0_0_/_0.10)] focus-visible:border-[oklch(1_0_0_/_0.22)] transition-colors pb-2 disabled:opacity-45"
         autoComplete="off"
         autoFocus
       />

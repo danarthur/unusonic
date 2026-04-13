@@ -8,7 +8,9 @@ import { Button } from '@/shared/ui/button';
 import { restoreGhostRelationship } from '@/features/network-data';
 import type { DeletedRelationship } from '@/features/network-data';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 interface RecentlyDeletedListProps {
   deletedRelationships: DeletedRelationship[];
@@ -50,31 +52,41 @@ export function RecentlyDeletedList({ deletedRelationships, sourceOrgId }: Recen
           strokeWidth={1.5}
         />
       </button>
-      {open && (
-        <div className="pt-3 space-y-2">
-          <ul className="space-y-2">
-            {deletedRelationships.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-[oklch(1_0_0_/_0.06)] bg-[var(--stage-surface-elevated)] px-3 py-2"
-              >
-                <span className="text-sm text-[var(--stage-text-primary)] truncate min-w-0">{d.targetName}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleRestore(d.id)}
-                  disabled={isPending || !d.canRestore}
-                  className="shrink-0 gap-1.5 border-[oklch(1_0_0/0.12)] text-[var(--stage-text-primary)]"
-                >
-                  <RotateCcw className="size-3.5" />
-                  Restore
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={STAGE_MEDIUM}
+            className="overflow-hidden"
+          >
+            <div className="pt-3 space-y-2">
+              <ul className="space-y-2">
+                {deletedRelationships.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] px-3 py-2"
+                  >
+                    <span className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] truncate min-w-0">{d.targetName}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRestore(d.id)}
+                      disabled={isPending || !d.canRestore}
+                      className="shrink-0 gap-1.5 border-[var(--stage-edge-subtle)] text-[var(--stage-text-primary)]"
+                    >
+                      <RotateCcw className="size-3.5" strokeWidth={1.5} />
+                      Restore
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

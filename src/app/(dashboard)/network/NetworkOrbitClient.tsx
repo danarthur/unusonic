@@ -28,11 +28,11 @@ export function NetworkOrbitClient({ orgId, open: controlledOpen, onOpenChange, 
       <Button
         variant="outline"
         onClick={() => setOpen(true)}
-        className="gap-2 rounded-xl border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/40 hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]"
+        className="gap-2 rounded-xl border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-surface-raised)] hover:text-[var(--stage-text-primary)]"
       >
         <Search className="size-4" strokeWidth={1.5} />
-        Seek Network
-        <kbd className="ml-1.5 rounded bg-[oklch(1_0_0/0.1)] px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+        Seek network
+        <kbd className="ml-1.5 rounded bg-[var(--stage-surface-raised)] px-1.5 py-0.5 font-mono stage-label">⌘K</kbd>
       </Button>
       <OmniSearch sourceOrgId={orgId} open={open} onOpenChange={setOpen} onOpenForge={onOpenForge} />
     </>

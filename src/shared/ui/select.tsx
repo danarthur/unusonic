@@ -37,7 +37,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "stage-input flex w-fit items-center justify-between gap-2 whitespace-nowrap transition-[color,box-shadow] data-[size=sm]:h-[calc(var(--stage-input-height,34px)-6px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-[var(--stage-text-tertiary)] data-[placeholder]:text-[var(--stage-text-tertiary)]",
+        "stage-input flex w-fit items-center justify-between gap-2 whitespace-nowrap transition-[color,box-shadow] data-[size=sm]:h-[calc(var(--stage-input-height,34px)-6px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-[var(--stage-text-tertiary)] data-[placeholder]:text-[var(--stage-text-secondary)]",
         className
       )}
       {...props}
@@ -109,7 +109,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-default items-center gap-2 rounded-[var(--stage-radius-nested)] py-2 pr-8 pl-3 text-sm outline-hidden select-none text-[var(--stage-text-primary)] focus:bg-[var(--stage-surface-hover)] focus:text-[var(--stage-text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2 *:[span]:last:text-[var(--stage-text-secondary)]",
+        "relative flex w-full cursor-default items-center gap-2 rounded-[var(--stage-radius-nested)] py-2 pr-8 pl-3 text-sm outline-hidden select-none text-[var(--stage-text-primary)] focus:bg-[oklch(1_0_0_/_0.08)] focus:text-[var(--stage-text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2 *:[span]:last:text-[var(--stage-text-secondary)]",
         className
       )}
       {...props}

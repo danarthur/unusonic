@@ -120,7 +120,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className={cn(
-            'relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-[oklch(1_0_0_/_0.05)] transition-colors hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-50',
+            'relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-[oklch(1_0_0_/_0.05)] transition-colors hover:bg-[oklch(1_0_0_/_0.10)] disabled:opacity-45',
             !brandColor && 'border-[oklch(1_0_0_/_0.08)]'
           )}
           style={brandColor ? { borderColor: colorWithAlpha(brandColor, 0.25) ?? brandColor } : undefined}
@@ -206,7 +206,7 @@ export function IdentityForm({ orgId, defaultValues, onValuesChange, submitLabel
           type="submit"
           disabled={isPending}
           className={cn(
-            'relative w-full overflow-hidden rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.10)] px-6 py-4 text-sm font-medium text-[var(--stage-text-primary)] transition-colors hover:bg-[oklch(1_0_0_/_0.15)] hover:border-[oklch(1_0_0_/_0.20)] disabled:opacity-50'
+            'relative w-full overflow-hidden rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.10)] px-6 py-4 text-sm font-medium text-[var(--stage-text-primary)] transition-colors hover:bg-[oklch(1_0_0_/_0.15)] hover:border-[oklch(1_0_0_/_0.20)] disabled:opacity-45'
           )}
         >
           {isPending ? (

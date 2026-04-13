@@ -36,9 +36,10 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     fontSize: 22,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Helvetica',
+    fontWeight: 500,
     color: '#f0eeeb',
-    letterSpacing: 2,
+    letterSpacing: 2.64, // 0.12em * 22px — matches wordmark spec
   },
   headerRight: {
     alignItems: 'flex-end',

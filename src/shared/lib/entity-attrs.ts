@@ -103,8 +103,12 @@ const EmergencyContactSchema = z
   .nullable()
   .optional();
 
-// ─── VenueOps sub-object schema ───────────────────────────────────────────────
-
+// ─── VenueOps sub-object schema (DEPRECATED) ─────────────────────────────────
+/**
+ * @deprecated The venue_ops sub-object is preserved for backwards compat reads.
+ * All fields have been promoted to top-level VenueAttrsSchema keys.
+ * New code should read from top-level attrs, not attrs.venue_ops.
+ */
 const VenueOpsSchema = z
   .object({
     [VENUE_OPS.parking_notes]: optStr,
@@ -154,6 +158,11 @@ export const PersonAttrsSchema = z.object({
     .array(z.object({ start: z.string(), end: z.string() }))
     .catch([]),
   [PERSON_ATTR.instagram]: optStr,
+  [PERSON_ATTR.spotify_user_id]: optStr,
+  [PERSON_ATTR.spotify_display_name]: optStr,
+  [PERSON_ATTR.spotify_refresh_token]: optStr,
+  [PERSON_ATTR.music_library_path]: optStr,
+  [PERSON_ATTR.apple_music_connected]: boolFlag,
 });
 
 /**
@@ -186,17 +195,66 @@ export const CompanyAttrsSchema = z.object({
 export const VenueAttrsSchema = z.object({
   [VENUE_ATTR.venue_type]: optStr,
   [VENUE_ATTR.capacity]: z.union([z.string(), z.number()]).nullable().optional(),
+
+  /** @deprecated Kept for backwards compat reads. Use top-level keys instead. */
   [VENUE_ATTR.venue_ops]: VenueOpsSchema,
+
+  // ── Address fields ─────────────────────────────────────────────────────
   [VENUE_ATTR.address]: AddressSchema,
   [VENUE_ATTR.formatted_address]: optStr,
   [VENUE_ATTR.street]: optStr,
   [VENUE_ATTR.city]: optStr,
   [VENUE_ATTR.state]: optStr,
   [VENUE_ATTR.postal_code]: optStr,
+
+  // ── Free-text note fields ──────────────────────────────────────────────
   [VENUE_ATTR.load_in_notes]: optStr,
   [VENUE_ATTR.power_notes]: optStr,
   [VENUE_ATTR.stage_notes]: optStr,
   [VENUE_ATTR.website]: optStr,
+
+  // ── Promoted from venue_ops (now top-level) ────────────────────────────
+  [VENUE_ATTR.parking_notes]: optStr,
+  [VENUE_ATTR.dock_hours]: optStr,
+  [VENUE_ATTR.access_notes]: optStr,
+  [VENUE_ATTR.venue_contact_name]: optStr,
+  [VENUE_ATTR.venue_contact_phone]: optStr,
+  [VENUE_ATTR.dock_address]: optStr,
+  [VENUE_ATTR.stage_width]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.stage_depth]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.trim_height]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.load_in_window]: optStr,
+  [VENUE_ATTR.load_out_window]: optStr,
+  [VENUE_ATTR.curfew]: optStr,
+  [VENUE_ATTR.house_power_amps]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.union_local]: optStr,
+  [VENUE_ATTR.house_pa_included]: z.boolean().nullable().optional(),
+  [VENUE_ATTR.house_lighting_included]: z.boolean().nullable().optional(),
+  [VENUE_ATTR.wifi_credentials]: optStr,
+  [VENUE_ATTR.green_room_count]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.green_room_notes]: optStr,
+
+  // ── New fields ─────────────────────────────────────────────────────────
+  [VENUE_ATTR.power_voltage]: optStr,
+  [VENUE_ATTR.power_phase]: optStr,
+  [VENUE_ATTR.rigging_type]: optStr,
+  [VENUE_ATTR.rigging_points_count]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.rigging_weight_per_point]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.ceiling_height]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.freight_elevator]: optStr,
+  [VENUE_ATTR.dock_door_height]: optStr,
+  [VENUE_ATTR.dock_door_width]: optStr,
+  [VENUE_ATTR.noise_ordinance]: optStr,
+  [VENUE_ATTR.weather_exposure]: optStr,
+  [VENUE_ATTR.crew_parking_notes]: optStr,
+  [VENUE_ATTR.forklift_available]: optStr,
+  [VENUE_ATTR.dressing_room_count]: z.union([z.string(), z.number()]).nullable().optional(),
+  [VENUE_ATTR.production_office]: optStr,
+  [VENUE_ATTR.catering_kitchen]: optStr,
+  [VENUE_ATTR.nearest_hospital]: optStr,
+  [VENUE_ATTR.last_verified_at]: optStr,
+  [VENUE_ATTR.verified_by]: optStr,
+  [VENUE_ATTR.timezone]: optStr,
 });
 
 /**
@@ -304,6 +362,7 @@ const SENTINEL_KEYS = new Set([
   'created_by_org_id',
   'claimed_by_user_id',
   'wifi_credentials',
+  'spotify_refresh_token',
 ]);
 
 /**

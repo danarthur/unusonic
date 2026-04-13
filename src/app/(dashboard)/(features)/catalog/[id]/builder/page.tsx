@@ -173,7 +173,7 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
             aria-label="Decrease quantity"
             onClick={() => updateBlock(block.id, { quantity: Math.max(1, quantity - 1) })}
             transition={STAGE_LIGHT}
-            className="shrink-0 w-10 h-10 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-lg flex items-center justify-center hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="stage-hover overflow-hidden shrink-0 w-10 h-10 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-lg flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             −
           </motion.button>
@@ -192,7 +192,7 @@ function LineItemInspector({ block, updateBlock, labelClass, inputClass }: LineI
             aria-label="Increase quantity"
             onClick={() => updateBlock(block.id, { quantity: quantity + 1 })}
             transition={STAGE_LIGHT}
-            className="shrink-0 w-10 h-10 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-lg flex items-center justify-center hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="stage-hover overflow-hidden shrink-0 w-10 h-10 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-lg flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           >
             +
           </motion.button>
@@ -284,7 +284,7 @@ function SortableBlock({
           'rounded-[var(--stage-radius-nested)] border p-4 cursor-pointer transition-colors relative group',
           isSelected
             ? 'border-[oklch(1_0_0_/_0.25)] bg-[oklch(1_0_0_/_0.06)] ring-1 ring-[var(--stage-accent)]'
-            : 'border-[var(--stage-edge-subtle)] hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[var(--stage-surface)]',
+            : 'border-[var(--stage-edge-subtle)] hover:border-[oklch(1_0_0_/_0.15)] stage-hover overflow-hidden',
           isDragging && 'shadow-lg'
         )}
         onClick={onSelect}
@@ -303,7 +303,7 @@ function SortableBlock({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="absolute right-2 top-2 p-1 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute right-2 top-2 p-1 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] opacity-0 group-hover:opacity-100 transition-opacity"
           aria-label="Remove block"
         >
           <X size={14} strokeWidth={1.5} />
@@ -574,7 +574,7 @@ export default function CatalogBuilderPage() {
   }, [workspaceId, ionPrompt]);
 
   const inputClass =
-    'w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
+    'w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]';
   const labelClass = 'block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1';
 
   if (!hasWorkspace || !workspaceId) {
@@ -633,7 +633,7 @@ export default function CatalogBuilderPage() {
             type="button"
             onClick={() => { setIonError(null); setIonModalOpen(true); }}
             transition={STAGE_LIGHT}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             title="Ask Aion to build this package"
           >
             <LivingLogo size="sm" status="idle" />
@@ -644,7 +644,7 @@ export default function CatalogBuilderPage() {
             onClick={saveDefinition}
             disabled={saving}
             transition={STAGE_LIGHT}
-            className="px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.2)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] disabled:opacity-50"
+            className="stage-hover overflow-hidden px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.2)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm disabled:opacity-45"
           >
             {saving ? 'Saving…' : 'Save Changes'}
           </motion.button>
@@ -655,7 +655,7 @@ export default function CatalogBuilderPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Ask Aion</DialogTitle>
-            <DialogClose className="p-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]" />
+            <DialogClose className="stage-hover overflow-hidden p-2 rounded-[var(--stage-radius-nested)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]" />
           </DialogHeader>
           <div className="px-6 pb-6 flex flex-col gap-4">
             <p className="text-sm text-[var(--stage-text-secondary)]">
@@ -676,7 +676,7 @@ export default function CatalogBuilderPage() {
               onClick={handleIonSubmit}
               disabled={ionLoading || !ionPrompt.trim()}
               transition={STAGE_LIGHT}
-              className="w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.2)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] disabled:opacity-50"
+              className="stage-hover overflow-hidden w-full py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.2)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] font-medium text-sm disabled:opacity-45"
             >
               {ionLoading ? 'Building…' : 'Generate package'}
             </motion.button>
@@ -839,7 +839,7 @@ export default function CatalogBuilderPage() {
                           type="checkbox"
                           checked={staffing.required}
                           onChange={(e) => updateStaffing({ required: e.target.checked })}
-                          className="rounded border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-nested)] text-[var(--stage-accent)] focus:ring-[var(--stage-accent)]"
+                          className="rounded border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] text-[var(--stage-accent)] focus-visible:ring-[var(--stage-accent)]"
                         />
                         <span className="text-sm text-[var(--stage-text-primary)]">Requires staff with role</span>
                       </label>

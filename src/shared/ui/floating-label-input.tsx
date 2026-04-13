@@ -39,7 +39,7 @@ export function FloatingLabelInput({
         value={value}
         defaultValue={defaultValue}
         className={cn(
-          'peer w-full h-11 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well,var(--stage-surface-nested))] px-3 pt-5 pb-1 text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-transparent outline-none transition-all duration-200',
+          'peer w-full h-11 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well,var(--stage-surface-nested))] px-3 pt-5 pb-1 text-[length:var(--stage-input-font-size,13px)] tracking-tight text-[var(--stage-text-primary)] placeholder:text-transparent outline-none transition-colors duration-[80ms]',
           'hover:border-[oklch(1_0_0_/_0.15)] focus-visible:border-[var(--stage-accent)] focus-visible:ring-0',
           className
         )}
@@ -62,9 +62,9 @@ export function FloatingLabelInput({
       <label
         htmlFor={inputId}
         className={cn(
-          'pointer-events-none absolute left-3 transition-all duration-200',
+          'pointer-events-none absolute left-3 transition-colors duration-[80ms]',
           floating
-            ? 'top-1.5 text-[10px] font-medium text-[var(--stage-text-secondary)]'
+            ? 'top-1.5 text-label font-medium text-[var(--stage-text-secondary)]'
             : 'top-1/2 -translate-y-1/2 text-sm text-[var(--stage-text-secondary)]'
         )}
       >

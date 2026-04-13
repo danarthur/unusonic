@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/shared/lib/auth/session';
+import { getSession, SessionError } from '@/shared/lib/auth/session';
 import { getSystemClient } from '@/shared/api/supabase/system';
 
 type FinanceRow = {
@@ -68,6 +68,9 @@ export async function GET() {
       return NextResponse.json([]);
     }
   } catch (err) {
+    if (err instanceof SessionError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('❌ Finance API Fatal:', err);
     return NextResponse.json([]);
   }

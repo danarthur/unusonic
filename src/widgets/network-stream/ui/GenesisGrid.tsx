@@ -7,7 +7,8 @@ import { cn } from '@/shared/lib/utils';
 import { HoloCard } from './HoloCard';
 import type { GenesisReaction } from './GenesisState';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 export interface GenesisGridProps {
   reaction?: GenesisReaction | undefined;

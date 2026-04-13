@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
 /**
  * Top-level error boundary. Replaces the entire root layout when triggered.
  * Uses inline styles only so it does not depend on CSS/design-system chunks.
@@ -12,6 +15,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <body
@@ -30,7 +37,7 @@ export default function GlobalError({
       >
         <div style={{ maxWidth: 400, textAlign: 'center' }}>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 500, marginBottom: 16 }}>
-            Something went wrong
+            This page encountered an error
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'oklch(0.98 0 0 / 0.7)', marginBottom: 16 }}>
             Open the browser console (F12 → Console) to see the error.
@@ -47,7 +54,9 @@ export default function GlobalError({
               marginBottom: 16,
             }}
           >
-            {error.message}
+            {error.digest
+              ? `Error reference: ${error.digest}`
+              : "An unexpected error occurred."}
           </pre>
           <button
             type="button"

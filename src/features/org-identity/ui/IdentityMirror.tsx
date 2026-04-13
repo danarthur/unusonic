@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
+import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import { cn } from '@/shared/lib/utils';
 import { colorWithAlpha } from '../lib/color';
@@ -75,7 +76,7 @@ export function IdentityMirror({ tempName, tempColor, tempLogo, tempBio, flash, 
           rotateY,
           transformStyle: 'preserve-3d',
         }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={STAGE_MEDIUM}
       >
         <motion.div
           key={cureKey}
@@ -86,7 +87,7 @@ export function IdentityMirror({ tempName, tempColor, tempLogo, tempBio, flash, 
           }}
           initial={flash ? { opacity: 0.6, scale: 0.98 } : false}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 28, duration: 0.25 }}
+          transition={STAGE_LIGHT}
         >
           <div className="flex flex-col gap-6 p-8 sm:p-10">
             {/* Logo: same border as card (mercury or accent) */}

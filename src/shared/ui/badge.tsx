@@ -12,11 +12,11 @@ const badgeVariants = cva(
         default:
           "bg-[var(--stage-accent-muted)] text-[var(--stage-text-primary)] [a&]:hover:bg-[oklch(1_0_0_/_0.15)]",
         secondary:
-          "bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)] [a&]:hover:bg-[var(--stage-surface-hover)]",
+          "bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)]",
         destructive:
           "bg-[oklch(0.65_0.18_20_/_0.2)] text-[var(--color-unusonic-error)] [a&]:hover:bg-[oklch(0.65_0.18_20_/_0.3)]",
         outline:
-          "bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] [a&]:hover:bg-[var(--stage-surface-hover)]",
+          "bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]",
       },
     },
     defaultVariants: {

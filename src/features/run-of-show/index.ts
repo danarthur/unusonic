@@ -1,4 +1,4 @@
-export type { Cue, CueType, RosTemplate, AssignedCrewEntry, AssignedGearEntry } from './model/run-of-show-types';
+export type { Cue, CueType, RosTemplate, AssignedCrewEntry, AssignedGearEntry, Section, TemplateSectionDef, TemplateCueDef } from './model/run-of-show-types';
 export {
   fetchCues,
   updateCueOrder,
@@ -6,7 +6,13 @@ export {
   updateCue,
   deleteCue,
   duplicateCue,
+  fetchSections,
+  createSection,
+  updateSection,
+  deleteSection,
+  updateSectionOrder,
   fetchRosTemplates,
   saveRosTemplate,
   deleteRosTemplate,
+  applyRosTemplate,
 } from './api/ros';

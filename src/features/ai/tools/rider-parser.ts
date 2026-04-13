@@ -10,7 +10,7 @@
 'use server';
 
 import { generateObject } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 import { semanticSearchCatalog } from '@/features/sales/api/catalog-embeddings';
 import { createClient } from '@/shared/api/supabase/server';
@@ -96,7 +96,7 @@ export async function parseRiderText(
   try {
     // Step 1: Extract structured requirements via LLM
     const { object: extracted } = await generateObject({
-      model: openai('gpt-4o'),
+      model: anthropic('claude-sonnet-4-20250514'),
       schema: RiderRequirementSchema,
       system: RIDER_SYSTEM,
       prompt: trimmed,

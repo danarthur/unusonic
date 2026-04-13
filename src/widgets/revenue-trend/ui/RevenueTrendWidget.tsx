@@ -45,7 +45,7 @@ export function RevenueTrendWidget({ data, loading = false }: RevenueTrendWidget
             <div key={month.label} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
               {/* Value label — visible on the tallest bar, hover on others */}
               <span
-                className="text-[9px] font-medium tabular-nums opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-micro font-medium tabular-nums opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{
                   color: 'var(--stage-text-secondary)',
                   opacity: month.revenue === maxRevenue ? 1 : undefined,
@@ -72,7 +72,7 @@ export function RevenueTrendWidget({ data, loading = false }: RevenueTrendWidget
 
               {/* Month label */}
               <span
-                className="text-[9px] font-medium uppercase tracking-wider shrink-0"
+                className="stage-micro shrink-0"
                 style={{ color: 'var(--stage-text-secondary)' }}
               >
                 {month.label}

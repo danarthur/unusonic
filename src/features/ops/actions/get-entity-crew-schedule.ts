@@ -43,12 +43,14 @@ export async function getEntityCrewSchedule(entityId: string): Promise<CrewSched
 }
 
 /**
- * Returns past confirmed/dispatched crew assignments for this entity.
- * Excludes 'requested' status — historical requests that were never confirmed
- * are not meaningful history.
+ * Returns past crew assignments for this entity (last 90 days).
+ * Includes all statuses — recent shows still need prep/reference access.
  */
 export async function getEntityCrewHistory(entityId: string): Promise<CrewScheduleEntry[]> {
   const supabase = await createClient();
+
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
   const { data, error } = await supabase
     .schema('ops')
@@ -56,9 +58,10 @@ export async function getEntityCrewHistory(entityId: string): Promise<CrewSchedu
     .select('assignment_id, event_id, role, status, event_title, starts_at, ends_at, venue_name, venue_address, location_address, deal_id, pay_rate, pay_rate_type, scheduled_hours, event_archetype')
     .eq('entity_id', entityId)
     .lt('starts_at', new Date().toISOString())
-    .in('status', ['confirmed', 'dispatched'])
+    .gte('starts_at', ninetyDaysAgo.toISOString())
+    .in('status', ['requested', 'confirmed', 'dispatched'])
     .order('starts_at', { ascending: false })
-    .limit(10);
+    .limit(30);
 
   if (error) {
     console.error('[ops] getEntityCrewHistory:', error.message);

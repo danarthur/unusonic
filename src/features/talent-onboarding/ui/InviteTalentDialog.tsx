@@ -166,7 +166,7 @@ export function InviteTalentDialog({
             onSubmit={handleSubmit}
             data-surface="raised"
             className={cn(
-              'stage-panel flex flex-col gap-6 p-5 transition-all duration-200',
+              'stage-panel flex flex-col gap-6 p-5 transition-colors duration-[80ms]',
               isContractor
                 ? 'border border-dashed border-[var(--color-unusonic-warning)]/60 shadow-[0_0_20px_-4px_var(--color-unusonic-warning)/0.15]'
                 : 'shadow-[0_0_20px_-4px_var(--stage-accent)/0.12]'
@@ -212,7 +212,7 @@ export function InviteTalentDialog({
                 className="stage-input"
               />
               {emailStatus === 'checking' && (
-                <p className="mt-1 text-[10px] text-[var(--stage-text-secondary)]">Checking…</p>
+                <p className="mt-1 text-label text-[var(--stage-text-secondary)]">Checking…</p>
               )}
               {emailStatus === 'found' && (
                 <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/10 px-2 py-1.5">
@@ -363,7 +363,7 @@ export function InviteTalentDialog({
               variant={isContractor ? 'default' : 'silk'}
               disabled={isPending || (isContractor && skillTags.length === 0)}
               className={cn(
-                'w-full font-medium transition-all',
+                'w-full font-medium transition-colors',
                 isContractor && 'bg-[var(--color-unusonic-warning)]/90 text-[var(--stage-text-on-accent)] hover:bg-[var(--color-unusonic-warning)] border-none'
               )}
             >

@@ -92,7 +92,7 @@ export function MobileDock({ user, workspaceName }: MobileDockProps) {
                   const IconComp = isActive && item.iconFilled ? item.iconFilled : item.icon;
                   return <IconComp size={24} strokeWidth={1.5} className="shrink-0" />;
                 })()}
-                <span className="text-[10px] font-medium mt-0.5 truncate w-full text-center">
+                <span className="text-label font-medium mt-0.5 truncate w-full text-center">
                   {item.label}
                 </span>
               </Link>
@@ -110,7 +110,7 @@ export function MobileDock({ user, workspaceName }: MobileDockProps) {
                 aria-label="More"
               >
                 <Menu size={24} strokeWidth={1.5} />
-                <span className="text-[10px] font-medium mt-0.5">More</span>
+                <span className="text-label font-medium mt-0.5">More</span>
               </button>
             </SheetTrigger>
             <SheetContent side="left" className="!max-w-[280px] flex flex-col p-0">

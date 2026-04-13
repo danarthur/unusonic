@@ -14,7 +14,8 @@ import Link from 'next/link';
 import type { OutstandingInvoice } from '@/features/finance-sync';
 import { cn } from '@/shared/lib/utils';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 interface OverdueAlertProps {
   invoices: OutstandingInvoice[];
@@ -42,7 +43,7 @@ export function OverdueAlert({ invoices, className }: OverdueAlertProps) {
         exit={{ opacity: 0, y: -8 }}
         transition={spring}
         className={cn(
-          'relative overflow-hidden rounded-2xl border border-[var(--color-unusonic-error)]/20 bg-[var(--color-unusonic-error)]/[0.06] p-4',
+          'relative overflow-hidden rounded-2xl border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-error)] bg-[var(--stage-surface)] p-4',
           className,
         )}
       >

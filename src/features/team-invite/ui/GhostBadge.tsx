@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { Plus, Crown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { getRoleLabel } from '../model/role-presets';
@@ -35,19 +36,19 @@ export function GhostBadge({ status, data, onClick, className }: GhostBadgeProps
       layout
       initial={{ scale: 0.96, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+      transition={STAGE_MEDIUM}
       onClick={onClick}
       className={cn(
-        'group relative flex w-full flex-col rounded-[var(--stage-radius-panel)] border transition-all duration-300',
+        'group relative flex w-full flex-col rounded-[var(--stage-radius-panel)] border transition-colors duration-100',
         'bg-[var(--stage-surface-raised)] border-[oklch(1_0_0_/_0.08)]',
         'shadow-[0_4px_24px_-1px_oklch(0_0_0/0.2)]',
         'hover:border-[oklch(1_0_0_/_0.15)] hover:shadow-[0_20px_40px_-4px_oklch(0_0_0/0.25)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[oklch(0.10_0_0)]',
-        isEmpty && 'min-h-[120px] items-center justify-center cursor-pointer text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:border-[var(--stage-accent)]/30',
+        isEmpty && 'min-h-[120px] items-center justify-center cursor-pointer text-[var(--stage-text-secondary)] hover:border-[var(--stage-accent)]/30 stage-hover overflow-hidden',
         !isEmpty && 'min-h-[160px] p-4 sm:p-5 items-center justify-center text-center sm:text-left sm:items-start sm:justify-start',
         isCaptain && 'cursor-pointer border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/10 text-[var(--stage-text-primary)] shadow-[0_0_0_1px_var(--stage-accent)/25] hover:border-[var(--stage-accent)]/60',
         isGhost && 'cursor-pointer bg-[var(--color-surface-100)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.15)]',
-        (status === 'invited' || status === 'active') && 'cursor-pointer text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]',
+        (status === 'invited' || status === 'active') && 'cursor-pointer text-[var(--stage-text-primary)] stage-hover overflow-hidden',
         className
       )}
     >
@@ -81,12 +82,12 @@ export function GhostBadge({ status, data, onClick, className }: GhostBadgeProps
               {data?.name ?? 'Unnamed'}
             </p>
             {(roleLabel || data?.job_title || portalLabel) && (
-              <p className="w-full truncate text-[11px] sm:text-xs text-[var(--stage-text-secondary)]">
+              <p className="w-full truncate text-field-label sm:text-xs text-[var(--stage-text-secondary)]">
                 {[roleLabel, data?.job_title, portalLabel].filter(Boolean).join(' · ')}
               </p>
             )}
             {data?.email && status !== 'captain' && (
-              <p className="w-full truncate text-[10px] text-[var(--stage-text-secondary)]/80 mt-0.5">{data.email}</p>
+              <p className="w-full truncate text-label text-[var(--stage-text-secondary)]/80 mt-0.5">{data.email}</p>
             )}
           </div>
         </div>

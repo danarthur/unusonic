@@ -137,7 +137,7 @@ function eventToDefaultValues(event: EventCommandDTO): EventCommandFormValues {
 }
 
 const inputBase =
-  'w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none transition-[box-shadow,border-color] focus:ring-2 focus:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.15)]';
+  'w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none transition-[box-shadow,border-color] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[oklch(1_0_0_/_0.15)]';
 
 interface EventCommandGridProps {
   event: EventCommandDTO;
@@ -271,7 +271,7 @@ export function EventCommandGrid({ event: initialEvent }: EventCommandGridProps)
                   placeholder="Event title"
                   className={cn(
                     'w-full min-w-0 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-transparent py-2 px-3 text-2xl md:text-3xl font-light text-[var(--stage-text-primary)] tracking-tight placeholder:text-[var(--stage-text-secondary)] outline-none transition-[border-color,box-shadow]',
-                    'ring-1 ring-[var(--stage-accent)]/15 focus:ring-2 focus:ring-[var(--stage-accent)]/30 focus:border-[var(--stage-accent)]/30'
+                    'ring-1 ring-[var(--stage-accent)]/15 focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/30 focus-visible:border-[var(--stage-accent)]/30'
                   )}
                 />
                 <div className="flex items-center gap-2 mt-1 flex-wrap">

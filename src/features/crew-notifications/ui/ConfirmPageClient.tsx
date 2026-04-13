@@ -61,7 +61,7 @@ export function ConfirmPageClient({ details, initialAction }: ConfirmPageClientP
         className="w-full max-w-md"
       >
         {/* Wordmark */}
-        <p className="text-xs font-semibold tracking-[0.12em] uppercase text-[oklch(1_0_0)]/30 mb-8">Unusonic</p>
+        <p className="text-xs font-medium tracking-[0.12em] uppercase text-[oklch(1_0_0)]/30 mb-8">Unusonic</p>
 
         {/* Done state */}
         {status === 'done' && (
@@ -94,7 +94,7 @@ export function ConfirmPageClient({ details, initialAction }: ConfirmPageClientP
         {/* Error state */}
         {status === 'error' && (
           <div className="text-center">
-            <p className="text-[oklch(1_0_0)]/80 font-medium mb-2">Something went wrong</p>
+            <p className="text-[oklch(1_0_0)]/80 font-medium mb-2">An error occurred</p>
             <p className="text-sm text-[oklch(1_0_0)]/40">{error}</p>
           </div>
         )}
@@ -114,14 +114,14 @@ export function ConfirmPageClient({ details, initialAction }: ConfirmPageClientP
               <div className="flex items-center gap-3">
                 <User size={14} className="text-[oklch(1_0_0)]/30 shrink-0" />
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-[oklch(1_0_0)]/30 mb-0.5">Role</p>
-                  <p className="text-sm font-semibold text-[oklch(1_0_0)]">{details.role}</p>
+                  <p className="stage-label text-[oklch(1_0_0)]/30 mb-0.5">Role</p>
+                  <p className="text-sm font-medium text-[oklch(1_0_0)]">{details.role}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <Calendar size={14} className="text-[oklch(1_0_0)]/30 shrink-0" />
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-[oklch(1_0_0)]/30 mb-0.5">Date</p>
+                  <p className="stage-label text-[oklch(1_0_0)]/30 mb-0.5">Date</p>
                   <p className="text-sm text-[oklch(1_0_0)]/80">{details.eventDate}</p>
                 </div>
               </div>
@@ -129,8 +129,8 @@ export function ConfirmPageClient({ details, initialAction }: ConfirmPageClientP
                 <div className="flex items-center gap-3">
                   <Clock size={14} className="text-[oklch(1_0_0)]/30 shrink-0" />
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-[oklch(1_0_0)]/30 mb-0.5">Call time</p>
-                    <p className="text-sm font-semibold text-[oklch(1_0_0)]">{details.callTime}</p>
+                    <p className="stage-label text-[oklch(1_0_0)]/30 mb-0.5">Call time</p>
+                    <p className="text-sm font-medium text-[oklch(1_0_0)]">{details.callTime}</p>
                   </div>
                 </div>
               )}
@@ -138,7 +138,7 @@ export function ConfirmPageClient({ details, initialAction }: ConfirmPageClientP
                 <div className="flex items-center gap-3">
                   <MapPin size={14} className="text-[oklch(1_0_0)]/30 shrink-0" />
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-[oklch(1_0_0)]/30 mb-0.5">Venue</p>
+                    <p className="stage-label text-[oklch(1_0_0)]/30 mb-0.5">Venue</p>
                     <p className="text-sm text-[oklch(1_0_0)]/80">
                       {details.venueName}
                       {details.venueAddress && <span className="text-[oklch(1_0_0)]/40"> · {details.venueAddress}</span>}
@@ -154,7 +154,7 @@ export function ConfirmPageClient({ details, initialAction }: ConfirmPageClientP
                 type="button"
                 onClick={() => handleAction('confirmed')}
                 disabled={status === 'loading'}
-                className="flex-1 py-3 rounded-xl bg-[var(--color-unusonic-success)]/15 border border-[var(--color-unusonic-success)]/30 text-[var(--color-unusonic-success)] font-semibold text-sm hover:bg-[var(--color-unusonic-success)]/25 transition-colors focus:outline-none disabled:opacity-60"
+                className="flex-1 py-3 rounded-xl bg-[var(--color-unusonic-success)]/15 border border-[var(--color-unusonic-success)]/30 text-[var(--color-unusonic-success)] font-medium text-sm hover:bg-[var(--color-unusonic-success)]/25 transition-colors focus:outline-none disabled:opacity-45"
               >
                 {status === 'loading' ? '…' : 'Confirm'}
               </button>
@@ -162,7 +162,7 @@ export function ConfirmPageClient({ details, initialAction }: ConfirmPageClientP
                 type="button"
                 onClick={() => handleAction('declined')}
                 disabled={status === 'loading'}
-                className="flex-1 py-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] text-[oklch(1_0_0)]/50 font-medium text-sm hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[oklch(1_0_0)]/70 transition-colors focus:outline-none disabled:opacity-60"
+                className="flex-1 py-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] text-[oklch(1_0_0)]/50 font-medium text-sm hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[oklch(1_0_0)]/70 transition-colors focus:outline-none disabled:opacity-45"
               >
                 {status === 'loading' ? '…' : 'Decline'}
               </button>

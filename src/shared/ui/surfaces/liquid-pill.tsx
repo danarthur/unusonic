@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion, type HTMLMotionProps } from 'framer-motion';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 interface LiquidPillProps extends HTMLMotionProps<'div'> {
@@ -17,7 +18,7 @@ export function LiquidPill({
   children,
   className,
   layout,
-  transition = { type: 'spring', stiffness: 300, damping: 30 },
+  transition = STAGE_MEDIUM,
   ...props
 }: LiquidPillProps) {
   return (

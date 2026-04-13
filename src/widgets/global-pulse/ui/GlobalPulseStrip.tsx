@@ -11,7 +11,7 @@ import {
 } from '@/shared/ui/popover';
 import { usePulseMetrics, useHealthIndex } from '../lib/use-pulse-metrics';
 import { useRecoveryNeeded } from '@/features/sovereign-recovery/lib/use-recovery-needed';
-import { M3_FADE_THROUGH_ENTER } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { Sparkline, MiniBarStrip } from './Sparkline';
 
 /**
@@ -48,7 +48,7 @@ export function GlobalPulseStrip() {
         className="stage-panel px-4 py-3 md:px-6 md:py-3 flex items-center justify-between gap-4"
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={M3_FADE_THROUGH_ENTER}
+        transition={STAGE_LIGHT}
       >
         <div className="h-5 w-24 stage-panel-nested stage-skeleton !rounded-lg" />
         <div className="md:flex gap-6 hidden">
@@ -64,12 +64,12 @@ export function GlobalPulseStrip() {
       className="stage-panel px-4 py-3 md:px-6 md:py-3 flex items-center justify-between gap-4"
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={M3_FADE_THROUGH_ENTER}
+      transition={STAGE_LIGHT}
       aria-label="Business health at a glance"
     >
       {/* Mobile: single Health Index */}
       <div className="md:hidden flex items-center gap-2 min-w-0">
-        <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Health</span>
+        <span className="stage-label">Health</span>
         <span className="text-lg font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums">
           {healthIndex}%
         </span>
@@ -81,7 +81,7 @@ export function GlobalPulseStrip() {
           <div className="relative flex items-center gap-2">
             <Sparkline values={velocitySparkline} stroke="var(--stage-accent)" opacity={0.5} className="shrink-0" />
             <div>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Velocity</span>
+              <span className="stage-label">Velocity</span>
               <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums block">
                 {revenueFormatted}
                 <span className="text-[var(--stage-text-secondary)] font-normal"> / {targetFormatted}</span>
@@ -93,7 +93,7 @@ export function GlobalPulseStrip() {
           <div className="relative flex items-center gap-2">
             <MiniBarStrip values={pulseBars} fill="var(--stage-accent)" opacity={0.5} className="shrink-0" />
             <div>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Pulse</span>
+              <span className="stage-label">Pulse</span>
               <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums block">
                 {metrics.activeGigsNext72h} <span className="text-[var(--stage-text-secondary)] font-normal">next 72h</span>
               </span>
@@ -102,7 +102,7 @@ export function GlobalPulseStrip() {
         </div>
         <div className="flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-[var(--stage-text-secondary)] shrink-0" aria-hidden />
-          <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Alerts</span>
+          <span className="stage-label">Alerts</span>
           <span className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight tabular-nums">
             {metrics.alertsCount}
           </span>
@@ -125,7 +125,7 @@ export function GlobalPulseStrip() {
               aria-label="Account recovery needed"
             >
               <Shield className="w-4 h-4" />
-              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-unusonic-error" aria-hidden />
+              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[var(--color-unusonic-error)]" aria-hidden />
             </button>
           </PopoverTrigger>
           <PopoverContent

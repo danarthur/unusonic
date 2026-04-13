@@ -63,6 +63,7 @@ export function SignUpFlow({
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [logoAcknowledging, setLogoAcknowledging] = useState(false);
   const logoAckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const accountCreatedRef = useRef(false);
 
   const {
     signupStep,
@@ -114,23 +115,30 @@ export function SignUpFlow({
     } else if (signupStep === 3) {
       startTransition(async () => {
         try {
-          const result = await signUpForPasskey({
-            email: email.trim().toLowerCase(),
-            fullName: fullName.trim(),
-          });
-          if (!result.ok) {
-            setPasskeyError(result.error ?? 'Failed to create account');
-            return;
+          // If account was already created on a previous attempt (passkey failed),
+          // skip signup and go straight to passkey registration.
+          if (!accountCreatedRef.current) {
+            const result = await signUpForPasskey({
+              email: email.trim().toLowerCase(),
+              fullName: fullName.trim(),
+            });
+            if (!result.ok) {
+              setPasskeyError(result.error ?? 'Failed to create account');
+              return;
+            }
+            accountCreatedRef.current = true;
           }
           const passkeyResult = await registerPasskey({ friendlyName: guessDeviceName() });
           const postSignupDest = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/onboarding';
           if (!passkeyResult.ok) {
-            window.location.href = postSignupDest;
+            // Passkey failed or was cancelled — stay on step 3 so user can retry.
+            // Account is created but unusable without a passkey.
+            setPasskeyError(passkeyResult.error || 'Passkey was not created. Please try again — you need a passkey to sign in.');
             return;
           }
           window.location.href = postSignupDest;
         } catch (e) {
-          setPasskeyError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+          setPasskeyError(e instanceof Error ? e.message : 'Passkey registration failed. Try again.');
         }
       });
     }
@@ -247,7 +255,7 @@ export function SignUpFlow({
                         onClick={handleSignupStepSubmit}
                         disabled={isSignupPending}
                         transition={STAGE_HEAVY}
-                        className="stage-btn stage-btn-primary w-full py-3.5 rounded-full font-medium text-sm transition-colors disabled:opacity-70 disabled:pointer-events-none flex items-center justify-center gap-2"
+                        className="stage-btn stage-btn-primary w-full py-3.5 rounded-full font-medium text-sm transition-colors disabled:opacity-45 disabled:pointer-events-none flex items-center justify-center gap-2"
                       >
                         {isSignupPending ? (
                           <>

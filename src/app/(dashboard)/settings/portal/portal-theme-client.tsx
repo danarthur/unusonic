@@ -12,51 +12,10 @@ import {
   getPresetTokens,
   portalThemeToCssVars,
   PORTAL_THEME_PRESETS,
+  PORTAL_THEME_LABELS,
+  PORTAL_THEME_DESCRIPTIONS,
 } from '@/shared/lib/portal-theme';
 import { updatePortalTheme } from './actions';
-
-// =============================================================================
-// Preset metadata (labels, descriptions)
-// =============================================================================
-
-const PRESET_META: Record<PortalThemePreset, { label: string; description: string }> = {
-  default: {
-    label: 'Default',
-    description: 'Warm white paper, near-black accent. High-end print document feel.',
-  },
-  minimalist: {
-    label: 'Minimalist',
-    description: 'Swiss-inspired. Maximum white space. Sharp corners. Typography does the work.',
-  },
-  'dark-stage': {
-    label: 'Dark Stage',
-    description: 'Deep near-black, cool precision. Corporate AV, touring production, technical vendors.',
-  },
-  editorial: {
-    label: 'Editorial',
-    description: 'High-contrast, bold typography. Brand activations, experiential marketing, fashion events.',
-  },
-  civic: {
-    label: 'Civic',
-    description: 'Clean, trustworthy, warm. Nonprofit galas, government events, institutional productions.',
-  },
-  'tactile-warm': {
-    label: 'Tactile Warm',
-    description: 'Warm, textured, serif headings. Luxury events, weddings, high-end galas.',
-  },
-  'neo-brutalist': {
-    label: 'Neo-Brutalist',
-    description: 'Bold, raw, high contrast. Black borders, vivid accent. Festivals and edgy brands.',
-  },
-  'retro-future': {
-    label: 'Retro-Future',
-    description: 'Vintage palette meets digital precision. Monospace headings, muted green-gray.',
-  },
-  custom: {
-    label: 'Custom',
-    description: 'Full control over all theme tokens. Start from your brand color.',
-  },
-};
 
 // =============================================================================
 // Miniature proposal preview (rendered inline with preset tokens)
@@ -136,98 +95,163 @@ function PresetThumbnail({ tokens }: { tokens: PortalThemeTokens }) {
 
 function LivePreview({ tokens }: { tokens: PortalThemeTokens }) {
   const vars = portalThemeToCssVars(tokens);
+  const isRowLayout = tokens.itemLayout === 'row';
+  const isMinimalLayout = tokens.itemLayout === 'minimal';
+  const isCardLayout = !isRowLayout && !isMinimalLayout;
+  const showTrim = tokens.sectionTrim !== 'none';
+  const showBandTop = tokens.accentBand === 'top';
+  const showBandBottom = tokens.accentBand === 'bottom';
 
-  const btnTextColor = tokens.accentText;
+  // Scale the preview title relative to the actual token (preview is ~40% scale)
+  const titleSize = `calc(${tokens.heroTitleSize} * 0.55)`;
+  const totalSize = `calc(${tokens.totalScale} * 0.7)`;
 
   return (
     <motion.div
-      key={tokens.accent + tokens.bg + tokens.radius + tokens.shadow}
+      key={tokens.accent + tokens.bg + tokens.radius + tokens.shadow + tokens.itemLayout + tokens.heroTitleSize}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_MEDIUM}
-      className="w-full rounded-xl overflow-hidden p-5 sm:p-6 flex flex-col gap-4"
-      style={{ ...vars, backgroundColor: 'var(--portal-bg)', fontFamily: 'var(--portal-font-body)' } as React.CSSProperties}
+      className="w-full rounded-xl overflow-hidden p-5 sm:p-6 flex flex-col"
+      style={{
+        ...vars,
+        backgroundColor: 'var(--portal-bg)',
+        fontFamily: 'var(--portal-font-body)',
+        gap: 'var(--portal-gap)',
+      } as React.CSSProperties}
     >
       {/* Hero */}
       <div
-        className="rounded-[var(--portal-radius)] p-4 sm:p-5"
+        className="rounded-[var(--portal-radius)] relative overflow-hidden"
         style={{
-          backgroundColor: 'var(--portal-surface)',
+          backgroundColor: 'var(--portal-hero-surface, var(--portal-surface))',
           border: 'var(--portal-border-width) solid var(--portal-border)',
           boxShadow: 'var(--portal-shadow-strong)',
+          padding: `calc(${tokens.heroPadding} * 0.6) var(--portal-card-padding)`,
+          textAlign: tokens.heroAlign as React.CSSProperties['textAlign'],
         }}
       >
+        {showBandTop && (
+          <div className="absolute top-0 left-0 right-0" style={{ height: '3px', backgroundColor: 'var(--portal-accent)' }} />
+        )}
         <p
-          className="text-[10px] font-medium uppercase tracking-[0.15em]"
-          style={{ color: 'var(--portal-text-secondary)' }}
+          style={{
+            color: 'var(--portal-text-secondary)',
+            fontSize: 'var(--portal-label-size)',
+            fontWeight: 'var(--portal-label-weight)',
+            letterSpacing: 'var(--portal-label-tracking)',
+            textTransform: tokens.labelTransform as React.CSSProperties['textTransform'],
+          }}
         >
           Your Company
         </p>
         <p
-          className="text-sm mt-2"
+          className="text-xs mt-1.5"
           style={{ color: 'var(--portal-text-secondary)' }}
         >
           Prepared for Alex Rivera
         </p>
         <p
-          className="text-lg sm:text-xl mt-0.5"
+          className="mt-0.5 leading-tight"
           style={{
             color: 'var(--portal-text)',
             fontFamily: 'var(--portal-font-heading)',
             fontWeight: 'var(--portal-heading-weight)',
             letterSpacing: 'var(--portal-heading-tracking)',
+            fontSize: titleSize,
           }}
         >
           Summer Festival 2026
         </p>
-        <div className="flex gap-2 mt-3">
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
           <span
-            className="text-[10px] px-2 py-1"
+            className="text-micro px-2 py-0.5"
             style={{
               border: 'var(--portal-border-width) solid var(--portal-border)',
               backgroundColor: 'var(--portal-accent-subtle)',
               color: 'var(--portal-text)',
-              borderRadius: 'var(--portal-radius)',
+              borderRadius: 'var(--portal-btn-radius)',
             }}
           >
             Sat, June 14
           </span>
         </div>
+        {showBandBottom && (
+          <div className="absolute bottom-0 left-0 right-0" style={{ height: '3px', backgroundColor: 'var(--portal-accent)' }} />
+        )}
       </div>
 
-      {/* Line items */}
-      <div className="grid grid-cols-3 gap-2">
-        {['Stage + Sound', 'Lighting', 'Crew'].map((name) => (
-          <div
-            key={name}
-            className="rounded-[var(--portal-radius)] p-3 flex flex-col gap-1.5"
-            style={{
-              backgroundColor: 'var(--portal-surface)',
-              border: 'var(--portal-border-width) solid var(--portal-border)',
-              boxShadow: 'var(--portal-shadow)',
-            }}
-          >
-            <p
-              className="text-[11px] font-medium leading-tight"
-              style={{ color: 'var(--portal-text)' }}
+      {/* Section trim preview */}
+      {showTrim && (
+        <div className="flex items-center justify-center" style={{ height: '6px' }}>
+          {tokens.sectionTrim === 'wave' && (
+            <svg viewBox="0 0 200 8" preserveAspectRatio="none" className="w-full h-full" fill="none">
+              <path d="M0 4 Q25 0 50 4 Q75 8 100 4 Q125 0 150 4 Q175 8 200 4" stroke="var(--portal-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            </svg>
+          )}
+          {tokens.sectionTrim === 'angle' && (
+            <svg viewBox="0 0 200 6" preserveAspectRatio="none" className="w-full h-full" fill="none">
+              <path d="M0 6 L100 0 L200 6" stroke="var(--portal-accent)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            </svg>
+          )}
+          {tokens.sectionTrim === 'dots' && (
+            <svg viewBox="0 0 200 4" className="w-full h-full">
+              {Array.from({ length: 15 }, (_, i) => <circle key={i} cx={6 + i * 13} cy="2" r="1" fill="var(--portal-border)" />)}
+            </svg>
+          )}
+          {tokens.sectionTrim === 'straight' && (
+            <div className="w-full" style={{ height: '1px', backgroundColor: 'var(--portal-border)' }} />
+          )}
+        </div>
+      )}
+
+      {/* Line items — layout-aware */}
+      {isCardLayout && (
+        <div className="grid grid-cols-3 gap-2">
+          {['Stage + Sound', 'Lighting', 'Crew'].map((name) => (
+            <div
+              key={name}
+              className="rounded-[var(--portal-radius)] flex flex-col gap-1"
+              style={{
+                backgroundColor: 'var(--portal-surface)',
+                border: 'var(--portal-border-width) solid var(--portal-border)',
+                boxShadow: 'var(--portal-shadow)',
+                padding: `calc(${tokens.cardPadding} * 0.6)`,
+              }}
             >
-              {name}
-            </p>
-            <p
-              className="text-[10px]"
-              style={{ color: 'var(--portal-text-secondary)' }}
-            >
-              1 × $2,400
-            </p>
-            <p
-              className="text-xs font-semibold tabular-nums mt-auto"
-              style={{ color: 'var(--portal-text)' }}
-            >
-              $2,400
-            </p>
+              <p className="text-label font-medium leading-tight" style={{ color: 'var(--portal-text)' }}>{name}</p>
+              <p className="text-micro" style={{ color: 'var(--portal-text-secondary)' }}>1 × $2,400</p>
+              <p className="text-label font-medium tabular-nums mt-auto" style={{ color: 'var(--portal-text)' }}>$2,400</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isRowLayout && (
+        <div className="flex flex-col">
+          <div className="flex justify-between pb-1 mb-1" style={{ borderBottom: '1px solid var(--portal-border)' }}>
+            <span className="text-micro uppercase tracking-wider" style={{ color: 'var(--portal-text-secondary)' }}>Item</span>
+            <span className="text-micro uppercase tracking-wider" style={{ color: 'var(--portal-text-secondary)' }}>Total</span>
           </div>
-        ))}
-      </div>
+          {['Stage + Sound', 'Lighting', 'Crew'].map((name) => (
+            <div key={name} className="flex justify-between py-1.5" style={{ borderBottom: 'var(--portal-border-width) solid var(--portal-border-subtle)' }}>
+              <span className="text-label" style={{ color: 'var(--portal-text)' }}>{name}</span>
+              <span className="text-label font-medium tabular-nums" style={{ color: 'var(--portal-text)' }}>$2,400</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isMinimalLayout && (
+        <div className="flex flex-col">
+          {['Stage + Sound', 'Lighting', 'Crew'].map((name) => (
+            <div key={name} className="flex justify-between py-1.5" style={{ borderBottom: '1px solid var(--portal-border-subtle)' }}>
+              <span className="text-label" style={{ color: 'var(--portal-text)' }}>{name}</span>
+              <span className="text-label tabular-nums" style={{ color: 'var(--portal-text)' }}>$2,400</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* CTA bar */}
       <div
@@ -238,26 +262,26 @@ function LivePreview({ tokens }: { tokens: PortalThemeTokens }) {
           boxShadow: 'var(--portal-shadow)',
         }}
       >
-        <div>
+        <div className="flex items-baseline gap-1.5">
           <span
-            className="text-[9px] font-medium uppercase tracking-wider"
+            className="text-micro font-medium uppercase tracking-wider"
             style={{ color: 'var(--portal-text-secondary)' }}
           >
             Total
           </span>
           <span
-            className="text-sm font-semibold tabular-nums ml-2"
-            style={{ color: 'var(--portal-text)' }}
+            className="font-semibold tabular-nums"
+            style={{ color: 'var(--portal-text)', fontSize: totalSize }}
           >
             $7,200
           </span>
         </div>
         <span
-          className="text-[11px] font-medium px-4 py-1.5"
+          className="text-label font-medium px-3 py-1"
           style={{
             backgroundColor: 'var(--portal-accent)',
-            color: btnTextColor,
-            borderRadius: 'var(--portal-radius)',
+            color: tokens.accentText,
+            borderRadius: 'var(--portal-btn-radius)',
           }}
         >
           Review & Sign
@@ -316,12 +340,12 @@ export function PortalThemeClient({ initialPreset, initialConfig }: PortalThemeC
 
       {/* Preset grid */}
       <section>
-        <h2 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
+        <h2 className="stage-label text-field-label mb-4">
           Presets
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {selectablePresets.map((preset) => {
-            const meta = PRESET_META[preset];
+            const meta = { label: PORTAL_THEME_LABELS[preset], description: PORTAL_THEME_DESCRIPTIONS[preset] };
             const tokens = getPresetTokens(preset);
             const isSelected = selected === preset;
 
@@ -381,14 +405,14 @@ export function PortalThemeClient({ initialPreset, initialConfig }: PortalThemeC
             transition={STAGE_LIGHT}
             className="text-sm text-[var(--stage-text-secondary)] mt-3"
           >
-            {PRESET_META[selected].description}
+            {PORTAL_THEME_DESCRIPTIONS[selected]}
           </motion.p>
         </AnimatePresence>
       </section>
 
       {/* Live preview */}
       <section>
-        <h2 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
+        <h2 className="stage-label text-field-label mb-4">
           Preview
         </h2>
         <div className="stage-panel rounded-xl p-1 border border-[var(--stage-border)]">
@@ -428,8 +452,8 @@ export function PortalThemeClient({ initialPreset, initialConfig }: PortalThemeC
                 className={cn(
                   'inline-flex items-center gap-2 rounded-[var(--stage-radius-button)] px-4 py-2 text-sm font-medium',
                   'bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)]',
-                  'hover:brightness-[0.95] transition-[filter]',
-                  'disabled:opacity-50 disabled:pointer-events-none',
+                  'hover:bg-[oklch(1_0_0_/_0.08)] transition-colors',
+                  'disabled:opacity-45 disabled:pointer-events-none',
                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
                 )}
               >

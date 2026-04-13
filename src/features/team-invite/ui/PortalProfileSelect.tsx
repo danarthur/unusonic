@@ -55,8 +55,8 @@ export function PortalProfileSelect({
         <SelectTrigger
           className={cn(
             'w-full rounded-xl border border-[oklch(1_0_0_/_0.04)] bg-[oklch(1_0_0_/_0.05)] px-3 py-2.5 text-[var(--stage-text-primary)]',
-            'hover:bg-[oklch(1_0_0_/_0.07)] focus:border-[oklch(1_0_0_/_0.14)] focus:ring-2 focus:ring-[var(--stage-accent)]/30',
-            'transition-colors disabled:opacity-50'
+            'hover:bg-[oklch(1_0_0_/_0.07)] focus-visible:border-[oklch(1_0_0_/_0.14)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/30',
+            'transition-colors disabled:opacity-45'
           )}
         >
           <SelectValue placeholder="Auto-detect">

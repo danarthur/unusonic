@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getEventCommand } from '@/entities/event';
 import { EventCommandGrid } from '@/widgets/event-dashboard';
+import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 function EventSkeleton() {
   return (
@@ -53,10 +54,11 @@ async function EventContent({ id }: { id: string }) {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <AionPageContextSetter type="event" entityId={id} label={event.title ?? event.internal_code ?? null} />
       <header className="shrink-0 flex items-center gap-4 p-4 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]">
         <Link
           href="/calendar"
-          className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+          className="stage-hover overflow-hidden p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label="Back to Calendar"
         >
           <ArrowLeft size={20} />

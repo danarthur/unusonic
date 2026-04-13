@@ -108,7 +108,7 @@ export function QuickBookAction({ entityId, entityName }: QuickBookActionProps) 
   };
 
   return (
-    <div className="md:col-span-3">
+    <div>
       <AnimatePresence mode="wait">
         {!expanded ? (
           <motion.div
@@ -124,7 +124,7 @@ export function QuickBookAction({ entityId, entityName }: QuickBookActionProps) 
               onClick={handleOpen}
               className="gap-1.5"
             >
-              <CalendarPlus className="size-3.5" />
+              <CalendarPlus className="size-3.5" strokeWidth={1.5} />
               Book on show
             </Button>
           </motion.div>
@@ -135,22 +135,23 @@ export function QuickBookAction({ entityId, entityName }: QuickBookActionProps) 
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={STAGE_MEDIUM}
-            className="stage-panel rounded-2xl p-4 space-y-3"
+            className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+            data-surface="elevated"
           >
-            <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)]">
+            <h3 className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
               Book {entityName} on a show
             </h3>
 
             {loading ? (
-              <p className="text-xs text-[var(--stage-text-secondary)]">Loading deals...</p>
+              <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Loading deals...</p>
             ) : deals.length === 0 ? (
-              <p className="text-xs text-[var(--stage-text-secondary)]">No active deals in this workspace.</p>
+              <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">No active deals in this workspace.</p>
             ) : (
               <>
                 <div className="space-y-1">
                   <label
                     htmlFor="quick-book-deal"
-                    className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
+                    className="stage-label text-[var(--stage-text-secondary)]"
                   >
                     Show
                   </label>
@@ -172,7 +173,7 @@ export function QuickBookAction({ entityId, entityName }: QuickBookActionProps) 
                 <div className="space-y-1">
                   <label
                     htmlFor="quick-book-role"
-                    className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
+                    className="stage-label text-[var(--stage-text-secondary)]"
                   >
                     Role (optional)
                   </label>
@@ -187,13 +188,13 @@ export function QuickBookAction({ entityId, entityName }: QuickBookActionProps) 
                 </div>
 
                 {conflict && (
-                  <p className="text-xs text-[var(--color-unusonic-warning)]">{conflict}</p>
+                  <p className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-warning)]">{conflict}</p>
                 )}
               </>
             )}
 
             {error && (
-              <p role="alert" className="text-xs text-[var(--color-unusonic-error)]">{error}</p>
+              <p role="alert" className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-error)]">{error}</p>
             )}
 
             <div className="flex items-center gap-2 pt-1">

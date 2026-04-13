@@ -14,6 +14,18 @@ export interface AssignedGearEntry {
   name: string;
 }
 
+export interface Section {
+  id: string;
+  event_id: string;
+  title: string;
+  color: string | null;
+  sort_order: number;
+  start_time: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Cue {
   id: string;
   event_id: string;
@@ -26,8 +38,31 @@ export interface Cue {
   is_pre_show: boolean;
   assigned_crew: AssignedCrewEntry[];
   assigned_gear: AssignedGearEntry[];
+  section_id: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+}
+
+export interface TemplateSectionDef {
+  title: string;
+  color: string | null;
+  sort_order: number;
+  start_time: string | null;
+  notes: string | null;
+}
+
+export interface TemplateCueDef {
+  title: string | null;
+  start_time: string | null;
+  duration_minutes: number;
+  type: CueType;
+  notes: string | null;
+  sort_order: number;
+  is_pre_show: boolean;
+  assigned_crew: AssignedCrewEntry[];
+  assigned_gear: AssignedGearEntry[];
+  /** Index into the template's sections array. Undefined for unsectioned cues. */
+  section_ref?: number;
 }
 
 export interface RosTemplate {
@@ -35,7 +70,9 @@ export interface RosTemplate {
   workspace_id: string;
   name: string;
   description: string | null;
-  cues: Omit<Cue, 'id' | 'event_id' | 'created_at' | 'updated_at'>[];
+  /** Legacy templates may only have cues (no sections). */
+  cues: TemplateCueDef[];
+  sections?: TemplateSectionDef[];
   created_at: string;
   updated_at: string;
 }

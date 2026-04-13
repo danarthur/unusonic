@@ -174,7 +174,7 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
           const isToday = dayKey === todayKey;
           const headerContent = (
             <div className="flex flex-col items-center gap-0.5">
-              <span className="text-[10px] font-medium text-[var(--stage-text-secondary)]/60 uppercase tracking-widest">{format(d, 'EEE')}</span>
+              <span className="stage-label text-[var(--stage-text-secondary)]/60">{format(d, 'EEE')}</span>
               <span className={`text-lg tabular-nums ${
                 isToday ? 'font-medium w-8 h-8 flex items-center justify-center rounded-full bg-[var(--color-unusonic-error)] text-[oklch(0.10_0_0)]' : 'font-light text-[var(--stage-text-primary)]'
               }`}>{format(d, 'd')}</span>
@@ -185,7 +185,7 @@ export function WeekGrid({ events, viewDate, onEventClick, onDayClick, maxVisibl
               key={dayKey}
               type="button"
               onClick={() => onDayClick(dayKey)}
-              className={`p-2 text-center tracking-tight hover:bg-[var(--stage-surface-hover)] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset ${
+              className={`p-2 text-center tracking-tight stage-hover overflow-hidden rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset ${
                 isToday ? 'bg-[var(--today-bg)]' : ''
               }`}
             >

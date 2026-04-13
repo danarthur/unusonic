@@ -5,13 +5,25 @@ import * as Sentry from '@sentry/nextjs';
 // ─── Route & role constants ───
 // Mirrors src/shared/lib/resolve-destination.ts (inline for Edge Runtime safety)
 const DASHBOARD_ROLES = ['owner', 'admin', 'member'];
+const CLIENT_ROLES = ['client'];
 const DASHBOARD_HOME = '/lobby';
 const PORTAL_HOME = '/schedule';
+const CLIENT_HOME = '/client/home';
 const PORTAL_ROUTES = ['/schedule', '/my-calendar', '/profile', '/pay', '/pipeline', '/proposals', '/setlists', '/riders', '/crew-status'];
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p', '/claim', '/confirm', '/crew/'];
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p/', '/claim', '/confirm', '/crew/', '/bridge'];
+// Client portal has its own auth (session cookie or Supabase auth via claimed entity).
+// See docs/reference/client-portal-design.md §14–§17. The proxy does NOT enforce
+// anything on /client/* or /api/client-portal/* — the route group's layout and
+// the API route handlers handle gating via getClientPortalContext() and the
+// Route Handlers respectively.
+const CLIENT_PORTAL_ROUTES = ['/client/', '/client', '/api/client-portal/'];
 
 function isPortalRoute(pathname: string): boolean {
   return PORTAL_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'));
+}
+
+function isClientPortalRoute(pathname: string): boolean {
+  return CLIENT_PORTAL_ROUTES.some(r => pathname === r || pathname.startsWith(r));
 }
 
 function isDashboardRole(slug: string | null | undefined): boolean {
@@ -19,17 +31,59 @@ function isDashboardRole(slug: string | null | undefined): boolean {
   return DASHBOARD_ROLES.includes(slug);
 }
 
+function isClientRole(slug: string | null | undefined): boolean {
+  if (!slug) return false;
+  return CLIENT_ROLES.includes(slug);
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip static files and Next.js internals
+  // Skip static files and Next.js internals (including file-based
+  // icon/manifest routes like /icon, /apple-icon, /manifest.webmanifest which
+  // are generated from src/app/icon.tsx etc. and have no file extension in
+  // their URL — the extension test below wouldn't catch them).
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/monitoring') ||
+    pathname.startsWith('/.well-known/') ||
     pathname === '/favicon.ico' ||
+    pathname === '/icon' ||
+    pathname === '/apple-icon' ||
+    pathname === '/manifest.webmanifest' ||
+    pathname.startsWith('/icon/') ||
+    pathname.startsWith('/apple-icon/') ||
     /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js)$/.test(pathname)
   ) {
     return NextResponse.next();
+  }
+
+  // Client portal routes bypass the proxy's dashboard/employee auth entirely.
+  // Their (client-portal)/layout.tsx resolves auth via getClientPortalContext()
+  // (unusonic_client_session cookie OR Supabase auth for claimed entities) and
+  // redirects to /client/sign-in when neither is present.
+  if (isClientPortalRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Proposal public token first-touch mint.
+  // On first visit to /p/<token>, if neither the session cookie nor the
+  // "no-mint-tried" marker cookie is present, redirect to the mint handler.
+  // The mint handler sets one of those two cookies on its way back, breaking
+  // any infinite loop on lead-stage proposals with no resolvable client entity.
+  // This runs in Edge Runtime where NextResponse.redirect() produces a proper
+  // HTTP 307 — server components can't do that in Next.js 16 (see §15.1).
+  if (pathname.startsWith('/p/') && pathname.length > 3) {
+    const hasSession = request.cookies.has('unusonic_client_session');
+    const hasNoMintMarker = request.cookies.has('unusonic_client_no_mint');
+    if (!hasSession && !hasNoMintMarker) {
+      const proposalToken = pathname.slice(3).split('/')[0];
+      if (proposalToken) {
+        const mintUrl = new URL('/api/client-portal/mint-from-proposal', request.url);
+        mintUrl.searchParams.set('token', proposalToken);
+        return NextResponse.redirect(mintUrl);
+      }
+    }
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -91,6 +145,7 @@ export async function proxy(request: NextRequest) {
   // ─── Resolve role (JWT first, DB fallback for legacy sessions) ───
   let roleSlug: string | null = null;
   let isPortalUser = false;
+  let isClientUser = false;
   let hasWorkspace = Object.keys(workspaceRoles).length > 0;
 
   if (hasWorkspace) {
@@ -102,7 +157,8 @@ export async function proxy(request: NextRequest) {
     } else {
       roleSlug = entries[0][1];
     }
-    isPortalUser = !!roleSlug && !isDashboardRole(roleSlug);
+    isClientUser = isClientRole(roleSlug);
+    isPortalUser = !!roleSlug && !isDashboardRole(roleSlug) && !isClientUser;
   } else if (userId) {
     // Legacy sessions without sync trigger — temporary DB fallback
     const { data: memberRow } = await supabase
@@ -118,12 +174,13 @@ export async function proxy(request: NextRequest) {
       });
       if (slug) {
         roleSlug = slug;
-        isPortalUser = !isDashboardRole(slug);
+        isClientUser = isClientRole(slug);
+        isPortalUser = !isDashboardRole(slug) && !isClientUser;
       }
     }
   }
 
-  const resolvedHome = isPortalUser ? PORTAL_HOME : DASHBOARD_HOME;
+  const resolvedHome = isClientUser ? CLIENT_HOME : isPortalUser ? PORTAL_HOME : DASHBOARD_HOME;
 
   // ─── RULE 2: Authenticated user at root → onboarding or home ───
   if (userId && pathname === '/') {
@@ -134,7 +191,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // ─── RULE 3: Authenticated user on public route → redirect home ───
-  const isPassthrough = pathname === '/auth/callback' || pathname.startsWith('/p/') || pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew/');
+  const isPassthrough = pathname === '/auth/callback' || pathname.startsWith('/p/') || pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew/') || pathname.startsWith('/bridge');
   if (userId && isPublic && !isPassthrough) {
     if (!hasWorkspace) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
@@ -144,8 +201,16 @@ export async function proxy(request: NextRequest) {
 
   // ─── RULE 4: Role-based route enforcement ───
   // Portal-only users cannot access dashboard routes.
+  // Client-only users cannot access dashboard or portal routes (they use /client/*).
   // Dashboard users CAN access portal routes (progressive access — additive, never subtractive).
+  // Note: /client/* routes bypass the proxy entirely (line 58), so client users
+  // navigating to their portal never reach this check. This catches clients
+  // trying to access dashboard or employee routes.
   if (userId && !isPublic && !pathname.startsWith('/api/') && !pathname.startsWith('/onboarding') && !pathname.startsWith('/signout')) {
+    if (isClientUser && !isClientPortalRoute(pathname)) {
+      Sentry.logger.info('middleware.clientUserOnDashboard', { pathname });
+      return NextResponse.redirect(new URL(CLIENT_HOME, request.url));
+    }
     if (isPortalUser && !isPortalRoute(pathname)) {
       Sentry.logger.info('middleware.portalUserOnDashboard', { pathname });
       return NextResponse.redirect(new URL(PORTAL_HOME, request.url));

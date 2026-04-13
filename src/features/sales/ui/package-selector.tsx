@@ -10,7 +10,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { getPackages } from '../api/proposal-actions';
-import type { Package } from '../api/package-actions';
+import type { Package } from '@/types/supabase';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
@@ -61,7 +61,7 @@ export function PackageSelector({
       <SheetContent side="right" className="max-w-md">
         <SheetHeader>
           <SheetTitle>Add from catalog</SheetTitle>
-          <SheetClose className="p-2 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]" />
+          <SheetClose className="p-2 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden" />
         </SheetHeader>
         <SheetBody>
           <p className="text-xs text-[var(--stage-text-secondary)] mb-4">
@@ -89,7 +89,7 @@ export function PackageSelector({
                     {pkg.description && (
                       <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{pkg.description}</p>
                     )}
-                    <p className="text-sm font-semibold text-[var(--stage-text-primary)] mt-1">
+                    <p className="text-sm font-medium text-[var(--stage-text-primary)] mt-1">
                       ${Number(pkg.price).toLocaleString()}
                     </p>
                   </div>
@@ -97,7 +97,7 @@ export function PackageSelector({
                     type="button"
                     onClick={() => handleSelect(pkg)}
                     transition={STAGE_LIGHT}
-                    className="shrink-0 p-2.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="shrink-0 p-2.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] stage-hover overflow-hidden"
                     aria-label={`Add ${pkg.name} to proposal`}
                   >
                     <Plus size={18} strokeWidth={1.5} />

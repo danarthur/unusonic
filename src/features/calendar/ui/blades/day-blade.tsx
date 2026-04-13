@@ -11,7 +11,8 @@ import { EventSummaryCard } from '@/features/calendar/ui/blades/event-summary-ca
 const BLADE_PARAM = 'blade'; // day blade open for this date (view anchor stays in 'date')
 const EVENT_PARAM = 'event';
 const DRAWER_WIDTH = 400;
-const springConfig = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const springConfig = STAGE_MEDIUM;
 
 export interface DayBladeProps {
   /** Current date from URL (YYYY-MM-DD). */
@@ -111,7 +112,7 @@ export function DayBlade({ date, events, eventId, onDateChange }: DayBladeProps)
           <button
             type="button"
             onClick={close}
-            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             aria-label="Close"
           >
             <X className="w-5 h-5" strokeWidth={1.5} />
@@ -122,7 +123,7 @@ export function DayBlade({ date, events, eventId, onDateChange }: DayBladeProps)
           <button
             type="button"
             onClick={goPrev}
-            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             aria-label="Previous day"
           >
             <span className="text-sm font-medium">&lt;</span>
@@ -130,10 +131,10 @@ export function DayBlade({ date, events, eventId, onDateChange }: DayBladeProps)
           <button
             type="button"
             onClick={goToday}
-            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] ${
+            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ${
               isToday
                 ? 'bg-[var(--stage-accent)] text-[oklch(0.10_0_0)]'
-                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.03]'
+                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden'
             }`}
           >
             Today
@@ -141,7 +142,7 @@ export function DayBlade({ date, events, eventId, onDateChange }: DayBladeProps)
           <button
             type="button"
             onClick={goNext}
-            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] hover:brightness-[1.04] transition-[color,background-color,filter] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+            className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             aria-label="Next day"
           >
             <span className="text-sm font-medium">&gt;</span>

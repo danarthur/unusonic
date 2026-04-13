@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Search, X, Lock } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { searchCrewMembers, type CrewSearchResult } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import { checkCrewAvailability, type AvailabilityStatus } from '@/features/ops/actions/check-crew-availability';
 
 export interface CrewRoleAssignmentRowProps {
   role: {
@@ -19,7 +20,22 @@ export interface CrewRoleAssignmentRowProps {
   sourceOrgId: string | null;
   onAssign: (roleIdx: number, entityId: string, name: string) => void;
   onClear: (roleIdx: number) => void;
+  /** Deal's proposed date (YYYY-MM-DD). When set, availability badge is shown for assigned crew. */
+  proposedDate?: string | null;
+  /** Current deal ID — excluded from availability conflict checks. */
+  dealId?: string | null;
 }
+
+// ─── Availability dot colors ─────────────────────────────────────────────────
+
+const AVAILABILITY_DOT_STYLES: Record<AvailabilityStatus | 'loading', string> = {
+  available: 'bg-[var(--stage-text-primary)]',
+  acknowledged: 'bg-[oklch(0.75_0.15_145)]',
+  held: 'bg-[var(--color-unusonic-warning)]',
+  booked: 'bg-[var(--stage-text-tertiary)]',
+  blackout: 'bg-[var(--stage-text-tertiary)]',
+  loading: 'bg-[var(--stage-text-tertiary)] animate-pulse',
+};
 
 export function CrewRoleAssignmentRow({
   role,
@@ -27,6 +43,8 @@ export function CrewRoleAssignmentRow({
   sourceOrgId,
   onAssign,
   onClear,
+  proposedDate,
+  dealId,
 }: CrewRoleAssignmentRowProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CrewSearchResult[]>([]);
@@ -34,6 +52,37 @@ export function CrewRoleAssignmentRow({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  // ── Availability check ──────────────────────────────────────────────────
+  const [availabilityStatus, setAvailabilityStatus] = useState<AvailabilityStatus | 'loading' | null>(null);
+  const availabilityCacheRef = useRef<{ entityId: string; date: string } | null>(null);
+
+  useEffect(() => {
+    const entityId = role.entity_id;
+    if (!entityId || !proposedDate) {
+      setAvailabilityStatus(null);
+      return;
+    }
+
+    // Skip if already cached for this entity+date combo
+    if (
+      availabilityCacheRef.current?.entityId === entityId &&
+      availabilityCacheRef.current?.date === proposedDate
+    ) {
+      return;
+    }
+
+    setAvailabilityStatus('loading');
+    let cancelled = false;
+
+    checkCrewAvailability(entityId, proposedDate, dealId).then((result) => {
+      if (cancelled) return;
+      availabilityCacheRef.current = { entityId, date: proposedDate };
+      setAvailabilityStatus(result.status);
+    });
+
+    return () => { cancelled = true; };
+  }, [role.entity_id, proposedDate, dealId]);
 
   const handleSearch = useCallback((value: string) => {
     setQuery(value);
@@ -90,7 +139,7 @@ export function CrewRoleAssignmentRow({
         </span>
         <span
           className={cn(
-            'text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-[var(--stage-radius-input)]',
+            'stage-label px-1.5 py-0.5 rounded-[var(--stage-radius-input)]',
             role.booking_type === 'talent'
               ? 'bg-[var(--color-unusonic-info)]/15 text-[var(--color-unusonic-info)]'
               : 'bg-[var(--ctx-well)] text-[var(--stage-text-secondary)]'
@@ -104,6 +153,15 @@ export function CrewRoleAssignmentRow({
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] text-xs font-medium text-[var(--stage-text-primary)]">
             {role.client_locked && (
               <Lock className="w-3 h-3 text-[var(--color-unusonic-warning)]" strokeWidth={1.5} aria-label="Client locked" />
+            )}
+            {availabilityStatus && (
+              <span
+                className={cn(
+                  'inline-block w-2 h-2 rounded-full shrink-0',
+                  AVAILABILITY_DOT_STYLES[availabilityStatus],
+                )}
+                title={availabilityStatus === 'loading' ? 'Checking availability…' : `Availability: ${availabilityStatus}`}
+              />
             )}
             {role.assignee_name}
             <button
@@ -163,7 +221,7 @@ export function CrewRoleAssignmentRow({
                       <span className="text-[var(--stage-text-secondary)] truncate">{r.job_title}</span>
                     )}
                     <span className={cn(
-                      'ml-auto text-[10px] uppercase tracking-wider shrink-0',
+                      'ml-auto stage-label shrink-0',
                       r._section === 'team' ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--stage-text-secondary)]'
                     )}>
                       {r._section === 'team' ? 'Team' : 'Network'}

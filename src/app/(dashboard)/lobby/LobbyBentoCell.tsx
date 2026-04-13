@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { useLobbyFocus } from './LobbyFocusContext';
 
@@ -24,7 +25,7 @@ export function LobbyBentoCell({ id, children, className, enableBokeh = true }: 
   return (
     <motion.div
       layout
-      transition={{ type: 'spring', stiffness: 280, damping: 36, mass: 1.4 }}
+      transition={STAGE_HEAVY}
       onFocus={() => enableBokeh && setFocusedCardId(id)}
       onBlur={() => setFocusedCardId(null)}
       onMouseEnter={() => enableBokeh && setFocusedCardId(id)}

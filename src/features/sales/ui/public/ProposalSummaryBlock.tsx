@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { CalendarDays, DollarSign, FileText, MapPin, ShieldCheck } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 export interface ProposalSummaryBlockProps {
   eventTitle: string;
@@ -223,7 +224,13 @@ export function ProposalSummaryBlock({
             >
               Total
             </p>
-            <p className="text-sm font-medium leading-snug tabular-nums" style={{ color: 'var(--portal-text)' }}>
+            <p
+              className="font-medium leading-snug tabular-nums"
+              style={{
+                color: 'var(--portal-text)',
+                fontSize: 'var(--portal-total-scale, 1rem)',
+              }}
+            >
               {formatCurrency(total)}
             </p>
           </div>
@@ -276,7 +283,7 @@ export function ProposalSummaryBlock({
 
       {/* Audit trail trust copy */}
       <p
-        className="mt-4 pt-4 text-[11px] leading-relaxed"
+        className="mt-4 pt-4 text-field-label leading-relaxed"
         style={{
           color: 'var(--portal-text-secondary)',
           borderTop: 'var(--portal-border-width) solid var(--portal-border-subtle)',

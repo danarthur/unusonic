@@ -35,9 +35,9 @@ export interface PortalNavItem {
   href: string;
 }
 
-const NAV: Record<string, PortalNavItem> = {
+export const NAV: Record<string, PortalNavItem> = {
   gigs:          { id: 'gigs',          label: 'Gigs',       icon: CalendarDays,   href: '/schedule' },
-  calendar:      { id: 'calendar',      label: 'Calendar',   icon: Calendar,       href: '/calendar' },
+  calendar:      { id: 'calendar',      label: 'Calendar',   icon: Calendar,       href: '/schedule?view=month' },
   pay:           { id: 'pay',           label: 'Pay',        icon: Banknote,       href: '/pay' },
   profile:       { id: 'profile',       label: 'Profile',    icon: UserCircle,     href: '/profile' },
   // DJ / Entertainer specific
@@ -78,7 +78,7 @@ export const PORTAL_PROFILES: Record<string, PortalProfile> = {
     matchCapabilities: ['dj', 'entertainer', 'entertainment'],
     matchSkillTags: ['dj', 'mc', 'emcee', 'entertainer', 'host'],
     matchGigRolePatterns: [/\b(dj|mc|emcee|entertainer|host)\b/i],
-    navItemIds: ['gigs', 'calendar', 'pay', 'profile'],
+    navItemIds: ['gigs', 'pay', 'profile'],
     defaultLanding: '/schedule',
     hasGigWorkspace: true,
   },
@@ -88,7 +88,7 @@ export const PORTAL_PROFILES: Record<string, PortalProfile> = {
     matchCapabilities: ['lighting', 'sound', 'video', 'stagehand', 'rigging', 'a/v', 'av', 'audio'],
     matchSkillTags: ['lighting', 'sound', 'video', 'stagehand', 'rigging', 'audio', 'a1', 'v1', 'l1'],
     matchGigRolePatterns: [/\b(lighting|sound|audio|video|stagehand|rigger|tech|a1|v1|l1|grip)\b/i],
-    navItemIds: ['gigs', 'calendar', 'pay', 'profile'],
+    navItemIds: ['gigs', 'pay', 'profile'],
     defaultLanding: '/schedule',
     hasGigWorkspace: false,
   },
@@ -98,7 +98,7 @@ export const PORTAL_PROFILES: Record<string, PortalProfile> = {
     matchCapabilities: ['sales', 'account management', 'business development'],
     matchSkillTags: [],
     matchGigRolePatterns: [],
-    navItemIds: ['gigs', 'calendar', 'pipeline', 'proposals', 'pay', 'profile'],
+    navItemIds: ['gigs', 'pipeline', 'proposals', 'pay', 'profile'],
     defaultLanding: '/schedule',
     hasGigWorkspace: false,
   },
@@ -108,7 +108,7 @@ export const PORTAL_PROFILES: Record<string, PortalProfile> = {
     matchCapabilities: ['band', 'musical act', 'musician', 'vocalist', 'performer'],
     matchSkillTags: ['band', 'musician', 'vocalist', 'singer', 'guitarist', 'drummer', 'bassist'],
     matchGigRolePatterns: [/\b(band|musician|vocalist|singer|performer)\b/i],
-    navItemIds: ['gigs', 'calendar', 'setlists', 'pay', 'profile'],
+    navItemIds: ['gigs', 'setlists', 'pay', 'profile'],
     defaultLanding: '/schedule',
     hasGigWorkspace: true,
   },
@@ -118,9 +118,9 @@ export const PORTAL_PROFILES: Record<string, PortalProfile> = {
     matchCapabilities: ['production management', 'stage management', 'crew chief'],
     matchSkillTags: ['production manager', 'stage manager', 'crew chief', 'pm'],
     matchGigRolePatterns: [/\b(production manager|stage manager|crew chief|pm|td)\b/i],
-    navItemIds: ['gigs', 'calendar', 'crew-status', 'pay', 'profile'],
+    navItemIds: ['gigs', 'crew-status', 'pay', 'profile'],
     defaultLanding: '/schedule',
-    hasGigWorkspace: false,
+    hasGigWorkspace: true,
   },
 };
 
@@ -181,11 +181,13 @@ export function resolvePortalProfile(opts: {
 
   const primary = matched[0] ?? DEFAULT_PROFILE;
 
-  // Merge nav items from all matched profiles (dedup by id)
+  // Merge nav items from all matched profiles (dedup by id, primary first)
   const seen = new Set<string>();
   const mergedNavIds: string[] = [];
-  for (const id of primary.navItemIds) {
-    if (!seen.has(id)) { seen.add(id); mergedNavIds.push(id); }
+  for (const profile of (matched.length > 0 ? matched : [DEFAULT_PROFILE])) {
+    for (const id of profile.navItemIds) {
+      if (!seen.has(id)) { seen.add(id); mergedNavIds.push(id); }
+    }
   }
 
   return {
@@ -226,5 +228,7 @@ export function getDefaultNavItems(): PortalNavItem[] {
 
 /** Check if a nav item is active based on current pathname. */
 export function isPortalNavActive(itemHref: string, pathname: string): boolean {
-  return pathname === itemHref || pathname.startsWith(itemHref + '/');
+  // Strip query params from href for matching
+  const hrefPath = itemHref.split('?')[0];
+  return pathname === hrefPath || pathname.startsWith(hrefPath + '/');
 }

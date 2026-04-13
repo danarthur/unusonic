@@ -22,11 +22,11 @@ function formatSince(iso: string): string {
 
 const COMPLETENESS_PILL_CLASS: Record<CrewCompletenessLevel, string | null> = {
   incomplete: null,
-  core: 'text-[var(--stage-text-secondary)] text-[10px] font-medium',
+  core: 'text-[var(--stage-text-secondary)] stage-badge-text',
   ready:
-    'text-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/10 border border-[var(--color-unusonic-info)]/20 rounded-full px-2 py-0.5 text-[10px] font-medium',
+    'text-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/10 border border-[var(--color-unusonic-info)]/20 rounded-full px-2 py-0.5 stage-badge-text',
   compliant:
-    'text-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/10 border border-[var(--color-unusonic-success)]/20 rounded-full px-2 py-0.5 text-[10px] font-medium',
+    'text-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/10 border border-[var(--color-unusonic-success)]/20 rounded-full px-2 py-0.5 stage-badge-text',
 };
 
 const COMPLETENESS_LABEL: Record<CrewCompletenessLevel, string | null> = {
@@ -36,7 +36,7 @@ const COMPLETENESS_LABEL: Record<CrewCompletenessLevel, string | null> = {
   compliant: 'Compliant',
 };
 
-/** Core (employee): solid ceramic. Partner: frosted glass. Preferred (inner_circle): silk star marker. */
+/** Core (employee): matte elevated. Partner: standard surface. Preferred (inner_circle): silk star marker. */
 export function NetworkCard({ node, onClick, onTogglePreferred, className, layoutId }: NetworkCardProps) {
   // Freelancer persons (external_partner + person + inner_circle) render as crew, not partners
   const isFreelancerPerson = node.kind === 'external_partner' && node.identity.entityType === 'person' && node.gravity === 'inner_circle';
@@ -81,21 +81,21 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
           className={`absolute top-2.5 left-2.5 z-10 rounded p-1 transition-colors duration-[80ms] ${
             isPreferred
               ? 'text-[var(--stage-text-primary)]'
-              : 'text-[var(--stage-text-secondary)]/30 hover:text-[var(--stage-text-primary)]/70'
+              : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]/70'
           }`}
           title={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
           aria-label={isPreferred ? 'Remove from preferred' : 'Mark as preferred'}
           aria-pressed={isPreferred}
         >
           <Star
-            size={13}
+            size={14}
             strokeWidth={1.5}
             className={isPreferred ? 'fill-[var(--stage-text-primary)]' : ''}
           />
         </button>
       ) : isPartner && isPreferred ? (
         <span className="absolute top-2.5 left-2.5 text-[var(--stage-text-primary)]" aria-label="Preferred partner">
-          <Star size={13} className="fill-[var(--stage-text-primary)]" />
+          <Star size={14} strokeWidth={1.5} className="fill-[var(--stage-text-primary)]" />
         </span>
       ) : null}
       {isCore && node.meta.doNotRebook && (
@@ -109,7 +109,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
           <motion.div
             layoutId={layoutId ? `${layoutId}-avatar` : undefined}
             className={cn(
-              'flex shrink-0 items-center justify-center overflow-hidden bg-[oklch(1_0_0_/_0.06)] mt-0.5',
+              'flex shrink-0 items-center justify-center overflow-hidden bg-[var(--stage-surface-nested)] mt-0.5',
               'size-10',
               node.identity.entityType === 'person' || node.identity.entityType === 'couple'
                 ? 'rounded-full'
@@ -123,26 +123,26 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
                 className="size-full object-cover"
               />
             ) : isPartner && node.identity.entityType === 'venue' ? (
-              <MapPin className="size-5 text-[var(--stage-text-secondary)]" />
+              <MapPin className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
             ) : isPartner && node.identity.entityType !== 'person' && node.identity.entityType !== 'couple' ? (
-              <Building2 className="size-5 text-[var(--stage-text-secondary)]" />
+              <Building2 className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
             ) : (
-              <User className="size-5 text-[var(--stage-text-secondary)]" />
+              <User className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
             )}
           </motion.div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-medium tracking-tight text-[var(--stage-text-primary)]">
+            <p className="truncate font-medium tracking-tight text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
               {node.identity.name}
             </p>
             {isPartner ? (
               node.meta.email ? (
-                <p className="truncate text-xs text-[var(--stage-text-secondary)]">{node.meta.email}</p>
+                <p className="truncate stage-label text-[var(--stage-text-secondary)]">{node.meta.email}</p>
               ) : null
             ) : (
-              <p className="text-xs text-[var(--stage-text-secondary)]">
+              <p className="stage-label text-[var(--stage-text-secondary)]">
                 {node.identity.label}
                 {node.kind === 'extended_team' && (
-                  <span className="ml-1.5 text-[var(--stage-text-secondary)]">· 1099</span>
+                  <span className="ml-1.5 stage-badge-text text-[var(--stage-text-secondary)]">· 1099</span>
                 )}
               </p>
             )}
@@ -158,7 +158,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
                   {filtered.slice(0, 3).map((tag) => (
                     <span
                       key={tag}
-                      className="rounded bg-[var(--stage-text-primary)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                      className="rounded bg-[var(--stage-text-primary)]/10 px-1.5 py-0.5 stage-badge-text text-[var(--stage-text-secondary)]"
                     >
                       {tag}
                     </span>
@@ -172,7 +172,7 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
                 {node.meta.capabilities!.slice(0, 2).map((cap) => (
                   <span
                     key={cap}
-                    className="rounded bg-[oklch(1_0_0/0.08)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--stage-text-secondary)]"
+                    className="rounded bg-[var(--stage-text-primary)]/10 px-1.5 py-0.5 stage-badge-text text-[var(--stage-text-secondary)]"
                   >
                     {cap}
                   </span>
@@ -187,17 +187,17 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
               </div>
             )}
             {isPartner && (node.meta.outstanding_balance ?? 0) > 0 && (
-              <p className="mt-1.5 text-xs font-medium text-[var(--color-unusonic-warning)]">
+              <p className="mt-1.5 font-[family-name:var(--stage-data-font)] text-[length:var(--stage-readout-sm-size)] tabular-nums text-[var(--color-unusonic-warning)]">
                 ${(node.meta.outstanding_balance!).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} outstanding
               </p>
             )}
             {(node.meta.referral_count ?? 0) > 0 && (
-              <p className="mt-1 text-[10px] font-medium text-[var(--stage-text-secondary)]">
+              <p className="mt-1 font-[family-name:var(--stage-data-font)] text-[length:var(--stage-readout-sm-size)] tabular-nums text-[var(--stage-text-secondary)]">
                 {node.meta.referral_count} referral{node.meta.referral_count! > 1 ? 's' : ''}
               </p>
             )}
             {!(node.meta.outstanding_balance ?? 0) && !(node.meta.referral_count ?? 0) && node.meta.connectedSince && (
-              <p className="mt-1 text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
+              <p className="mt-1 stage-label text-[var(--stage-text-secondary)] tabular-nums">
                 since {formatSince(node.meta.connectedSince)}
               </p>
             )}
@@ -205,9 +205,9 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
         </div>
         <span
           className={cn(
-            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
+            'shrink-0 rounded-full px-2 py-0.5 stage-badge-text',
             isPartner
-              ? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
+              ? 'bg-[var(--stage-text-primary)]/10 text-[var(--stage-text-secondary)]'
               : 'bg-[var(--stage-text-primary)]/10 text-[var(--stage-text-secondary)]'
           )}
         >
@@ -226,11 +226,12 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
       layoutId={layoutId}
       onClick={onClick}
       onKeyDown={handleCardKeyDown}
+      data-surface="elevated"
       className={cn(
-        'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left transition-[border-color,box-shadow] duration-[80ms] cursor-pointer',
+        'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left cursor-pointer',
         'text-[var(--stage-text-primary)]',
         isArchived && 'opacity-40',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
         className
       )}
       transition={STAGE_MEDIUM}

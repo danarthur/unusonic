@@ -8,13 +8,35 @@ import { ArrowLeft, FileText, LayoutDashboard } from 'lucide-react';
 import { getFinancials } from '@/features/finance/api/get-gig-financials';
 import {
   RevenueRing,
-  InvoiceList,
+  InvoiceListWidget,
   QuickActions,
   SetupBilling,
   ProfitabilityCard,
   RevenueStream,
   PaymentTimeline,
 } from '@/features/finance/ui/widgets';
+import type { InvoiceDTO } from '@/features/finance/model/types';
+import type { InvoiceBalanceRow } from '@/features/finance/ui/widgets/InvoiceListWidget';
+
+function toBalanceRows(dtos: InvoiceDTO[]): InvoiceBalanceRow[] {
+  return dtos.map((d) => ({
+    id: d.id,
+    invoice_number: d.invoice_number,
+    invoice_kind: 'standard',
+    status: d.status,
+    bill_to_snapshot: null,
+    total_amount: Number(d.total_amount) || 0,
+    paid_amount: d.amountPaid,
+    balance_due: (Number(d.total_amount) || 0) - d.amountPaid,
+    days_overdue: 0,
+    due_date: d.due_date,
+    issue_date: d.issue_date,
+    public_token: d.token,
+    qbo_sync_status: null,
+    event_id: d.event_id,
+    deal_id: null,
+  }));
+}
 
 export default async function EventFinancePage({
   params,
@@ -46,7 +68,7 @@ export default async function EventFinancePage({
       <header className="mb-6 flex items-center gap-4 shrink-0 flex-wrap">
         <Link
           href={`/events/g/${data.eventId}`}
-          className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+          className="stage-hover overflow-hidden p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label="Back to event"
         >
           <ArrowLeft size={20} />
@@ -59,14 +81,14 @@ export default async function EventFinancePage({
         </div>
         <Link
           href={`/events/g/${data.eventId}`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+          className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
         >
           <LayoutDashboard size={18} />
           Event grid
         </Link>
         <Link
           href={`/events/${data.eventId}/deal`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+          className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
         >
           <FileText size={18} />
           Deal room
@@ -94,7 +116,7 @@ export default async function EventFinancePage({
         {/* Row 2 – Wide: Invoice list or Setup Billing */}
         <div className="md:col-span-2 min-w-0">
           {hasInvoices ? (
-            <InvoiceList invoices={data.invoices} />
+            <InvoiceListWidget invoices={toBalanceRows(data.invoices)} />
           ) : (
             <SetupBilling
               eventId={data.eventId}

@@ -96,7 +96,7 @@ export function MemberForge({
           return;
         }
         if (result.ok === false) {
-          setFormError(result.error ?? 'Something went wrong.');
+          setFormError(result.error ?? 'Unable to save profile.');
           return;
         }
         const raw = result.member;
@@ -122,7 +122,7 @@ export function MemberForge({
         onSave(member);
       } catch (err) {
         console.error('[MemberForge]', err);
-        const msg = err instanceof Error ? err.message : 'Something went wrong.';
+        const msg = err instanceof Error ? err.message : 'Unable to save profile.';
         setFormError(msg);
       }
     });
@@ -135,7 +135,7 @@ export function MemberForge({
           role="alert"
           className="flex items-start gap-3 rounded-xl border border-[var(--stage-accent)]/30 bg-[var(--stage-accent)]/10 px-4 py-3 text-sm text-[var(--stage-text-primary)]"
         >
-          <span className="shrink-0 mt-0.5 size-5 rounded-full border border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/20 flex items-center justify-center text-[10px] font-medium text-[var(--stage-accent)]">!</span>
+          <span className="shrink-0 mt-0.5 size-5 rounded-full border border-[var(--stage-accent)]/50 bg-[var(--stage-accent)]/20 flex items-center justify-center text-label font-medium text-[var(--stage-accent)]">!</span>
           <p className="flex-1">{formError}</p>
           <button
             type="button"

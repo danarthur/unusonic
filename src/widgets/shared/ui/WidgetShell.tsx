@@ -8,8 +8,7 @@ import Link from 'next/link';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
 import {
-  M3_STAGGER_CHILDREN,
-  M3_STAGGER_DELAY,
+  STAGE_STAGGER_CHILDREN,
 } from '@/shared/lib/motion-constants';
 
 interface WidgetShellProps {
@@ -118,8 +117,7 @@ export function WidgetShell({
           variants={{
             visible: {
               transition: {
-                staggerChildren: M3_STAGGER_CHILDREN,
-                delayChildren: M3_STAGGER_DELAY,
+                staggerChildren: STAGE_STAGGER_CHILDREN,
               },
             },
             hidden: {},

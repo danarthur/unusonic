@@ -50,8 +50,8 @@ export function NetworkGrid({ graph, orgBadges = {} }: NetworkGridProps) {
 
   if (!graph) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] p-8">
-        <p className="text-sm text-[var(--stage-text-secondary)]">
+      <div className="flex min-h-[320px] items-center justify-center rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-8">
+        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-secondary)]">
           No network data. Ensure you belong to an organization.
         </p>
       </div>

@@ -59,7 +59,7 @@ export function PaymentTimeline({ timeline, className }: PaymentTimelineProps) {
   if (!timeline) {
     return (
       <StagePanel className={`flex flex-col gap-5 p-6 min-h-[200px] ${className ?? ''}`}>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] shrink-0">
+        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] shrink-0">
           Payment Timeline
         </h2>
         <p className="text-sm text-[var(--stage-text-secondary)] mt-1">No invoice dates yet</p>
@@ -69,24 +69,24 @@ export function PaymentTimeline({ timeline, className }: PaymentTimelineProps) {
 
   return (
     <StagePanel className={`flex flex-col gap-6 p-6 min-h-[200px] min-w-0 ${className ?? ''}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] shrink-0">
+      <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] shrink-0">
         Cash Horizon
       </h2>
 
       {/* Labels row: Issue | Now | Due */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)] mb-0.5">Issue</p>
+          <p className="stage-label mb-0.5">Issue</p>
           <p className="text-sm font-medium text-[var(--stage-text-primary)] leading-tight">
             {formatShortDate(timeline.issueDate)}
           </p>
         </div>
         <div className="flex flex-col items-center justify-end">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)] mb-0.5">Now</p>
+          <p className="stage-label mb-0.5">Now</p>
           <span className="text-sm font-medium text-[var(--stage-text-primary)]">Today</span>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)] mb-0.5">Due</p>
+          <p className="stage-label mb-0.5">Due</p>
           <p className="text-sm font-medium text-[var(--stage-text-primary)] leading-tight">
             {formatShortDate(timeline.dueDate)}
           </p>
@@ -102,7 +102,7 @@ export function PaymentTimeline({ timeline, className }: PaymentTimelineProps) {
           aria-hidden
         />
         <motion.div
-          className="absolute w-4 h-4 rounded-full bg-[var(--walnut)] -translate-x-1/2 z-10 border-2 border-[var(--stage-surface)]"
+          className="absolute w-4 h-4 rounded-full bg-[var(--stage-accent)] -translate-x-1/2 z-10 border-2 border-[var(--stage-surface)]"
           style={{ left: `${positionPct}%` }}
           initial={{ opacity: 0 }}
           animate={{

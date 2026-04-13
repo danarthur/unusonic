@@ -20,6 +20,10 @@ export type LedgerTransaction = {
 export type EventLedgerDTO = {
   totalRevenue: number;
   totalCost: number;
+  /** Expenses only (excludes labor). */
+  expenseCost: number;
+  /** Crew labor cost. */
+  laborCost: number;
   margin: number;
   marginPercent: number;
   collected: number;
@@ -34,6 +38,8 @@ export type EventLedgerDTO = {
   eventHours: number | null;
   /** (Revenue - Crew Cost) / Event Hours. Null if event hours or revenue unavailable. */
   effectiveHourlyRate: number | null;
+  /** How many crew_assignments have a pay_rate set vs total crew count. */
+  crewRateCompleteness: { rated: number; total: number };
   transactions: LedgerTransaction[];
   // Formatted strings for display
   fmt: {
@@ -194,21 +200,25 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
     .neq('status', 'removed');
 
   let crewCost = 0;
+  let crewRated = 0;
+  const crewTotal = (crewAssignments ?? []).length;
   for (const ca of crewAssignments ?? []) {
     const row = ca as { pay_rate?: number | null; pay_rate_type?: string | null; scheduled_hours?: number | null };
     if (row.pay_rate == null) continue;
+    crewRated++;
     if (row.pay_rate_type === 'hourly') {
       crewCost += Number(row.pay_rate) * (row.scheduled_hours ?? 8);
     } else {
       crewCost += Number(row.pay_rate);
     }
   }
+  const crewRateCompleteness = { rated: crewRated, total: crewTotal };
 
   // ── Costs: expenses ──────────────────────────────────────────────────────
   const expenses = await getEventExpenses(eventId);
-  let totalCost = 0;
+  let expenseCost = 0;
   const expenseTransactions: LedgerTransaction[] = expenses.map((exp) => {
-    totalCost += Number(exp.amount);
+    expenseCost += Number(exp.amount);
     return {
       id: exp.id,
       type: 'expense' as const,
@@ -220,7 +230,8 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
     };
   });
 
-  // ── Margin ────────────────────────────────────────────────────────────────
+  // ── Margin (includes both labor and expenses) ─────────────────────────────
+  const totalCost = expenseCost + crewCost;
   const margin = totalRevenue - totalCost;
   const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
 
@@ -249,6 +260,8 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
   return {
     totalRevenue,
     totalCost,
+    expenseCost,
+    laborCost: crewCost,
     margin,
     marginPercent,
     collected,
@@ -258,6 +271,7 @@ export async function getEventLedger(eventId: string): Promise<EventLedgerDTO | 
     projectedCost,
     eventHours,
     effectiveHourlyRate,
+    crewRateCompleteness,
     transactions,
     fmt: {
       totalRevenue: formatCurrency(totalRevenue),

@@ -38,7 +38,7 @@ function CategoryBadge({ category }: { category: string }) {
   };
   return (
     <span className={cn(
-      'rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-widest font-medium',
+      'rounded-full border px-2 py-0.5 stage-badge-text uppercase tracking-widest',
       colors[category] ?? colors.custom
     )}>
       {category}
@@ -151,7 +151,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
       {/* Active sources grouped by category */}
       {grouped.map((group) => (
         <div key={group.category} className="stage-panel p-4 rounded-[var(--stage-radius-panel)]">
-          <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/80 mb-3">
+          <p className="stage-label text-[var(--stage-text-secondary)]/80 mb-3">
             {group.label}
           </p>
           <motion.div
@@ -165,7 +165,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
                 key={source.id}
                 variants={{ hidden: { opacity: 0, y: 4 }, visible: { opacity: 1, y: 0 } }}
                 transition={STAGE_LIGHT}
-                className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-[var(--stage-surface-nested)] transition-colors group"
+                className="flex items-center gap-3 py-2 px-3 rounded-xl stage-hover overflow-hidden transition-colors group"
               >
                 {renamingId === source.id ? (
                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -177,7 +177,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
                         if (e.key === 'Enter') handleRename(source.id);
                         if (e.key === 'Escape') setRenamingId(null);
                       }}
-                      className="flex-1 min-w-0 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--stage-surface-nested)] px-2 py-1 text-sm text-[var(--stage-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                      className="flex-1 min-w-0 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-2 py-1 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                     <button
                       type="button"
@@ -200,7 +200,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
                       {source.label}
                     </span>
                     {source.is_referral && (
-                      <span className="text-[9px] uppercase tracking-widest text-[var(--stage-text-secondary)] shrink-0">
+                      <span className="stage-micro shrink-0">
                         referral
                       </span>
                     )}
@@ -240,7 +240,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
 
       {/* Add form */}
       <div className="stage-panel p-4 rounded-[var(--stage-radius-panel)]">
-        <p className="text-[10px] uppercase tracking-widest text-[var(--stage-text-secondary)]/80 mb-3">
+        <p className="stage-label text-[var(--stage-text-secondary)]/80 mb-3">
           Add source
         </p>
         <div className="flex flex-col gap-3">
@@ -250,12 +250,12 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
               onChange={(e) => setNewLabel(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="Source name..."
-              className="flex-1 min-w-0 rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface-nested)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+              className="flex-1 min-w-0 rounded-xl border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             />
             <select
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value as Category)}
-              className="rounded-xl border border-[var(--stage-border)] bg-[var(--stage-surface-nested)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] appearance-none cursor-pointer"
+              className="rounded-xl border border-[var(--stage-border)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] appearance-none cursor-pointer"
             >
               {CATEGORIES.map(({ value, label }) => (
                 <option key={value} value={value}>{label}</option>
@@ -268,7 +268,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
                 type="checkbox"
                 checked={newIsReferral}
                 onChange={(e) => setNewIsReferral(e.target.checked)}
-                className="rounded border-[var(--stage-border)] bg-[var(--stage-surface-nested)] accent-[var(--stage-accent)] focus:ring-[var(--stage-accent)]"
+                className="rounded border-[var(--stage-border)] bg-[var(--ctx-well)] accent-[var(--stage-accent)] focus-visible:ring-[var(--stage-accent)]"
               />
               <span className="text-xs text-[var(--stage-text-secondary)]">This is a referral source</span>
             </label>
@@ -276,7 +276,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
               type="button"
               onClick={handleAdd}
               disabled={adding || !newLabel.trim()}
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-[var(--stage-text-primary)] transition-colors bg-[var(--stage-surface)] hover:bg-[var(--stage-surface-hover)] border border-[var(--stage-border-hover)] disabled:opacity-40 disabled:pointer-events-none"
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-[var(--stage-text-primary)] transition-colors bg-[var(--stage-surface)] border border-[var(--stage-border-hover)] disabled:opacity-45 disabled:pointer-events-none stage-hover overflow-hidden"
             >
               <Plus className="size-3.5" strokeWidth={1.5} />
               Add
@@ -310,7 +310,7 @@ export function LeadSourceManager({ initialSources }: { initialSources: Workspac
                     {archivedSources.map((source) => (
                       <div
                         key={source.id}
-                        className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-[var(--stage-surface-nested)] transition-colors group"
+                        className="flex items-center gap-3 py-2 px-3 rounded-xl stage-hover overflow-hidden transition-colors group"
                       >
                         <span className="text-sm text-[var(--stage-text-secondary)] tracking-tight flex-1 min-w-0 truncate line-through">
                           {source.label}

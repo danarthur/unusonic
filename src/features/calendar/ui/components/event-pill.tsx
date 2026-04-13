@@ -40,8 +40,8 @@ export function EventPill({ event, className = '' }: EventPillProps) {
         backgroundBlendMode: 'overlay',
       } : undefined}
     >
-      <span className="text-xs font-semibold text-left truncate text-[var(--stage-text-primary)]">{event.title}</span>
-      <span className="text-[10px] font-normal text-[var(--stage-text-primary)]/80 tabular-nums truncate">{timeRange}</span>
+      <span className="text-xs font-medium text-left truncate text-[var(--stage-text-primary)]">{event.title}</span>
+      <span className="text-label font-normal text-[var(--stage-text-primary)]/80 tabular-nums truncate">{timeRange}</span>
     </div>
   );
 }

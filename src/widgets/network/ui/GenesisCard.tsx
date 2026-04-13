@@ -10,7 +10,6 @@ import { TierSelector, type GenesisTierId } from '@/features/org-identity/ui/Tie
 import { ColorTuner } from '@/features/org-identity/ui/ColorTuner';
 import { LogoField } from '@/features/org-identity/ui/LogoField';
 import { Input } from '@/shared/ui/input';
-import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 function slugify(name: string): string {
@@ -60,7 +59,7 @@ export function GenesisCard() {
           <div>
             <label
               htmlFor="genesis-name"
-              className="mb-2 block text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
+              className="mb-2 block stage-label text-[var(--stage-text-secondary)]"
             >
               Organization name
             </label>
@@ -86,7 +85,7 @@ export function GenesisCard() {
 
         {/* 2. Visuals: Brand color + logo (upload or link) */}
         <section className="space-y-5">
-          <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+          <span className="stage-label text-[var(--stage-text-secondary)]">
             Brand
           </span>
           <ColorTuner value={brandColor} onChange={setBrandColor} />
@@ -109,21 +108,13 @@ export function GenesisCard() {
         <input type="hidden" name="brand_color" value={brandColor ?? ''} />
 
         {state?.ok === false && state?.error && (
-          <p className="text-sm text-[var(--color-unusonic-error)] -mt-2">{state.error}</p>
+          <p className="stage-label text-[var(--color-unusonic-error)] -mt-2" role="alert">{state.error}</p>
         )}
 
         <button
           type="submit"
           disabled={isPending || !name.trim()}
-          className={cn(
-            'mt-2 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-medium transition-colors duration-[80ms]',
-            'border border-[oklch(1_0_0_/_0.08)] h-12',
-            'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)]',
-            'hover:bg-[var(--stage-accent)]/25 hover:border-[var(--stage-accent)]/40',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
-            'disabled:pointer-events-none disabled:opacity-[0.45]',
-            'shadow-[0_0_0_1px_var(--stage-edge-subtle),inset_0_1px_0_0_var(--stage-edge-top)]'
-          )}
+          className="stage-btn stage-btn-primary w-full"
         >
           {isPending ? (
             <span className="text-[var(--stage-text-secondary)]">Setting up…</span>

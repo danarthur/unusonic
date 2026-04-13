@@ -6,8 +6,11 @@
 
 'use server';
 
+import * as Sentry from '@sentry/nextjs';
 import { embed } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { createVoyage } from 'voyage-ai-provider';
+
+const voyage = createVoyage({ apiKey: process.env.VOYAGE_API_KEY! });
 import { createClient } from '@/shared/api/supabase/server';
 
 /**
@@ -70,7 +73,7 @@ export async function generateAndUpsertEmbedding(
 
     // Generate embedding
     const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
+      model: voyage.textEmbeddingModel('voyage-3'),
       value: contentText,
     });
 
@@ -93,6 +96,7 @@ export async function generateAndUpsertEmbedding(
       `[catalog-embeddings] Failed to generate embedding for package ${packageId}:`,
       err
     );
+    Sentry.captureException(err, { tags: { module: 'catalog', action: 'generateEmbedding' } });
   }
 }
 
@@ -139,7 +143,7 @@ export async function semanticSearchCatalog(
 ): Promise<{ packageId: string; similarity: number }[]> {
   try {
     const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
+      model: voyage.textEmbeddingModel('voyage-3'),
       value: query,
     });
 
@@ -161,6 +165,7 @@ export async function semanticSearchCatalog(
     }));
   } catch (err) {
     console.error('[catalog-embeddings] Semantic search failed:', err);
+    Sentry.captureException(err, { tags: { module: 'catalog', action: 'semanticSearch' } });
     return [];
   }
 }

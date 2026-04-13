@@ -51,7 +51,7 @@ export interface SmartTagInputProps {
 }
 
 const inputBaseClass =
-  'w-full min-w-0 border-0 bg-transparent px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus:ring-0';
+  'w-full min-w-0 border-0 bg-transparent px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-0';
 
 export function SmartTagInput({
   workspaceId,
@@ -158,9 +158,9 @@ export function SmartTagInput({
           aria-disabled={disabled}
           aria-label="Tags"
           className={cn(
-            'flex min-h-[42px] w-full flex-wrap items-center gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 px-3 py-2 text-left text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]',
+            'flex min-h-[42px] w-full flex-wrap items-center gap-2 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 px-3 py-2 text-left text-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
             value.length === 0 && 'py-2.5',
-            disabled && 'pointer-events-none opacity-50',
+            disabled && 'pointer-events-none opacity-45',
             className
           )}
         >
@@ -182,7 +182,7 @@ export function SmartTagInput({
                       e.stopPropagation();
                       removeTag(tag.id);
                     }}
-                    className="rounded p-0.5 hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]"
+                    className="rounded p-0.5 hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
                     aria-label={`Remove ${tag.label}`}
                   >
                     <X size={12} />
@@ -223,7 +223,7 @@ export function SmartTagInput({
               <Command.Item
                 value={`create:${query.trim()}`}
                 onSelect={handleCreate}
-                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--stage-accent)] hover:bg-[var(--stage-surface-hover)] data-[selected=true]:bg-[var(--stage-surface-hover)]"
+                className="stage-hover overflow-hidden flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--stage-accent)] data-[selected=true]:bg-[oklch(1_0_0_/_0.08)]"
               >
                 Create &quot;{query.trim()}&quot;
               </Command.Item>
@@ -237,8 +237,8 @@ export function SmartTagInput({
                   onSelect={() => handleSelectTag(tag)}
                   disabled={selectedIds.has(tag.id)}
                   className={cn(
-                    'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm data-[selected=true]:bg-[var(--stage-surface-hover)]',
-                    selectedIds.has(tag.id) && 'opacity-50'
+                    'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm data-[selected=true]:bg-[oklch(1_0_0_/_0.08)]',
+                    selectedIds.has(tag.id) && 'opacity-45'
                   )}
                 >
                   <span

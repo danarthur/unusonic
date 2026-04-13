@@ -254,8 +254,8 @@ export function PackageSelectorPalette({
                           <span
                             className={cn(
                               'inline-block w-2 h-2 rounded-full shrink-0',
-                              availability[pkg.id].status === 'available' ? 'bg-emerald-400' :
-                              availability[pkg.id].status === 'tight' ? 'bg-amber-400' : 'bg-red-400'
+                              availability[pkg.id].status === 'available' ? 'bg-[var(--color-unusonic-success)]' :
+                              availability[pkg.id].status === 'tight' ? 'bg-[var(--color-unusonic-warning)]' : 'bg-[var(--color-unusonic-error)]'
                             )}
                             title={
                               availability[pkg.id].status === 'available'
@@ -273,7 +273,7 @@ export function PackageSelectorPalette({
                       {pkg.category === 'rental' && availability[pkg.id] && availability[pkg.id].status !== 'available' && (
                         <p className={cn(
                           'text-xs mt-0.5',
-                          availability[pkg.id].status === 'tight' ? 'text-amber-400' : 'text-red-400'
+                          availability[pkg.id].status === 'tight' ? 'text-[var(--color-unusonic-warning)]' : 'text-[var(--color-unusonic-error)]'
                         )}>
                           {availability[pkg.id].status === 'shortage'
                             ? 'Fully booked'
@@ -292,7 +292,7 @@ export function PackageSelectorPalette({
                 <>
                   <li className="flex items-center gap-3 py-1.5 px-2">
                     <div className="h-px flex-1 bg-[oklch(1_0_0_/_0.08)]" />
-                    <span className="text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider">
+                    <span className="stage-label">
                       Related
                     </span>
                     <div className="h-px flex-1 bg-[oklch(1_0_0_/_0.08)]" />
@@ -308,7 +308,7 @@ export function PackageSelectorPalette({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
-                          <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.06)] text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-wider">
+                          <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[oklch(1_0_0_/_0.06)] stage-label">
                             AI
                           </span>
                         </div>

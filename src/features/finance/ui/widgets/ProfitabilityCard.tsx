@@ -11,7 +11,8 @@ import { formatCurrency } from '../../model/types';
 import type { ProfitabilityDTO } from '../../model/types';
 import type { FinancialSummaryDTO } from '../../model/types';
 
-const spring = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const spring = STAGE_MEDIUM;
 
 export interface ProfitabilityCardProps {
   profitability: ProfitabilityDTO;
@@ -35,14 +36,14 @@ export function ProfitabilityCard({
     <div
       className={`stage-panel p-6 flex flex-col gap-4 border-[oklch(1_0_0_/_0.08)] ${className ?? ''}`}
     >
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+      <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
         Gross Profit
       </h2>
       <div className="font-mono text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight">
         {formatCurrency(grossProfit)}
       </div>
 
-      {/* Segmented progress bar: Cost (rose-100) | Profit (emerald-500) */}
+      {/* Segmented progress bar: Cost | Profit */}
       <div className="w-full h-3 rounded-full overflow-hidden bg-[oklch(1_0_0_/_0.08)] flex">
         <motion.div
           className="h-full bg-[oklch(0.35_0.08_20_/_0.25)]"

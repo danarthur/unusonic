@@ -7,6 +7,7 @@
 
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getCalendarEventsInputSchema } from '../model/schema';
 import type { CalendarEvent } from '../model/types';
@@ -104,6 +105,7 @@ export async function getCalendarEvents(
     return result;
   } catch (err) {
     console.error('[calendar] getCalendarEvents unexpected error:', err);
+    Sentry.captureException(err, { tags: { module: 'calendar', action: 'getCalendarEvents' } });
     return [];
   }
 }

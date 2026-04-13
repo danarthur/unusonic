@@ -162,7 +162,7 @@ export function PackageManager({
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[oklch(1_0_0_/_0.12)] text-sm font-medium text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[oklch(1_0_0_/_0.12)] text-sm font-medium text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] stage-hover overflow-hidden"
           >
             <Plus size={16} strokeWidth={1.5} aria-hidden />
             Add package
@@ -220,7 +220,7 @@ export function PackageManager({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 placeholder="e.g. Full Production Package"
                 required
               />
@@ -234,7 +234,7 @@ export function PackageManager({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] resize-none"
+                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
                 placeholder="Brief description"
               />
             </div>
@@ -246,7 +246,7 @@ export function PackageManager({
                 id="pkg-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as PackageCategory)}
-                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                className="w-full px-4 py-2.5 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]/50 text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -299,14 +299,14 @@ export function PackageManager({
               <button
                 type="button"
                 onClick={closeModal}
-                className="flex-1 px-4 py-3 rounded-xl border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                className="flex-1 px-4 py-3 rounded-xl border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] stage-hover overflow-hidden"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-3 rounded-xl border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:brightness-[1.06] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                className="flex-1 px-4 py-3 rounded-xl border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:bg-[oklch(1_0_0_/_0.08)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 {saving ? 'Saving…' : editingId ? 'Save' : 'Create'}
               </button>

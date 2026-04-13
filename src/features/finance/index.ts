@@ -15,4 +15,4 @@ export {
   recordManualPayment,
 } from './api/invoice-actions';
 export { getFinancials } from './api/get-gig-financials';
-export { RevenueRing, InvoiceList, QuickActions, SetupBilling } from './ui';
+export { RevenueRing, InvoiceListWidget, QuickActions, SetupBilling } from './ui';

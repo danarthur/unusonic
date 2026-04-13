@@ -207,11 +207,11 @@ export function AvatarUpload({ orgId, value, onChange, className }: AvatarUpload
             ) : (
               <User className="size-10 text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-accent)] transition-colors" />
             )}
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+            <div className="absolute inset-0 bg-[oklch(0.06_0_0/0.75)] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
               <Camera className="size-6 text-[oklch(1_0_0)]" />
             </div>
             {uploading && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-[oklch(0.06_0_0/0.75)]">
                 <span className="text-xs text-[oklch(1_0_0)]">Uploading…</span>
               </div>
             )}

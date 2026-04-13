@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * QuickBooks Online API client (FSD Shared layer).
  * 2026 spec: idempotency (Request-Id + requestid), no client-side backoff on 429.

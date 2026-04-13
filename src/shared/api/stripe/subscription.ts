@@ -36,7 +36,7 @@ async function fetchTierConfigFromDB(tier: TierSlug): Promise<{
   stripe_extra_seat_price_id: string | null;
 } | null> {
   const supabase = getSystemClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('tier_config')
     .select('stripe_price_id, stripe_extra_seat_price_id')
     .eq('tier', tier)
@@ -67,7 +67,7 @@ interface WorkspaceBillingRow {
  */
 async function fetchWorkspace(workspaceId: string): Promise<WorkspaceBillingRow> {
   const supabase = getSystemClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('workspaces')
     .select('id, name, stripe_customer_id, stripe_subscription_id, subscription_tier, extra_seats, billing_status')
     .eq('id', workspaceId)
@@ -101,7 +101,7 @@ export async function createOrGetStripeCustomer(workspaceId: string): Promise<st
 
   // Atomic conditional update — only set if still null to prevent TOCTOU race
   const supabase = getSystemClient();
-  const { data: updated, error } = await (supabase as any)
+  const { data: updated, error } = await supabase
     .from('workspaces')
     .update({ stripe_customer_id: customer.id })
     .eq('id', workspaceId)

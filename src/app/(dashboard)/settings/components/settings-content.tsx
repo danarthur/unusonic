@@ -9,14 +9,15 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { STAGE_MEDIUM, STAGE_HEAVY } from '@/shared/lib/motion-constants';
 import Link from 'next/link';
-import { 
-  User, 
-  Building2, 
-  Plug2, 
-  Camera, 
-  Check, 
-  X, 
+import {
+  User,
+  Building2,
+  Plug2,
+  Camera,
+  Check,
+  X,
   Loader2,
   ExternalLink,
   Sparkles,
@@ -27,6 +28,9 @@ import {
   Clock,
   Palette,
   Shield,
+  Volume2,
+  VolumeX,
+  Play,
 } from 'lucide-react';
 import { updateProfile } from '@/features/identity-hydration';
 import { ProfileAvatarUpload } from '@/features/identity-hydration/ui/ProfileAvatarUpload';
@@ -35,6 +39,9 @@ import { TeamManagement } from './team-management';
 import { RoleBuilderShell } from '@/features/role-builder';
 import { usePreferences } from '@/shared/ui/providers/PreferencesContext';
 import { CeramicSwitch } from '@/shared/ui/switch';
+import { useSoundStore } from '@/shared/lib/sound/sound-store';
+import { SoundEngine } from '@/shared/lib/sound/sound-engine';
+import type { SoundName } from '@/shared/lib/sound/sounds';
 import type { WorkspaceMemberData, LocationData } from '@/app/actions/workspace';
 import { updateWorkspacePaymentDefaults, type WorkspacePaymentDefaults } from '@/features/org-management/api/payment-defaults-actions';
 
@@ -72,7 +79,8 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { militaryTime, setMilitaryTime } = usePreferences();
-  
+  const { enabled: soundEnabled, volume, studioMode, setEnabled: setSoundEnabled, setVolume, setStudioMode } = useSoundStore();
+
   // Profile state
   const [fullName, setFullName] = useState(data.profile.fullName);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(data.profile.avatarUrl);
@@ -81,7 +89,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
     searchParams?.error === 'qbo_auth_failed' ? 'QuickBooks authorization failed. Try again.' : null
   );
   
-  const springConfig = { type: 'spring', stiffness: 300, damping: 30 } as const;
+  const springConfig = STAGE_MEDIUM;
   
   const handleSaveProfile = () => {
     setError(null);
@@ -121,7 +129,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
             <Clock className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
@@ -142,6 +150,96 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         </div>
       </motion.section>
 
+      {/* Sound & Notifications */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...springConfig, delay: 0.13 }}
+        className="stage-panel p-6 space-y-6"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
+            {soundEnabled ? (
+              <Volume2 className="w-5 h-5 text-[var(--stage-text-secondary)]" />
+            ) : (
+              <VolumeX className="w-5 h-5 text-[var(--stage-text-secondary)]" />
+            )}
+          </div>
+          <div>
+            <h2 className="text-lg font-medium text-[var(--stage-text-primary)]">Sound</h2>
+            <p className="text-xs text-[var(--stage-text-secondary)]">Audio feedback for interactions and notifications</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* Master toggle */}
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
+            <div>
+              <p className="text-sm font-medium text-[var(--stage-text-primary)]">Enable sounds</p>
+              <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">Play audio feedback for actions and notifications</p>
+            </div>
+            <CeramicSwitch
+              checked={soundEnabled}
+              onCheckedChange={setSoundEnabled}
+              aria-label="Enable sounds"
+            />
+          </div>
+
+          {soundEnabled && (
+            <>
+              {/* Volume */}
+              <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
+                <div>
+                  <p className="text-sm font-medium text-[var(--stage-text-primary)]">Volume</p>
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{Math.round(volume * 100)}%</p>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="w-28 accent-[var(--stage-accent)]"
+                  aria-label="Sound volume"
+                />
+              </div>
+
+              {/* Studio Mode */}
+              <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
+                <div>
+                  <p className="text-sm font-medium text-[var(--stage-text-primary)]">Studio Mode</p>
+                  <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">Suppress all sounds except critical alerts</p>
+                </div>
+                <CeramicSwitch
+                  checked={studioMode}
+                  onCheckedChange={setStudioMode}
+                  aria-label="Studio Mode"
+                />
+              </div>
+
+              {/* Preview sounds */}
+              <div className="p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)] space-y-3">
+                <p className="text-sm font-medium text-[var(--stage-text-primary)]">Preview</p>
+                <div className="flex flex-wrap gap-2">
+                  {(['resolve', 'confirm', 'arrive', 'alert', 'tap', 'close'] as SoundName[]).map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => SoundEngine.play(name)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] bg-[var(--ctx-well)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)] transition-colors"
+                    >
+                      <Play size={10} />
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </motion.section>
+
       {/* Profile Section */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
@@ -150,7 +248,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
             <User className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
@@ -171,7 +269,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           {/* Profile Form */}
           <div className="space-y-4 flex-1">
             <div>
-              <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-2">
+              <label className="block stage-field-label mb-2">
                 Full Name
               </label>
               <input
@@ -180,15 +278,15 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Enter your full name"
                 className="w-full px-4 py-3 rounded-xl
-                  bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]
+                  bg-[var(--ctx-well)] border border-[var(--stage-border)]
                   text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/40
-                  focus:outline-none focus:border-[var(--stage-accent)] focus:ring-2 focus:ring-[var(--stage-accent-muted)]
-                  transition-all duration-300"
+                  focus:outline-none focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent-muted)]
+                  transition-colors duration-100"
               />
             </div>
             
             <div>
-              <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-2">
+              <label className="block stage-field-label mb-2">
                 Email
               </label>
               <div className="px-4 py-3 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]
@@ -203,8 +301,8 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                 disabled={isPending || fullName === data.profile.fullName}
                 transition={springConfig}
                 className="px-5 py-2.5 rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] text-sm font-medium
-                  hover:brightness-[1.06] disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-[filter] flex items-center gap-2"
+                  hover:bg-[oklch(1_0_0_/_0.08)] disabled:opacity-45 disabled:cursor-not-allowed
+                  transition-colors flex items-center gap-2"
               >
                 {isPending ? (
                   <>
@@ -244,7 +342,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
             <Palette className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
@@ -254,7 +352,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         </div>
         <Link
           href="/settings/identity"
-          className="flex items-center justify-between w-full p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)] hover:border-[var(--stage-border-hover)] hover:bg-[var(--stage-surface-raised)] transition-colors text-left"
+          className="flex items-center justify-between w-full p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)] stage-hover overflow-hidden hover:border-[var(--stage-border-hover)] transition-colors text-left"
         >
           <span className="text-sm font-medium text-[var(--stage-text-primary)]">Open Identity Architect</span>
           <ExternalLink className="w-4 h-4 text-[var(--stage-text-secondary)]" />
@@ -270,7 +368,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           className="stage-panel p-6 space-y-6"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
               <Building2 className="w-5 h-5 text-[var(--stage-text-secondary)]" />
             </div>
             <div>
@@ -300,7 +398,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
             <div className="p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-1">
+                  <p className="stage-field-label mb-1">
                     Invite Code
                   </p>
                   <p className="text-lg font-mono font-medium text-[var(--stage-text-secondary)] tracking-widest">
@@ -311,7 +409,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                   onClick={() => {
                     navigator.clipboard.writeText(data.workspace!.inviteCode!);
                   }}
-                  className="p-2.5 rounded-xl bg-[var(--stage-surface-nested)] hover:bg-[var(--stage-surface-hover)] text-[var(--stage-text-secondary)] transition-colors"
+                  className="stage-hover overflow-hidden p-2.5 rounded-xl bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] transition-colors"
                   title="Copy invite code"
                 >
                   <Copy className="w-4 h-4" />
@@ -346,7 +444,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
                       )}
                     </div>
                     {location.isPrimary && (
-                      <span className="text-[10px] font-medium text-[var(--color-unusonic-success)] uppercase tracking-wider">
+                      <span className="stage-label text-[var(--color-unusonic-success)]">
                         Primary
                       </span>
                     )}
@@ -368,7 +466,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           className="stage-panel p-6 space-y-6"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
               <Shield className="w-5 h-5 text-[var(--stage-text-secondary)]" />
             </div>
             <div>
@@ -412,7 +510,7 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
         className="stage-panel p-6 space-y-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
             <Plug2 className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
@@ -449,9 +547,9 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
           )}
           
           {/* Placeholder for future integrations */}
-          <div className="p-4 rounded-xl bg-[var(--stage-surface-nested)] border border-dashed border-[var(--stage-border)]">
+          <div className="p-4 rounded-xl bg-[var(--ctx-well)] border border-dashed border-[var(--stage-border)]">
             <div className="flex items-center gap-4 opacity-40">
-              <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-[var(--stage-text-secondary)]" />
               </div>
               <div>
@@ -517,17 +615,17 @@ function PaymentTermsSection({ defaults }: { defaults: WorkspacePaymentDefaults 
   const fieldLabel = 'text-sm text-[var(--stage-text-secondary)] tracking-tight';
   const fieldHint = 'text-xs text-[var(--stage-text-secondary)]/40 mt-0.5';
   const inputClass =
-    'w-20 bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)] rounded-[var(--stage-radius-input)] px-3 py-2 text-sm text-[var(--stage-text-primary)] text-right focus:outline-none focus:border-[var(--stage-border-focus)] tabular-nums';
+    'w-20 bg-[var(--ctx-well)] border border-[var(--stage-border)] rounded-[var(--stage-radius-input)] px-3 py-2 text-sm text-[var(--stage-text-primary)] text-right focus:outline-none focus-visible:border-[var(--stage-border-focus)] tabular-nums';
 
   return (
     <motion.section
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.2 }}
+      transition={{ ...STAGE_HEAVY, delay: 0.2 }}
       className="stage-panel p-6 space-y-6"
     >
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
           <Clock className="w-5 h-5 text-[var(--stage-text-secondary)]" />
         </div>
         <div>
@@ -602,14 +700,14 @@ function PaymentTermsSection({ defaults }: { defaults: WorkspacePaymentDefaults 
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            transition={STAGE_MEDIUM}
             className="overflow-hidden"
           >
             <button
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-primary)] border border-[var(--stage-border)] bg-[var(--stage-surface)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none disabled:opacity-40"
+              className="stage-hover overflow-hidden px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-primary)] border border-[var(--stage-border)] bg-[var(--stage-surface)] transition-colors focus:outline-none disabled:opacity-45"
             >
               {saving ? 'Saving…' : saved ? 'Saved' : 'Save defaults'}
             </button>

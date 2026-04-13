@@ -57,7 +57,7 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
       }
       const result = await createGenesisOrganization(null, formData);
       if (result.ok) {
-        router.push('/lobby');
+        router.push('/');
         return { ok: true };
       }
       return { ok: false, error: result.error };
@@ -76,7 +76,7 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
       <form action={submitAction} className="flex flex-col gap-8 stage-panel rounded-[var(--stage-radius-panel,12px)] p-8 border border-[oklch(1_0_0/0.08)]">
         {/* Slug (read-only) */}
         <div>
-          <span className="text-[11px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+          <span className="stage-label">
             Studio URL
           </span>
           <p className="mt-2 text-lg text-[var(--stage-text-primary)] font-mono">unusonic.events/{slug}</p>
@@ -86,7 +86,7 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
         <section>
           <label
             htmlFor="genesis-name"
-            className="mb-2 block text-[11px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
+            className="mb-2 block stage-label"
           >
             Organization name
           </label>
@@ -116,7 +116,7 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
           type="submit"
           disabled={isPending || !name.trim()}
           transition={STAGE_MEDIUM}
-          className="stage-btn stage-btn-primary w-full py-3.5 rounded-full font-medium text-sm transition-colors disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+          className="stage-btn stage-btn-primary w-full py-3.5 rounded-full font-medium text-sm transition-colors disabled:opacity-45 disabled:pointer-events-none flex items-center justify-center gap-2"
         >
           {isPending ? (
             <>

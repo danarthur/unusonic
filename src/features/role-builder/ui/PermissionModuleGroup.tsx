@@ -31,7 +31,7 @@ export function PermissionModuleGroup({
           'flex w-full items-center justify-between gap-3 px-4 py-3 text-left',
           'text-[var(--stage-text-primary)] tracking-tight font-medium',
           'border-b border-[var(--stage-border)]',
-          'hover:bg-[var(--stage-surface)] transition-colors'
+          'transition-colors stage-hover overflow-hidden'
         )}
       >
         <span>{label}</span>

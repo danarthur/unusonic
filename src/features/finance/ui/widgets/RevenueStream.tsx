@@ -28,7 +28,7 @@ export function RevenueStream({
       className={`flex flex-col gap-5 p-6 min-h-[200px] min-w-0 overflow-visible ${className ?? ''}`}
     >
       <div className="shrink-0 space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)]">
+        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
           Top Revenue Drivers
         </h2>
         <p className="text-xs text-[var(--stage-text-secondary)]">

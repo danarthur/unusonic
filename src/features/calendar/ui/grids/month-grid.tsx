@@ -68,7 +68,7 @@ export function MonthGrid({ events, viewDate, onEventClick, onDayClick, locale }
         {weekdays.map((label) => (
           <div
             key={label}
-            className="px-2 py-3 text-center text-sm font-semibold text-[var(--stage-text-primary)]/80 tracking-tight"
+            className="px-2 py-3 text-center text-sm font-medium text-[var(--stage-text-primary)]/80 tracking-tight"
           >
             {label}
           </div>
@@ -89,7 +89,7 @@ export function MonthGrid({ events, viewDate, onEventClick, onDayClick, locale }
           return (
             <div
               key={key}
-              className={`min-h-[100px] flex flex-col gap-1.5 p-2.5 overflow-hidden border-r border-b border-[oklch(1_0_0_/_0.08)]/20 last:border-r-0 transition-colors duration-200 hover:bg-[var(--stage-surface)]/60 ${densityClass} ${
+              className={`min-h-[100px] flex flex-col gap-1.5 p-2.5 overflow-hidden border-r border-b border-[oklch(1_0_0_/_0.08)]/20 last:border-r-0 transition-colors duration-200 stage-hover ${densityClass} ${
                 inMonth ? (isPast ? 'bg-[var(--stage-surface)]/40 opacity-60 saturate-[0.7]' : 'bg-[var(--stage-surface)]/40') : 'bg-[var(--stage-accent)]/[0.01] opacity-50'
               } ${isToday ? 'ring-2 ring-inset ring-[var(--today-ring)] bg-[var(--today-bg)] !opacity-100 !saturate-100' : ''}`}
             >
@@ -97,7 +97,7 @@ export function MonthGrid({ events, viewDate, onEventClick, onDayClick, locale }
                 <button
                   type="button"
                   onClick={() => onDayClick(key)}
-                  className={`text-base md:text-lg tabular-nums shrink-0 hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded ${
+                  className={`text-base md:text-lg tabular-nums shrink-0 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded ${
                     isToday ? 'font-medium text-[var(--stage-text-primary)]' : inMonth ? 'font-light text-[var(--stage-text-primary)]' : 'font-light text-[var(--stage-text-primary)]/40'
                   }`}
                 >
@@ -117,7 +117,7 @@ export function MonthGrid({ events, viewDate, onEventClick, onDayClick, locale }
                   <button
                     type="button"
                     onClick={() => onEventClick?.(dayEvents[0])}
-                    className="text-left w-full rounded-lg transition-all duration-300 hover:bg-[var(--stage-text-primary)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-inset"
+                    className="text-left w-full rounded-lg transition-colors duration-100 hover:bg-[var(--stage-text-primary)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset"
                   >
                     <EventPill event={dayEvents[0]} />
                   </button>

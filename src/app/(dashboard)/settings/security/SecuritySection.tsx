@@ -17,7 +17,8 @@ import { guessDeviceName } from '@/features/auth/passkey-management/lib/guess-de
 import type { TeamAccessMember } from '@/features/auth/passkey-management/api/team-access';
 import { Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-const sectionSpring = { type: 'spring' as const, stiffness: 200, damping: 20 };
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
+const sectionSpring = STAGE_HEAVY;
 
 type PendingRecovery = { id: string; timelock_until: string } | null;
 
@@ -172,7 +173,7 @@ export function SecuritySection({
               a.click();
               URL.revokeObjectURL(url);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-surface)] text-[var(--stage-text-primary)] border border-[var(--stage-border)] hover:bg-[var(--stage-surface-hover)] transition-colors"
+            className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-surface)] text-[var(--stage-text-primary)] border border-[var(--stage-border)] transition-colors"
           >
             <Download className="w-4 h-4" />
             Export identity (CXF)
@@ -182,7 +183,7 @@ export function SecuritySection({
 
       {/* Pending recovery */}
       {pendingRecoveryRequest && (
-        <section className="rounded-2xl bg-[var(--color-unusonic-warning)]/10 border border-[var(--color-unusonic-warning)]/30 p-6">
+        <section className="rounded-2xl bg-[var(--stage-surface)] border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-warning)] p-6">
           <div className="flex items-center gap-3 mb-2">
             <ShieldAlert className="w-5 h-5 text-[var(--color-unusonic-warning)]" />
             <h2 className="text-base font-medium text-[var(--stage-text-primary)]">Recovery in progress</h2>
@@ -195,7 +196,7 @@ export function SecuritySection({
             type="button"
             onClick={handleCancelRecovery}
             disabled={cancelLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)] border border-[var(--color-unusonic-warning)]/40 hover:bg-[var(--color-unusonic-warning)]/30 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)] border border-[var(--color-unusonic-warning)]/40 hover:bg-[var(--color-unusonic-warning)]/30 disabled:opacity-45"
           >
             {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Cancel recovery
@@ -241,7 +242,7 @@ export function SecuritySection({
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--stage-surface-nested)] border border-[var(--stage-border)]"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--ctx-well)] border border-[var(--stage-border)]"
                 >
                   {editingId === pk.id ? (
                     <>
@@ -264,10 +265,10 @@ export function SecuritySection({
                   ) : deletingId === pk.id ? (
                     <>
                       <p className="flex-1 text-sm text-[var(--color-unusonic-error)]">Remove this passkey?</p>
-                      <button type="button" onClick={() => handleDelete(pk.id)} disabled={deleteLoading} className="text-xs font-medium text-[var(--color-unusonic-error)] hover:underline disabled:opacity-50">
+                      <button type="button" onClick={() => handleDelete(pk.id)} disabled={deleteLoading} className="text-xs font-medium text-[var(--color-unusonic-error)] hover:underline disabled:opacity-45">
                         {deleteLoading ? 'Removing…' : 'Remove'}
                       </button>
-                      <button type="button" onClick={() => setDeletingId(null)} disabled={deleteLoading} className="text-xs text-[var(--stage-text-secondary)] hover:underline disabled:opacity-50">Cancel</button>
+                      <button type="button" onClick={() => setDeletingId(null)} disabled={deleteLoading} className="text-xs text-[var(--stage-text-secondary)] hover:underline disabled:opacity-45">Cancel</button>
                     </>
                   ) : (
                     <>
@@ -324,13 +325,13 @@ export function SecuritySection({
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddPasskey(); if (e.key === 'Escape') setShowAddNameInput(false); }}
               autoFocus
               placeholder="Name this device"
-              className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-[var(--stage-surface-nested)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-primary)]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-[var(--ctx-well)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
             />
             <button
               type="button"
               onClick={handleAddPasskey}
               disabled={passkeyLoading}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:brightness-[1.06] transition-[filter] disabled:opacity-50 shrink-0"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors disabled:opacity-45 shrink-0"
             >
               {passkeyLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
@@ -354,7 +355,7 @@ export function SecuritySection({
             type="button"
             onClick={handleStartAdd}
             disabled={passkeyLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:brightness-[1.06] transition-[filter] disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors disabled:opacity-45"
           >
             <Plus className="w-4 h-4" strokeWidth={1.5} />
             Add passkey
@@ -387,12 +388,12 @@ export function SecuritySection({
             name="guardianEmail"
             placeholder="Guardian email"
             required
-            className="w-full px-4 py-2.5 rounded-xl bg-[var(--stage-surface-nested)] border border-[var(--stage-border)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-primary)]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="w-full px-4 py-2.5 rounded-xl bg-[var(--ctx-well)] border border-[var(--stage-border)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           />
           <button
             type="submit"
             disabled={isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:brightness-[1.06] transition-[filter] disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors disabled:opacity-45"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> : null}
             {isPending ? 'Sending...' : 'Invite guardian'}
@@ -430,7 +431,7 @@ export function SecuritySection({
             {teamAccess.map((member) => (
               <div
                 key={member.userId}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--stage-surface-nested)] border border-[var(--stage-border)]"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--ctx-well)] border border-[var(--stage-border)]"
               >
                 {/* Avatar */}
                 <div className="w-8 h-8 rounded-lg bg-[oklch(1_0_0_/_0.08)] flex items-center justify-center shrink-0 overflow-hidden">
@@ -483,7 +484,7 @@ export function SecuritySection({
 
                 {/* Risk badge */}
                 {member.risk && (
-                  <span className={`flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
+                  <span className={`flex items-center gap-1 stage-label px-2 py-0.5 rounded-full shrink-0 ${
                     member.risk === 'high'
                       ? 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]'
                       : 'bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]'

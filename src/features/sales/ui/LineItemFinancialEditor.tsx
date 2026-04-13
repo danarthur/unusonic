@@ -267,11 +267,11 @@ export function LineItemFinancialEditor({
             <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-[oklch(1_0_0_/_0.08)]">
               <div className="flex items-center gap-2 min-w-0">
                 <Calculator className="w-4 h-4 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} aria-hidden />
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] truncate">
+                <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] truncate">
                   Line item
                 </h2>
                 {category && (
-                  <span className="ml-1 shrink-0 rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
+                  <span className="ml-1 shrink-0 rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-2 py-0.5 stage-label">
                     {category.replace('_', ' ')}
                   </span>
                 )}
@@ -279,7 +279,7 @@ export function LineItemFinancialEditor({
               <button
                 type="button"
                 onClick={() => onSelectIndex(null)}
-                className="shrink-0 p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                className="shrink-0 p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] stage-hover overflow-hidden"
                 aria-label="Close editor"
               >
                 <X className="w-4 h-4" strokeWidth={1.5} />
@@ -323,7 +323,7 @@ export function LineItemFinancialEditor({
                       }}
                       readOnly={readOnly}
                       placeholder="e.g. Stage lighting rig"
-                      className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)] read-only:opacity-70"
+                      className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface-raised)] read-only:opacity-70"
                     />
                   </div>
 
@@ -343,7 +343,7 @@ export function LineItemFinancialEditor({
                         value={item.displayGroupName ?? ''}
                         onChange={(e) => onUpdateDisplayGroupName(selectedIndex!, e.target.value || null)}
                         placeholder="e.g. Entertainment, Production, Staffing"
-                        className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)]"
+                        className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface-raised)]"
                       />
                       {existingSections.length > 0 && (
                         <datalist id="editor-section-list">
@@ -373,7 +373,7 @@ export function LineItemFinancialEditor({
                       }
                       readOnly={readOnly}
                       placeholder="Visible on the proposal PDF — describe what the client is getting."
-                      className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)] resize-none leading-relaxed read-only:opacity-70"
+                      className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface-raised)] resize-none leading-relaxed read-only:opacity-70"
                     />
                   </div>
 
@@ -386,7 +386,7 @@ export function LineItemFinancialEditor({
                       >
                         <Lock className="w-3 h-3 opacity-60" strokeWidth={1.5} aria-hidden />
                         Internal notes
-                        <span className="ml-1 text-[10px] normal-case tracking-normal text-[var(--stage-text-tertiary)]">
+                        <span className="ml-1 text-label normal-case tracking-normal text-[var(--stage-text-tertiary)]">
                           (not on client PDF)
                         </span>
                       </label>
@@ -402,7 +402,7 @@ export function LineItemFinancialEditor({
                           )
                         }
                         placeholder="Vendor contact, order number, setup notes — only your team sees this."
-                        className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)] resize-none leading-relaxed"
+                        className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface-raised)] resize-none leading-relaxed"
                       />
                     </div>
                   )}
@@ -420,7 +420,7 @@ export function LineItemFinancialEditor({
                           <p className="text-xs font-medium text-[var(--stage-text-primary)]">
                             {item.isClientVisible !== false ? 'Visible to client' : 'Hidden from client'}
                           </p>
-                          <p className="text-[11px] text-[var(--stage-text-secondary)] leading-tight mt-0.5">
+                          <p className="text-field-label text-[var(--stage-text-secondary)] leading-tight mt-0.5">
                             {item.isClientVisible !== false
                               ? 'Shows on proposal PDF and public view.'
                               : 'Appears on your pull sheet only.'}
@@ -435,7 +435,7 @@ export function LineItemFinancialEditor({
                           onUpdateIsClientVisible(selectedIndex!, !(item.isClientVisible !== false))
                         }
                         className={cn(
-                          'shrink-0 relative inline-flex h-5 w-9 items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)]',
+                          'shrink-0 relative inline-flex h-5 w-9 items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface-raised)]',
                           item.isClientVisible !== false
                             ? 'bg-[var(--stage-accent)]'
                             : 'bg-[oklch(1_0_0_/_0.15)]'
@@ -484,7 +484,7 @@ export function LineItemFinancialEditor({
                       <div className={cn(
                         'mt-2 flex flex-col gap-1 px-3 py-2 rounded-[var(--stage-radius-nested)] text-sm',
                         belowFloor
-                          ? 'bg-[oklch(0.65_0.15_55_/_0.1)] text-amber-400'
+                          ? 'bg-[oklch(0.65_0.15_55_/_0.1)] text-[var(--color-unusonic-warning)]'
                           : 'bg-[oklch(1_0_0_/_0.03)] text-[var(--stage-text-secondary)]'
                       )}>
                         <div className="flex items-center justify-between">
@@ -528,7 +528,7 @@ export function LineItemFinancialEditor({
                           const newMult = newType === 'flat' ? 1 : (item.unitMultiplier ?? 1);
                           onUpdateBillingMethod(selectedIndex!, newType, newMult);
                         }}
-                        className="flex-1 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)] disabled:opacity-60"
+                        className="flex-1 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface-raised)] disabled:opacity-45"
                       >
                         <option value="flat">Flat rate</option>
                         <option value="hour">Per hour</option>
@@ -547,7 +547,7 @@ export function LineItemFinancialEditor({
                               const safe = Number.isFinite(v) ? Math.max(0.25, v) : 1;
                               onUpdateBillingMethod(selectedIndex!, item.unitType as UnitType, safe);
                             }}
-                            className="w-20 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] focus:ring-offset-2 focus:ring-offset-[var(--stage-surface-raised)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
+                            className="w-20 rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] text-center tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface-raised)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-45"
                             aria-label={item.unitType === 'hour' ? 'Number of hours' : 'Number of days'}
                           />
                           <span className="text-xs text-[var(--stage-text-secondary)]">
@@ -569,7 +569,7 @@ export function LineItemFinancialEditor({
                           {item.quantity} ×{' '}
                           <span className="text-[var(--stage-text-primary)]">${effectivePrice.toLocaleString()}</span>
                           {' = '}
-                          <span className="font-semibold text-[var(--stage-text-primary)]">${lineTotal.toLocaleString()}</span>
+                          <span className="font-medium text-[var(--stage-text-primary)]">${lineTotal.toLocaleString()}</span>
                         </p>
                       ) : (
                         <p className="text-xs text-[var(--stage-text-primary)] tabular-nums">
@@ -578,7 +578,7 @@ export function LineItemFinancialEditor({
                           {item.unitType === 'hour' ? 'hr' : 'day'}{(item.unitMultiplier ?? 1) !== 1 ? 's' : ''} ×{' '}
                           <span className="text-[var(--stage-text-primary)]">${effectivePrice.toLocaleString()}/{item.unitType === 'hour' ? 'hr' : 'day'}</span>
                           {' = '}
-                          <span className="font-semibold text-[var(--stage-text-primary)]">${lineTotal.toLocaleString()}</span>
+                          <span className="font-medium text-[var(--stage-text-primary)]">${lineTotal.toLocaleString()}</span>
                         </p>
                       )}
                       {hasCostData && totalCost != null && (
@@ -621,13 +621,13 @@ export function LineItemFinancialEditor({
                             type="checkbox"
                             checked={subRentalCostUnlocked}
                             onChange={(e) => setSubRentalCostUnlocked(e.target.checked)}
-                            className="rounded border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--color-unusonic-warning)] focus:ring-[var(--stage-accent)]"
+                            className="rounded border-[oklch(1_0_0_/_0.12)] bg-[var(--stage-surface)] text-[var(--color-unusonic-warning)] focus-visible:ring-[var(--stage-accent)]"
                           />
                           Sub-rental or custom order (unlocks cost edit)
                         </label>
                       )}
                       {!costEditable && !costRentalRetail && (
-                        <p className="mt-1.5 text-[11px] text-[var(--stage-text-secondary)]">
+                        <p className="mt-1.5 text-field-label text-[var(--stage-text-secondary)]">
                           Set in catalog — edit there to apply to all proposals.
                         </p>
                       )}
@@ -715,7 +715,7 @@ export function LineItemFinancialEditor({
                                 <p className="text-xs font-medium text-[var(--stage-text-primary)] truncate">
                                   {role.quantity > 1 ? `${role.quantity}× ` : ''}{role.role}
                                 </p>
-                                <p className="text-[11px] text-[var(--stage-text-secondary)] mt-0.5">
+                                <p className="text-field-label text-[var(--stage-text-secondary)] mt-0.5">
                                   {role.booking_type === 'talent'
                                     ? 'Talent — flat fee'
                                     : hasOvertime
@@ -740,14 +740,14 @@ export function LineItemFinancialEditor({
                                   </span>
                                 )}
                                 {role.assignee_name && (
-                                  <p className="text-[11px] text-[var(--color-unusonic-warning)] mt-0.5 truncate flex items-center gap-1">
+                                  <p className="text-field-label text-[var(--color-unusonic-warning)] mt-0.5 truncate flex items-center gap-1">
                                     {role.client_locked && <Lock className="w-3 h-3 shrink-0" strokeWidth={1.5} aria-label="Client locked" />}
                                     → {role.assignee_name}
                                   </p>
                                 )}
                               </div>
                               {role.default_rate != null && (
-                                <span className="text-xs font-semibold text-[var(--stage-text-primary)] shrink-0 tabular-nums">
+                                <span className="text-xs font-medium text-[var(--stage-text-primary)] shrink-0 tabular-nums">
                                   ${roleCost.toLocaleString()}
                                 </span>
                               )}
@@ -775,7 +775,7 @@ export function LineItemFinancialEditor({
                     </div>
                   )}
                   {isPackageHeaderOrChild && !readOnly && (
-                    <p className="text-[11px] text-[var(--stage-text-tertiary)] pt-1 border-t border-[oklch(1_0_0_/_0.08)]">
+                    <p className="text-field-label text-[var(--stage-text-tertiary)] pt-1 border-t border-[oklch(1_0_0_/_0.08)]">
                       Swap is not available for bundled items. Unpack the bundle first to swap individual lines.
                     </p>
                   )}
@@ -791,19 +791,19 @@ export function LineItemFinancialEditor({
                   type="button"
                   disabled={prevIndex == null}
                   onClick={() => prevIndex != null && onSelectIndex(prevIndex)}
-                  className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-30 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded-lg px-2 py-1"
+                  className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-45 disabled:pointer-events-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-lg px-2 py-1"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
                   Prev
                 </button>
-                <span className="text-[11px] text-[var(--stage-text-tertiary)] tabular-nums">
+                <span className="text-field-label text-[var(--stage-text-tertiary)] tabular-nums">
                   {(selectedIndex ?? 0) + 1} / {lineItems.length}
                 </span>
                 <button
                   type="button"
                   disabled={nextIndex == null}
                   onClick={() => nextIndex != null && onSelectIndex(nextIndex)}
-                  className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-30 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] rounded-lg px-2 py-1"
+                  className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-45 disabled:pointer-events-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-lg px-2 py-1"
                 >
                   Next
                   <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />

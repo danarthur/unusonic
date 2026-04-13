@@ -284,3 +284,29 @@ export async function uploadAvatar(formData: FormData): Promise<{
   revalidatePath('/');
   return { success: true, avatarUrl: publicUrl };
 }
+
+// ============================================================================
+// Ghost Entity Claiming
+// ============================================================================
+
+/**
+ * Claims ghost entities matching the authenticated user's email that have
+ * CLIENT relationship edges. Creates workspace memberships with client role.
+ * Called during onboarding — fire-and-forget, errors are non-blocking.
+ *
+ * Returns the number of entities claimed (0 if none found or on error).
+ */
+export async function claimGhostEntities(): Promise<number> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc('claim_ghost_entities_for_user');
+    if (error) {
+      console.error('[claimGhostEntities] RPC error:', error.message);
+      return 0;
+    }
+    return data ?? 0;
+  } catch (err) {
+    console.error('[claimGhostEntities] Unexpected error:', err);
+    return 0;
+  }
+}

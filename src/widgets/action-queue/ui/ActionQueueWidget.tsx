@@ -17,7 +17,6 @@ import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import type { ActionItem } from '@/widgets/dashboard/api';
 import {
   STAGE_LIGHT,
-  M3_SHARED_AXIS_Y_VARIANTS,
 } from '@/shared/lib/motion-constants';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -46,7 +45,7 @@ function ActionRow({ item }: { item: ActionItem }) {
 
   return (
     <motion.div
-      variants={M3_SHARED_AXIS_Y_VARIANTS}
+      variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
       transition={STAGE_LIGHT}
       className="flex items-center gap-3 py-2"
     >
@@ -75,7 +74,7 @@ function SectionHeader({ priority }: { priority: ActionItem['priority'] }) {
   const config = priorityConfig[priority];
   return (
     <p
-      className="text-[10px] uppercase tracking-widest font-medium mt-3 mb-1 first:mt-0"
+      className="stage-label mt-3 mb-1 first:mt-0"
       style={{ color: config.color }}
     >
       {config.label}

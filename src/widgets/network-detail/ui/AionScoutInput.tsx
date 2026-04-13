@@ -64,7 +64,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
 
   return (
     <div className="space-y-2">
-      <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
+      <label className="stage-label text-[var(--stage-text-secondary)]">
         Website
       </label>
       <motion.div
@@ -75,8 +75,8 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
           rounded-xl overflow-hidden
           transition-colors duration-[80ms]
           ${canActivate
-            ? 'border border-[var(--stage-accent)]/50 bg-[oklch(1_0_0_/_0.10)]/50 focus-within:border-[var(--stage-accent)]/70'
-            : 'border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-text-primary)]/[0.02]'
+            ? 'border border-[oklch(1_0_0/0.15)] bg-[oklch(1_0_0_/_0.10)]/50 focus-within:border-[oklch(1_0_0/0.20)]'
+            : 'border border-[var(--stage-edge-subtle)] bg-[var(--stage-text-primary)]/[0.02]'
           }
         `}
       >
@@ -94,7 +94,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
             relative z-10 flex min-w-[140px] sm:min-w-[160px] flex-1 items-center justify-center gap-3 pl-8 pr-5
             transition-colors duration-[80ms]
             ${canActivate && !isScanning
-              ? 'cursor-pointer text-[var(--stage-accent)] hover:bg-[oklch(1_0_0/0.08)] active:bg-[oklch(1_0_0/0.04)]'
+              ? 'cursor-pointer text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)] active:bg-[oklch(1_0_0/0.04)]'
               : 'cursor-default text-[var(--stage-text-secondary)] opacity-[0.45] pointer-events-none'
             }
           `}
@@ -127,8 +127,8 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
           </motion.div>
           <span
             className={`
-              text-xs font-medium uppercase tracking-widest
-              ${isScanning ? 'text-[var(--stage-accent)]' : canActivate ? 'text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-accent)]/90' : 'text-[var(--stage-text-tertiary)]'}
+              stage-label
+              ${isScanning ? 'text-[var(--stage-text-primary)]' : canActivate ? 'text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-tertiary)]'}
             `}
           >
             {isScanning ? 'Scanning' : status === 'success' ? 'Acquired' : 'Aion'}

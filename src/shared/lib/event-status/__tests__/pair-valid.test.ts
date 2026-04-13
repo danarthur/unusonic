@@ -92,4 +92,16 @@ describe('eventStatusPairValid', () => {
       expect(eventStatusPairValid('', null)).toBe(false);
     });
   });
+
+  // Regression pin for rescan finding N1 (2026-04-11):
+  // handoverDeal writes `status='planned', lifecycle_status='production'` on insert so
+  // new events appear on Lobby widgets, dashboard urgency alerts, and global search,
+  // which all filter `.in('lifecycle_status', [...])` and silently exclude NULL. If
+  // this pair ever stops validating, handoverDeal will start failing at the DB-level
+  // pair-check trigger and the entire handoff flow breaks. Do not remove.
+  describe('regression — N1 handoverDeal explicit lifecycle_status', () => {
+    it('must accept (planned, production)', () => {
+      expect(eventStatusPairValid('planned', 'production')).toBe(true);
+    });
+  });
 });

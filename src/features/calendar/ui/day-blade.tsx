@@ -9,7 +9,8 @@ import type { CalendarEvent } from '@/features/calendar/model/types';
 import { EventCard } from '@/features/calendar/ui/components/event-card';
 
 const DRAWER_WIDTH = 400;
-const springConfig = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+const springConfig = STAGE_MEDIUM;
 
 export interface DayBladeProps {
   /** Current date from URL (YYYY-MM-DD). When set, blade is open. */
@@ -98,7 +99,7 @@ export function DayBlade({ date, events, focusEventId }: DayBladeProps) {
               <button
                 type="button"
                 onClick={close}
-                className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                className="p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />

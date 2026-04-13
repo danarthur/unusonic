@@ -25,12 +25,12 @@ export function EventCard({ event, crewCount, className = '' }: EventCardProps) 
 
   return (
     <div
-      className={`stage-panel-nested rounded-xl border-l-4 p-4 transition-all duration-300 antialiased ${colorClass} ${className}`}
+      className={`stage-panel-nested rounded-xl border-l-4 p-4 transition-colors duration-100 antialiased ${colorClass} ${className}`}
     >
       <div className="text-xs font-medium text-[var(--stage-text-secondary)] tabular-nums">
         {format(startDate, 'h:mm a')} – {format(endDate, 'h:mm a')}
       </div>
-      <h3 className="text-base font-semibold text-[var(--stage-text-primary)] mt-1 tracking-tight">{event.title}</h3>
+      <h3 className="text-base font-medium text-[var(--stage-text-primary)] mt-1 tracking-tight">{event.title}</h3>
       {event.clientName && (
         <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5 flex items-center gap-1.5">
           <User size={14} strokeWidth={1.5} className="shrink-0 opacity-70" />

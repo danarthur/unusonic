@@ -116,7 +116,7 @@ export function UpgradeBanner(props: UpgradeBannerProps) {
             <div className="flex items-center gap-2 shrink-0">
               <Link
                 href={type === 'billing_past_due' ? '/settings/billing' : '/settings/plan'}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:brightness-[1.06] transition-[filter]"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(0.90_0_0)] transition-colors"
               >
                 {type === 'billing_past_due' ? 'Update billing' : 'Review plan'}
                 <ArrowRight className="w-3 h-3" strokeWidth={1.5} />

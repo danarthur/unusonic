@@ -9,7 +9,7 @@ interface MorningBriefingProps {
 export const WeatherCard = () => (
   <StagePanel className="flex-1 min-h-[100px] !p-4">
     <div className="flex justify-between items-start mb-2">
-      <span className="font-mono text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-widest">Atmosphere</span>
+      <span className="font-mono stage-label">Atmosphere</span>
       <CloudRain size={16} className="text-[var(--stage-text-secondary)]" />
     </div>
     <div className="flex items-end justify-between">
@@ -18,7 +18,7 @@ export const WeatherCard = () => (
         <div className="text-xs text-[var(--stage-text-secondary)] mt-1 font-medium">Heavy Rain</div>
       </div>
       <div className="flex flex-col items-end gap-1">
-        <span className="text-[10px] text-[var(--stage-text-secondary)] font-mono">H:65° L:58°</span>
+        <span className="text-label text-[var(--stage-text-secondary)] font-mono">H:65° L:58°</span>
       </div>
     </div>
   </StagePanel>
@@ -27,7 +27,7 @@ export const WeatherCard = () => (
 export const TimeCard = () => (
   <StagePanel className="flex-1 min-h-[100px] !p-4">
     <div className="flex justify-between items-start mb-1">
-      <span className="font-mono text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-widest">Local</span>
+      <span className="font-mono stage-label">Local</span>
       <Clock size={16} className="text-[var(--stage-text-secondary)]" />
     </div>
     <div className="mt-auto">
@@ -40,7 +40,7 @@ export const TimeCard = () => (
 const SystemStatsCard = () => (
   <StagePanel className="py-4 space-y-4 !p-4">
     <div className="flex items-center justify-between mb-2">
-      <span className="font-mono text-[10px] text-[var(--stage-text-secondary)] uppercase tracking-widest">System</span>
+      <span className="font-mono stage-label">System</span>
       <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-unusonic-success)] shadow-[0_0_8px_oklch(0.7_0.15_160_/_0.4)]" />
     </div>
 
@@ -70,6 +70,6 @@ const StatRow = ({ label, value, icon }: { label: string, value: string, icon: a
       {icon}
       <span className="text-xs font-medium">{label}</span>
     </div>
-    <span className="font-mono text-xs text-[var(--stage-text-primary)] font-semibold bg-[oklch(1_0_0/0.06)] px-1.5 py-0.5 rounded-md">{value}</span>
+    <span className="font-mono text-xs text-[var(--stage-text-primary)] font-medium bg-[oklch(1_0_0/0.06)] px-1.5 py-0.5 rounded-md">{value}</span>
   </div>
 );

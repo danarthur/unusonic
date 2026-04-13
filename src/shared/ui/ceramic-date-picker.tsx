@@ -28,7 +28,7 @@ export const DAY_PICKER_CLASSNAMES = {
   dropdowns: 'flex gap-2 justify-center',
   dropdown: 'min-w-0 rounded-[var(--stage-radius-input,6px)] border border-[var(--stage-edge-subtle,oklch(1_0_0/0.03))] bg-[var(--ctx-dropdown)] px-3 py-2 text-[length:var(--stage-input-font-size,13px)] text-[var(--stage-text-primary)]',
   weekdays: 'flex gap-1 w-full justify-between',
-  weekday: 'w-9 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] text-center',
+  weekday: 'w-9 py-1.5 stage-label text-center',
   week: 'flex gap-1 w-full justify-between',
   day: 'w-9 h-9 p-0',
   day_button: cn(

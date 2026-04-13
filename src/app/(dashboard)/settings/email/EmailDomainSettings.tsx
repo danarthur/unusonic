@@ -23,7 +23,8 @@ interface EmailDomainSettingsProps {
 
 // ── Spring preset ──────────────────────────────────────────────────────────────
 
-const spring = { type: 'spring' as const, stiffness: 200, damping: 20 };
+import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
+const spring = STAGE_HEAVY;
 
 // ── Status pill ────────────────────────────────────────────────────────────────
 
@@ -89,14 +90,14 @@ function DnsRecordRow({ label, type, name, value }: {
   return (
     <div className="grid grid-cols-[80px_60px_1fr_1fr_40px] gap-3 items-start py-3 border-b border-[var(--stage-border)] last:border-0">
       <span className="text-xs font-medium text-[var(--stage-text-secondary)] pt-0.5">{label}</span>
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[var(--stage-surface-nested)] text-[var(--stage-text-secondary)] border border-[var(--stage-border)] w-fit">
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded stage-badge-text font-mono bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] border border-[var(--stage-border)] w-fit">
         {type}
       </span>
       <span className="text-xs font-mono text-[var(--stage-text-primary)] break-all">{name}</span>
       <span className="text-xs font-mono text-[var(--stage-text-primary)] break-all">{value}</span>
       <button
         onClick={handleCopy}
-        className="flex items-center justify-center w-8 h-8 rounded-[var(--stage-radius-button)] transition-colors hover:bg-[var(--stage-surface-hover)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] shrink-0"
+        className="stage-hover overflow-hidden flex items-center justify-center w-8 h-8 rounded-[var(--stage-radius-button)] transition-colors text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] shrink-0"
         title="Copy value"
       >
         {copied ? <Check className="w-3.5 h-3.5 text-[var(--color-unusonic-success)]" /> : <Copy className="w-3.5 h-3.5" />}
@@ -208,7 +209,7 @@ export function EmailDomainSettings({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={spring}
-          className="flex items-start gap-2 px-4 py-3 rounded-xl bg-[var(--color-unusonic-error)]/10 border border-[var(--color-unusonic-error)]/20 text-sm text-[var(--color-unusonic-error)]"
+          className="flex items-start gap-2 px-4 py-3 rounded-xl bg-[var(--stage-surface)] border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-error)] text-sm text-[var(--color-unusonic-error)]"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{error}</span>
@@ -241,7 +242,7 @@ export function EmailDomainSettings({
                   placeholder="mail.yourdomain.com"
                   value={domainInput}
                   onChange={(e) => setDomainInput(e.target.value)}
-                  className="w-full px-3 py-2 rounded-[var(--stage-radius-input)] bg-[var(--stage-surface-nested)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-border-focus)] transition-all font-mono"
+                  className="w-full px-3 py-2 rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-border-focus)] transition-[border-color,box-shadow] font-mono"
                 />
                 <p className="mt-1 text-xs text-[var(--stage-text-secondary)]">
                   Use a subdomain like mail.yourdomain.com to avoid conflicts with your existing email.
@@ -258,7 +259,7 @@ export function EmailDomainSettings({
                     placeholder="Invisible Touch Events"
                     value={fromNameInput}
                     onChange={(e) => setFromNameInput(e.target.value)}
-                    className="w-full px-3 py-2 rounded-[var(--stage-radius-input)] bg-[var(--stage-surface-nested)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-border-focus)] transition-all"
+                    className="w-full px-3 py-2 rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-border-focus)] transition-[border-color,box-shadow]"
                   />
                 </div>
                 <div>
@@ -270,7 +271,7 @@ export function EmailDomainSettings({
                     placeholder="hello"
                     value={fromLocalpartInput}
                     onChange={(e) => setFromLocalpartInput(e.target.value)}
-                    className="w-full px-3 py-2 rounded-[var(--stage-radius-input)] bg-[var(--stage-surface-nested)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--stage-border-focus)] transition-all font-mono"
+                    className="w-full px-3 py-2 rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-border-focus)] transition-[border-color,box-shadow] font-mono"
                   />
                 </div>
               </div>
@@ -278,7 +279,7 @@ export function EmailDomainSettings({
               <button
                 onClick={handleAdd}
                 disabled={!domainInput.trim() || isPending}
-                className="px-4 py-2 rounded-[var(--stage-radius-button)] text-sm font-medium tracking-tight bg-ceramic text-obsidian hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 rounded-[var(--stage-radius-button)] text-sm font-medium tracking-tight stage-btn stage-btn-primary disabled:opacity-45 disabled:cursor-not-allowed transition-colors"
               >
                 {isPending ? 'Adding…' : 'Add domain'}
               </button>
@@ -308,7 +309,7 @@ export function EmailDomainSettings({
                   <button
                     onClick={handleVerify}
                     disabled={isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--stage-surface-hover)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-[var(--stage-border)] transition-colors disabled:opacity-40"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-[var(--stage-border)] transition-colors disabled:opacity-45"
                   >
                     <RefreshCw className={`w-3 h-3 ${isPending ? 'animate-spin' : ''}`} />
                     Check verification
@@ -316,7 +317,7 @@ export function EmailDomainSettings({
                   <button
                     onClick={handleRemove}
                     disabled={isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/20 border border-[var(--color-unusonic-error)]/20 transition-colors disabled:opacity-40"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/20 border border-[var(--color-unusonic-error)]/20 transition-colors disabled:opacity-45"
                   >
                     <Trash2 className="w-3 h-3" />
                     Remove
@@ -328,7 +329,7 @@ export function EmailDomainSettings({
             {/* DNS records */}
             <div className="stage-panel p-5">
               <div className="mb-4">
-                <h3 className="text-sm font-semibold tracking-tight text-[var(--stage-text-primary)]">DNS records</h3>
+                <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)]">DNS records</h3>
                 <p className="mt-0.5 text-xs text-[var(--stage-text-secondary)]">
                   Add these records to your DNS provider. Verification can take up to 72 hours.
                 </p>
@@ -337,7 +338,7 @@ export function EmailDomainSettings({
               {/* Table header */}
               <div className="grid grid-cols-[80px_60px_1fr_1fr_40px] gap-3 pb-2 border-b border-[var(--stage-border)]">
                 {['Type', 'DNS', 'Host', 'Value', ''].map((h) => (
-                  <span key={h} className="text-[10px] font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">{h}</span>
+                  <span key={h} className="stage-label text-[var(--stage-text-secondary)]">{h}</span>
                 ))}
               </div>
 
@@ -391,7 +392,7 @@ export function EmailDomainSettings({
               <button
                 onClick={handleRemove}
                 disabled={isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/20 border border-[var(--color-unusonic-error)]/20 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/20 border border-[var(--color-unusonic-error)]/20 transition-colors disabled:opacity-45"
               >
                 <Trash2 className="w-3 h-3" />
                 Remove

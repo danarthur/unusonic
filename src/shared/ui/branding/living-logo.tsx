@@ -96,11 +96,11 @@ export function LivingLogo({
   const isIdle = status === 'idle' || status === 'ambient';
 
   // Compute the dynamic offset for the tidal drift
-  // Loading: oscillate between close (1) and far (7)
+  // Loading/Thinking: oscillate between close (1) and far (7)
   // Success: converge to near-alignment (0.5)
   // Error: diverge to max (7)
   // Idle: resting offset (4)
-  const targetOffset = isLoading
+  const targetOffset = isLoading || isThinking
     ? PHASE_OFFSET // animated via keyframes below
     : isSuccess
       ? 0.5
@@ -108,10 +108,13 @@ export function LivingLogo({
         ? 7
         : PHASE_OFFSET;
 
-  // For the tidal loading animation, we use keyframes
-  const loadingKeyframes = isLoading && !prefersReducedMotion
-    ? [PHASE_OFFSET, 1, PHASE_OFFSET]
+  // Tidal animation: pills drift closer then apart
+  // Loading: slower, wider breath (5s cycle)
+  // Thinking: faster, tighter oscillation (2.4s cycle) — feels like processing
+  const tidalKeyframes = (isLoading || isThinking) && !prefersReducedMotion
+    ? [PHASE_OFFSET, isThinking ? 0.5 : 1, PHASE_OFFSET]
     : undefined;
+  const tidalDuration = isThinking ? 2.4 : 5;
 
   return (
     <div
@@ -142,15 +145,22 @@ export function LivingLogo({
           rx={PILL_RX}
           fill={fill}
           animate={{
-            y: loadingKeyframes
-              ? loadingKeyframes.map(o => CENTER_Y - PILL_HEIGHT / 2 - o / 2)
+            y: tidalKeyframes
+              ? tidalKeyframes.map(o => CENTER_Y - PILL_HEIGHT / 2 - o / 2)
               : CENTER_Y - PILL_HEIGHT / 2 - targetOffset / 2,
+            opacity: isThinking && !prefersReducedMotion ? [1, 0.5, 1] : 1,
           }}
           transition={
-            isLoading && !prefersReducedMotion
+            (isLoading || isThinking) && !prefersReducedMotion
               ? {
                   y: {
-                    duration: 5,
+                    duration: tidalDuration,
+                    repeat: Infinity,
+                    repeatType: 'mirror' as const,
+                    ease: 'easeInOut',
+                  },
+                  opacity: {
+                    duration: tidalDuration,
                     repeat: Infinity,
                     repeatType: 'mirror' as const,
                     ease: 'easeInOut',
@@ -168,15 +178,22 @@ export function LivingLogo({
           rx={PILL_RX}
           fill={fill}
           animate={{
-            y: loadingKeyframes
-              ? loadingKeyframes.map(o => CENTER_Y - PILL_HEIGHT / 2 + o / 2)
+            y: tidalKeyframes
+              ? tidalKeyframes.map(o => CENTER_Y - PILL_HEIGHT / 2 + o / 2)
               : CENTER_Y - PILL_HEIGHT / 2 + targetOffset / 2,
+            opacity: isThinking && !prefersReducedMotion ? [0.5, 1, 0.5] : 1,
           }}
           transition={
-            isLoading && !prefersReducedMotion
+            (isLoading || isThinking) && !prefersReducedMotion
               ? {
                   y: {
-                    duration: 5,
+                    duration: tidalDuration,
+                    repeat: Infinity,
+                    repeatType: 'mirror' as const,
+                    ease: 'easeInOut',
+                  },
+                  opacity: {
+                    duration: tidalDuration,
                     repeat: Infinity,
                     repeatType: 'mirror' as const,
                     ease: 'easeInOut',

@@ -78,8 +78,8 @@ export function SettingsNav() {
                   href={href}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium tracking-tight transition-colors whitespace-nowrap ${
                     isActive
-                      ? 'bg-[var(--stage-surface-hover)] text-[var(--stage-text-primary)]'
-                      : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface)]'
+                      ? 'bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)]'
+                      : 'stage-hover overflow-hidden text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden />

@@ -152,7 +152,7 @@ export function PullSheetClient({
       <header className="sticky top-0 z-20 flex items-center gap-3 px-6 py-3 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)] print:hidden">
         <Link
           href={`/events/g/${eventId}`}
-          className="shrink-0 p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+          className="stage-hover overflow-hidden shrink-0 p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label="Back to Event Studio"
         >
           <ArrowLeft size={18} />
@@ -160,7 +160,7 @@ export function PullSheetClient({
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[var(--stage-text-primary)] truncate">{eventTitle}</p>
-          <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/60">
+          <p className="stage-label text-[var(--stage-text-secondary)]/60">
             Pull Sheet
           </p>
         </div>
@@ -208,15 +208,15 @@ export function PullSheetClient({
               <div className="grid grid-cols-3 divide-x divide-[oklch(1_0_0_/_0.10)]">
                 <div className="flex flex-col items-center gap-1 pr-6">
                   <span className="text-2xl font-semibold text-[var(--stage-text-secondary)] font-mono">{pendingGear}</span>
-                  <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/60">To pull</span>
+                  <span className="stage-label text-[var(--stage-text-secondary)]/60">To pull</span>
                 </div>
                 <div className="flex flex-col items-center gap-1 px-6">
                   <span className="text-2xl font-semibold text-[var(--stage-accent)] font-mono">{pulledGear}</span>
-                  <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/60">Pulled</span>
+                  <span className="stage-label text-[var(--stage-text-secondary)]/60">Pulled</span>
                 </div>
                 <div className="flex flex-col items-center gap-1 pl-6">
                   <span className="text-2xl font-semibold text-[var(--color-unusonic-success)] font-mono">{loadedGear}</span>
-                  <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]/60">Loaded</span>
+                  <span className="stage-label text-[var(--stage-text-secondary)]/60">Loaded</span>
                 </div>
               </div>
               <div className="mt-4 h-1.5 rounded-full bg-[oklch(1_0_0_/_0.10)] overflow-hidden">
@@ -316,12 +316,12 @@ export function PullSheetClient({
                               {item.name}
                             </span>
                             {item.quantity > 1 && (
-                              <span className="shrink-0 text-[10px] font-mono text-[var(--stage-text-secondary)] bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 rounded">
+                              <span className="shrink-0 text-label font-mono text-[var(--stage-text-secondary)] bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] px-1.5 py-0.5 rounded">
                                 ×{item.quantity}
                               </span>
                             )}
                             {item.is_sub_rental && (
-                              <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-accent)] bg-[var(--stage-accent)]/10 border border-[var(--stage-accent)]/20 px-1.5 py-0.5 rounded">
+                              <span className="shrink-0 stage-label text-[var(--stage-accent)] bg-[var(--stage-accent)]/10 border border-[var(--stage-accent)]/20 px-1.5 py-0.5 rounded">
                                 Sub-rental
                               </span>
                             )}
@@ -335,9 +335,9 @@ export function PullSheetClient({
                               shrink-0 min-w-[80px] px-4 py-2 rounded-[22px] text-xs font-medium tracking-tight
                               border transition-colors text-center
                               focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]
-                              disabled:opacity-60
-                              ${GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) >= 3 ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40 hover:brightness-[1.04]' : ''}
-                              ${GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) >= 1 && GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) < 3 ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-text-primary)] border-[var(--stage-accent)]/30 hover:brightness-[1.04]' : ''}
+                              disabled:opacity-45
+                              ${GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) >= 3 ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40' : ''}
+                              ${GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) >= 1 && GEAR_LIFECYCLE_ORDER.indexOf(item.status as GearStatus) < 3 ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-text-primary)] border-[var(--stage-accent)]/30' : ''}
                               ${item.status === 'allocated' || !GEAR_LIFECYCLE_ORDER.includes(item.status as GearStatus) ? 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]' : ''}
                             `}
                           >
@@ -411,7 +411,7 @@ export function PullSheetClient({
                                   <span className="text-[var(--stage-text-secondary)]/50 italic">Unassigned</span>
                                 )}
                               </span>
-                              <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border ${
+                              <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-md stage-badge-text border ${
                                 isConfirmed
                                   ? 'bg-[var(--color-unusonic-success)]/10 text-[var(--color-unusonic-success)] border-[var(--color-unusonic-success)]/20'
                                   : 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)]/60 border-[oklch(1_0_0_/_0.10)]'

@@ -91,7 +91,7 @@ export function AionOnboardingShell({
   }, [isWelcome, onWelcomeComplete, skipWelcomeHold]);
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-unusonic-void text-[var(--stage-text-primary)] font-sans">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-[var(--stage-void)] text-[var(--stage-text-primary)] font-sans">
       <div className="fixed inset-0 pointer-events-none grain-overlay z-0" aria-hidden />
 
       <div className={contentMaxWidth === '2xl' ? 'z-10 w-full max-w-2xl flex flex-col items-center gap-8 relative px-4' : 'z-10 w-full max-w-lg flex flex-col items-center gap-8 relative px-4'}>

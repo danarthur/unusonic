@@ -21,8 +21,8 @@ function getItemStatus(pkg: PackageWithTags): ItemStatus {
 }
 
 const statusStripe: Record<ItemStatus, string> = {
-  active: 'border-l-[3px] border-l-emerald-500/60',
-  draft: 'border-l-[3px] border-l-amber-400/60',
+  active: 'border-l-[3px] border-l-[var(--color-unusonic-success)]/60',
+  draft: 'border-l-[3px] border-l-[var(--color-unusonic-warning)]/60',
   archived: 'border-l-[3px] border-l-[oklch(1_0_0_/_0.1)]',
 };
 
@@ -108,7 +108,7 @@ export function CatalogCard({ pkg, onArchive, isFocused }: CatalogCardProps) {
             {pkg.name}
           </h2>
           {status === 'draft' && (
-            <span className="shrink-0 text-xs uppercase tracking-wider text-amber-400/80">
+            <span className="shrink-0 text-xs uppercase tracking-wider text-[var(--color-unusonic-warning)]/80">
               Draft
             </span>
           )}
@@ -130,7 +130,7 @@ export function CatalogCard({ pkg, onArchive, isFocused }: CatalogCardProps) {
             </span>
           )}
           {nearFloor && (
-            <span className="text-xs font-medium text-amber-400/90">
+            <span className="text-xs font-medium text-[var(--color-unusonic-warning)]/90">
               Near floor
             </span>
           )}
@@ -143,10 +143,10 @@ export function CatalogCard({ pkg, onArchive, isFocused }: CatalogCardProps) {
               className={cn(
                 'inline-block w-2 h-2 rounded-full',
                 Number(pkg.stock_quantity ?? 0) > 3
-                  ? 'bg-emerald-400'
+                  ? 'bg-[var(--color-unusonic-success)]'
                   : Number(pkg.stock_quantity ?? 0) >= 1
-                    ? 'bg-amber-400'
-                    : 'bg-red-400',
+                    ? 'bg-[var(--color-unusonic-warning)]'
+                    : 'bg-[var(--color-unusonic-error)]',
               )}
               aria-hidden
             />

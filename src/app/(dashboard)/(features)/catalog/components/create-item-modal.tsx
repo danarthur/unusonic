@@ -228,7 +228,7 @@ export function CreateItemModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                 placeholder="e.g. Gold Wedding Package"
                 required
               />
@@ -247,7 +247,7 @@ export function CreateItemModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] resize-none"
+                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] resize-none"
                 placeholder="Included items or notes"
               />
             </div>
@@ -264,7 +264,7 @@ export function CreateItemModal({
                 id="cat-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as PackageCategory)}
-                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -379,7 +379,7 @@ export function CreateItemModal({
                 <label className="block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1.5">
                   Billing type
                 </label>
-                <div className="flex gap-1 p-1 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]">
+                <div className="flex gap-1 p-1 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]">
                   {(
                     [
                       ['flat', 'Flat rate'],
@@ -420,7 +420,7 @@ export function CreateItemModal({
                       step={0.25}
                       value={unitMultiplier}
                       onChange={(e) => setUnitMultiplier(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder={unitType === 'hour' ? 'e.g. 4 (minimum hours)' : 'e.g. 2'}
                     />
                     <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
@@ -433,7 +433,7 @@ export function CreateItemModal({
 
             {/* Rental fields */}
             {category === 'rental' && (
-              <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--stage-surface-nested)]">
+              <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
                 <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
                   Inventory &amp; Fulfillment
                 </p>
@@ -452,7 +452,7 @@ export function CreateItemModal({
                       min={0}
                       value={stockQuantity}
                       onChange={(e) => setStockQuantity(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                       placeholder="e.g. 100"
                       required
                     />
@@ -466,7 +466,7 @@ export function CreateItemModal({
                         type="checkbox"
                         checked={isSubRental}
                         onChange={(e) => setIsSubRental(e.target.checked)}
-                        className="rounded border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] accent-[var(--stage-accent)] focus:ring-[var(--stage-accent)]"
+                        className="rounded border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] accent-[var(--stage-accent)] focus-visible:ring-[var(--stage-accent)]"
                       />
                       <span className="text-sm text-[var(--stage-text-primary)]">
                         We sub-rent this item from another vendor
@@ -504,7 +504,7 @@ export function CreateItemModal({
                       id="cat-buffer-days"
                       value={bufferDays}
                       onChange={(e) => setBufferDays(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                      className="w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     >
                       <option value="">—</option>
                       <option value="0">0 days</option>
@@ -522,7 +522,7 @@ export function CreateItemModal({
 
             {/* Taxable */}
             {category !== 'package' && (
-              <div className="flex items-center justify-between gap-3 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.10)] px-4 py-3 bg-[var(--stage-surface-nested)]">
+              <div className="flex items-center justify-between gap-3 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.10)] px-4 py-3 bg-[var(--ctx-well)]">
                 <div>
                   <p className="text-sm font-medium text-[var(--stage-text-primary)]">Taxable</p>
                   <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
@@ -542,14 +542,14 @@ export function CreateItemModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                className="stage-hover overflow-hidden flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:brightness-[1.06] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:bg-[oklch(1_0_0_/_0.08)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
                 {saving ? 'Saving...' : editingId ? 'Save' : 'Create'}
               </button>

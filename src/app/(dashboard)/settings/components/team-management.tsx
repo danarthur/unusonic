@@ -9,6 +9,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { 
   Users, 
   Shield, 
@@ -33,6 +34,8 @@ import {
   type WorkspacePermissions,
 } from '@/app/actions/workspace';
 import { WorkspaceRoleSelect } from '@/features/role-builder';
+import { PortalProfileSelect } from '@/features/team-invite/ui/PortalProfileSelect';
+import { updatePortalProfile } from '@/features/team-invite';
 import { InviteTeamMemberSheet } from './InviteTeamMemberSheet';
 
 // ============================================================================
@@ -101,11 +104,12 @@ const DEPARTMENTS = [
   'Other',
 ];
 
-const ROLE_COLORS = {
+const ROLE_COLORS: Record<string, string> = {
   owner: 'bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)] border-[var(--color-unusonic-warning)]/20',
   admin: 'bg-[oklch(0.55_0.15_250)]/10 text-[oklch(0.65_0.15_250)] border-[oklch(0.55_0.15_250)]/20',
   member: 'bg-[var(--color-unusonic-success)]/10 text-[var(--color-unusonic-success)] border-[var(--color-unusonic-success)]/20',
   viewer: 'bg-[var(--stage-surface)]/10 text-[var(--stage-text-tertiary)] border-[var(--stage-surface)]/20',
+  employee: 'bg-[oklch(0.55_0.12_280)]/10 text-[oklch(0.65_0.12_280)] border-[oklch(0.55_0.12_280)]/20',
 };
 
 // ============================================================================
@@ -119,7 +123,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const springConfig = { type: 'spring', stiffness: 300, damping: 30 } as const;
+  const springConfig = STAGE_MEDIUM;
 
   const canManage = currentUserRole === 'owner' || currentUserRole === 'admin';
   
@@ -163,6 +167,20 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
     });
   };
   
+  const handlePortalProfileChange = async (rosterEdgeId: string, profileKey: string | null) => {
+    if (!canManage) return;
+    setError(null);
+    setSavingId(`${rosterEdgeId}-portal-profile`);
+    startTransition(async () => {
+      const result = await updatePortalProfile(workspaceId, rosterEdgeId, profileKey);
+      if (!result.ok) {
+        setError(result.error || 'Failed to update portal profile');
+      }
+      setSavingId(null);
+      router.refresh();
+    });
+  };
+
   const toggleExpand = (memberId: string) => {
     setExpandedMember(expandedMember === memberId ? null : memberId);
   };
@@ -172,7 +190,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--stage-surface-nested)] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-[var(--ctx-well)] flex items-center justify-center">
             <Users className="w-5 h-5 text-[var(--stage-text-secondary)]" />
           </div>
           <div>
@@ -184,7 +202,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
         <div className="flex items-center gap-2">
           {canManage && <InviteTeamMemberSheet workspaceId={workspaceId} canManage={canManage} />}
           {!canManage && (
-            <div className="px-3 py-1.5 rounded-lg bg-[var(--stage-surface-nested)] border border-[var(--stage-border)]">
+            <div className="px-3 py-1.5 rounded-lg bg-[var(--ctx-well)] border border-[var(--stage-border)]">
               <span className="text-xs text-[var(--stage-text-secondary)]">View only</span>
             </div>
           )}
@@ -225,10 +243,10 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
               <button
                 onClick={() => toggleExpand(member.id)}
                 disabled={isOwner || !canManage}
-                className="w-full p-4 flex items-center gap-4 hover:bg-[var(--stage-surface-raised)] transition-colors disabled:cursor-default"
+                className="stage-hover overflow-hidden w-full p-4 flex items-center gap-4 transition-colors disabled:cursor-default"
               >
                 {/* Avatar */}
-                <div className="w-10 h-10 rounded-xl overflow-hidden bg-[var(--stage-surface-nested)] flex items-center justify-center shrink-0 ring-2 ring-[var(--stage-border)]">
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-[var(--ctx-well)] flex items-center justify-center shrink-0 ring-2 ring-[var(--stage-border)]">
                   {member.avatarUrl ? (
                     <img
                       src={member.avatarUrl}
@@ -247,7 +265,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                     <p className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
                       {member.fullName || member.email}
                     </p>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider border ${ROLE_COLORS[member.role]}`}>
+                    <span className={`px-2 py-0.5 rounded-full stage-badge-text uppercase tracking-wider border ${ROLE_COLORS[member.role]}`}>
                       {member.roleName ?? member.role}
                     </span>
                   </div>
@@ -298,9 +316,17 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                         disabled={isPending}
                         onSuccess={() => router.refresh()}
                       />
+                      {/* Portal Profile Override (employees with roster edge only) */}
+                      {member.rosterEdgeId && member.roleName?.toLowerCase() === 'employee' && (
+                        <PortalProfileSelect
+                          value={member.portalProfile}
+                          onChange={(val) => handlePortalProfileChange(member.rosterEdgeId!, val)}
+                          disabled={isPending && savingId === `${member.rosterEdgeId}-portal-profile`}
+                        />
+                      )}
                       {/* Department Select */}
                       <div>
-                        <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-2">
+                        <label className="block stage-field-label mb-2">
                           Department
                         </label>
                         <div className="relative">
@@ -309,11 +335,11 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                             onChange={(e) => handleDepartmentChange(member.id, e.target.value)}
                             disabled={isPending && savingId === `${member.id}-department`}
                             className="w-full px-3 py-2.5 rounded-xl appearance-none
-                              bg-[var(--stage-surface-raised)] border border-[var(--stage-border)]
+                              bg-[var(--ctx-well)] border border-[var(--stage-border)]
                               text-[var(--stage-text-primary)] text-sm
-                              focus:outline-none focus:border-[var(--stage-accent)] focus:ring-2 focus:ring-[var(--stage-accent-muted)]
-                              disabled:opacity-50 disabled:cursor-not-allowed
-                              transition-all duration-300"
+                              focus:outline-none focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent-muted)]
+                              disabled:opacity-45 disabled:cursor-not-allowed
+                              transition-colors duration-100"
                           >
                             <option value="">Select department...</option>
                             {DEPARTMENTS.map((dept) => (
@@ -329,7 +355,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                       
                       {/* Permissions Grid */}
                       <div>
-                        <label className="block text-[11px] font-medium text-[var(--stage-text-secondary)] tracking-tight mb-3">
+                        <label className="block stage-field-label mb-3">
                           Permissions
                         </label>
                         <div className="space-y-2">
@@ -343,12 +369,12 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                                 key={perm.key}
                                 onClick={() => handleTogglePermission(member.id, perm.key, isEnabled)}
                                 disabled={isSaving}
-                                className={`w-full p-3 rounded-xl border flex items-center gap-3 transition-all duration-200
+                                className={`w-full p-3 rounded-xl border flex items-center gap-3 transition-colors duration-[80ms]
                                   ${isEnabled
                                     ? 'bg-[var(--color-unusonic-success)]/5 border-[var(--color-unusonic-success)]/20'
-                                    : 'bg-[var(--stage-surface)] border-[var(--stage-border)] hover:border-[var(--stage-surface-hover)]'
+                                    : 'bg-[var(--stage-surface)] border-[var(--stage-border)] hover:border-[oklch(1_0_0_/_0.15)]'
                                   }
-                                  disabled:opacity-50 disabled:cursor-not-allowed`}
+                                  disabled:opacity-45 disabled:cursor-not-allowed`}
                               >
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center
                                   ${isEnabled ? 'bg-[var(--color-unusonic-success)]/10' : 'bg-[var(--stage-surface)]'}`}>
@@ -359,7 +385,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                                   <p className={`text-sm font-medium ${isEnabled ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]'}`}>
                                     {perm.label}
                                   </p>
-                                  <p className="text-[11px] text-[var(--stage-text-secondary)]/70">{perm.description}</p>
+                                  <p className="text-field-label text-[var(--stage-text-secondary)]/70">{perm.description}</p>
                                 </div>
                                 
                                 {isSaving ? (

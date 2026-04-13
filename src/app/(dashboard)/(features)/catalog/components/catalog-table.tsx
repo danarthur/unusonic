@@ -60,9 +60,9 @@ function getStockDisplay(pkg: PackageWithTags): { value: number | null; color: s
     return { value: null, color: '' };
   }
   const qty = pkg.stock_quantity ?? 0;
-  let color = 'bg-emerald-400';
-  if (qty === 0) color = 'bg-red-400';
-  else if (qty <= 3) color = 'bg-amber-400';
+  let color = 'bg-[var(--color-unusonic-success)]';
+  if (qty === 0) color = 'bg-[var(--color-unusonic-error)]';
+  else if (qty <= 3) color = 'bg-[var(--color-unusonic-warning)]';
   return { value: qty, color };
 }
 
@@ -194,7 +194,7 @@ export function CatalogTable({ packages, selectedIds, onSelectionChange, onArchi
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-nested)]">
+            <tr className="border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]">
               <th className="px-4 py-3 w-10">
                 <input
                   type="checkbox"
@@ -247,7 +247,7 @@ export function CatalogTable({ packages, selectedIds, onSelectionChange, onArchi
                     transition={STAGE_LIGHT}
                     onClick={() => router.push(href)}
                     className={cn(
-                      'border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 hover:bg-[var(--stage-surface-nested)] cursor-pointer',
+                      'border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 stage-hover overflow-hidden cursor-pointer',
                       selected && 'bg-[oklch(1_0_0_/_0.04)]',
                       focused && 'ring-1 ring-inset ring-[var(--stage-accent)]/40',
                       status === 'archived' && 'opacity-70'
@@ -329,10 +329,10 @@ export function CatalogTable({ packages, selectedIds, onSelectionChange, onArchi
                     {/* Status */}
                     <td className="px-4 py-3 text-sm">
                       {status === 'active' && (
-                        <span className="text-emerald-400">Active</span>
+                        <span className="text-[var(--color-unusonic-success)]">Active</span>
                       )}
                       {status === 'draft' && (
-                        <span className="text-amber-400">Draft</span>
+                        <span className="text-[var(--color-unusonic-warning)]">Draft</span>
                       )}
                       {status === 'archived' && (
                         <span className="text-[var(--stage-text-secondary)]">Archived</span>
@@ -388,7 +388,7 @@ export function CatalogTable({ packages, selectedIds, onSelectionChange, onArchi
                       transition={STAGE_LIGHT}
                       onClick={() => router.push(href)}
                       className={cn(
-                        'border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 hover:bg-[var(--stage-surface-nested)] cursor-pointer',
+                        'border-b border-[oklch(1_0_0_/_0.08)] last:border-b-0 stage-hover overflow-hidden cursor-pointer',
                         status === 'archived' && 'opacity-70'
                       )}
                     >
@@ -433,8 +433,8 @@ export function CatalogTable({ packages, selectedIds, onSelectionChange, onArchi
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        {status === 'active' && <span className="text-emerald-400">Active</span>}
-                        {status === 'draft' && <span className="text-amber-400">Draft</span>}
+                        {status === 'active' && <span className="text-[var(--color-unusonic-success)]">Active</span>}
+                        {status === 'draft' && <span className="text-[var(--color-unusonic-warning)]">Draft</span>}
                         {status === 'archived' && <span className="text-[var(--stage-text-secondary)]">Archived</span>}
                       </td>
                       <td className="px-4 py-3" />

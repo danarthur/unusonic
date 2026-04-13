@@ -65,7 +65,7 @@ export function CsvExportButton({ packages, className }: CsvExportButtonProps) {
         'inline-flex items-center gap-1.5 px-3 py-2.5 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors',
         'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-        'disabled:opacity-40 disabled:pointer-events-none',
+        'disabled:opacity-45 disabled:pointer-events-none',
         className
       )}
       aria-label="Export CSV"

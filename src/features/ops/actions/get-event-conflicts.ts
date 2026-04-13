@@ -121,7 +121,7 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
 
   // ── Entity-level crew conflicts (deal_crew → deal_crew overlap) ────────
   // Get deal_crew rows for the current event's deal (via project)
-  const { data: currentDealCrewRaw } = await (supabase as any)
+  const { data: currentDealCrewRaw } = await supabase
     .schema('ops')
     .from('deal_crew')
     .select('id, entity_id, role_note, deal_id')

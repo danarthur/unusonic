@@ -45,7 +45,7 @@ export function PersonaInlinePicker({ value, onChange }: PersonaInlinePickerProp
       transition={STAGE_MEDIUM}
       className="w-full"
     >
-      <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
+      <p className="stage-label mb-3">
         What best describes you?
       </p>
       <div className="grid grid-cols-3 gap-2">
@@ -57,7 +57,7 @@ export function PersonaInlinePicker({ value, onChange }: PersonaInlinePickerProp
               key={opt.value}
               type="button"
               onClick={() => onChange(opt.value)}
-              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-200 text-center ${
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-colors duration-[80ms] text-center ${
                 isSelected
                   ? 'border-[oklch(1_0_0/0.20)] bg-[oklch(1_0_0/0.06)]'
                   : 'border-[oklch(1_0_0/0.06)] bg-transparent hover:border-[oklch(1_0_0/0.12)] hover:bg-[oklch(1_0_0/0.03)]'
@@ -75,7 +75,7 @@ export function PersonaInlinePicker({ value, onChange }: PersonaInlinePickerProp
               >
                 {opt.label}
               </span>
-              <span className="text-[10px] text-[var(--stage-text-tertiary)] leading-tight">
+              <span className="text-label text-[var(--stage-text-tertiary)] leading-tight">
                 {opt.description}
               </span>
             </button>

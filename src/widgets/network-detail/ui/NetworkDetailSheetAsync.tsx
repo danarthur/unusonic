@@ -1,4 +1,3 @@
-import { getNetworkNodeDetails } from '@/features/network-data';
 import { NetworkDetailSheet } from './NetworkDetailSheet';
 
 interface NetworkDetailSheetAsyncProps {
@@ -8,14 +7,19 @@ interface NetworkDetailSheetAsyncProps {
   returnPath?: string;
 }
 
-/** Async server component: fetches details and renders the sheet. Used with Suspense. */
-export async function NetworkDetailSheetAsync({
+/** Passes params to NetworkDetailSheet which fetches via useQuery. */
+export function NetworkDetailSheetAsync({
   nodeId,
   kind,
   sourceOrgId,
   returnPath,
 }: NetworkDetailSheetAsyncProps) {
-  const details = await getNetworkNodeDetails(nodeId, kind, sourceOrgId);
-  if (!details) return null;
-  return <NetworkDetailSheet details={details} sourceOrgId={sourceOrgId} returnPath={returnPath} />;
+  return (
+    <NetworkDetailSheet
+      nodeId={nodeId}
+      kind={kind}
+      sourceOrgId={sourceOrgId}
+      returnPath={returnPath}
+    />
+  );
 }

@@ -3,10 +3,7 @@
 import { motion } from 'framer-motion';
 import { TimelineItem } from '@/app/(dashboard)/(features)/events/components/TimelineItem';
 import {
-  M3_FADE_THROUGH_ENTER,
-  M3_SHARED_AXIS_Y_VARIANTS,
-  M3_STAGGER_CHILDREN,
-  M3_STAGGER_DELAY,
+  STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
 
 interface DailyBriefingClientProps {
@@ -20,7 +17,7 @@ export function DailyBriefingClient({ items }: DailyBriefingClientProps) {
         className="h-full flex flex-col items-center justify-center text-[var(--stage-text-secondary)] opacity-80"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.8 }}
-        transition={{ ...M3_FADE_THROUGH_ENTER, delay: 0.15 }}
+        transition={{ ...STAGE_LIGHT, delay: 0.15 }}
       >
         <p className="text-xs tracking-widest uppercase font-sans leading-relaxed">No unread client messages</p>
       </motion.div>
@@ -36,8 +33,7 @@ export function DailyBriefingClient({ items }: DailyBriefingClientProps) {
         variants={{
           visible: {
             transition: {
-              staggerChildren: M3_STAGGER_CHILDREN,
-              delayChildren: M3_STAGGER_DELAY,
+              staggerChildren: 0.03,
             },
           },
           hidden: {},
@@ -48,8 +44,8 @@ export function DailyBriefingClient({ items }: DailyBriefingClientProps) {
           <motion.div
             key={item.id || index}
             className="relative pl-6"
-            variants={M3_SHARED_AXIS_Y_VARIANTS}
-            transition={M3_FADE_THROUGH_ENTER}
+            variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+            transition={STAGE_LIGHT}
           >
             <div className="absolute left-3 top-1.5 stage-panel !rounded-full !p-0 w-2.5 h-2.5 !bg-[oklch(1_0_0/0.5)]" />
             <TimelineItem

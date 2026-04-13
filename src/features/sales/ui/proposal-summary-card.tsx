@@ -25,10 +25,10 @@ export function ProposalSummaryCard({
   const marginColor =
     marginPercent != null
       ? marginPercent >= 35
-        ? 'text-emerald-400'
+        ? 'text-[var(--color-unusonic-success)]'
         : marginPercent >= 15
-          ? 'text-amber-400'
-          : 'text-red-400'
+          ? 'text-[var(--color-unusonic-warning)]'
+          : 'text-[var(--color-unusonic-error)]'
       : '';
 
   // Talent budget color: green > 20% of revenue, amber 5-20%, red < 5% or negative
@@ -39,10 +39,10 @@ export function ProposalSummaryCard({
   const talentBudgetColor =
     talentBudgetPercent != null
       ? talentBudgetPercent >= 20
-        ? 'text-emerald-400'
+        ? 'text-[var(--color-unusonic-success)]'
         : talentBudgetPercent >= 5
-          ? 'text-amber-400'
-          : 'text-red-400'
+          ? 'text-[var(--color-unusonic-warning)]'
+          : 'text-[var(--color-unusonic-error)]'
       : '';
 
   if (totalRevenue === 0 && estimatedCost == null && floorGapCount === 0) {
@@ -101,7 +101,7 @@ export function ProposalSummaryCard({
 
         {/* Floor warning */}
         {floorGapCount > 0 && (
-          <div className="flex items-start gap-2 pt-2 border-t border-[var(--stage-edge-subtle)] text-xs text-amber-400">
+          <div className="flex items-start gap-2 pt-2 border-t border-[var(--stage-edge-subtle)] text-xs text-[var(--color-unusonic-warning)]">
             <span className="shrink-0 mt-px">&#9888;</span>
             <span>
               {floorGapCount} item{floorGapCount !== 1 ? 's' : ''} below floor (-${floorGapTotal.toLocaleString()} total)

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { RefreshCw, Search, Loader2 } from 'lucide-react';
 import { getPackages } from '../api/proposal-actions';
-import type { Package } from '../api/package-actions';
+import type { Package } from '@/types/supabase';
 import type { ProposalLineItemCategory } from '../model/types';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 
@@ -77,7 +77,7 @@ export function SwapItemPicker({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.15)] text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.15)] text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
       >
         <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
         Swap item
@@ -103,7 +103,7 @@ export function SwapItemPicker({
                   placeholder="Search catalog…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] text-xs focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]"
+                  className="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
                 />
               </div>
             </div>
@@ -124,17 +124,17 @@ export function SwapItemPicker({
                     type="button"
                     disabled={selecting}
                     onClick={() => handleSelect(pkg.id)}
-                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-void)] px-3 py-2.5 hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[var(--stage-surface)] disabled:opacity-60 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-[var(--stage-accent)]"
+                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-void)] px-3 py-2.5 hover:border-[oklch(1_0_0_/_0.15)] disabled:opacity-45 transition-colors text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] stage-hover overflow-hidden"
                   >
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-[var(--stage-text-primary)] truncate">{pkg.name}</p>
                       {pkg.description && (
-                        <p className="text-[11px] text-[var(--stage-text-secondary)] truncate mt-0.5">
+                        <p className="text-field-label text-[var(--stage-text-secondary)] truncate mt-0.5">
                           {pkg.description}
                         </p>
                       )}
                     </div>
-                    <span className="text-xs font-semibold text-[var(--stage-text-primary)] shrink-0 tabular-nums">
+                    <span className="text-xs font-medium text-[var(--stage-text-primary)] shrink-0 tabular-nums">
                       ${Number(pkg.price).toLocaleString()}
                     </span>
                   </button>

@@ -6,9 +6,9 @@ import { Sparkles, Check, Loader2 } from 'lucide-react';
 import { WidgetShell } from '@/widgets/shared';
 import { STUB_SUGGESTED_ACTIONS, type SuggestedAction } from '../lib/suggested-actions';
 import {
-  M3_FADE_THROUGH_ENTER,
+  STAGE_LIGHT,
+  STAGE_MEDIUM,
   M3_FADE_THROUGH_EXIT,
-  M3_SHARED_AXIS_Y_VARIANTS,
 } from '@/shared/lib/motion-constants';
 
 type ActionStreamWidgetProps = {
@@ -86,15 +86,15 @@ function ActionCard({
   return (
     <motion.div
       layout
-      initial={M3_SHARED_AXIS_Y_VARIANTS.hidden}
+      initial={{ opacity: 0, y: 12 }}
       animate={{
         opacity: isDone ? 0 : 1,
         y: 0,
         scale: isDone ? 0.95 : 1,
       }}
       exit={{ opacity: 0, scale: 0.95, transition: M3_FADE_THROUGH_EXIT }}
-      transition={M3_FADE_THROUGH_ENTER}
-      className="stage-panel-elevated rounded-[var(--stage-radius-nested)] overflow-hidden cursor-pointer transition-[filter] hover:brightness-[1.04]"
+      transition={STAGE_LIGHT}
+      className="stage-panel-elevated rounded-[var(--stage-radius-nested)] overflow-hidden cursor-pointer hover:bg-[oklch(1_0_0_/_0.08)] transition-colors"
     >
       <button
         type="button"
@@ -112,7 +112,7 @@ function ActionCard({
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+              transition={STAGE_MEDIUM}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-unusonic-success)]/20 text-[var(--color-unusonic-success)]"
             >
               <Check className="w-5 h-5" aria-hidden />
@@ -129,7 +129,7 @@ function ActionCard({
                 {action.detail}
               </p>
             </div>
-            <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-[var(--stage-accent)] pt-0.5 text-right" title={action.cta}>
+            <span className="shrink-0 stage-label text-[var(--stage-accent)] pt-0.5 text-right" title={action.cta}>
               {action.cta}
             </span>
           </>

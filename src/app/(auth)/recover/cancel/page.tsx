@@ -46,7 +46,7 @@ export default async function RecoverCancelPage({ searchParams }: PageProps) {
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] border border-[oklch(1_0_0_/_0.22)] px-4 py-2.5 text-sm font-medium hover:brightness-[1.06] transition-[filter]"
+              className="inline-flex items-center justify-center rounded-xl bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] border border-[oklch(1_0_0_/_0.22)] px-4 py-2.5 text-sm font-medium hover:bg-[oklch(1_0_0_/_0.08)] transition-colors"
             >
               Sign in
             </Link>
@@ -62,7 +62,7 @@ export default async function RecoverCancelPage({ searchParams }: PageProps) {
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] px-4 py-2.5 text-sm font-medium hover:brightness-[1.06] transition-[filter]"
+              className="inline-flex items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] px-4 py-2.5 text-sm font-medium hover:bg-[oklch(1_0_0_/_0.08)] transition-colors"
             >
               Sign in
             </Link>
