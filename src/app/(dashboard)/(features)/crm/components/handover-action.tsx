@@ -25,7 +25,7 @@ export function HandoverAction({ onHandover, handingOver }: HandoverActionProps)
         onClick={onHandover}
         disabled={handingOver}
         transition={STAGE_MEDIUM}
-        className="stage-btn stage-btn-primary w-full py-4 px-6 disabled:opacity-60 disabled:pointer-events-none"
+        className="stage-btn stage-btn-primary w-full py-4 px-6 disabled:opacity-45 disabled:pointer-events-none"
       >
         {handingOver ? 'Building…' : 'Build proposal'}
       </motion.button>

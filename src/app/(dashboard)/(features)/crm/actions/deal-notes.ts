@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { revalidatePath } from 'next/cache';
+import { upsertEmbedding, deleteEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
 
 // =============================================================================
 // Types
@@ -48,7 +49,7 @@ export async function getDealNotes(
   const { data: { user } } = await supabase.auth.getUser();
   const currentUserId = user?.id ?? '';
 
-  let query = (supabase as any)
+  let query = supabase
     .schema('ops')
     .from('deal_notes')
     .select('id, content, created_at, author_user_id, attachments, pinned_at, phase_tag')
@@ -139,7 +140,7 @@ export async function addDealNote(
   if (!deal) return { success: false, error: 'Deal not found' };
 
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('ops')
     .from('deal_notes')
     .insert({
@@ -154,8 +155,15 @@ export async function addDealNote(
     .single();
 
   if (error) return { success: false, error: error.message };
+
+  // Fire-and-forget: embed the note for Aion RAG
+  const noteId = (data as { id: string }).id;
+  const { data: dealRow } = await supabase.from('deals').select('title').eq('id', dealId).maybeSingle();
+  const header = buildContextHeader('deal_note', { dealTitle: (dealRow as any)?.title });
+  upsertEmbedding(workspaceId, 'deal_note', noteId, content.trim(), header).catch(console.error);
+
   revalidatePath('/crm');
-  return { success: true, id: (data as { id: string }).id };
+  return { success: true, id: noteId };
 }
 
 // =============================================================================
@@ -187,7 +195,7 @@ export async function deleteDealNote(
   const isAdmin = role === 'owner' || role === 'admin';
 
    
-  let query = (supabase as any)
+  let query = supabase
     .schema('ops')
     .from('deal_notes')
     .delete({ count: 'exact' })
@@ -203,6 +211,10 @@ export async function deleteDealNote(
 
   if (error) return { success: false, error: error.message };
   if (count === 0) return { success: false, error: 'Note not found or not yours' };
+
+  // Fire-and-forget: remove embedding
+  deleteEmbedding('deal_note', noteId).catch(console.error);
+
   return { success: true };
 }
 
@@ -246,7 +258,7 @@ export async function togglePinNote(
 
   const supabase = await createClient();
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('ops')
     .from('deal_notes')
     .update({ pinned_at: pin ? new Date().toISOString() : null })
@@ -288,7 +300,7 @@ export async function editDealNote(
   const role = (membership as { role?: string } | null)?.role;
   const isAdmin = role === 'owner' || role === 'admin';
 
-  let query = (supabase as any)
+  let query = supabase
     .schema('ops')
     .from('deal_notes')
     .update({ content: content.trim(), updated_at: new Date().toISOString() })
@@ -301,5 +313,9 @@ export async function editDealNote(
 
   const { error } = await query;
   if (error) return { success: false, error: error.message };
+
+  // Fire-and-forget: re-embed the updated note
+  upsertEmbedding(workspaceId, 'deal_note', noteId, content.trim()).catch(console.error);
+
   return { success: true };
 }

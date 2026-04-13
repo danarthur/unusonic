@@ -48,7 +48,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
       <div className="flex-1 min-h-[80vh] p-6 overflow-y-auto" data-surface="void">
         <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-medium text-[var(--stage-text-primary)] tracking-tight mb-2">Production queue</h1>
+            <h1 className="stage-readout-lg mb-2">Production queue</h1>
             <p className="text-[var(--stage-text-secondary)]">
               {optimisticGigs.length === 0
                 ? 'No productions yet.'
@@ -91,7 +91,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                   <div className="p-2 stage-panel stage-panel-nested !rounded-full text-2xl text-[var(--stage-text-primary)]">
                     <Sparkles size={18} />
                   </div>
-                  <span className="stage-panel stage-panel-nested !rounded-full !p-0 px-2 py-1 text-xs font-mono text-[var(--stage-text-secondary)]">
+                  <span className="stage-panel stage-panel-nested !rounded-full !p-0 px-2 py-1 stage-badge-text text-[var(--stage-text-secondary)]">
                     {gig.status ?? '—'}
                   </span>
                 </div>
@@ -107,12 +107,12 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                   className="flex flex-col flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset focus-visible:rounded-2xl"
                   onClick={(e) => gig.isOptimistic && e.preventDefault()}
                 >
-                  <h3 className="text-xl font-medium tracking-tight text-[var(--stage-text-primary)] mb-1 transition-colors">
-                    {gig.title ?? 'Untitled Production'}
+                  <h3 className="stage-readout-lg mb-1 transition-colors">
+                    {gig.title ?? 'Untitled production'}
                   </h3>
-                  <p className="text-sm text-[var(--stage-text-secondary)] mb-4">{gig.client_name ?? 'Client'}</p>
+                  <p className="stage-label mb-4">{gig.client_name ?? 'Client'}</p>
 
-                  <div className="flex items-center gap-4 text-xs text-[var(--stage-text-secondary)] border-t border-[var(--stage-edge-subtle)] pt-4 mt-2">
+                  <div className="flex items-center gap-4 stage-badge-text text-[var(--stage-text-secondary)] border-t border-[var(--stage-edge-subtle)] pt-4 mt-2">
                     <span className="flex items-center gap-1.5">
                       <Clock size={14} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
                       {gig.event_date

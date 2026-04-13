@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Lock, Plus, Trash2, Loader2 } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { STAGE_LIGHT, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT, STAGE_MEDIUM, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
 import {
   getAdvancingChecklist,
   seedAdvancingChecklist,
@@ -24,6 +24,10 @@ type AdvancingChecklistProps = {
   runOfShowData: RunOfShowData | null;
   contractStatus: string | null;
   archetype?: string | null;
+  /** Event date (ISO date string, e.g. '2026-04-15') — drives urgency indicators. */
+  eventDate?: string | null;
+  /** Transport mode — when 'none' or 'personal_vehicle', truck items are excluded. */
+  transportMode?: string | null;
 };
 
 function computeAutoStates(
@@ -43,6 +47,7 @@ function computeAutoStates(
     venue_access_confirmed: !!logistics.venue_access_confirmed,
     contract_signed: contractStatus === 'signed',
     truck_loaded: !!logistics.truck_loaded,
+    crew_gear_confirmed: !!(logistics as Record<string, unknown>).crew_gear_confirmed,
   };
 }
 
@@ -57,12 +62,40 @@ function timeAgo(isoStr: string): string {
   return `${days}d ago`;
 }
 
+/** Compute days until event. Negative = past. */
+function computeDaysUntil(eventDate: string | null | undefined): number | null {
+  if (!eventDate) return null;
+  const now = new Date();
+  const event = new Date(eventDate + 'T00:00:00');
+  const diffMs = event.getTime() - now.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+type UrgencyLevel = 'green' | 'amber' | 'red' | 'past';
+
+function getUrgency(daysUntil: number | null): UrgencyLevel | null {
+  if (daysUntil == null) return null;
+  if (daysUntil < 0) return 'past';
+  if (daysUntil <= 3) return 'red';
+  if (daysUntil <= 7) return 'amber';
+  return 'green';
+}
+
+const URGENCY_COLORS: Record<UrgencyLevel, string> = {
+  green: 'var(--color-unusonic-success)',
+  amber: 'var(--color-unusonic-warning)',
+  red: 'var(--color-unusonic-error)',
+  past: 'var(--stage-text-tertiary)',
+};
+
 export function AdvancingChecklist({
   eventId,
   crewRows,
   runOfShowData,
   contractStatus,
   archetype,
+  eventDate,
+  transportMode,
 }: AdvancingChecklistProps) {
   const [items, setItems] = useState<AdvancingChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +110,7 @@ export function AdvancingChecklist({
     (async () => {
       let list = await getAdvancingChecklist(eventId);
       if (!cancelled && list.length === 0) {
-        list = await seedAdvancingChecklist(eventId, archetype);
+        list = await seedAdvancingChecklist(eventId, archetype, transportMode);
       }
       if (!cancelled) {
         setItems(list);
@@ -131,7 +164,7 @@ export function AdvancingChecklist({
   }, [crewRows, runOfShowData, contractStatus]);
 
   // Auto-keys that can be manually toggled (they write to logistics JSONB)
-  const TOGGLEABLE_AUTO_KEYS = new Set<string>(['venue_access_confirmed', 'truck_loaded']);
+  const TOGGLEABLE_AUTO_KEYS = new Set<string>(['venue_access_confirmed', 'truck_loaded', 'crew_gear_confirmed']);
 
   // ── Toggle item ──
   const handleToggle = async (item: AdvancingChecklistItem) => {
@@ -152,6 +185,8 @@ export function AdvancingChecklist({
       updateFlightCheckStatus(eventId, { logistics: { venue_access_confirmed: newDone } as RunOfShowData['logistics'] });
     } else if (item.auto_key === 'truck_loaded') {
       updateFlightCheckStatus(eventId, { logistics: { truck_loaded: newDone } as RunOfShowData['logistics'] });
+    } else if (item.auto_key === 'crew_gear_confirmed') {
+      updateFlightCheckStatus(eventId, { logistics: { crew_gear_confirmed: newDone } as RunOfShowData['logistics'] });
     }
   };
 
@@ -182,8 +217,19 @@ export function AdvancingChecklist({
     if (addOpen) inputRef.current?.focus();
   }, [addOpen]);
 
+  // ── Date awareness ──
+  const daysUntil = computeDaysUntil(eventDate);
+  const urgency = getUrgency(daysUntil);
+
   // ── Derived ──
-  const sorted = [...items].sort((a, b) => a.sort_order - b.sort_order);
+  // Sort: incomplete items first when urgent (≤7 days), then by sort_order
+  const sorted = [...items].sort((a, b) => {
+    // When urgent, push incomplete items above done items
+    if (urgency && (urgency === 'red' || urgency === 'amber')) {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+    }
+    return a.sort_order - b.sort_order;
+  });
   const doneCount = sorted.filter((i) => i.done).length;
   const totalCount = sorted.length;
   const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
@@ -203,10 +249,40 @@ export function AdvancingChecklist({
     <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-          Advancing
-        </h3>
-        <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
+        <div className="flex items-center gap-2">
+          <h3 className="stage-label">
+            Advancing
+          </h3>
+          {/* Countdown badge */}
+          {daysUntil != null && !allDone && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded-md stage-badge-text tabular-nums tracking-tight"
+              style={{
+                color: urgency === 'green'
+                  ? 'var(--stage-text-tertiary)'
+                  : urgency && urgency !== 'past'
+                    ? URGENCY_COLORS[urgency]
+                    : 'var(--stage-text-tertiary)',
+                backgroundColor: urgency === 'green'
+                  ? 'oklch(1 0 0 / 0.04)'
+                  : urgency === 'red'
+                    ? `color-mix(in oklch, ${URGENCY_COLORS.red} 15%, transparent)`
+                    : urgency === 'amber'
+                      ? `color-mix(in oklch, ${URGENCY_COLORS.amber} 12%, transparent)`
+                      : 'oklch(1 0 0 / 0.03)',
+              }}
+            >
+              {daysUntil < 0
+                ? `${Math.abs(daysUntil)}d ago`
+                : daysUntil === 0
+                  ? 'Today'
+                  : daysUntil === 1
+                    ? 'Tomorrow'
+                    : `${daysUntil}d`}
+            </span>
+          )}
+        </div>
+        <span className="stage-badge-text text-[var(--stage-text-tertiary)] tabular-nums">
           {doneCount}/{totalCount}
         </span>
       </div>
@@ -215,10 +291,16 @@ export function AdvancingChecklist({
       <div className="h-1 rounded-full bg-[oklch(1_0_0_/_0.04)] mb-4 overflow-hidden">
         <motion.div
           className="h-full rounded-full"
-          style={{ background: allDone ? 'var(--color-unusonic-success)' : 'var(--stage-text-secondary)' }}
+          style={{
+            background: allDone
+              ? 'var(--color-unusonic-success)'
+              : urgency && (urgency === 'red' || urgency === 'amber') && !allDone
+                ? URGENCY_COLORS[urgency]
+                : 'var(--stage-text-secondary)',
+          }}
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          transition={STAGE_MEDIUM}
         />
       </div>
 
@@ -231,7 +313,7 @@ export function AdvancingChecklist({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ ...STAGE_LIGHT, delay: i * STAGE_STAGGER_CHILDREN }}
+              transition={STAGE_LIGHT}
               className="overflow-hidden"
             >
               <div className="flex items-start gap-2.5 py-1.5 group">
@@ -240,7 +322,7 @@ export function AdvancingChecklist({
                   type="button"
                   onClick={() => handleToggle(item)}
                   disabled={!!(item.auto_key && !TOGGLEABLE_AUTO_KEYS.has(item.auto_key))}
-                  className="shrink-0 mt-0.5 relative flex items-center justify-center size-4 rounded-[3px] border transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+                  className="shrink-0 mt-0.5 relative flex items-center justify-center size-4 rounded-[3px] border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   style={{
                     borderColor: item.done
                       ? 'var(--color-unusonic-success)'
@@ -262,17 +344,17 @@ export function AdvancingChecklist({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={`text-sm tracking-tight leading-tight ${
+                      className={`stage-readout leading-tight ${
                         item.done
                           ? 'text-[var(--stage-text-tertiary)] line-through'
-                          : 'text-[var(--stage-text-primary)]'
+                          : ''
                       }`}
                     >
                       {item.label}
                     </span>
                     {item.auto_key && (
                       <span
-                        className="inline-flex items-center px-1 py-px rounded text-[9px] font-medium uppercase tracking-wider"
+                        className="inline-flex items-center px-1 py-px rounded stage-micro"
                         style={{
                           background: 'oklch(1 0 0 / 0.04)',
                           color: 'var(--stage-text-tertiary)',
@@ -281,9 +363,17 @@ export function AdvancingChecklist({
                         Auto
                       </span>
                     )}
+                    {/* Urgency dot for incomplete items when show is approaching */}
+                    {!item.done && urgency && (urgency === 'red' || urgency === 'amber') && (
+                      <span
+                        className="size-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: URGENCY_COLORS[urgency] }}
+                        title={daysUntil === 0 ? 'Show is today' : daysUntil === 1 ? 'Show is tomorrow' : `${daysUntil}d until show`}
+                      />
+                    )}
                   </div>
                   {item.done && item.done_by && item.done_at && (
-                    <p className="text-[10px] text-[var(--stage-text-tertiary)] mt-0.5 truncate">
+                    <p className="text-label text-[var(--stage-text-tertiary)] mt-0.5 truncate">
                       {item.done_by} &middot; {timeAgo(item.done_at)}
                     </p>
                   )}
@@ -320,14 +410,14 @@ export function AdvancingChecklist({
                 if (e.key === 'Escape') { setAddOpen(false); setAddLabel(''); }
               }}
               placeholder="Checklist item"
-              className="flex-1 bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] focus:border-[oklch(1_0_0_/_0.20)]"
+              className="flex-1 bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)]"
               style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
             />
             <button
               type="button"
               onClick={handleAdd}
               disabled={!addLabel.trim() || addSaving}
-              className="stage-btn stage-btn-secondary px-3 py-1.5 text-sm disabled:opacity-40 disabled:pointer-events-none"
+              className="stage-btn stage-btn-secondary px-3 py-1.5 text-sm disabled:opacity-45 disabled:pointer-events-none"
             >
               {addSaving ? <Loader2 className="size-3.5 animate-spin" /> : 'Add'}
             </button>
@@ -336,7 +426,7 @@ export function AdvancingChecklist({
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="flex items-center gap-1.5 text-sm text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors focus:outline-none"
+            className="flex items-center gap-1.5 text-sm text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
           >
             <Plus size={13} />
             <span>Add item</span>

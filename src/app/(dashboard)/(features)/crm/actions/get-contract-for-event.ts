@@ -1,5 +1,6 @@
 'use server';
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
@@ -44,6 +45,7 @@ export async function getContractForEvent(
     };
   } catch (err) {
     console.error('[CRM] getContractForEvent:', err);
+    Sentry.captureException(err, { tags: { module: 'crm', action: 'getContractForEvent' } });
     return null;
   }
 }

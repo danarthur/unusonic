@@ -209,16 +209,24 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
     };
   }, [deal.event_id]);
 
-  // Refetch proposal when user returns to this tab (e.g. after sending from proposal builder)
+  // Refetch proposal when user returns to this tab or navigates back from proposal builder
   useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        getProposalForDeal(deal.id).then(setInitialProposal);
-        getProposalPublicUrl(deal.id).then(setPublicProposalUrl);
-      }
+    const refetch = () => {
+      getProposalForDeal(deal.id).then(setInitialProposal);
+      getProposalPublicUrl(deal.id).then(setPublicProposalUrl);
+      getProposalHistoryForDeal(deal.id).then(setProposalHistory);
+      getFollowUpForDeal(deal.id).then(setQueueItem);
     };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refetch();
+    };
+    const onFocus = () => refetch();
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [deal.id]);
 
   // When proposal is sent or deal is handed over, fetch the public URL so "View signed proposal" works
@@ -323,7 +331,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
         transition={STAGE_MEDIUM}
       >
         <StagePanel elevated className="p-5">
-          <p className="stage-label text-[var(--stage-text-secondary)] mb-4">
+          <p className="stage-label mb-4">
             Deal pipeline
           </p>
           <PipelineTracker
@@ -394,7 +402,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
           )}
 
           {/* Production team */}
-          <ProductionTeamCard dealId={deal.id} sourceOrgId={sourceOrgId ?? null} eventDate={deal.proposed_date} workspaceId={deal.workspace_id} />
+          <ProductionTeamCard dealId={deal.id} sourceOrgId={sourceOrgId ?? null} eventDate={deal.proposed_date} workspaceId={deal.workspace_id} isLocked={isLocked} />
 
           {/* Deal diary */}
           <DealDiaryCard dealId={deal.id} dealTitle={deal.title} workspaceId={deal.workspace_id} />
@@ -411,10 +419,10 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                     <FileCheck size={24} className="text-[var(--color-unusonic-success)]" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="stage-label" style={{ color: 'var(--stage-text-secondary)', marginBottom: 'var(--stage-gap, 6px)' }}>
+                    <p className="stage-label" style={{ marginBottom: 'var(--stage-gap, 6px)' }}>
                       Contract
                     </p>
-                    <h2 className="stage-readout tracking-tight leading-none" style={{ color: 'var(--stage-text-primary)' }}>
+                    <h2 className="stage-readout leading-none">
                       {contract?.status === 'signed' ? 'Signed by client' : 'Contract'}
                     </h2>
                     {contract?.signed_at && (
@@ -456,8 +464,8 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                 )}
               </StagePanel>
 
-              <div className="flex flex-col flex-1 min-h-0 overflow-y-auto" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-                <p className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
+              <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+                <p className="stage-label">
                   Proposal (agreed scope)
                 </p>
                 <ProposalBuilder
@@ -473,20 +481,20 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
           )}
         </div>
 
-        {/* ── Right column: sticky summary ── */}
-        <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col lg:sticky lg:top-0 lg:self-start" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+        {/* ── Right column ── */}
+        <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
           {/* Proposal card */}
           {!isLocked && (
-            <StagePanel elevated className="flex flex-col" style={{ padding: 'var(--stage-padding, 16px)' }}>
-              <p className="stage-label" style={{ color: 'var(--stage-text-secondary)', marginBottom: 'var(--stage-gap, 6px)' }}>
+            <StagePanel elevated className="flex flex-col" style={{ padding: 'var(--stage-padding, 16px)', overflow: 'visible' }}>
+              <p className="stage-label" style={{ marginBottom: 'var(--stage-gap, 6px)' }}>
                 Proposal
               </p>
 
               {isDatePast && (
                 <div
-                  className="flex items-start gap-2.5 px-3 py-2.5 text-xs leading-relaxed"
+                  className="flex items-start gap-2.5 px-3 py-2.5 text-xs leading-relaxed border-l-[3px] border-l-[var(--color-unusonic-warning)]"
                   style={{
-                    background: 'color-mix(in oklch, var(--color-unusonic-warning) 8%, transparent)',
+                    background: 'var(--stage-surface)',
                     borderRadius: 'var(--stage-radius-nested, 8px)',
                     color: 'var(--color-unusonic-warning)',
                     marginBottom: 'var(--stage-gap-wide, 12px)',
@@ -494,7 +502,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                 >
                   <AlertTriangle size={14} className="shrink-0 mt-px" />
                   <div className="min-w-0">
-                    <p className="font-medium">Event date has passed</p>
+                    <p className="font-medium">Show date has passed</p>
                     <p className="mt-0.5" style={{ color: 'var(--stage-text-secondary)' }}>
                       Update the date or mark as lost.
                     </p>
@@ -502,7 +510,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                 </div>
               )}
 
-              <h2 className="stage-readout-lg tracking-tight leading-none" style={{ color: 'var(--stage-text-primary)', marginBottom: 'var(--stage-gap, 6px)' }}>
+              <h2 className="stage-readout-lg leading-none" style={{ marginBottom: 'var(--stage-gap, 6px)' }}>
                 {proposalSigned
                   ? 'Signed'
                   : proposalSent
@@ -570,7 +578,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                     type="button"
                     onClick={handleSendReminder}
                     disabled={reminderSending || reminderSent}
-                    className="transition-colors disabled:opacity-40 shrink-0"
+                    className="transition-colors disabled:opacity-45 shrink-0"
                     style={{ fontSize: 'var(--stage-label-size, 11px)', color: 'var(--stage-text-secondary)' }}
                   >
                     {reminderSent ? 'Reminder sent' : reminderSending ? 'Sending…' : 'Send reminder'}
@@ -595,7 +603,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
               <div className="mt-auto flex flex-col" style={{ paddingTop: 'var(--stage-gap-wide, 12px)', gap: 'var(--stage-gap-wide, 12px)' }}>
                 {(proposalSent || proposalSigned) && (sentDate || signedDate) && (
                   <div className="flex items-center justify-between" style={{ paddingTop: 'var(--stage-gap-wide, 12px)', borderTop: '1px solid var(--stage-edge-subtle)', gap: 'var(--stage-gap, 6px)' }}>
-                    <p className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
+                    <p className="stage-label">
                       {proposalSigned && signedDate ? `Signed ${signedDate}` : sentDate ? `Sent ${sentDate}` : null}
                     </p>
                     {publicProposalUrl && (proposalSent || proposalSigned) && (
@@ -774,7 +782,7 @@ function EmailDeliveryIndicator({ entry }: { entry: ProposalHistoryEntry }) {
   if (entry.email_bounced_at) {
     return (
       <span
-        className="inline-flex items-center gap-1 text-[10px] font-medium"
+        className="inline-flex items-center gap-1 text-label font-medium"
         style={{ color: 'var(--color-unusonic-error)' }}
         title={`Bounced ${new Date(entry.email_bounced_at).toLocaleString()}`}
       >
@@ -787,7 +795,7 @@ function EmailDeliveryIndicator({ entry }: { entry: ProposalHistoryEntry }) {
   if (entry.email_delivered_at) {
     return (
       <span
-        className="inline-flex items-center gap-1 text-[10px]"
+        className="inline-flex items-center gap-1 text-label"
         style={{ color: 'var(--stage-text-tertiary)' }}
         title={`Delivered ${new Date(entry.email_delivered_at).toLocaleString()}`}
       >
@@ -804,7 +812,7 @@ function ProposalStatusPill({ status }: { status: string }) {
   const style = PROPOSAL_STATUS_STYLES[status] ?? { label: status, color: 'var(--stage-text-tertiary)' };
   return (
     <span
-      className="inline-flex items-center gap-1 text-[10px] font-medium tracking-wide"
+      className="inline-flex items-center gap-1 text-label font-medium tracking-wide"
       style={{ color: style.color }}
     >
       <span

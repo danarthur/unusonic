@@ -15,10 +15,12 @@ import {
   getOrgRosterForStakeholder,
   createContactForOrg,
   type DealStakeholderDisplay,
-  type DealStakeholderRole,
   type OrgRosterContact,
 } from '../actions/deal-stakeholders';
-import { getStakeholderRoleLabel } from '../lib/stakeholder-roles';
+import {
+  getStakeholderRoleLabel,
+  type DealStakeholderRole,
+} from '../lib/stakeholder-roles';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
@@ -352,7 +354,7 @@ export function StakeholderGrid({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1">
+      <p className="stage-label mb-1">
         Stakeholders
       </p>
 
@@ -364,7 +366,7 @@ export function StakeholderGrid({
           transition={STAGE_LIGHT}
           className="space-y-1"
         >
-          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
+          <p className="stage-label">
             Client
           </p>
           {billTo ? (
@@ -476,7 +478,7 @@ export function StakeholderGrid({
             {s.organization_name && (
               <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{s.organization_name}</p>
             )}
-            <span className="inline-block mt-1 text-[11px] font-medium text-[var(--stage-text-secondary)]/80 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] rounded-md px-1.5 py-0.5 leading-none">
+            <span className="inline-block mt-1 text-field-label font-medium text-[var(--stage-text-secondary)]/80 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] rounded-md px-1.5 py-0.5 leading-none">
               {getStakeholderRoleLabel(s.role)}
             </span>
           </div>
@@ -593,7 +595,7 @@ export function StakeholderGrid({
                   onClick={handleAddNewContactOpen}
                   className="w-full rounded-xl border-dashed border-[oklch(1_0_0_/_0.20)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-accent)]/40"
                 >
-                  + Add New Contact to {pendingOrg?.name ?? 'Organization'}
+                  + Add new contact to {pendingOrg?.name ?? 'organization'}
                 </Button>
                 <Button
                   type="button"
@@ -742,7 +744,7 @@ export function StakeholderGrid({
                     'w-full rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors',
                     isCurrent
                       ? 'border-[var(--stage-text-primary)] bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] cursor-default'
-                      : 'border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]'
+                      : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-card)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.10)] hover:text-[var(--stage-text-primary)]'
                   )}
                 >
                   {isLoading && !isCurrent ? <Loader2 className="size-4 animate-spin inline mr-2" /> : null}

@@ -5,6 +5,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { computePaymentStatus, paymentStatusLabel, paymentStatusColor } from '@/features/sales/lib/compute-payment-status';
 import { NetworkDetailSheetWithSuspense } from '@/widgets/network-detail';
+import { applyActiveEventsFilter } from '@/shared/lib/event-status/get-active-events-filter';
 import { ProductionGridShell } from './components/production-grid-shell';
 import type { StreamCardItem } from './components/stream-card';
 import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
@@ -105,11 +106,13 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
           .order('proposed_date', { ascending: true })
       : { data: [] as Record<string, unknown>[] },
     workspaceId
-      ? supabase
-          .schema('ops')
-          .from('events')
-          .select('id, title, starts_at, lifecycle_status, archived_at, created_at, client_entity_id, venue_entity_id, deal_id')
-          .eq('workspace_id', workspaceId)
+      ? applyActiveEventsFilter(
+          supabase
+            .schema('ops')
+            .from('events')
+            .select('id, title, starts_at, lifecycle_status, archived_at, created_at, client_entity_id, venue_entity_id, deal_id')
+            .eq('workspace_id', workspaceId)
+        )
           .order('starts_at', { ascending: true })
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     ]);
@@ -127,7 +130,7 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
 
     if (dealIds.length > 0) {
       const [stakeholdersRes, proposalsRes] = await Promise.all([
-        (supabase as any)
+        supabase
           .schema('ops')
           .from('deal_stakeholders')
           .select('deal_id, role, organization_id')
@@ -248,7 +251,7 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
 
     // Merge follow-up queue signals into stream items
     if (workspaceId) {
-      const { data: queueItems } = await (supabase as any)
+      const { data: queueItems } = await supabase
         .schema('ops')
         .from('follow_up_queue')
         .select('deal_id, reason, priority_score, status')

@@ -15,15 +15,21 @@ const WrapCrewEntrySchema = z.object({
   role: z.string().max(200).nullable(),
   planned_hours: z.number().min(0).max(999).nullable(),
   actual_hours: z.number().min(0).max(999).nullable(),
+  rating: z.number().int().min(1).max(5).nullable().default(null),
+  crew_note: z.string().max(500).nullable().default(null),
 });
 
 const GearConditionSchema = z.enum(['good', 'damaged', 'missing', 'quarantined']);
+
+const GearSourceSchema = z.enum(['company', 'crew', 'subrental']).default('company');
 
 const WrapGearEntrySchema = z.object({
   item_id: z.string().min(1).max(200),
   name: z.string().min(1).max(200),
   condition: GearConditionSchema,
   notes: z.string().max(500).nullable(),
+  source: GearSourceSchema,
+  supplied_by_name: z.string().max(200).nullable().default(null),
 });
 
 const WrapReportSchema = z.object({
@@ -50,7 +56,7 @@ export async function getWrapReport(
 
   const supabase = await createClient();
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('ops')
     .from('events')
     .select('wrap_report')
@@ -91,7 +97,7 @@ export async function saveWrapReport(
     const supabase = await createClient();
 
     // Verify workspace ownership
-    const { data: evt } = await (supabase as any)
+    const { data: evt } = await supabase
       .schema('ops')
       .from('events')
       .select('id')
@@ -113,13 +119,13 @@ export async function saveWrapReport(
       if (profile?.full_name) completedBy = profile.full_name;
     }
 
-    const payload: WrapReport = {
+    const payload = {
       ...parsed.data,
       completed_at: new Date().toISOString(),
       completed_by: completedBy,
-    };
+    } as WrapReport;
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .schema('ops')
       .from('events')
       .update({ wrap_report: payload })
@@ -146,7 +152,7 @@ export async function prefillWrapReport(
     role_note: string | null;
     call_time: string | null;
   }[],
-  gearItems: { id: string; name: string; status: string }[]
+  gearItems: { id: string; name: string; status: string; source?: string; supplied_by_name?: string | null }[]
 ): Promise<WrapReport> {
   const actual_crew_hours: WrapCrewEntry[] = crewRows.map((row) => ({
     entity_id: row.entity_id,
@@ -154,6 +160,8 @@ export async function prefillWrapReport(
     role: row.role_note,
     planned_hours: null,
     actual_hours: null,
+    rating: null,
+    crew_note: null,
   }));
 
   const gear_condition_notes: WrapGearEntry[] = gearItems.map((item) => ({
@@ -161,6 +169,8 @@ export async function prefillWrapReport(
     name: item.name,
     condition: (item.status === 'quarantine' ? 'quarantined' : 'good') as GearCondition,
     notes: null,
+    source: (item.source as WrapGearEntry['source']) ?? 'company',
+    supplied_by_name: item.supplied_by_name ?? null,
   }));
 
   return {

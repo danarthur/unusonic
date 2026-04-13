@@ -111,7 +111,7 @@ async function syncDealCrewFromProposal(
     if (packageIds.length === 0) {
       // No packages — clean up any stale unconfirmed proposal rows
        
-      await (supabase as any)
+      await supabase
         .schema('ops')
         .from('deal_crew')
         .delete()
@@ -191,7 +191,7 @@ async function syncDealCrewFromProposal(
     }
 
     // Fetch existing deal_crew rows
-    const { data: existingCrew, error: existingError } = await (supabase as any)
+    const { data: existingCrew, error: existingError } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('id, entity_id, role_note, catalog_item_id, confirmed_at, source')
@@ -256,7 +256,7 @@ async function syncDealCrewFromProposal(
 
     // Insert one at a time to handle partial unique constraints gracefully
     for (const row of toInsert) {
-      const { error: insertError } = await (supabase as any)
+      const { error: insertError } = await supabase
         .schema('ops')
         .from('deal_crew')
         .insert(row);
@@ -276,7 +276,7 @@ async function syncDealCrewFromProposal(
 
     if (staleIds.length > 0) {
       console.warn('[syncDealCrew] Deleting stale rows:', staleIds, 'activePackageIds:', [...activePackageIdSet]);
-      await (supabase as any)
+      await supabase
         .schema('ops')
         .from('deal_crew')
         .delete()
@@ -388,7 +388,7 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
     let confirmationOverlay: Awaited<ReturnType<typeof resolveCrewConfirmationBatch>> | null = null;
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: eventRow } = await (supabase as any)
+      const { data: eventRow } = await supabase
         .schema('ops')
         .from('events')
         .select('id')
@@ -506,7 +506,7 @@ export async function addManualDealCrew(
     // Check for scheduling conflicts before assigning
     const conflict = await checkCrewConflict(supabase, dealId, entityId, workspaceId);
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .schema('ops')
       .from('deal_crew')
       .upsert(
@@ -548,7 +548,7 @@ export async function confirmDealCrew(
   try {
     const supabase = await createClient();
 
-    const { error, count } = await (supabase as any)
+    const { error, count } = await supabase
       .schema('ops')
       .from('deal_crew')
       .update({ confirmed_at: new Date().toISOString() }, { count: 'exact' })
@@ -583,7 +583,7 @@ export async function removeDealCrew(
     const supabase = await createClient();
 
     // Read the row first to capture entity_id and deal_id for gear cascade
-    const { data: crewRow } = await (supabase as any)
+    const { data: crewRow } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('entity_id, deal_id')
@@ -594,7 +594,7 @@ export async function removeDealCrew(
     const removedEntityId = (crewRow?.entity_id as string) ?? null;
     const dealId = (crewRow?.deal_id as string) ?? null;
 
-    const { error, count } = await (supabase as any)
+    const { error, count } = await supabase
       .schema('ops')
       .from('deal_crew')
       .delete({ count: 'exact' })
@@ -608,7 +608,7 @@ export async function removeDealCrew(
     let revertedGearCount = 0;
     if (removedEntityId && dealId) {
       // Find all events linked to this deal
-      const { data: events } = await (supabase as any)
+      const { data: events } = await supabase
         .schema('ops')
         .from('events')
         .select('id')
@@ -619,7 +619,7 @@ export async function removeDealCrew(
 
       if (eventIds.length > 0) {
         // Revert gear items sourced from this crew member back to company
-        const { count: revertCount } = await (supabase as any)
+        const { count: revertCount } = await supabase
           .schema('ops')
           .from('event_gear_items')
           .update({
@@ -664,7 +664,7 @@ export async function addManualOpenRole(
   try {
     const supabase = await createClient();
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .schema('ops')
       .from('deal_crew')
       .insert({
@@ -711,7 +711,7 @@ export async function assignDealCrewEntity(
 
     // Verify the row belongs to a deal in the caller's workspace before mutating.
 
-    const { data: row } = await (supabase as any)
+    const { data: row } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('id, deal_id, workspace_id')
@@ -726,7 +726,7 @@ export async function assignDealCrewEntity(
     const conflict = await checkCrewConflict(supabase, DealIds.as(row.deal_id), entityId, workspaceId);
 
 
-    const { error, count } = await (supabase as any)
+    const { error, count } = await supabase
       .schema('ops')
       .from('deal_crew')
       .update(
@@ -769,7 +769,7 @@ async function checkCrewConflict(
     if (!proposedDate) return null;
 
     // Check other deal_crew assignments on the same date (excluding this deal), scoped to workspace
-    const { data: otherDealCrew } = await (supabase as any)
+    const { data: otherDealCrew } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('deal_id')
@@ -782,7 +782,7 @@ async function checkCrewConflict(
       const dayStart = `${proposedDate}T00:00:00.000Z`;
       const dayEnd = `${proposedDate}T23:59:59.999Z`;
 
-      const { data: events } = await (supabase as any)
+      const { data: events } = await supabase
         .schema('ops')
         .from('events')
         .select('id, title, starts_at')
@@ -792,7 +792,7 @@ async function checkCrewConflict(
 
       if (events?.length) {
         for (const evt of events as { id: string; title: string | null }[]) {
-          const { count } = await (supabase as any)
+          const { count } = await supabase
             .schema('ops')
             .from('crew_assignments')
             .select('id', { count: 'exact', head: true })
@@ -1125,7 +1125,7 @@ export async function remindAllUnconfirmed(
     const eventId = (dealRow as { event_id?: string | null } | null)?.event_id ?? null;
 
     // Fetch all pending crew (assigned but not confirmed, not declined)
-    const { data: pendingRows } = await (supabase as any)
+    const { data: pendingRows } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('id, entity_id')
@@ -1182,7 +1182,7 @@ export async function getDealCrewForEvent(eventId: string): Promise<DealCrewRow[
   const supabase = await createClient();
 
   // Resolve deal_id from the event's back-reference
-  const { data: evt } = await (supabase as any)
+  const { data: evt } = await supabase
     .schema('ops')
     .from('events')
     .select('deal_id')
@@ -1215,7 +1215,7 @@ export async function getCrewGearSummary(eventId: string): Promise<CrewGearSumma
     const supabase = await createClient();
 
     // Resolve deal_id from event
-    const { data: evt } = await (supabase as any)
+    const { data: evt } = await supabase
       .schema('ops')
       .from('events')
       .select('deal_id')
@@ -1227,7 +1227,7 @@ export async function getCrewGearSummary(eventId: string): Promise<CrewGearSumma
     if (!dealId) return { total: 0, selfEquipped: 0 };
 
     // Count assigned crew (entity_id not null) and how many bring own gear
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('brings_own_gear')
@@ -1263,7 +1263,7 @@ export async function getDealCrewEquipmentNames(dealId: string): Promise<string[
     const supabase = await createClient();
 
     // Get entity IDs of assigned crew
-    const { data: crewRows } = await (supabase as any)
+    const { data: crewRows } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('entity_id')
@@ -1275,7 +1275,7 @@ export async function getDealCrewEquipmentNames(dealId: string): Promise<string[
     if (entityIds.length === 0) return [];
 
     // Fetch all equipment names for these entities
-    const { data: equipment } = await (supabase as any)
+    const { data: equipment } = await supabase
       .schema('ops')
       .from('crew_equipment')
       .select('name')
@@ -1330,7 +1330,7 @@ export async function updateCrewDispatch(
   try {
     const supabase = await createClient();
 
-    const { error, count } = await (supabase as any)
+    const { error, count } = await supabase
       .schema('ops')
       .from('deal_crew')
       .update(updates, { count: 'exact' })

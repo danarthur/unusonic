@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SurfaceProvider, SURFACE_LEVEL } from '@/shared/ui/surface-context';
 import { ChevronLeft, ChevronDown, Check, FileText, ExternalLink, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDeal, getDealByEventId } from '../actions/get-deal';
@@ -61,25 +62,20 @@ function OverrideStatusConfirm({
   submitting: boolean;
 }) {
   return (
-    <AnimatePresence>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
       <div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-      >
+        className="absolute inset-0 bg-[oklch(0.06_0_0/0.75)]"
+        style={{ zIndex: 0 }}
+        onClick={onCancel}
+      />
+      <div className="relative w-full max-w-sm" style={{ zIndex: 1 }}>
         <motion.div
-          className="absolute inset-0 stage-scrim"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={STAGE_HEAVY}
-          onClick={onCancel}
-        />
-        <motion.div
-          className="relative z-10 w-full max-w-sm"
           initial={{ opacity: 0, y: 16, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.97 }}
           transition={STAGE_HEAVY}
         >
           <div
@@ -88,11 +84,11 @@ function OverrideStatusConfirm({
           >
             <div>
               <p className="stage-label text-[var(--color-unusonic-warning)] mb-1.5">Manual override</p>
-              <h2 className="text-[var(--stage-text-primary)] font-medium tracking-tight text-base leading-snug">
+              <h2 className="stage-readout leading-snug">
                 Set status to &ldquo;{DEAL_STATUS_LABELS[status] ?? status}&rdquo;?
               </h2>
             </div>
-            <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
+            <p className="stage-field-label leading-relaxed">
               {OVERRIDE_STATUS_MESSAGES[status]}
             </p>
             <div className="flex gap-2 pt-1">
@@ -109,7 +105,7 @@ function OverrideStatusConfirm({
                 type="button"
                 onClick={onConfirm}
                 disabled={submitting}
-                className="flex-1 border border-[var(--color-unusonic-warning)]/40 bg-[var(--color-unusonic-warning)]/10 py-2.5 text-sm font-medium text-[var(--color-unusonic-warning)] hover:bg-[var(--color-unusonic-warning)]/20 transition-colors focus:outline-none disabled:opacity-40 disabled:pointer-events-none"
+                className="flex-1 border border-[var(--color-unusonic-warning)]/40 bg-[var(--color-unusonic-warning)]/10 py-2.5 text-sm font-medium text-[var(--color-unusonic-warning)] hover:bg-[var(--color-unusonic-warning)]/20 transition-colors focus:outline-none disabled:opacity-45 disabled:pointer-events-none"
                 style={{ borderRadius: 'var(--stage-radius-nested, 8px)' }}
               >
                 {submitting ? 'Saving…' : 'Override anyway'}
@@ -118,7 +114,7 @@ function OverrideStatusConfirm({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </div>
   );
 }
 
@@ -162,7 +158,7 @@ export function Prism({
   const isDeal = selectedItem?.source === 'deal';
   const isEvent = selectedItem?.source === 'event';
   const dealSignedOrDeposit =
-    isDeal && selectedItem?.status && ['contract_signed', 'deposit_received'].includes(selectedItem.status);
+    isDeal && selectedItem?.status && ['contract_signed', 'deposit_received', 'won'].includes(selectedItem.status);
 
   useEffect(() => {
     if (!selectedId || !selectedItem) {
@@ -357,7 +353,7 @@ export function Prism({
   if (!selectedId) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 min-h-[320px] text-[var(--stage-text-secondary)]">
-        <p className="text-sm leading-relaxed">Select a production from the stream.</p>
+        <p className="stage-field-label leading-relaxed">Select a production from the stream.</p>
       </div>
     );
   }
@@ -365,12 +361,12 @@ export function Prism({
     return (
       <div className="flex flex-col items-center justify-center flex-1 min-h-[320px] text-[var(--stage-text-secondary)] gap-3">
         <div className="h-8 w-8 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] stage-skeleton" style={{ borderRadius: 'var(--stage-radius-nested, 8px)' }} aria-hidden />
-        <p className="text-sm leading-relaxed">Loading production…</p>
+        <p className="stage-field-label leading-relaxed">Loading production…</p>
       </div>
     );
   }
 
-  const title = selectedItem.title ?? 'Untitled Production';
+  const title = selectedItem.title ?? 'Untitled production';
   const subtitle = [selectedItem.client_name ?? 'Client', selectedItem.event_date ? new Date(selectedItem.event_date + 'T00:00:00').toLocaleDateString() : null]
     .filter(Boolean)
     .join(' • ');
@@ -379,7 +375,7 @@ export function Prism({
   return (
     <>
     <motion.div
-      className="flex flex-col h-full min-h-0"
+      className="flex flex-col flex-1 min-h-0"
       initial={false}
       animate={{
         borderLeftColor: handoverJustDone
@@ -412,10 +408,10 @@ export function Prism({
             </motion.button>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-medium tracking-tight leading-none truncate" style={{ color: 'var(--stage-text-primary)' }}>
+            <h2 className="stage-readout-lg leading-none truncate">
               {title}
             </h2>
-            <p className="text-sm leading-relaxed truncate mt-1" style={{ color: 'var(--stage-text-secondary)' }}>{subtitle}</p>
+            <p className="stage-label leading-relaxed truncate mt-1">{subtitle}</p>
           </div>
           {/* Status indicator — clickable pill for deals, health dot for events */}
           {isDeal && deal?.status ? (
@@ -436,10 +432,10 @@ export function Prism({
                   className="h-1.5 w-1.5 rounded-full shrink-0"
                   style={{ backgroundColor: dealStatusColor(deal.status) }}
                 />
-                <span className="text-[10px] font-medium uppercase tracking-widest whitespace-nowrap">
+                <span className="stage-label whitespace-nowrap">
                   {DEAL_STATUS_LABELS[deal.status] ?? deal.status}
                 </span>
-                <ChevronDown size={10} className="ml-0.5 opacity-60" />
+                <ChevronDown size={10} className="ml-0.5 text-[var(--stage-text-secondary)]" />
               </button>
 
               <AnimatePresence>
@@ -490,7 +486,7 @@ export function Prism({
                         <span className="flex-1 tracking-tight text-[var(--stage-text-secondary)]">{label}</span>
                         {deal.status === value
                           ? <Check size={11} className="shrink-0" style={{ color: 'var(--stage-text-primary)' }} />
-                          : <span className="text-[9px] uppercase tracking-widest text-[var(--stage-text-tertiary)] shrink-0">override</span>
+                          : <span className="stage-micro shrink-0">override</span>
                         }
                       </button>
                     ))}
@@ -547,7 +543,7 @@ export function Prism({
                 onClick={() => !disabled && setLens(tab.value)}
                 disabled={disabled}
                 className={cn(
-                  'relative z-10 px-4 py-1.5 text-sm font-medium tracking-tight transition-colors focus:outline-none',
+                  'relative z-10 px-4 py-1.5 stage-label transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                   isActive
                     ? 'text-[var(--stage-text-on-accent)]'
                     : disabled
@@ -575,7 +571,8 @@ export function Prism({
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-6" style={{ background: 'var(--stage-surface)' }}>
+      <SurfaceProvider level={SURFACE_LEVEL.void}>
+      <div className="flex-1 min-h-0 overflow-y-auto p-6" style={{ background: 'var(--stage-void)' }} data-surface="void">
         {/* Handover banner — visible across all tabs */}
         <AnimatePresence mode="wait">
           {showHandover && !handoverJustDone && (
@@ -589,10 +586,10 @@ export function Prism({
               style={{ borderRadius: 'var(--stage-radius-panel)' }}
             >
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight">
+                <p className="stage-readout">
                   Contract signed — ready for production
                 </p>
-                <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
+                <p className="stage-badge-text text-[var(--stage-text-secondary)] mt-0.5">
                   Hand over to access run of show, crewing, and logistics.
                 </p>
               </div>
@@ -600,7 +597,7 @@ export function Prism({
                 type="button"
                 onClick={handleHandover}
                 disabled={handingOver}
-                className="stage-btn stage-btn-primary shrink-0 flex items-center gap-2 disabled:opacity-60 disabled:pointer-events-none"
+                className="stage-btn stage-btn-primary shrink-0 flex items-center gap-2 disabled:opacity-45 disabled:pointer-events-none"
               >
                 {handingOver ? 'Handing over…' : 'Hand over to production'}
                 {!handingOver && <ArrowRight size={16} aria-hidden />}
@@ -614,14 +611,14 @@ export function Prism({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={STAGE_MEDIUM}
-              className="mb-6 p-4 flex items-center gap-3 border border-[color-mix(in_oklch,var(--color-unusonic-success)_20%,transparent)]"
+              className="mb-6 p-4 flex items-center gap-3 border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-success)]"
               style={{
                 borderRadius: 'var(--stage-radius-panel)',
-                background: 'color-mix(in oklch, var(--color-unusonic-success) 6%, var(--stage-surface))',
+                background: 'var(--stage-surface)',
               }}
             >
               <CheckCircle2 size={18} className="text-[var(--color-unusonic-success)] shrink-0" aria-hidden />
-              <p className="text-sm text-[var(--stage-text-primary)] tracking-tight">
+              <p className="stage-readout-sm">
                 Handed over — Plan tab is now live.
               </p>
             </motion.div>
@@ -641,7 +638,7 @@ export function Prism({
         {loading ? (
           <div className="flex flex-col items-center justify-center min-h-[200px] gap-4">
             <div className="h-10 w-10 stage-skeleton" style={{ background: 'var(--stage-surface)', borderRadius: 'var(--stage-radius-nested, 8px)' }} aria-hidden />
-            <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">Loading</p>
+            <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">Loading...</p>
           </div>
         ) : (
           <AnimatePresence mode="wait">
@@ -690,7 +687,7 @@ export function Prism({
               >
                 <div className="stage-panel-elevated p-6 flex flex-col gap-6">
                   <div>
-                    <p className="stage-label text-[var(--stage-text-secondary)] mb-1">
+                    <p className="stage-label mb-1">
                       Deal · event selected
                     </p>
                     {linkedDealLoading ? (
@@ -800,6 +797,7 @@ export function Prism({
           </AnimatePresence>
         )}
       </div>
+      </SurfaceProvider>
     </motion.div>
 
     <MarkAsLostModal

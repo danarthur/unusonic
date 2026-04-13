@@ -9,6 +9,7 @@ import { syncGearFromProposalToEvent } from './sync-gear-from-proposal';
 import { seedAdvancingChecklist } from './advancing-checklist';
 import { syncCrewRatesToAssignments } from './sync-crew-rates-to-assignments';
 import { instrument } from '@/shared/lib/instrumentation';
+import { resolveEventTimezone, toVenueInstant } from '@/shared/lib/timezone';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -134,31 +135,47 @@ export async function handoverDeal(
   const title = (r.title as string)?.trim() || 'Untitled Production';
   const proposedDate = r.proposed_date ? String(r.proposed_date) : new Date().toISOString().slice(0, 10);
 
-  let startAt: string;
-  let endAt: string;
+  let startAt = '';
+  let endAt = '';
   let eventName: string;
   let venueEntityId: string | null = null;
   let runOfShowData: HandoverRunOfShowData | null = null;
   let clientEntityId: string | null = null;
 
   if (payload?.vitals) {
-    startAt = payload.vitals.start_at;
-    endAt = payload.vitals.end_at;
     venueEntityId = payload.vitals.venue_entity_id ?? null;
     clientEntityId = payload.vitals.client_entity_id ?? null;
+    startAt = payload.vitals.start_at;
+    endAt = payload.vitals.end_at;
     eventName = (payload.name ?? title).trim() || title;
     runOfShowData = payload.run_of_show_data ?? null;
   } else {
-    const dealStartTime = (r.event_start_time as string) ?? null;
-    const dealEndTime = (r.event_end_time as string) ?? null;
-    startAt = dealStartTime ? `${proposedDate}T${dealStartTime}:00` : `${proposedDate}T08:00:00.000Z`;
-    endAt = dealEndTime ? `${proposedDate}T${dealEndTime}:00` : `${proposedDate}T18:00:00.000Z`;
     eventName = title;
+  }
+
+  // §3.2: resolve IANA timezone for the event record. Used for the ops.events.timezone
+  // column AND (in the legacy path) to convert local times to proper UTC instants.
+  // Resolution: venue attrs → workspace → 'UTC'. Before this fix, the legacy path
+  // hardcoded T08:00:00.000Z, making "8am" mean 8:00 UTC regardless of venue location.
+  const eventTimezone = await resolveEventTimezone({ venueId: venueEntityId, workspaceId });
+
+  // Legacy path (no handoff wizard payload): convert deal's local times to UTC via venue tz
+  if (!payload?.vitals) {
+    startAt = toVenueInstant(proposedDate, (r.event_start_time as string) ?? '08:00', eventTimezone);
+    endAt = toVenueInstant(proposedDate, (r.event_end_time as string) ?? '18:00', eventTimezone);
   }
 
   // Crew is managed via ops.deal_crew — Plan tab reads from it directly and the
   // handoff wizard no longer collects crew_roles, so runOfShowData passes through unchanged.
 
+  // Pass 4 Phase 0.5 (rescan fix N1): set status + lifecycle_status explicitly on handoff.
+  // Before this fix, lifecycle_status defaulted to NULL, which silently failed the
+  // `.in('lifecycle_status', [...])` filters on Lobby widgets (use-lobby-events.ts:62),
+  // dashboard urgency alerts (get-urgency-alerts.ts:76/305), CRM hooks (useCRM.ts:43),
+  // and global search (search-global.ts:36). Every new event after handoff was invisible
+  // on the Lobby and urgency surfaces until someone manually advanced the lifecycle.
+  // The ('planned', 'production') pair is valid per ops.event_status_pair_valid (see
+  // src/shared/lib/event-status/pair-valid.ts and the corresponding DB trigger).
   const { data: event, error: eventErr } = await supabase
     .schema('ops')
     .from('events')
@@ -169,6 +186,9 @@ export async function handoverDeal(
       title: eventName,
       starts_at: startAt,
       ends_at: endAt,
+      status: 'planned',
+      lifecycle_status: 'production',
+      timezone: eventTimezone,
       venue_entity_id: venueEntityId,
       client_entity_id: clientEntityId,
       event_archetype: (deal as Record<string, unknown>).event_archetype as string | null,
@@ -274,13 +294,32 @@ export async function handoverDeal(
 
   if (acceptedProposal?.id) {
     const signedAt = (acceptedProposal as { signed_at?: string | null }).signed_at ?? new Date().toISOString();
-    await supabase.from('contracts').insert({
-      workspace_id: workspaceId,
-      event_id: eventId,
-      status: 'signed',
-      signed_at: signedAt,
-      pdf_url: null,
-    });
+    // Pass 4 Phase 0.5 (rescan fix C9): the naked insert swallowed RLS/FK errors silently.
+    // Now captured to Sentry + surfaced as a warning. Non-fatal: the event still exists
+    // and the PM can recreate the contract row manually if this fails. Mirrors the
+    // crew-sync instrumentation pattern above.
+    const { error: contractErr } = await supabase
+      .from('contracts')
+      .insert({
+        workspace_id: workspaceId,
+        event_id: eventId,
+        status: 'signed',
+        signed_at: signedAt,
+        pdf_url: null,
+      })
+      .select('id')
+      .maybeSingle();
+    if (contractErr) {
+      Sentry.logger.error('crm.handoverDeal.contractInsertFailed', {
+        dealId,
+        eventId,
+        workspaceId,
+        proposalId: acceptedProposal.id,
+        code: contractErr.code,
+        message: contractErr.message,
+      });
+      warnings.push('Contract record creation failed — you may need to recreate it manually on the Plan tab.');
+    }
   }
 
   revalidatePath('/crm');

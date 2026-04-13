@@ -176,7 +176,7 @@ export function ClientConnector({
         href={sheetHref}
         className={cn(
           'w-full text-left rounded-2xl border border-[oklch(1_0_0_/_0.10)] overflow-hidden transition-colors',
-          'hover:bg-[var(--stage-surface-hover)]',
+          'stage-hover overflow-hidden',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
           compact ? 'stage-panel p-3' : 'stage-panel p-4'
         )}

@@ -43,21 +43,21 @@ export function StakeholderStrip({ stakeholders, onClickStakeholder, className }
         const pill = (
           <span
             key={s.id}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs tracking-tight bg-[oklch(1_0_0_/_0.04)] border border-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] ${
-              isClickable ? 'cursor-pointer hover:bg-[var(--stage-surface-hover)] hover:border-[oklch(1_0_0_/_0.10)] transition-colors' : ''
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg stage-badge-text tracking-tight bg-[oklch(1_0_0_/_0.04)] border border-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] ${
+              isClickable ? 'cursor-pointer stage-hover overflow-hidden hover:border-[oklch(1_0_0_/_0.10)] transition-colors' : ''
             }`}
             onClick={isClickable ? () => onClickStakeholder(s) : undefined}
             role={isClickable ? 'button' : undefined}
             tabIndex={isClickable ? 0 : undefined}
             onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClickStakeholder(s); } } : undefined}
           >
-            <Icon size={12} strokeWidth={1.5} className="shrink-0 opacity-60" />
+            <Icon size={12} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" />
             <span className="text-[var(--stage-text-tertiary)]">{ROLE_LABEL[s.role] ?? s.role}</span>
             <span className="text-[var(--stage-text-primary)] font-medium truncate max-w-[120px]">
               {s.name ?? 'Unknown'}
             </span>
             {isClickable && (
-              <ExternalLink size={10} strokeWidth={1.5} className="shrink-0 opacity-30" />
+              <ExternalLink size={10} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-tertiary)]" />
             )}
           </span>
         );
@@ -65,7 +65,7 @@ export function StakeholderStrip({ stakeholders, onClickStakeholder, className }
         return pill;
       })}
       {overflow > 0 && (
-        <span className="text-xs text-[var(--stage-text-tertiary)]">+{overflow} more</span>
+        <span className="stage-badge-text text-[var(--stage-text-tertiary)]">+{overflow} more</span>
       )}
     </div>
   );

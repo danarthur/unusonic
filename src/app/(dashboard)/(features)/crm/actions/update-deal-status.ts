@@ -3,6 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { DealIds, EntityIds, type DealId, type EntityId } from '@/shared/types/branded-ids';
 import type { LostReason } from './get-deal';
 
 // Standard statuses settable through normal flows
@@ -61,6 +62,10 @@ export async function updateDealStatus(
 
     const patch: Record<string, unknown> = { status };
 
+    if (status === 'won') {
+      patch.won_at = new Date().toISOString();
+    }
+
     if (status === 'lost') {
       if (!lostInput?.lost_reason) {
         return { success: false, error: 'A loss reason is required.' };
@@ -93,10 +98,12 @@ export async function updateDealStatus(
  * Assigns a directory entity as the deal owner.
  */
 export async function assignDealOwner(
-  dealId: string,
-  ownerEntityId: string | null
+  rawDealId: string,
+  rawOwnerEntityId: string | null
 ): Promise<UpdateDealStatusResult> {
   try {
+    const dealId: DealId = DealIds.parse(rawDealId);
+    const ownerEntityId: EntityId | null = rawOwnerEntityId ? EntityIds.parse(rawOwnerEntityId) : null;
     const workspaceId = await getActiveWorkspaceId();
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
 

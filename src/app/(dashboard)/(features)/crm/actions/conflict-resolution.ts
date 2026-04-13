@@ -3,6 +3,7 @@
 import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { DealIds, DealCrewIds, EntityIds, type DealId, type DealCrewId, type EntityId } from '@/shared/types/branded-ids';
 
 // =============================================================================
 // swapCrewMember
@@ -11,17 +12,19 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 // =============================================================================
 
 export async function swapCrewMember(
-  dealId: string,
-  oldDealCrewId: string,
-  newEntityId: string,
+  rawDealId: string,
+  rawOldDealCrewId: string,
+  rawNewEntityId: string,
   roleNote: string | null,
 ): Promise<{ success: boolean; error?: string }> {
-  const parsed = z.object({
-    dealId: z.string().uuid(),
-    oldDealCrewId: z.string().uuid(),
-    newEntityId: z.string().uuid(),
-  }).safeParse({ dealId, oldDealCrewId, newEntityId });
-  if (!parsed.success) return { success: false, error: 'Invalid input' };
+  let dealId: DealId, oldDealCrewId: DealCrewId, newEntityId: EntityId;
+  try {
+    dealId = DealIds.parse(rawDealId);
+    oldDealCrewId = DealCrewIds.parse(rawOldDealCrewId);
+    newEntityId = EntityIds.parse(rawNewEntityId);
+  } catch {
+    return { success: false, error: 'Invalid input' };
+  }
 
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) return { success: false, error: 'Not authorised' };
@@ -30,7 +33,7 @@ export async function swapCrewMember(
     const supabase = await createClient();
 
     // Verify the old row belongs to the caller's workspace
-    const { data: oldRow } = await (supabase as any)
+    const { data: oldRow } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('id, deal_id, workspace_id, role_note')
@@ -44,7 +47,7 @@ export async function swapCrewMember(
     const effectiveRole = roleNote ?? oldRow.role_note ?? null;
 
     // Delete the old crew row
-    const { error: deleteErr } = await (supabase as any)
+    const { error: deleteErr } = await supabase
       .schema('ops')
       .from('deal_crew')
       .delete()
@@ -54,7 +57,7 @@ export async function swapCrewMember(
     if (deleteErr) return { success: false, error: deleteErr.message };
 
     // Insert the new crew member with the same role
-    const { error: insertErr } = await (supabase as any)
+    const { error: insertErr } = await supabase
       .schema('ops')
       .from('deal_crew')
       .upsert(
@@ -246,7 +249,7 @@ export async function acceptGearConflict(
     const acceptedConflicts = (ros.accepted_gear_conflicts as Record<string, string>[]) ?? [];
     acceptedConflicts.push({ gear_name: gearName, note, accepted_at: new Date().toISOString() });
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .schema('ops')
       .from('events')
       .update({

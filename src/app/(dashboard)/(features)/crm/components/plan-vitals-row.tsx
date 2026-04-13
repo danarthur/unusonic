@@ -1,22 +1,13 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
-import { motion } from 'framer-motion';
 import {
   Calendar,
   MapPin,
-  Clock,
-  Car,
-  Truck,
-  Package,
-  ChevronDown,
   ExternalLink,
   Pencil,
   Check,
   X as XIcon,
-  Plus,
-  Trash2,
 } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import {
@@ -24,166 +15,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/shared/ui/popover';
-import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
-import { updateFlightCheckStatus } from '../actions/update-flight-check-status';
-import { updateCallTimeSlots } from '../actions/update-call-time-slots';
 import { updateEventDates } from '../actions/update-event-dates';
 import { updateEventVenue } from '../actions/update-event-venue';
 import { updateEventCommand } from '@/features/event-dashboard';
 import { getVenueSuggestions, type VenueSuggestion } from '../actions/lookup';
-import { normalizeLogistics } from './flight-checks/types';
+import { DateFieldRow } from './date-field-row';
+import { CallTimesCard } from './call-times-card';
+import { TransportLogisticsCard } from './transport-logistics-card';
 import type { EventSummaryForPrism } from '../actions/get-event-summary';
-import type { CallTimeSlot, TransportMode, TransportStatus } from '@/entities/event/api/get-event-summary';
 
-const CALL_TIME_BUFFER_HOURS = 2;
-
-/** Status flow for Personal Vehicle and Company Van. */
-const VAN_STATUS_FLOW: TransportStatus[] = [
-  'pending',
-  'loading',
-  'dispatched',
-  'on_site',
-  'returning',
-  'complete',
-];
-
-/** Status flow for Rental Truck (rental-specific checkpoints). */
-const RENTAL_STATUS_FLOW: TransportStatus[] = [
-  'pending_rental',
-  'truck_picked_up',
-  'loading',
-  'dispatched',
-  'on_site',
-  'returning',
-  'truck_returned',
-];
-
-const TRANSPORT_MODE_OPTIONS: { value: TransportMode; label: string }[] = [
-  { value: 'personal_vehicle', label: 'Personal' },
-  { value: 'company_van', label: 'Company' },
-  { value: 'rental_truck', label: 'Rental' },
-];
-
-function getStatusFlow(mode: TransportMode): TransportStatus[] {
-  return mode === 'rental_truck' ? RENTAL_STATUS_FLOW : VAN_STATUS_FLOW;
-}
-
-function getFirstStatusForMode(mode: TransportMode): TransportStatus {
-  return getStatusFlow(mode)[0];
-}
-
-const TRANSPORT_STATUS_LABELS: Record<TransportStatus, string> = {
-  pending: 'Pending',
-  loading: 'Loading',
-  dispatched: 'Dispatched',
-  on_site: 'On Site',
-  returning: 'Returning',
-  complete: 'Complete',
-  pending_rental: 'Pending Rental',
-  truck_picked_up: 'Truck Picked Up',
-  truck_returned: 'Truck Returned',
-};
-
-const TRANSPORT_STATUS_STYLES: Record<
-  TransportStatus,
-  { bg: string; border: string; text: string }
-> = {
-  pending: {
-    bg: 'bg-[oklch(1_0_0_/_0.05)]',
-    border: 'border-[oklch(1_0_0_/_0.10)]',
-    text: 'text-[var(--stage-text-secondary)]',
-  },
-  pending_rental: {
-    bg: 'bg-[oklch(1_0_0_/_0.05)]',
-    border: 'border-[oklch(1_0_0_/_0.10)]',
-    text: 'text-[var(--stage-text-secondary)]',
-  },
-  truck_picked_up: {
-    bg: 'bg-[var(--color-unusonic-warning)]/10',
-    border: 'border-[var(--color-unusonic-warning)]/40',
-    text: 'text-[var(--color-unusonic-warning)]',
-  },
-  loading: {
-    bg: 'bg-[var(--color-unusonic-warning)]/10',
-    border: 'border-[var(--color-unusonic-warning)]/40',
-    text: 'text-[var(--color-unusonic-warning)]',
-  },
-  dispatched: {
-    bg: 'bg-[var(--color-unusonic-info)]/10',
-    border: 'border-[var(--color-unusonic-info)]/40',
-    text: 'text-[var(--color-unusonic-info)]',
-  },
-  on_site: {
-    bg: 'bg-[var(--color-unusonic-success)]/10',
-    border: 'border-[var(--color-unusonic-success)]/40',
-    text: 'text-[var(--color-unusonic-success)]',
-  },
-  returning: {
-    bg: 'bg-[var(--color-unusonic-info)]/10',
-    border: 'border-[var(--color-unusonic-info)]/40',
-    text: 'text-[var(--color-unusonic-info)]',
-  },
-  complete: {
-    bg: 'bg-[var(--color-unusonic-success)]/10',
-    border: 'border-[var(--color-unusonic-success)]/40',
-    text: 'text-[var(--color-unusonic-success)]',
-  },
-  truck_returned: {
-    bg: 'bg-[var(--color-unusonic-success)]/10',
-    border: 'border-[var(--color-unusonic-success)]/40',
-    text: 'text-[var(--color-unusonic-success)]',
-  },
-};
-
-function getDefaultCallTime(startsAt: string | null): string {
-  if (!startsAt) return 'TBD';
-  const d = new Date(startsAt);
-  d.setHours(d.getHours() - CALL_TIME_BUFFER_HOURS);
-  return d.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function getCallTimeDisplay(
-  startsAt: string | null,
-  callTimeOverride: string | null | undefined
-): string {
-  if (callTimeOverride) {
-    return new Date(callTimeOverride).toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  }
-  return getDefaultCallTime(startsAt);
-}
-
-function getCallTimeOffset(
-  startsAt: string | null,
-  callTimeOverride: string | null | undefined
-): string | null {
-  if (!startsAt) return null;
-  const showMs = new Date(startsAt).getTime();
-  const callMs = callTimeOverride
-    ? new Date(callTimeOverride).getTime()
-    : showMs - CALL_TIME_BUFFER_HOURS * 60 * 60 * 1000;
-  const diffMs = showMs - callMs;
-  if (diffMs <= 0) return null;
-  const hours = Math.floor(diffMs / (60 * 60 * 1000));
-  const mins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
-  if (hours === 0) return `${mins}m before show`;
-  if (mins === 0) return `${hours}h before show`;
-  return `${hours}h ${mins}m before show`;
-}
-
-function googleMapsUrl(address: string): string {
-  if (!address || address === '—') return 'https://www.google.com/maps';
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-}
+// ─── Date/time helpers ───────────────────────────────────────────────────────
 
 function formatEventDateTime(startsAt: string | null, endsAt: string | null): {
   date: string;
@@ -242,559 +83,12 @@ function combineDateAndTime(datePart: string, timePart: string): string {
   return new Date(`${datePart}T${timePart}`).toISOString();
 }
 
-/** Resolve effective transport mode and status from run_of_show_data (with legacy truck_status fallback). */
-function resolveTransport(
-  runOfShowData: EventSummaryForPrism['run_of_show_data'],
-  logistics: Record<string, unknown>
-): { mode: TransportMode; status: TransportStatus } {
-  const mode = (runOfShowData?.transport_mode ?? 'company_van') as TransportMode;
-  const flow = getStatusFlow(mode);
-  const raw = runOfShowData?.transport_status ?? logistics.truck_status ?? null;
-  const validStatus = raw && flow.includes(raw as TransportStatus) ? (raw as TransportStatus) : flow[0];
-  return { mode, status: validStatus };
+function googleMapsUrl(address: string): string {
+  if (!address || address === '\u2014') return 'https://www.google.com/maps';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
-const MODE_ICONS = {
-  personal_vehicle: Car,
-  company_van: Truck,
-  rental_truck: Package,
-} as const;
-
-type TransportLogisticsCardProps = {
-  eventId: string;
-  runOfShowData: EventSummaryForPrism['run_of_show_data'];
-  onUpdated: () => void;
-};
-
-function TransportLogisticsCard({
-  eventId,
-  runOfShowData,
-  onUpdated,
-}: TransportLogisticsCardProps) {
-  const logistics = normalizeLogistics(runOfShowData);
-  const { mode: initialMode, status: initialStatus } = resolveTransport(runOfShowData, logistics);
-
-  const [optimisticMode, setOptimisticMode] = useState<TransportMode | null>(null);
-  const [optimisticStatus, setOptimisticStatus] = useState<TransportStatus | null>(null);
-  const [updating, setUpdating] = useState(false);
-  const [modeOpen, setModeOpen] = useState(false);
-
-  const displayMode = optimisticMode ?? initialMode;
-  const flow = getStatusFlow(displayMode);
-  const displayStatus = optimisticStatus ?? initialStatus;
-  const style = TRANSPORT_STATUS_STYLES[displayStatus];
-  const ModeIcon = MODE_ICONS[displayMode];
-
-  const cycleStatus = useCallback(async () => {
-    const idx = flow.indexOf(displayStatus);
-    const nextIdx = (idx + 1) % flow.length;
-    const next = flow[nextIdx];
-    setOptimisticStatus(next);
-    setUpdating(true);
-    const result = await updateFlightCheckStatus(eventId, {
-      transport_status: next,
-    });
-    setUpdating(false);
-    setOptimisticStatus(null);
-    if (result.success) {
-      onUpdated();
-    } else {
-      toast.error(result.error ?? 'Failed to update transport status.');
-    }
-  }, [eventId, displayStatus, flow, onUpdated]);
-
-  const setMode = useCallback(
-    async (newMode: TransportMode) => {
-      setModeOpen(false);
-      if (newMode === displayMode) return;
-      const firstStatus = getFirstStatusForMode(newMode);
-      setOptimisticMode(newMode);
-      setOptimisticStatus(firstStatus);
-      setUpdating(true);
-      const result = await updateFlightCheckStatus(eventId, {
-        transport_mode: newMode,
-        transport_status: firstStatus,
-      });
-      setUpdating(false);
-      setOptimisticMode(null);
-      setOptimisticStatus(null);
-      if (result.success) {
-        onUpdated();
-      } else {
-        toast.error(result.error ?? 'Failed to update transport mode.');
-      }
-    },
-    [eventId, displayMode, onUpdated]
-  );
-
-  return (
-    <motion.div
-      layout
-      transition={STAGE_LIGHT}
-      className={`rounded-[var(--stage-radius-panel)] border ${style.border} ${style.bg} transition-colors`}
-    >
-      <StagePanel elevated className="p-6 sm:p-7 rounded-[var(--stage-radius-panel)] flex flex-col gap-5 min-h-[130px]">
-        <div className="flex items-center gap-4">
-          <ModeIcon
-            size={22}
-            className={`shrink-0 ${style.text}`}
-            aria-hidden
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)] mb-2">
-              Transport
-            </p>
-            <Popover open={modeOpen} onOpenChange={setModeOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  disabled={updating}
-                  className="inline-flex items-center gap-1.5 text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug hover:text-[var(--stage-accent)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded disabled:opacity-60"
-                >
-                  {TRANSPORT_MODE_OPTIONS.find((o) => o.value === displayMode)?.label ?? displayMode}
-                  <ChevronDown size={14} className="text-[var(--stage-text-tertiary)]" aria-hidden />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-48 p-1">
-                {TRANSPORT_MODE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setMode(opt.value)}
-                    className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={updating ? undefined : cycleStatus}
-          disabled={updating}
-          className="mt-3 flex items-center justify-between gap-3 w-full rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.05)] py-3 px-4 hover:bg-[oklch(1_0_0_/_0.10)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 text-left"
-        >
-          <motion.span
-            key={displayStatus}
-            initial={{ opacity: 0, y: 2 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={STAGE_LIGHT}
-            className={`font-medium tracking-tight text-base truncate ${style.text}`}
-          >
-            {updating ? '…' : TRANSPORT_STATUS_LABELS[displayStatus]}
-          </motion.span>
-          <span className="text-xs text-[var(--stage-text-tertiary)] shrink-0">Next</span>
-        </button>
-      </StagePanel>
-    </motion.div>
-  );
-}
-
-// ─── DateFieldRow ─────────────────────────────────────────────────────────────
-
-type DateFieldRowProps = {
-  inputType: 'date' | 'time';
-  prefix?: string;
-  display: string;
-  isEditing: boolean;
-  value: string;
-  saving: boolean;
-  className?: string;
-  onChange: (v: string) => void;
-  onOpen: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-};
-
-function DateFieldRow({
-  inputType, prefix, display, isEditing, value, saving, className = '',
-  onChange, onOpen, onSave, onCancel,
-}: DateFieldRowProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Close when focus leaves this row entirely (e.g. clicking outside)
-  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
-    if (containerRef.current?.contains(e.relatedTarget as Node)) return;
-    onCancel();
-  };
-
-  return (
-    // group is on the outer div so hover applies to the whole row
-    <div
-      ref={containerRef}
-      className="group flex items-center gap-1.5 min-w-0"
-      onBlur={isEditing ? handleBlur : undefined}
-    >
-      {prefix && (
-        <span className="text-[10px] font-mono text-[var(--stage-text-secondary)]/50 uppercase tracking-wider shrink-0 leading-none mt-px select-none">
-          {prefix}
-        </span>
-      )}
-      {isEditing ? (
-        <>
-          <input
-            type={inputType}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); onSave(); }
-              if (e.key === 'Escape') onCancel();
-            }}
-            autoFocus
-            className="min-w-0 flex-1 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.15)] rounded-md px-1.5 py-0.5 text-[var(--stage-text-primary)] text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-          />
-          {/* onMouseDown prevent keeps input focused so the click event fires */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={onSave}
-            disabled={saving}
-            aria-label="Save"
-            className="shrink-0 p-0.5 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors"
-          >
-            <Check size={13} />
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={onCancel}
-            aria-label="Cancel"
-            className="shrink-0 p-0.5 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors"
-          >
-            <XIcon size={13} />
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={onOpen}
-          className={`flex items-center gap-1.5 min-w-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded ${className}`}
-        >
-          <span className="text-sm text-[var(--stage-text-primary)] group-hover:text-[var(--stage-accent)] transition-colors truncate">
-            {display}
-          </span>
-          <Pencil
-            size={11}
-            className="shrink-0 text-transparent group-hover:text-[var(--stage-text-tertiary)] transition-colors"
-            aria-hidden
-          />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ─── CallTimesCard ────────────────────────────────────────────────────────────
-
-const DEFAULT_SLOT_TEMPLATES = [
-  { id: 'load_in', label: 'Load-in', offsetHours: -4 },
-  { id: 'av', label: 'AV / Production', offsetHours: -2 },
-  { id: 'doors', label: 'Doors', offsetHours: -0.5 },
-];
-
-function makeDefaultSlots(startsAt: string): CallTimeSlot[] {
-  const base = new Date(startsAt).getTime();
-  return DEFAULT_SLOT_TEMPLATES.map((t) => ({
-    id: t.id,
-    label: t.label,
-    time: new Date(base + t.offsetHours * 60 * 60 * 1000).toISOString(),
-  }));
-}
-
-function formatSlotTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function toDatetimeLocal(iso: string): string {
-  return new Date(iso).toISOString().slice(0, 16);
-}
-
-type CallTimesCardProps = {
-  eventId: string;
-  runOfShowData: EventSummaryForPrism['run_of_show_data'];
-  startsAt: string | null;
-  onUpdated: () => void;
-};
-
-function CallTimesCard({ eventId, runOfShowData, startsAt, onUpdated }: CallTimesCardProps) {
-  const rawSlots = (runOfShowData?.call_time_slots ?? null) as CallTimeSlot[] | null;
-  const legacyOverride = runOfShowData?.call_time_override ?? null;
-
-  const [slots, setSlots] = useState<CallTimeSlot[]>(rawSlots ?? []);
-  const [saving, setSaving] = useState(false);
-  // editing: 'new' = new row being entered, or slot id = that row in edit mode
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editLabel, setEditLabel] = useState('');
-  const [editTime, setEditTime] = useState('');
-
-  const openEdit = (slot: CallTimeSlot) => {
-    setEditingId(slot.id);
-    setEditLabel(slot.label);
-    setEditTime(toDatetimeLocal(slot.time));
-  };
-
-  const openNew = () => {
-    const defaultTime = startsAt
-      ? new Date(new Date(startsAt).getTime() - 2 * 60 * 60 * 1000).toISOString().slice(0, 16)
-      : '';
-    setEditingId('new');
-    setEditLabel('');
-    setEditTime(defaultTime);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditLabel('');
-    setEditTime('');
-  };
-
-  const saveEdit = async () => {
-    if (!editLabel.trim() || !editTime) return;
-    const isoTime = new Date(editTime).toISOString();
-    let next: CallTimeSlot[];
-    if (editingId === 'new') {
-      const newId = editLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-      let id = newId;
-      let n = 0;
-      while (slots.some((s) => s.id === id)) {
-        n += 1;
-        id = `${newId}_${n}`;
-      }
-      next = [...slots, { id, label: editLabel.trim(), time: isoTime }];
-    } else {
-      next = slots.map((s) => s.id === editingId ? { ...s, label: editLabel.trim(), time: isoTime } : s);
-    }
-    setSlots(next);
-    cancelEdit();
-    setSaving(true);
-    const result = await updateCallTimeSlots(eventId, next);
-    setSaving(false);
-    if (result.success) onUpdated();
-  };
-
-  const deleteSlot = async (id: string) => {
-    const next = slots.filter((s) => s.id !== id);
-    setSlots(next);
-    setSaving(true);
-    const result = await updateCallTimeSlots(eventId, next);
-    setSaving(false);
-    if (result.success) onUpdated();
-  };
-
-  const addDefaults = async () => {
-    if (!startsAt) return;
-    const next = makeDefaultSlots(startsAt);
-    setSlots(next);
-    setSaving(true);
-    const result = await updateCallTimeSlots(eventId, next);
-    setSaving(false);
-    if (result.success) onUpdated();
-  };
-
-  // Keep local state in sync when data reloads
-  const prevRaw = useRef(rawSlots);
-  if (prevRaw.current !== rawSlots) {
-    prevRaw.current = rawSlots;
-    setSlots(rawSlots ?? []);
-  }
-
-  const hasSlots = slots.length > 0;
-
-  return (
-    <StagePanel elevated className="p-6 sm:p-7 rounded-[var(--stage-radius-panel)] flex flex-col gap-5 min-h-[130px]">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Clock size={14} className="shrink-0 text-[var(--stage-text-secondary)]/70" aria-hidden />
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
-            Call times
-          </p>
-          {saving && (
-            <span className="text-[10px] text-[var(--stage-text-secondary)]/50">saving…</span>
-          )}
-        </div>
-        {hasSlots && (
-          <button
-            type="button"
-            onClick={openNew}
-            disabled={editingId !== null}
-            className="p-1 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-40"
-            title="Add slot"
-          >
-            <Plus size={14} aria-hidden />
-          </button>
-        )}
-      </div>
-
-      {hasSlots ? (
-        <div className="flex flex-col gap-2">
-          {slots.map((slot) =>
-            editingId === slot.id ? (
-              <div key={slot.id} className="flex flex-col gap-1.5">
-                <input
-                  type="text"
-                  value={editLabel}
-                  onChange={(e) => setEditLabel(e.target.value)}
-                  placeholder="Slot label (e.g. Load-in)"
-                  autoFocus
-                  className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                />
-                <div className="flex gap-1.5 items-center">
-                  <input
-                    type="datetime-local"
-                    value={editTime}
-                    onChange={(e) => setEditTime(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                    className="flex-1 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                  />
-                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors">
-                    <Check size={14} />
-                  </button>
-                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] transition-colors">
-                    <XIcon size={14} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div key={slot.id} className="group flex items-center justify-between gap-2 py-1">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-mono text-[var(--stage-text-secondary)]/60 uppercase tracking-wider leading-none">{slot.label}</p>
-                  <p className="text-sm text-[var(--stage-text-primary)] font-medium tracking-tight mt-0.5">{formatSlotTime(slot.time)}</p>
-                </div>
-                <div className="flex items-center gap-1 invisible group-hover:visible transition-[visibility]">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(slot)}
-                    disabled={editingId !== null}
-                    className="p-1 rounded text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none disabled:opacity-40 transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil size={11} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteSlot(slot.id)}
-                    disabled={saving || editingId !== null}
-                    className="p-1 rounded text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 focus:outline-none disabled:opacity-40 transition-colors"
-                    title="Remove"
-                  >
-                    <Trash2 size={11} aria-hidden />
-                  </button>
-                </div>
-              </div>
-            )
-          )}
-          {editingId === 'new' && (
-            <div className="flex flex-col gap-1.5 mt-1">
-              <input
-                type="text"
-                value={editLabel}
-                onChange={(e) => setEditLabel(e.target.value)}
-                placeholder="Slot label (e.g. Soundcheck)"
-                autoFocus
-                className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-              />
-              <div className="flex gap-1.5 items-center">
-                <input
-                  type="datetime-local"
-                  value={editTime}
-                  onChange={(e) => setEditTime(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                  className="flex-1 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                />
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors">
-                  <Check size={14} />
-                </button>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] transition-colors">
-                  <XIcon size={14} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Empty state — no slots configured yet */
-        <div className="flex flex-col gap-3 flex-1">
-          {legacyOverride ? (
-            <div>
-              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug">
-                {getCallTimeDisplay(startsAt, legacyOverride)}
-              </p>
-              <p className="text-xs text-[var(--stage-text-secondary)]/60 mt-0.5">
-                {getCallTimeOffset(startsAt, legacyOverride) ?? 'Single call time'}
-              </p>
-            </div>
-          ) : (
-            <div>
-              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug">
-                {getCallTimeDisplay(startsAt, null)}
-              </p>
-              <p className="text-xs text-[var(--stage-text-secondary)]/60 mt-0.5">
-                Auto · {getCallTimeOffset(startsAt, null) ?? '—'}
-              </p>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {startsAt && (
-              <button
-                type="button"
-                onClick={addDefaults}
-                disabled={saving}
-                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-medium tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
-              >
-                <Plus size={12} aria-hidden />
-                Add slots
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={openNew}
-              disabled={saving}
-              className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-medium tracking-tight text-[var(--stage-text-secondary)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60 transition-colors"
-            >
-              Custom slot
-            </button>
-          </div>
-          {editingId === 'new' && (
-            <div className="flex flex-col gap-1.5">
-              <input
-                type="text"
-                value={editLabel}
-                onChange={(e) => setEditLabel(e.target.value)}
-                placeholder="Slot label (e.g. Load-in)"
-                autoFocus
-                className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-              />
-              <div className="flex gap-1.5 items-center">
-                <input
-                  type="datetime-local"
-                  value={editTime}
-                  onChange={(e) => setEditTime(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                  className="flex-1 rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-2.5 py-1.5 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                />
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} disabled={saving} aria-label="Save" className="shrink-0 p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45 transition-colors">
-                  <Check size={14} />
-                </button>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelEdit} aria-label="Cancel" className="shrink-0 p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] transition-colors">
-                  <XIcon size={14} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </StagePanel>
-  );
-}
-
-// ─── PlanVitalsRow ────────────────────────────────────────────────────────────
+// ─── PlanVitalsRow ───────────────────────────────────────────────────────────
 
 type PlanVitalsRowProps = {
   eventId: string;
@@ -812,16 +106,12 @@ export function PlanVitalsRow({
   onEventUpdated,
 }: PlanVitalsRowProps) {
   const runOfShowData = event.run_of_show_data ?? null;
-  const logistics = normalizeLogistics(runOfShowData);
 
   const venueEntityId = event.venue_entity_id ?? null;
   const locationName =
     event.venue_name ?? event.location_name ?? null;
   const locationAddress =
     event.venue_address ?? event.location_address ?? event.location_name ?? '';
-  const hasAddress = Boolean(
-    locationAddress && locationAddress !== '—' && locationAddress.trim()
-  );
 
   // Location card — venue search state
   const [locationOpen, setLocationOpen] = useState(false);
@@ -965,8 +255,8 @@ export function PlanVitalsRow({
         {/* Header */}
         <div className="flex items-center gap-2">
           <Calendar size={14} className="shrink-0 text-[var(--stage-text-secondary)]/70" aria-hidden />
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
-            Event date / time
+          <p className="stage-label">
+            Show date / time
           </p>
         </div>
         {/* Values — stacked vertically so date and times don't get cut off */}
@@ -986,7 +276,7 @@ export function PlanVitalsRow({
           <DateFieldRow
             inputType="time"
             prefix="Start"
-            display={dateTime.startTime || '—'}
+            display={dateTime.startTime || '\u2014'}
             isEditing={editingField === 'startTime'}
             value={fieldValue}
             saving={savingField}
@@ -998,7 +288,7 @@ export function PlanVitalsRow({
           <DateFieldRow
             inputType="time"
             prefix="End"
-            display={dateTime.endTime ?? '—'}
+            display={dateTime.endTime ?? '\u2014'}
             isEditing={editingField === 'endTime'}
             value={fieldValue}
             saving={savingField}
@@ -1008,12 +298,12 @@ export function PlanVitalsRow({
             onCancel={cancelField}
           />
           {dateTime.multiDay && (
-            <span className="inline-block text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]">
+            <span className="inline-block stage-label px-1.5 py-0.5 rounded bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]">
               Multi-day
             </span>
           )}
           {fieldError && (
-            <p className="text-[10px] text-[var(--color-unusonic-error)]">{fieldError}</p>
+            <p className="text-label text-[var(--color-unusonic-error)]">{fieldError}</p>
           )}
           <div className="border-t border-[oklch(1_0_0_/_0.05)] pt-3 flex flex-col gap-3">
             {(['loadIn', 'loadOut'] as const).map((field) => {
@@ -1021,11 +311,11 @@ export function PlanVitalsRow({
               const label = field === 'loadIn' ? 'Load-in' : 'Load-out';
               const display = iso
                 ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                : '—';
+                : '\u2014';
               const isEditing = editingLoadField === field;
               return (
                 <div key={field} className="group flex items-center gap-1.5 min-w-0">
-                  <span className="text-[10px] font-mono text-[var(--stage-text-secondary)]/50 uppercase tracking-wider shrink-0 leading-none mt-px select-none">
+                  <span className="stage-label text-[var(--stage-text-tertiary)] shrink-0 leading-none mt-px select-none">
                     {label}
                   </span>
                   {isEditing ? (
@@ -1067,7 +357,7 @@ export function PlanVitalsRow({
                       onClick={() => openLoadField(field)}
                       className="flex items-center gap-1.5 min-w-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
                     >
-                      <span className="text-sm text-[var(--stage-text-primary)] group-hover:text-[var(--stage-accent)] transition-colors truncate">
+                      <span className="stage-readout group-hover:text-[var(--stage-accent)] transition-colors truncate">
                         {display}
                       </span>
                       <Pencil size={11} className="shrink-0 text-transparent group-hover:text-[var(--stage-text-tertiary)] transition-colors" aria-hidden />
@@ -1077,7 +367,7 @@ export function PlanVitalsRow({
               );
             })}
             {loadFieldError && (
-              <p className="text-[10px] text-[var(--color-unusonic-error)]">{loadFieldError}</p>
+              <p className="text-label text-[var(--color-unusonic-error)]">{loadFieldError}</p>
             )}
           </div>
         </div>
@@ -1098,20 +388,20 @@ export function PlanVitalsRow({
             >
               <div className="flex items-center gap-2">
                 <MapPin size={14} className="shrink-0 text-[var(--stage-text-secondary)]/70" aria-hidden />
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80">
+                <p className="stage-label">
                   Location
                 </p>
               </div>
               <div className="min-w-0">
-                <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-snug truncate group-hover:text-[var(--stage-accent)] transition-colors">
+                <p className="stage-readout leading-snug truncate group-hover:text-[var(--stage-accent)] transition-colors">
                   {locationName}
                 </p>
                 {locationAddress && locationAddress !== locationName && (
-                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1 truncate leading-relaxed">
+                  <p className="stage-readout-sm text-[var(--stage-text-secondary)] mt-1 truncate leading-relaxed">
                     {locationAddress}
                   </p>
                 )}
-                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--stage-text-secondary)]/60 group-hover:text-[var(--stage-text-secondary)] transition-colors">
+                <span className="mt-2 inline-flex items-center gap-1 text-label font-medium text-[var(--stage-text-secondary)]/60 group-hover:text-[var(--stage-text-secondary)] transition-colors">
                   <Pencil size={9} aria-hidden />
                   Edit
                 </span>
@@ -1125,7 +415,7 @@ export function PlanVitalsRow({
             >
               <div className="flex items-center gap-2">
                 <MapPin size={14} className="shrink-0 text-[var(--stage-text-secondary)]/50 group-hover:text-[var(--stage-text-secondary)] transition-colors" aria-hidden />
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/60 group-hover:text-[var(--stage-text-tertiary)] transition-colors">
+                <p className="stage-label/60 group-hover:text-[var(--stage-text-tertiary)] transition-colors">
                   Location
                 </p>
               </div>
@@ -1143,9 +433,9 @@ export function PlanVitalsRow({
         <PopoverContent align="start" className="w-72 p-4">
           {locationMode === 'view' && locationName ? (
             <>
-              <p className="text-[var(--stage-text-primary)] font-medium tracking-tight mb-1">{locationName}</p>
+              <p className="stage-readout mb-1">{locationName}</p>
               {locationAddress && locationAddress !== locationName && (
-                <p className="text-sm text-[var(--stage-text-secondary)] mb-3">{locationAddress}</p>
+                <p className="stage-readout-sm text-[var(--stage-text-secondary)] mb-3">{locationAddress}</p>
               )}
               <div className="flex flex-col gap-2">
                 <a
@@ -1181,9 +471,9 @@ export function PlanVitalsRow({
                       type="button"
                       onClick={clearVenue}
                       disabled={savingVenue}
-                      className="text-xs py-1.5 px-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
+                      className="text-xs py-1.5 px-2 rounded-lg border border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
                     >
-                      {savingVenue ? '…' : 'Clear'}
+                      {savingVenue ? '\u2026' : 'Clear'}
                     </button>
                   )}
                 </div>
@@ -1192,7 +482,7 @@ export function PlanVitalsRow({
           ) : (
             /* Search mode */
             <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]/80 mb-3">
+              <p className="stage-label mb-3">
                 {locationMode === 'search' && locationName ? 'Change venue' : 'Set venue'}
               </p>
               <input
@@ -1200,11 +490,11 @@ export function PlanVitalsRow({
                 type="text"
                 value={venueQuery}
                 onChange={(e) => handleVenueQueryChange(e.target.value)}
-                placeholder="Search venues…"
+                placeholder="Search venues\u2026"
                 className="w-full rounded-lg border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               />
               {venueSearching && (
-                <p className="text-xs text-[var(--stage-text-secondary)] px-1">Searching…</p>
+                <p className="text-xs text-[var(--stage-text-secondary)] px-1">Searching\u2026</p>
               )}
               {venueResults.length > 0 && (
                 <ul className="mt-1 max-h-48 overflow-y-auto stage-panel stage-panel-nested rounded-lg list-none">
@@ -1215,11 +505,11 @@ export function PlanVitalsRow({
                           type="button"
                           disabled={savingVenue}
                           onClick={() => selectVenue(r.id)}
-                          className="w-full text-left px-3 py-2.5 hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-60"
+                          className="w-full text-left px-3 py-2.5 hover:bg-[oklch(1_0_0_/_0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
                         >
-                          <p className="text-sm text-[var(--stage-text-primary)] font-medium truncate">{r.name}</p>
+                          <p className="stage-readout truncate">{r.name}</p>
                           {r.address && (
-                            <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">{r.address}</p>
+                            <p className="stage-badge-text text-[var(--stage-text-secondary)] truncate mt-0.5">{r.address}</p>
                           )}
                         </button>
                       </li>
@@ -1248,7 +538,7 @@ export function PlanVitalsRow({
                     rel="noopener noreferrer"
                     className="text-[var(--stage-accent)] hover:underline"
                   >
-                    Add one in Network →
+                    Add one in Network \u2192
                   </a>
                 </p>
               )}

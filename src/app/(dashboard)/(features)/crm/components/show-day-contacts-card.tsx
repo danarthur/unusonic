@@ -73,7 +73,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
         {!editing && (
           <button
             onClick={startEdit}
-            className="inline-flex items-center gap-1.5 text-xs font-medium tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
+            className="stage-badge-text inline-flex items-center gap-1.5 transition-colors hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
             style={{ color: 'var(--stage-text-secondary)' }}
           >
             <Pencil size={13} aria-hidden />
@@ -101,7 +101,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                   gap: 'var(--stage-gap, 6px)',
                   padding: 'var(--stage-gap-wide, 10px)',
                   borderRadius: 'var(--stage-radius-nested, 8px)',
-                  backgroundColor: 'var(--ctx-well, var(--stage-input-bg))',
+                  backgroundColor: 'var(--ctx-well)',
                 }}
               >
                 <button
@@ -118,7 +118,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                   placeholder="Role (e.g. Venue manager)"
                   value={c.role}
                   onChange={(e) => updateField(idx, 'role', e.target.value)}
-                  className="w-full bg-transparent text-sm font-medium tracking-tight placeholder:text-[var(--stage-text-tertiary)] focus:outline-none"
+                  className="w-full bg-transparent text-sm font-medium tracking-tight placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   style={{ color: 'var(--stage-text-primary)' }}
                 />
                 <input
@@ -126,7 +126,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                   placeholder="Name"
                   value={c.name}
                   onChange={(e) => updateField(idx, 'name', e.target.value)}
-                  className="w-full bg-transparent text-sm tracking-tight placeholder:text-[var(--stage-text-tertiary)] focus:outline-none"
+                  className="w-full bg-transparent text-sm tracking-tight placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   style={{ color: 'var(--stage-text-primary)' }}
                 />
                 <input
@@ -134,7 +134,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                   placeholder="Phone"
                   value={c.phone ?? ''}
                   onChange={(e) => updateField(idx, 'phone', e.target.value)}
-                  className="w-full bg-transparent text-sm tracking-tight placeholder:text-[var(--stage-text-tertiary)] focus:outline-none"
+                  className="w-full bg-transparent text-sm tracking-tight placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   style={{ color: 'var(--stage-text-primary)' }}
                 />
                 <input
@@ -142,7 +142,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                   placeholder="Email"
                   value={c.email ?? ''}
                   onChange={(e) => updateField(idx, 'email', e.target.value)}
-                  className="w-full bg-transparent text-sm tracking-tight placeholder:text-[var(--stage-text-tertiary)] focus:outline-none"
+                  className="w-full bg-transparent text-sm tracking-tight placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   style={{ color: 'var(--stage-text-primary)' }}
                 />
               </div>
@@ -151,7 +151,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
             <button
               type="button"
               onClick={addRow}
-              className="flex items-center gap-1.5 text-xs font-medium tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded py-1"
+              className="stage-badge-text flex items-center gap-1.5 transition-colors hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded py-1"
               style={{ color: 'var(--stage-accent)' }}
             >
               <Plus size={13} aria-hidden />
@@ -182,8 +182,8 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={STAGE_LIGHT}
-            className="text-sm"
-            style={{ color: 'var(--stage-text-tertiary)' }}
+            className="stage-field-label"
+            style={{ color: 'var(--stage-text-secondary)' }}
           >
             No contacts added
           </motion.p>
@@ -204,22 +204,19 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                 style={{ gap: '2px' }}
               >
                 <p
-                  className="text-xs font-medium uppercase tracking-widest"
+                  className="stage-label"
                   style={{ color: 'var(--stage-text-tertiary)' }}
                 >
                   {c.role}
                 </p>
-                <p
-                  className="text-sm font-medium tracking-tight"
-                  style={{ color: 'var(--stage-text-primary)' }}
-                >
+                <p className="stage-readout truncate">
                   {c.name}
                 </p>
                 <div className="flex items-center flex-wrap" style={{ gap: 'var(--stage-gap, 8px)' }}>
                   {c.phone && (
                     <a
                       href={`tel:${c.phone}`}
-                      className="inline-flex items-center gap-1 text-xs tracking-tight transition-colors hover:text-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
+                      className="stage-label inline-flex items-center gap-1 transition-colors hover:text-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
                       style={{ color: 'var(--stage-text-secondary)' }}
                     >
                       <Phone size={12} aria-hidden />
@@ -229,7 +226,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                   {c.email && (
                     <a
                       href={`mailto:${c.email}`}
-                      className="inline-flex items-center gap-1 text-xs tracking-tight transition-colors hover:text-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
+                      className="stage-label inline-flex items-center gap-1 transition-colors hover:text-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
                       style={{ color: 'var(--stage-text-secondary)' }}
                     >
                       <Mail size={12} aria-hidden />

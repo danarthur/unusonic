@@ -68,7 +68,7 @@ export async function compileAndSendDaySheet(input: {
     const supabase = await createClient();
 
     // 1. Fetch event details
-    const { data: evt } = await (supabase as any)
+    const { data: evt } = await supabase
       .schema('ops')
       .from('events')
       .select('title, starts_at, location_name, location_address, show_day_contacts, project:projects!inner(workspace_id)')

@@ -14,6 +14,7 @@ export const AUTO_KEYS = [
   'venue_access_confirmed',
   'contract_signed',
   'truck_loaded',
+  'crew_gear_confirmed',
 ] as const;
 
 export type AutoKey = (typeof AUTO_KEYS)[number];
@@ -24,9 +25,10 @@ export const DEFAULT_CHECKLIST_ITEMS: Omit<AdvancingChecklistItem, 'id'>[] = [
   { label: 'Gear pulled', done: false, done_by: null, done_at: null, auto_key: 'gear_all_pulled', sort_order: 2 },
   { label: 'Truck loaded', done: false, done_by: null, done_at: null, auto_key: 'truck_loaded', sort_order: 3 },
   { label: 'Contract signed', done: false, done_by: null, done_at: null, auto_key: 'contract_signed', sort_order: 4 },
-  { label: 'Client brief confirmed', done: false, done_by: null, done_at: null, auto_key: null, sort_order: 5 },
-  { label: 'Parking instructions added', done: false, done_by: null, done_at: null, auto_key: null, sort_order: 6 },
-  { label: 'Load-in time confirmed', done: false, done_by: null, done_at: null, auto_key: null, sort_order: 7 },
+  { label: 'Crew gear confirmed', done: false, done_by: null, done_at: null, auto_key: 'crew_gear_confirmed', sort_order: 5 },
+  { label: 'Client brief confirmed', done: false, done_by: null, done_at: null, auto_key: null, sort_order: 6 },
+  { label: 'Parking instructions added', done: false, done_by: null, done_at: null, auto_key: null, sort_order: 7 },
+  { label: 'Load-in time confirmed', done: false, done_by: null, done_at: null, auto_key: null, sort_order: 8 },
 ];
 
 export const ARCHETYPE_TEMPLATES: Record<string, Omit<AdvancingChecklistItem, 'id'>[]> = {

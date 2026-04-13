@@ -135,7 +135,7 @@ export function StreamCard({
     const result = await cancelEvent(item.id);
     setIsPending(false);
     setConfirmAction(null);
-    if (!result.success) toast.error(result.error ?? 'Failed to cancel event');
+    if (!result.success) toast.error(result.error ?? 'Failed to cancel show');
   };
 
   const handleArchive = async (e: React.MouseEvent) => {
@@ -179,7 +179,7 @@ export function StreamCard({
     const result = await rescheduleEvent(item.id, rescheduleDate);
     setIsPending(false);
     if (result.success) setRescheduleOpen(false);
-    else toast.error(result.error ?? 'Failed to reschedule event');
+    else toast.error(result.error ?? 'Failed to reschedule show');
   };
 
   const handleRescheduleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -201,8 +201,6 @@ export function StreamCard({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
       transition={STAGE_MEDIUM}
       className={cn(className)}
       onMouseEnter={() => setHovered(true)}
@@ -223,7 +221,7 @@ export function StreamCard({
         <div
           className={cn(
             'relative px-4 py-3 transition-colors duration-100',
-            'bg-[var(--stage-surface-elevated)] hover:bg-[var(--stage-surface-raised)]',
+            'bg-[var(--stage-surface-elevated)] hover:bg-[oklch(1_0_0_/_0.08)]',
             itemPhase === 'cancelled' && 'opacity-[0.45]',
           )}
           style={{
@@ -270,22 +268,22 @@ export function StreamCard({
           </div>
 
           {/* Row 2: Client + Meta */}
-          <div className="flex items-center gap-3 mt-2 text-xs text-[var(--stage-text-secondary)] leading-none">
+          <div className="flex items-center gap-3 mt-2 stage-badge-text text-[var(--stage-text-secondary)] leading-none">
             {item.client_name && (
               <span className="flex items-center gap-1 truncate min-w-0">
-                <User size={11} className="shrink-0 opacity-45" aria-hidden />
+                <User size={11} className="shrink-0 text-[var(--stage-text-tertiary)]" aria-hidden />
                 <span className="truncate">{item.client_name}</span>
               </span>
             )}
             {item.event_date && (
               <span className="flex items-center gap-1 shrink-0">
-                <Clock size={11} className="shrink-0 opacity-45" aria-hidden />
+                <Clock size={11} className="shrink-0 text-[var(--stage-text-tertiary)]" aria-hidden />
                 {formatEventDate(item.event_date)}
               </span>
             )}
             {item.location && (
               <span className="flex items-center gap-1 truncate min-w-0">
-                <MapPin size={11} className="shrink-0 opacity-45" aria-hidden />
+                <MapPin size={11} className="shrink-0 text-[var(--stage-text-tertiary)]" aria-hidden />
                 <span className="truncate">{item.location.split(',')[0]}</span>
               </span>
             )}
@@ -322,64 +320,80 @@ export function StreamCard({
                 transition={STAGE_LIGHT}
                 className="overflow-hidden"
               >
-                <div className="flex items-center gap-1.5 mt-2 pt-2" style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}>
-                  {/* Deal: Reopen */}
-                  {showReopenButton && (
-                    <ActionBtn
-                      icon={<RotateCcw size={11} />}
-                      label="Reopen deal"
-                      onClick={handleReopen}
-                      disabled={isPending}
-                    />
-                  )}
-
-                  {/* Deal: Archive */}
-                  {showDealArchiveButtons && (
-                    <ActionBtn
-                      icon={<Archive size={11} />}
-                      label={confirmAction === 'archive' ? 'Confirm?' : 'Archive deal'}
-                      onClick={handleArchive}
-                      disabled={isPending}
-                      active={confirmAction === 'archive'}
-                      variant="warning"
-                    />
-                  )}
-
-                  {/* Deal: Mark lost */}
-                  {showDealLostButton && (
-                    <ActionBtn
-                      icon={<TrendingDown size={11} />}
-                      label={confirmAction === 'lost' ? 'Confirm?' : 'Mark lost'}
-                      onClick={handleMarkLost}
-                      disabled={isPending}
-                      active={confirmAction === 'lost'}
-                      variant="error"
-                    />
-                  )}
-
-                  {/* Event: Reschedule */}
-                  {isEvent && itemPhase !== 'cancelled' && (
-                    <ActionBtn
-                      icon={<CalendarClock size={11} />}
-                      label="Reschedule show"
-                      onClick={handleRescheduleToggle}
-                      disabled={isPending}
-                      active={rescheduleOpen}
-                      variant="info"
-                    />
-                  )}
-
-                  {/* Event: Cancel */}
-                  {isEvent && itemPhase !== 'cancelled' && (
-                    <ActionBtn
-                      icon={<XCircle size={11} />}
-                      label={confirmAction === 'cancel' ? 'Confirm?' : 'Cancel show'}
-                      onClick={handleCancel}
-                      disabled={isPending}
-                      active={confirmAction === 'cancel'}
-                      variant="warning"
-                    />
-                  )}
+                <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}>
+                  <AnimatePresence mode="wait">
+                    {confirmAction ? (
+                      /* ── Confirmation strip ── */
+                      <motion.div
+                        key={`confirm-${confirmAction}`}
+                        initial={{ opacity: 0, y: -2 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -2 }}
+                        transition={STAGE_LIGHT}
+                        className="flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="stage-badge-text text-[var(--stage-text-secondary)] flex-1 truncate">
+                          {confirmAction === 'archive' && 'Archive this deal?'}
+                          {confirmAction === 'lost' && 'Mark this deal as lost?'}
+                          {confirmAction === 'cancel' && 'Cancel this show?'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={
+                            confirmAction === 'archive' ? handleArchive
+                            : confirmAction === 'lost' ? handleMarkLost
+                            : handleCancel
+                          }
+                          disabled={isPending}
+                          className="flex items-center gap-1 px-2 py-0.5 stage-badge-text font-medium rounded-md transition-colors disabled:opacity-45"
+                          style={{
+                            color: confirmAction === 'lost' ? 'var(--color-unusonic-error)' : 'var(--color-unusonic-warning)',
+                            backgroundColor: confirmAction === 'lost'
+                              ? 'color-mix(in oklch, var(--color-unusonic-error) 12%, transparent)'
+                              : 'color-mix(in oklch, var(--color-unusonic-warning) 12%, transparent)',
+                          }}
+                        >
+                          {confirmAction === 'archive' && <><Archive size={10} /> Archive</>}
+                          {confirmAction === 'lost' && <><TrendingDown size={10} /> Mark lost</>}
+                          {confirmAction === 'cancel' && <><XCircle size={10} /> Cancel show</>}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setConfirmAction(null); if (timerRef.current) clearTimeout(timerRef.current); }}
+                          className="px-1.5 py-0.5 stage-badge-text text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors"
+                        >
+                          Dismiss
+                        </button>
+                      </motion.div>
+                    ) : (
+                      /* ── Action buttons (default) ── */
+                      <motion.div
+                        key="actions-default"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={STAGE_LIGHT}
+                        className="flex items-center gap-1.5"
+                      >
+                        {showReopenButton && (
+                          <ActionBtn icon={<RotateCcw size={11} />} label="Reopen deal" onClick={handleReopen} disabled={isPending} />
+                        )}
+                        {showDealArchiveButtons && (
+                          <ActionBtn icon={<Archive size={11} />} label="Archive" onClick={handleArchive} disabled={isPending} variant="warning" />
+                        )}
+                        {showDealLostButton && (
+                          <ActionBtn icon={<TrendingDown size={11} />} label="Lost" onClick={handleMarkLost} disabled={isPending} variant="error" />
+                        )}
+                        {isEvent && itemPhase !== 'cancelled' && (
+                          <ActionBtn icon={<CalendarClock size={11} />} label="Reschedule" onClick={handleRescheduleToggle} disabled={isPending} active={rescheduleOpen} variant="info" />
+                        )}
+                        {isEvent && itemPhase !== 'cancelled' && (
+                          <ActionBtn icon={<XCircle size={11} />} label="Cancel" onClick={handleCancel} disabled={isPending} variant="warning" />
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}
@@ -411,7 +425,7 @@ export function StreamCard({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleRescheduleConfirm(); }}
                     disabled={isPending || !rescheduleDate}
-                    className="flex items-center justify-center size-6 text-[var(--color-unusonic-info)] bg-[oklch(0.55_0.15_250_/_0.10)] text-xs font-medium transition-colors hover:bg-[oklch(0.55_0.15_250_/_0.20)] disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="flex items-center justify-center size-6 text-[var(--color-unusonic-info)] bg-[oklch(0.75_0.15_240_/_0.10)] stage-badge-text font-medium transition-colors hover:bg-[oklch(0.75_0.15_240_/_0.20)] disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
                   >
                     ✓
@@ -419,7 +433,7 @@ export function StreamCard({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setRescheduleOpen(false); setRescheduleDate(item.event_date ?? ''); }}
-                    className="flex items-center justify-center size-6 text-[var(--stage-text-tertiary)] bg-[var(--stage-surface)] text-xs font-medium transition-colors hover:text-[var(--stage-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="flex items-center justify-center size-6 text-[var(--stage-text-tertiary)] bg-[var(--stage-surface)] stage-badge-text font-medium transition-colors hover:text-[var(--stage-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
                   >
                     ✕
@@ -462,7 +476,7 @@ function ActionBtn({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center gap-1 px-1.5 py-0.5 text-label font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45',
+        'flex items-center gap-1 px-1.5 py-0.5 stage-badge-text font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45',
         active && colorVar
           ? 'border'
           : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',

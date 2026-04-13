@@ -7,7 +7,7 @@ import { format, isBefore, startOfDay } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, AlertCircle, ChevronDown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 
 /** Parse "yyyy-MM-dd" as local date. new Date("yyyy-MM-dd") is UTC midnight and shifts to previous day in western timezones. */
 export function parseLocalDateString(dateStr: string): Date {
@@ -66,7 +66,7 @@ function StageDropdown(
         </span>
         <ChevronDown
           size={12}
-          className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-200', open && 'rotate-180')}
+          className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-[80ms]', open && 'rotate-180')}
           aria-hidden
         />
       </button>
@@ -106,10 +106,10 @@ function StageDropdown(
                   }}
                   className={cn(
                     'flex w-full items-center px-3 py-2 text-left text-[length:var(--stage-input-font-size,13px)] tracking-tight transition-colors min-w-0',
-                    o.disabled && 'opacity-30 pointer-events-none',
+                    o.disabled && 'opacity-45 pointer-events-none',
                     o.value === Number(val)
-                      ? 'bg-[var(--ctx-well-hover)] text-[var(--stage-text-primary)] font-medium'
-                      : 'text-[var(--stage-text-secondary)] hover:bg-[var(--ctx-well-hover)] hover:text-[var(--stage-text-primary)]'
+                      ? 'bg-[oklch(1_0_0_/_0.05)] text-[var(--stage-text-primary)] font-medium'
+                      : 'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)]'
                   )}
                 >
                   {o.label}
@@ -134,14 +134,14 @@ export const DAY_PICKER_CLASSNAMES = {
   dropdowns: 'flex gap-2 justify-center',
   dropdown: '',
   weekdays: 'flex gap-1 w-full justify-between',
-  weekday: 'w-9 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] text-center',
+  weekday: 'w-9 py-1.5 stage-label text-center',
   week: 'flex gap-1 w-full justify-between',
   day: 'w-9 h-9 p-0',
   day_button: cn(
     'h-9 w-9 rounded-[var(--stage-radius-input,6px)] text-[length:var(--stage-input-font-size,13px)] font-medium transition-colors',
-    'hover:bg-[var(--stage-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset',
-    'data-[selected]:bg-walnut data-[selected]:text-[oklch(0.10_0_0)] data-[selected]:font-semibold',
-    'data-[outside]:text-[var(--stage-text-secondary)]/50'
+    'stage-hover overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset',
+    'data-[selected]:bg-[var(--stage-accent)] data-[selected]:text-[oklch(0.10_0_0)] data-[selected]:font-medium',
+    'data-[outside]:text-[var(--stage-text-tertiary)]'
   ),
   today: 'bg-[var(--today-bg)] ring-1 ring-[var(--today-ring)]',
 } as const;
@@ -178,7 +178,7 @@ export function CalendarPanel({ value, onChange, onClose, className }: CalendarP
       )}
     >
       <div className="px-4 pt-4 pb-1">
-        <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">Choose date</p>
+        <p className="stage-label">Choose date</p>
       </div>
       <div className="p-4 pt-2">
       <DayPicker
@@ -312,7 +312,7 @@ export function CeramicDatePicker({
           'flex w-full min-w-[11rem] max-w-full items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] transition-colors duration-75',
           isPastDate
             ? 'border-[var(--color-unusonic-warning)]/60 bg-[var(--color-unusonic-warning)]/5 text-[var(--stage-text-primary)]'
-            : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]',
+            : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] stage-hover overflow-hidden',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
         )}
       >
@@ -325,7 +325,7 @@ export function CeramicDatePicker({
       {isPastDate && (
         <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-unusonic-warning)]">
           <AlertCircle size={12} strokeWidth={1.5} />
-          This date is in the past — use for logging historical events
+          This date is in the past — use for logging past shows
         </p>
       )}
 
@@ -351,7 +351,7 @@ export function CeramicDatePicker({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            transition={STAGE_NAV_CROSSFADE}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--stage-void)]/40"
             onClick={() => setOpen(false)}
           >

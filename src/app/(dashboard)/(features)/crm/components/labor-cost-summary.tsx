@@ -25,7 +25,7 @@ export function LaborCostSummary({ crewRows, proposalTotal }: LaborCostSummaryPr
       <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
         <div className="flex items-center gap-2">
           <DollarSign size={14} className="text-[var(--stage-text-tertiary)] shrink-0" aria-hidden />
-          <span className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>Labor</span>
+          <span className="stage-label">Labor</span>
         </div>
         <p className="text-sm tracking-tight mt-2" style={{ color: 'var(--stage-text-tertiary)' }}>
           No crew assigned
@@ -50,25 +50,25 @@ export function LaborCostSummary({ crewRows, proposalTotal }: LaborCostSummaryPr
       <div className="flex items-center gap-2 mb-2">
         <DollarSign size={14} className="text-[var(--stage-text-tertiary)] shrink-0" aria-hidden />
         <span className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>Labor</span>
-        <span className="ml-auto text-[10px] tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
+        <span className="ml-auto text-label tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
           {assignedCount} crew
         </span>
       </div>
 
       {/* Main readout */}
-      <p className="stage-readout tracking-tight tabular-nums" style={{ color: 'var(--stage-text-primary)' }}>
+      <p className="stage-readout">
         {currencyFmt.format(totalLabor)}
       </p>
 
       {/* Proposal + margin */}
       {proposalTotal != null && (
         <div className="flex flex-col gap-1 mt-2">
-          <p className="text-xs tracking-tight tabular-nums" style={{ color: 'var(--stage-text-secondary)' }}>
+          <p className="stage-readout-sm" style={{ color: 'var(--stage-text-secondary)' }}>
             Proposal: {currencyFmt.format(proposalTotal)}
           </p>
           {projectedMargin != null && (
             <p
-              className="text-xs tracking-tight tabular-nums font-medium"
+              className="stage-readout-sm font-medium"
               style={{ color: marginPositive ? 'var(--color-unusonic-success)' : 'var(--color-unusonic-error)' }}
             >
               Margin: {currencyFmt.format(projectedMargin)}
@@ -82,7 +82,7 @@ export function LaborCostSummary({ crewRows, proposalTotal }: LaborCostSummaryPr
       {ratesMissing > 0 && (
         <div className="flex items-center gap-1.5 mt-2">
           <AlertTriangle size={12} className="shrink-0" style={{ color: 'var(--color-unusonic-warning)' }} aria-hidden />
-          <p className="text-[11px] tracking-tight" style={{ color: 'var(--color-unusonic-warning)' }}>
+          <p className="stage-badge-text" style={{ color: 'var(--color-unusonic-warning)' }}>
             {ratesMissing} of {assignedCount} rates missing
           </p>
         </div>

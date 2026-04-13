@@ -55,7 +55,7 @@ export function ClientSummaryCard({ client, compact }: ClientSummaryCardProps) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-medium text-[var(--stage-text-secondary)] tracking-tight">No client linked</p>
-            <p className="text-xs text-[var(--stage-text-tertiary)] truncate mt-0.5">
+            <p className="stage-badge-text text-[var(--stage-text-tertiary)] truncate mt-0.5">
               Link a client when creating a deal to see contact and billing here
             </p>
           </div>
@@ -179,12 +179,12 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
           <SheetTitle>
             Client
           </SheetTitle>
-          <SheetClose className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)]" />
+          <SheetClose className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden" />
         </SheetHeader>
         <SheetBody className="flex flex-col gap-6 px-6 py-5 overflow-y-auto">
           {/* Vitals */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
+            <h3 className="stage-label mb-3">
               Contact
             </h3>
             <div className="space-y-2 text-sm">
@@ -231,7 +231,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
 
           {/* Financials / Billing */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
+            <h3 className="stage-label mb-3">
               Billing address
             </h3>
             <textarea
@@ -249,7 +249,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
 
           {/* History */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
+            <h3 className="stage-label mb-3">
               Past gigs
             </h3>
             <div className="flex items-center gap-2 text-sm text-[var(--stage-text-secondary)]">
@@ -260,7 +260,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
 
           {/* Notes */}
           <section>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-3">
+            <h3 className="stage-label mb-3">
               Client notes
             </h3>
             <textarea

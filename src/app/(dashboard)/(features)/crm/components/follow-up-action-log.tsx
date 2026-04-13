@@ -25,7 +25,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const CHANNEL_DOT_COLORS: Record<string, string> = {
-  phone: 'oklch(0.65 0.15 250)',   // blue
+  phone: 'var(--color-unusonic-info)',   // blue
   sms: 'var(--color-unusonic-success)',     // green
   email: 'var(--color-unusonic-warning)',   // amber
   system: 'var(--stage-text-tertiary)',     // gray
@@ -77,11 +77,11 @@ export function FollowUpActionLog({ dealId }: FollowUpActionLogProps) {
         className="w-full flex items-center justify-between"
       >
         <div className="flex items-center gap-2">
-          <p className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
+          <p className="stage-label">
             Follow-up history
           </p>
           <span
-            className="inline-flex items-center justify-center text-[10px] font-medium tabular-nums"
+            className="inline-flex items-center justify-center stage-badge-text tabular-nums"
             style={{
               color: 'var(--stage-text-tertiary)',
               background: 'oklch(1 0 0 / 0.06)',

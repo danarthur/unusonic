@@ -3,7 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { getCurrentOrgId } from '@/features/network/api/actions';
-import { searchNetworkOrgs } from '@/features/network-data/api/actions';
+import { searchNetworkOrgs } from '@/features/network-data/api/network-read-actions';
 import { searchCrewMembers } from './deal-crew';
 
 // -----------------------------------------------------------------------------
@@ -70,7 +70,7 @@ export async function searchReferrerEntities(query: string): Promise<ReferrerSea
     const companyEmployees: { id: string; name: string; companyName: string }[] = [];
     const matchedCompanyIds = companyMatches.map((c) => c.id);
     if (matchedCompanyIds.length > 0) {
-      const { data: rosterEdges } = await (supabase as any)
+      const { data: rosterEdges } = await supabase
         .schema('cortex')
         .from('relationships')
         .select('source_entity_id, target_entity_id, context_data')
@@ -111,7 +111,7 @@ export async function searchReferrerEntities(query: string): Promise<ReferrerSea
     const personIds = people.map((p) => p.id);
     const personCompanyMap = new Map<string, string>();
     if (personIds.length > 0) {
-      const { data: affiliations } = await (supabase as any)
+      const { data: affiliations } = await supabase
         .schema('cortex')
         .from('relationships')
         .select('source_entity_id, target_entity_id')

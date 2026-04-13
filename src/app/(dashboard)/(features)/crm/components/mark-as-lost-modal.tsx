@@ -11,7 +11,7 @@ import type { LostReason } from '../actions/get-deal';
 const LOST_REASONS: { value: LostReason; label: string; description: string }[] = [
   { value: 'budget',       label: 'Budget',       description: 'Could not afford it' },
   { value: 'competitor',   label: 'Competitor',   description: 'Went with another company' },
-  { value: 'cancelled',    label: 'Cancelled',    description: 'Event cancelled entirely' },
+  { value: 'cancelled',    label: 'Cancelled',    description: 'Show cancelled entirely' },
   { value: 'no_response',  label: 'No response',  description: 'Client went silent' },
   { value: 'scope',        label: 'Scope',        description: 'Outside what you offer' },
   { value: 'timing',       label: 'Timing',       description: 'Already booked that date' },
@@ -65,6 +65,7 @@ export function MarkAsLostModal({ open, onClose, onConfirm }: Props) {
 
           <motion.div
             className="relative z-10 w-full max-w-sm"
+            data-surface="raised"
             initial={{ opacity: 0, y: 16, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -74,13 +75,13 @@ export function MarkAsLostModal({ open, onClose, onConfirm }: Props) {
               {/* Header */}
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-1">Deal outcome</p>
+                  <p className="stage-label mb-1">Deal outcome</p>
                   <h2 className="text-[var(--stage-text-primary)] font-medium tracking-tight text-lg leading-none">Why was this lost?</h2>
                 </div>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                  className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                   aria-label="Close"
                 >
                   <X size={16} strokeWidth={1.5} aria-hidden />
@@ -98,13 +99,13 @@ export function MarkAsLostModal({ open, onClose, onConfirm }: Props) {
                       'flex flex-col gap-0.5 rounded-2xl border px-4 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
                       reason === value
                         ? 'border-[var(--color-unusonic-error)]/60 bg-[var(--color-unusonic-error)]/10 text-[var(--color-unusonic-error)]'
-                        : 'border-[oklch(1_0_0_/_0.10)] hover:border-[oklch(1_0_0_/_0.20)] hover:bg-[var(--stage-surface-hover)] text-[var(--stage-text-secondary)]'
+                        : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-card)] hover:border-[oklch(1_0_0_/_0.20)] stage-hover overflow-hidden text-[var(--stage-text-secondary)]'
                     )}
                   >
                     <span className={cn('text-sm font-medium tracking-tight', reason === value ? 'text-[var(--color-unusonic-error)]' : 'text-[var(--stage-text-primary)]')}>
                       {label}
                     </span>
-                    <span className="text-[11px] leading-snug opacity-70">{description}</span>
+                    <span className="text-field-label leading-snug text-[var(--stage-text-secondary)]">{description}</span>
                   </button>
                 ))}
               </div>
@@ -120,7 +121,7 @@ export function MarkAsLostModal({ open, onClose, onConfirm }: Props) {
                     transition={STAGE_HEAVY}
                     className="overflow-hidden"
                   >
-                    <label className="block text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider mb-1.5">
+                    <label className="block stage-label mb-1.5">
                       Which company? (optional)
                     </label>
                     <input
@@ -129,7 +130,7 @@ export function MarkAsLostModal({ open, onClose, onConfirm }: Props) {
                       onChange={(e) => setCompetitorName(e.target.value)}
                       placeholder="e.g. Pinnacle Productions"
                       autoFocus
-                      className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface-raised)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      className="w-full rounded-xl border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] px-3 py-2.5 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     />
                   </motion.div>
                 )}
@@ -141,7 +142,7 @@ export function MarkAsLostModal({ open, onClose, onConfirm }: Props) {
                   type="button"
                   onClick={handleClose}
                   disabled={submitting}
-                  className="flex-1 rounded-xl border border-[oklch(1_0_0_/_0.10)] py-2.5 text-sm font-medium text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
+                  className="flex-1 rounded-xl border border-[oklch(1_0_0_/_0.10)] py-2.5 text-sm font-medium text-[var(--stage-text-secondary)] stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
                 >
                   Cancel
                 </button>
@@ -149,7 +150,7 @@ export function MarkAsLostModal({ open, onClose, onConfirm }: Props) {
                   type="button"
                   onClick={handleConfirm}
                   disabled={!reason || submitting}
-                  className="flex-1 rounded-xl border border-[var(--color-unusonic-error)]/40 bg-[var(--color-unusonic-error)]/10 py-2.5 text-sm font-medium text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-unusonic-error)]/60 disabled:opacity-40 disabled:pointer-events-none"
+                  className="flex-1 rounded-xl border border-[var(--color-unusonic-error)]/40 bg-[var(--color-unusonic-error)]/10 py-2.5 text-sm font-medium text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-unusonic-error)]/60 disabled:opacity-45 disabled:pointer-events-none"
                 >
                   {submitting ? 'Marking lost…' : 'Mark as lost'}
                 </button>

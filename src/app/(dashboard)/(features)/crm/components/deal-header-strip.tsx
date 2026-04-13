@@ -2,9 +2,10 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, MapPin, Building2, Plus, X, Loader2 } from 'lucide-react';
+import { User, MapPin, Building2, Plus, X, Loader2, Eye } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { TimePicker } from '@/shared/ui/time-picker';
@@ -224,7 +225,7 @@ function SlotPicker({
         value={query}
         onChange={(e) => handleSearch(e.target.value)}
         placeholder="Search network…"
-        className="w-full bg-transparent px-4 py-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] border-b border-[oklch(1_0_0_/_0.06)]"
+        className="w-full bg-transparent px-4 py-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] border-b border-[oklch(1_0_0_/_0.06)]"
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
       />
       {loading && (
@@ -556,7 +557,7 @@ export function DealHeaderStrip({
     return (
       <div className="flex items-center gap-1.5 min-w-0">
         <EntityIcon entityType={s.entity_type} className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
-        <span className="text-sm text-[var(--stage-text-primary)] tracking-tight truncate">{s.name}</span>
+        <span className="stage-readout truncate">{s.name}</span>
         {entityId && (
           <a
             href={`/network/entity/${entityId}?kind=external_partner`}
@@ -577,7 +578,7 @@ export function DealHeaderStrip({
   // No nested cards. Spatial grouping and labels provide structure.
   // Editable fields get a bottom-border (LCD well pattern).
   const fieldLabel = "stage-label text-[var(--stage-text-tertiary)] mb-1 select-none leading-none";
-  const emptyValue = "text-sm text-[var(--stage-text-tertiary)] flex items-center gap-1.5";
+  const emptyValue = "stage-field-label text-[var(--stage-text-tertiary)] flex items-center gap-1.5";
   const fieldBlock = "px-3 py-2.5 min-w-0";
   const fieldBlockInteractive = "cursor-pointer [border-radius:var(--stage-radius-input,6px)] hover:bg-[var(--stage-accent-muted)] transition-colors";
 
@@ -593,9 +594,21 @@ export function DealHeaderStrip({
         transition={STAGE_MEDIUM}
       >
         <StagePanel elevated className={cn("p-5", readOnly && "pointer-events-none opacity-45")}>
-          <p className="stage-label text-[var(--stage-text-secondary)] mb-4">
-            Deal
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="stage-label">
+              Deal
+            </p>
+            {deal.event_id && !readOnly && (
+              <Link
+                href={`/preview/deal/${deal.id}`}
+                className="flex items-center gap-1.5 stage-badge-text transition-colors pointer-events-auto opacity-100"
+                style={{ color: 'var(--stage-text-tertiary)' }}
+              >
+                <Eye size={12} strokeWidth={1.5} />
+                Preview portal
+              </Link>
+            )}
+          </div>
 
           <div className="flex flex-col gap-2.5">
 
@@ -614,15 +627,15 @@ export function DealHeaderStrip({
                 value={title ?? ''}
                 onChange={(e) => onTitleChange!(e.target.value)}
                 placeholder="Untitled deal"
-                className="bg-transparent text-sm font-medium text-[var(--stage-text-primary)] tracking-tight focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] min-w-0 w-full placeholder:text-[var(--stage-text-secondary)]"
+                className="bg-transparent stage-readout focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] min-w-0 w-full placeholder:text-[var(--stage-text-secondary)]"
               />
             ) : (
-              <p className="text-sm font-medium text-[var(--stage-text-secondary)] tracking-tight truncate">
+              <p className="stage-readout text-[var(--stage-text-secondary)] truncate">
                 {title || 'Untitled deal'}
               </p>
             )}
             {saving && (
-              <span className="text-[9px] text-[var(--stage-text-tertiary)] tracking-wide mt-1 block">Saving…</span>
+              <span className="text-micro text-[var(--stage-text-tertiary)] tracking-wide mt-1 block">Saving…</span>
             )}
           </div>
 
@@ -640,7 +653,7 @@ export function DealHeaderStrip({
             >
               <p className={fieldLabel}>Date</p>
               {proposedDate ? (
-                <span className="text-sm text-[var(--stage-text-primary)] tracking-tight whitespace-nowrap">
+                <span className="stage-readout whitespace-nowrap">
                   {formatDate(proposedDate)}
                 </span>
               ) : (
@@ -723,7 +736,7 @@ export function DealHeaderStrip({
                 />
               </div>
             ) : (
-              <span className="text-sm text-[var(--stage-text-secondary)] tracking-tight whitespace-nowrap">
+              <span className="stage-readout text-[var(--stage-text-secondary)] whitespace-nowrap">
                 {deal.event_start_time
                   ? `${formatTime12h(deal.event_start_time)}${deal.event_end_time ? ` – ${formatTime12h(deal.event_end_time)}` : ''}`
                   : '—'}
@@ -751,7 +764,7 @@ export function DealHeaderStrip({
               ) : hasLegacyClient ? (
                 <div className="flex items-center gap-1.5 min-w-0">
                   <Building2 className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
-                  <span className="text-sm text-[var(--stage-text-primary)] tracking-tight truncate">{client!.organization.name}</span>
+                  <span className="stage-readout truncate">{client!.organization.name}</span>
                 </div>
               ) : (
                 <span className={emptyValue}>
@@ -808,7 +821,7 @@ export function DealHeaderStrip({
               {ownerLabel ? (
                 <div className="flex items-center gap-1.5 min-w-0">
                   <User className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
-                  <span className="text-sm text-[var(--stage-text-primary)] tracking-tight truncate">{ownerLabel}</span>
+                  <span className="stage-readout truncate">{ownerLabel}</span>
                 </div>
               ) : (
                 <span className={emptyValue}>
@@ -853,7 +866,7 @@ export function DealHeaderStrip({
                   {hasSalesMembers && !showAllMembers && workspaceMembers.length > salesMembers.length && (
                     <button type="button"
                       onClick={(e) => { e.stopPropagation(); setShowAllMembers(true); }}
-                      className="w-full text-left px-4 py-2 text-[11px] uppercase tracking-widest text-[var(--stage-text-tertiary)] hover:bg-[var(--stage-accent-muted)] transition-colors border-t border-[oklch(1_0_0_/_0.06)]">
+                      className="w-full text-left px-4 py-2 stage-label text-field-label text-[var(--stage-text-tertiary)] hover:bg-[var(--stage-accent-muted)] transition-colors border-t border-[oklch(1_0_0_/_0.06)]">
                       Show all team
                     </button>
                   )}
@@ -897,17 +910,17 @@ export function DealHeaderStrip({
             <p className={cn(fieldLabel, "mb-0 shrink-0")}>Type</p>
             {eventArchetype ? (
               readOnly ? (
-                <span className="text-sm text-[var(--stage-text-secondary)] capitalize">{eventArchetype.replace(/_/g, ' ')}</span>
+                <span className="stage-readout text-[var(--stage-text-secondary)] capitalize">{eventArchetype.replace(/_/g, ' ')}</span>
               ) : (
                 <button type="button" onClick={handleOpenArchetypePicker}
-                  className="text-sm text-[var(--stage-text-secondary)] px-2.5 py-1 capitalize hover:bg-[var(--stage-accent-muted)] transition-colors"
+                  className="stage-readout text-[var(--stage-text-secondary)] px-2.5 py-1 capitalize hover:bg-[var(--stage-accent-muted)] transition-colors"
                   style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}>
                   {eventArchetype.replace(/_/g, ' ')}
                 </button>
               )
             ) : !readOnly ? (
               <button type="button" onClick={handleOpenArchetypePicker}
-                className="text-sm px-2.5 py-1 text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors flex items-center gap-1.5"
+                className="stage-field-label px-2.5 py-1 text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors flex items-center gap-1.5"
                 style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}>
                 <Plus size={10} />add type
               </button>
@@ -996,7 +1009,7 @@ export function DealHeaderStrip({
                     className="w-full text-left border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.03)] px-4 py-3 text-sm hover:bg-[var(--stage-accent-muted)] transition-colors focus:outline-none"
                     style={{ borderRadius: 'var(--stage-radius-panel)' }}
                   >
-                    <span className="font-medium text-[var(--stage-text-primary)]">{c.display_name}</span>
+                    <span className="stage-readout">{c.display_name}</span>
                     {c.email && <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{c.email}</p>}
                   </button>
                 ))}

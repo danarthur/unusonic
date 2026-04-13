@@ -125,7 +125,7 @@ export function AssignCrewSheet({
           {!loading && members.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <Users className="size-10 text-[var(--stage-text-secondary)]/60" strokeWidth={1.5} aria-hidden />
-              <p className="text-sm text-[var(--stage-text-secondary)]">No team members found. Add people on the Network page.</p>
+              <p className="text-sm text-[var(--stage-text-secondary)]">No crew found. Add people from the Network.</p>
               <Link
                 href="/network"
                 className="text-sm font-medium text-[var(--stage-accent)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
@@ -145,7 +145,7 @@ export function AssignCrewSheet({
                         key={pref.entityId}
                         layout
                         transition={STAGE_LIGHT}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.03)] px-4 py-3 transition-colors hover:bg-[var(--stage-surface-hover)] focus-within:ring-2 focus-within:ring-[var(--stage-accent)]"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.03)] px-4 py-3 transition-colors stage-hover overflow-hidden focus-within:ring-2 focus-within:ring-[var(--stage-accent)]"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-[var(--stage-text-primary)] font-medium tracking-tight truncate">{pref.name}</p>
@@ -157,7 +157,7 @@ export function AssignCrewSheet({
                           type="button"
                           onClick={() => handleSelectPreferred(pref)}
                           disabled={assigningId !== null}
-                          className="shrink-0 rounded-[22px] border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] px-3 py-1.5 text-xs font-medium tracking-tight text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                          className="shrink-0 rounded-[22px] border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] px-3 py-1.5 text-xs font-medium tracking-tight text-[var(--stage-text-secondary)] stage-hover overflow-hidden hover:text-[var(--stage-text-primary)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                         >
                           {assigningId === pref.entityId ? '…' : 'Assign'}
                         </button>
@@ -174,7 +174,7 @@ export function AssignCrewSheet({
                     key={member.id}
                     layout
                     transition={STAGE_LIGHT}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.03)] px-4 py-3 transition-colors hover:bg-[var(--stage-surface-hover)] focus-within:ring-2 focus-within:ring-[var(--stage-accent)]"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.03)] px-4 py-3 transition-colors stage-hover overflow-hidden focus-within:ring-2 focus-within:ring-[var(--stage-accent)]"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-[var(--stage-text-primary)] font-medium tracking-tight truncate">{member.name}</p>
@@ -188,7 +188,7 @@ export function AssignCrewSheet({
                       type="button"
                       onClick={() => handleSelect(member)}
                       disabled={assigningId !== null}
-                      className="shrink-0 rounded-[22px] border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] px-3 py-1.5 text-xs font-medium tracking-tight text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      className="shrink-0 rounded-[22px] border border-[oklch(1_0_0_/_0.10)] bg-[oklch(1_0_0_/_0.06)] px-3 py-1.5 text-xs font-medium tracking-tight text-[var(--stage-text-secondary)] stage-hover overflow-hidden hover:text-[var(--stage-text-primary)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     >
                       {assigningId === member.id ? '…' : 'Assign'}
                     </button>

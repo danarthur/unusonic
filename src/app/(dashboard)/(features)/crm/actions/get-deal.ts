@@ -2,7 +2,6 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import type { Json } from '@/types/supabase';
 
 export type LeadSource = 'referral' | 'repeat_client' | 'website' | 'social' | 'direct';
 export type LostReason = 'budget' | 'competitor' | 'cancelled' | 'no_response' | 'scope' | 'timing';
@@ -21,7 +20,9 @@ export type DealDetail = {
   organization_id: string | null;
   main_contact_id: string | null;
   venue_id: string | null;
-  preferred_crew: Json | null;
+  // Rescan fix C7 (2026-04-11): deal.preferred_crew was selected + returned
+  // but never read. The handoff wizard no longer collects crew_roles after
+  // Pass 1's B2 fix. Column dropped in migration 20260412020000.
   owner_user_id: string | null;
   owner_entity_id: string | null;
   lead_source: LeadSource | null;
@@ -49,7 +50,7 @@ export async function getDeal(dealId: string): Promise<DealDetail | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('deals')
-    .select('id, workspace_id, title, status, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, preferred_crew, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
+    .select('id, workspace_id, title, status, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
     .eq('id', dealId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -70,7 +71,6 @@ export async function getDeal(dealId: string): Promise<DealDetail | null> {
     organization_id: (r.organization_id as string) ?? null,
     main_contact_id: (r.main_contact_id as string) ?? null,
     venue_id: (r.venue_id as string) ?? null,
-    preferred_crew: (r.preferred_crew as Json) ?? null,
     owner_user_id: (r.owner_user_id as string) ?? null,
     owner_entity_id: (r.owner_entity_id as string) ?? null,
     lead_source: (r.lead_source as LeadSource) ?? null,
@@ -95,7 +95,7 @@ export async function getDealByEventId(eventId: string): Promise<DealDetail | nu
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('deals')
-    .select('id, workspace_id, title, status, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, preferred_crew, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
+    .select('id, workspace_id, title, status, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
     .eq('event_id', eventId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -116,7 +116,6 @@ export async function getDealByEventId(eventId: string): Promise<DealDetail | nu
     organization_id: (r.organization_id as string) ?? null,
     main_contact_id: (r.main_contact_id as string) ?? null,
     venue_id: (r.venue_id as string) ?? null,
-    preferred_crew: (r.preferred_crew as Json) ?? null,
     owner_user_id: (r.owner_user_id as string) ?? null,
     owner_entity_id: (r.owner_entity_id as string) ?? null,
     lead_source: (r.lead_source as LeadSource) ?? null,

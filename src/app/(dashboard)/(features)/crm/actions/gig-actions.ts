@@ -5,6 +5,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { resolveEventTimezone, toVenueInstant } from '@/shared/lib/timezone';
 
 /** Map legacy CRM status to event lifecycle_status (unified schema). */
 const LEGACY_STATUS_TO_LIFECYCLE: Record<string, 'lead' | 'tentative' | 'confirmed' | 'production' | 'live' | 'archived' | 'cancelled'> = {
@@ -63,8 +64,10 @@ export async function createGig(input: CreateGigInput): Promise<CreateGigResult>
 
     const supabase = await createClient();
 
-    const startsAt = eventStartAt ?? (eventDate ? `${eventDate}T08:00:00.000Z` : new Date().toISOString());
-    const endsAt = eventEndAt ?? (eventDate ? `${eventDate}T18:00:00.000Z` : new Date(Date.now() + 10 * 60 * 60 * 1000).toISOString());
+    // §3.2: resolve timezone from workspace (no venue on quick-create path)
+    const eventTimezone = await resolveEventTimezone({ workspaceId });
+    const startsAt = eventStartAt ?? (eventDate ? toVenueInstant(eventDate, '08:00', eventTimezone) : new Date().toISOString());
+    const endsAt = eventEndAt ?? (eventDate ? toVenueInstant(eventDate, '18:00', eventTimezone) : new Date(Date.now() + 10 * 60 * 60 * 1000).toISOString());
 
     // Resolve directory entity for the client org (organizationId is a public.organizations.id)
     let clientEntityId: string | null = null;
@@ -86,6 +89,7 @@ export async function createGig(input: CreateGigInput): Promise<CreateGigResult>
         title: title.trim(),
         starts_at: startsAt,
         ends_at: endsAt,
+        timezone: eventTimezone,
         status: 'planned',
         lifecycle_status: lifecycleStatus,
         location_name: location?.trim() ?? null,

@@ -105,7 +105,7 @@ function VendorSlotPicker({
         value={query}
         onChange={(e) => handleSearch(e.target.value)}
         placeholder="Search network…"
-        className="w-full bg-transparent px-4 py-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] border-b border-[oklch(1_0_0_/_0.06)]"
+        className="w-full bg-transparent px-4 py-3 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] border-b border-[oklch(1_0_0_/_0.06)]"
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
       />
       {loading && (
@@ -332,7 +332,7 @@ export function DealDetailsCard({
   const renderVendorValue = (s: DealStakeholderDisplay) => (
     <div className="flex items-center gap-2 min-w-0">
       <EntityIcon entityType={s.entity_type} className="size-3.5 text-[var(--stage-text-tertiary)]" />
-      <span className="text-sm text-[var(--stage-text-primary)] tracking-tight truncate">{s.name}</span>
+      <span className="stage-readout truncate">{s.name}</span>
       {renderEditBtn(s)}
       <button
         type="button"
@@ -397,8 +397,8 @@ export function DealDetailsCard({
       empty: 'Add source',
       onClick: () => setLeadSourceSheetOpen(true),
     },
-    // Referred by — always in the grid when referrer exists (prevents layout shift)
-    ...(deal.referrer_entity_id ? [{
+    // Referred by — shown when referrer exists on server OR just linked locally
+    ...(deal.referrer_entity_id || referrerDisplayName ? [{
       label: 'Referred by',
       value: referrerDisplayName ?? 'Loading…',
       onClick: () => setLeadSourceSheetOpen(true),
@@ -433,7 +433,7 @@ export function DealDetailsCard({
   if (pastDealsCount > 0) {
     conditionalStats.push({
       label: 'Client history',
-      value: pastDealsCount === 1 ? 'First event' : `${pastDealsCount - 1} prior event${pastDealsCount > 2 ? 's' : ''}`,
+      value: pastDealsCount === 1 ? 'First show' : `${pastDealsCount - 1} prior show${pastDealsCount > 2 ? 's' : ''}`,
     });
   }
 
@@ -505,7 +505,7 @@ export function DealDetailsCard({
   return (
     <>
       <StagePanel elevated className="p-5 shrink-0">
-        <p className="stage-label text-[var(--stage-text-secondary)] mb-4">
+        <p className="stage-label mb-4">
           Signals
         </p>
 
@@ -533,7 +533,7 @@ export function DealDetailsCard({
                   </span>
                   <span
                     className={cn(
-                      'text-sm font-medium tracking-tight truncate tabular-nums',
+                      'stage-readout truncate',
                       isEmpty && !isClickable && 'text-[var(--stage-text-tertiary)] font-normal',
                       isEmpty && isClickable && 'text-[var(--stage-text-tertiary)] font-normal flex items-center gap-1',
                     )}

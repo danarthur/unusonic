@@ -64,7 +64,7 @@ export async function getWorkspaceMembersForPicker(): Promise<WorkspaceMemberOpt
   // Query Sales capability
   const salesEntityIds = new Set<string>();
   if (allEntityIds.length > 0) {
-    const { data: caps } = await (supabase as any)
+    const { data: caps } = await supabase
       .schema('ops')
       .from('entity_capabilities')
       .select('entity_id')

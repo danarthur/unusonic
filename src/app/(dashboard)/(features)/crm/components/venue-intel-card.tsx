@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Building2, Calendar } from 'lucide-react';
+import { MapPin, Building2, Calendar, ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { getVenueIntel, type VenueIntel, type VenueStaticData } from '../actions/get-venue-intel';
+import { getCoiStatus, type CoiStatus } from '@/features/network-data/api/entity-document-actions';
 
 type VenueIntelCardProps = {
   venueEntityId: string;
@@ -13,14 +14,19 @@ type VenueIntelCardProps = {
 
 export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
   const [intel, setIntel] = useState<VenueIntel | null>(null);
+  const [coiInfo, setCoiInfo] = useState<CoiStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getVenueIntel(venueEntityId).then((data) => {
+    Promise.all([
+      getVenueIntel(venueEntityId),
+      getCoiStatus(venueEntityId),
+    ]).then(([venueData, coiData]) => {
       if (!cancelled) {
-        setIntel(data);
+        setIntel(venueData);
+        setCoiInfo(coiData);
         setLoading(false);
       }
     });
@@ -39,8 +45,9 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
 
   const hasStatic = intel && hasStaticData(intel.staticData);
   const hasPastShows = intel && intel.pastShows.length > 0;
+  const hasCoi = coiInfo !== null; // always show COI row — indicates status even when no document
 
-  if (!hasStatic && !hasPastShows) {
+  if (!hasStatic && !hasPastShows && !hasCoi) {
     return (
       <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
         <div className="flex items-center" style={{ gap: 'var(--stage-gap, 8px)', marginBottom: 'var(--stage-gap, 8px)' }}>
@@ -76,21 +83,14 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
           className="flex flex-col"
           style={{ gap: 'var(--stage-gap-wide, 12px)' }}
         >
-          {/* Static venue data */}
-          {hasStatic && (
-            <div className="flex flex-col" style={{ gap: 'var(--stage-gap, 6px)' }}>
-              {staticField('Capacity', intel!.staticData.capacity)}
-              {staticField('Curfew', intel!.staticData.curfew)}
-              {staticField('Load-in', intel!.staticData.loadInNotes)}
-              {staticField('Power', intel!.staticData.powerNotes)}
-              {staticField('Parking', intel!.staticData.parkingNotes)}
-              {staticField('Access', intel!.staticData.accessNotes)}
-              {staticField('Stage', intel!.staticData.stageNotes)}
-            </div>
-          )}
+          {/* COI status */}
+          {hasCoi && <CoiStatusRow coiInfo={coiInfo!} />}
+
+          {/* Static venue data — grouped by section */}
+          {hasStatic && <StaticDataSections data={intel!.staticData} />}
 
           {/* Divider between sections */}
-          {hasStatic && hasPastShows && (
+          {(hasStatic || hasCoi) && hasPastShows && (
             <div style={{ borderTop: '1px solid var(--stage-edge-subtle)' }} />
           )}
 
@@ -98,7 +98,7 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
           {hasPastShows && (
             <div className="flex flex-col" style={{ gap: 'var(--stage-gap, 8px)' }}>
               <p
-                className="text-xs font-medium uppercase tracking-widest"
+                className="stage-label"
                 style={{ color: 'var(--stage-text-tertiary)' }}
               >
                 Past shows ({intel!.pastShows.length})
@@ -108,19 +108,18 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
                   key={idx}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...STAGE_MEDIUM, delay: idx * 0.03 }}
+                  transition={STAGE_MEDIUM}
                   className="flex flex-col"
                   style={{
                     gap: '4px',
                     padding: 'var(--stage-gap, 8px)',
                     borderRadius: 'var(--stage-radius-nested, 8px)',
-                    backgroundColor: 'var(--ctx-well, var(--stage-input-bg))',
+                    backgroundColor: 'var(--ctx-well)',
                   }}
                 >
                   <div className="flex items-center justify-between">
                     <p
-                      className="text-sm font-medium tracking-tight truncate"
-                      style={{ color: 'var(--stage-text-primary)' }}
+                      className="stage-readout truncate"
                     >
                       {show.eventTitle}
                     </p>
@@ -153,7 +152,7 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
                         borderLeft: '2px solid var(--stage-edge-subtle)',
                       }}
                     >
-                      <span className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--stage-text-tertiary)' }}>
+                      <span className="stage-label" style={{ color: 'var(--stage-text-tertiary)' }}>
                         Client feedback:{' '}
                       </span>
                       {show.clientFeedback}
@@ -169,10 +168,100 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
   );
 }
 
+// ── COI Status Row ──────────────────────────────────────────────────────────
+
+function CoiStatusRow({ coiInfo }: { coiInfo: CoiStatus }) {
+  if (!coiInfo.hasDocument) {
+    return (
+      <div
+        className="flex items-center rounded-lg px-3 py-2"
+        style={{
+          gap: '8px',
+          backgroundColor: 'oklch(1 0 0 / 0.03)',
+          borderRadius: 'var(--stage-radius-nested, 8px)',
+        }}
+      >
+        <ShieldQuestion size={14} style={{ color: 'var(--stage-text-tertiary)' }} aria-hidden />
+        <span className="stage-badge-text" style={{ color: 'var(--stage-text-tertiary)' }}>
+          No COI on file
+        </span>
+      </div>
+    );
+  }
+
+  const expiresAt = coiInfo.expiresAt;
+  if (!expiresAt) {
+    return (
+      <div
+        className="flex items-center rounded-lg px-3 py-2"
+        style={{
+          gap: '8px',
+          backgroundColor: 'oklch(1 0 0 / 0.03)',
+          borderRadius: 'var(--stage-radius-nested, 8px)',
+        }}
+      >
+        <ShieldCheck size={14} style={{ color: 'var(--color-unusonic-success)' }} aria-hidden />
+        <span className="stage-badge-text" style={{ color: 'var(--color-unusonic-success)' }}>
+          COI on file (no expiry set)
+        </span>
+      </div>
+    );
+  }
+
+  const now = new Date();
+  const expiry = new Date(expiresAt + 'T00:00:00');
+  const diffMs = expiry.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  let icon = ShieldCheck;
+  let color = 'var(--color-unusonic-success)'; // green
+  let label = `COI valid until ${formatDate(expiresAt)}`;
+
+  if (diffDays < 0) {
+    icon = ShieldX;
+    color = 'var(--color-unusonic-error)'; // red
+    label = `COI expired ${formatDate(expiresAt)}`;
+  } else if (diffDays <= 30) {
+    icon = ShieldAlert;
+    color = 'var(--color-unusonic-warning)'; // amber
+    label = `COI expires in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+  }
+
+  const Icon = icon;
+
+  return (
+    <div
+      className="flex items-center rounded-lg px-3 py-2"
+      style={{
+        gap: '8px',
+        backgroundColor: 'oklch(1 0 0 / 0.03)',
+        borderRadius: 'var(--stage-radius-nested, 8px)',
+      }}
+    >
+      <Icon size={14} style={{ color }} aria-hidden />
+      <span className="stage-badge-text" style={{ color }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function hasStaticData(s: VenueStaticData): boolean {
-  return !!(s.capacity || s.loadInNotes || s.powerNotes || s.parkingNotes || s.curfew || s.accessNotes || s.stageNotes);
+  return !!(
+    s.capacity || s.loadInNotes || s.powerNotes || s.parkingNotes ||
+    s.curfew || s.accessNotes || s.stageNotes || s.dockAddress ||
+    s.dockHours || s.loadInWindow || s.loadOutWindow || s.riggingType ||
+    s.powerVoltage || s.powerPhase || s.weatherExposure ||
+    s.noiseOrdinance || s.freightElevator || s.crewParkingNotes ||
+    s.stageWidth || s.stageDepth || s.trimHeight || s.ceilingHeight ||
+    s.housePowerAmps || s.housePaIncluded || s.houseLightingIncluded ||
+    s.greenRoomCount || s.greenRoomNotes || s.dressingRoomCount ||
+    s.productionOffice || s.cateringKitchen || s.venueContactName ||
+    s.unionLocal || s.nearestHospital || s.dockDoorHeight ||
+    s.dockDoorWidth || s.forkliftAvailable || s.riggingPointsCount
+  );
 }
 
 function staticField(label: string, value: string | null): React.ReactNode {
@@ -180,17 +269,125 @@ function staticField(label: string, value: string | null): React.ReactNode {
   return (
     <div className="flex flex-col" style={{ gap: '1px' }}>
       <span
-        className="text-xs font-medium uppercase tracking-widest"
+        className="stage-label"
         style={{ color: 'var(--stage-text-tertiary)' }}
       >
         {label}
       </span>
-      <span
-        className="text-sm tracking-tight"
-        style={{ color: 'var(--stage-text-primary)' }}
-      >
+      <span className="stage-readout">
         {value}
       </span>
+    </div>
+  );
+}
+
+// ── Compose helpers (merge related fields onto single rows) ─────────────────
+
+function composePower(amps: string | null, voltage: string | null, phase: string | null): string | null {
+  const parts: string[] = [];
+  if (amps) parts.push(`${amps}A`);
+  if (voltage) parts.push(voltage);
+  if (phase) parts.push(phase);
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
+function composeStageDims(width: string | null, depth: string | null): string | null {
+  if (!width && !depth) return null;
+  if (width && depth) return `${width}ft W x ${depth}ft D`;
+  return width ? `${width}ft W` : `${depth}ft D`;
+}
+
+function composeRigging(type: string | null, points: string | null, weight: string | null): string | null {
+  if (!type) return null;
+  const label = type.replace(/_/g, ' ');
+  const details: string[] = [];
+  if (points) details.push(`${points} points`);
+  if (weight) details.push(`${weight} lbs/point`);
+  return details.length > 0 ? `${label} (${details.join(', ')})` : label;
+}
+
+function composeDockDoors(width: string | null, height: string | null): string | null {
+  if (!width && !height) return null;
+  if (width && height) return `${width}W x ${height}H`;
+  return width ? `${width}W` : `${height}H`;
+}
+
+function composeCount(count: string | null, notes: string | null): string | null {
+  if (!count && !notes) return null;
+  if (count && notes) return `${count} -- ${notes}`;
+  return count ?? notes;
+}
+
+function composeContact(name: string | null, phone: string | null): string | null {
+  if (!name && !phone) return null;
+  if (name && phone) return `${name} (${phone})`;
+  return name ?? phone;
+}
+
+// ── StaticSection — renders a group label + fields, skips if all fields are null
+
+function StaticSection({ label, fields }: { label: string; fields: React.ReactNode[] }) {
+  const nonNull = fields.filter(Boolean);
+  if (nonNull.length === 0) return null;
+  return (
+    <div className="flex flex-col" style={{ gap: 'var(--stage-gap, 6px)' }}>
+      <span
+        className="stage-label"
+        style={{ color: 'var(--stage-text-tertiary)', marginBottom: '2px' }}
+      >
+        {label}
+      </span>
+      {nonNull}
+    </div>
+  );
+}
+
+// ── StaticDataSections — all grouped sections for venue static data ─────────
+
+function StaticDataSections({ data: s }: { data: VenueStaticData }) {
+  return (
+    <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+      <StaticSection label="Loading and access" fields={[
+        staticField('Capacity', s.capacity),
+        staticField('Dock address', s.dockAddress),
+        staticField('Dock hours', s.dockHours),
+        staticField('Dock doors', composeDockDoors(s.dockDoorWidth, s.dockDoorHeight)),
+        staticField('Load-in', s.loadInWindow),
+        staticField('Load-out', s.loadOutWindow),
+        staticField('Load-in notes', s.loadInNotes),
+        staticField('Freight elevator', s.freightElevator),
+        staticField('Forklift', s.forkliftAvailable),
+        staticField('Access', s.accessNotes),
+      ]} />
+      <StaticSection label="Parking" fields={[
+        staticField('Production parking', s.parkingNotes),
+        staticField('Crew parking', s.crewParkingNotes),
+      ]} />
+      <StaticSection label="Stage and technical" fields={[
+        staticField('Stage', s.stageNotes),
+        staticField('Dimensions', composeStageDims(s.stageWidth, s.stageDepth)),
+        staticField('Trim height', s.trimHeight),
+        staticField('Ceiling height', s.ceilingHeight),
+        staticField('Rigging', composeRigging(s.riggingType, s.riggingPointsCount, s.riggingWeightPerPoint)),
+        staticField('Power', composePower(s.housePowerAmps, s.powerVoltage, s.powerPhase)),
+        staticField('Power notes', s.powerNotes),
+        staticField('House PA', s.housePaIncluded ? 'Included' : null),
+        staticField('House lighting', s.houseLightingIncluded ? 'Included' : null),
+      ]} />
+      <StaticSection label="Backstage" fields={[
+        staticField('Green rooms', composeCount(s.greenRoomCount, s.greenRoomNotes)),
+        staticField('Dressing rooms', s.dressingRoomCount),
+        staticField('Production office', s.productionOffice),
+        staticField('Catering kitchen', s.cateringKitchen),
+        staticField('Venue contact', composeContact(s.venueContactName, s.venueContactPhone)),
+      ]} />
+      <StaticSection label="Compliance" fields={[
+        staticField('Curfew', s.curfew),
+        staticField('Noise ordinance', s.noiseOrdinance),
+        staticField('Union', s.unionLocal),
+        staticField('Weather exposure', s.weatherExposure),
+        staticField('Nearest hospital', s.nearestHospital),
+      ]} />
     </div>
   );
 }

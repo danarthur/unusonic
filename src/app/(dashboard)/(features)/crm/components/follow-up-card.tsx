@@ -4,19 +4,22 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, MessageSquare, Mail, Clock, ChevronDown } from 'lucide-react';
+import { Phone, MessageSquare, Mail, Clock, ChevronDown, Sparkles, Copy, X, Loader2 } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
 import { computeStallSignal, type StallSignal } from '@/shared/lib/stall-signal';
+import { normalizedEditDistance, classifyEdit } from '@/shared/lib/edit-distance';
 import type { DealDetail } from '../actions/get-deal';
 import {
   type FollowUpQueueItem,
+  type AionDealContext,
   actOnFollowUp,
   snoozeFollowUp,
   dismissFollowUp,
   logFollowUpAction,
+  getDealContextForAion,
 } from '../actions/follow-up-actions';
 
 // =============================================================================
@@ -68,6 +71,16 @@ const REASON_TYPE_STYLES: Record<string, { label: string; color: string; bg: str
     color: 'var(--color-unusonic-error)',
     bg: 'color-mix(in oklch, var(--color-unusonic-error) 10%, transparent)',
   },
+  date_hold_pressure: {
+    label: 'Date conflict',
+    color: 'var(--color-unusonic-warning)',
+    bg: 'color-mix(in oklch, var(--color-unusonic-warning) 10%, transparent)',
+  },
+  proposal_sent: {
+    label: 'Proposal sent',
+    color: 'var(--stage-text-secondary)',
+    bg: 'color-mix(in oklch, var(--stage-text-secondary) 10%, transparent)',
+  },
 };
 
 // Suggested action copy is provided directly by the cron engine as a full sentence.
@@ -82,6 +95,8 @@ function draftSmsByReason(reasonType: string, clientName: string, dealTitle: str
       return `${name}wanted to make sure you received the proposal for ${dealTitle}. Could you confirm the best email to send it to?`;
     case 'deadline_proximity':
       return `${name}the date for ${dealTitle} is coming up — wanted to check in and see where things stand.`;
+    case 'date_hold_pressure':
+      return `${name}wanted to follow up on ${dealTitle}. I'm currently holding your date but have had another inquiry come in — could we chat about locking things in?`;
     case 'no_activity':
     case 'stall':
       return `${name}just following up on ${dealTitle}. Let me know if you have any questions or if there's anything I can help with.`;
@@ -198,7 +213,7 @@ function StallOnlyCard({ deal, stallSignal }: { deal: DealDetail; stallSignal: S
               aria-hidden
             />
             <div className="min-w-0 flex-1">
-              <p className={cn('text-xs font-medium tracking-tight', stallSignal.urgent ? 'text-[var(--color-unusonic-warning)]' : 'text-[var(--stage-text-secondary)]')}>
+              <p className={cn('stage-label', stallSignal.urgent ? 'text-[var(--color-unusonic-warning)]' : 'text-[var(--stage-text-secondary)]')}>
                 {stallSignal.urgent ? 'Urgent \u2014 ' : ''}{stallSignal.daysInStage} day{stallSignal.daysInStage !== 1 ? 's' : ''} at {stallSignal.stageName}
               </p>
               <p className="text-xs text-[var(--stage-text-tertiary)] mt-0.5">{stallSignal.suggestion}</p>
@@ -254,6 +269,12 @@ function FullFollowUpCard({
   const [logFormOpen, setLogFormOpen] = useState(false);
   const [dismissing, setDismissing] = useState(false);
 
+  // Aion draft state
+  const [draftState, setDraftState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [draft, setDraft] = useState('');
+  const [draftChannel, setDraftChannel] = useState<'sms' | 'email'>('sms');
+  const originalDraftRef = useRef<string>('');
+
   const reasonStyle = REASON_TYPE_STYLES[queueItem.reason_type] ?? REASON_TYPE_STYLES.stall;
   const actionCopy = queueItem.suggested_action ?? null;
 
@@ -278,14 +299,96 @@ function FullFollowUpCard({
     }
   };
 
-  const handleSendText = () => {
+  const handleSendText = (overrideBody?: string) => {
     if (!clientPhone) return;
-    const clientName = (queueItem.context_snapshot?.client_name as string) ?? '';
-    const body = draftSmsByReason(queueItem.reason_type, clientName, deal.title ?? 'your event');
+    const isAionDraft = !!overrideBody && !!originalDraftRef.current;
+    const body = overrideBody
+      ?? draftSmsByReason(
+          queueItem.reason_type,
+          (queueItem.context_snapshot?.client_name as string) ?? '',
+          deal.title ?? 'your show',
+        );
     window.open(`sms:${encodeURIComponent(clientPhone)}?body=${encodeURIComponent(body)}`);
-    logFollowUpAction(deal.id, 'sms_sent', 'sms', 'Sent follow-up text').then(() => {
+
+    // Build edit tracking for Aion drafts
+    let editTracking: Parameters<typeof logFollowUpAction>[5] = undefined;
+    if (isAionDraft) {
+      const distance = normalizedEditDistance(originalDraftRef.current, body);
+      editTracking = {
+        draftOriginal: originalDraftRef.current,
+        editClassification: classifyEdit(distance),
+        editDistance: Math.round(distance * 1000) / 1000,
+      };
+    }
+
+    logFollowUpAction(
+      deal.id,
+      'sms_sent',
+      'sms',
+      isAionDraft ? 'Sent Aion-drafted follow-up text' : 'Sent follow-up text',
+      undefined,
+      editTracking,
+    ).then(() => {
       onActionComplete();
     });
+  };
+
+  const handleDraftMessage = async () => {
+    setDraftState('loading');
+    try {
+      const context = await getDealContextForAion(deal.id, queueItem);
+      if (!context) {
+        toast.error('Could not load deal context');
+        setDraftState('idle');
+        return;
+      }
+
+      const res = await fetch('/api/aion/draft-follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context, workspaceId: deal.workspace_id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? 'Failed to generate draft');
+        setDraftState('error');
+        return;
+      }
+
+      const data = await res.json();
+      setDraft(data.draft);
+      setDraftChannel(data.channel ?? 'sms');
+      originalDraftRef.current = data.draft;
+      setDraftState('ready');
+    } catch {
+      toast.error('Failed to generate draft');
+      setDraftState('error');
+    }
+  };
+
+  const handleCopyDraft = async () => {
+    try {
+      await navigator.clipboard.writeText(draft);
+      toast.success('Copied to clipboard');
+
+      // Structured edit tracking
+      const distance = normalizedEditDistance(originalDraftRef.current, draft);
+      logFollowUpAction(
+        deal.id,
+        draftChannel === 'sms' ? 'sms_sent' : 'email_sent',
+        draftChannel,
+        'Copied Aion-drafted follow-up',
+        undefined,
+        {
+          draftOriginal: originalDraftRef.current,
+          editClassification: classifyEdit(distance),
+          editDistance: Math.round(distance * 1000) / 1000,
+        },
+      );
+    } catch {
+      toast.error('Failed to copy');
+    }
   };
 
   return (
@@ -300,11 +403,11 @@ function FullFollowUpCard({
         <StagePanel elevated className="p-5 flex flex-col gap-4">
           {/* Header: label + reason type badge */}
           <div className="flex items-center justify-between">
-            <p className="stage-label text-[var(--stage-text-secondary)]">
+            <p className="stage-label">
               Follow up
             </p>
             <span
-              className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium tracking-wide"
+              className="inline-flex items-center px-2 py-0.5 stage-badge-text tracking-wide"
               style={{
                 color: reasonStyle.color,
                 background: reasonStyle.bg,
@@ -321,7 +424,7 @@ function FullFollowUpCard({
           </p>
 
           {/* Suggested action */}
-          {actionCopy && (
+          {actionCopy && draftState !== 'ready' && (
             <p
               className="text-xs leading-relaxed"
               style={{ color: 'var(--stage-text-secondary)' }}
@@ -330,8 +433,114 @@ function FullFollowUpCard({
             </p>
           )}
 
+          {/* Draft review mode */}
+          <AnimatePresence>
+            {draftState === 'ready' && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={STAGE_LIGHT}
+                className="overflow-hidden"
+              >
+                <div
+                  className="flex flex-col gap-3"
+                  style={{
+                    paddingTop: 'var(--stage-gap-wide, 12px)',
+                    borderTop: '1px solid var(--stage-edge-subtle)',
+                  }}
+                >
+                  {/* Channel toggle */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="stage-label text-[var(--stage-text-tertiary)] mr-1.5">Send as</span>
+                    {(['sms', 'email'] as const).map((ch) => {
+                      const Icon = ch === 'sms' ? MessageSquare : Mail;
+                      const isActive = draftChannel === ch;
+                      return (
+                        <button
+                          key={ch}
+                          type="button"
+                          onClick={() => setDraftChannel(ch)}
+                          className={cn(
+                            'p-2 transition-colors',
+                            isActive
+                              ? 'text-[var(--stage-text-primary)] bg-[oklch(1_0_0_/_0.10)]'
+                              : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
+                          )}
+                          style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
+                          aria-label={ch}
+                        >
+                          <Icon size={14} />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Editable draft */}
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    rows={4}
+                    className="w-full resize-none bg-transparent text-[var(--stage-text-primary)] leading-relaxed py-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    style={{
+                      fontSize: 'var(--stage-input-font-size, 13px)',
+                      borderBottom: '1px solid var(--stage-edge-subtle)',
+                    }}
+                  />
+
+                  {/* Draft action buttons */}
+                  <div className="flex items-center gap-2">
+                    {clientPhone && draftChannel === 'sms' && (
+                      <button
+                        type="button"
+                        onClick={() => handleSendText(draft)}
+                        className="stage-btn stage-btn-primary text-xs inline-flex items-center gap-1.5"
+                      >
+                        <MessageSquare size={12} />
+                        Send via text
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCopyDraft}
+                      className="stage-btn stage-btn-secondary text-xs inline-flex items-center gap-1.5"
+                    >
+                      <Copy size={12} />
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setDraftState('idle'); setDraft(''); }}
+                      className="text-xs transition-colors"
+                      style={{ color: 'var(--stage-text-tertiary)' }}
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Action buttons row */}
           <div className="flex items-center flex-wrap gap-2">
+            {/* Draft a message (Aion) */}
+            {draftState !== 'ready' && (
+              <button
+                type="button"
+                onClick={handleDraftMessage}
+                disabled={draftState === 'loading'}
+                className="stage-btn stage-btn-primary text-xs inline-flex items-center gap-1.5 disabled:opacity-45"
+              >
+                {draftState === 'loading' ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                {draftState === 'loading' ? 'Drafting...' : 'Draft a message'}
+              </button>
+            )}
+
             {/* Log action */}
             <button
               type="button"
@@ -341,11 +550,11 @@ function FullFollowUpCard({
               Log action
             </button>
 
-            {/* Send via text */}
-            {clientPhone && (
+            {/* Send via text (fallback — only show when no draft) */}
+            {clientPhone && draftState !== 'ready' && (
               <button
                 type="button"
-                onClick={handleSendText}
+                onClick={() => handleSendText()}
                 className="stage-btn stage-btn-secondary text-xs inline-flex items-center gap-1.5"
               >
                 <MessageSquare size={12} />
@@ -477,7 +686,7 @@ function InlineLogForm({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Optional note..."
           rows={1}
-          className="w-full resize-none bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] leading-relaxed py-1 outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+          className="w-full resize-none bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] leading-relaxed py-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           style={{
             fontSize: 'var(--stage-input-font-size, 13px)',
             borderBottom: '1px solid var(--stage-edge-subtle)',

@@ -9,7 +9,7 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import type { DealCrewRow } from '../actions/deal-crew';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
 import { normalizeGearItems, normalizeLogistics, GEAR_LIFECYCLE_ORDER, GEAR_BRANCH_STATES } from './flight-checks/types';
@@ -103,10 +103,10 @@ export function OpsActionsCard({
   return (
     <StagePanel elevated className="h-full p-5 flex flex-col rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+        <h3 className="stage-label">
           Production checklist
         </h3>
-        <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
+        <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">
           {doneCount}/{actions.length}
         </span>
       </div>
@@ -118,7 +118,7 @@ export function OpsActionsCard({
           style={{ background: allDone ? 'var(--color-unusonic-success)' : 'var(--stage-text-secondary)' }}
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          transition={STAGE_MEDIUM}
         />
       </div>
 
@@ -128,7 +128,7 @@ export function OpsActionsCard({
             key={action.label}
             initial={{ opacity: 0, x: -4 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ ...STAGE_LIGHT, delay: i * 0.03 }}
+            transition={STAGE_LIGHT}
             className="flex items-start gap-2.5 py-1"
           >
             {action.done ? (
@@ -141,7 +141,7 @@ export function OpsActionsCard({
                 {action.label}
               </p>
               {action.done && action.detail && (
-                <p className="text-[10px] text-[var(--stage-text-tertiary)] mt-0.5 truncate">{action.detail}</p>
+                <p className="text-label text-[var(--stage-text-tertiary)] mt-0.5 truncate">{action.detail}</p>
               )}
             </div>
           </motion.div>

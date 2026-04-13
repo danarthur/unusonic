@@ -189,7 +189,7 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
                 }
               }}
               disabled={reverting}
-              className="shrink-0 text-xs font-medium uppercase tracking-widest text-[var(--color-unusonic-warning)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] rounded px-2 py-1"
+              className="shrink-0 stage-label text-[var(--color-unusonic-warning)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] rounded px-2 py-1"
             >
               {reverting ? 'Reverting…' : 'Revert to draft'}
             </button>
@@ -205,7 +205,7 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
             )}
           >
             <div className="shrink-0 px-5 py-4 border-b border-[var(--stage-edge-subtle)] rounded-t-[var(--stage-radius-panel)]">
-              <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+              <p className="stage-label">
                 Catalog
               </p>
               <p className="text-sm text-[var(--stage-text-secondary)] mt-1 leading-relaxed">
@@ -225,14 +225,15 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className="flex items-center gap-3 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--stage-surface-raised)] shadow-xl p-3 min-h-[56px] min-w-[200px] cursor-grabbing ring-1 ring-[var(--stage-border)]"
+                    className="flex items-center gap-3 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised)] p-3 min-h-[56px] min-w-[200px] cursor-grabbing"
+                    style={{ boxShadow: 'inset 0 1px 0 0 var(--stage-edge-top), 0 16px 48px oklch(0 0 0 / 0.7)' }}
                   >
                     <div className="shrink-0 p-1 text-[var(--stage-text-secondary)] pointer-events-none">
                       <GripVertical className="w-4 h-4" aria-hidden />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">{pkg.name}</p>
-                      <p className="text-xs text-[var(--stage-text-secondary)] tabular-nums mt-0.5">
+                      <p className="stage-readout truncate">{pkg.name}</p>
+                      <p className="stage-readout-sm text-[var(--stage-text-secondary)] mt-0.5">
                         ${Number(pkg.price).toLocaleString()}
                       </p>
                     </div>

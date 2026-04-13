@@ -255,10 +255,10 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
       {/* Empty state — only when all tiers are empty */}
       {!loading && isEmpty && (
         <div className="mb-4">
-          <p className="text-xs font-medium text-[var(--stage-text-tertiary)] mb-1">
+          <p className="stage-field-label text-[var(--stage-text-secondary)] mb-1">
             No crew yet
           </p>
-          <p className="text-xs text-[var(--stage-text-tertiary)] leading-relaxed">
+          <p className="stage-badge-text text-[var(--stage-text-tertiary)] leading-relaxed">
             Build a proposal with packages to get crew suggestions, or add crew directly.
           </p>
         </div>

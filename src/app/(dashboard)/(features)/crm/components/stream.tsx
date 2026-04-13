@@ -180,10 +180,10 @@ export function Stream({
       <header className="shrink-0 flex flex-col gap-4 p-4">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium tracking-tight leading-none" style={{ color: 'var(--stage-text-primary)' }}>
+            <h1 className="stage-readout-lg leading-none">
               Productions
             </h1>
-            <p className="text-sm leading-relaxed mt-1" style={{ color: 'var(--stage-text-secondary)' }}>
+            <p className="stage-label leading-relaxed mt-1">
               {items.length === 0
                 ? 'No productions yet.'
                 : 'Inquiry to wrap.'}
@@ -265,7 +265,7 @@ export function Stream({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search productions…"
-                className="w-full pl-8 pr-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/30"
+                className="w-full pl-8 pr-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] hover:border-[oklch(1_0_0_/_0.15)]"
                 style={{
                   background: 'var(--stage-surface-elevated)',
                   borderRadius: 'var(--stage-radius-input, 6px)',
@@ -408,7 +408,7 @@ function DateGroupedList({
                 <button
                   type="button"
                   onClick={() => onOpenDayView(group.date!)}
-                  className="flex items-center gap-1 px-1.5 py-0.5 text-label font-medium tracking-wide transition-colors stage-hover overflow-hidden"
+                  className="flex items-center gap-1 px-1.5 py-0.5 stage-badge-text font-medium transition-colors stage-hover overflow-hidden"
                   style={{
                     color: 'var(--stage-text-secondary)',
                     borderRadius: 'var(--stage-radius-input, 6px)',

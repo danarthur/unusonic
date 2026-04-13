@@ -98,7 +98,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
         <SheetBody className="flex flex-col gap-5">
           {/* Partner A */}
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-3">Partner A</p>
+            <p className="stage-label mb-3">Partner A</p>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <FloatingLabelInput label="First name" value={partnerAFirst} onChange={(e) => setPartnerAFirst(e.target.value)} />
@@ -110,7 +110,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
 
           {/* Partner B */}
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-3">Partner B</p>
+            <p className="stage-label mb-3">Partner B</p>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <FloatingLabelInput label="First name" value={partnerBFirst} onChange={(e) => setPartnerBFirst(e.target.value)} />
@@ -123,9 +123,9 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
           {/* Display name */}
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Display name</p>
+              <p className="stage-label">Display name</p>
               {displayNameMode === 'auto' && (
-                <span className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-[10px] text-[var(--stage-text-secondary)]">
+                <span className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-label text-[var(--stage-text-secondary)]">
                   auto
                 </span>
               )}
@@ -133,7 +133,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
                 <button
                   type="button"
                   onClick={() => setDisplayNameMode('auto')}
-                  className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-[10px] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
+                  className="rounded-full border border-[oklch(1_0_0_/_0.08)] bg-[oklch(1_0_0_/_0.05)] px-2 py-0.5 text-label text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                 >
                   reset to auto
                 </button>
@@ -150,7 +150,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
           </div>
           {onChangeType && (
             <div className="pt-4 border-t border-[oklch(1_0_0_/_0.10)] space-y-2">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Client type</p>
+              <p className="stage-label">Client type</p>
               <p className="text-xs text-[var(--stage-text-secondary)]/70">Switch if this client was entered as the wrong type.</p>
               <div className="flex gap-2">
                 {([['company', 'Company'], ['person', 'Individual']] as const).map(([type, label]) => (
@@ -166,7 +166,7 @@ export function CoupleEditSheet({ open, onOpenChange, entityId, initialValues, o
                     }}
                     className={cn(
                       'flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                      'border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] disabled:opacity-40'
+                      'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-card)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] disabled:opacity-45'
                     )}
                   >
                     {changingType === type ? <Loader2 className="size-3 animate-spin inline mr-1" /> : null}

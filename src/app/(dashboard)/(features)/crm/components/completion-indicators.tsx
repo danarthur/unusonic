@@ -65,10 +65,10 @@ export function CompletionIndicators({
   return (
     <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+        <h3 className="stage-label">
           Production readiness
         </h3>
-        <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
+        <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">
           {doneCount}/{indicators.length}
         </span>
       </div>
@@ -76,7 +76,7 @@ export function CompletionIndicators({
       {/* Progress bar */}
       <div className="h-1 rounded-full bg-[oklch(1_0_0_/_0.04)] mb-4 overflow-hidden">
         <div
-          className="h-full rounded-full bg-[var(--stage-text-primary)] transition-[width] duration-500"
+          className="h-full rounded-full bg-[var(--stage-text-primary)] transition-[width] duration-100"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -85,16 +85,16 @@ export function CompletionIndicators({
         {indicators.map((ind) => (
           <span
             key={ind.label}
-            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] tracking-tight border ${
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md stage-badge-text ${
               ind.done
-                ? 'bg-[oklch(1_0_0_/_0.04)] border-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)]'
-                : 'bg-transparent border-dashed border-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-tertiary)]'
+                ? 'bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-secondary)]'
+                : 'bg-transparent border border-dashed border-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-tertiary)]'
             }`}
           >
             {ind.done ? (
               <Check size={10} strokeWidth={1.5} className="text-[var(--color-unusonic-success)]" />
             ) : (
-              <AlertCircle size={10} strokeWidth={1.5} className="opacity-40" />
+              <AlertCircle size={10} strokeWidth={1.5} className="text-[var(--stage-text-tertiary)]" />
             )}
             {ind.label}
             {ind.detail && <span className="text-[var(--stage-text-tertiary)] ml-0.5">{ind.detail}</span>}

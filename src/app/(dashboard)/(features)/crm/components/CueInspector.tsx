@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, useOptimistic, startTransition } from 'react';
 import { Clock, Mic, Sun, Video, Truck, Copy, Trash2, MousePointerClick } from 'lucide-react';
+
+const SW = 1.5;
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
-import type { Cue, CueType, AssignedCrewEntry } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
+import type { Cue, CueType, AssignedCrewEntry, Section } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
 
 type CueInspectorProps = {
   selectedCue: Cue | null;
@@ -14,6 +16,7 @@ type CueInspectorProps = {
   onDelete: () => Promise<void>;
   onDuplicate: () => Promise<void>;
   eventCrew?: AssignedCrewEntry[];
+  sections?: Section[];
 };
 
 const typeOptions: { value: CueType; label: string; icon: typeof Mic }[] = [
@@ -31,10 +34,12 @@ export function CueInspector({
   onDelete,
   onDuplicate,
   eventCrew,
+  sections,
 }: CueInspectorProps) {
   const [formState, setFormState] = useState<Partial<Cue>>({});
   const [optimisticCue, setOptimisticCue] = useOptimistic<Partial<Cue>>({});
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (!selectedCue) {
@@ -50,6 +55,7 @@ export function CueInspector({
       type: selectedCue.type,
       notes: selectedCue.notes ?? '',
       assigned_crew: selectedCue.assigned_crew ?? [],
+      section_id: selectedCue.section_id ?? null,
     });
     startTransition(() => {
       setOptimisticCue({
@@ -58,6 +64,7 @@ export function CueInspector({
         type: selectedCue.type,
         notes: selectedCue.notes ?? '',
         assigned_crew: selectedCue.assigned_crew ?? [],
+        section_id: selectedCue.section_id ?? null,
       });
     });
   }, [selectedCue, setOptimisticCue]);
@@ -69,8 +76,8 @@ export function CueInspector({
 
   const handleDelete = async () => {
     if (!selectedCue) return;
-    if (!window.confirm('This will permanently remove the cue.')) return;
     await onDelete();
+    setConfirmingDelete(false);
   };
 
   const scheduleSave = (updates: Partial<Cue>) => {
@@ -103,7 +110,7 @@ export function CueInspector({
     return (
       <StagePanel className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <MousePointerClick size={24} className="text-[var(--stage-text-secondary)]/70" />
+          <MousePointerClick size={24} strokeWidth={SW} className="text-[var(--stage-text-secondary)]/70" />
           <p className="text-sm text-[var(--stage-text-secondary)]">Select a cue to edit</p>
         </div>
       </StagePanel>
@@ -111,15 +118,15 @@ export function CueInspector({
   }
 
   return (
-    <StagePanel className="h-full flex flex-col gap-6">
+    <StagePanel className="flex flex-col gap-6 !overflow-visible">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Cue Inspector</h3>
+          <h3 className="stage-label">Cue inspector</h3>
           <p className="text-xs text-[var(--stage-text-secondary)] mt-1">Adjust timing, type, and notes.</p>
         </div>
         <div className="text-right">
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Starts at</p>
-          <div className="font-mono text-4xl font-medium text-[var(--stage-text-primary)] tracking-tight">
+          <p className="stage-label">Starts at</p>
+          <div className="stage-readout-hero">
             {computedStartTime ?? '--:--'}
           </div>
         </div>
@@ -127,7 +134,7 @@ export function CueInspector({
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Title</label>
+          <label className="stage-label">Title</label>
           <input
             value={(formState.title as string) ?? ''}
             onChange={(event) => updateField('title', event.target.value)}
@@ -138,9 +145,9 @@ export function CueInspector({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Duration</label>
+            <label className="stage-label">Duration</label>
             <div className="w-full bg-[var(--ctx-well)] rounded-md px-4 py-3 text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus-within:ring-2 focus-within:ring-[var(--stage-accent)] transition-colors border border-[oklch(1_0_0_/_0.08)] flex items-center gap-2">
-              <Clock size={14} className="text-[var(--stage-text-secondary)]" />
+              <Clock size={14} strokeWidth={SW} className="text-[var(--stage-text-secondary)]" />
               <input
                 type="number"
                 min={1}
@@ -152,8 +159,8 @@ export function CueInspector({
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Type</label>
-            <div className="stage-panel stage-panel-nested !rounded-2xl !p-1 flex items-center gap-2">
+            <label className="stage-label">Type</label>
+            <div className="stage-panel stage-panel-nested !p-1 flex items-center gap-2">
               {typeOptions.map((option) => {
                 const Icon = option.icon;
                 const isActive = (formState.type ?? selectedCue?.type) === option.value;
@@ -170,22 +177,39 @@ export function CueInspector({
                     )}
                     aria-label={option.label}
                   >
-                    <Icon size={16} />
+                    <Icon size={16} strokeWidth={SW} />
                   </button>
                 );
               })}
             </div>
-            <div className="flex items-center gap-2 text-xs text-[var(--stage-text-secondary)] uppercase tracking-wider">
-              <activeType.icon size={12} />
+            <div className="flex items-center gap-2 stage-label">
+              <activeType.icon size={12} strokeWidth={SW} />
               {activeType.label}
             </div>
           </div>
         </div>
 
+        {/* Section selector */}
+        {sections && sections.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <label className="stage-label">Section</label>
+            <select
+              value={(formState.section_id as string) ?? ''}
+              onChange={(event) => updateField('section_id', event.target.value || null)}
+              className="w-full bg-[var(--ctx-well)] rounded-md px-4 py-3 text-sm text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] transition-colors border border-[oklch(1_0_0_/_0.08)] appearance-none"
+            >
+              <option value="">Unsectioned</option>
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>{s.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Crew</label>
+          <label className="stage-label">Crew</label>
           {!eventCrew || eventCrew.length === 0 ? (
-            <p className="text-xs text-[var(--stage-text-secondary)]">No crew assigned to this event yet</p>
+            <p className="text-xs text-[var(--stage-text-secondary)]">No crew assigned to this show yet</p>
           ) : (
             <div className="flex flex-col gap-1">
               {eventCrew.map((entry) => {
@@ -200,7 +224,7 @@ export function CueInspector({
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-2 rounded-xl border transition-colors text-left',
                       isChecked
-                        ? 'bg-[var(--color-unusonic-info)]/10 border-[var(--color-unusonic-info)]/30'
+                        ? 'bg-[oklch(1_0_0_/_0.08)] border-[var(--stage-accent)]/30'
                         : 'bg-[var(--stage-surface)] border-[oklch(1_0_0_/_0.08)] hover:border-[oklch(1_0_0_/_0.12)]'
                     )}
                   >
@@ -208,7 +232,7 @@ export function CueInspector({
                       className={cn(
                         'w-4 h-4 rounded flex items-center justify-center border shrink-0',
                         isChecked
-                          ? 'bg-[var(--color-unusonic-info)] border-[var(--color-unusonic-info)]'
+                          ? 'bg-[var(--stage-accent)] border-[var(--stage-accent)]'
                           : 'border-[oklch(1_0_0_/_0.08)]'
                       )}
                     >
@@ -220,7 +244,7 @@ export function CueInspector({
                     </div>
                     <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{entry.display_name}</span>
                     {entry.role && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wider bg-[var(--color-unusonic-info)]/10 text-[var(--color-unusonic-info)] shrink-0">
+                      <span className="stage-label px-1.5 py-0.5 rounded-full bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] shrink-0">
                         {entry.role}
                       </span>
                     )}
@@ -232,7 +256,7 @@ export function CueInspector({
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">Notes</label>
+          <label className="stage-label">Notes</label>
           <textarea
             value={(formState.notes as string) ?? ''}
             onChange={(event) => updateField('notes', event.target.value)}
@@ -252,17 +276,25 @@ export function CueInspector({
           onClick={onDuplicate}
           className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[oklch(1_0_0_/_0.05)] hover:bg-[oklch(1_0_0_/_0.10)] text-xs font-medium text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
         >
-          <Copy size={12} />
+          <Copy size={12} strokeWidth={SW} />
           Duplicate cue
         </button>
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[var(--color-unusonic-error)]/10 hover:bg-[var(--color-unusonic-error)]/15 text-xs font-medium text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-        >
-          <Trash2 size={12} />
-          Delete cue
-        </button>
+        {confirmingDelete ? (
+          <div className="flex items-center gap-2">
+            <span className="stage-label">Remove permanently</span>
+            <button className="stage-btn stage-btn-danger text-sm px-2 py-1" onClick={handleDelete}>Delete cue</button>
+            <button className="stage-btn stage-btn-secondary text-sm px-2 py-1" onClick={() => setConfirmingDelete(false)}>Cancel</button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            className="h-10 flex items-center justify-center gap-2 rounded-lg bg-[var(--color-unusonic-error)]/10 hover:bg-[var(--color-unusonic-error)]/15 text-xs font-medium text-[var(--color-unusonic-error)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+          >
+            <Trash2 size={12} strokeWidth={SW} />
+            Delete cue
+          </button>
+        )}
       </div>
     </StagePanel>
   );

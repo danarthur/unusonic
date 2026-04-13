@@ -86,15 +86,17 @@ export function ShowHealthCard({ dealId, health, onSaved, inline }: ShowHealthCa
                     key={key}
                     type="button"
                     onClick={() => setStatus(key)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    className="flex items-center gap-1.5 px-2 py-1 stage-badge-text tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
                     style={{
                       borderRadius: 'var(--stage-radius-input, 6px)',
                       color: status === key ? color : 'var(--stage-text-tertiary)',
                       backgroundColor:
                         status === key
-                          ? `color-mix(in oklch, ${color} 12%, transparent)`
+                          ? key === 'on_track'
+                            ? `color-mix(in oklch, ${color} 6%, transparent)`
+                            : `color-mix(in oklch, ${color} 12%, transparent)`
                           : 'var(--stage-surface)',
-                      border: `1px solid ${status === key ? `color-mix(in oklch, ${color} 30%, transparent)` : 'oklch(1 0 0 / 0.06)'}`,
+                      border: status === key ? 'none' : '1px solid oklch(1 0 0 / 0.06)',
                     }}
                   >
                     <span

@@ -22,7 +22,7 @@ export async function updateGearItemStatus(
 
   const supabase = await createClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   const { error } = await db
     .schema('ops')

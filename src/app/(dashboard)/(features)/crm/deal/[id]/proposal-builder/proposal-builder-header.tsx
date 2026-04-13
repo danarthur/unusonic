@@ -29,7 +29,7 @@ export function ProposalBuilderHeader({ dealId, deal }: { dealId: string; deal: 
         <ArrowLeft size={20} />
       </a>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+        <p className="stage-label">
           Proposal builder
         </p>
         <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight truncate mt-0.5">

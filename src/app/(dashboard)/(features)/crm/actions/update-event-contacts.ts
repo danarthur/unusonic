@@ -40,7 +40,7 @@ export async function updateEventContacts(
     const supabase = await createClient();
 
     // Verify workspace ownership via direct workspace_id
-    const { data: evt } = await (supabase as any)
+    const { data: evt } = await supabase
       .schema('ops')
       .from('events')
       .select('id')
@@ -50,7 +50,7 @@ export async function updateEventContacts(
 
     if (!evt) return { success: false, error: 'Not authorised' };
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .schema('ops')
       .from('events')
       .update({ show_day_contacts: parsed.data })

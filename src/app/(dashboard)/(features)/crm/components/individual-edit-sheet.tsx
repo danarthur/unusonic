@@ -77,19 +77,19 @@ export function IndividualEditSheet({ open, onOpenChange, entityId, initialValue
         </SheetHeader>
         <SheetBody className="flex flex-col gap-5">
           <div className="space-y-3">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Name</p>
+            <p className="stage-label">Name</p>
             <div className="grid grid-cols-2 gap-3">
               <FloatingLabelInput label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               <FloatingLabelInput label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </div>
           </div>
           <div className="space-y-3">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Contact</p>
+            <p className="stage-label">Contact</p>
             <FloatingLabelInput label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <FloatingLabelInput label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
           <div className="space-y-3">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Display name</p>
+            <p className="stage-label">Display name</p>
             <FloatingLabelInput
               label="How they appear in the app"
               value={displayName}
@@ -99,7 +99,7 @@ export function IndividualEditSheet({ open, onOpenChange, entityId, initialValue
 
           {onChangeType && (
             <div className="pt-4 border-t border-[oklch(1_0_0_/_0.10)] space-y-2">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Client type</p>
+              <p className="stage-label">Client type</p>
               <p className="text-xs text-[var(--stage-text-secondary)]/70">Switch if this client was entered as the wrong type.</p>
               <div className="flex gap-2">
                 {([['company', 'Company'], ['couple', 'Couple']] as const).map(([type, label]) => (
@@ -115,7 +115,7 @@ export function IndividualEditSheet({ open, onOpenChange, entityId, initialValue
                     }}
                     className={cn(
                       'flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                      'border-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] disabled:opacity-40'
+                      'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-card)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--stage-text-primary)] disabled:opacity-45'
                     )}
                   >
                     {changingType === type ? <Loader2 className="size-3 animate-spin inline mr-1" /> : null}

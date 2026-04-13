@@ -12,14 +12,18 @@ import {
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { STAGE_LIGHT, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT, STAGE_MEDIUM, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
 import {
   getEventGearItems,
   updateGearItemStatus,
   assignGearOperator,
   batchGetGearAvailability,
+  getCrewEquipmentMatchesForEvent,
+  sourceGearFromCrew,
   type EventGearItem,
   type GearAvailability,
+  type GearSource,
+  type CrewGearMatch,
 } from '../../actions/event-gear-items';
 import {
   GEAR_LIFECYCLE_ORDER,
@@ -56,6 +60,12 @@ function getInitials(name: string | null): string {
     .join('');
 }
 
+const SOURCE_CHIP_STYLES: Record<GearSource, { bg: string; text: string; label: string }> = {
+  company: { bg: 'bg-[oklch(1_0_0/0.06)]', text: 'text-[var(--stage-text-tertiary)]', label: 'Company' },
+  crew: { bg: 'bg-[oklch(0.75_0.15_240_/_0.15)]', text: 'text-[var(--color-unusonic-info)]', label: 'Crew' },
+  subrental: { bg: 'bg-[var(--color-unusonic-warning)]/15', text: 'text-[var(--color-unusonic-warning)]', label: 'Sub-rental' },
+};
+
 // =============================================================================
 // Props
 // =============================================================================
@@ -89,6 +99,8 @@ export function GearFlightCheck({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<Map<string, GearAvailability>>(new Map());
+  const [crewMatches, setCrewMatches] = useState<Record<string, CrewGearMatch[]>>({});
+  const [sourcing, setSourcing] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
@@ -139,6 +151,45 @@ export function GearFlightCheck({
       .catch(() => setAvailability(new Map()));
   }, [items, eventStartsAt, eventEndsAt]);
 
+  // ── Fetch crew equipment matches ───────────────────────────────────────────
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setCrewMatches({});
+      return;
+    }
+    // Only fetch if any items have catalog_package_id (matchable)
+    if (!items.some((i) => i.catalog_package_id)) {
+      setCrewMatches({});
+      return;
+    }
+    getCrewEquipmentMatchesForEvent(eventId)
+      .then((result) => setCrewMatches(result))
+      .catch(() => setCrewMatches({}));
+  }, [items, eventId]);
+
+  // ── Handle sourcing from crew ──────────────────────────────────────────────
+
+  const handleSourceFromCrew = useCallback(async (itemId: string, entityId: string) => {
+    setSourcing(itemId);
+    // Optimistic: update item source locally
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? { ...item, source: 'crew' as GearSource, supplied_by_entity_id: entityId }
+          : item,
+      ),
+    );
+    const result = await sourceGearFromCrew({ eventGearItemId: itemId, suppliedByEntityId: entityId });
+    setSourcing(null);
+    if (result.success) {
+      fetchItems(); // Re-fetch to get resolved supplier name
+      onUpdated?.();
+    } else {
+      fetchItems(); // Revert
+    }
+  }, [eventId, fetchItems, onUpdated]);
+
   // ── Department grouping ─────────────────────────────────────────────────────
 
   const departmentGroups = useMemo((): DepartmentGearGroup[] => {
@@ -174,6 +225,27 @@ export function GearFlightCheck({
       : `${loadedOrBeyond.length} of ${linearItems.length} loaded`;
   const summaryProgress =
     linearItems.length > 0 ? (loadedOrBeyond.length / linearItems.length) * 100 : 0;
+
+  // Source breakdown for gear gap footer
+  const sourceCounts = useMemo(() => {
+    const counts = { company: 0, crew: 0, subrental: 0 };
+    for (const item of items) {
+      counts[item.source] = (counts[item.source] ?? 0) + 1;
+    }
+    return counts;
+  }, [items]);
+  const hasMultipleSources = (sourceCounts.crew > 0 ? 1 : 0) + (sourceCounts.subrental > 0 ? 1 : 0) > 0;
+
+  // Count company-sourced items that have crew matches (could be crew-sourced)
+  const crewSourceableCount = useMemo(() => {
+    let count = 0;
+    for (const item of items) {
+      if (item.source === 'company' && crewMatches[item.id]?.length) {
+        count++;
+      }
+    }
+    return count;
+  }, [items, crewMatches]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
@@ -242,7 +314,7 @@ export function GearFlightCheck({
       <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
         <div className="flex items-center gap-3">
           <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
-          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Gear</h3>
+          <h3 className="stage-label">Gear</h3>
           <span className="flex-1" />
           <Loader2 className="size-4 animate-spin text-[var(--stage-text-tertiary)]" />
         </div>
@@ -258,7 +330,7 @@ export function GearFlightCheck({
         <div className="flex items-center gap-3">
           <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
           <div className="min-w-0 flex-1">
-            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Gear</h3>
+            <h3 className="stage-label">Gear</h3>
             <p className="text-sm text-[var(--color-unusonic-error)] mt-0.5">{error}</p>
           </div>
           <button
@@ -282,7 +354,7 @@ export function GearFlightCheck({
         <div className="flex items-center gap-3">
           <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
           <div>
-            <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Gear</h3>
+            <h3 className="stage-label">Gear</h3>
             <p className="text-sm text-[var(--stage-text-secondary)] mt-0.5">
               No gear items. Gear will appear here after proposal sync.
             </p>
@@ -303,10 +375,10 @@ export function GearFlightCheck({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
-          <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">Gear</h3>
-          <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">{items.length}</span>
+          <h3 className="stage-label">Gear</h3>
+          <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">{items.length}</span>
         </div>
-        <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">{summaryText}</span>
+        <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">{summaryText}</span>
       </div>
 
       {/* Summary progress bar */}
@@ -321,7 +393,7 @@ export function GearFlightCheck({
           }}
           initial={{ width: 0 }}
           animate={{ width: `${summaryProgress}%` }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          transition={STAGE_MEDIUM}
         />
       </div>
 
@@ -336,7 +408,7 @@ export function GearFlightCheck({
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ ...STAGE_LIGHT, delay: i * STAGE_STAGGER_CHILDREN }}
+                transition={STAGE_LIGHT}
                 className="overflow-hidden"
               >
                 <GearItemRow
@@ -346,6 +418,9 @@ export function GearFlightCheck({
                   availability={item.catalog_package_id ? availability.get(item.catalog_package_id) : undefined}
                   operatorPickerOpen={operatorPickerOpen === item.id}
                   crewRows={crewRows}
+                  crewMatchesForItem={crewMatches[item.id]}
+                  sourcingItem={sourcing === item.id}
+                  onSourceFromCrew={(entityId) => handleSourceFromCrew(item.id, entityId)}
                   onAdvance={() => advanceItem(item.id)}
                   onSetStatus={(s) => setItemStatus(item.id, s)}
                   onToggleMenu={() => setMenuOpen(menuOpen === item.id ? null : item.id)}
@@ -380,6 +455,9 @@ export function GearFlightCheck({
               availability={availability}
               operatorPickerOpen={operatorPickerOpen}
               crewRows={crewRows}
+              crewMatches={crewMatches}
+              sourcing={sourcing}
+              onSourceFromCrew={handleSourceFromCrew}
               onAdvance={advanceItem}
               onSetStatus={setItemStatus}
               onToggleMenu={(id) => setMenuOpen(menuOpen === id ? null : id)}
@@ -389,6 +467,35 @@ export function GearFlightCheck({
             />
           );
         })}
+
+      {/* Gear gap summary footer */}
+      {(hasMultipleSources || crewSourceableCount > 0) && (
+        <div className="mt-4 pt-3 border-t border-[oklch(1_0_0_/_0.06)] flex items-center gap-3 flex-wrap">
+          <span className="text-label text-[var(--stage-text-tertiary)]">
+            {items.length} items:
+          </span>
+          {sourceCounts.company > 0 && (
+            <span className="text-label tabular-nums text-[var(--stage-text-secondary)]">
+              {sourceCounts.company} company
+            </span>
+          )}
+          {sourceCounts.crew > 0 && (
+            <span className={`text-label tabular-nums ${SOURCE_CHIP_STYLES.crew.text}`}>
+              {sourceCounts.crew} crew-supplied
+            </span>
+          )}
+          {sourceCounts.subrental > 0 && (
+            <span className={`text-label tabular-nums ${SOURCE_CHIP_STYLES.subrental.text}`}>
+              {sourceCounts.subrental} sub-rental
+            </span>
+          )}
+          {crewSourceableCount > 0 && (
+            <span className="text-label tabular-nums text-[var(--color-unusonic-info)]">
+              {crewSourceableCount} could be crew-sourced
+            </span>
+          )}
+        </div>
+      )}
     </StagePanel>
   );
 }
@@ -407,6 +514,9 @@ function DepartmentSection({
   availability,
   operatorPickerOpen,
   crewRows,
+  crewMatches,
+  sourcing,
+  onSourceFromCrew,
   onAdvance,
   onSetStatus,
   onToggleMenu,
@@ -423,6 +533,9 @@ function DepartmentSection({
   availability: Map<string, GearAvailability>;
   operatorPickerOpen: string | null;
   crewRows: DealCrewRow[];
+  crewMatches: Record<string, CrewGearMatch[]>;
+  sourcing: string | null;
+  onSourceFromCrew: (itemId: string, entityId: string) => void;
   onAdvance: (id: string) => void;
   onSetStatus: (id: string, s: GearStatus) => void;
   onToggleMenu: (id: string) => void;
@@ -450,10 +563,10 @@ function DepartmentSection({
         >
           <ChevronDown className="size-3 text-[var(--stage-text-tertiary)] group-hover:text-[var(--stage-text-secondary)] transition-colors" />
         </motion.div>
-        <span className="stage-label text-[var(--stage-text-secondary)] tracking-tight">
+        <span className="stage-label tracking-tight">
           {department}
         </span>
-        <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
+        <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">
           {items.length}
         </span>
 
@@ -466,13 +579,13 @@ function DepartmentSection({
                 className="size-5 rounded-full bg-[oklch(1_0_0_/_0.08)] border border-[oklch(1_0_0_/_0.12)] flex items-center justify-center"
                 title={c.entity_name ?? c.role_note ?? undefined}
               >
-                <span className="text-[8px] font-medium text-[var(--stage-text-tertiary)]">
+                <span className="text-micro font-medium text-[var(--stage-text-tertiary)]">
                   {getInitials(c.entity_name)}
                 </span>
               </div>
             ))}
             {deptCrew.length > 3 && (
-              <span className="text-[9px] text-[var(--stage-text-tertiary)] ml-1.5 tabular-nums">
+              <span className="text-micro text-[var(--stage-text-tertiary)] ml-1.5 tabular-nums">
                 +{deptCrew.length - 3}
               </span>
             )}
@@ -480,7 +593,7 @@ function DepartmentSection({
         )}
 
         <span className="flex-1" />
-        <span className="text-[10px] text-[var(--stage-text-tertiary)] tracking-tight tabular-nums">
+        <span className="text-label text-[var(--stage-text-tertiary)] tracking-tight tabular-nums">
           {loadedCount}/{items.length} loaded
         </span>
       </button>
@@ -504,7 +617,7 @@ function DepartmentSection({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    transition={{ ...STAGE_LIGHT, delay: i * STAGE_STAGGER_CHILDREN }}
+                    transition={STAGE_LIGHT}
                     className="overflow-hidden"
                   >
                     <GearItemRow
@@ -514,6 +627,9 @@ function DepartmentSection({
                       availability={item.catalog_package_id ? availability.get(item.catalog_package_id) : undefined}
                       operatorPickerOpen={operatorPickerOpen === item.id}
                       crewRows={crewRows}
+                      crewMatchesForItem={crewMatches[item.id]}
+                      sourcingItem={sourcing === item.id}
+                      onSourceFromCrew={(entityId) => onSourceFromCrew(item.id, entityId)}
                       onAdvance={() => onAdvance(item.id)}
                       onSetStatus={(s) => onSetStatus(item.id, s)}
                       onToggleMenu={() => onToggleMenu(item.id)}
@@ -543,6 +659,9 @@ type GearItemRowProps = {
   availability?: GearAvailability;
   operatorPickerOpen: boolean;
   crewRows: DealCrewRow[];
+  crewMatchesForItem?: CrewGearMatch[];
+  sourcingItem: boolean;
+  onSourceFromCrew: (entityId: string) => void;
   onAdvance: () => void;
   onSetStatus: (s: GearStatus) => void;
   onToggleMenu: () => void;
@@ -558,6 +677,9 @@ function GearItemRow({
   availability,
   operatorPickerOpen,
   crewRows,
+  crewMatchesForItem,
+  sourcingItem,
+  onSourceFromCrew,
   onAdvance,
   onSetStatus,
   onToggleMenu,
@@ -610,15 +732,15 @@ function GearItemRow({
   return (
     <div>
       <div
-        className={`flex items-center gap-3 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0 ${isBranch ? 'opacity-60' : ''}`}
+        className={`flex items-center gap-3 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0 ${isBranch ? 'text-[var(--stage-text-secondary)]' : ''}`}
       >
         {/* Name + quantity */}
         <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)] truncate">
+          <span className="stage-readout truncate">
             {item.name}
           </span>
           {item.quantity > 1 && (
-            <span className="shrink-0 text-[10px] tabular-nums text-[var(--stage-text-tertiary)] bg-[oklch(1_0_0_/_0.06)] px-1.5 py-0.5 rounded-full">
+            <span className="shrink-0 text-label tabular-nums text-[var(--stage-text-tertiary)] bg-[oklch(1_0_0_/_0.06)] px-1.5 py-0.5 rounded-full">
               x{item.quantity}
             </span>
           )}
@@ -627,7 +749,7 @@ function GearItemRow({
         {/* Availability badge */}
         {availability && availability.stockQuantity !== null && (
           <span
-            className={`shrink-0 text-[10px] tabular-nums px-1.5 py-0.5 rounded-full font-medium ${
+            className={`shrink-0 text-label tabular-nums px-1.5 py-0.5 rounded-full font-medium ${
               availability.available > 0
                 ? 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]'
                 : 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]'
@@ -637,10 +759,34 @@ function GearItemRow({
           </span>
         )}
 
-        {/* Sub-rental badge */}
-        {item.is_sub_rental && (
-          <span className="shrink-0 text-[10px] font-medium tracking-tight px-2 py-0.5 rounded-full bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]">
-            Sub-rental
+        {/* Source chip */}
+        {item.source !== 'company' && (() => {
+          const chip = SOURCE_CHIP_STYLES[item.source];
+          return (
+            <span
+              className={`shrink-0 stage-badge-text tracking-tight px-2 py-0.5 rounded-full ${chip.bg} ${chip.text}`}
+              title={item.supplied_by_name ? `Supplied by ${item.supplied_by_name}` : undefined}
+            >
+              {chip.label}
+              {item.supplied_by_name && <span className="text-[var(--stage-text-secondary)] ml-0.5">· {item.supplied_by_name}</span>}
+            </span>
+          );
+        })()}
+
+        {/* Crew match suggestion — only for company-sourced items with matches */}
+        {item.source === 'company' && crewMatchesForItem && crewMatchesForItem.length > 0 && (
+          <span className="shrink-0 flex items-center gap-1.5">
+            <span className="stage-badge-text tracking-tight text-[var(--color-unusonic-info)]">
+              {crewMatchesForItem[0].entityName}
+            </span>
+            <button
+              type="button"
+              disabled={sourcingItem}
+              onClick={() => onSourceFromCrew(crewMatchesForItem[0].entityId)}
+              className="px-2 py-0.5 rounded-full stage-badge-text tracking-tight font-medium bg-[oklch(0.75_0.15_240_/_0.15)] text-[var(--color-unusonic-info)] hover:bg-[oklch(0.75_0.15_240_/_0.25)] transition-colors disabled:opacity-45"
+            >
+              {sourcingItem ? '...' : 'Source'}
+            </button>
           </span>
         )}
 
@@ -682,7 +828,7 @@ function GearItemRow({
         <button
           type="button"
           onClick={onOpenOperatorPicker}
-          className="shrink-0 size-5 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+          className="shrink-0 size-5 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           style={{
             background: item.operator_entity_id
               ? 'oklch(1 0 0 / 0.10)'
@@ -698,7 +844,7 @@ function GearItemRow({
           }
         >
           {item.operator_entity_id && operatorCrew ? (
-            <span className="text-[8px] font-medium text-[var(--stage-text-secondary)]">
+            <span className="text-micro font-medium text-[var(--stage-text-secondary)]">
               {getInitials(operatorCrew.entity_name)}
             </span>
           ) : (
@@ -709,12 +855,12 @@ function GearItemRow({
         {/* Status label / branch badge */}
         <div className="shrink-0 flex items-center gap-1.5">
           {item.status === 'quarantine' && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium tracking-tight bg-[var(--color-unusonic-error)]/20 text-[var(--color-unusonic-error)]">
+            <span className="px-2 py-0.5 rounded-full stage-badge-text tracking-tight bg-[var(--color-unusonic-error)]/20 text-[var(--color-unusonic-error)]">
               Quarantine
             </span>
           )}
           {item.status === 'sub_rented' && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium tracking-tight bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)]">
+            <span className="px-2 py-0.5 rounded-full stage-badge-text tracking-tight bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)]">
               Sub-rented
             </span>
           )}
@@ -724,14 +870,14 @@ function GearItemRow({
               onClick={onAdvance}
               disabled={updating || isTerminal}
               className={`
-                px-3 py-1 rounded-[22px] text-[11px] font-medium tracking-tight
+                px-3 py-1 rounded-[22px] text-field-label font-medium tracking-tight
                 border transition-colors
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]
-                disabled:opacity-40 disabled:cursor-default
+                disabled:opacity-45 disabled:cursor-default
                 ${
                   isTerminal
                     ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40'
-                    : 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--stage-surface-hover)] hover:text-[var(--stage-text-primary)]'
+                    : 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.10)] stage-hover overflow-hidden hover:text-[var(--stage-text-primary)]'
                 }
               `}
             >
@@ -747,7 +893,7 @@ function GearItemRow({
             type="button"
             onClick={onToggleMenu}
             disabled={updating}
-            className="p-1 rounded text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)] disabled:opacity-40"
+            className="p-1 rounded text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
             aria-label="More actions"
           >
             <MoreVertical size={14} strokeWidth={1.5} />
@@ -871,22 +1017,22 @@ function OperatorPicker({
               }`}
             >
               <div className="size-5 rounded-full bg-[oklch(1_0_0_/_0.08)] border border-[oklch(1_0_0_/_0.12)] flex items-center justify-center shrink-0">
-                <span className="text-[8px] font-medium text-[var(--stage-text-tertiary)]">
+                <span className="text-micro font-medium text-[var(--stage-text-tertiary)]">
                   {getInitials(c.entity_name)}
                 </span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-[var(--stage-text-primary)] tracking-tight truncate">
+                <p className="stage-readout truncate">
                   {c.entity_name ?? c.role_note ?? 'Unknown'}
                 </p>
                 {c.role_note && c.entity_name && (
-                  <p className="text-[10px] text-[var(--stage-text-tertiary)] tracking-tight truncate">
+                  <p className="text-label text-[var(--stage-text-tertiary)] tracking-tight truncate">
                     {c.role_note}
                   </p>
                 )}
               </div>
               {c.entity_id === currentOperatorId && (
-                <span className="text-[10px] text-[var(--stage-text-tertiary)]">current</span>
+                <span className="text-label text-[var(--stage-text-tertiary)]">current</span>
               )}
             </button>
           ))}

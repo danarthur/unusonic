@@ -15,6 +15,10 @@ export type DaySheetCrewMember = {
   phone: string | null;
   email: string | null;
   entityId: string | null;
+  /** Freeform gear notes from deal_crew (Phase 1). */
+  gearNotes: string | null;
+  /** Structured gear items this crew member is bringing (Phase 3 source=crew). */
+  bringList: { name: string; quantity: number }[];
 };
 
 export type DaySheetData = {
@@ -53,7 +57,7 @@ export async function compileDaySheetData(
 
   // 1. Fetch event
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not typed in PostgREST client
-  const { data: evt } = await (supabase as any)
+  const { data: evt } = await supabase
     .schema('ops')
     .from('events')
     .select(
@@ -107,6 +111,8 @@ export async function compileDaySheetData(
     entity_name: (r.entity_name as string | null) ?? null,
     role_note: (r.role_note as string | null) ?? null,
     call_time: (r.call_time as string | null) ?? null,
+    gear_notes: (r.gear_notes as string | null) ?? null,
+    brings_own_gear: Boolean(r.brings_own_gear),
   }));
 
   // Resolve emails and phones from directory.entities
@@ -139,6 +145,24 @@ export async function compileDaySheetData(
     }
   }
 
+  // Fetch crew-sourced event gear items for bring list per crew member
+  const crewBringMap = new Map<string, { name: string; quantity: number }[]>();
+  {
+    const { data: crewGear } = await supabase
+      .schema('ops')
+      .from('event_gear_items')
+      .select('name, quantity, supplied_by_entity_id')
+      .eq('event_id', parsed.data.eventId)
+      .eq('source', 'crew');
+
+    for (const g of (crewGear ?? []) as { name: string; quantity: number; supplied_by_entity_id: string | null }[]) {
+      if (!g.supplied_by_entity_id) continue;
+      const list = crewBringMap.get(g.supplied_by_entity_id) ?? [];
+      list.push({ name: g.name, quantity: g.quantity });
+      crewBringMap.set(g.supplied_by_entity_id, list);
+    }
+  }
+
   // Build crew list
   const crewList: DaySheetCrewMember[] = typedCrew
     .filter((r) => r.entity_id)
@@ -151,6 +175,8 @@ export async function compileDaySheetData(
         phone: contact?.phone ?? null,
         email: contact?.email ?? null,
         entityId: r.entity_id,
+        gearNotes: r.brings_own_gear ? r.gear_notes : null,
+        bringList: r.entity_id ? (crewBringMap.get(r.entity_id) ?? []) : [],
       };
     });
 

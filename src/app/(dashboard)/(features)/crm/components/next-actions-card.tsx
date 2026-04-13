@@ -56,7 +56,7 @@ function computeActions(
 
   items.push({
     id: 'date',
-    label: 'Set event date',
+    label: 'Set show date',
     done: !!deal.proposed_date,
     detail: deal.proposed_date
       ? new Date(deal.proposed_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -201,13 +201,13 @@ export function NextActionsCard({
   const progressPct = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
   return (
-    <StagePanel elevated className="h-full p-5 flex flex-col">
+    <StagePanel elevated className="h-full p-5 flex flex-col" style={{ overflow: 'visible' }}>
       {/* Header with progress */}
       <div className="flex items-center justify-between mb-4">
-        <p className="stage-label text-[var(--stage-text-secondary)]">
+        <p className="stage-label">
           Next actions
         </p>
-        <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
+        <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">
           {doneCount}/{totalCount}
         </span>
       </div>
@@ -253,7 +253,7 @@ export function NextActionsCard({
                 {item.label}
               </p>
               {item.done && item.detail && (
-                <p className="text-[10px] text-[var(--stage-text-tertiary)] mt-0.5 truncate">
+                <p className="text-label text-[var(--stage-text-tertiary)] mt-0.5 truncate">
                   {item.detail}
                 </p>
               )}

@@ -3,6 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { resolveEventTimezone, toVenueInstant } from '@/shared/lib/timezone';
 
 export type CrystallizeResult =
   | { success: true; eventId: string }
@@ -54,18 +55,25 @@ export async function crystallizeDeal(dealId: string): Promise<CrystallizeResult
 
   const projectId = (projects[0] as { id: string }).id;
   const proposedDate = r.proposed_date ? String(r.proposed_date) : new Date().toISOString().slice(0, 10);
-  const startAt = `${proposedDate}T08:00:00.000Z`;
-  const endAt = `${proposedDate}T18:00:00.000Z`;
   const title = (r.title as string)?.trim() || 'Untitled Production';
+
+  // §3.2: resolve timezone instead of hardcoding UTC. No venue on crystallize path.
+  const eventTimezone = await resolveEventTimezone({ workspaceId });
+  const startAt = toVenueInstant(proposedDate, '08:00', eventTimezone);
+  const endAt = toVenueInstant(proposedDate, '18:00', eventTimezone);
 
   const { data: event, error: eventErr } = await supabase
     .schema('ops')
     .from('events')
     .insert({
       project_id: projectId,
-      name: title,
-      start_at: startAt,
-      end_at: endAt,
+      workspace_id: workspaceId,
+      title,
+      starts_at: startAt,
+      ends_at: endAt,
+      timezone: eventTimezone,
+      status: 'planned',
+      lifecycle_status: 'production',
     })
     .select('id')
     .single();

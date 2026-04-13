@@ -19,7 +19,7 @@ export async function getDealIdForEvent(
 
   const supabase = await createClient();
 
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('events')
     .select('deal_id')

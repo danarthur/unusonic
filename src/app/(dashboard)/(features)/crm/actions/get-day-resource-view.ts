@@ -97,7 +97,7 @@ export async function getDayResourceView(date: string): Promise<DayResourceView 
   let crewByDealId = new Map<string, DayCrewSlot[]>();
 
   if (dealIds.length > 0) {
-    const { data: crewRows } = await (supabase as any)
+    const { data: crewRows } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('id, deal_id, entity_id, role_note, department, confirmed_at')

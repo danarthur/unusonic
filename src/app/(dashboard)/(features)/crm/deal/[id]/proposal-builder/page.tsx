@@ -4,6 +4,7 @@ import { getDealStakeholders } from '../../../actions/deal-stakeholders';
 import { ArrowLeft } from 'lucide-react';
 import { ProposalBuilderLoader } from './proposal-builder-loader';
 import { ProposalBuilderHeader } from './proposal-builder-header';
+import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 export default async function DealProposalBuilderPage({
   params,
@@ -28,6 +29,7 @@ export default async function DealProposalBuilderPage({
 
   return (
     <div className="flex flex-col h-full min-h-[80vh] relative">
+      <AionPageContextSetter type="proposal" entityId={dealId} label={deal.title ?? null} />
       <ProposalBuilderHeader dealId={dealId} deal={deal} />
 
       <main className="relative z-10 flex-1 min-h-0 overflow-auto">

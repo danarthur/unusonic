@@ -2,18 +2,18 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { useOptimistic, useState, useEffect, useRef, Suspense, useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from './stream';
 import { Prism } from './prism';
 import type { StreamCardItem } from './stream-card';
 import type { OptimisticUpdate } from './crm-production-queue';
 import type { StreamMode } from '../page';
-import { getCrmGigs } from '../actions/get-crm-gigs';
+import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
+import { crmQueries } from '@/features/crm/api/queries';
+import { queryKeys } from '@/shared/api/query-keys';
 import { cn } from '@/shared/lib/utils';
 
-/** Module-level cache so the list survives remounts (e.g. Next.js re-rendering the page segment). */
-let sharedGigsCache: StreamCardItem[] = [];
-let sharedGigsCacheTs = 0;
-const STALE_MS = 30_000; // consider cache stale after 30s
+// Cache is now managed by TanStack Query — no module-level state needed
 
 function buildCrmSearch(stream: StreamMode, selectedId: string | null): string {
   const params = new URLSearchParams();
@@ -52,6 +52,8 @@ type ProductionGridShellProps = {
 export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId }: ProductionGridShellProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { workspaceId } = useWorkspace();
+  const queryClient = useQueryClient();
   const [isMobile, setIsMobile] = useState(false);
   const [currentStream, setCurrentStream] = useState<StreamMode>(streamMode);
 
@@ -59,48 +61,15 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
     setCurrentStream(streamMode);
   }, [streamMode]);
 
-  // Use cached data for instant render on revisits, RSC props as fallback
-  const [clientGigs, setClientGigs] = useState<StreamCardItem[]>(() => {
-    if (sharedGigsCache.length > 0) return sharedGigsCache;
-    return gigs;
+  // TanStack Query manages the gigs list. RSC props seed the cache for instant first render.
+  const { data: clientGigs = gigs } = useQuery({
+    ...crmQueries.gigs(workspaceId ?? ''),
+    enabled: !!workspaceId,
+    initialData: gigs,
   });
-  useEffect(() => {
-    if (clientGigs.length > 0) {
-      sharedGigsCache = clientGigs;
-      sharedGigsCacheTs = Date.now();
-    }
-  }, [clientGigs]);
 
-  // When RSC re-renders (e.g. after router.refresh()), sync the fresh gigs into client state.
-  const prevGigsRef = useRef(gigs);
-  useEffect(() => {
-    if (gigs === prevGigsRef.current) return;
-    prevGigsRef.current = gigs;
-    sharedGigsCache = gigs;
-    sharedGigsCacheTs = Date.now();
-    setClientGigs(gigs);
-  }, [gigs]);
-
-  // Background refresh: if cache is stale or we mounted with empty data,
-  // fetch fresh in the background so the list stays current without blocking render.
-  const hasFetchedRef = useRef(false);
-  useEffect(() => {
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
-    const isStale = Date.now() - sharedGigsCacheTs > STALE_MS;
-    const isEmpty = sharedGigsCache.length === 0 && gigs.length === 0;
-    if (!isStale && !isEmpty) return; // fresh data from RSC or cache, skip
-    let cancelled = false;
-    getCrmGigs().then((fetched) => {
-      if (cancelled) return;
-      sharedGigsCache = fetched;
-      sharedGigsCacheTs = Date.now();
-      setClientGigs(fetched);
-    });
-    return () => { cancelled = true; };
-  }, [gigs]);
   const [rawOptimisticGigs, addOptimisticGig] = useOptimistic(clientGigs, gigsReducer);
-  // Deduplicate: refetchGigs + router.refresh can both add the same deal
+  // Deduplicate: optimistic add + cache refresh can produce duplicates
   const optimisticGigs = useMemo(() => {
     const seen = new Set<string>();
     return rawOptimisticGigs.filter((g) => {
@@ -110,18 +79,12 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
       return true;
     });
   }, [rawOptimisticGigs]);
-  useEffect(() => {
-    if (optimisticGigs.length > 0) sharedGigsCache = optimisticGigs;
-  }, [optimisticGigs]);
 
-  // Passed to CreateGigModal so it can pull a fresh list immediately after success,
-  // without relying on router.refresh() to propagate through prevGigsRef.
-  const refetchGigs = useCallback(async () => {
-    const fetched = await getCrmGigs();
-    sharedGigsCache = fetched;
-    sharedGigsCacheTs = Date.now();
-    setClientGigs(fetched);
-  }, []);
+  // Invalidate the gigs query — passed to CreateGigModal instead of manual refetch
+  const invalidateGigs = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.deals.all(workspaceId ?? '') }),
+    [queryClient, workspaceId],
+  );
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -146,7 +109,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-[80vh] md:min-h-0 relative" data-surface="void" style={{ background: 'var(--stage-void)' }}>
+    <div className="flex flex-col md:flex-row flex-1 min-h-0 relative" data-surface="void" style={{ background: 'var(--stage-void)' }}>
       {/* Left: Stream. On mobile hidden when item selected; on desktop always visible. */}
       <aside
         className={cn(
@@ -159,7 +122,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
           selectedId={selectedId}
           onSelect={setSelected}
           addOptimisticGig={addOptimisticGig}
-          onRefetchList={refetchGigs}
+          onRefetchList={invalidateGigs}
           mode={currentStream}
           onModeChange={setStreamMode}
           sourceOrgId={currentOrgId}
@@ -169,7 +132,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
       {/* Right: Prism or empty. On mobile only visible when selected (stack); on desktop always. */}
       <main
         className={cn(
-          'flex flex-col flex-1 min-w-0',
+          'flex flex-col flex-1 min-w-0 min-h-0',
           !selectedId && 'hidden md:flex'
         )}
       >

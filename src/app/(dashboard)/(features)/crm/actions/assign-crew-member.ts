@@ -4,6 +4,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { createClient } from '@/shared/api/supabase/server';
 import { applyRuleToCrewMember } from './apply-call-time-rules';
 import { sendCrewAssignmentEmail } from '@/features/crew-notifications/api/send-assignment-email';
+import { notifyNewGigRequest } from '@/shared/api/push/send-notification';
 
 export type AssignCrewMemberResult =
   | { success: true }
@@ -71,6 +72,28 @@ export async function assignCrewMember(
   applyRuleToCrewMember(eventId, assignmentId, role, entityId).catch(() => {});
   // Send assignment email with confirmation link (fire-and-forget)
   sendCrewAssignmentEmail(eventId, assignmentId, entityId).catch(() => {});
+  // Push notification to the assignee's devices (fire-and-forget)
+  (async () => {
+    try {
+      const { data: ent } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('claimed_by_user_id')
+        .eq('id', entityId)
+        .maybeSingle();
+      if (!ent?.claimed_by_user_id) return;
+      const { data: evt } = await supabase
+        .schema('ops')
+        .from('events')
+        .select('title')
+        .eq('id', eventId)
+        .maybeSingle();
+      await notifyNewGigRequest(ent.claimed_by_user_id, {
+        eventTitle: evt?.title ?? 'an upcoming show',
+        role,
+      });
+    } catch { /* non-critical */ }
+  })();
 
   return { success: true };
 }

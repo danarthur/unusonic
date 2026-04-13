@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
@@ -122,7 +122,7 @@ export function SortControl({
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-full transition-colors',
+          'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 stage-badge-text font-medium rounded-full transition-colors',
           'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
         )}
         style={{
@@ -135,60 +135,63 @@ export function SortControl({
         <DirIcon size={10} />
       </button>
 
-      {open &&
-        createPortal(
-          <motion.div
-            ref={dropdownRef}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={STAGE_LIGHT}
-            className="fixed z-50 min-w-[150px] p-2"
-            style={{
-              top: pos.top,
-              right: pos.right,
-              background: 'var(--stage-surface-raised)',
-              borderRadius: 'var(--stage-radius-panel, 12px)',
-              border: '1px solid var(--stage-edge-subtle)',
-              boxShadow: '0 8px 32px oklch(0 0 0 / 0.4)',
-            }}
-          >
-            {SORT_OPTIONS.map((opt) => {
-              const isActive = sort.field === opt.field;
-              return (
-                <button
-                  key={opt.field}
-                  type="button"
-                  onClick={() => {
-                    if (isActive) {
-                      onSortChange({ field: sort.field, direction: sort.direction === 'asc' ? 'desc' : 'asc' });
-                    } else {
-                      onSortChange({ field: opt.field, direction: opt.defaultDir });
-                    }
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-md transition-colors text-left',
-                    isActive
-                      ? 'text-[var(--stage-text-primary)]'
-                      : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
-                  )}
-                  style={{
-                    background: isActive
-                      ? 'color-mix(in oklch, var(--stage-accent) 8%, transparent)'
-                      : 'transparent',
-                  }}
-                >
-                  {opt.label}
-                  {isActive && (
-                    <DirIcon size={10} style={{ color: 'var(--stage-accent)' }} />
-                  )}
-                </button>
-              );
-            })}
-          </motion.div>,
-          document.body
-        )}
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              ref={dropdownRef}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={STAGE_LIGHT}
+              className="fixed z-50 min-w-[150px] p-2"
+              style={{
+                top: pos.top,
+                right: pos.right,
+                background: 'var(--stage-surface-raised)',
+                borderRadius: 'var(--stage-radius-panel, 12px)',
+                border: '1px solid var(--stage-edge-subtle)',
+                boxShadow: '0 8px 32px oklch(0 0 0 / 0.4)',
+              }}
+            >
+              {SORT_OPTIONS.map((opt) => {
+                const isActive = sort.field === opt.field;
+                return (
+                  <button
+                    key={opt.field}
+                    type="button"
+                    onClick={() => {
+                      if (isActive) {
+                        onSortChange({ field: sort.field, direction: sort.direction === 'asc' ? 'desc' : 'asc' });
+                      } else {
+                        onSortChange({ field: opt.field, direction: opt.defaultDir });
+                      }
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      'flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-md transition-colors text-left',
+                      isActive
+                        ? 'text-[var(--stage-text-primary)]'
+                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
+                    )}
+                    style={{
+                      background: isActive
+                        ? 'color-mix(in oklch, var(--stage-accent) 8%, transparent)'
+                        : 'transparent',
+                    }}
+                  >
+                    {opt.label}
+                    {isActive && (
+                      <DirIcon size={10} style={{ color: 'var(--stage-accent)' }} />
+                    )}
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 }

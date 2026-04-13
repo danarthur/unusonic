@@ -209,7 +209,7 @@ export function FilterChipBar({
           type="button"
           onClick={() => onFiltersChange({ ...filters, needsAttention: !filters.needsAttention })}
           className={cn(
-            'shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors',
+            'shrink-0 flex items-center gap-1.5 px-3 py-1.5 stage-badge-text font-medium rounded-full transition-colors',
             filters.needsAttention
               ? 'text-[var(--stage-text-primary)]'
               : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
@@ -224,7 +224,7 @@ export function FilterChipBar({
           <Bell size={12} />
           Needs attention
           <span
-            className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-semibold rounded-full"
+            className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 stage-badge-text rounded-full"
             style={{
               background: filters.needsAttention ? 'var(--stage-accent)' : 'var(--stage-surface)',
               color: filters.needsAttention ? 'var(--stage-surface)' : 'var(--stage-text-secondary)',
@@ -332,7 +332,7 @@ export function FilterChipBar({
             exit={{ opacity: 0, scale: 0.9 }}
             transition={STAGE_LIGHT}
             onClick={() => onFiltersChange(INITIAL_FILTERS)}
-            className="shrink-0 flex items-center gap-1 px-2 py-1 text-xs rounded-full transition-colors"
+            className="shrink-0 flex items-center gap-1 px-2 py-1 stage-badge-text rounded-full transition-colors"
             style={{ color: 'var(--stage-text-secondary)' }}
           >
             <X size={12} /> Clear
@@ -434,7 +434,7 @@ function FilterChip({
         type="button"
         onClick={onToggle}
         className={cn(
-          'shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors',
+          'shrink-0 flex items-center gap-1.5 px-3 py-1.5 stage-badge-text font-medium rounded-full transition-colors',
           active
             ? 'text-[var(--stage-text-primary)]'
             : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]'
@@ -452,7 +452,7 @@ function FilterChip({
         {label}
         {count != null && count > 0 && (
           <span
-            className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-semibold rounded-full"
+            className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 stage-badge-text rounded-full"
             style={{
               background: 'var(--stage-accent)',
               color: 'var(--stage-surface)',
@@ -463,9 +463,10 @@ function FilterChip({
         )}
       </button>
 
-      {isOpen &&
-        createPortal(
-          <motion.div
+      {createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
             ref={dropdownRef}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -482,9 +483,11 @@ function FilterChip({
             }}
           >
             {children}
-          </motion.div>,
-          document.body
-        )}
+          </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 }
@@ -575,7 +578,7 @@ function ClientPicker({
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search clients…"
           autoFocus
-          className="w-full pl-7 pr-2 py-1.5 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+          className="w-full pl-7 pr-2 py-1.5 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           style={{
             background: 'var(--stage-surface-elevated)',
             borderRadius: '6px',

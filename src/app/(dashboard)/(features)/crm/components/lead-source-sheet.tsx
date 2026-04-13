@@ -11,19 +11,18 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, Search } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { STAGE_HEAVY, STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_HEAVY, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { getWorkspaceLeadSources, type WorkspaceLeadSource } from '@/features/lead-sources';
 import { updateDealScalars } from '../actions/update-deal-scalars';
-import { searchNetworkOrgs } from '@/features/network-data';
-import { searchCrewMembers } from '../actions/deal-crew';
+import { searchReferrerEntities, type ReferrerSearchResult } from '../actions/search-referrer';
 import { getEntityDisplayName } from '../actions/lookup';
 import { toast } from 'sonner';
 
 const CATEGORIES = ['referral', 'digital', 'marketplace', 'offline', 'relationship', 'custom'] as const;
 
-/** Backdrop: 200ms ease-out, not a spring (per overlay spec). */
-const BACKDROP_TRANSITION = { duration: 0.2, ease: [0.4, 0, 0.2, 1] as const };
-const EXIT_TRANSITION = { duration: 0.15, ease: [0.4, 0, 0.2, 1] as const };
+/** Backdrop/exit: use standard nav crossfade (0.12s). */
+const BACKDROP_TRANSITION = STAGE_NAV_CROSSFADE;
+const EXIT_TRANSITION = STAGE_NAV_CROSSFADE;
 
 const OVERLAY_SHADOW = '0 24px 64px -12px oklch(0 0 0 / 0.6), 0 8px 24px -4px oklch(0 0 0 / 0.4)';
 
@@ -37,7 +36,7 @@ type Props = {
   onClose: () => void;
 };
 
-type ReferrerResult = { id: string; name: string; section: 'team' | 'network' };
+type ReferrerResult = ReferrerSearchResult;
 
 export function LeadSourceSheet({
   open, dealId, currentLeadSourceId, currentReferrerEntityId, sourceOrgId, onSaved, onClose,
@@ -57,7 +56,7 @@ export function LeadSourceSheet({
 
   const selectedSource = sources.find((s) => s.id === selectedSourceId);
   // Show referrer section if: source is a referral type, OR a referrer is already linked
-  const isReferral = selectedSource?.is_referral ?? false;
+  const isReferral = selectedSource?.is_referral === true || selectedSource?.category === 'referral';
   const showReferrerSection = isReferral || !!referrerEntityId;
 
   useEffect(() => {
@@ -81,23 +80,16 @@ export function LeadSourceSheet({
   }, [open, currentLeadSourceId, currentReferrerEntityId]);
 
   useEffect(() => {
-    if (referrerQuery.length < 2 || !sourceOrgId) { setReferrerResults([]); return; }
+    if (referrerQuery.length < 2) { setReferrerResults([]); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setReferrerSearching(true);
-      const [net, crew] = await Promise.all([
-        searchNetworkOrgs(sourceOrgId, referrerQuery),
-        searchCrewMembers(sourceOrgId, referrerQuery),
-      ]);
-      const seen = new Set<string>();
-      const out: ReferrerResult[] = [];
-      for (const r of crew) { if (!seen.has(r.entity_id)) { seen.add(r.entity_id); out.push({ id: r.entity_id, name: r.name, section: 'team' }); } }
-      for (const r of net) { const eid = r.entity_uuid ?? r.id; if (!seen.has(eid)) { seen.add(eid); out.push({ id: eid, name: r.name, section: 'network' }); } }
-      setReferrerResults(out);
+      const results = await searchReferrerEntities(referrerQuery);
+      setReferrerResults(results);
       setReferrerSearching(false);
     }, 250);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [referrerQuery, sourceOrgId]);
+  }, [referrerQuery]);
 
   const handleSelectSource = useCallback(async (source: WorkspaceLeadSource) => {
     setSelectedSourceId(source.id);
@@ -178,6 +170,7 @@ export function LeadSourceSheet({
           >
             <div
               className="flex flex-col max-h-[80vh]"
+              data-surface="raised"
               style={{
                 background: 'var(--stage-surface-raised, oklch(0.26 0.004 50))',
                 border: '1px solid oklch(1 0 0 / 0.08)',
@@ -238,7 +231,7 @@ export function LeadSourceSheet({
                                   onClick={() => handleSelectSource(source)}
                                   transition={STAGE_LIGHT}
                                   className={cn(
-                                    'rounded-full border px-3 py-1 text-[11px] font-medium tracking-tight transition-colors focus:outline-none disabled:opacity-45 hover:bg-[var(--stage-surface-hover)]',
+                                    'rounded-full border px-3 py-1 text-field-label font-medium tracking-tight transition-colors focus:outline-none disabled:opacity-45 stage-hover overflow-hidden',
                                     active
                                       ? 'border-[var(--stage-accent)]/40 bg-[var(--stage-accent)]/10 text-[var(--stage-text-primary)]'
                                       : 'border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-edge-top)]',
@@ -284,7 +277,7 @@ export function LeadSourceSheet({
                             type="button"
                             onClick={handleClearReferrer}
                             disabled={saving}
-                            className="text-[10px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-45"
+                            className="text-label text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors disabled:opacity-45"
                           >
                             Clear
                           </button>
@@ -379,9 +372,10 @@ export function LeadSourceSheet({
                                         type="button"
                                         disabled={saving}
                                         onClick={() => handleSelectReferrer(r.id, r.name)}
-                                        className="w-full text-left px-3 py-2 text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors truncate disabled:opacity-45"
+                                        className="w-full text-left px-3 py-2 stage-hover overflow-hidden transition-colors disabled:opacity-45"
                                       >
-                                        {r.name}
+                                        <span className="block text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] truncate">{r.name}</span>
+                                        {r.subtitle && <span className="block text-field-label text-[var(--stage-text-tertiary)] truncate">{r.subtitle}</span>}
                                       </button>
                                     ))}
                                   </>
@@ -395,9 +389,10 @@ export function LeadSourceSheet({
                                         type="button"
                                         disabled={saving}
                                         onClick={() => handleSelectReferrer(r.id, r.name)}
-                                        className="w-full text-left px-3 py-2 text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-hover)] transition-colors truncate disabled:opacity-45"
+                                        className="w-full text-left px-3 py-2 stage-hover overflow-hidden transition-colors disabled:opacity-45"
                                       >
-                                        {r.name}
+                                        <span className="block text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] truncate">{r.name}</span>
+                                        {r.subtitle && <span className="block text-field-label text-[var(--stage-text-tertiary)] truncate">{r.subtitle}</span>}
                                       </button>
                                     ))}
                                   </>

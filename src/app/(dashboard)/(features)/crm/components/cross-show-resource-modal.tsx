@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Package, AlertTriangle, ArrowLeftRight, Search, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import {
   getDayResourceView,
@@ -242,18 +242,18 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
     <>
       {/* Backdrop */}
       <motion.div
-        className="fixed inset-0 z-[60]"
-        style={{ backgroundColor: 'oklch(0.06 0 0 / 0.75)' }}
+        className="stage-scrim z-[60]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={STAGE_NAV_CROSSFADE}
         onClick={onClose}
       />
 
       {/* Drawer — slides from right */}
       <motion.aside
         className="fixed inset-y-0 right-0 z-[61] flex w-full max-w-lg flex-col overflow-hidden"
+        data-surface="raised"
         style={{ backgroundColor: 'var(--stage-surface-raised)' }}
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
@@ -263,11 +263,11 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
         {/* Header */}
         <div
           className="flex items-center justify-between shrink-0 px-5 py-4 border-b"
-          style={{ borderColor: 'var(--stage-border)' }}
+          style={{ borderColor: 'var(--stage-edge-subtle)' }}
         >
           <div>
             <h2
-              className="text-base font-semibold tracking-tight"
+              className="text-base font-medium tracking-tight"
               style={{ color: 'var(--stage-text-primary)' }}
             >
               Day view — {formatDate(date)}
@@ -331,7 +331,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                   }}
                 >
                   <Users size={14} style={{ color: 'var(--stage-text-tertiary)' }} />
-                  <span className="text-xs font-medium tracking-tight uppercase" style={{ color: 'var(--stage-text-secondary)' }}>
+                  <span className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
                     Crew
                   </span>
                   <span className="text-xs tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
@@ -355,7 +355,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                         key={member.entityId ?? `crew-${idx}`}
                         initial={{ opacity: 0, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ ...STAGE_LIGHT, delay: idx * 0.02 }}
+                        transition={STAGE_LIGHT}
                         className="relative"
                       >
                         <div
@@ -367,11 +367,11 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                         >
                           {/* Name + role */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium tracking-tight truncate" style={{ color: 'var(--stage-text-primary)' }}>
+                            <p className="stage-readout truncate">
                               {member.entityName}
                             </p>
                             {member.role && (
-                              <p className="text-[11px] truncate" style={{ color: 'var(--stage-text-tertiary)' }}>
+                              <p className="text-field-label truncate" style={{ color: 'var(--stage-text-tertiary)' }}>
                                 {member.role}
                                 {member.department && ` · ${member.department}`}
                               </p>
@@ -400,7 +400,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                           {isConflict && (
                             <div className="flex items-center gap-1.5 shrink-0">
                               <span
-                                className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5"
+                                className="stage-micro px-1.5 py-0.5"
                                 style={{
                                   color: 'var(--color-unusonic-error)',
                                   backgroundColor: 'color-mix(in oklch, var(--color-unusonic-error) 10%, transparent)',
@@ -418,7 +418,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                                       handleOpenSwap(member.entityId, first.dealCrewId, first.dealId, member.role);
                                     }
                                   }}
-                                  className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide transition-colors"
+                                  className="flex items-center gap-0.5 px-1.5 py-0.5 text-label font-medium tracking-wide transition-colors"
                                   style={{
                                     color: 'var(--color-unusonic-info)',
                                     backgroundColor: 'color-mix(in oklch, var(--color-unusonic-info) 10%, transparent)',
@@ -463,9 +463,9 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                                       onChange={(e) => handleSwapSearch(e.target.value)}
                                       placeholder="Search replacement…"
                                       autoFocus
-                                      className="w-full pl-7 pr-3 py-1.5 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]/30"
+                                      className="w-full pl-7 pr-3 py-1.5 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/30"
                                       style={{
-                                        background: 'var(--ctx-well, var(--stage-input-bg))',
+                                        background: 'var(--ctx-well)',
                                         borderRadius: 'var(--stage-radius-input, 6px)',
                                         border: '1px solid var(--stage-edge-subtle)',
                                       }}
@@ -474,7 +474,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                                   <button
                                     type="button"
                                     onClick={() => setSwapTarget(null)}
-                                    className="text-[10px] font-medium px-2 py-1 transition-colors"
+                                    className="text-label font-medium px-2 py-1 transition-colors"
                                     style={{
                                       color: 'var(--stage-text-secondary)',
                                       borderRadius: 'var(--stage-radius-input, 6px)',
@@ -487,7 +487,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                                 {isSearching && (
                                   <div className="flex items-center gap-1.5 py-1">
                                     <Loader2 size={12} className="animate-spin" style={{ color: 'var(--stage-text-tertiary)' }} />
-                                    <span className="text-[11px]" style={{ color: 'var(--stage-text-tertiary)' }}>Searching…</span>
+                                    <span className="text-field-label" style={{ color: 'var(--stage-text-tertiary)' }}>Searching…</span>
                                   </div>
                                 )}
 
@@ -499,18 +499,18 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                                           type="button"
                                           onClick={() => handleSwapConfirm(alt.id)}
                                           disabled={isSwapping}
-                                          className="w-full text-left flex items-center gap-2 px-2.5 py-1.5 text-xs transition-colors hover:bg-[var(--ctx-well-hover,oklch(1_0_0/0.04))] disabled:opacity-50"
+                                          className="w-full text-left flex items-center gap-2 px-2.5 py-1.5 text-xs transition-colors hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-45"
                                           style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
                                         >
                                           <span className="flex-1 truncate" style={{ color: 'var(--stage-text-primary)' }}>
                                             {alt.name}
                                           </span>
                                           {alt.jobTitle && (
-                                            <span className="text-[10px] shrink-0" style={{ color: 'var(--stage-text-tertiary)' }}>
+                                            <span className="text-label shrink-0" style={{ color: 'var(--stage-text-tertiary)' }}>
                                               {alt.jobTitle}
                                             </span>
                                           )}
-                                          <span className="text-[9px] uppercase tracking-wider shrink-0" style={{ color: 'var(--stage-text-tertiary)' }}>
+                                          <span className="stage-micro shrink-0" style={{ color: 'var(--stage-text-tertiary)' }}>
                                             {alt.section}
                                           </span>
                                         </button>
@@ -520,7 +520,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                                 )}
 
                                 {!isSearching && swapQuery.length >= 2 && swapResults.length === 0 && (
-                                  <p className="text-[11px] py-1" style={{ color: 'var(--stage-text-tertiary)' }}>
+                                  <p className="text-field-label py-1" style={{ color: 'var(--stage-text-tertiary)' }}>
                                     No matches found.
                                   </p>
                                 )}
@@ -545,7 +545,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                     }}
                   >
                     <Package size={14} style={{ color: 'var(--stage-text-tertiary)' }} />
-                    <span className="text-xs font-medium tracking-tight uppercase" style={{ color: 'var(--stage-text-secondary)' }}>
+                    <span className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
                       Gear
                     </span>
                     <span className="text-xs tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
@@ -562,7 +562,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                           key={item.name}
                           initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ ...STAGE_LIGHT, delay: idx * 0.02 }}
+                          transition={STAGE_LIGHT}
                           className={cn(
                             'px-5 py-2.5 flex items-center gap-3',
                             isConflict && 'bg-[color-mix(in_oklch,var(--color-unusonic-error)_5%,transparent)]',
@@ -571,10 +571,10 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                         >
                           {/* Name + quantity */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium tracking-tight truncate" style={{ color: 'var(--stage-text-primary)' }}>
+                            <p className="stage-readout truncate">
                               {item.name}
                             </p>
-                            <p className="text-[11px] tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
+                            <p className="text-field-label tabular-nums" style={{ color: 'var(--stage-text-tertiary)' }}>
                               qty {item.totalQuantity}
                             </p>
                           </div>
@@ -600,7 +600,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                           {/* Conflict badge */}
                           {isConflict && (
                             <span
-                              className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 shrink-0"
+                              className="stage-micro px-1.5 py-0.5 shrink-0"
                               style={{
                                 color: 'var(--color-unusonic-error)',
                                 backgroundColor: 'color-mix(in oklch, var(--color-unusonic-error) 10%, transparent)',

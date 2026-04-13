@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Wallet, ArrowDownRight, ArrowUpRight, Clock } from 'lucide-react';
+import { Wallet, ArrowDownRight, ArrowUpRight, Clock, AlertTriangle } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type { EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
@@ -24,20 +24,48 @@ export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
       {/* Waterfall card — Total Revenue / Estimated Cost / Projected Margin / EHR */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--color-unusonic-success)]">
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">Total revenue</p>
-          <p className="text-xl font-semibold text-[var(--color-unusonic-success)] tracking-tight tabular-nums">
+          <p className="stage-label mb-1">Total revenue</p>
+          <p className="stage-readout-lg text-[var(--color-unusonic-success)]">
             {ledger ? ledger.fmt.totalRevenue : '—'}
           </p>
         </StagePanel>
         <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--color-unusonic-error)]">
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">Estimated cost</p>
-          <p className="text-xl font-semibold text-[var(--stage-text-secondary)] tracking-tight tabular-nums">
+          <p className="stage-label mb-1">Estimated cost</p>
+          <p className="stage-readout-lg text-[var(--stage-text-secondary)]">
             {ledger ? ledger.fmt.totalCost : '—'}
           </p>
+          {ledger && (ledger.laborCost > 0 || ledger.expenseCost > 0) && (
+            <div className="mt-2 space-y-0.5">
+              {ledger.laborCost > 0 && (
+                <p className="text-field-label tabular-nums tracking-tight flex items-center gap-1">
+                  <span className={ledger.crewRateCompleteness.rated < ledger.crewRateCompleteness.total ? 'text-[var(--color-unusonic-warning)]' : 'text-[var(--stage-text-tertiary)]'}>
+                    Labor {ledger.fmt.crewCost}
+                    {ledger.crewRateCompleteness.total > 0 && (
+                      <> ({ledger.crewRateCompleteness.rated}/{ledger.crewRateCompleteness.total} rated)</>
+                    )}
+                  </span>
+                  {ledger.crewRateCompleteness.rated < ledger.crewRateCompleteness.total && (
+                    <AlertTriangle size={10} className="text-[var(--color-unusonic-warning)]" aria-label="Incomplete crew rates" />
+                  )}
+                </p>
+              )}
+              {ledger.expenseCost > 0 && (
+                <p className="text-field-label tabular-nums tracking-tight text-[var(--stage-text-tertiary)]">
+                  Expenses ${ledger.expenseCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              )}
+            </div>
+          )}
+          {ledger && ledger.crewRateCompleteness.total > 0 && ledger.laborCost === 0 && ledger.crewRateCompleteness.rated < ledger.crewRateCompleteness.total && (
+            <p className="mt-2 text-field-label tabular-nums tracking-tight text-[var(--color-unusonic-warning)] flex items-center gap-1">
+              <AlertTriangle size={10} aria-hidden />
+              {ledger.crewRateCompleteness.rated}/{ledger.crewRateCompleteness.total} crew rated
+            </p>
+          )}
         </StagePanel>
         <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--color-unusonic-warning)]">
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1">Projected margin</p>
-          <p className="text-xl font-semibold text-[var(--color-unusonic-warning)] tracking-tight tabular-nums">
+          <p className="stage-label mb-1">Projected margin</p>
+          <p className="stage-readout-lg text-[var(--color-unusonic-warning)]">
             {ledger ? ledger.fmt.margin : '—'}
           </p>
         </StagePanel>
@@ -48,11 +76,11 @@ export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
         <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--stage-text-primary)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1 flex items-center gap-1.5">
+              <p className="stage-label mb-1 flex items-center gap-1.5">
                 <Clock size={14} strokeWidth={1.5} aria-hidden />
                 Effective rate
               </p>
-              <p className="text-xl font-semibold text-[var(--stage-text-primary)] tracking-tight tabular-nums">
+              <p className="stage-readout-lg">
                 {ledger.fmt.effectiveHourlyRate}
               </p>
             </div>
@@ -67,7 +95,7 @@ export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
 
       {/* Transaction stream */}
       <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border-l-4 border-l-[var(--color-unusonic-error)]">
-        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
+        <h2 className="stage-label mb-4">
           Transaction stream
         </h2>
         {ledger && ledger.transactions.length > 0 ? (
@@ -102,7 +130,7 @@ export function LedgerLens({ eventId, ledger }: LedgerLensProps) {
 
       <Link
         href={`/events/${eventId}/finance`}
-        className="inline-flex items-center gap-2 px-4 py-3 rounded-full border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[var(--stage-surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]"
+        className="inline-flex items-center gap-2 px-4 py-3 rounded-full border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm stage-hover overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]"
       >
         <Wallet size={18} strokeWidth={1.5} aria-hidden />
         Open finance

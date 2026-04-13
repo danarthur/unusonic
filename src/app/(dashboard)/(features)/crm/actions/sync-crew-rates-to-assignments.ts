@@ -19,7 +19,7 @@ export async function syncCrewRatesToAssignments(
     const supabase = await createClient();
 
     // 1. Get deal_crew rows with assigned entities
-    const { data: crewRows, error: crewErr } = await (supabase as any)
+    const { data: crewRows, error: crewErr } = await supabase
       .schema('ops')
       .from('deal_crew')
       .select('id, entity_id, role_note, day_rate, confirmed_at')
@@ -34,7 +34,7 @@ export async function syncCrewRatesToAssignments(
     if (!crewRows || crewRows.length === 0) return;
 
     // 2. Get the workspace_id from the event
-    const { data: event, error: eventErr } = await (supabase as any)
+    const { data: event, error: eventErr } = await supabase
       .schema('ops')
       .from('events')
       .select('workspace_id')
@@ -55,7 +55,7 @@ export async function syncCrewRatesToAssignments(
     // which is still correct for fresh inserts, but on re-run we must
     // respect any portal confirmations that arrived between handoff and now.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existingAssignments } = await (supabase as any)
+    const { data: existingAssignments } = await supabase
       .schema('ops')
       .from('crew_assignments')
       .select('id, entity_id, pay_rate, status')
@@ -82,7 +82,7 @@ export async function syncCrewRatesToAssignments(
     }
 
     // 4. Get max sort_order for inserts
-    const { data: maxRow } = await (supabase as any)
+    const { data: maxRow } = await supabase
       .schema('ops')
       .from('crew_assignments')
       .select('sort_order')
@@ -108,7 +108,7 @@ export async function syncCrewRatesToAssignments(
       if (existing) {
         // Update pay_rate only if currently null
         if (existing.pay_rate == null && dc.day_rate != null) {
-          await (supabase as any)
+          await supabase
             .schema('ops')
             .from('crew_assignments')
             .update({ pay_rate: dc.day_rate, pay_rate_type: 'flat' })
@@ -122,7 +122,7 @@ export async function syncCrewRatesToAssignments(
         // already be set for status='confirmed' writes, which is true by
         // construction here (we just read `dc.confirmed_at` from the source).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any)
+        await supabase
           .schema('ops')
           .from('crew_assignments')
           .insert({

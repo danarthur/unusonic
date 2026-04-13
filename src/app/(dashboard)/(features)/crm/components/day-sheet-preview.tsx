@@ -32,6 +32,7 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
   const [data, setData] = useState<DaySheetData | null>(null);
   const [isLoading, startLoad] = useTransition();
   const [isSending, startSend] = useTransition();
+  const [confirmingSend, setConfirmingSend] = useState(false);
   // Fetch on mount
   useEffect(() => {
     let cancelled = false;
@@ -49,11 +50,6 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
   const handleSend = () => {
     if (crewWithEmail === 0) return;
 
-    const confirmed = window.confirm(
-      `Send day sheet to ${crewWithEmail} crew member${crewWithEmail !== 1 ? 's' : ''}?`,
-    );
-    if (!confirmed) return;
-
     startSend(async () => {
       const result = await compileAndSendDaySheet({ eventId, dealId });
       if (result.success) {
@@ -64,6 +60,7 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
           );
         }
         toast.success(parts.join('. '));
+        setConfirmingSend(false);
         onClose();
       } else {
         toast.error(result.error);
@@ -77,8 +74,7 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
     <>
       {/* Backdrop */}
       <motion.div
-        className="fixed inset-0 z-[60]"
-        style={{ backgroundColor: 'oklch(0.06 0 0 / 0.75)' }}
+        className="stage-scrim"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -89,6 +85,7 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
       {/* Drawer */}
       <motion.aside
         className="fixed inset-y-0 right-0 z-[61] flex w-full max-w-md flex-col overflow-hidden"
+        data-surface="raised"
         style={{ backgroundColor: 'var(--stage-surface-raised)' }}
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
@@ -98,12 +95,12 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
         {/* Header */}
         <div
           className="flex items-center justify-between shrink-0 px-5 py-4 border-b"
-          style={{ borderColor: 'var(--stage-border)' }}
+          style={{ borderColor: 'var(--stage-edge-subtle)' }}
         >
           <div className="flex items-center gap-2.5">
             <FileText size={18} strokeWidth={1.5} style={{ color: 'var(--stage-text-secondary)' }} />
             <h2
-              className="text-base font-semibold tracking-tight"
+              className="text-base font-medium tracking-tight"
               style={{ color: 'var(--stage-text-primary)' }}
             >
               Day sheet preview
@@ -133,7 +130,7 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
         {data && (
           <div
             className="shrink-0 px-5 py-4 border-t space-y-2"
-            style={{ borderColor: 'var(--stage-border)' }}
+            style={{ borderColor: 'var(--stage-edge-subtle)' }}
           >
             <div className="flex items-center justify-between">
               <p className="text-xs tracking-tight" style={{ color: 'var(--stage-text-tertiary)' }}>
@@ -141,13 +138,23 @@ export function DaySheetPreview({ onClose, eventId, dealId }: DaySheetPreviewPro
                 {missingEmail > 0 && ` (${missingEmail} missing)`}
               </p>
             </div>
-            <button
-              onClick={handleSend}
-              disabled={isSending || crewWithEmail === 0}
-              className="stage-btn stage-btn-primary w-full text-sm py-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isSending ? 'Sending\u2026' : `Send day sheet to ${crewWithEmail} crew`}
-            </button>
+            {confirmingSend ? (
+              <div className="flex items-center gap-2">
+                <span className="stage-label">Send to {crewWithEmail} crew member{crewWithEmail !== 1 ? 's' : ''}?</span>
+                <button className="stage-btn stage-btn-primary text-sm px-3 py-1.5" onClick={handleSend} disabled={isSending}>
+                  {isSending ? 'Sending\u2026' : 'Send'}
+                </button>
+                <button className="stage-btn stage-btn-secondary text-sm px-3 py-1.5" onClick={() => setConfirmingSend(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingSend(true)}
+                disabled={isSending || crewWithEmail === 0}
+                className="stage-btn stage-btn-primary w-full text-sm py-2.5 disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                {`Send day sheet to ${crewWithEmail} crew`}
+              </button>
+            )}
           </div>
         )}
       </motion.aside>
@@ -169,12 +176,11 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
       {/* Event header */}
       <div>
         <h3
-          className="text-lg font-semibold tracking-tight"
-          style={{ color: 'var(--stage-text-primary)' }}
+          className="stage-readout-lg"
         >
           {data.eventTitle}
         </h3>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--stage-text-secondary)' }}>
+        <p className="stage-label mt-0.5">
           {data.eventDate}
         </p>
       </div>
@@ -183,12 +189,12 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
       {(data.venueName || data.venueAddress) && (
         <Section icon={MapPin} title="Venue">
           {data.venueName && (
-            <p className="text-sm font-medium" style={{ color: 'var(--stage-text-primary)' }}>
+            <p className="stage-readout">
               {data.venueName}
             </p>
           )}
           {data.venueAddress && (
-            <p className="text-sm mt-0.5" style={{ color: 'var(--stage-text-secondary)' }}>
+            <p className="stage-label mt-0.5">
               {data.venueAddress}
             </p>
           )}
@@ -213,7 +219,7 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
             {data.timeline.map((item, i) => (
               <div key={i} className="flex items-baseline gap-3">
                 <span
-                  className="text-sm font-mono font-medium shrink-0 w-20 text-right"
+                  className="stage-readout shrink-0 w-20 text-right"
                   style={{ color: 'var(--stage-text-primary)' }}
                 >
                   {item.time}
@@ -235,10 +241,10 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
               <div
                 key={i}
                 className="flex items-start justify-between gap-2 py-1.5"
-                style={{ borderBottom: i < data.crewList.length - 1 ? '1px solid var(--stage-border)' : 'none' }}
+                style={{ borderBottom: i < data.crewList.length - 1 ? '1px solid var(--stage-edge-subtle)' : 'none' }}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--stage-text-primary)' }}>
+                  <p className="stage-readout truncate">
                     {member.name}
                   </p>
                   {member.role && (
@@ -250,7 +256,7 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
                 <div className="flex items-center gap-2 shrink-0">
                   {member.callTime && (
                     <span
-                      className="text-xs font-mono px-1.5 py-0.5 rounded"
+                      className="stage-readout-sm px-1.5 py-0.5 rounded"
                       style={{
                         backgroundColor: 'var(--stage-surface)',
                         color: 'var(--stage-text-secondary)',
@@ -278,7 +284,7 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
             {data.showDayContacts.map((contact, i) => (
               <div key={i} className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium" style={{ color: 'var(--stage-text-primary)' }}>
+                  <p className="stage-readout">
                     {contact.name}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--stage-text-tertiary)' }}>
@@ -287,7 +293,7 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {contact.phone && (
-                    <span className="text-xs font-mono" style={{ color: 'var(--stage-text-secondary)' }}>
+                    <span className="stage-readout-sm" style={{ color: 'var(--stage-text-secondary)' }}>
                       {contact.phone}
                     </span>
                   )}
@@ -336,7 +342,7 @@ function Section({
       <div className="flex items-center gap-2 mb-2">
         <Icon size={14} strokeWidth={1.5} style={{ color: 'var(--stage-text-tertiary)' }} />
         <h4
-          className="text-xs font-medium uppercase tracking-wider"
+          className="stage-label"
           style={{ color: 'var(--stage-text-tertiary)' }}
         >
           {title}

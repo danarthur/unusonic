@@ -52,6 +52,10 @@ export function CreateClientDialog({
         toast.error(result.error);
         return;
       }
+      if (!result.organizationId) {
+        toast.error('Organization was not created.');
+        return;
+      }
       const linkResult = await linkDealToClient(
         dealId,
         result.organizationId,
@@ -88,7 +92,7 @@ export function CreateClientDialog({
 
         <SheetBody className="flex flex-col gap-5 px-6 py-6 overflow-y-auto">
           <div className="space-y-2">
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+            <label className="stage-label">
               Organization name
             </label>
             <div className="relative">
@@ -103,7 +107,7 @@ export function CreateClientDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+            <label className="stage-label">
               Main contact name
             </label>
             <div className="relative">
@@ -118,7 +122,7 @@ export function CreateClientDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+            <label className="stage-label">
               Contact email
             </label>
             <div className="relative">

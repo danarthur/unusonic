@@ -24,7 +24,7 @@ export async function sendCrewReminderByEntity(
 
   const supabase = await createClient();
    
-  const db = supabase as any;
+  const db = supabase;
 
   // RLS-scoped: only returns rows in caller's workspace
   const { data: assignment, error } = await db

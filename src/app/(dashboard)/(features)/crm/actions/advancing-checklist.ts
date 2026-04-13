@@ -71,9 +71,18 @@ export async function getAdvancingChecklist(
   return items;
 }
 
+/** Auto-keys that only apply when a company/rental vehicle is involved. */
+const TRUCK_ONLY_AUTO_KEYS = new Set(['truck_loaded', 'gear_all_pulled']);
+/** Auto-keys that only apply when crew-sourced gear exists. */
+const CREW_GEAR_AUTO_KEYS = new Set(['crew_gear_confirmed']);
+
 export async function seedAdvancingChecklist(
   eventId: string,
   archetype?: string | null,
+  /** Transport mode — when 'none' or 'personal_vehicle', truck-related items are excluded from seed. */
+  transportMode?: string | null,
+  /** Whether the event has crew-sourced gear items. When false, crew_gear_confirmed is excluded. */
+  hasCrewGear?: boolean,
 ): Promise<AdvancingChecklistItem[]> {
   if (!uuidSchema.safeParse(eventId).success) return [];
   const workspaceId = await getActiveWorkspaceId();
@@ -83,7 +92,17 @@ export async function seedAdvancingChecklist(
   if (existing.length > 0) return existing;
 
   const template = (archetype && ARCHETYPE_TEMPLATES[archetype]) || DEFAULT_CHECKLIST_ITEMS;
-  const seeded: AdvancingChecklistItem[] = template.map((item) => ({
+
+  // Filter out truck-related items when no truck is involved
+  const needsTruck = !transportMode || transportMode === 'company_van' || transportMode === 'rental_truck';
+  const filtered = template.filter((item) => {
+    if (!item.auto_key) return true;
+    if (TRUCK_ONLY_AUTO_KEYS.has(item.auto_key) && !needsTruck) return false;
+    if (CREW_GEAR_AUTO_KEYS.has(item.auto_key) && !hasCrewGear) return false;
+    return true;
+  });
+
+  const seeded: AdvancingChecklistItem[] = filtered.map((item) => ({
     ...item,
     id: crypto.randomUUID(),
   }));

@@ -4,6 +4,10 @@ import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { addDays } from 'date-fns';
+import { getDeal } from './get-deal';
+import { getDealClientContext } from './get-deal-client';
+import { getProposalForDeal } from '@/features/sales/api/proposal-actions';
+import { upsertEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
 
 // =============================================================================
 // Types
@@ -20,6 +24,7 @@ export type FollowUpQueueItem = {
   suggested_channel: string | null;
   context_snapshot: Record<string, any> | null;
   status: 'pending' | 'snoozed' | 'acted' | 'dismissed';
+  follow_up_category: 'sales' | 'ops' | 'nurture';
   snoozed_until: string | null;
   acted_at: string | null;
   acted_by: string | null;
@@ -48,7 +53,7 @@ export async function getFollowUpQueue(): Promise<FollowUpQueueItem[]> {
   if (!workspaceId) return [];
 
   const supabase = await createClient();
-  const db = supabase as any;
+  const db = supabase;
 
   const { data, error } = await db
     .schema('ops')
@@ -75,7 +80,7 @@ export async function getFollowUpForDeal(dealId: string): Promise<FollowUpQueueI
   if (!workspaceId) return null;
 
   const supabase = await createClient();
-  const db = supabase as any;
+  const db = supabase;
 
   const { data, error } = await db
     .schema('ops')
@@ -95,12 +100,57 @@ export async function getFollowUpForDeal(dealId: string): Promise<FollowUpQueueI
   return (data as FollowUpQueueItem) ?? null;
 }
 
+/**
+ * Create an immediate follow-up queue item when a proposal is sent.
+ * This avoids waiting for the daily cron — the PM sees the follow-up card right away.
+ * No-ops if a pending/snoozed item already exists for this deal.
+ */
+export async function createProposalSentFollowUp(dealId: string): Promise<void> {
+  try {
+    const workspaceId = await getActiveWorkspaceId();
+    if (!workspaceId) return;
+
+    const supabase = await createClient();
+    const db = supabase;
+
+    // Check if a pending/snoozed item already exists
+    const { data: existing } = await db
+      .schema('ops')
+      .from('follow_up_queue')
+      .select('id')
+      .eq('deal_id', dealId)
+      .eq('workspace_id', workspaceId)
+      .in('status', ['pending', 'snoozed'])
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) return; // already has a follow-up item
+
+    await db
+      .schema('ops')
+      .from('follow_up_queue')
+      .insert({
+        workspace_id: workspaceId,
+        deal_id: dealId,
+        priority_score: 20,
+        reason: 'Proposal sent — follow up if no response',
+        reason_type: 'proposal_sent',
+        suggested_action: 'Check if client has viewed the proposal',
+        suggested_channel: 'email',
+        context_snapshot: { trigger: 'proposal_sent', created: new Date().toISOString() },
+        status: 'pending',
+      });
+  } catch {
+    // Non-fatal — follow-up creation should not break the send flow
+  }
+}
+
 export async function getFollowUpLog(dealId: string): Promise<FollowUpLogEntry[]> {
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) return [];
 
   const supabase = await createClient();
-  const db = supabase as any;
+  const db = supabase;
 
   const { data, error } = await db
     .schema('ops')
@@ -135,7 +185,7 @@ export async function actOnFollowUp(
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
 
     const supabase = await createClient();
-    const db = supabase as any;
+    const db = supabase;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'Not authenticated.' };
 
@@ -191,7 +241,7 @@ export async function snoozeFollowUp(
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
 
     const supabase = await createClient();
-    const db = supabase as any;
+    const db = supabase;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'Not authenticated.' };
 
@@ -244,7 +294,7 @@ export async function dismissFollowUp(
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
 
     const supabase = await createClient();
-    const db = supabase as any;
+    const db = supabase;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'Not authenticated.' };
 
@@ -293,13 +343,18 @@ export async function logFollowUpAction(
   channel: string,
   summary?: string,
   content?: string,
+  editTracking?: {
+    draftOriginal: string;
+    editClassification: 'approved_unchanged' | 'light_edit' | 'heavy_edit' | 'rejected';
+    editDistance: number;
+  },
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     const workspaceId = await getActiveWorkspaceId();
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
 
     const supabase = await createClient();
-    const db = supabase as any;
+    const db = supabase;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'Not authenticated.' };
 
@@ -325,6 +380,11 @@ export async function logFollowUpAction(
         channel,
         summary: summary ?? null,
         content: content ?? null,
+        ...(editTracking ? {
+          draft_original: editTracking.draftOriginal,
+          edit_classification: editTracking.editClassification,
+          edit_distance: editTracking.editDistance,
+        } : {}),
       });
 
     if (logErr) return { success: false, error: logErr.message };
@@ -347,9 +407,127 @@ export async function logFollowUpAction(
         .eq('id', (pendingItem as { id: string }).id);
     }
 
+    // Fire-and-forget: embed the follow-up content for Aion RAG
+    const textToEmbed = content || summary;
+    if (textToEmbed) {
+      const { data: dealRow } = await supabase.from('deals').select('title').eq('id', dealId).maybeSingle();
+      const header = buildContextHeader('follow_up', { dealTitle: (dealRow as any)?.title, channel });
+      // Use deal_id + timestamp as a pseudo source_id since follow_up_log rows don't have a returned id
+      const sourceId = `${dealId}-${Date.now()}`;
+      upsertEmbedding(workspaceId, 'follow_up', sourceId, textToEmbed, header).catch(console.error);
+    }
+
     revalidatePath('/crm');
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Failed to log follow-up.' };
   }
+}
+
+// =============================================================================
+// Aion context assembly
+// =============================================================================
+
+export type AionDealContext = {
+  deal: {
+    title: string | null;
+    status: string;
+    event_date: string | null;
+    event_archetype: string | null;
+    budget: number | null;
+    notes: string | null;
+  };
+  client: {
+    name: string | null;
+    contact_first_name: string | null;
+    contact_email: string | null;
+    contact_phone: string | null;
+    past_deals_count: number;
+  } | null;
+  proposal: {
+    status: string | null;
+    total: number | null;
+    view_count: number;
+    last_viewed_at: string | null;
+    item_summary: string[];
+  } | null;
+  followUp: {
+    reason: string;
+    reason_type: string;
+    suggested_channel: string | null;
+    recent_log: string[];
+  };
+  entityIds: string[];
+};
+
+/**
+ * Assembles deal + client + proposal + follow-up history into a single DTO
+ * for Aion draft generation. Strips IDs and sensitive data.
+ */
+export async function getDealContextForAion(
+  dealId: string,
+  queueItem: FollowUpQueueItem,
+): Promise<AionDealContext | null> {
+  const [deal, client, proposal, log] = await Promise.all([
+    getDeal(dealId),
+    getDealClientContext(dealId),
+    getProposalForDeal(dealId),
+    getFollowUpLog(dealId),
+  ]);
+
+  if (!deal) return null;
+
+  const entityIds = [deal.organization_id, deal.main_contact_id, deal.venue_id].filter((id): id is string => !!id);
+
+  // Compute proposal total from line items
+  let proposalTotal: number | null = null;
+  if (proposal?.items?.length) {
+    proposalTotal = proposal.items.reduce(
+      (sum: number, item: { quantity?: number; unit_price?: number }) =>
+        sum + ((item.quantity ?? 1) * ((item as any).unit_price ?? 0)),
+      0,
+    );
+  }
+
+  return {
+    deal: {
+      title: deal.title,
+      status: deal.status,
+      event_date: deal.proposed_date,
+      event_archetype: deal.event_archetype,
+      budget: deal.budget_estimated,
+      notes: deal.notes,
+    },
+    client: client
+      ? {
+          name: client.organization.name,
+          contact_first_name: client.mainContact?.first_name ?? null,
+          contact_email: client.mainContact?.email ?? null,
+          contact_phone: client.mainContact?.phone ?? null,
+          past_deals_count: client.pastDealsCount,
+        }
+      : null,
+    proposal: proposal
+      ? {
+          status: (proposal as any).status ?? null,
+          total: proposalTotal,
+          view_count: (proposal as any).view_count ?? 0,
+          last_viewed_at: (proposal as any).last_viewed_at ?? null,
+          item_summary: (proposal.items ?? [])
+            .slice(0, 5)
+            .map((item: { name?: string }) => (item as any).name ?? '')
+            .filter(Boolean),
+        }
+      : null,
+    followUp: {
+      reason: queueItem.reason,
+      reason_type: queueItem.reason_type,
+      suggested_channel: queueItem.suggested_channel,
+      recent_log: log
+        .slice(0, 3)
+        .map((entry) => entry.summary ?? `${entry.action_type} via ${entry.channel}`)
+        .filter(Boolean),
+    },
+    entityIds,
+  };
 }

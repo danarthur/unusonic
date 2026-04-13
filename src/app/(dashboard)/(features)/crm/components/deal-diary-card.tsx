@@ -94,10 +94,10 @@ function AttachmentDisplay({ attachment, noteDate }: { attachment: DealNoteAttac
       <button
         type="button"
         onClick={handleClick}
-        className="flex flex-col overflow-hidden transition-opacity hover:opacity-90"
+        className="flex flex-col overflow-hidden transition-opacity stage-hover overflow-hidden"
         style={{
           borderRadius: 'var(--stage-radius-nested, 8px)',
-          background: 'oklch(0.30 0.004 50)',
+          background: 'var(--stage-surface-raised)',
           boxShadow: 'inset 0 1px 0 0 oklch(1 0 0 / 0.10)',
         }}
       >
@@ -127,7 +127,7 @@ function AttachmentDisplay({ attachment, noteDate }: { attachment: DealNoteAttac
       style={{
         padding: '6px 10px',
         borderRadius: 'var(--stage-radius-nested, 8px)',
-        background: 'oklch(0.30 0.004 50)',
+        background: 'var(--stage-surface-raised)',
         fontSize: 'var(--stage-label-size, 11px)',
         color: 'var(--stage-text-secondary)',
         boxShadow: 'inset 0 1px 0 0 oklch(1 0 0 / 0.10)',
@@ -159,7 +159,7 @@ function StagedFilePill({ staged, onRemove }: { staged: StagedFile; onRemove: ()
       style={{
         padding: '6px 10px',
         borderRadius: 'var(--stage-radius-nested, 8px)',
-        background: 'oklch(0.30 0.004 50)',
+        background: 'var(--stage-surface-raised)',
         boxShadow: 'inset 0 1px 0 0 oklch(1 0 0 / 0.10)',
         fontSize: 'var(--stage-label-size, 11px)',
         color: 'var(--stage-text-secondary)',
@@ -243,14 +243,14 @@ function NoteRow({
         {note.author_avatar_url ? (
           <img src={note.author_avatar_url} className="size-6 rounded-full object-cover" alt="" loading="lazy" />
         ) : (
-          <span className="text-[9px] font-medium text-[var(--stage-text-secondary)]">{initials}</span>
+          <span className="text-micro font-medium text-[var(--stage-text-secondary)]">{initials}</span>
         )}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="stage-label font-medium" style={{ color: 'var(--stage-text-secondary)' }}>
+          <span className="stage-label font-medium">
             {note.author_name}
           </span>
           <span className="stage-label" style={{ color: 'var(--stage-text-tertiary)' }}>
@@ -282,7 +282,7 @@ function NoteRow({
               }}
             />
             <div className="flex items-center gap-2 mt-1">
-              <button type="button" onClick={handleEditSave} className="stage-label flex items-center gap-1" style={{ color: 'var(--stage-text-secondary)' }}>
+              <button type="button" onClick={handleEditSave} className="stage-label flex items-center gap-1">
                 <Check size={10} /> Save
               </button>
               <button type="button" onClick={() => { setEditing(false); setEditValue(note.content); }} className="stage-label" style={{ color: 'var(--stage-text-tertiary)' }}>
@@ -493,7 +493,7 @@ function ComposeBar({
           }}
           placeholder={stagedFiles.length > 0 ? 'Add a caption…' : 'Add a note…'}
           rows={1}
-          className="flex-1 resize-none bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] leading-relaxed py-1 outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-accent)]"
+          className="flex-1 resize-none bg-transparent text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] leading-relaxed py-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           style={{ fontSize: 'var(--stage-input-font-size, 13px)' }}
         />
 
@@ -650,7 +650,7 @@ export function DealDiaryCard({ dealId, workspaceId, phaseTag }: DealDiaryCardPr
       }}
     >
       <div className="flex items-center justify-between" style={{ marginBottom: 'var(--stage-gap, 6px)' }}>
-        <p className="stage-label" style={{ color: 'var(--stage-text-secondary)' }}>
+        <p className="stage-label">
           Notes
           {notes.length > 0 && (
             <span style={{ color: 'var(--stage-text-tertiary)' }}> · {notes.length}</span>
@@ -660,22 +660,10 @@ export function DealDiaryCard({ dealId, workspaceId, phaseTag }: DealDiaryCardPr
           <button
             type="button"
             onClick={() => setComposing(true)}
-            className="flex items-center gap-1.5 transition-colors"
+            className="stage-badge-text flex items-center gap-1.5 transition-colors hover:text-[var(--stage-text-primary)]"
             style={{
-              fontSize: 'var(--stage-label-size, 11px)',
-              fontWeight: 500,
               color: 'var(--stage-text-secondary)',
-              padding: '4px 10px 4px 8px',
-              borderRadius: 'var(--stage-radius-pill)',
-              background: 'oklch(1 0 0 / 0.06)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'oklch(1 0 0 / 0.12)';
-              e.currentTarget.style.color = 'var(--stage-text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'oklch(1 0 0 / 0.06)';
-              e.currentTarget.style.color = 'var(--stage-text-secondary)';
+              padding: '4px 0',
             }}
           >
             <Plus size={14} /> Add note
@@ -755,7 +743,7 @@ export function DealDiaryCard({ dealId, workspaceId, phaseTag }: DealDiaryCardPr
 
       {/* Card-level drag indicator */}
       {cardDragOver && !composing && (
-        <div className="stage-label text-center py-2" style={{ color: 'var(--stage-text-secondary)' }}>
+        <div className="stage-label text-center py-2">
           Drop to attach files
         </div>
       )}

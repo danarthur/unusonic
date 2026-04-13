@@ -2,7 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
-import { VENUE_ATTR, VENUE_OPS } from '@/features/network-data/model/attribute-keys';
+import { VENUE_ATTR } from '@/features/network-data/model/attribute-keys';
 
 export type VenueOpsData = {
   display_name: string | null;
@@ -18,6 +18,8 @@ export type VenueOpsData = {
 /**
  * Fetches standing venue ops data from directory.entities.attributes
  * for the read-only reference card in LogisticsFlightCheck.
+ *
+ * All fields are now read from top-level attributes (promoted from venue_ops).
  */
 export async function getVenueOps(
   venueEntityId: string
@@ -36,22 +38,18 @@ export async function getVenueOps(
 
   const d = data as { display_name: string | null; attributes: unknown };
   const attrs = readEntityAttrs(d.attributes, 'venue');
-  const venueOps = attrs[VENUE_ATTR.venue_ops] ?? {};
 
-  // Capacity: prefer top-level, fall back to venue_ops sub-object
-  const topCapacity = attrs[VENUE_ATTR.capacity];
-  const opsCapacity = venueOps[VENUE_OPS.capacity];
-  const rawCapacity = topCapacity ?? opsCapacity;
+  const rawCapacity = attrs[VENUE_ATTR.capacity];
   const capacity = rawCapacity != null ? Number(rawCapacity) : null;
 
   return {
     display_name: d.display_name ?? null,
     venue_type: attrs[VENUE_ATTR.venue_type] ?? null,
     capacity: Number.isNaN(capacity) ? null : capacity,
-    parking_notes: venueOps[VENUE_OPS.parking_notes] ?? null,
-    dock_hours: venueOps[VENUE_OPS.dock_hours] ?? null,
-    access_notes: venueOps[VENUE_OPS.access_notes] ?? null,
-    venue_contact_name: venueOps[VENUE_OPS.venue_contact_name] ?? null,
-    venue_contact_phone: venueOps[VENUE_OPS.venue_contact_phone] ?? null,
+    parking_notes: attrs[VENUE_ATTR.parking_notes] ?? null,
+    dock_hours: attrs[VENUE_ATTR.dock_hours] ?? null,
+    access_notes: attrs[VENUE_ATTR.access_notes] ?? null,
+    venue_contact_name: attrs[VENUE_ATTR.venue_contact_name] ?? null,
+    venue_contact_phone: attrs[VENUE_ATTR.venue_contact_phone] ?? null,
   };
 }

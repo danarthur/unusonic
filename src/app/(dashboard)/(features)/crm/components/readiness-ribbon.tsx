@@ -15,18 +15,13 @@ const STATUS_COLOR: Record<ReadinessStatus, string> = {
 };
 
 const STATUS_BG: Record<ReadinessStatus, string> = {
-  green: 'color-mix(in oklch, var(--color-unusonic-success) 12%, transparent)',
+  green: 'color-mix(in oklch, var(--color-unusonic-success) 5%, transparent)',
   amber: 'color-mix(in oklch, var(--color-unusonic-warning) 12%, transparent)',
   red: 'color-mix(in oklch, var(--color-unusonic-error) 12%, transparent)',
-  grey: 'color-mix(in oklch, var(--stage-text-tertiary) 8%, transparent)',
+  grey: 'oklch(1 0 0 / 0.04)',
 };
 
-const STATUS_BORDER: Record<ReadinessStatus, string> = {
-  green: 'color-mix(in oklch, var(--color-unusonic-success) 25%, transparent)',
-  amber: 'color-mix(in oklch, var(--color-unusonic-warning) 25%, transparent)',
-  red: 'color-mix(in oklch, var(--color-unusonic-error) 25%, transparent)',
-  grey: 'color-mix(in oklch, var(--stage-text-tertiary) 15%, transparent)',
-};
+// Borders removed — fill alone provides sufficient containment on dark backgrounds (container-weight-budget.md)
 
 // ── Signal icons ──
 
@@ -46,29 +41,27 @@ function ReadinessPill({ signal, signalKey }: { signal: ReadinessSignal; signalK
   const Icon = SIGNAL_ICON[signalKey];
   const color = STATUS_COLOR[signal.status];
   const bg = STATUS_BG[signal.status];
-  const border = STATUS_BORDER[signal.status];
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={STAGE_LIGHT}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+      className="flex items-center gap-1.5 px-2 py-1 rounded-full"
       style={{
         backgroundColor: bg,
-        border: `1px solid ${border}`,
       }}
     >
-      {Icon && <Icon size={14} style={{ color }} aria-hidden />}
+      {Icon && <Icon size={13} style={{ color }} aria-hidden />}
       <span
-        className="text-[11px] font-medium tracking-tight leading-none"
+        className="stage-badge-text leading-none"
         style={{ color: 'var(--stage-text-secondary)' }}
       >
         {signal.label}
       </span>
       {signal.fraction && (
         <span
-          className="text-[10px] tabular-nums leading-none"
+          className="stage-badge-text tabular-nums leading-none"
           style={{ color: 'var(--stage-text-tertiary)' }}
         >
           {signal.fraction}
@@ -119,7 +112,7 @@ export function ReadinessRibbon({ readiness, mini }: ReadinessRibbonProps) {
       animate="visible"
       variants={{
         hidden: {},
-        visible: { transition: { staggerChildren: STAGE_STAGGER_CHILDREN } },
+        visible: { transition: { staggerChildren: 0 } },
       }}
       className="flex flex-wrap items-center"
       style={{ gap: '8px' }}
