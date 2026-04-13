@@ -4,10 +4,12 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown,
+  ChevronRight,
   Package,
   MoreVertical,
   Loader2,
   RefreshCw,
+  Sparkles,
   User,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -110,6 +112,7 @@ export function GearFlightCheck({
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [operatorPickerOpen, setOperatorPickerOpen] = useState<string | null>(null);
+  const [sourcingBannerOpen, setSourcingBannerOpen] = useState(false);
 
   // ── Fetch gear items ────────────────────────────────────────────────────────
 
@@ -278,16 +281,20 @@ export function GearFlightCheck({
   }, [items]);
   const hasMultipleSources = (sourceCounts.crew > 0 ? 1 : 0) + (sourceCounts.subrental > 0 ? 1 : 0) > 0;
 
-  // Count company-sourced items that have crew matches (could be crew-sourced)
-  const crewSourceableCount = useMemo(() => {
-    let count = 0;
+  // Company-sourced items that have at least one crew match (could be crew-sourced).
+  // Surfaced as the proactive "sourcing opportunities" banner — Layer 2 gap
+  // analysis turned from passive stat to actionable recommender.
+  const sourcingOpportunities = useMemo(() => {
+    const list: { item: EventGearItem; matches: CrewGearMatch[] }[] = [];
     for (const item of items) {
-      if (item.source === 'company' && crewMatches[item.id]?.length) {
-        count++;
+      const matches = crewMatches[item.id];
+      if (item.source === 'company' && matches && matches.length > 0) {
+        list.push({ item, matches });
       }
     }
-    return count;
+    return list;
   }, [items, crewMatches]);
+  const crewSourceableCount = sourcingOpportunities.length;
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
@@ -438,6 +445,103 @@ export function GearFlightCheck({
           transition={STAGE_MEDIUM}
         />
       </div>
+
+      {/* Sourcing opportunities — Layer 2 gap-analysis recommender.
+       * When any company-sourced items have an owner among the assigned crew,
+       * surface the opportunity proactively instead of making the PM scan
+       * every row for the small "crew owns this" hint. */}
+      {crewSourceableCount > 0 && (
+        <div
+          className="mb-4 rounded-lg border overflow-hidden"
+          style={{
+            borderColor: 'color-mix(in oklch, var(--color-unusonic-info) 30%, transparent)',
+            background: 'color-mix(in oklch, var(--color-unusonic-info) 8%, transparent)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setSourcingBannerOpen((v) => !v)}
+            className="w-full flex items-center gap-2 px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+          >
+            <Sparkles
+              size={14}
+              strokeWidth={1.5}
+              className="shrink-0 text-[var(--color-unusonic-info)]"
+            />
+            <span
+              className="text-sm font-medium text-[var(--stage-text-primary)] flex-1 text-left"
+            >
+              {crewSourceableCount} item{crewSourceableCount === 1 ? '' : 's'} could be sourced from crew
+            </span>
+            <span className="stage-badge-text text-[var(--stage-text-tertiary)] shrink-0">
+              {sourcingBannerOpen ? 'Hide' : 'Review'}
+            </span>
+            <motion.div
+              animate={{ rotate: sourcingBannerOpen ? 90 : 0 }}
+              transition={STAGE_LIGHT}
+              className="shrink-0"
+            >
+              <ChevronRight size={14} strokeWidth={1.5} className="text-[var(--stage-text-tertiary)]" />
+            </motion.div>
+          </button>
+          <AnimatePresence initial={false}>
+            {sourcingBannerOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={STAGE_LIGHT}
+                style={{ overflow: 'hidden' }}
+              >
+                <ul
+                  className="divide-y"
+                  style={{ borderColor: 'color-mix(in oklch, var(--color-unusonic-info) 20%, transparent)' }}
+                >
+                  {sourcingOpportunities.map(({ item, matches }) => {
+                    const owner = matches[0];
+                    const isSourcing = sourcing === item.id;
+                    return (
+                      <li
+                        key={item.id}
+                        className="flex items-center gap-2 px-3 py-2"
+                        style={{
+                          borderTopColor:
+                            'color-mix(in oklch, var(--color-unusonic-info) 18%, transparent)',
+                        }}
+                      >
+                        <span className="stage-readout truncate flex-1 min-w-0">{item.name}</span>
+                        <span className="stage-badge-text text-[var(--stage-text-secondary)] truncate shrink-0 max-w-[40%]">
+                          {owner.entityName}
+                          {matches.length > 1 ? ` +${matches.length - 1}` : ''} owns
+                        </span>
+                        <button
+                          type="button"
+                          disabled={isSourcing}
+                          onClick={() => handleSourceFromCrew(item.id, owner.entityId)}
+                          className="shrink-0 stage-badge-text tracking-tight px-2 py-1 rounded-md border transition-colors disabled:opacity-45"
+                          style={{
+                            color: 'var(--color-unusonic-info)',
+                            background:
+                              'color-mix(in oklch, var(--color-unusonic-info) 12%, transparent)',
+                            borderColor:
+                              'color-mix(in oklch, var(--color-unusonic-info) 30%, transparent)',
+                          }}
+                        >
+                          {isSourcing ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            'Source from crew'
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Flat list (single department) */}
       {useFlatList && (
