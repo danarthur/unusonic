@@ -120,6 +120,9 @@ export function ProposalSendFlow({
       {clientAttached === false && (
         <p className="text-xs text-[var(--color-unusonic-error)]">Attach a client to this deal before sending.</p>
       )}
+      {clientAttached !== false && lineItemCount === 0 && (
+        <p className="text-xs text-[var(--stage-text-secondary)]">Add at least one line item before sending.</p>
+      )}
     </div>
   );
 }

@@ -227,7 +227,12 @@ export async function handoverDeal(
     .single();
 
   if (eventErr) {
-    console.error('[CRM] handoverDeal insert event:', eventErr.message);
+    Sentry.logger.error('crm.handoverDeal.insertEventFailed', {
+      dealId,
+      workspaceId,
+      projectId,
+      error: eventErr.message,
+    });
     return { success: false, error: eventErr.message };
   }
 
@@ -339,7 +344,12 @@ export async function handoverDeal(
     .eq('workspace_id', workspaceId);
 
   if (updateErr) {
-    console.error('[CRM] handoverDeal update deal:', updateErr.message);
+    Sentry.logger.error('crm.handoverDeal.updateDealFailed', {
+      dealId,
+      eventId,
+      workspaceId,
+      error: updateErr.message,
+    });
     return { success: false, error: updateErr.message };
   }
 

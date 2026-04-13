@@ -787,7 +787,18 @@ export async function upsertProposal(
       .join('\n');
     const { data: dealRow } = await supabase.from('deals').select('title').eq('id', dealId).maybeSingle();
     const header = buildContextHeader('proposal', { dealTitle: (dealRow as any)?.title });
-    upsertEmbedding(workspaceId, 'proposal', proposalId, proposalText, header).catch(console.error);
+    upsertEmbedding(workspaceId, 'proposal', proposalId, proposalText, header).catch((err: unknown) => {
+      Sentry.captureMessage('upsertProposal: embedding failed', {
+        level: 'warning',
+        extra: {
+          workspaceId,
+          proposalId,
+          dealId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        tags: { area: 'sales.embeddings' },
+      });
+    });
   }
 
   return { proposalId, total };
@@ -1219,7 +1230,18 @@ export async function sendProposalReminder(
 
   // Fetch rich proposal data for reminder enrichment (status is 'sent' or 'viewed' — both valid)
   const proposalData = publicToken
-    ? await getPublicProposal(publicToken).catch(() => null)
+    ? await getPublicProposal(publicToken).catch((err: unknown) => {
+        Sentry.captureMessage('sendProposalReminder: getPublicProposal failed', {
+          level: 'warning',
+          extra: {
+            dealId,
+            publicToken,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          tags: { area: 'sales.docuseal' },
+        });
+        return null;
+      })
     : null;
 
   const { sendProposalReminderEmail } = await import('@/shared/api/email/send');
