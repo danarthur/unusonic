@@ -14,6 +14,7 @@ import {
 } from '@react-email/components';
 import * as React from 'react';
 import { formatEventDate } from '@/shared/lib/format-currency';
+import { type EmailPalette, DEFAULT_EMAIL_PALETTE } from '@/shared/lib/email-palette';
 
 export interface ProposalAcceptedEmailProps {
   signerName: string;
@@ -25,6 +26,7 @@ export interface ProposalAcceptedEmailProps {
   totalFormatted?: string | null;
   depositAmount?: string | null;
   depositDueDays?: number | null;
+  theme?: EmailPalette | null;
 }
 
 export function ProposalAcceptedEmail({
@@ -37,7 +39,9 @@ export function ProposalAcceptedEmail({
   totalFormatted,
   depositAmount,
   depositDueDays,
+  theme: themeProp,
 }: ProposalAcceptedEmailProps) {
+  const t = themeProp ?? DEFAULT_EMAIL_PALETTE;
   const formattedDate = new Date(signedAt).toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
@@ -57,190 +61,168 @@ export function ProposalAcceptedEmail({
     ? `Your deposit of ${depositAmount} is due${depositDueDays ? ` within ${depositDueDays} days` : ''}.`
     : null;
 
-  const nextStep2 = depositAmount
-    ? `2. Your deposit of ${depositAmount} is due — an invoice will follow.`
-    : '2. Your team will be in touch with next steps shortly.';
-
   return (
     <Html>
       <Head>
         <meta name="color-scheme" content="light dark" />
         <meta name="supported-color-schemes" content="light dark" />
       </Head>
-      <Preview>It&apos;s confirmed — your agreement for {dealTitle} has been recorded. Here&apos;s what happens next.</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          <Section style={section}>
+      <Preview>Confirmed — your agreement for {dealTitle} has been recorded.</Preview>
+      <Body style={{
+        backgroundColor: t.bgHex,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      }}>
+        <Container style={{ margin: '0 auto', padding: '32px 16px', maxWidth: '520px' }}>
+          <Section style={{
+            padding: '40px 36px',
+            borderRadius: '16px',
+            backgroundColor: t.surfaceHex,
+            border: `1px solid ${t.borderSubtleHex}`,
+          }}>
             {workspaceName ? (
-              <Text style={brandLine}>{workspaceName}</Text>
+              <Text style={{
+                color: t.textSecondaryHex,
+                fontSize: '11px',
+                fontWeight: 500,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase' as const,
+                margin: '0 0 12px',
+              }}>{workspaceName}</Text>
             ) : null}
 
-            {/* State indicator — immediately communicates outcome before reading */}
-            <Text style={statusLabel}>Agreement signed</Text>
+            {/* State indicator — shape + color + text per WCAG 1.4.1 */}
+            <Text style={{
+              color: '#4cb051',
+              fontSize: '11px',
+              fontWeight: 500,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const,
+              margin: '0 0 16px',
+            }}>&#x2713; Agreement signed</Text>
 
-            <Text style={heading}>It&apos;s confirmed.</Text>
-            <Text style={body}>
-              {signerName}, your agreement for <strong style={{ color: '#fafafa' }}>{dealTitle}</strong> was signed on {formattedDate}.
-              Everything is locked in — you can view the full scope anytime using the link below.
+            <Text style={{
+              color: t.textHex,
+              fontSize: '22px',
+              fontWeight: 600,
+              margin: '0 0 16px',
+              letterSpacing: '-0.025em',
+            }}>Confirmed.</Text>
+            <Text style={{
+              color: t.textSecondaryHex,
+              fontSize: '15px',
+              lineHeight: 1.5,
+              margin: '0 0 16px',
+            }}>
+              {signerName}, your agreement for <strong style={{ color: t.textHex }}>{dealTitle}</strong> was signed on {formattedDate}.
+              The agreement is on file — view the full scope anytime using the link below.
             </Text>
 
             {/* Precise timestamp as a standalone record line */}
-            <Text style={signedTimestampStyle}>{signedTimestamp}</Text>
+            <Text style={{
+              color: t.textSecondaryHex,
+              fontSize: '12px',
+              fontFamily: '"Courier New", Courier, monospace',
+              margin: '0 0 20px',
+            }}>{signedTimestamp}</Text>
 
             {eventDate ? (
-              <Text style={body}>
+              <Text style={{
+                color: t.textSecondaryHex,
+                fontSize: '15px',
+                lineHeight: 1.5,
+                margin: '0 0 16px',
+              }}>
                 Your event is scheduled for {formatEventDate(eventDate)}.
               </Text>
             ) : null}
 
             {/* Hero total — the most important number, shown at display scale */}
             {totalFormatted ? (
-              <Text style={heroTotal}>{totalFormatted}</Text>
+              <Text style={{
+                color: t.textHex,
+                fontSize: '30px',
+                fontWeight: 700,
+                letterSpacing: '-0.03em',
+                textAlign: 'center' as const,
+                margin: '24px 0',
+              }}>{totalFormatted}</Text>
             ) : null}
 
-            {/* Deposit callout with green left-border accent */}
+            {/* Deposit callout with accent left-border */}
             {depositLine ? (
-              <Section style={depositCallout}>
-                <Text style={depositText}>{depositLine}</Text>
+              <Section style={{
+                backgroundColor: t.bgHex,
+                borderRadius: '8px',
+                borderLeft: `3px solid ${t.borderHex}`,
+                padding: '12px 16px',
+                margin: '0 0 24px',
+              }}>
+                <Text style={{
+                  color: t.textHex,
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  margin: 0,
+                }}>{depositLine}</Text>
               </Section>
             ) : null}
 
-            <Button href={portalUrl} style={button}>
-              View agreement
-            </Button>
+            <Section style={{ textAlign: 'center' as const, margin: '32px 0 24px' }}>
+              <Button href={portalUrl} style={{
+                backgroundColor: t.accentHex,
+                color: t.accentTextHex,
+                fontSize: '14px',
+                fontWeight: 600,
+                padding: '13px 32px',
+                borderRadius: '100px',
+                textDecoration: 'none',
+                display: 'inline-block',
+                letterSpacing: '-0.01em',
+              }}>
+                View agreement
+              </Button>
+            </Section>
 
-            <Text style={nextStepsHeading}>What&apos;s next</Text>
-            <Text style={nextStepText}>1. A timestamped copy of your agreement has been emailed to you.</Text>
-            <Text style={nextStepText}>{nextStep2}</Text>
-            <Text style={nextStepText}>3. View the full scope at any time using the link below.</Text>
+            <Text style={{
+              color: t.textSecondaryHex,
+              fontSize: '11px',
+              fontWeight: 500,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const,
+              margin: '24px 0 8px',
+            }}>What happens next</Text>
+            {depositAmount ? (
+              <>
+                <Text style={{ color: t.textSecondaryHex, fontSize: '14px', lineHeight: 1.5, margin: '0 0 6px' }}>1. Your deposit of {depositAmount} is due — an invoice will follow.</Text>
+                <Text style={{ color: t.textSecondaryHex, fontSize: '14px', lineHeight: 1.5, margin: '0 0 6px' }}>2. View the full scope at any time using the link above.</Text>
+              </>
+            ) : (
+              <>
+                <Text style={{ color: t.textSecondaryHex, fontSize: '14px', lineHeight: 1.5, margin: '0 0 6px' }}>1. Your team will be in touch with next steps.</Text>
+                <Text style={{ color: t.textSecondaryHex, fontSize: '14px', lineHeight: 1.5, margin: '0 0 6px' }}>2. View the full scope at any time using the link above.</Text>
+              </>
+            )}
 
-            <Text style={body}>
-              {fromLabel} will be in touch shortly with any questions. Reply to this email and it goes directly to them.
+            <Text style={{
+              color: t.textSecondaryHex,
+              fontSize: '15px',
+              lineHeight: 1.5,
+              margin: '0 0 16px',
+            }}>
+              {fromLabel} will follow up with any remaining details. Reply to this email and it goes directly to them.
             </Text>
 
-            <Text style={platformAttr}>via Unusonic</Text>
+            <Text style={{
+              color: t.textSecondaryHex,
+              fontSize: '10px',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const,
+              margin: '16px 0 0',
+            }}>via Unusonic</Text>
           </Section>
         </Container>
       </Body>
     </Html>
   );
 }
-
-const main = {
-  backgroundColor: '#0f0f0f',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-};
-
-const container = {
-  margin: '0 auto',
-  padding: '24px 20px',
-  maxWidth: '480px',
-};
-
-const section = {
-  padding: '40px 36px',
-  borderRadius: '12px',
-  backgroundColor: '#1a1a1a',
-  border: '1px solid rgba(255,255,255,0.08)',
-};
-
-const brandLine = {
-  color: 'rgba(250,250,250,0.5)',
-  fontSize: '11px',
-  fontWeight: 600,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase' as const,
-  margin: '0 0 12px',
-};
-
-const statusLabel = {
-  color: '#22c55e',
-  fontSize: '11px',
-  fontWeight: 600,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const,
-  margin: '0 0 16px',
-};
-
-const heading = {
-  color: '#fafafa',
-  fontSize: '22px',
-  fontWeight: 600,
-  margin: '0 0 16px',
-  letterSpacing: '-0.025em',
-};
-
-const body = {
-  color: 'rgba(250,250,250,0.85)',
-  fontSize: '15px',
-  lineHeight: 1.5,
-  margin: '0 0 16px',
-};
-
-const signedTimestampStyle = {
-  color: 'rgba(250,250,250,0.4)',
-  fontSize: '12px',
-  fontFamily: '"Courier New", Courier, monospace',
-  margin: '0 0 20px',
-};
-
-const heroTotal = {
-  color: '#fafafa',
-  fontSize: '30px',
-  fontWeight: 700,
-  letterSpacing: '-0.03em',
-  textAlign: 'center' as const,
-  margin: '20px 0',
-};
-
-const depositCallout = {
-  backgroundColor: 'rgba(255,255,255,0.04)',
-  borderRadius: '8px',
-  borderLeft: '3px solid rgba(34,197,94,0.5)',
-  padding: '12px 16px',
-  margin: '0 0 24px',
-};
-
-const depositText = {
-  color: '#fafafa',
-  fontSize: '14px',
-  fontWeight: 500,
-  margin: 0,
-};
-
-const button = {
-  backgroundColor: '#f5f5f5',
-  color: '#0a0a0a',
-  fontSize: '15px',
-  fontWeight: 600,
-  padding: '14px 32px',
-  borderRadius: '100px',
-  textDecoration: 'none',
-  display: 'inline-block',
-};
-
-const nextStepsHeading = {
-  color: 'rgba(250,250,250,0.55)',
-  fontSize: '11px',
-  fontWeight: 600,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const,
-  margin: '24px 0 8px',
-};
-
-const nextStepText = {
-  color: 'rgba(250,250,250,0.75)',
-  fontSize: '14px',
-  lineHeight: 1.5,
-  margin: '0 0 6px',
-};
-
-const platformAttr = {
-  color: 'rgba(250,250,250,0.2)',
-  fontSize: '10px',
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const,
-  margin: '20px 0 0',
-};
 
 export default ProposalAcceptedEmail;

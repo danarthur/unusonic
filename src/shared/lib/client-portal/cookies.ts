@@ -22,15 +22,27 @@ export const CLIENT_PORTAL_SESSION_COOKIE = 'unusonic_client_session';
 /**
  * httpOnly cookie name for the step-up JWT claim.
  * Contains { step_up_until: ISO, step_up_method: 'otp' | 'passkey' }.
- * Short-lived (15 minutes) per §15.4.
+ *
+ * Short-lived and **sliding** — bumped to 30 minutes on 2026-04-10 per
+ * the Songs slice §0 A6. Every successful `requireStepUp()` call refreshes
+ * the expiry, so a couple building a 20-song list in one sitting sees at
+ * most one OTP prompt. See `step-up.ts` for the refresh mechanics.
  */
 export const CLIENT_PORTAL_STEP_UP_COOKIE = 'unusonic_client_step_up';
 
 /** Hard ceiling matches compute_client_session_expiry() — 365 days in seconds. */
 export const CLIENT_PORTAL_MAX_COOKIE_AGE_SECONDS = 60 * 60 * 24 * 365;
 
-/** Step-up JWT claim TTL in seconds — 15 minutes per §15.4. */
-export const CLIENT_PORTAL_STEP_UP_TTL_SECONDS = 60 * 15;
+/**
+ * Step-up JWT claim TTL in seconds — **30 minutes**, sliding.
+ *
+ * Bumped from 15 minutes on 2026-04-10 per Songs design §0 A6. The sliding
+ * refresh lives in `requireStepUp()`; this constant is only the window
+ * length, not a hard expiry. A couple who keeps interacting with the
+ * portal within any 30-minute gap stays stepped-up indefinitely until the
+ * session itself expires.
+ */
+export const CLIENT_PORTAL_STEP_UP_TTL_SECONDS = 60 * 30;
 
 type CookieOptions = {
   httpOnly: true;
@@ -110,8 +122,18 @@ export async function readStepUpCookie(): Promise<{
 }
 
 /**
- * Sets the step-up cookie after a successful OTP or passkey challenge.
- * 15-minute TTL per §15.4.
+ * Sets (or refreshes) the step-up cookie.
+ *
+ * Called in two places:
+ *   1. After a successful OTP / passkey challenge — promotes a session
+ *      to "stepped-up" state (the initial set).
+ *   2. Inside `requireStepUp()` on every successful check — slides the
+ *      expiry forward by another full TTL window (§0 A6 refresh).
+ *
+ * Stamps `stepUpUntil = now + CLIENT_PORTAL_STEP_UP_TTL_SECONDS`. The
+ * caller does NOT supply the expiry — this is the one place in the
+ * client portal that computes a step-up deadline, so the sliding
+ * behavior can't drift between callers.
  */
 export async function setStepUpCookie(method: 'otp' | 'passkey'): Promise<void> {
   const stepUpUntil = new Date(Date.now() + CLIENT_PORTAL_STEP_UP_TTL_SECONDS * 1000);

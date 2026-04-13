@@ -90,3 +90,30 @@ export {
   type ResolvedDealContact,
   type DealContactSource,
 } from './resolve-deal-contact';
+
+export { resolveEventDj } from './resolve-event-dj';
+
+export {
+  computeEventLock,
+  isWithinLateAddWindow,
+  LOCKING_EVENT_STATUSES,
+  type EventLockReason,
+  type EventLockState,
+} from './event-lock';
+
+export {
+  pickRelevantEvent,
+  type PickableEvent,
+} from './pick-relevant-event';
+
+export {
+  addSongRequest,
+  updateSongRequest,
+  deleteSongRequest,
+  type SongMutationResult,
+  type SongRequestContext,
+  type AddSongRequestInput,
+  type AddSongRequestData,
+  type UpdateSongRequestInput,
+  type DeleteSongRequestInput,
+} from './song-request-helpers';

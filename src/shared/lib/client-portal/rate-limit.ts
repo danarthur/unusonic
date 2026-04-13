@@ -16,7 +16,15 @@ export type RateLimitScope =
   | 'magic_link_email'
   | 'magic_link_ip'
   | 'otp_attempt_email'
-  | 'otp_attempt_ip';
+  | 'otp_attempt_ip'
+  // Songs anti-spam scope (added 2026-04-10, client portal Songs slice §0 A7).
+  // Per-entity: caps total couple mutations (add + update + delete) at
+  // 150/day. Intentionally high — a couple building a list in one sitting
+  // easily hits 50-80 mutations and the original first-pass cap of
+  // 30/day would have throttled the primary happy path. The spam ceiling
+  // lives on the RPC (100-entry hard cap inside client_songs_add_request);
+  // this scope is only to stop compromised-cookie abuse bursts.
+  | 'song_request_entity';
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -31,12 +39,13 @@ export function hashEmailKey(email: string): string {
 
 type ScopeConfig = { limit: number; windowSeconds: number };
 
-/** Canonical per-scope limits from §15.6. */
+/** Canonical per-scope limits from §15.6 + Songs design doc §0 A7. */
 const SCOPE_DEFAULTS: Record<RateLimitScope, ScopeConfig> = {
-  magic_link_email: { limit: 3, windowSeconds: 60 * 60 },      // 3/hr (also enforce 10/day separately if needed)
-  magic_link_ip:    { limit: 30, windowSeconds: 60 * 60 },     // 30/hr per IP
-  otp_attempt_email:{ limit: 10, windowSeconds: 60 * 60 },     // 10 failures/hr → workspace alert
-  otp_attempt_ip:   { limit: 100, windowSeconds: 60 * 60 },    // 100 failures/hr → 24h IP block
+  magic_link_email:    { limit: 3,   windowSeconds: 60 * 60 },         // 3/hr (also enforce 10/day separately if needed)
+  magic_link_ip:       { limit: 30,  windowSeconds: 60 * 60 },         // 30/hr per IP
+  otp_attempt_email:   { limit: 10,  windowSeconds: 60 * 60 },         // 10 failures/hr → workspace alert
+  otp_attempt_ip:      { limit: 100, windowSeconds: 60 * 60 },         // 100 failures/hr → 24h IP block
+  song_request_entity: { limit: 150, windowSeconds: 24 * 60 * 60 },    // 150/day per entity (Songs A7)
 };
 
 /**

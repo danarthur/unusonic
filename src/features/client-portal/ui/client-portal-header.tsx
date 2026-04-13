@@ -9,6 +9,8 @@
  */
 import 'server-only';
 
+import type { ReactNode } from 'react';
+
 // Using a plain <img> on purpose: logos are workspace-owned assets served
 // from Supabase Storage, not bundled, and next/image optimization is
 // unnecessary on a page that only renders one small image above the fold.
@@ -16,9 +18,11 @@ import type { ClientPortalWorkspaceSummary } from './client-portal-shell';
 
 type ClientPortalHeaderProps = {
   workspace: ClientPortalWorkspaceSummary;
+  /** Optional slot for workspace switcher (rendered for claimed multi-workspace clients). */
+  switcher?: ReactNode;
 };
 
-export function ClientPortalHeader({ workspace }: ClientPortalHeaderProps) {
+export function ClientPortalHeader({ workspace, switcher }: ClientPortalHeaderProps) {
   return (
     <header
       className="flex items-center justify-between gap-4 px-6 py-5"
@@ -46,6 +50,7 @@ export function ClientPortalHeader({ workspace }: ClientPortalHeaderProps) {
           </span>
         )}
       </div>
+      {switcher}
     </header>
   );
 }

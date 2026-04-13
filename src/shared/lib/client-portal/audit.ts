@@ -21,7 +21,11 @@ export type ClientPortalResource =
   | 'document'
   | 'aion_query'
   | 'sign_in'
-  | 'session';
+  | 'session'
+  // Songs resource type (added 2026-04-10, client portal Songs slice).
+  // Covers both the couple-side add/update/delete path and the DJ-side
+  // acknowledge/promote path. Same resource — two sides of the workflow.
+  | 'song_request';
 
 export type ClientPortalAction =
   | 'view'
@@ -36,13 +40,35 @@ export type ClientPortalAction =
   | 'otp_verify'
   | 'magic_link_issue'
   | 'passkey_register'
-  | 'passkey_auth';
+  | 'passkey_auth'
+  // Songs actions (added 2026-04-10, client portal Songs slice).
+  //
+  // The original design doc §7.2 first-pass suggested using 'message' as
+  // the action string for all song mutations, but that loses fidelity
+  // for audit queries ("show me every add/delete/promote in the last
+  // 30 days for this entity" becomes a JSONB metadata grep). Dedicated
+  // actions are cheap and give us clean Resend alerting + dashboard
+  // filters out of the box.
+  //
+  // Couple side (called from client_songs_* route handlers):
+  | 'song_add'         // couple added a new request
+  | 'song_update'      // couple edited tier / notes / author label
+  | 'song_delete'      // couple removed a request
+  // DJ / staff side (called from ops_songs_* route handlers):
+  | 'song_acknowledge' // DJ stamped acknowledged_at + optional label
+  | 'song_promote';    // DJ moved from client_song_requests to dj_song_pool
 
 export type ClientPortalActorKind =
   | 'anonymous_token'
   | 'magic_link_session'
   | 'claimed_user'
-  | 'service_role';
+  | 'service_role'
+  // Staff side (added 2026-04-10, Songs slice). A workspace_members user
+  // authenticated via the staff dashboard invoking an ops_songs_* RPC on
+  // behalf of a client's song_request resource. The audit row still
+  // targets the CLIENT's entity_id (the resource subject) — `actor_id`
+  // carries the staff user's auth.uid().
+  | 'workspace_staff';
 
 export type ClientPortalAuthMethod =
   | 'magic_link'

@@ -29,6 +29,8 @@ export type DaySheetEmailProps = {
   showDayContacts: { role: string; name: string; phone: string | null }[];
   runOfShowUrl: string;
   workspaceName: string;
+  /** Per-crew equipment assignments (Phase 4). Each entry = one crew member who is bringing gear. */
+  equipmentAssignments?: { crewName: string; items: string[] }[];
 };
 
 export function DaySheetEmail({
@@ -42,6 +44,7 @@ export function DaySheetEmail({
   showDayContacts,
   runOfShowUrl,
   workspaceName,
+  equipmentAssignments,
 }: DaySheetEmailProps) {
   const previewText = `Day sheet: ${eventTitle} — ${eventDate}`;
 
@@ -108,6 +111,25 @@ export function DaySheetEmail({
                       </Column>
                       <Column style={detailValue}>
                         <Text style={detailValueText}>{member.name}</Text>
+                      </Column>
+                    </Row>
+                  ))}
+                </Section>
+              </>
+            )}
+
+            {/* Equipment assignments */}
+            {equipmentAssignments && equipmentAssignments.length > 0 && (
+              <>
+                <Text style={sectionLabel}>Equipment assignments</Text>
+                <Section style={detailsBlock}>
+                  {equipmentAssignments.map((entry, i) => (
+                    <Row key={i} style={detailRow}>
+                      <Column style={detailLabel}>
+                        <Text style={detailLabelText}>{entry.crewName}</Text>
+                      </Column>
+                      <Column style={detailValue}>
+                        <Text style={detailValueText}>{entry.items.join(', ')}</Text>
                       </Column>
                     </Row>
                   ))}

@@ -18,6 +18,7 @@ import {
 import * as React from 'react';
 import { formatCurrency, formatEventDate } from '@/shared/lib/format-currency';
 import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
+import { type EmailPalette, DEFAULT_EMAIL_PALETTE } from '@/shared/lib/email-palette';
 
 export interface ProposalLinkEmailProps {
   proposalUrl: string;
@@ -33,6 +34,7 @@ export interface ProposalLinkEmailProps {
   eventArchetype?: string | null;
   eventStartTime?: string | null;
   eventEndTime?: string | null;
+  theme?: EmailPalette | null;
 }
 
 
@@ -50,7 +52,9 @@ export function ProposalLinkEmail({
   eventArchetype,
   eventStartTime,
   eventEndTime,
+  theme: themeProp,
 }: ProposalLinkEmailProps) {
+  const t = themeProp ?? DEFAULT_EMAIL_PALETTE;
   const from = workspaceName?.trim() || senderName?.trim() || 'your production company';
   const firstName = clientFirstName?.trim() || null;
   const brandLine = workspaceName?.trim() || null;
@@ -87,6 +91,147 @@ export function ProposalLinkEmail({
 
   const showDetailsBlock = !!(eventDate || total);
 
+  const main = {
+    backgroundColor: t.bgHex,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  };
+
+  const container = {
+    margin: '0 auto',
+    padding: '32px 16px',
+    maxWidth: '520px',
+  };
+
+  const section = {
+    padding: '40px 36px',
+    borderRadius: '16px',
+    backgroundColor: t.surfaceHex,
+    border: `1px solid ${t.borderSubtleHex}`,
+  };
+
+  const brandStyle = {
+    color: t.textSecondaryHex,
+    fontSize: '10px',
+    fontWeight: 500,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    margin: '0 0 24px',
+  };
+
+  const headingStyle = {
+    color: t.textHex,
+    fontSize: '22px',
+    fontWeight: 600,
+    margin: '0 0 16px',
+    letterSpacing: '-0.02em',
+    lineHeight: 1.2,
+  };
+
+  const bodyStyle = {
+    color: t.textSecondaryHex,
+    fontSize: '15px',
+    lineHeight: 1.6,
+    margin: '0 0 24px',
+  };
+
+  const detailsBlockStyle = {
+    backgroundColor: t.bgHex,
+    borderRadius: '10px',
+    border: `1px solid ${t.borderSubtleHex}`,
+    padding: '4px 16px',
+    margin: '0 0 24px',
+  };
+
+  const detailRowStyle = {
+    borderBottom: `1px solid ${t.borderSubtleHex}`,
+  };
+
+  const detailLabelStyle = {
+    width: '88px',
+    paddingTop: '14px',
+    paddingBottom: '14px',
+    verticalAlign: 'top' as const,
+  };
+
+  const detailValueStyle = {
+    paddingTop: '14px',
+    paddingBottom: '14px',
+    verticalAlign: 'top' as const,
+  };
+
+  const detailLabelTextStyle = {
+    color: t.textSecondaryHex,
+    fontSize: '12px',
+    fontWeight: 500,
+    margin: 0,
+    letterSpacing: '0.02em',
+  };
+
+  const detailValueTextStyle = {
+    color: t.textHex,
+    fontSize: '14px',
+    fontWeight: 500,
+    margin: 0,
+  };
+
+  const buttonStyle = {
+    backgroundColor: t.accentHex,
+    color: t.accentTextHex,
+    fontSize: '14px',
+    fontWeight: 600,
+    padding: '13px 32px',
+    borderRadius: '100px',
+    textDecoration: 'none',
+    display: 'inline-block',
+    letterSpacing: '-0.01em',
+  };
+
+  const trustLineStyle = {
+    color: t.textSecondaryHex,
+    fontSize: '13px',
+    textAlign: 'center' as const,
+    margin: '0 0 4px',
+    lineHeight: 1.5,
+  };
+
+  const dividerStyle = {
+    borderColor: t.borderSubtleHex,
+    margin: '24px 0 20px',
+  };
+
+  const footerStyle = {
+    color: t.textSecondaryHex,
+    fontSize: '12px',
+    lineHeight: 1.6,
+    margin: '0 0 12px',
+  };
+
+  const footerLinkStyle = {
+    color: t.textSecondaryHex,
+    fontSize: '11px',
+    lineHeight: 1.5,
+    margin: '0 0 16px',
+    wordBreak: 'break-all' as const,
+  };
+
+  const heroTotalStyle = {
+    color: t.textHex,
+    fontSize: '30px',
+    fontWeight: 700,
+    letterSpacing: '-0.03em',
+    textAlign: 'center' as const,
+    margin: '24px 0 8px',
+  };
+
+  const platformAttrStyle = {
+    color: t.textSecondaryHex,
+    fontSize: '10px',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const,
+    margin: '16px 0 0',
+    textAlign: 'center' as const,
+  };
+
   return (
     <Html>
       <Head>
@@ -99,59 +244,59 @@ export function ProposalLinkEmail({
           <Section style={section}>
             {/* Brand line */}
             {brandLine && (
-              <Text style={brand}>{brandLine}</Text>
+              <Text style={brandStyle}>{brandLine}</Text>
             )}
 
             {/* Heading */}
-            <Text style={heading}>
+            <Text style={headingStyle}>
               {firstName ? `${firstName}, your proposal is ready.` : `Your proposal is ready.`}
             </Text>
 
             {/* Intro */}
-            <Text style={body}>
+            <Text style={bodyStyle}>
               {dealTitle?.trim()
-                ? `${from} has prepared a proposal for ${dealTitle}. Review the scope and pricing below, then sign to confirm your booking.`
-                : `${from} has prepared a proposal for you. Review the scope and pricing below, then sign to confirm your booking.`}
+                ? `${from} has prepared a proposal for ${dealTitle}. Review the full scope, then sign to confirm.`
+                : `${from} has prepared a proposal for you. Review the full scope, then sign to confirm.`}
             </Text>
 
             {/* Hero total — most important number, shown at display scale before the detail table */}
             {totalStr && (
-              <Text style={heroTotal}>{totalStr}</Text>
+              <Text style={heroTotalStyle}>{totalStr}</Text>
             )}
 
             {/* Event details block — scope, date, payment terms */}
             {showDetailsBlock && (
-              <Section style={detailsBlock}>
+              <Section style={detailsBlockStyle}>
                 {dealTitle && (
-                  <Row style={detailRow}>
-                    <Column style={detailLabel}>
-                      <Text style={detailLabelText}>Scope</Text>
+                  <Row style={detailRowStyle}>
+                    <Column style={detailLabelStyle}>
+                      <Text style={detailLabelTextStyle}>Scope</Text>
                     </Column>
-                    <Column style={detailValue}>
-                      <Text style={detailValueText}>{dealTitle}</Text>
+                    <Column style={detailValueStyle}>
+                      <Text style={detailValueTextStyle}>{dealTitle}</Text>
                     </Column>
                   </Row>
                 )}
                 {eventDate && (
-                  <Row style={detailRow}>
-                    <Column style={detailLabel}>
-                      <Text style={detailLabelText}>Date</Text>
+                  <Row style={detailRowStyle}>
+                    <Column style={detailLabelStyle}>
+                      <Text style={detailLabelTextStyle}>Date</Text>
                     </Column>
-                    <Column style={detailValue}>
-                      <Text style={detailValueText}>{formatEventDate(eventDate)}</Text>
+                    <Column style={detailValueStyle}>
+                      <Text style={detailValueTextStyle}>{formatEventDate(eventDate)}</Text>
                     </Column>
                   </Row>
                 )}
                 {eventStartTime && (
-                  <Row style={detailRow}>
-                    <Column style={detailLabel}>
-                      <Text style={detailLabelText}>Time</Text>
+                  <Row style={detailRowStyle}>
+                    <Column style={detailLabelStyle}>
+                      <Text style={detailLabelTextStyle}>Time</Text>
                     </Column>
-                    <Column style={detailValue}>
-                      <Text style={detailValueText}>
+                    <Column style={detailValueStyle}>
+                      <Text style={detailValueTextStyle}>
                         {(() => {
-                          const fmt = (t: string) => {
-                            const [h, m] = t.split(':').map(Number);
+                          const fmt = (timeStr: string) => {
+                            const [h, m] = timeStr.split(':').map(Number);
                             const p = h >= 12 ? 'PM' : 'AM';
                             return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${p}`;
                           };
@@ -164,12 +309,12 @@ export function ProposalLinkEmail({
                   </Row>
                 )}
                 {paymentLine && (
-                  <Row style={detailRow}>
-                    <Column style={detailLabel}>
-                      <Text style={detailLabelText}>Payment</Text>
+                  <Row style={detailRowStyle}>
+                    <Column style={detailLabelStyle}>
+                      <Text style={detailLabelTextStyle}>Payment</Text>
                     </Column>
-                    <Column style={detailValue}>
-                      <Text style={detailValueText}>{paymentLine}</Text>
+                    <Column style={detailValueStyle}>
+                      <Text style={detailValueTextStyle}>{paymentLine}</Text>
                     </Column>
                   </Row>
                 )}
@@ -177,175 +322,34 @@ export function ProposalLinkEmail({
             )}
 
             {/* CTA */}
-            <Section style={{ textAlign: 'center' as const, margin: '32px 0 20px' }}>
-              <Button href={proposalUrl} style={button}>
+            <Section style={{ textAlign: 'center' as const, margin: '32px 0 24px' }}>
+              <Button href={proposalUrl} style={buttonStyle}>
                 Review and sign
               </Button>
             </Section>
 
             {/* Trust line */}
-            <Text style={trustLine}>
-              After signing, a timestamped copy is sent to both parties for your records.
+            <Text style={trustLineStyle}>
+              After signing, a timestamped copy goes to both parties for your records.
             </Text>
 
-            <Hr style={divider} />
+            <Hr style={dividerStyle} />
 
             {/* Footer */}
-            <Text style={footer}>
-              This link is personal to {firstName ?? 'you'} — please don&apos;t forward it.
+            <Text style={footerStyle}>
+              This link is personal to {firstName ?? 'you'} — do not forward it.
               Reply to this email with any questions — replies go directly to {from}.
             </Text>
-            <Text style={footerLink}>
+            <Text style={footerLinkStyle}>
               Or copy this link into your browser:{'\n'}
               {proposalUrl}
             </Text>
-            <Text style={platformAttr}>via Unusonic</Text>
+            <Text style={platformAttrStyle}>via Unusonic</Text>
           </Section>
         </Container>
       </Body>
     </Html>
   );
 }
-
-const main = {
-  backgroundColor: '#0d0d0d',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-};
-
-const container = {
-  margin: '0 auto',
-  padding: '32px 16px',
-  maxWidth: '520px',
-};
-
-const section = {
-  padding: '40px 36px',
-  borderRadius: '16px',
-  backgroundColor: '#161616',
-  border: '1px solid rgba(255,255,255,0.07)',
-};
-
-const brand = {
-  color: 'rgba(250,250,250,0.4)',
-  fontSize: '10px',
-  fontWeight: 700,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase' as const,
-  margin: '0 0 24px',
-};
-
-const heading = {
-  color: '#f5f5f5',
-  fontSize: '22px',
-  fontWeight: 600,
-  margin: '0 0 14px',
-  letterSpacing: '-0.02em',
-  lineHeight: 1.2,
-};
-
-const body = {
-  color: 'rgba(245,245,245,0.75)',
-  fontSize: '15px',
-  lineHeight: 1.6,
-  margin: '0 0 24px',
-};
-
-const detailsBlock = {
-  backgroundColor: 'rgba(255,255,255,0.04)',
-  borderRadius: '10px',
-  border: '1px solid rgba(255,255,255,0.08)',
-  padding: '4px 16px',
-  margin: '0 0 4px',
-};
-
-const detailRow = {
-  borderBottom: '1px solid rgba(255,255,255,0.05)',
-};
-
-const detailLabel = {
-  width: '88px',
-  paddingTop: '14px',
-  paddingBottom: '14px',
-  verticalAlign: 'top' as const,
-};
-
-const detailValue = {
-  paddingTop: '14px',
-  paddingBottom: '14px',
-  verticalAlign: 'top' as const,
-};
-
-const detailLabelText = {
-  color: 'rgba(245,245,245,0.4)',
-  fontSize: '12px',
-  fontWeight: 500,
-  margin: 0,
-  letterSpacing: '0.02em',
-};
-
-const detailValueText = {
-  color: '#f5f5f5',
-  fontSize: '14px',
-  fontWeight: 500,
-  margin: 0,
-};
-
-const button = {
-  backgroundColor: '#f5f5f5',
-  color: '#0d0d0d',
-  fontSize: '14px',
-  fontWeight: 700,
-  padding: '13px 32px',
-  borderRadius: '100px',
-  textDecoration: 'none',
-  display: 'inline-block',
-  letterSpacing: '-0.01em',
-};
-
-const trustLine = {
-  color: 'rgba(245,245,245,0.55)',
-  fontSize: '13px',
-  textAlign: 'center' as const,
-  margin: '0 0 4px',
-  lineHeight: 1.5,
-};
-
-const divider = {
-  borderColor: 'rgba(255,255,255,0.07)',
-  margin: '24px 0 20px',
-};
-
-const footer = {
-  color: 'rgba(245,245,245,0.35)',
-  fontSize: '12px',
-  lineHeight: 1.6,
-  margin: '0 0 10px',
-};
-
-const footerLink = {
-  color: 'rgba(245,245,245,0.2)',
-  fontSize: '11px',
-  lineHeight: 1.5,
-  margin: '0 0 16px',
-  wordBreak: 'break-all' as const,
-};
-
-const heroTotal = {
-  color: '#f5f5f5',
-  fontSize: '30px',
-  fontWeight: 700,
-  letterSpacing: '-0.03em',
-  textAlign: 'center' as const,
-  margin: '20px 0 4px',
-};
-
-const platformAttr = {
-  color: 'rgba(245,245,245,0.2)',
-  fontSize: '10px',
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const,
-  margin: '4px 0 0',
-  textAlign: 'center' as const,
-};
 
 export default ProposalLinkEmail;

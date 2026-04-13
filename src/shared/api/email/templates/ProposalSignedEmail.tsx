@@ -26,6 +26,7 @@ export interface ProposalSignedEmailProps {
   totalFormatted?: string | null;
   signerEmail?: string | null;
   eventDate?: string | null;
+  accentHex?: string | null;
 }
 
 export function ProposalSignedEmail({
@@ -37,6 +38,7 @@ export function ProposalSignedEmail({
   totalFormatted,
   signerEmail,
   eventDate,
+  accentHex,
 }: ProposalSignedEmailProps) {
   const formattedDate = new Date(signedAt).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -63,11 +65,11 @@ export function ProposalSignedEmail({
         <Container style={container}>
           <Section style={section}>
             {workspaceName ? (
-              <Text style={brandLine}>{workspaceName}</Text>
+              <Text style={{ ...brandLineBase, color: accentHex ?? '#737373' }}>{workspaceName}</Text>
             ) : null}
             <Text style={heading}>{signerName} signed.</Text>
             <Text style={body}>
-              <strong style={{ color: '#fafafa' }}>{dealTitle}</strong> — signed on {formattedDate}.
+              <strong style={{ color: '#e0e0e0' }}>{dealTitle}</strong> — signed on {formattedDate}.
               The agreement is confirmed. Follow up to send the deposit invoice.
             </Text>
 
@@ -84,7 +86,7 @@ export function ProposalSignedEmail({
               {eventDate ? (
                 <Row style={detailRow}>
                   <Column style={detailLabel}>
-                    <Text style={detailLabelText}>Event</Text>
+                    <Text style={detailLabelText}>Date</Text>
                   </Column>
                   <Column style={detailValue}>
                     <Text style={detailValueText}>{formatEventDate(eventDate)}</Text>
@@ -97,7 +99,7 @@ export function ProposalSignedEmail({
                     <Text style={detailLabelText}>Total</Text>
                   </Column>
                   <Column style={detailValue}>
-                    <Text style={{ ...detailValueText, fontWeight: 700 }}>{totalFormatted}</Text>
+                    <Text style={{ ...detailValueText, fontWeight: 600 }}>{totalFormatted}</Text>
                   </Column>
                 </Row>
               ) : null}
@@ -105,9 +107,11 @@ export function ProposalSignedEmail({
 
             <Text style={signedTimestampStyle}>{signedTimestamp}</Text>
 
-            <Button href={crmUrl} style={button}>
-              Open deal
-            </Button>
+            <Section style={{ textAlign: 'center' as const, margin: '0 0 24px' }}>
+              <Button href={crmUrl} style={button}>
+                Open deal
+              </Button>
+            </Section>
             <Text style={footer}>
               Internal notification from Unusonic.
             </Text>
@@ -120,25 +124,25 @@ export function ProposalSignedEmail({
 }
 
 const main = {
-  backgroundColor: '#0f0f0f',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  backgroundColor: '#0d0d0d',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
 };
 
 const container = {
   margin: '0 auto',
-  padding: '24px 16px',
-  maxWidth: '480px',
+  padding: '32px 16px',
+  maxWidth: '520px',
 };
 
 const section = {
   padding: '40px 36px',
-  borderRadius: '12px',
-  backgroundColor: '#1a1a1a',
-  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: '16px',
+  backgroundColor: '#161616',
+  border: '1px solid rgba(255,255,255,0.07)',
 };
 
 const heading = {
-  color: '#fafafa',
+  color: '#e0e0e0',
   fontSize: '20px',
   fontWeight: 600,
   margin: '0 0 16px',
@@ -146,16 +150,15 @@ const heading = {
 };
 
 const body = {
-  color: 'rgba(250,250,250,0.85)',
+  color: '#a3a3a3',
   fontSize: '15px',
   lineHeight: 1.5,
   margin: '0 0 24px',
 };
 
-const brandLine = {
-  color: 'rgba(250,250,250,0.5)',
+const brandLineBase = {
   fontSize: '11px',
-  fontWeight: 600,
+  fontWeight: 500,
   letterSpacing: '0.12em',
   textTransform: 'uppercase' as const,
   margin: '0 0 20px',
@@ -187,7 +190,7 @@ const detailValue = {
 };
 
 const detailLabelText = {
-  color: 'rgba(245,245,245,0.4)',
+  color: '#737373',
   fontSize: '12px',
   fontWeight: 500,
   margin: 0,
@@ -195,42 +198,43 @@ const detailLabelText = {
 };
 
 const detailValueText = {
-  color: '#f5f5f5',
+  color: '#e0e0e0',
   fontSize: '14px',
   fontWeight: 500,
   margin: 0,
 };
 
 const button = {
-  backgroundColor: '#22c55e',
-  color: '#fff',
-  fontSize: '15px',
+  backgroundColor: '#f5f5f5',
+  color: '#0d0d0d',
+  fontSize: '14px',
   fontWeight: 600,
-  padding: '12px 24px',
-  borderRadius: '8px',
+  padding: '13px 32px',
+  borderRadius: '100px',
   textDecoration: 'none',
   display: 'inline-block',
+  letterSpacing: '-0.01em',
 };
 
 const footer = {
-  color: 'rgba(250,250,250,0.5)',
+  color: '#737373',
   fontSize: '12px',
-  marginTop: '24px',
+  marginTop: '0',
 };
 
 const signedTimestampStyle = {
-  color: 'rgba(250,250,250,0.4)',
+  color: '#737373',
   fontSize: '12px',
   fontFamily: '"Courier New", Courier, monospace',
   margin: '0 0 20px',
 };
 
 const platformAttr = {
-  color: 'rgba(250,250,250,0.2)',
+  color: '#404040',
   fontSize: '10px',
   letterSpacing: '0.08em',
   textTransform: 'uppercase' as const,
-  margin: '8px 0 0',
+  margin: '16px 0 0',
 };
 
 export default ProposalSignedEmail;

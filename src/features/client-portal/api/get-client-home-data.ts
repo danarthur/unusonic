@@ -33,9 +33,14 @@ import 'server-only';
 
 import { getSystemClient } from '@/shared/api/supabase/system';
 import {
+  computeEventLock,
   resolveDealContact,
+  resolveEventDj,
+  type EventLockReason,
   type ResolvedDealContact,
 } from '@/shared/lib/client-portal';
+import { pickRelevantEvent } from '@/shared/lib/client-portal/pick-relevant-event';
+import { isSongsEnabledForArchetype } from '@/features/client-portal/api/get-client-songs-page-data';
 import type { PortalThemeConfig } from '@/shared/lib/portal-theme';
 
 import type { ClientPortalWorkspaceSummary } from '../ui/client-portal-shell';
@@ -71,6 +76,28 @@ export type ClientHomeInvoice = {
   dueDate: string | null;
 };
 
+/**
+ * Songs summary for the home dock.
+ *
+ * Null when the archetype gate (§0 A9) is closed — the home card
+ * renders nothing for corporate / conference / concert events. Non-null
+ * for wedding / social / generic archetypes regardless of the current
+ * `count`.
+ *
+ * `lastSongRequestAt` is the follow-up-engine signal (B5). A couple who
+ * hasn't added any songs 30 days before their wedding is a follow-up
+ * trigger — the engine reads this field and scores "30 days to show,
+ * last_song_request_at is null" as a nudge-worthy state. Exposed here
+ * so the engine doesn't have to re-read JSONB.
+ */
+export type ClientHomeSongs = {
+  count: number;
+  acknowledgedCount: number;
+  isLocked: boolean;
+  lockReason: EventLockReason;
+  lastSongRequestAt: string | null;
+};
+
 export type ClientHomeData = {
   workspace: ClientPortalWorkspaceSummary;
   entity: {
@@ -81,7 +108,19 @@ export type ClientHomeData = {
   deal: ClientHomeDeal | null;
   proposal: ClientHomeProposal | null;
   invoice: ClientHomeInvoice | null;
+  /** PM / sales owner card contact — the "one visible human" for most
+   *  of the home page (attributed warmth principle). Resolved via
+   *  `resolveDealContact`, which prefers deal.owner_entity_id → profiles
+   *  → crew DJ fallback. */
   contact: ResolvedDealContact | null;
+  /** DJ-specific contact for song attribution. Separate from `contact`
+   *  to prevent the A10 failure mode where "Priya has seen this" would
+   *  attribute to the PM instead of the actual DJ. Resolved via
+   *  `resolveEventDj` which walks event → deal → deal_crew (DJ role only)
+   *  and NEVER falls back to the PM. Null if no DJ assigned yet. */
+  dj: ResolvedDealContact | null;
+  /** Null when archetype gate is closed — home omits the Songs card entirely. */
+  songs: ClientHomeSongs | null;
 };
 
 type EntityRow = {
@@ -99,6 +138,8 @@ type EventRow = {
   venue_address: string | null;
   status: string | null;
   workspace_id: string | null;
+  event_archetype: string | null;
+  run_of_show_data: Record<string, unknown> | null;
 };
 
 type DealRow = {
@@ -134,36 +175,6 @@ type WorkspaceRow = {
   portal_theme_config: Record<string, unknown> | null;
 };
 
-/**
- * Pick the most relevant event for the portal home.
- * Preference: soonest upcoming → else most recent past.
- */
-function pickRelevantEvent(events: EventRow[]): EventRow | null {
-  if (events.length === 0) return null;
-  const now = Date.now();
-
-  const withEnds = events.filter((e) => e.ends_at !== null);
-  const upcoming = withEnds
-    .filter((e) => new Date(e.ends_at as string).getTime() >= now)
-    .sort(
-      (a, b) =>
-        new Date(a.starts_at ?? a.ends_at!).getTime() -
-        new Date(b.starts_at ?? b.ends_at!).getTime(),
-    );
-  if (upcoming.length > 0) return upcoming[0];
-
-  const past = withEnds
-    .filter((e) => new Date(e.ends_at as string).getTime() < now)
-    .sort(
-      (a, b) =>
-        new Date(b.ends_at!).getTime() - new Date(a.ends_at!).getTime(),
-    );
-  if (past.length > 0) return past[0];
-
-  // Fallback: no ends_at on any row — pick the first.
-  return events[0];
-}
-
 export async function getClientHomeData(
   entityId: string,
 ): Promise<ClientHomeData | null> {
@@ -172,7 +183,7 @@ export async function getClientHomeData(
   const supabase = getSystemClient();
   // directory + ops schemas aren't in the public Database type surface.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const crossSchema = supabase as any;
+  const crossSchema = supabase;
 
   // --- 1. Entity ---
   const { data: entityData } = await crossSchema
@@ -213,7 +224,7 @@ export async function getClientHomeData(
   const { data: eventRows } = await crossSchema
     .schema('ops')
     .from('events')
-    .select('id, title, starts_at, ends_at, venue_name, venue_address, status, workspace_id')
+    .select('id, title, starts_at, ends_at, venue_name, venue_address, status, workspace_id, event_archetype, run_of_show_data')
     .eq('client_entity_id', entityId)
     .eq('workspace_id', workspaceId);
 
@@ -308,6 +319,47 @@ export async function getClientHomeData(
       }
     : null;
 
+  // --- 8. DJ-specific contact for song attribution (§0 A10) ---
+  // Only resolve when the archetype supports songs — saves a DB round
+  // trip on corporate events where we wouldn't render the Songs card
+  // anyway. Null return propagates to the Songs card sublabel as
+  // "your DJ" instead of a mis-attributed PM name.
+  let dj: ResolvedDealContact | null = null;
+  if (isSongsEnabledForArchetype(eventRow.event_archetype)) {
+    dj = await resolveEventDj(eventRow.id);
+  }
+
+  // --- 9. Songs summary (§0 A9 archetype gate + B5 follow-up signal) ---
+  // Null return means "omit the Songs card from the dock" — the page
+  // reads `data.songs === null` as the "don't render" signal.
+  let songs: ClientHomeSongs | null = null;
+  if (isSongsEnabledForArchetype(eventRow.event_archetype)) {
+    const ros = (eventRow.run_of_show_data ?? {}) as Record<string, unknown>;
+    const rawRequests = ros.client_song_requests;
+    const requests = Array.isArray(rawRequests) ? rawRequests : [];
+    const lock = computeEventLock(eventRow.starts_at, eventRow.status);
+
+    let acknowledgedCount = 0;
+    let lastRequestedAt: string | null = null;
+    for (const raw of requests) {
+      if (!raw || typeof raw !== 'object') continue;
+      const r = raw as Record<string, unknown>;
+      if (r.acknowledged_at) acknowledgedCount += 1;
+      const requestedAt = typeof r.requested_at === 'string' ? r.requested_at : null;
+      if (requestedAt && (!lastRequestedAt || requestedAt > lastRequestedAt)) {
+        lastRequestedAt = requestedAt;
+      }
+    }
+
+    songs = {
+      count: requests.length,
+      acknowledgedCount,
+      isLocked: lock.locked,
+      lockReason: lock.reason,
+      lastSongRequestAt: lastRequestedAt,
+    };
+  }
+
   return {
     workspace,
     entity: {
@@ -319,5 +371,7 @@ export async function getClientHomeData(
     proposal,
     invoice,
     contact,
+    dj,
+    songs,
   };
 }

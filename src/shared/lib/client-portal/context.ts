@@ -20,8 +20,11 @@ import 'server-only';
 import { headers as nextHeaders } from 'next/headers';
 import { createHash } from 'node:crypto';
 
+import { cookies } from 'next/headers';
+
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { ACTIVE_WORKSPACE_COOKIE_NAME } from '@/shared/lib/constants';
 
 import { readSessionCookie, readStepUpCookie } from './cookies';
 
@@ -76,7 +79,7 @@ export async function getClientPortalContext(): Promise<ClientPortalContext> {
     // Cross-schema query — directory schema isn't in the generated Database
     // type's public surface, so cast to any (matches pattern in get-public-event.ts).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const crossSchema = system as any;
+    const crossSchema = system;
     const { data: entities, error } = await crossSchema
       .schema('directory')
       .from('entities')
@@ -97,11 +100,23 @@ export async function getClientPortalContext(): Promise<ClientPortalContext> {
         ownerWorkspaceId: e.owner_workspace_id,
         type: e.type,
       }));
+
+      // Workspace-aware: if the active workspace cookie is set, scope to
+      // entities belonging to that workspace. Falls back to all entities
+      // (backwards compatible for users without the cookie).
+      const cookieStore = await cookies();
+      const activeWsId = cookieStore.get(ACTIVE_WORKSPACE_COOKIE_NAME)?.value;
+      const scoped = activeWsId
+        ? mapped.filter((e) => e.ownerWorkspaceId === activeWsId)
+        : mapped;
+      // If the active workspace has no matching entities, fall back to all
+      const resolved = scoped.length > 0 ? scoped : mapped;
+
       return {
         kind: 'claimed',
         userId: user.id,
         entities: mapped,
-        activeEntity: mapped[0] ?? null,
+        activeEntity: resolved[0] ?? null,
         stepUpVerifiedUntil: stepUp?.stepUpUntil ?? null,
         stepUpMethod: stepUp?.stepUpMethod ?? null,
       };
@@ -123,7 +138,7 @@ export async function getClientPortalContext(): Promise<ClientPortalContext> {
 
     if (!tokenErr && tokenRow && new Date(tokenRow.expires_at).getTime() > Date.now()) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const crossSchema = system as any;
+      const crossSchema = system;
       const { data: entity } = await crossSchema
         .schema('directory')
         .from('entities')
