@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as Sentry from '@sentry/nextjs';
 import {
   ChevronDown,
   ChevronRight,
@@ -124,7 +125,10 @@ export function GearFlightCheck({
       setItems(data);
     } catch (e) {
       setError('Failed to load gear items.');
-      console.error('[GearFlightCheck] fetch error:', e);
+      Sentry.captureException(e, {
+        tags: { component: 'GearFlightCheck', action: 'fetchItems' },
+        extra: { eventId },
+      });
     } finally {
       setLoading(false);
     }

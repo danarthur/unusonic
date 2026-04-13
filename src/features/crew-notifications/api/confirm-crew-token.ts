@@ -1,6 +1,7 @@
 'use server';
 
 import 'server-only';
+import * as Sentry from '@sentry/nextjs';
 import { getSystemClient } from '@/shared/api/supabase/system';
 
 export type TokenDetails = {
@@ -104,7 +105,11 @@ export async function getCrewTokenDetails(token: string): Promise<TokenDetails |
       callTimeOverride = a.call_time_override;
     }
   } else {
-    // Legacy: read from JSONB crew_items by crew_index
+    // Legacy: read from JSONB crew_items by crew_index.
+    // WARNING: if crew was reordered via Production Team Card after this token
+    // was issued, the JSONB index is stale and the displayed call time will be
+    // wrong. New tokens always set assignment_id (the branch above) — only
+    // pre-migration outstanding tokens fall through here.
     const ros = e.run_of_show_data ?? {};
     const crewItems = Array.isArray(ros.crew_items)
       ? (ros.crew_items as { call_time_slot_id?: string | null; call_time_override?: string | null }[])
@@ -114,6 +119,15 @@ export async function getCrewTokenDetails(token: string): Promise<TokenDetails |
       callTimeSlotId = crewItem.call_time_slot_id ?? null;
       callTimeOverride = crewItem.call_time_override ?? null;
     }
+    Sentry.captureMessage('confirm-crew-token: legacy JSONB crew_index fallback', {
+      level: 'warning',
+      extra: {
+        token: r.token,
+        crewIndex: r.crew_index,
+        hasCrewItem: !!crewItem,
+      },
+      tags: { area: 'crew-notifications.legacy' },
+    });
   }
 
   let recipientName = r.email;

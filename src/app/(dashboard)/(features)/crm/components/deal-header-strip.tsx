@@ -70,7 +70,6 @@ export type DealHeaderStripProps = {
   title: string | null;
   proposedDate: string | null;
   eventArchetype: string | null;
-  budgetEstimated: number | null;
   readOnly?: boolean;
   saving?: boolean;
   onTitleChange?: (value: string) => void;
@@ -117,8 +116,6 @@ export function DealHeaderStrip({
   title,
   proposedDate,
   eventArchetype,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  budgetEstimated: _budgetEstimated,
   readOnly = false,
   saving = false,
   onTitleChange,

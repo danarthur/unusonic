@@ -327,7 +327,6 @@ export function PlanLens({
       title={localTitle}
       proposedDate={deal.proposed_date}
       eventArchetype={deal.event_archetype ?? null}
-      budgetEstimated={deal.budget_estimated}
       saving={scalarsSaving}
       onTitleChange={handleTitleChange}
       onSaveScalar={(patch) => {

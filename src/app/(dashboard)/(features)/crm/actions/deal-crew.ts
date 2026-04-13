@@ -275,7 +275,22 @@ async function syncDealCrewFromProposal(
       .map((r) => r.id);
 
     if (staleIds.length > 0) {
-      console.warn('[syncDealCrew] Deleting stale rows:', staleIds, 'activePackageIds:', [...activePackageIdSet]);
+      // Audit finding: stale-row culling was previously silent — owners saw
+      // crew vanish after a proposal edit with no explanation. Escalate the
+      // count to Sentry as a warning so the pattern is visible across sessions.
+      // Row-level visibility in the UI needs a separate "X roles removed from
+      // proposal sync" toast on the Production Team Card load path.
+      Sentry.captureMessage('syncDealCrewFromProposal: culled stale unconfirmed rows', {
+        level: 'warning',
+        extra: {
+          dealId,
+          workspaceId,
+          culledCount: staleIds.length,
+          staleIds,
+          activePackageIds: [...activePackageIdSet],
+        },
+        tags: { area: 'crm.crew-sync' },
+      });
       await supabase
         .schema('ops')
         .from('deal_crew')

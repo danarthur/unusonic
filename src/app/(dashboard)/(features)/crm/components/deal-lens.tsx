@@ -307,7 +307,6 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
         title={localTitle}
         proposedDate={localDate}
         eventArchetype={localArchetype}
-        budgetEstimated={localBudget}
         readOnly={isLocked}
         saving={scalarsSaving}
         onTitleChange={handleTitleChange}
