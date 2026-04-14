@@ -4345,6 +4345,7 @@ export type Database = {
           default_tax_rate: number
           dmarc_status: string | null
           extra_seats: number
+          feature_flags: Json
           grace_period_ends_at: string | null
           id: string
           last_payment_failed_at: string | null
@@ -4385,6 +4386,7 @@ export type Database = {
           default_tax_rate?: number
           dmarc_status?: string | null
           extra_seats?: number
+          feature_flags?: Json
           grace_period_ends_at?: string | null
           id?: string
           last_payment_failed_at?: string | null
@@ -4425,6 +4427,7 @@ export type Database = {
           default_tax_rate?: number
           dmarc_status?: string | null
           extra_seats?: number
+          feature_flags?: Json
           grace_period_ends_at?: string | null
           id?: string
           last_payment_failed_at?: string | null
