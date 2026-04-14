@@ -1,3 +1,4 @@
+export const widgetKey = 'network-stream' as const;
 export { StreamLayout } from './ui/StreamLayout';
 export { TheMembrane } from './ui/TheMembrane';
 export { OmniSearch } from './ui/OmniSearch';

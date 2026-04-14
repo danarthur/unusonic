@@ -1,16 +1,24 @@
 /**
  * Unit tests for the metric registry, argument validation, and callMetric.
- * Phase 1.2d acceptance tests.
+ * Phase 1.2d acceptance tests + Phase 2.1 library manifest coverage.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { readdirSync, statSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 vi.mock('@/shared/api/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
 import { METRICS, METRIC_IDS } from '../registry';
-import { isScalarMetric, isTableMetric } from '../types';
+import {
+  isScalarMetric,
+  isTableMetric,
+  isWidgetMetric,
+  type MetricCapability,
+} from '../types';
 import { callMetric } from '../call';
+import { getVisibleLibrary, getRoleDefaults } from '../library';
 
 // ─── Registry sanity ────────────────────────────────────────────────────────
 
@@ -19,14 +27,22 @@ describe('registry sanity', () => {
     const def = METRICS[id];
     expect(def).toBeDefined();
     expect(def.id).toBe(id);
-    expect(def.rpcName).toMatch(/^metric_/);
-    expect(def.rpcSchema).toBe('finance');
     expect(def.title.length).toBeGreaterThan(0);
     expect(def.description.length).toBeGreaterThan(0);
-    expect(def.emptyState.title.length).toBeGreaterThan(0);
-    expect(def.emptyState.body.length).toBeGreaterThan(0);
-    expect(def.requiredCapabilities.length).toBeGreaterThan(0);
+    // Widget-kind entries use the lobby. namespace; some are non-picker
+    // surfaces (sheets, banners) and ship with intentionally empty empty-state
+    // copy. RPC-backed metrics must always explain themselves.
+    if (!isWidgetMetric(def)) {
+      expect(def.emptyState.title.length).toBeGreaterThan(0);
+      expect(def.emptyState.body.length).toBeGreaterThan(0);
+      expect(def.requiredCapabilities.length).toBeGreaterThan(0);
+    }
     expect(def.roles.length).toBeGreaterThan(0);
+
+    if (isScalarMetric(def) || isTableMetric(def)) {
+      expect(def.rpcName).toMatch(/^metric_/);
+      expect(def.rpcSchema).toBe('finance');
+    }
   });
 
   it.each(METRIC_IDS)('%s has the right shape for its kind', (id) => {
@@ -42,11 +58,15 @@ describe('registry sanity', () => {
         expect(col.label.length).toBeGreaterThan(0);
       }
       expect(typeof def.exportable).toBe('boolean');
+    } else if (isWidgetMetric(def)) {
+      expect(def.widgetKey.length).toBeGreaterThan(0);
+      expect(def.id.startsWith('lobby.')).toBe(true);
     }
   });
 
-  it('exposes all 8 Phase 1.2 metrics', () => {
-    expect(METRIC_IDS.sort()).toEqual([
+  it('exposes all 8 Phase 1.2 RPC metrics', () => {
+    const rpcIds = METRIC_IDS.filter((id) => !isWidgetMetric(METRICS[id])).sort();
+    expect(rpcIds).toEqual([
       'finance.1099_worksheet',
       'finance.ar_aged_60plus',
       'finance.invoice_variance',
@@ -56,6 +76,111 @@ describe('registry sanity', () => {
       'finance.sales_tax_worksheet',
       'finance.unreconciled_payments',
     ]);
+  });
+});
+
+// ─── Library manifest coverage (Phase 2.1) ──────────────────────────────────
+
+/** Widget folders excluded from library coverage. */
+const WIDGET_EXCLUDES = new Set(['dashboard', 'shared']);
+
+function listWidgetFolders(): string[] {
+  const widgetsDir = join(process.cwd(), 'src', 'widgets');
+  return readdirSync(widgetsDir).filter((name) => {
+    if (WIDGET_EXCLUDES.has(name)) return false;
+    const full = join(widgetsDir, name);
+    return statSync(full).isDirectory();
+  });
+}
+
+function widgetFolderFor(widgetKey: string): string {
+  return join(process.cwd(), 'src', 'widgets', widgetKey);
+}
+
+describe('library manifest', () => {
+  const widgetEntries = Object.values(METRICS).filter(isWidgetMetric);
+
+  it('every widget-kind entry points at a real folder', () => {
+    for (const def of widgetEntries) {
+      const folder = widgetFolderFor(def.widgetKey);
+      expect(existsSync(folder), `missing folder for ${def.id}: ${folder}`).toBe(true);
+    }
+  });
+
+  it('every widget folder (minus dashboard/shared) has a registry entry', () => {
+    const folders = listWidgetFolders();
+    const entryKeys = new Set([
+      // qbo-variance is an RPC-backed metric (finance.qbo_variance). It owns the
+      // folder via its widgetKey property on the scalar entry.
+      METRICS['finance.qbo_variance'].widgetKey,
+      ...widgetEntries.map((d) => d.widgetKey),
+    ]);
+    for (const folder of folders) {
+      expect(entryKeys.has(folder), `no registry entry for src/widgets/${folder}`).toBe(true);
+    }
+  });
+});
+
+describe('getVisibleLibrary', () => {
+  it('returns only cards whose capabilities are all held', () => {
+    const caps = new Set<MetricCapability>(['finance:view']);
+    const visible = getVisibleLibrary(caps);
+    // Revenue collected requires finance:view only — must pass.
+    expect(visible.some((m) => m.id === 'finance.revenue_collected')).toBe(true);
+    // QBO variance requires finance:view + finance:reconcile — must NOT pass.
+    expect(visible.some((m) => m.id === 'finance.qbo_variance')).toBe(false);
+  });
+
+  it('includes no-capability entries for any user', () => {
+    const visible = getVisibleLibrary(new Set());
+    expect(visible.some((m) => m.id === 'lobby.action_queue')).toBe(true);
+    expect(visible.some((m) => m.id === 'lobby.network')).toBe(true);
+  });
+
+  it('adds gated cards only when both capabilities are held', () => {
+    const full = new Set<MetricCapability>(['finance:view', 'finance:reconcile']);
+    const visible = getVisibleLibrary(full);
+    expect(visible.some((m) => m.id === 'finance.qbo_variance')).toBe(true);
+    expect(visible.some((m) => m.id === 'finance.unreconciled_payments')).toBe(true);
+  });
+});
+
+describe('getRoleDefaults', () => {
+  it('finance_admin sees finance cards but not touring-coordinator-only ones', () => {
+    const caps = new Set<MetricCapability>([
+      'finance:view',
+      'finance:reconcile',
+      'deals:read:global',
+      'planning:view',
+      'ros:view',
+    ]);
+    const adminCards = getRoleDefaults(caps, 'finance_admin');
+    expect(adminCards.some((m) => m.id === 'finance.revenue_collected')).toBe(true);
+    expect(adminCards.some((m) => m.id === 'finance.qbo_variance')).toBe(true);
+    // Live-gig monitor is scoped to owner/pm/touring_coordinator — not finance_admin.
+    expect(adminCards.some((m) => m.id === 'lobby.live_gig_monitor')).toBe(false);
+  });
+
+  it('employee persona only sees portal-appropriate cards', () => {
+    const caps = new Set<MetricCapability>([
+      'planning:view',
+      'ros:view',
+      'portal:own_schedule',
+      'portal:own_profile',
+      'portal:own_pay',
+    ]);
+    const employeeCards = getRoleDefaults(caps, 'employee');
+    // Action queue is a cross-role card an employee does see.
+    expect(employeeCards.some((m) => m.id === 'lobby.action_queue')).toBe(true);
+    // Deal pipeline is owner/pm/finance_admin only.
+    expect(employeeCards.some((m) => m.id === 'lobby.deal_pipeline')).toBe(false);
+  });
+
+  it('enforces capability filter before role filter', () => {
+    // Owner persona but no finance capability — finance cards drop out.
+    const caps = new Set<MetricCapability>(['planning:view']);
+    const ownerCards = getRoleDefaults(caps, 'owner');
+    expect(ownerCards.some((m) => m.id === 'finance.revenue_collected')).toBe(false);
   });
 });
 

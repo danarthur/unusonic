@@ -21,7 +21,7 @@ import type {
   TableMetricDefinition,
   MetricUnit,
 } from './types';
-import { isScalarMetric } from './types';
+import { isScalarMetric, isWidgetMetric } from './types';
 
 // ─── Result shapes ───────────────────────────────────────────────────────────
 
@@ -159,6 +159,18 @@ export async function callMetric(
       metricId,
       args: rawArgs,
       error: `Unknown metric '${metricId}'`,
+    };
+  }
+
+  // Widget-kind entries are render hints for the Phase 2.3 library picker,
+  // not RPC-backed metrics. callMetric refuses them so an Aion/pin flow that
+  // hands us 'lobby.*' never silently hits a non-existent RPC.
+  if (isWidgetMetric(definition)) {
+    return {
+      ok: false,
+      metricId,
+      args: rawArgs,
+      error: `Metric '${metricId}' is a widget entry and cannot be invoked via callMetric`,
     };
   }
 

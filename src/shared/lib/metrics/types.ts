@@ -51,20 +51,16 @@ export type MetricEmptyState = {
 /** Schemas the RPC may live in. Public is allowed for grandfathered metric reads. */
 export type MetricRpcSchema = 'finance' | 'ops' | 'cortex' | 'directory' | 'public';
 
-/** Common fields across both kinds. */
+/** Common fields across all kinds. */
 type MetricBase = {
   /** Stable, namespaced ID. e.g. 'finance.revenue_collected'. Pin storage uses this verbatim. */
   id: string;
-  rpcName: string;
-  rpcSchema: MetricRpcSchema;
   argsSchema: z.ZodTypeAny;
   /** Defaults applied at the call site if the caller omits an optional arg. */
   defaultArgs?: Record<string, unknown>;
   requiredCapabilities: MetricCapability[];
   refreshability: MetricRefreshCadence;
   roles: MetricRole[];
-  /** Phase 2.1 hint: the widget folder under src/widgets/ this metric optionally renders as. */
-  widgetKey?: string;
   title: string;
   description: string;
   emptyState: MetricEmptyState;
@@ -72,8 +68,16 @@ type MetricBase = {
   notes?: string;
 };
 
+/** RPC-backed metric base: adds RPC name/schema plus an optional widget render hint. */
+type RpcMetricBase = MetricBase & {
+  rpcName: string;
+  rpcSchema: MetricRpcSchema;
+  /** Phase 2.1 hint: the widget folder under src/widgets/ this metric optionally renders as. */
+  widgetKey?: string;
+};
+
 /** Aion-friendly scalar metric — one hero number, optional comparison and sparkline. */
-export type ScalarMetricDefinition = MetricBase & {
+export type ScalarMetricDefinition = RpcMetricBase & {
   kind: 'scalar';
   unit: MetricUnit;
   /** Set even if comparison isn't always returned — the registry owns sentiment. */
@@ -83,7 +87,7 @@ export type ScalarMetricDefinition = MetricBase & {
 };
 
 /** Tabular metric for Reconciliation surface or any list view. */
-export type TableMetricDefinition = MetricBase & {
+export type TableMetricDefinition = RpcMetricBase & {
   kind: 'table';
   /** Column rendering hints. Keys MUST match the RPC's return column names. */
   columns: Array<{
@@ -96,7 +100,25 @@ export type TableMetricDefinition = MetricBase & {
   exportable: boolean;
 };
 
-export type MetricDefinition = ScalarMetricDefinition | TableMetricDefinition;
+/**
+ * Widget-kind metric — catalogs an existing lobby bento card (or other standalone
+ * widget) for the Phase 2.3 "swap from library" UX. Unlike scalar/table metrics,
+ * widgets carry their own data fetch and render; callMetric() does not resolve
+ * them. The registry entry exists so the library-filter pipeline
+ * (capability + role) can reason about the card before it renders.
+ *
+ * `widgetKey` is required and MUST match the folder under `src/widgets/` as well
+ * as the `widgetKey` const exported by that folder.
+ */
+export type WidgetMetricDefinition = MetricBase & {
+  kind: 'widget';
+  widgetKey: string;
+};
+
+export type MetricDefinition =
+  | ScalarMetricDefinition
+  | TableMetricDefinition
+  | WidgetMetricDefinition;
 
 /** Type guards. */
 export function isScalarMetric(m: MetricDefinition): m is ScalarMetricDefinition {
@@ -105,4 +127,8 @@ export function isScalarMetric(m: MetricDefinition): m is ScalarMetricDefinition
 
 export function isTableMetric(m: MetricDefinition): m is TableMetricDefinition {
   return m.kind === 'table';
+}
+
+export function isWidgetMetric(m: MetricDefinition): m is WidgetMetricDefinition {
+  return m.kind === 'widget';
 }

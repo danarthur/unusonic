@@ -32,6 +32,12 @@ const yearSchema = z.object({
   year: z.number().int().min(2000).max(2100),
 });
 
+/**
+ * Widget-kind entries use `lobby.*` IDs to namespace them away from RPC metrics.
+ * They catalog existing widget folders under `src/widgets/` so the Phase 2.3
+ * "swap from library" picker can filter by the viewer's capabilities and role.
+ * No RPC runs when these IDs are resolved — the widget owns its own data fetch.
+ */
 export const METRICS: Record<string, MetricDefinition> = {
   // ── Scalar metrics ─────────────────────────────────────────────────────────
 
@@ -81,6 +87,7 @@ export const METRICS: Record<string, MetricDefinition> = {
     kind: 'scalar',
     rpcSchema: 'finance',
     rpcName: 'metric_qbo_variance',
+    widgetKey: 'qbo-variance',
     argsSchema: noArgsSchema,
     unit: 'count',
     comparisonSentiment: 'negative',
@@ -225,6 +232,560 @@ export const METRICS: Record<string, MetricDefinition> = {
     ],
     exportable: true,
     notes: 'Reads finance.bills (AP). Direct freelancer payments are out of scope until Phase 5.',
+  },
+
+  // ── Widget-kind entries (Phase 2.1 library manifest) ───────────────────────
+  // IDs use the `lobby.` namespace; `widgetKey` matches the folder under
+  // `src/widgets/`. These cards own their own data fetch; the registry entry
+  // only exists so the library picker + role-default resolver can reason about
+  // them. Grouped by domain for review.
+
+  // Finance / revenue cards -------------------------------------------------
+
+  'lobby.financial_pulse': {
+    id: 'lobby.financial_pulse',
+    kind: 'widget',
+    widgetKey: 'financial-pulse',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['finance:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'finance_admin'],
+    title: 'Financial pulse',
+    description: 'Outstanding receivables, money in, money out. Rolling snapshot.',
+    emptyState: {
+      title: 'No financial activity yet',
+      body: 'Once you issue your first invoice or receive a payment, this card will surface receivables and cash movement.',
+    },
+  },
+
+  'lobby.revenue_trend': {
+    id: 'lobby.revenue_trend',
+    kind: 'widget',
+    widgetKey: 'revenue-trend',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['finance:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'finance_admin'],
+    title: 'Revenue trend',
+    description: 'Revenue booked by month, trailing window. Tracks the slope of the business.',
+    emptyState: {
+      title: 'Not enough history',
+      body: 'Revenue trend appears once you have at least two months of paid invoices.',
+    },
+  },
+
+  'lobby.payment_health': {
+    id: 'lobby.payment_health',
+    kind: 'widget',
+    widgetKey: 'payment-health',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['finance:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'finance_admin'],
+    title: 'Payment health',
+    description: 'On-time vs late invoice mix for the workspace. High-signal signal for AR risk.',
+    emptyState: {
+      title: 'No invoices issued yet',
+      body: 'Payment health lights up after your first issued invoice matures.',
+    },
+  },
+
+  'lobby.client_concentration': {
+    id: 'lobby.client_concentration',
+    kind: 'widget',
+    widgetKey: 'client-concentration',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['finance:view', 'deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'finance_admin'],
+    title: 'Top clients',
+    description: 'Revenue share by top accounts. Surfaces single-client risk.',
+    emptyState: {
+      title: 'No billable clients yet',
+      body: 'Once deals close and invoice, your top clients will rank here.',
+    },
+  },
+
+  'lobby.event_roi_snapshot': {
+    id: 'lobby.event_roi_snapshot',
+    kind: 'widget',
+    widgetKey: 'event-roi-snapshot',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['finance:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'finance_admin', 'pm'],
+    title: 'Event ROI',
+    description: 'Revenue vs cost per event. Flags margin drift show-over-show.',
+    emptyState: {
+      title: 'No completed events with costs',
+      body: 'ROI appears once an event has both billed revenue and recorded costs.',
+    },
+  },
+
+  // Pipeline / sales cards --------------------------------------------------
+
+  'lobby.deal_pipeline': {
+    id: 'lobby.deal_pipeline',
+    kind: 'widget',
+    widgetKey: 'deal-pipeline',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin'],
+    title: 'Pipeline',
+    description: 'Open deals by stage, weighted value, and stage counts.',
+    emptyState: {
+      title: 'Pipeline is clear',
+      body: 'Create a deal to see your pipeline take shape.',
+    },
+  },
+
+  'lobby.pipeline_velocity': {
+    id: 'lobby.pipeline_velocity',
+    kind: 'widget',
+    widgetKey: 'pipeline-velocity',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Pipeline velocity',
+    description: 'Average time deals spend in each stage. Bottleneck detector.',
+    emptyState: {
+      title: 'Not enough stage history',
+      body: 'Once deals have moved through multiple stages, their cadence appears here.',
+    },
+  },
+
+  'lobby.passive_pipeline_feed': {
+    id: 'lobby.passive_pipeline_feed',
+    kind: 'widget',
+    widgetKey: 'passive-pipeline-feed',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Pipeline feed',
+    description: 'Low-attention feed of recent pipeline movement — stage changes, proposal sends, new deals.',
+    emptyState: {
+      title: 'Quiet in the pipeline',
+      body: 'Activity shows up here as deals move.',
+    },
+  },
+
+  // Schedule / ops cards ----------------------------------------------------
+
+  'lobby.today_schedule': {
+    id: 'lobby.today_schedule',
+    kind: 'widget',
+    widgetKey: 'today-schedule',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Today',
+    description: 'Events, calls, and load-ins scheduled for today in workspace timezone.',
+    emptyState: {
+      title: 'Nothing on today',
+      body: 'Your workspace has no events scheduled for today.',
+    },
+  },
+
+  'lobby.week_strip': {
+    id: 'lobby.week_strip',
+    kind: 'widget',
+    widgetKey: 'week-strip',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'This week',
+    description: 'Seven-day strip of scheduled events and major calls.',
+    emptyState: {
+      title: 'No events this week',
+      body: 'Events scheduled in the next seven days will appear here.',
+    },
+  },
+
+  'lobby.urgency_strip': {
+    id: 'lobby.urgency_strip',
+    kind: 'widget',
+    widgetKey: 'urgency-strip',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Urgency',
+    description: 'Deals, events, and invoices that need attention now.',
+    emptyState: {
+      title: 'Nothing urgent',
+      body: 'Urgent items will surface at the top of your lobby when they appear.',
+    },
+  },
+
+  'lobby.action_queue': {
+    id: 'lobby.action_queue',
+    kind: 'widget',
+    widgetKey: 'action-queue',
+    argsSchema: noArgsSchema,
+    // Action items cut across domains; we show the card to anyone who can see
+    // the lobby. Data fetcher filters by what the viewer is allowed to act on.
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin', 'touring_coordinator', 'employee'],
+    title: 'Actions',
+    description: 'Outstanding tasks assigned to you across deals, proposals, and shows.',
+    emptyState: {
+      title: 'Inbox zero',
+      body: 'Nothing is waiting on you right now.',
+    },
+    notes: 'No required capability — data fetcher scopes to the viewer.',
+  },
+
+  'lobby.activity_feed': {
+    id: 'lobby.activity_feed',
+    kind: 'widget',
+    widgetKey: 'activity-feed',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin', 'touring_coordinator'],
+    title: 'Recent activity',
+    description: 'Workspace-wide event stream — edits, sends, assignments, payments.',
+    emptyState: {
+      title: 'No activity yet',
+      body: 'Activity will populate as you and your team work in Unusonic.',
+    },
+    notes: 'No required capability — fetcher filters rows to what the viewer can see.',
+  },
+
+  'lobby.action_stream': {
+    id: 'lobby.action_stream',
+    kind: 'widget',
+    widgetKey: 'action-stream',
+    argsSchema: noArgsSchema,
+    // Suggested actions are Aion-driven.
+    requiredCapabilities: ['tier:aion:active'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Action stream',
+    description: 'Aion-suggested next actions based on what changed in your workspace.',
+    emptyState: {
+      title: 'No suggestions right now',
+      body: 'Aion surfaces suggested actions as deals, shows, and invoices change.',
+    },
+    notes: 'Aion feature — gated on tier:aion:active.',
+  },
+
+  'lobby.event_type_dist': {
+    id: 'lobby.event_type_dist',
+    kind: 'widget',
+    widgetKey: 'event-type-dist',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Event types',
+    description: 'Mix of event types in the current window — festival, private, corporate, etc.',
+    emptyState: {
+      title: 'No events classified yet',
+      body: 'Event-type distribution appears once you have tagged shows.',
+    },
+  },
+
+  // Live production cards ---------------------------------------------------
+
+  'lobby.live_gig_monitor': {
+    id: 'lobby.live_gig_monitor',
+    kind: 'widget',
+    widgetKey: 'live-gig-monitor',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view', 'ros:view'],
+    refreshability: 'live',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Live gig monitor',
+    description: 'Countdown and status for the next show — load-in, doors, set times.',
+    emptyState: {
+      title: 'No upcoming shows',
+      body: 'Your next show will appear here once scheduled.',
+    },
+  },
+
+  'lobby.active_production': {
+    id: 'lobby.active_production',
+    kind: 'widget',
+    widgetKey: 'active-production',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'live',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Active production',
+    description: 'What is in production right now — crew on call, shows in motion.',
+    emptyState: {
+      title: 'Nothing in production',
+      body: 'When crews are on call or shows are live, they show here.',
+    },
+  },
+
+  'lobby.real_time_logistics': {
+    id: 'lobby.real_time_logistics',
+    kind: 'widget',
+    widgetKey: 'real-time-logistics',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'live',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Real-time logistics',
+    description: 'Transport status, crew arrivals, gear moves across today.',
+    emptyState: {
+      title: 'No logistics events today',
+      body: 'Load-ins, transport, and crew check-ins appear here as they happen.',
+    },
+  },
+
+  'lobby.production_timeline': {
+    id: 'lobby.production_timeline',
+    kind: 'widget',
+    widgetKey: 'production-timeline',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Production timeline',
+    description: 'Horizontal timeline across deals and events — milestones, critical dates.',
+    emptyState: {
+      title: 'Nothing on the timeline',
+      body: 'Milestones appear here as you add deals and schedule shows.',
+    },
+  },
+
+  'lobby.run_of_show': {
+    id: 'lobby.run_of_show',
+    kind: 'widget',
+    widgetKey: 'run-of-show',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['ros:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Run of show',
+    description: 'Cue-by-cue production timeline for an individual show.',
+    emptyState: {
+      title: 'No run of show yet',
+      body: 'Create or import cues on the show page to build a run of show.',
+    },
+    notes: 'Typically embedded in the show page rather than picked standalone; present here for completeness. Employee persona uses run_of_show_feed (live, scoped) instead.',
+  },
+
+  'lobby.run_of_show_feed': {
+    id: 'lobby.run_of_show_feed',
+    kind: 'widget',
+    widgetKey: 'run-of-show-feed',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['ros:view'],
+    refreshability: 'live',
+    roles: ['owner', 'pm', 'touring_coordinator', 'employee'],
+    title: 'Run-of-show feed',
+    description: 'Live cue feed during a show — what is happening, what is next.',
+    emptyState: {
+      title: 'No active show',
+      body: 'When a show is in live mode, cues stream here.',
+    },
+  },
+
+  // Workspace / health cards ------------------------------------------------
+
+  'lobby.global_pulse': {
+    id: 'lobby.global_pulse',
+    kind: 'widget',
+    widgetKey: 'global-pulse',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner'],
+    title: 'Global pulse',
+    description: 'Top-level business health at a glance — pipeline, cash, people, shows.',
+    emptyState: {
+      title: 'Pulse warming up',
+      body: 'Health metrics appear once you have some deals and shows on the books.',
+    },
+    notes: 'No required capability — composite card; individual metrics gate themselves.',
+  },
+
+  'lobby.sentiment_pulse': {
+    id: 'lobby.sentiment_pulse',
+    kind: 'widget',
+    widgetKey: 'sentiment-pulse',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['tier:aion:active'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Sentiment pulse',
+    description: 'Aion-summarized signal across client comms, proposals, and show debriefs.',
+    emptyState: {
+      title: 'Sentiment is still building',
+      body: 'Aion needs a few proposals and show debriefs before it can read signal.',
+    },
+    notes: 'Aion feature — gated on tier:aion:active.',
+  },
+
+  // Network / directory cards -----------------------------------------------
+
+  'lobby.network': {
+    id: 'lobby.network',
+    kind: 'widget',
+    widgetKey: 'network',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Network',
+    description: 'People, venues, and companies in your directory. The relationship graph.',
+    emptyState: {
+      title: 'Network is empty',
+      body: 'Add a contact or summon a ghost to start building your network.',
+    },
+    notes: 'No required capability — reads directory.entities scoped to workspace.',
+  },
+
+  'lobby.network_detail': {
+    id: 'lobby.network_detail',
+    kind: 'widget',
+    widgetKey: 'network-detail',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Network detail',
+    description: 'Deep-dive sheet for a single person or organization — trade ledger, notes, roster.',
+    emptyState: {
+      title: 'Pick a contact',
+      body: 'Select someone from your network to open their dossier.',
+    },
+    notes: 'Sheet surface, not a standalone lobby card. Present so Aion can reference it.',
+  },
+
+  'lobby.network_stream': {
+    id: 'lobby.network_stream',
+    kind: 'widget',
+    widgetKey: 'network-stream',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Network stream',
+    description: 'Membrane-style stream of directory activity — new contacts, recent touches.',
+    emptyState: {
+      title: 'No network activity yet',
+      body: 'As contacts are added and touched, the stream fills in.',
+    },
+    notes: 'Layout surface for the network page, not a lobby card.',
+  },
+
+  'lobby.org_dashboard': {
+    id: 'lobby.org_dashboard',
+    kind: 'widget',
+    widgetKey: 'org-dashboard',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['workspace:team:manage'],
+    refreshability: 'manual',
+    roles: ['owner'],
+    title: 'Organization settings',
+    description: 'Workspace-level org profile — name, logo, defaults.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Settings sheet, not a pickable lobby card. Exposed to the library so role-default resolver can show it to owners only.',
+  },
+
+  // Onboarding / nudge cards ------------------------------------------------
+
+  'lobby.onboarding': {
+    id: 'lobby.onboarding',
+    kind: 'widget',
+    widgetKey: 'onboarding',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin', 'touring_coordinator', 'employee'],
+    title: 'Claim wizard',
+    description: 'Guided flow for a new user claiming a ghost or completing onboarding.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Claim flow at /claim/[token]; not a lobby card. Catalogued for completeness.',
+  },
+
+  'lobby.passkey_nudge_banner': {
+    id: 'lobby.passkey_nudge_banner',
+    kind: 'widget',
+    widgetKey: 'passkey-nudge-banner',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin', 'touring_coordinator', 'employee'],
+    title: 'Passkey nudge',
+    description: 'Banner prompting the viewer to add a passkey if none is enrolled.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Global layout banner, not picker-selectable. Registered so the library is exhaustive.',
+  },
+
+  'lobby.recovery_backup_prompt': {
+    id: 'lobby.recovery_backup_prompt',
+    kind: 'widget',
+    widgetKey: 'recovery-backup-prompt',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin', 'touring_coordinator', 'employee'],
+    title: 'Recovery backup',
+    description: 'Prompt to back up the sovereign-recovery phrase + Shamir shards.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Security nudge banner, not a pickable card. Registered for completeness.',
+  },
+
+  // Dev / design surfaces ---------------------------------------------------
+
+  'lobby.design_showcase': {
+    id: 'lobby.design_showcase',
+    kind: 'widget',
+    widgetKey: 'design-showcase',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['workspace:owner'],
+    refreshability: 'manual',
+    roles: ['owner'],
+    title: 'Identity lab',
+    description: 'Internal design-system showcase. Not exposed to end users.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Dev-only surface. Gated to owners; will likely be removed from the library in a later phase.',
+  },
+
+  // Event command-grid ------------------------------------------------------
+
+  'lobby.event_dashboard': {
+    id: 'lobby.event_dashboard',
+    kind: 'widget',
+    widgetKey: 'event-dashboard',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['planning:view'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator'],
+    title: 'Event command',
+    description: 'Full-page command grid for a single event — logistics, crew, financials.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Event page grid, not a lobby card. Registered so Aion/library can reference it.',
   },
 };
 

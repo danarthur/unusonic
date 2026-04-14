@@ -1,3 +1,4 @@
+export const widgetKey = 'network-detail' as const;
 export { NetworkDetailSheet } from './ui/NetworkDetailSheet';
 export { NetworkDetailSheetWithSuspense } from './ui/NetworkDetailSheetWithSuspense';
 export { IdentityHeader } from './ui/IdentityHeader';

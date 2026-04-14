@@ -1,3 +1,4 @@
+export const widgetKey = 'network' as const;
 export { NetworkGrid } from './ui/NetworkGrid';
 export { NetworkCard } from './ui/NetworkCard';
 export { EntitySheet } from './ui/EntitySheet';

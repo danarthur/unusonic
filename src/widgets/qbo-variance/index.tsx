@@ -22,6 +22,8 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { METRICS } from '@/shared/lib/metrics/registry';
 import type { QboVarianceDTO } from './api/get-qbo-variance';
 
+export const widgetKey = 'qbo-variance' as const;
+
 interface QboVarianceWidgetProps {
   data?: QboVarianceDTO | null;
   loading?: boolean;

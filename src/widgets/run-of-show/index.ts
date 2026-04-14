@@ -1,3 +1,4 @@
+export const widgetKey = 'run-of-show' as const;
 export { RunOfShow } from './ui/run-of-show';
 export { TimelineView } from './ui/timeline-view';
 export { ViewToggle } from './ui/view-toggle';
