@@ -54,13 +54,15 @@ export async function syncCrewRatesToAssignments(
 
     if (!crewRows || crewRows.length === 0) return empty;
 
-    // 2. Get the workspace_id from the event
+    // 2. Get the workspace_id from the event. `.maybeSingle()` guards against
+    // read-replica visibility lag right after the handoff insert — `.single()`
+    // would throw "no rows" before the new event row is observable.
     const { data: event, error: eventErr } = await supabase
       .schema('ops')
       .from('events')
       .select('workspace_id')
       .eq('id', eventId)
-      .single();
+      .maybeSingle();
 
     if (eventErr || !event) {
       console.error('[handoff] sync-crew-rates query event:', eventErr?.message ?? 'event not found');

@@ -31,7 +31,7 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
       'id, project_id, title, starts_at, ends_at, venue_entity_id, workspace_id, lifecycle_status, status, ' +
       'internal_code, confidentiality_level, slug, dates_load_in, dates_load_out, venue_address, venue_google_maps_id, ' +
       'location_name, location_address, logistics_dock_info, logistics_power_info, ' +
-      'client_entity_id, guest_count_expected, guest_count_actual, tech_requirements, compliance_docs, ' +
+      'client_entity_id, deal_id, guest_count_expected, guest_count_actual, tech_requirements, compliance_docs, ' +
       'crm_probability, crm_estimated_value, lead_source, notes, created_at, updated_at, ' +
       'project:projects!inner(workspace_id)'
     )
@@ -90,6 +90,7 @@ export async function getEventCommand(eventId: string): Promise<EventCommandDTO 
     logistics_dock_info: (r.logistics_dock_info as string) ?? null,
     logistics_power_info: (r.logistics_power_info as string) ?? null,
     client_entity_id: clientEntityId,
+    deal_id: (r.deal_id as string) ?? null,
     // producer_id and pm_id were dropped from ops.events (migration 20260309082105).
     // Personnel assignments now live in cortex.relationships ROSTER_MEMBER edges; resolve there if needed.
     producer_id: null,

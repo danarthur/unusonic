@@ -54,6 +54,7 @@ export async function getContractForEvent(
 
     const supabase = await createClient();
     const { data, error } = await supabase
+      .schema('public')
       .from('contracts')
       .select('status, signed_at, pdf_url')
       .eq('event_id', eventId)

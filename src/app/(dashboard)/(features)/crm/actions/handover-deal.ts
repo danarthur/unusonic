@@ -105,6 +105,8 @@ export async function handoverDeal(
       .eq('id', dealId)
       .eq('workspace_id', workspaceId);
     revalidatePath('/crm');
+    revalidatePath('/events');
+    revalidatePath(`/events/${eid}`, 'layout');
     return { success: true, eventId: eid };
   }
 
@@ -291,8 +293,11 @@ export async function handoverDeal(
   });
   const warnings: string[] = [];
 
-  const [crewSyncResult] = await Promise.allSettled([
+  // Crew + gear sync are awaited so we can surface failures as warnings on the
+  // HandoverResult — checklist + DJ prep stay fire-and-forget (Sentry-only).
+  const [crewSyncResult, gearSyncResult] = await Promise.allSettled([
     syncCrewRatesToAssignments(eventId, dealId),
+    syncGearFromProposalToEvent(eventId),
   ]);
   if (crewSyncResult.status === 'rejected') {
     const reason = crewSyncResult.reason instanceof Error
@@ -313,20 +318,18 @@ export async function handoverDeal(
       'No crew was assigned on the deal — add crew on the Plan tab before the show.',
     );
   }
-
-  // Non-critical: gear + checklist + DJ client seed (fire-and-forget).
-  // These were previously `.catch(console.error)` — failures were invisible and the
-  // user saw a half-built event (empty gear flight check, missing advancing checklist,
-  // blank DJ prep) with no indication anything went wrong. Now captured to Sentry.
-  syncGearFromProposalToEvent(eventId).catch((err) => {
-    const message = err instanceof Error ? err.message : String(err);
+  if (gearSyncResult.status === 'rejected') {
+    const reason = gearSyncResult.reason instanceof Error
+      ? gearSyncResult.reason.message
+      : String(gearSyncResult.reason);
     Sentry.logger.error('crm.handoverDeal.gearSyncFailed', {
       dealId,
       eventId,
       workspaceId,
-      error: message,
+      error: reason,
     });
-  });
+    warnings.push('Gear sync failed — flight check may be empty until you re-run gear sync.');
+  }
   seedAdvancingChecklist(eventId, archetype).catch((err) => {
     const message = err instanceof Error ? err.message : String(err);
     Sentry.logger.error('crm.handoverDeal.advancingChecklistSeedFailed', {
@@ -420,6 +423,8 @@ export async function handoverDeal(
   revalidatePath('/crm');
   revalidatePath('/');
   revalidatePath('/network');
+  revalidatePath('/events');
+  revalidatePath(`/events/${eventId}`, 'layout');
   return { success: true, eventId, warnings: warnings.length > 0 ? warnings : undefined };
   });
 }

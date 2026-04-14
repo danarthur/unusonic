@@ -141,11 +141,13 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
   }, [clientQuery]);
 
   const buildPayload = useCallback((): HandoverPayload => {
+    const trimmedVenue = venueEntityId.trim();
+    const trimmedClient = clientEntityId.trim();
     const vitals: HandoverVitals = {
       start_at: fromLocalDatetime(startAt),
       end_at: fromLocalDatetime(endAt),
-      venue_entity_id: venueEntityId.trim() || null,
-      client_entity_id: clientEntityId.trim() || null,
+      venue_entity_id: trimmedVenue || null,
+      client_entity_id: trimmedClient || null,
     };
     const run_of_show_data = {
       gear_requirements: gearRequirements.trim() || null,
@@ -171,6 +173,13 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
         setError(
           'No client linked. The client portal cannot open this event without a bill-to stakeholder — pick one above or add one on the deal before handing off.',
         );
+        return;
+      }
+      // Block submit while async venue creation or client lookup is in flight —
+      // pressing Next mid-creation could submit a stale entityId before the
+      // server insert resolved. Mirrors quick-win 10 from the audit.
+      if (venueCreating || clientLoading) {
+        setError('Finish picking a venue or client before handing over.');
         return;
       }
       setSubmitting(true);
@@ -201,7 +210,7 @@ export function HandoffWizard({ dealId, deal, stakeholders, onSuccess, onDismiss
     } else {
       setStepIndex((i) => i + 1);
     }
-  }, [isLast, buildPayload, dealId, clientEntityId, onSuccess, onDismiss]);
+  }, [isLast, buildPayload, dealId, clientEntityId, venueCreating, clientLoading, onSuccess, onDismiss]);
 
   const handleBack = useCallback(() => {
     setError(null);
