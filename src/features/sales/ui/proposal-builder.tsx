@@ -105,6 +105,7 @@ export function ProposalBuilder({
   const [sending, setSending] = useState(false);
   const [sentUrl, setSentUrl] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [saveToCatalogPending, setSaveToCatalogPending] = useState(false);
   const [saveToCatalogMessage, setSaveToCatalogMessage] = useState<string | null>(null);
   /** Email/name for DocuSeal e-signature. Set by contact pill selection or custom email form. */
@@ -587,10 +588,19 @@ export function ProposalBuilder({
   /** Save current line items as draft, then send via DocuSeal or legacy flow. */
   const handleSendSubmit = useCallback((eEmail: string, eName: string) => {
     setSendError(null);
+    setSendNotice(null);
     setSending(true);
     startTransition(async () => {
       try {
         const input = lineItems.map(toLineItemInput);
+
+        // Guard: persist must succeed and yield items before we attempt to send.
+        // Without this, an auto-save failure mid-session sends a stale or empty
+        // proposal under the e-sign flow.
+        if (input.length === 0) {
+          setSendError('Add at least one line item before sending.');
+          return;
+        }
 
         const upsert = await upsertProposal(dealId, input);
         if (!upsert.proposalId) {
@@ -606,6 +616,11 @@ export function ProposalBuilder({
           if (result.success) {
             setSentUrl(result.publicUrl);
             setSendError(null);
+            if (result.docusealFallback) {
+              setSendNotice(
+                `E-signature step skipped (${result.docusealFallback.reason}). Sent as a plain proposal link instead.`
+              );
+            }
           } else {
             setSendError(result.error);
           }
@@ -1186,6 +1201,7 @@ export function ProposalBuilder({
               saveToCatalogMessage={saveToCatalogMessage}
               showDraftSaved={showDraftSaved}
               sendError={sendError}
+              sendNotice={sendNotice}
               sentUrl={sentUrl}
               signingName={signingName}
               signingEmail={signingEmail}

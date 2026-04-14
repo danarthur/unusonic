@@ -419,11 +419,11 @@ export function PublicProposalView({ data, token, className, itemLayout = 'card'
           }}
         >
           <p style={{ color: 'var(--portal-text-primary)', fontWeight: 500, marginBottom: '0.5rem' }}>
-            Online signing not yet enabled
+            E-signature isn’t enabled for this workspace yet
           </p>
           <p>
-            Reach out to your contact to complete this proposal. Once eSignature is configured for
-            this account, you’ll be able to sign here directly.
+            Reach out to your contact to complete this proposal. Once they configure DocuSeal,
+            you’ll be able to sign here directly.
           </p>
         </div>
       )}

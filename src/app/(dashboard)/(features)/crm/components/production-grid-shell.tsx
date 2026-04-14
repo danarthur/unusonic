@@ -47,9 +47,11 @@ type ProductionGridShellProps = {
   streamMode: StreamMode;
   /** Current Network org id (for client picker and Network Detail Sheet). */
   currentOrgId?: string | null;
+  /** When set, render a banner above the stream so users see the empty grid is a failure, not "no deals yet." */
+  loadError?: string | null;
 };
 
-export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId }: ProductionGridShellProps) {
+export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId, loadError }: ProductionGridShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { workspaceId } = useWorkspace();
@@ -110,6 +112,14 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
 
   return (
     <div className="flex flex-col md:flex-row flex-1 min-h-0 relative" data-surface="void" style={{ background: 'var(--stage-void)' }}>
+      {loadError && (
+        <div
+          role="alert"
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-20 max-w-[520px] w-[calc(100%-1.5rem)] rounded-lg border border-[var(--color-unusonic-error)]/30 bg-[var(--stage-surface)] px-4 py-2.5 text-sm text-[var(--color-unusonic-error)] shadow-[var(--stage-shadow-card)]"
+        >
+          {loadError}
+        </div>
+      )}
       {/* Left: Stream. On mobile hidden when item selected; on desktop always visible. */}
       <aside
         className={cn(
@@ -156,7 +166,9 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
         ) : (
           <div className="bento-center flex-1 p-8 text-center">
             <p className="text-[var(--stage-text-secondary)] leading-relaxed text-sm max-w-sm">
-              Select a production from the stream.
+              {optimisticGigs.length === 0
+                ? 'No productions yet. Create one to get started.'
+                : 'Select a production from the stream.'}
             </p>
           </div>
         )}

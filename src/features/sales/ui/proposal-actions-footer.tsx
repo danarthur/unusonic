@@ -12,6 +12,7 @@ export interface ProposalActionsFooterProps {
   saveToCatalogMessage: string | null;
   showDraftSaved: boolean;
   sendError: string | null;
+  sendNotice: string | null;
   sentUrl: string | null;
   signingName: string;
   signingEmail: string;
@@ -28,6 +29,7 @@ export function ProposalActionsFooter({
   saveToCatalogMessage,
   showDraftSaved,
   sendError,
+  sendNotice,
   sentUrl,
   signingName,
   signingEmail,
@@ -78,6 +80,11 @@ export function ProposalActionsFooter({
       {sendError && (
         <p className="mt-3 text-sm text-[var(--color-unusonic-error)]" role="alert">
           {sendError}
+        </p>
+      )}
+      {sendNotice && (
+        <p className="mt-3 text-sm text-[var(--stage-text-secondary)]" role="status">
+          {sendNotice}
         </p>
       )}
       {sentUrl && (

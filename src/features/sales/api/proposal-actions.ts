@@ -19,6 +19,7 @@ import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../model/types';
 import { resolveRequiredRoles, type RequiredRole, type PackageDefinition } from './package-types';
 import { upsertEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 
 /** Base URL for public links (proposal, claim, etc.). Prefer NEXT_PUBLIC_APP_URL; on Vercel fall back to VERCEL_URL so links in emails are always absolute. */
 function getPublicBaseUrl(): string {
@@ -826,11 +827,26 @@ export async function publishProposal(proposalId: string): Promise<PublishPropos
     .select('public_token')
     .single();
 
-  if (error) {
+  if (error || !data) {
+    // Check whether the proposal exists in a non-draft state — gives the caller
+    // a precise message ("already sent") instead of the ambiguous catch-all.
+    const { data: existing } = await supabase
+      .from('proposals')
+      .select('status')
+      .eq('id', proposalId)
+      .maybeSingle();
+    const existingStatus = (existing as { status?: string | null } | null)?.status ?? null;
+    if (existingStatus && existingStatus !== 'draft') {
+      return {
+        publicToken: null,
+        publicUrl: null,
+        error: `Proposal already ${existingStatus} (cannot republish).`,
+      };
+    }
     return {
       publicToken: null,
       publicUrl: null,
-      error: error?.message ?? 'Proposal not found or not draft',
+      error: error?.message ?? 'Proposal not found.',
     };
   }
 
@@ -938,7 +954,7 @@ export async function revertProposalToDraft(proposalId: string): Promise<RevertP
 // =============================================================================
 
 export type SendForSignatureResult =
-  | { success: true; publicUrl: string }
+  | { success: true; publicUrl: string; docusealFallback?: { reason: string } }
   | { success: false; error: string };
 
 export async function sendForSignature(
@@ -1087,7 +1103,11 @@ export async function sendForSignature(
         .eq('id', draftProposalId)
         .eq('workspace_id', workspaceMembership);
     }
-    return { success: true, publicUrl };
+    return {
+      success: true,
+      publicUrl,
+      docusealFallback: { reason: submission.error ?? 'DocuSeal not configured' },
+    };
   }
 
   // 5. Store docuseal_submission_id + embed_src
@@ -1186,22 +1206,18 @@ export async function sendProposalReminder(
       .eq('id', deal.main_contact_id)
       .maybeSingle();
     if (entityRow) {
-      const attrs = (entityRow as { attributes?: Record<string, unknown> | null }).attributes ?? {};
+      const rawAttributes = (entityRow as { attributes?: Record<string, unknown> | null }).attributes ?? {};
       const entityType = (entityRow as { type?: string }).type ?? 'person';
       clientEntityType = entityType;
       if (entityType === 'company') {
-        clientEmail =
-          (attrs['support_email'] as string | null) ??
-          (attrs['email'] as string | null) ??
-          null;
+        const companyAttrs = readEntityAttrs(rawAttributes, 'company');
+        clientEmail = companyAttrs.support_email ?? companyAttrs.billing_email ?? null;
       } else if (entityType === 'couple') {
-        // Couples store primary contact email under partner_a_email
-        clientEmail =
-          (attrs['partner_a_email'] as string | null) ??
-          (attrs['email'] as string | null) ??
-          null;
+        const coupleAttrs = readEntityAttrs(rawAttributes, 'couple');
+        clientEmail = coupleAttrs.partner_a_email ?? coupleAttrs.partner_b_email ?? null;
       } else {
-        clientEmail = (attrs['email'] as string | null) ?? null;
+        const personAttrs = readEntityAttrs(rawAttributes, 'person');
+        clientEmail = personAttrs.email ?? null;
       }
       // display_name is a proper column, not an attributes JSONB field — no ESLint violation
       const displayName = (entityRow as { display_name?: string | null }).display_name ?? null;

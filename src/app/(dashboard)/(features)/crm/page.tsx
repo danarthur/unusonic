@@ -90,6 +90,7 @@ async function CRMNetworkSheet({ nodeId, kind, selectedId, streamMode }: { nodeI
 async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | null; streamMode: StreamMode }) {
   let currentOrgId: string | null = null;
   let gigs: StreamCardItem[] = [];
+  let loadError: string | null = null;
 
   try {
     currentOrgId = await getCurrentOrgId();
@@ -279,12 +280,10 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
   } catch (err) {
     // The CRM page wraps its entire data load (currentOrg, deals, events,
     // stakeholders, directory lookups, follow-up queue) in one try/catch. On
-    // failure the user sees an empty grid with no indication anything went
-    // wrong — "no deals yet" is indistinguishable from "workspace_id null" or
-    // "RLS rejected my query". Surface the failure to Sentry so the team can
-    // diagnose. (Fully fixing the UX — showing an inline error in
-    // ProductionGridShell — is still tracked separately.)
+    // failure the user sees an empty grid; surface a banner so they know the
+    // empty state is a load failure and not "no deals yet."
     const message = err instanceof Error ? err.message : String(err);
+    loadError = "Couldn't load productions. Refresh to try again.";
     Sentry.logger.error('crm.page.dataLoadFailed', {
       selectedId,
       streamMode,
@@ -304,6 +303,7 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
       selectedId={effectiveSelectedId}
       streamMode={streamMode}
       currentOrgId={currentOrgId}
+      loadError={loadError}
     />
   );
 }
