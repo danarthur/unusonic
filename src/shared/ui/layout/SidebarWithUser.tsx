@@ -24,6 +24,7 @@ import { useSidebarStore } from './sidebar-store';
 import { useDensityStore, type DensityTier } from './density-store';
 
 import { WorkspaceSwitcher, type WorkspaceEntry } from './WorkspaceSwitcher';
+import { RoleChip } from '@/shared/ui/RoleChip';
 
 interface SidebarWithUserProps {
   user: {
@@ -116,15 +117,34 @@ export function SidebarWithUser({ user, workspaceName, workspaces, activeWorkspa
           </button>
         </div>
 
-        {/* Workspace Indicator / Switcher */}
+        {/* Workspace Indicator / Switcher + Role Chip (Phase 2.4) */}
         {workspaceName && (
           <div className={cn('mb-4', collapsed ? 'px-1.5' : 'px-3')}>
             {workspaces && workspaces.length > 0 ? (
-              <WorkspaceSwitcher
-                workspaces={workspaces}
-                activeWorkspaceId={activeWorkspaceId ?? null}
-                collapsed={collapsed}
-              />
+              <>
+                <WorkspaceSwitcher
+                  workspaces={workspaces}
+                  activeWorkspaceId={activeWorkspaceId ?? null}
+                  collapsed={collapsed}
+                />
+                {/* Role chip — rendered beneath the switcher so the user
+                    always sees which role they're in for this workspace.
+                    Design doc §2.5: multi-workspace role disambiguation. */}
+                {(() => {
+                  const active = workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0];
+                  const role = active?.role;
+                  if (!role) return null;
+                  return collapsed ? (
+                    <div className="mt-1.5 flex justify-center">
+                      <RoleChip role={role} workspaceName={workspaceName} compact />
+                    </div>
+                  ) : (
+                    <div className="mt-1.5 pl-2">
+                      <RoleChip role={role} workspaceName={workspaceName} />
+                    </div>
+                  );
+                })()}
+              </>
             ) : !collapsed ? (
               <div className="px-2">
                 <p className="text-label text-[var(--stage-text-tertiary)] truncate">{workspaceName}</p>

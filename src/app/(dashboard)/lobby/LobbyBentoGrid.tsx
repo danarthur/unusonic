@@ -18,6 +18,7 @@ import {
   STAGE_STAGGER_CHILDREN,
   STAGE_STAGGER_DELAY,
 } from '@/shared/lib/motion-constants';
+import { renderLobbyCard } from './lobby-card-renderer';
 
 // ── Animation helpers ─────────────────────────────────────────────────────
 
@@ -40,6 +41,12 @@ const cellVariants = {
 
 interface LobbyBentoGridProps {
   dashboardData?: DashboardData;
+  /**
+   * Phase 2.2: when present, render exactly these registry IDs in order
+   * (modular Lobby path, behind the `reports.modular_lobby` feature flag).
+   * When absent, fall back to the legacy hard-coded layout below.
+   */
+  cardIds?: string[];
 }
 
 // ── Grid ──────────────────────────────────────────────────────────────────
@@ -60,7 +67,51 @@ interface LobbyBentoGridProps {
  * Tablet (md): 2-column, natural stacking
  * Mobile: 1-column, Action Queue first
  */
-export function LobbyBentoGrid({ dashboardData }: LobbyBentoGridProps) {
+/**
+ * Modular Lobby path (Phase 2.2). Renders an ordered list of registry IDs
+ * resolved by the page-level feature-flag check. Cards without a Phase 2.2
+ * renderer are skipped silently — see lobby-card-renderer.
+ */
+function ModularBentoGrid({
+  cardIds,
+  dashboardData,
+}: {
+  cardIds: string[];
+  dashboardData?: DashboardData;
+}) {
+  const loading = !dashboardData;
+  const cells = cardIds
+    .map((id) => ({ id, node: renderLobbyCard(id, { dashboardData, loading }) }))
+    .filter((c): c is { id: string; node: React.ReactElement } => c.node !== null);
+
+  return (
+    <motion.div
+      className="stage-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+      initial="hidden"
+      animate="visible"
+      variants={gridVariants}
+    >
+      {cells.map(({ id, node }) => (
+        <motion.div
+          key={id}
+          className="lg:col-span-2 lg:max-h-[360px]"
+          variants={cellVariants}
+          transition={STAGE_MEDIUM}
+        >
+          {node}
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
+/**
+ * Legacy hard-coded Lobby layout. Rendered when the modular Lobby flag is
+ * OFF for the workspace — every card slot, every breakpoint behavior, and
+ * every order-* class is preserved here so flag-off workspaces see no
+ * visible change.
+ */
+function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
   return (
     <motion.div
       className="stage-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
@@ -205,4 +256,11 @@ export function LobbyBentoGrid({ dashboardData }: LobbyBentoGridProps) {
       )}
     </motion.div>
   );
+}
+
+export function LobbyBentoGrid({ dashboardData, cardIds }: LobbyBentoGridProps) {
+  if (cardIds) {
+    return <ModularBentoGrid cardIds={cardIds} dashboardData={dashboardData} />;
+  }
+  return <LegacyBentoGrid dashboardData={dashboardData} />;
 }

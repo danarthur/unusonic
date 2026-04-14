@@ -44,10 +44,24 @@ export type DashboardData = {
 // ── Orchestrator ───────────────────────────────────────────────────────────
 
 /**
+ * Optional Phase 2.4 plumbing: when a global Lobby time-range is active, the
+ * caller can pass inclusive YYYY-MM-DD bounds here. Fetchers that honor them
+ * (financial pulse, revenue trend) use the bounds; fetchers that don't (all-time
+ * distributions, live schedules, activity feed) ignore them.
+ *
+ * Callers that omit this keep the legacy hardcoded windows. This preserves
+ * backward compatibility per the Phase 2.4 constraint.
+ */
+export interface DashboardDataPeriod {
+  periodStart: string;
+  periodEnd: string;
+}
+
+/**
  * Single entry point for the lobby/dashboard page.
  * Calls all data sources in parallel and returns a unified DTO.
  */
-export async function getDashboardData(): Promise<DashboardData> {
+export async function getDashboardData(period?: DashboardDataPeriod): Promise<DashboardData> {
   const [
     alerts,
     actions,
@@ -66,9 +80,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     getTodaySchedule(),
     getWeekEvents(),
     getDealPipeline(),
-    getFinancialPulse(),
+    getFinancialPulse(period),
     getActivityFeed(),
-    getRevenueTrend(),
+    getRevenueTrend(period),
     getEventTypeDistribution(),
     getClientConcentration(),
     // Phase 1.4 — gated on `finance:reconcile` inside the fetcher.

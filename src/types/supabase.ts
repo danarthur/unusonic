@@ -4355,6 +4355,38 @@ export type Database = {
         }
         Relationships: []
       }
+      user_lobby_layout: {
+        Row: {
+          card_ids: string[]
+          role_slug: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          card_ids: string[]
+          role_slug: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          card_ids?: string[]
+          role_slug?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_lobby_layout_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webauthn_challenges: {
         Row: {
           challenge: string

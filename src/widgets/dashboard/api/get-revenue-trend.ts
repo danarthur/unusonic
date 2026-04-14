@@ -24,19 +24,41 @@ const MONTH_LABELS = [
 // ── Action ─────────────────────────────────────────────────────────────────
 
 /**
+ * Phase 2.4: optional global Lobby time-range. The trend is a trailing
+ * 6-month series anchored on the period's end month. When omitted, the
+ * anchor is "now" — preserving original behavior for existing callers.
+ */
+export interface RevenueTrendPeriod {
+  periodStart: string;
+  periodEnd: string;
+}
+
+/**
  * Monthly revenue for the last 6 months.
  * Revenue = sum of non-optional proposal item totals for accepted/signed proposals,
  * bucketed by the month the proposal closed (signed_at ?? accepted_at).
  */
-export async function getRevenueTrend(): Promise<RevenueTrendData> {
+export async function getRevenueTrend(period?: RevenueTrendPeriod): Promise<RevenueTrendData> {
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) return EMPTY;
 
   const supabase = await createClient();
   const now = new Date();
 
-  // Build the 6-month window (inclusive of current month)
-  const windowStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  // Anchor: end of the active period (inclusive), falling back to "now".
+  let anchorYear: number;
+  let anchorMonth: number; // 0-indexed
+  if (period) {
+    const [ey, em] = period.periodEnd.split('-').map(Number);
+    anchorYear = ey;
+    anchorMonth = em - 1;
+  } else {
+    anchorYear = now.getFullYear();
+    anchorMonth = now.getMonth();
+  }
+
+  // Build the 6-month window (inclusive of the anchor month)
+  const windowStart = new Date(anchorYear, anchorMonth - 5, 1);
   const windowStartIso = `${windowStart.getFullYear()}-${String(windowStart.getMonth() + 1).padStart(2, '0')}-01`;
 
   // Fetch accepted/signed proposals in the window
@@ -91,10 +113,10 @@ export async function getRevenueTrend(): Promise<RevenueTrendData> {
     revenueByKey.set(key, (revenueByKey.get(key) ?? 0) + total);
   }
 
-  // Build ordered 6-month array
+  // Build ordered 6-month array, anchored on (anchorYear, anchorMonth)
   const months: RevenueTrendMonth[] = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(anchorYear, anchorMonth - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     months.push({
       label: MONTH_LABELS[d.getMonth()],

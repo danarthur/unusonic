@@ -31,6 +31,70 @@ function startOfMonth(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
+/**
+ * Phase 2.4: optional global Lobby time-range. Keeping the default path
+ * identical (this-month vs last-month) preserves every existing caller.
+ * When `periodStart`/`periodEnd` are provided, the "revenue this period"
+ * bucket uses those bounds and the "revenue last period" bucket uses an
+ * equal-length window immediately preceding them.
+ */
+export interface FinancialPulsePeriod {
+  /** Inclusive YYYY-MM-DD. */
+  periodStart: string;
+  /** Inclusive YYYY-MM-DD. */
+  periodEnd: string;
+}
+
+function ymdFromMs(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+function ymdPlusOneDay(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return ymdFromMs(Date.UTC(y, m - 1, d + 1));
+}
+
+function precedingWindow({ periodStart, periodEnd }: FinancialPulsePeriod): { start: string; end: string } {
+  // [start..end] inclusive → length in days = diff + 1.
+  const [sy, sm, sd] = periodStart.split('-').map(Number);
+  const [ey, em, ed] = periodEnd.split('-').map(Number);
+  const startMs = Date.UTC(sy, sm - 1, sd);
+  const endMs = Date.UTC(ey, em - 1, ed);
+  const lengthDays = Math.round((endMs - startMs) / 86_400_000) + 1;
+  const prevEndMs = startMs - 86_400_000;
+  const prevStartMs = prevEndMs - (lengthDays - 1) * 86_400_000;
+  return { start: ymdFromMs(prevStartMs), end: ymdFromMs(prevEndMs) };
+}
+
+interface PeriodBounds {
+  thisPeriodStart: string;
+  /** Exclusive upper bound for the "this" bucket. `null` → open-ended (legacy current-month path). */
+  thisPeriodEndExclusive: string | null;
+  lastPeriodStart: string;
+  lastPeriodEndExclusive: string;
+}
+
+function resolvePeriodBounds(now: Date, period?: FinancialPulsePeriod): PeriodBounds {
+  if (period) {
+    const prev = precedingWindow(period);
+    return {
+      thisPeriodStart: period.periodStart,
+      thisPeriodEndExclusive: ymdPlusOneDay(period.periodEnd),
+      lastPeriodStart: prev.start,
+      lastPeriodEndExclusive: ymdPlusOneDay(prev.end),
+    };
+  }
+  const thisMonthStart = startOfMonth(now);
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return {
+    thisPeriodStart: thisMonthStart,
+    thisPeriodEndExclusive: null,
+    lastPeriodStart: startOfMonth(lastMonthDate),
+    lastPeriodEndExclusive: thisMonthStart,
+  };
+}
+
 // ── Action ─────────────────────────────────────────────────────────────────
 
 /**
@@ -40,16 +104,23 @@ function startOfMonth(date: Date): string {
  * Revenue is derived from accepted/signed proposals (their item totals).
  * "Outstanding" = proposals sent but not yet signed.
  * "Overdue" = proposals sent that are past their `expires_at` date without signature.
+ *
+ * Phase 2.4: optional `period` argument wires this to the global Lobby
+ * time-range. When omitted, the default month-over-month comparison is
+ * preserved (backward compatible).
  */
-export async function getFinancialPulse(): Promise<FinancialPulseDTO> {
+export async function getFinancialPulse(period?: FinancialPulsePeriod): Promise<FinancialPulseDTO> {
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) return EMPTY;
 
   const supabase = await createClient();
   const now = new Date();
-  const thisMonthStart = startOfMonth(now);
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthStart = startOfMonth(lastMonthDate);
+  const {
+    thisPeriodStart,
+    thisPeriodEndExclusive,
+    lastPeriodStart,
+    lastPeriodEndExclusive,
+  } = resolvePeriodBounds(now, period);
 
   // Fetch all non-draft proposals for the workspace
   const { data: proposals, error } = await supabase
@@ -96,10 +167,13 @@ export async function getFinancialPulse(): Promise<FinancialPulseDTO> {
     const closedDate = p.signed_at ?? p.accepted_at;
 
     if (closedDate) {
-      // This proposal converted — count as revenue in the month it closed
-      if (closedDate >= thisMonthStart) {
+      // This proposal converted — count as revenue in the bucket it closed.
+      const inThisPeriod = thisPeriodEndExclusive
+        ? closedDate >= thisPeriodStart && closedDate < thisPeriodEndExclusive
+        : closedDate >= thisPeriodStart;
+      if (inThisPeriod) {
         revenueThisMonth += total;
-      } else if (closedDate >= lastMonthStart && closedDate < thisMonthStart) {
+      } else if (closedDate >= lastPeriodStart && closedDate < lastPeriodEndExclusive) {
         revenueLastMonth += total;
       }
     } else if (p.status === 'sent' || p.status === 'viewed') {
