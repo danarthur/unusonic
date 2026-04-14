@@ -1345,6 +1345,14 @@ export type Database = {
       }
     }
     Functions: {
+      _metric_assert_membership: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      _metric_resolve_tz: {
+        Args: { p_tz: string; p_workspace_id: string }
+        Returns: string
+      }
       get_fresh_qbo_token: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -1374,6 +1382,104 @@ export type Database = {
           tax_amount: number
           terms: string
           total_amount: number
+        }[]
+      }
+      metric_1099_worksheet: {
+        Args: { p_workspace_id: string; p_year: number }
+        Returns: {
+          bill_count: number
+          meets_1099_threshold: boolean
+          total_paid: number
+          vendor_id: string
+          vendor_name: string
+        }[]
+      }
+      metric_ar_aged_60plus: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          comparison_label: string
+          comparison_value: number
+          primary_value: number
+          secondary_text: string
+          sparkline_values: number[]
+        }[]
+      }
+      metric_invoice_variance: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          delta: number
+          invoice_id: string
+          invoice_number: string
+          local_total: number
+          qbo_last_error: string
+          qbo_last_sync_at: string
+          qbo_sync_status: string
+          qbo_total: number
+          status: string
+        }[]
+      }
+      metric_qbo_sync_health: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          comparison_label: string
+          comparison_value: number
+          primary_value: number
+          secondary_text: string
+          sparkline_values: number[]
+        }[]
+      }
+      metric_qbo_variance: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          comparison_label: string
+          comparison_value: number
+          primary_value: number
+          secondary_text: string
+          sparkline_values: number[]
+        }[]
+      }
+      metric_revenue_collected: {
+        Args: {
+          p_compare?: boolean
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          comparison_label: string
+          comparison_value: number
+          primary_value: number
+          secondary_text: string
+          sparkline_values: number[]
+        }[]
+      }
+      metric_sales_tax_worksheet: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          invoice_count: number
+          jurisdiction: string
+          tax_code: string
+          tax_collected: number
+          taxable_amount: number
+        }[]
+      }
+      metric_unreconciled_payments: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          amount: number
+          invoice_id: string
+          invoice_number: string
+          method: string
+          payment_id: string
+          qbo_last_error: string
+          qbo_sync_status: string
+          received_at: string
         }[]
       }
       next_invoice_number: { Args: { p_workspace_id: string }; Returns: string }
