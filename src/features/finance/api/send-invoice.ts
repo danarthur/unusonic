@@ -86,19 +86,29 @@ export async function sendInvoice(
     .select('id, amount, is_taxable, item_kind')
     .eq('invoice_id', invoiceId);
 
-  const taxableSubtotal = (lineItems ?? [])
-    .filter((li: { is_taxable: boolean; item_kind: string }) => li.is_taxable && li.item_kind !== 'tax_line')
-    .reduce((sum: number, li: { amount: number }) => sum + Number(li.amount), 0);
+  // Sum in integer cents — float reduce was drifting by sub-cent amounts that
+  // compounded across many line items and produced totals one cent off the
+  // PDF / public-view / Stripe checkout. The integer path matches the
+  // canonical totals stored on finance.invoices.
+  const toCents = (v: number) => Math.round(Number(v) * 100);
+  const fromCents = (c: number) => c / 100;
 
-  const taxAmount = taxRate > 0 && taxableSubtotal > 0
-    ? Math.round(taxableSubtotal * taxRate * 100) / 100
+  const taxableSubtotalCents = (lineItems ?? [])
+    .filter((li: { is_taxable: boolean; item_kind: string }) => li.is_taxable && li.item_kind !== 'tax_line')
+    .reduce((sum: number, li: { amount: number }) => sum + toCents(li.amount), 0);
+
+  const taxAmountCents = taxRate > 0 && taxableSubtotalCents > 0
+    ? Math.round(taxableSubtotalCents * taxRate)
     : 0;
 
-  const subtotal = (lineItems ?? [])
+  const subtotalCents = (lineItems ?? [])
     .filter((li: { item_kind: string }) => li.item_kind !== 'tax_line')
-    .reduce((sum: number, li: { amount: number }) => sum + Number(li.amount), 0);
+    .reduce((sum: number, li: { amount: number }) => sum + toCents(li.amount), 0);
 
-  const totalAmount = subtotal + taxAmount;
+  const totalAmountCents = subtotalCents + taxAmountCents;
+  const taxAmount = fromCents(taxAmountCents);
+  const subtotal = fromCents(subtotalCents);
+  const totalAmount = fromCents(totalAmountCents);
 
   // ── 4. Snapshot bill_to and from ───────────────────────────────────────────
   // Read the bill_to entity (directory schema)
@@ -142,8 +152,12 @@ export async function sendInvoice(
     v: 1,
     workspace_name: workspace?.name ?? 'Unusonic',
     logo_url: workspace?.logo_url ?? null,
-    address: null, // Workspace address not yet stored; Wave 2 finance onboarding adds this
-    ein: null, // Same — Wave 2
+    // Workspace address / EIN aren't captured yet (Wave 2 finance onboarding).
+    // Public invoice + PDF templates check for these and substitute placeholder
+    // copy ("Add your business address in Settings → Finance") rather than
+    // rendering an empty header band.
+    address: null,
+    ein: null,
     phone: null,
     email: null,
     website: null,

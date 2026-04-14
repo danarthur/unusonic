@@ -21,6 +21,14 @@ export interface QboClientOptions {
     refresh_token: string;
     token_expires_at: string;
   }) => Promise<void>;
+  /**
+   * Optional advisory-lock-protected refresh. When set, the client uses this
+   * RPC instead of calling Intuit's OAuth endpoint directly — required to
+   * avoid concurrent refresh races corrupting the Vault secret. The RPC is
+   * `finance.get_fresh_qbo_token(workspace_id)` (returns a fresh access_token
+   * plus the realm_id).
+   */
+  refreshViaRpc?: () => Promise<{ access_token: string; token_expires_at: string }>;
   /** Use sandbox base URL. Default false. */
   sandbox?: boolean;
 }

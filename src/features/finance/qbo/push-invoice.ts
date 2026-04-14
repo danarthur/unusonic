@@ -184,19 +184,24 @@ export async function pushInvoiceToQbo(
   // ── Build QBO Invoice payload ──────────────────────────────────────────────
   const defaultItemIds = (conn.default_item_ids ?? {}) as Record<string, string>;
 
+  // QBO `Amount` and `UnitPrice` are decimal dollars, not cents — but raw float
+  // arithmetic on `li.amount` / `li.unit_price` can produce values like 1234.56000004
+  // that fail QBO's tax/total reconciliation. Snap to two decimals so the
+  // amounts QBO receives match what we computed locally.
+  const round2 = (v: number) => Math.round(Number(v) * 100) / 100;
   const qboLines = (lineItems ?? [])
     .filter((li: any) => li.item_kind !== 'tax_line')
     .map((li: any, idx: number) => {
       const itemRef = defaultItemIds[li.item_kind] ?? defaultItemIds['service'] ?? null;
       return {
         DetailType: 'SalesItemLineDetail',
-        Amount: Number(li.amount),
+        Amount: round2(li.amount),
         Description: li.description,
         LineNum: idx + 1,
         SalesItemLineDetail: {
           ItemRef: itemRef ? { value: itemRef } : undefined,
           Qty: Number(li.quantity),
-          UnitPrice: Number(li.unit_price),
+          UnitPrice: round2(li.unit_price),
         },
       };
     });
@@ -314,6 +319,24 @@ function createQbClient(workspaceId: string, realmId: string): QuickBooksClient 
         realm_id: realmId,
         ...tokens,
       });
+    },
+    // Sync paths run in parallel under high load — refresh via the advisory-
+    // lock-protected RPC so concurrent syncs can't race each other into
+    // corrupting the Vault secret. See finance.get_fresh_qbo_token.
+    refreshViaRpc: async () => {
+      const system = getSystemClient();
+      const { data, error } = await system.rpc('get_fresh_qbo_token', {
+        p_workspace_id: workspaceId,
+      });
+      if (error) throw new Error(`get_fresh_qbo_token failed: ${error.message}`);
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row?.access_token) throw new Error('get_fresh_qbo_token returned no access_token');
+      // RPC issues a token good for the standard QBO 60-minute window. Subtract
+      // the buffer here so the next ensureToken call doesn't immediately re-refresh.
+      return {
+        access_token: row.access_token as string,
+        token_expires_at: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+      };
     },
     sandbox: process.env.NODE_ENV !== 'production',
   });

@@ -341,7 +341,7 @@ export function InvoiceListWidget({
                     colSpan={7}
                     className="py-12 text-center text-sm text-[var(--stage-text-secondary)]"
                   >
-                    No invoices yet. Create your first invoice from an accepted proposal.
+                    No invoices yet. Accept a proposal first, then spawn invoices here.
                   </td>
                 </tr>
               ) : (

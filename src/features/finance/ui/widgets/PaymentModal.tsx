@@ -93,6 +93,12 @@ export function PaymentModal({
       if (isNaN(rawAmount) || rawAmount <= 0) {
         return { error: 'Enter a valid amount', success: false };
       }
+      // Reject more than two decimal places before rounding so an obvious typo
+      // ($0.015) raises an error instead of silently snapping to $0.02 and
+      // recording a payment the user didn't intend.
+      if (!/^\d+(\.\d{1,2})?$/.test(amount.trim())) {
+        return { error: 'Amount must have at most two decimal places', success: false };
+      }
       const parsedAmount = Math.round(rawAmount * 100) / 100;
 
       const result = await recordManualPayment(

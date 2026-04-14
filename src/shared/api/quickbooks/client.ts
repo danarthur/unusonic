@@ -29,6 +29,11 @@ export class QuickBooksClient {
 
   /**
    * Resolve config and ensure token is valid (refresh if &lt; 5 mins remaining).
+   *
+   * When `refreshViaRpc` is provided, refresh goes through the advisory-lock-
+   * protected `finance.get_fresh_qbo_token` RPC so concurrent syncs don't race
+   * each other into corrupting the Vault secret. Falls back to in-process
+   * `refreshTokens()` only when no RPC callback is wired (initial-connect path).
    */
   private async ensureToken(): Promise<QboConfig> {
     if (!this.config) {
@@ -37,7 +42,16 @@ export class QuickBooksClient {
     const expiresAt = new Date(this.config.token_expires_at).getTime();
     const now = Date.now();
     if (expiresAt - now < TOKEN_REFRESH_BUFFER_MS) {
-      await this.refreshTokens();
+      if (this.options.refreshViaRpc) {
+        const fresh = await this.options.refreshViaRpc();
+        this.config = {
+          ...this.config,
+          access_token: fresh.access_token,
+          token_expires_at: fresh.token_expires_at,
+        };
+      } else {
+        await this.refreshTokens();
+      }
     }
     return this.config;
   }

@@ -225,6 +225,9 @@ export default async function PublicInvoicePage({
   const invoice = await fetchInvoice(token);
 
   if (!invoice) {
+    // RPC errors (Sentry-captured in fetchInvoice) and genuine missing-token
+    // both land here; offer a Retry path so a transient failure isn't a
+    // permanent dead end for the client.
     return (
       <div className="flex min-h-dvh items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
@@ -232,8 +235,15 @@ export default async function PublicInvoicePage({
             This invoice isn&rsquo;t available
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            The link may have expired or the invoice may have been removed.
+            The link may have expired, the invoice may have been removed, or there was a temporary
+            issue loading it.
           </p>
+          <a
+            href={`/i/${token}`}
+            className="mt-4 inline-flex items-center rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Try again
+          </a>
         </div>
       </div>
     );

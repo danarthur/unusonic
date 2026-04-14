@@ -54,7 +54,15 @@ export async function createInvoiceCheckoutSession(
     return { url: null, error: 'This invoice cannot be paid online' };
   }
 
-  const balanceDue = Number(row.total_amount) - Number(row.paid_amount);
+  // discount_amount is already netted into total_amount by finance.spawn_invoices_*
+  // for new invoices, but legacy rows can carry a non-zero discount_amount that
+  // wasn't subtracted into total_amount. Subtract again here so the Stripe
+  // session never overcharges. `Math.max(0, …)` clamps the rare double-discount
+  // case so we never charge a negative amount.
+  const totalAmount = Number(row.total_amount);
+  const paidAmount = Number(row.paid_amount);
+  const discountAmount = Number(row.discount_amount ?? 0);
+  const balanceDue = Math.max(0, totalAmount - paidAmount - discountAmount);
   if (!(balanceDue > 0)) {
     return { url: null, error: 'No balance due' };
   }
