@@ -325,9 +325,10 @@ function createQbClient(workspaceId: string, realmId: string): QuickBooksClient 
     // corrupting the Vault secret. See finance.get_fresh_qbo_token.
     refreshViaRpc: async () => {
       const system = getSystemClient();
-      const { data, error } = await system.rpc('get_fresh_qbo_token', {
-        p_workspace_id: workspaceId,
-      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance.get_fresh_qbo_token isn't in the public PostgREST schema slice generated into supabase.ts
+      const { data, error } = await (system as any)
+        .schema('finance')
+        .rpc('get_fresh_qbo_token', { p_workspace_id: workspaceId });
       if (error) throw new Error(`get_fresh_qbo_token failed: ${error.message}`);
       const row = Array.isArray(data) ? data[0] : data;
       if (!row?.access_token) throw new Error('get_fresh_qbo_token returned no access_token');
