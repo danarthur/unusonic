@@ -5,7 +5,7 @@ import { ArrowUp, Paperclip, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
-import AionVoice from '@/app/(dashboard)/(features)/brain/components/AionVoice';
+import AionVoice from '@/app/(dashboard)/(features)/aion/components/AionVoice';
 import { useSession } from '@/shared/ui/providers/SessionContext';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
 

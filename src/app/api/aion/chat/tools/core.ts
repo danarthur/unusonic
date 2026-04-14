@@ -14,7 +14,7 @@ import {
   type AionConfig,
   type AionVoiceConfig,
   type AionFollowUpRule,
-} from '@/app/(dashboard)/(features)/brain/actions/aion-config-actions';
+} from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 import {
   getFollowUpQueue,
   getDealContextForAion,

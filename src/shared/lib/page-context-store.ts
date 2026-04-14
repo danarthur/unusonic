@@ -18,7 +18,7 @@ export type PageContextType =
   | 'catalog'
   | 'calendar'
   | 'dashboard'
-  | 'brain'
+  | 'aion'
   | null;
 
 export interface PageContext {

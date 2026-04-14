@@ -20,7 +20,7 @@ import { canExecuteAionAction, recordAionAction } from '@/features/intelligence/
 import {
   getAionConfigForWorkspace,
   type AionConfig,
-} from '@/app/(dashboard)/(features)/brain/actions/aion-config-actions';
+} from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 import {
   getOnboardingState,
   type AionChatRequest,
@@ -29,7 +29,7 @@ import {
   type AionPageContext,
   type SuggestionChip,
   type OnboardingState,
-} from '@/app/(dashboard)/(features)/brain/lib/aion-chat-types';
+} from '@/app/(dashboard)/(features)/aion/lib/aion-chat-types';
 import { getFollowUpQueue } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
 import { getDealPipeline } from '@/widgets/dashboard/api/get-deal-pipeline';
 import { getFinancialPulse } from '@/widgets/dashboard/api/get-financial-pulse';
@@ -789,7 +789,7 @@ async function buildGreeting(state: OnboardingState, userName: string | null, wo
 
       // Surface proactive insights with urgency framing
       try {
-        const { getPendingInsights, markInsightsSurfaced } = await import('@/app/(dashboard)/(features)/brain/actions/aion-insight-actions');
+        const { getPendingInsights, markInsightsSurfaced } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
         const insights = await getPendingInsights(workspaceId ?? '', 5);
         if (insights.length > 0) {
           const urgent = insights.filter((i) => i.urgency === 'critical' || i.urgency === 'high');
@@ -942,7 +942,7 @@ type WorkspaceSnapshot = {
 
 async function getWorkspaceSnapshot(workspaceId: string): Promise<WorkspaceSnapshot> {
   try {
-    const { getPendingInsights } = await import('@/app/(dashboard)/(features)/brain/actions/aion-insight-actions');
+    const { getPendingInsights } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
     const [pipeline, pulse, queue, insights] = await Promise.all([
       getDealPipeline().catch(() => null), getFinancialPulse().catch(() => null), getFollowUpQueue().catch(() => []),
       getPendingInsights(workspaceId, 50).catch(() => []),

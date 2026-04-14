@@ -1,6 +1,6 @@
 'use client';
 
-import { ChatInterface } from '@/app/(dashboard)/(features)/brain/components/ChatInterface';
+import { ChatInterface } from '@/app/(dashboard)/(features)/aion/components/ChatInterface';
 import { useRequiredWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 
 export default function AionPage() {

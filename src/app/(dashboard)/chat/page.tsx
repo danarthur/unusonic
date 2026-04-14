@@ -1,4 +1,4 @@
-import { ChatInterface } from '@/app/(dashboard)/(features)/brain/components/ChatInterface';
+import { ChatInterface } from '@/app/(dashboard)/(features)/aion/components/ChatInterface';
 
 export default function ChatPage() {
   return (

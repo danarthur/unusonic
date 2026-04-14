@@ -335,7 +335,7 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       'Call this when the user asks "what needs my attention?", "anything I should know about?", or "what\'s urgent?".',
     inputSchema: z.object({}),
     execute: async () => {
-      const { getPendingInsights } = await import('@/app/(dashboard)/(features)/brain/actions/aion-insight-actions');
+      const { getPendingInsights } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
       const insights = await getPendingInsights(workspaceId, 10);
 
       if (insights.length === 0) {
@@ -366,7 +366,7 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       insightId: z.string().describe('The insight ID to dismiss'),
     }),
     execute: async (params) => {
-      const { dismissInsight } = await import('@/app/(dashboard)/(features)/brain/actions/aion-insight-actions');
+      const { dismissInsight } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
       const result = await dismissInsight(params.insightId);
       return { dismissed: result.success, insightId: params.insightId };
     },

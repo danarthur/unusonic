@@ -5,8 +5,8 @@ import { Copy, Check, PanelLeft, ChevronDown, Square, ThumbsUp, ThumbsDown, Penc
 import { useSession } from '@/shared/ui/providers/SessionContext';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
-import { AionInput } from '@/app/(dashboard)/(features)/brain/components/AionInput';
-import type { AionChatResponse, SuggestionChip, AionModelMode } from '@/app/(dashboard)/(features)/brain/lib/aion-chat-types';
+import { AionInput } from '@/app/(dashboard)/(features)/aion/components/AionInput';
+import type { AionChatResponse, SuggestionChip, AionModelMode } from '@/app/(dashboard)/(features)/aion/lib/aion-chat-types';
 import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { AionMessageRenderer } from './AionMessageRenderer';
 import type { DraftEditedData } from './DraftPreviewCard';
@@ -589,7 +589,7 @@ function MessageActions({ content, msgId, sessionId }: { content: string; msgId:
   const handleFeedback = useCallback((type: 'up' | 'down') => {
     const next = feedback === type ? null : type;
     setFeedback(next);
-    import('@/app/(dashboard)/(features)/brain/actions/aion-session-actions')
+    import('@/app/(dashboard)/(features)/aion/actions/aion-session-actions')
       .then(mod => mod.saveMessageFeedback(sessionId, msgId, next))
       .catch(() => {});
   }, [feedback, sessionId, msgId]);

@@ -11,7 +11,7 @@ import type { Json } from '@/types/supabase';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { computeStallSignalFromRaw } from '@/shared/lib/stall-signal';
 import { differenceInDays, parseISO } from 'date-fns';
-import type { AionFollowUpPlaybook, AionConfig } from '@/app/(dashboard)/(features)/brain/actions/aion-config-actions';
+import type { AionFollowUpPlaybook, AionConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

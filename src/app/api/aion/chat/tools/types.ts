@@ -1,5 +1,5 @@
-import type { AionConfig } from '@/app/(dashboard)/(features)/brain/actions/aion-config-actions';
-import type { AionPageContext } from '@/app/(dashboard)/(features)/brain/lib/aion-chat-types';
+import type { AionConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
+import type { AionPageContext } from '@/app/(dashboard)/(features)/aion/lib/aion-chat-types';
 
 /**
  * Shared context passed to each tool module.

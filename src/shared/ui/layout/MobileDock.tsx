@@ -49,7 +49,7 @@ export function MobileDock({ user, workspaceName }: MobileDockProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const handleNav = (id: string, href: string) => {
-    if (id === 'brain') setViewState('chat');
+    if (id === 'aion') setViewState('chat');
     else setViewState('overview');
     setSystemStatus('loading');
     router.push(href);
@@ -75,7 +75,7 @@ export function MobileDock({ user, workspaceName }: MobileDockProps) {
                 key={item.id}
                 href={item.href}
                 onClick={() => {
-                  setViewState(item.id === 'brain' ? 'chat' : 'overview');
+                  setViewState(item.id === 'aion' ? 'chat' : 'overview');
                   setSystemStatus('loading');
                 }}
                 className={cn(

@@ -17,7 +17,7 @@ import { getModel } from '../lib/models';
 import {
   getAionConfigForWorkspace,
   updateAionConfigForWorkspace,
-} from '@/app/(dashboard)/(features)/brain/actions/aion-config-actions';
+} from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;

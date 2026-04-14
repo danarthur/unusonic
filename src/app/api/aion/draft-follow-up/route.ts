@@ -13,8 +13,8 @@ import { generateText } from 'ai';
 import { getModel } from '../lib/models';
 import { createClient } from '@/shared/api/supabase/server';
 import { canExecuteAionAction, recordAionAction } from '@/features/intelligence/lib/aion-gate';
-import { getAionConfigForWorkspace } from '@/app/(dashboard)/(features)/brain/actions/aion-config-actions';
-import type { AionVoiceConfig } from '@/app/(dashboard)/(features)/brain/actions/aion-config-actions';
+import { getAionConfigForWorkspace } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
+import type { AionVoiceConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 import type { AionDealContext } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
 
 export const runtime = 'nodejs';

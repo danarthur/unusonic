@@ -74,7 +74,7 @@ export function SidebarWithUser({ user, workspaceName, workspaces, activeWorkspa
   }, [toggle]);
 
   const handleNavClick = (id: string) => {
-    if (id === 'brain') setViewState('chat');
+    if (id === 'aion') setViewState('chat');
     else setViewState('overview');
   };
 

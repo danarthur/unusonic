@@ -34,7 +34,7 @@ export interface CommandSpineNetworkProps {
 
 const STATIC_NAV = [
   { label: 'Overview', href: '/', icon: LayoutGrid },
-  { label: 'Brain', href: '/brain', icon: MessageSquare },
+  { label: 'Aion', href: '/aion', icon: MessageSquare },
   { label: 'Calendar', href: '/calendar', icon: CalendarDays },
   { label: 'Production (CRM)', href: '/crm', icon: FolderKanban },
   { label: 'Finance', href: '/finance', icon: Wallet },

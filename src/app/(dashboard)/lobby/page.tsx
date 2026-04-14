@@ -11,7 +11,7 @@ import {
 } from '@/shared/lib/motion-constants';
 import { UrgencyStrip } from '@/widgets/urgency-strip';
 import { LobbyBentoGrid } from './LobbyBentoGrid';
-import { ChatInterface } from '@/app/(dashboard)/(features)/brain/components/ChatInterface';
+import { ChatInterface } from '@/app/(dashboard)/(features)/aion/components/ChatInterface';
 import { PlanPromptBanner } from './PlanPromptBanner';
 import { dashboardQueries } from '@/widgets/dashboard/api/queries';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';

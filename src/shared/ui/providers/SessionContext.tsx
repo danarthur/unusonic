@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, ReactNode } from 'react';
-import type { AionMessageContent, AionChatResponse, AionPageContext, AionModelMode } from '@/app/(dashboard)/(features)/brain/lib/aion-chat-types';
+import type { AionMessageContent, AionChatResponse, AionPageContext, AionModelMode } from '@/app/(dashboard)/(features)/aion/lib/aion-chat-types';
 import { usePageContextStore } from '@/shared/lib/page-context-store';
 import {
   getSessionList,
@@ -9,7 +9,7 @@ import {
   createSession,
   saveMessage,
   type DbSessionMeta,
-} from '@/app/(dashboard)/(features)/brain/actions/aion-session-actions';
+} from '@/app/(dashboard)/(features)/aion/actions/aion-session-actions';
 
 // Define the shape of a message
 export type Message = {
@@ -343,7 +343,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSessions(prev => [...prev, { id: newId, createdAt: now, updatedAt: now, preview: '' }]);
     }
     // Fire-and-forget DB deletion
-    import('@/app/(dashboard)/(features)/brain/actions/aion-session-actions')
+    import('@/app/(dashboard)/(features)/aion/actions/aion-session-actions')
       .then(mod => mod.deleteSession(targetSessionId))
       .catch(() => {});
   }, [sessionId, storage]);
@@ -542,7 +542,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, [sessionId, storage, sendChatMessage]);
 
-  // --- THE BRAIN CONNECTOR (legacy webhook) ---
+  // --- THE AION CONNECTOR (legacy webhook) ---
   const sendMessage = async ({ text = '', file, audioBlob }: { text?: string; file?: File; audioBlob?: Blob }) => {
     // Prevent empty sends
     if (!text.trim() && !file && !audioBlob) return;
@@ -639,7 +639,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (audioBase64) playAudioBase64(audioBase64);
 
     } catch (error) {
-      console.error('Brain Error:', error);
+      console.error('Aion Error:', error);
       addMessage('assistant', "I'm having trouble connecting to the neural network. Please check your connection.");
     } finally {
       setIsLoading(false);
