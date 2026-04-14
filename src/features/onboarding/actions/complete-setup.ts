@@ -204,6 +204,14 @@ export async function initializeOrganization(
       venue: 'venue_brand',
     };
     const persona = personaMap[input.type];
+    if (!persona) {
+      // Defensive: callers must pass a valid OrganizationType. Roll back rather than
+      // upsert an undefined persona that would break agent_configs + role routing.
+      await dirDb.from('entities').delete().eq('id', orgId);
+      await db.from('workspace_members').delete().eq('workspace_id', workspace.id).eq('user_id', user.id);
+      await db.from('workspaces').delete().eq('id', workspace.id);
+      return { success: false, error: `Invalid organization type "${input.type}"` };
+    }
 
     await db.from('profiles').update({
       onboarding_completed: true,

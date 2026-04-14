@@ -28,7 +28,6 @@ export {
   updateProfile,
   updateOnboardingStep,
   completeOnboarding,
-  createWorkspace,
   joinWorkspace,
   uploadAvatar,
   claimGhostEntities,

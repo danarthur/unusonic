@@ -5,11 +5,16 @@
 
 import { z } from 'zod';
 
+// Single source of truth: trim + lowercase emails before validation so callers
+// can't bypass case normalization by skipping the client-side helper.
+const emailField = z
+  .string()
+  .min(1, 'Email is required')
+  .transform((v) => v.trim().toLowerCase())
+  .pipe(z.string().email('Please enter a valid email address'));
+
 export const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+  email: emailField,
   password: z
     .string()
     .min(1, 'Password is required')
@@ -17,10 +22,7 @@ export const loginSchema = z.object({
 });
 
 export const signupSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+  email: emailField,
   password: z
     .string()
     .min(1, 'Password is required')
@@ -35,10 +37,7 @@ export const signupSchema = z.object({
 
 /** Signup for passkey-only flow: no password; server creates user with random password. */
 export const signupForPasskeySchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+  email: emailField,
   fullName: z
     .string()
     .min(1, 'Name is required')
@@ -47,17 +46,11 @@ export const signupForPasskeySchema = z.object({
 
 /** Email OTP: send code to email, then verify the 6-digit code. */
 export const otpEmailSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+  email: emailField,
 });
 
 export const otpVerifySchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+  email: emailField,
   token: z
     .string()
     .min(6, 'Enter the 6-digit code')

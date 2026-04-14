@@ -9,7 +9,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
-import type { Profile, WorkspaceMembership } from '../model/types';
+import type { Profile } from '../model/types';
 
 // ============================================================================
 // Profile Actions
@@ -108,57 +108,6 @@ export async function completeOnboarding(): Promise<{ success: boolean; error?: 
 // ============================================================================
 // Workspace Actions
 // ============================================================================
-
-/**
- * Creates a new workspace and adds the user as owner
- */
-export async function createWorkspace(data: {
-  name: string;
-}): Promise<{ success: boolean; error?: string; workspace?: { id: string; name: string } }> {
-  const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: 'Not authenticated' };
-  }
-  
-  // Create workspace
-  const { data: workspace, error: createError } = await supabase
-    .from('workspaces')
-    .insert({
-      name: data.name,
-      created_by: user.id,
-    })
-    .select()
-    .single();
-  
-  if (createError) {
-    console.error('[Identity] Create workspace error:', createError);
-    return { success: false, error: createError.message };
-  }
-  
-  // Add user as owner
-  const { error: memberError } = await supabase
-    .from('workspace_members')
-    .insert({
-      workspace_id: workspace.id,
-      user_id: user.id,
-      role: 'owner',
-    });
-  
-  if (memberError) {
-    console.error('[Identity] Add member error:', memberError);
-    // Rollback workspace creation
-    await supabase.from('workspaces').delete().eq('id', workspace.id);
-    return { success: false, error: memberError.message };
-  }
-  
-  revalidatePath('/');
-  return { 
-    success: true, 
-    workspace: { id: workspace.id, name: workspace.name },
-  };
-}
 
 /**
  * Joins a workspace using an invite code

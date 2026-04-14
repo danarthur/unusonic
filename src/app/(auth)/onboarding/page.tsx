@@ -52,11 +52,15 @@ async function getOnboardingState() {
   if (!profileError) {
     profile = profileData;
   } else {
-    // Surface RLS regressions / missing-table errors instead of silently treating as "no profile"
+    // RLS or schema drift here used to land users on a perpetually-incomplete
+    // onboarding screen. Surface to Sentry AND throw so the global error
+    // boundary renders a real failure state instead of pretending the profile
+    // doesn't exist.
     Sentry.captureMessage('Onboarding profile fetch failed', {
-      level: 'warning',
+      level: 'error',
       extra: { userId: user.id, error: profileError.message, code: profileError.code },
     });
+    throw new Error(`Onboarding profile fetch failed: ${profileError.message}`);
   }
 
   // If onboarding is already complete, redirect to role-based home (middleware resolves)

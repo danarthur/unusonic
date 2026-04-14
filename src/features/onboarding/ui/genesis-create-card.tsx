@@ -53,10 +53,19 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
     async (_prev: { ok: boolean; error?: string } | null, formData: FormData) => {
       if (onboardingContext) {
         const persona = (formData.get('persona') as UserPersona) || onboardingContext.persona;
+        const orgType = PERSONA_TO_ORG_TYPE[persona];
+        if (!orgType) {
+          return { ok: false, error: `Unknown persona "${persona}"` };
+        }
+        const rawTier = (formData.get('tier') as string | null)?.trim() || 'scout';
+        if (!(rawTier in GENESIS_TO_SUBSCRIPTION)) {
+          return { ok: false, error: `Unknown tier "${rawTier}"` };
+        }
+        const tierId = rawTier as GenesisTierId;
         const result = await initializeOrganization({
           name: (formData.get('name') as string)?.trim() ?? '',
-          type: PERSONA_TO_ORG_TYPE[persona],
-          subscriptionTier: GENESIS_TO_SUBSCRIPTION[(formData.get('tier') as GenesisTierId) ?? 'scout'],
+          type: orgType,
+          subscriptionTier: GENESIS_TO_SUBSCRIPTION[tierId],
         });
         if (result.success) {
           router.push(result.redirectPath ?? '/');
