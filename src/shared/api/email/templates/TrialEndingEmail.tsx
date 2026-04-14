@@ -46,7 +46,7 @@ export function TrialEndingEmail({ workspaceName, trialEndsAt, billingUrl }: Tri
           <Section style={section}>
             <Text style={heading}>Your trial is ending</Text>
             <Text style={body}>
-              Heads up — the Unusonic trial for <strong>{workspaceName}</strong> ends on {when}.
+              Please note: the Unusonic trial for <strong>{workspaceName}</strong> ends on {when}.
               To avoid any interruption to your workspace, add a payment method before the trial
               expires.
             </Text>

@@ -17,6 +17,7 @@
 import 'server-only';
 
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getClientPortalContext } from '@/shared/lib/client-portal';
@@ -42,7 +43,11 @@ export default async function ClientProposalPage({
 }) {
   const { id } = await params;
   const context = await getClientPortalContext();
-  if (context.kind === 'none' || !context.activeEntity) return null;
+  if (context.kind === 'none' || !context.activeEntity) {
+    // notFound() instead of `return null` so a missing portal session shows a
+    // real 404 instead of a blank screen we can't trace.
+    notFound();
+  }
 
   const supabase = getSystemClient();
   const { data: proposal } = await supabase

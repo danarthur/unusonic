@@ -13,6 +13,7 @@
 import 'server-only';
 
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getClientPortalContext } from '@/shared/lib/client-portal';
@@ -58,7 +59,12 @@ export default async function ClientInvoicePage({
 }) {
   const { id } = await params;
   const context = await getClientPortalContext();
-  if (context.kind === 'none' || !context.activeEntity) return null;
+  if (context.kind === 'none' || !context.activeEntity) {
+    // notFound() instead of `return null` so a client hitting the page without
+    // a portal session gets a real 404 (logged in Vercel + Sentry) instead of
+    // a blank screen we can't trace.
+    notFound();
+  }
 
   const workspaceId = context.activeEntity.ownerWorkspaceId;
   const supabase = getSystemClient();

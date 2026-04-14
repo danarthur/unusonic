@@ -126,7 +126,11 @@ export default async function ClientPortalHomePage() {
   // Songs card attribution uses the DJ, not the PM, per §0 A10 — mis-
   // attributing song acknowledgements to the production manager breaks
   // the trust contract on the first demo (Critic's flag).
-  const songsCard = buildSongsCard(songs, dj?.displayName.split(/\s+/)[0] ?? null);
+  // Guard the split: a single-word displayName (or empty) returns '' which the
+  // songs card treats as "no name", instead of bleeding "null" or the full
+  // name into the headline.
+  const djFirstName = dj?.displayName ? dj.displayName.trim().split(/\s+/)[0] || null : null;
+  const songsCard = buildSongsCard(songs, djFirstName);
 
   return (
     <ClientPortalShell

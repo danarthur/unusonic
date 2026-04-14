@@ -185,7 +185,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
       })
       .then((data: AionChatResponse) => {
         const textContent = data.messages.filter((m) => m.type === 'text').map((m) => m.text).join('\n');
-        addMessage('assistant', textContent || 'Hey. I am Aion.', data.messages);
+        addMessage('assistant', textContent || 'Hey, I’m Aion.', data.messages);
       })
       .catch(() => { setInitError(true); });
   }, [workspaceId, messages.length, addMessage]);

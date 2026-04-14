@@ -3,8 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format, subMonths, startOfMonth, isAfter, isBefore } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Banknote, ChevronDown, Flag, FileText, Building } from 'lucide-react';
-import { toast } from 'sonner';
+import { Banknote, ChevronDown, FileText, Building } from 'lucide-react';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 /* ── Formatting helpers ────────────────────────────────────── */
@@ -235,19 +234,9 @@ function AssignmentCard({
                 )}
               </div>
 
-              {/* Flag issue */}
-              <button
-                type="button"
-                onClick={() =>
-                  toast.info(
-                    'Issue flagged — your manager will be notified'
-                  )
-                }
-                className="flex items-center gap-1.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors duration-[80ms] self-start"
-              >
-                <Flag className="size-3" />
-                Flag an issue
-              </button>
+              {/* Flag issue — pending real submission flow. The placeholder
+                  toast was misleading (no manager actually got notified), so
+                  the entry point was removed until the real dispute path lands. */}
             </div>
           </motion.div>
         )}

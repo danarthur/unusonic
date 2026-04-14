@@ -81,7 +81,8 @@ export default async function SchedulePage({
           No profile linked
         </h1>
         <p className="text-sm text-[var(--stage-text-secondary)] max-w-md">
-          Your account is not linked to a team member profile yet. Contact your manager.
+          Your account isn’t linked to a team member profile yet. Contact your team admin to link
+          your profile.
         </p>
       </div>
     );
