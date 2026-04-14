@@ -24,6 +24,7 @@ export const CAPABILITY_KEYS = [
   'finance:view',
   'finance:invoices:create',
   'finance:invoices:edit',
+  'finance:reconcile',
   // Planning & ROS
   'planning:view',
   'ros:view',

@@ -12,6 +12,7 @@ import { ActivityFeedWidget } from '@/widgets/activity-feed';
 import { RevenueTrendWidget } from '@/widgets/revenue-trend';
 import { EventTypeDistWidget } from '@/widgets/event-type-dist';
 import { ClientConcentrationWidget } from '@/widgets/client-concentration';
+import { QboVarianceWidget } from '@/widgets/qbo-variance';
 import {
   STAGE_MEDIUM,
   STAGE_STAGGER_CHILDREN,
@@ -185,6 +186,23 @@ export function LobbyBentoGrid({ dashboardData }: LobbyBentoGridProps) {
           loading={!dashboardData}
         />
       </motion.div>
+
+      {/* QBO variance — Phase 1.4, finance-admin/owner only.
+       * Hidden entirely when the fetcher returned null (capability denied).
+       * Rendered with a loading state until dashboardData resolves, so admins
+       * see the skeleton rather than a layout flash. */}
+      {(!dashboardData || dashboardData.qboVariance !== null) && (
+        <motion.div
+          className="order-10 lg:col-span-1 lg:max-h-[360px]"
+          variants={cellVariants}
+          transition={STAGE_MEDIUM}
+        >
+          <QboVarianceWidget
+            data={dashboardData?.qboVariance ?? undefined}
+            loading={!dashboardData}
+          />
+        </motion.div>
+      )}
     </motion.div>
   );
 }

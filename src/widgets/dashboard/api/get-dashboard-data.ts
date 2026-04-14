@@ -10,8 +10,10 @@ import { getActivityFeed } from './get-activity-feed';
 import { getRevenueTrend } from './get-revenue-trend';
 import { getEventTypeDistribution } from './get-event-type-dist';
 import { getClientConcentration } from './get-client-concentration';
+import { getQboVariance } from '@/widgets/qbo-variance/api/get-qbo-variance';
 
 import type { UrgencyAlert } from './get-urgency-alerts';
+import type { QboVarianceDTO } from '@/widgets/qbo-variance/api/get-qbo-variance';
 import type { ActionItem as ActionQueueItem } from './get-action-queue';
 import type { TodayScheduleResult } from './get-today-schedule';
 import type { WeekDay } from './get-week-events';
@@ -35,6 +37,8 @@ export type DashboardData = {
   revenueTrend: RevenueTrendData;
   eventTypes: EventTypeDistData;
   clientConcentration: ClientConcentrationData;
+  /** Null when the caller lacks the `finance:reconcile` capability. */
+  qboVariance: QboVarianceDTO | null;
 };
 
 // ── Orchestrator ───────────────────────────────────────────────────────────
@@ -44,19 +48,44 @@ export type DashboardData = {
  * Calls all data sources in parallel and returns a unified DTO.
  */
 export async function getDashboardData(): Promise<DashboardData> {
-  const [alerts, actions, today, week, pipeline, finance, activity, revenueTrend, eventTypes, clientConcentration] =
-    await Promise.all([
-      getUrgencyAlerts(),
-      getActionQueue(),
-      getTodaySchedule(),
-      getWeekEvents(),
-      getDealPipeline(),
-      getFinancialPulse(),
-      getActivityFeed(),
-      getRevenueTrend(),
-      getEventTypeDistribution(),
-      getClientConcentration(),
-    ]);
+  const [
+    alerts,
+    actions,
+    today,
+    week,
+    pipeline,
+    finance,
+    activity,
+    revenueTrend,
+    eventTypes,
+    clientConcentration,
+    qboVariance,
+  ] = await Promise.all([
+    getUrgencyAlerts(),
+    getActionQueue(),
+    getTodaySchedule(),
+    getWeekEvents(),
+    getDealPipeline(),
+    getFinancialPulse(),
+    getActivityFeed(),
+    getRevenueTrend(),
+    getEventTypeDistribution(),
+    getClientConcentration(),
+    // Phase 1.4 — gated on `finance:reconcile` inside the fetcher.
+    getQboVariance(),
+  ]);
 
-  return { alerts, actions, today, week, pipeline, finance, activity, revenueTrend, eventTypes, clientConcentration };
+  return {
+    alerts,
+    actions,
+    today,
+    week,
+    pipeline,
+    finance,
+    activity,
+    revenueTrend,
+    eventTypes,
+    clientConcentration,
+    qboVariance,
+  };
 }

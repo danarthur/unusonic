@@ -128,7 +128,7 @@ describe('callMetric scalar shaping', () => {
       schema: () => ({
         rpc: vi.fn().mockResolvedValue(rpcReturn),
       }),
-    } as unknown as Parameters<typeof callMetric>[3]['client'];
+    } as unknown as Parameters<typeof callMetric>[3] extends { client?: infer C } ? C : never;
   }
 
   it('formats currency under $10K with full precision', async () => {
@@ -257,7 +257,7 @@ describe('callMetric table shaping', () => {
       schema: () => ({
         rpc: vi.fn().mockResolvedValue(rpcReturn),
       }),
-    } as unknown as Parameters<typeof callMetric>[3]['client'];
+    } as unknown as Parameters<typeof callMetric>[3] extends { client?: infer C } ? C : never;
   }
 
   it('returns rows as-is for table metrics', async () => {

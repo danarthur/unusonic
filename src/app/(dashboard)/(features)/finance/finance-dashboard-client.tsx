@@ -11,7 +11,7 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, ArrowRight } from 'lucide-react';
+import { Plus, FileText, ArrowRight, ListChecks } from 'lucide-react';
 import { StagePanel, StageReadout } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import {
@@ -84,15 +84,26 @@ export function FinanceDashboardClient({
             Invoices, payments, and revenue
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => router.push('/finance/invoices/new')}
-          className="gap-2"
-        >
-          <Plus className="size-4" />
-          New invoice
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/finance/reconciliation')}
+            className="gap-2"
+          >
+            <ListChecks className="size-4" />
+            Reconciliation
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/finance/invoices/new')}
+            className="gap-2"
+          >
+            <Plus className="size-4" />
+            New invoice
+          </Button>
+        </div>
       </div>
 
       {/* ── Stats cards ───────────────────────────���────────────── */}
