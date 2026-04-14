@@ -70,8 +70,10 @@ export function TemplatePicker({
       onApplied(cues, sections);
       onOpenChange(false);
       toast.success('Template applied');
-    } catch {
-      toast.error('Failed to apply template');
+    } catch (err) {
+      // Surface the real error so out-of-range section_ref / template-shape
+      // failures aren't reduced to a generic "failed" message.
+      toast.error(err instanceof Error ? err.message : 'Failed to apply template');
     }
   };
 

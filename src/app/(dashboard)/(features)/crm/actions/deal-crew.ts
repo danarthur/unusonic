@@ -421,8 +421,12 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
       }
     } catch (overlayErr) {
       // Non-fatal: if the resolver blows up we fall back to the raw RPC value.
+      // Tag with fallback_used so an operator scanning Sentry can spot a
+      // run where the Plan lens is showing un-overlaid (potentially stale)
+      // crew confirmation data.
       Sentry.logger.error('crm.getDealCrew.confirmationOverlayFailed', {
         dealId,
+        fallback_used: true,
         error: overlayErr instanceof Error ? overlayErr.message : String(overlayErr),
       });
     }

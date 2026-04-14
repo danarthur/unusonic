@@ -306,11 +306,17 @@ export async function fetchRosTemplates(): Promise<RosTemplate[]> {
   if (error) throw new Error(error.message);
 
   // Normalize: old templates have cues as plain array, new ones use { __cues, __sections } wrapper.
+  // Anything else (legacy snapshots that don't match either shape) is dropped to
+  // an empty cue list rather than letting an unparseable shape silently lose
+  // data inside the picker. Sentry surfaces the legacy hit so we can re-import.
   return (data ?? []).map((row) => {
     const raw = row.cues as unknown;
     if (raw && typeof raw === 'object' && !Array.isArray(raw) && '__cues' in (raw as Record<string, unknown>)) {
       const wrapped = raw as { __cues: TemplateCueDef[]; __sections: TemplateSectionDef[] };
       return { ...row, cues: wrapped.__cues, sections: wrapped.__sections } as unknown as RosTemplate;
+    }
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      console.warn('[ros] fetchRosTemplates: legacy template shape detected', { templateId: row.id });
     }
     return { ...row, cues: (raw ?? []) as TemplateCueDef[], sections: [] } as unknown as RosTemplate;
   });
@@ -436,6 +442,15 @@ export async function applyRosTemplate(
 
   // Create cues
   for (const cue of templateCues) {
+    if (cue.section_ref !== undefined && cue.section_ref >= templateSections.length) {
+      // Reject malformed templates instead of silently dropping the section_id —
+      // a stray out-of-range ref means the template was edited by an old client
+      // or the on-disk JSONB drifted from sections. Better to fail loud here than
+      // create unsectioned cues the user can't trace.
+      throw new Error(
+        `Template cue "${cue.title ?? '(untitled)'}" references section ${cue.section_ref} but only ${templateSections.length} sections exist.`,
+      );
+    }
     const sectionId = cue.section_ref !== undefined ? sectionIdMap.get(cue.section_ref) ?? null : null;
 
     const { error: cueError } = await supabase

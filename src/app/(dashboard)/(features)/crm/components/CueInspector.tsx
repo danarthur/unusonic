@@ -36,8 +36,21 @@ export function CueInspector({
   eventCrew,
   sections,
 }: CueInspectorProps) {
-  const [formState, setFormState] = useState<Partial<Cue>>({});
-  const [optimisticCue, setOptimisticCue] = useOptimistic<Partial<Cue>>({});
+  // Seed both states from selectedCue so the first render after opening the
+  // inspector shows real values instead of an empty struct that flickers to the
+  // populated state once the useEffect below runs.
+  const initialFormState: Partial<Cue> = selectedCue
+    ? {
+        title: selectedCue.title,
+        duration_minutes: selectedCue.duration_minutes,
+        type: selectedCue.type,
+        notes: selectedCue.notes ?? '',
+        assigned_crew: selectedCue.assigned_crew ?? [],
+        section_id: selectedCue.section_id ?? null,
+      }
+    : {};
+  const [formState, setFormState] = useState<Partial<Cue>>(initialFormState);
+  const [optimisticCue, setOptimisticCue] = useOptimistic<Partial<Cue>>(initialFormState);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 

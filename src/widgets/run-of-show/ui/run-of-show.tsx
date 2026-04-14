@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import { toast } from 'sonner';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { GripVertical, Mic, Sun, Video, Truck, ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -128,13 +129,15 @@ export function RunOfShow({
         onSectionsChange?.(sectionData);
         setError(null);
       })
-      .catch(() => {
+      .catch((err) => {
         if (!active) return;
-        setError('Unable to load timeline');
+        const message = err instanceof Error ? err.message : 'Unable to load timeline';
+        setError(message);
         setCues([]);
         setSections([]);
         onCuesChange?.([]);
         onSectionsChange?.([]);
+        toast.error(message);
       })
       .finally(() => {
         if (!active) return;
@@ -184,6 +187,11 @@ export function RunOfShow({
     const sourceIndex = result.source.index;
     const destIndex = result.destination.index;
 
+    // Snapshot the current display state BEFORE we mutate so a server reject
+    // restores exactly what the user saw, not whatever cues/cuesOverride drift
+    // to between the optimistic update and the rollback.
+    const snapshot = displayCues.map((c) => ({ ...c }));
+
     // Build mutable copy of groups
     const mutableGroups = new Map<string, Cue[]>();
     for (const g of grouped) {
@@ -212,10 +220,13 @@ export function RunOfShow({
     setCues(newFlat);
     onCuesChange?.(newFlat);
 
-    updateCueOrder(newFlat).catch(() => {
-      // Rollback
-      setCues(cuesOverride ?? cues);
-      onCuesChange?.(cuesOverride ?? cues);
+    updateCueOrder(newFlat).catch((err) => {
+      // Rollback to the pre-drag snapshot — and tell the user the persistence
+      // failed so they don't keep planning against an order the server rejected.
+      setCues(snapshot);
+      onCuesChange?.(snapshot);
+      const message = err instanceof Error ? err.message : 'Could not save the new cue order.';
+      toast.error(message);
     });
   };
 

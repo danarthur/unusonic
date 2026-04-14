@@ -287,8 +287,8 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
           </p>
           <p className="stage-badge-text text-[var(--stage-text-tertiary)] leading-relaxed">
             {isLocked
-              ? 'No crew was carried over from the deal. Add crew here — assignments live on the Plan tab only; they do not flow back to the signed proposal.'
-              : 'Build a proposal with packages to get crew suggestions, or add crew directly. Manual additions here won\u2019t appear on the proposal line items.'}
+              ? 'No crew was assigned on the deal. Add crew here — assignments live on the Plan tab only; they do not flow back to the signed proposal.'
+              : 'Build a proposal with package assignments to get crew suggestions, or add crew directly. Manual additions here won\u2019t appear on the proposal line items.'}
           </p>
         </div>
       )}
