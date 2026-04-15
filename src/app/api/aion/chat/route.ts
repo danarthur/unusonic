@@ -39,6 +39,7 @@ import { createActionTools } from './tools/actions';
 import { createEntityTools } from './tools/entity';
 import { createProductionTools } from './tools/production';
 import { createAnalyticsTools, invokeCallMetric } from './tools/analytics';
+import { createRefusalTools } from './tools/refusal';
 import type { AionToolContext } from './tools/types';
 
 export const runtime = 'nodejs';
@@ -79,6 +80,9 @@ function buildToolsForIntent(
   const core = createCoreTools(toolCtx);
   const knowledge = createKnowledgeTools(toolCtx);
   const analytics = createAnalyticsTools(toolCtx);
+  // Phase 3.4: record_refusal is wired wherever call_metric is wired — refusal
+  // is the fallback path when the user asks for an out-of-registry metric.
+  const refusal = createRefusalTools(toolCtx);
 
   switch (intent) {
     // Lightweight intents — core + knowledge only (no write/entity/production tools)
@@ -89,7 +93,7 @@ function buildToolsForIntent(
 
     // Simple lookup can ask for a scalar metric (revenue, AR, sync health)
     case 'simple_lookup':
-      return { ...core, ...knowledge, ...analytics };
+      return { ...core, ...knowledge, ...analytics, ...refusal };
 
     // Draft requests — core has draft_follow_up + regenerate_draft, knowledge for context
     case 'draft_request':
@@ -120,6 +124,7 @@ function buildToolsForIntent(
         ...core,
         ...knowledge,
         ...analytics,
+        ...refusal,
         ...createActionTools(toolCtx),
         ...createEntityTools(toolCtx),
         ...createProductionTools(toolCtx),
@@ -521,8 +526,18 @@ function buildResponseFromResult(
           } else if (data.data_table) {
             msgs.push(data.data_table as AionMessageContent);
           } else if (data.error) {
-            // Phase 3.4 upgrades this to a proper `refusal` type.
+            // Phase 3.4: if call_metric hit an unknown id or validation error,
+            // we still surface a text block — Aion should generally call
+            // record_refusal instead when a metric isn't in the registry.
             msgs.push({ type: 'text', text: data.error });
+          }
+          break;
+        }
+
+        // Phase 3.4: record_refusal emits a refusal block. Rendered by RefusalCard.
+        case 'record_refusal': {
+          if (data.refusal) {
+            msgs.push(data.refusal as AionMessageContent);
           }
           break;
         }
@@ -644,6 +659,11 @@ function buildSystemPrompt(config: AionConfig, onboardingState: OnboardingState,
     '- finance.1099_worksheet — per-vendor totals for a calendar year. Args: year.',
     '',
     'Prefer call_metric over freehand composition. The legacy get_revenue_summary tool is for the broad financial scorecard; call_metric is for precise single-metric answers.',
+    '',
+    '=== REFUSAL + CLARIFIERS (Phase 3.4) ===',
+    'When the user asks for a metric NOT in the REGISTRY METRICS list, call `record_refusal` with the user\'s question, reason="metric_not_in_registry", an optional attempted_metric_id (pick the closest id if any), and up to 3 suggestions (related registry ids). Do not fabricate an answer.',
+    'When the question is AMBIGUOUS (e.g. "how\'s revenue" could map to revenue_collected vs revenue_booked), do NOT pick silently. Emit a [chips: ...] line at the end of your text response with 2-3 disambiguation options. The existing suggestions pipeline resends the chip\'s value as a new user turn — one clarifier, then commit.',
+    'State the limitation in one sentence. Never apologize at length. Offer the concrete next step.',
     '',
     '=== FOLLOW-UP TRAINING ===',
     'When the user describes how they handle follow-ups — timing, channels, rules, or exceptions — treat it like onboarding a new team member:',

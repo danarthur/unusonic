@@ -21,6 +21,10 @@ import {
   isTableMetric,
   type ScalarMetricDefinition,
 } from '@/shared/lib/metrics/types';
+import {
+  FEATURE_FLAGS,
+  isFeatureEnabled,
+} from '@/shared/lib/feature-flags';
 import type {
   AnalyticsResult,
   AnalyticsResultPill,
@@ -100,6 +104,7 @@ function buildPills(args: Record<string, unknown>): AnalyticsResultPill[] {
 function toAnalyticsResult(
   def: ScalarMetricDefinition,
   result: Awaited<ReturnType<typeof callMetric>>,
+  pinEnabled: boolean,
 ): AnalyticsResult | null {
   if (!('ok' in result) || !result.ok || result.kind !== 'scalar') return null;
 
@@ -132,6 +137,7 @@ function toAnalyticsResult(
     sparkline: result.sparkline,
     pills,
     pinnable: true,
+    pinEnabled,
     freshness: {
       computedAt: result.computedAt,
       cadence: def.refreshability,
@@ -199,7 +205,15 @@ export async function invokeCallMetric(
   }
 
   if (isScalarMetric(def) && result.kind === 'scalar') {
-    const block = toAnalyticsResult(def, result);
+    // Resolve the pin feature flag once per invocation. Client reads this to
+    // decide whether to show the Pin button; savePin re-checks server-side.
+    let pinEnabled = false;
+    try {
+      pinEnabled = await isFeatureEnabled(workspaceId, FEATURE_FLAGS.REPORTS_AION_PIN);
+    } catch {
+      pinEnabled = false;
+    }
+    const block = toAnalyticsResult(def, result, pinEnabled);
     if (!block) return { kind: 'error', message: 'Failed to shape scalar result.' };
     return { kind: 'analytics_result', block };
   }

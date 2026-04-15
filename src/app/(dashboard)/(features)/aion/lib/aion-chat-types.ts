@@ -120,6 +120,13 @@ export type AnalyticsResult = {
   pills: AnalyticsResultPill[];
   /** False when the metric isn't pinnable (e.g. a one-off computation). */
   pinnable: boolean;
+  /**
+   * Phase 3.2: mirrors the `reports.aion_pin` feature flag at the time the
+   * payload was built server-side. Client respects this as the UI gate; the
+   * savePin server action re-checks the flag, so disabling it mid-render
+   * downgrades gracefully.
+   */
+  pinEnabled?: boolean;
   /** Present when this card was opened from an existing pin. */
   pinId?: string;
   /** Freshness info for the provenance footer. */
@@ -128,6 +135,32 @@ export type AnalyticsResult = {
   error?: { message: string; recoveryUrl?: string };
   /** When set, renders the registry's empty-state copy instead of the value block. */
   empty?: { title: string; body: string; cta?: { label: string; href: string } };
+};
+
+// =============================================================================
+// refusal content type (Phase 3.4)
+// Sibling of analytics_result — used when Aion can't answer because the metric
+// isn't in the registry. See docs/reference/pages/reports-analytics-result-design.md §3.4.
+// =============================================================================
+
+export type Refusal = {
+  type: 'refusal';
+  /** Short user-facing prose. One sentence — "I don't have a defined metric for that." */
+  text: string;
+  /**
+   * Machine-readable reason. Common values:
+   *   'metric_not_in_registry' | 'insufficient_capability' | 'ambiguous_arg' | 'other'.
+   */
+  reason: string;
+  /** Registry ID of the closest near-match, when Aion almost matched but no. */
+  attemptedMetricId?: string;
+  /**
+   * Display title for the near-match. Resolved from the registry at tool-emit
+   * time so the renderer never has to re-resolve it.
+   */
+  attemptedMetricTitle?: string;
+  /** 2-3 alternatives the user can pick from. Reuses the shared SuggestionChip shape. */
+  suggestions?: SuggestionChip[];
 };
 
 export type AionMessageContent =
@@ -139,7 +172,8 @@ export type AionMessageContent =
   | { type: 'scorecard'; text: string; title: string; metrics: ScorecardMetric[] }
   | { type: 'chart'; text: string; title: string; chartType: 'bar' | 'line' | 'area' | 'donut'; data: ChartDataPoint[]; valuePrefix?: string; valueSuffix?: string }
   | { type: 'data_table'; text: string; title: string; columns: DataTableColumn[]; rows: Record<string, string | number>[] }
-  | AnalyticsResult;
+  | AnalyticsResult
+  | Refusal;
 
 // =============================================================================
 // Chat route request / response

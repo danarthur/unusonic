@@ -12,12 +12,22 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { AnalyticsResultCard } from '../AnalyticsResultCard';
-import type { AnalyticsResult } from '../../lib/aion-chat-types';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // Framer + sonner mocks keep the DOM deterministic.
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+
+// pin-actions is a server-only module — mock before importing the card.
+const hoistedPin = vi.hoisted(() => ({
+  savePinMock: vi.fn(async (_input: unknown) => ({ pinId: 'pin-new' })),
+}));
+const savePinMock = hoistedPin.savePinMock;
+vi.mock('../../actions/pin-actions', () => ({
+  savePin: hoistedPin.savePinMock,
+}));
+
+import { AnalyticsResultCard } from '../AnalyticsResultCard';
+import type { AnalyticsResult } from '../../lib/aion-chat-types';
 
 const baseResult = (overrides: Partial<AnalyticsResult> = {}): AnalyticsResult => ({
   type: 'analytics_result',
@@ -198,5 +208,104 @@ describe('<AnalyticsResultCard />', () => {
     const payload = JSON.parse(message.slice(message.indexOf('period=') + 7));
     expect(payload.period_start).toBeDefined();
     expect(payload.period_end).toBeDefined();
+  });
+});
+
+// =============================================================================
+// Phase 3.2 — Pin button + confirm row + read-only mode
+// =============================================================================
+
+describe('<AnalyticsResultCard /> — pin button (Phase 3.2)', () => {
+  it('hides the Pin button when pinEnabled is false', () => {
+    render(<AnalyticsResultCard result={baseResult({ pinEnabled: false })} />);
+    expect(screen.queryByTestId('analytics-pin-button')).toBeNull();
+  });
+
+  it('hides the Pin button when pinnable is false', () => {
+    render(
+      <AnalyticsResultCard
+        result={baseResult({ pinEnabled: true, pinnable: false })}
+      />,
+    );
+    expect(screen.queryByTestId('analytics-pin-button')).toBeNull();
+  });
+
+  it('renders the Pin button when pinEnabled and pinnable are both true', () => {
+    render(<AnalyticsResultCard result={baseResult({ pinEnabled: true })} />);
+    const btn = screen.getByTestId('analytics-pin-button');
+    expect(btn.getAttribute('aria-label')).toBe('Pin to Lobby');
+    expect(btn.getAttribute('data-pin-state')).toBe('unpinned');
+  });
+
+  it('switches to "Update pin" label when pinId is set on the result', () => {
+    render(
+      <AnalyticsResultCard
+        result={baseResult({ pinEnabled: true, pinId: 'pin-existing' })}
+      />,
+    );
+    const btn = screen.getByTestId('analytics-pin-button');
+    expect(btn.getAttribute('aria-label')).toBe('Update pin');
+    expect(btn.getAttribute('data-pin-state')).toBe('pinned');
+  });
+
+  it('reveals the confirm row on Pin click', () => {
+    render(<AnalyticsResultCard result={baseResult({ pinEnabled: true })} />);
+    fireEvent.click(screen.getByTestId('analytics-pin-button'));
+    expect(screen.getByTestId('analytics-pin-confirm')).toBeTruthy();
+    expect(screen.getByTestId('analytics-pin-cancel')).toBeTruthy();
+    expect(screen.getByTestId('analytics-pin-confirm-btn')).toBeTruthy();
+  });
+
+  it('calls savePin with mapped title/cadence/initial value on confirm', async () => {
+    savePinMock.mockClear();
+    render(<AnalyticsResultCard result={baseResult({ pinEnabled: true })} />);
+    fireEvent.click(screen.getByTestId('analytics-pin-button'));
+    fireEvent.click(screen.getByTestId('analytics-pin-confirm-btn'));
+    await waitFor(() => expect(savePinMock).toHaveBeenCalledTimes(1));
+    const firstCall = savePinMock.mock.calls[0] as unknown[];
+    const input = firstCall[0] as {
+      title: string;
+      metricId: string;
+      cadence: string;
+      initialValue: { primary: string };
+    };
+    expect(input.title).toBe('Revenue collected');
+    expect(input.metricId).toBe('finance.revenue_collected');
+    expect(input.cadence).toBe('hourly');
+    expect(input.initialValue.primary).toBe('$128,400');
+  });
+
+  it('in read-only mode renders "Open in Aion" and hides the Pin button', () => {
+    render(
+      <AnalyticsResultCard
+        result={baseResult({ pinEnabled: true, pinId: 'pin-1' })}
+        readOnly
+      />,
+    );
+    expect(screen.queryByTestId('analytics-pin-button')).toBeNull();
+    expect(screen.getByTestId('analytics-open-in-aion')).toBeTruthy();
+  });
+
+  it('in read-only mode hides the pills row', () => {
+    render(
+      <AnalyticsResultCard
+        result={baseResult({ pinEnabled: true, pinId: 'pin-1' })}
+        readOnly
+      />,
+    );
+    expect(screen.queryByTestId('analytics-pill-editable')).toBeNull();
+  });
+
+  it('fires onOpenInAion when the read-only "Open in Aion" button is clicked', () => {
+    const onOpen = vi.fn();
+    render(
+      <AnalyticsResultCard
+        result={baseResult({ pinEnabled: true, pinId: 'pin-1' })}
+        readOnly
+        onOpenInAion={onOpen}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('analytics-open-in-aion'));
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 });

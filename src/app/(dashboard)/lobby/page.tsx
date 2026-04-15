@@ -10,6 +10,8 @@ import { getLobbyLayout } from './actions/lobby-layout';
 import { LobbyClient } from './LobbyClient';
 import { userCapabilities } from '@/shared/lib/metrics/capabilities';
 import type { CapabilityKey } from '@/shared/lib/permission-registry';
+import { getPinnedAnswers } from '@/widgets/pinned-answers';
+import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,12 +59,23 @@ export default async function LobbyPage() {
     return <LobbyClient />;
   }
 
+  // Phase 3.2: pin feature flag is checked independently of the modular
+  // Lobby flag. A workspace may ship pins before modular Lobby, or vice versa.
+  const pinEnabled = await isFeatureEnabled(
+    workspaceId,
+    FEATURE_FLAGS.REPORTS_AION_PIN,
+  );
+  let pins: LobbyPin[] = [];
+  if (pinEnabled) {
+    pins = await getPinnedAnswers();
+  }
+
   const modularEnabled = await isFeatureEnabled(
     workspaceId,
     FEATURE_FLAGS.REPORTS_MODULAR_LOBBY,
   );
   if (!modularEnabled) {
-    return <LobbyClient />;
+    return <LobbyClient pins={pins} pinEnabled={pinEnabled} />;
   }
 
   // Flag-on path: resolve persisted layout or seeded defaults, pass to client.
@@ -88,5 +101,13 @@ export default async function LobbyPage() {
     userCaps = [];
   }
 
-  return <LobbyClient cardIds={cardIds} modularEnabled userCaps={userCaps} />;
+  return (
+    <LobbyClient
+      cardIds={cardIds}
+      modularEnabled
+      userCaps={userCaps}
+      pins={pins}
+      pinEnabled={pinEnabled}
+    />
+  );
 }

@@ -17,7 +17,17 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, Copy, Check, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import {
+  ChevronDown,
+  Copy,
+  Check,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Pin,
+  PinOff,
+  MessageSquare,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { StagePanel } from '@/shared/ui/stage-panel';
@@ -25,6 +35,7 @@ import { Sparkline } from '@/widgets/global-pulse/ui/Sparkline';
 import { DataFreshnessBadge } from '@/widgets/shared/ui/DataFreshnessBadge';
 import { cn } from '@/shared/lib/utils';
 import { ChartCard } from './ChartCard';
+import { savePin, type PinCadence } from '../actions/pin-actions';
 import type {
   AnalyticsResult,
   AnalyticsResultComparison,
@@ -322,13 +333,29 @@ interface AnalyticsResultCardProps {
    * to a re-run of callMetric.
    */
   onArgEdit?: (message: string) => void;
+  /**
+   * Read-only mode — used when the card renders inside the Lobby's "Your pins"
+   * widget. In this mode pills are non-interactive, the confirm row is hidden,
+   * and the header action flips from "Pin" to "Open in Aion".
+   */
+  readOnly?: boolean;
+  /**
+   * Called when the read-only card's "Open in Aion" button is clicked.
+   * Phase 3.3 wires the pin → Aion re-open flow; Phase 3.2 just exposes the
+   * handler so Lobby pin tiles can route correctly.
+   */
+  onOpenInAion?: () => void;
 }
 
 export function AnalyticsResultCard({
   result,
   onArgEdit,
+  readOnly = false,
+  onOpenInAion,
 }: AnalyticsResultCardProps) {
   const [openPill, setOpenPill] = React.useState<{ pill: AnalyticsResultPill; anchor: HTMLElement } | null>(null);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [pinSaved, setPinSaved] = React.useState<boolean>(Boolean(result.pinId));
 
   const dispatchArgEdit = React.useCallback(
     (argKey: string, newValue: unknown) => {
@@ -371,7 +398,16 @@ export function AnalyticsResultCard({
         transition={STAGE_LIGHT}
       >
         <StagePanel elevated stripe="error" padding="md" className="flex flex-col gap-2" role="article">
-          <HeaderRow title={result.title} />
+          <HeaderRow
+            title={result.title}
+            pinEnabled={result.pinEnabled}
+            pinnable={result.pinnable}
+            pinSaved={pinSaved}
+            hasPinId={Boolean(result.pinId)}
+            readOnly={readOnly}
+            onPinClick={() => setConfirmOpen((v) => !v)}
+            onOpenInAion={onOpenInAion}
+          />
           <p className="text-sm text-[var(--stage-text-primary)]">
             {result.error.message}
           </p>
@@ -412,7 +448,16 @@ export function AnalyticsResultCard({
         role="article"
         aria-label={`${result.title}: ${result.value.primary}${result.comparison ? ` — ${result.comparison.delta} ${result.comparison.label}` : ''}`}
       >
-        <HeaderRow title={result.title} />
+        <HeaderRow
+          title={result.title}
+          pinEnabled={result.pinEnabled}
+          pinnable={result.pinnable}
+          pinSaved={pinSaved}
+          hasPinId={Boolean(result.pinId)}
+          readOnly={readOnly}
+          onPinClick={() => setConfirmOpen((v) => !v)}
+          onOpenInAion={onOpenInAion}
+        />
 
         {empty ? (
           <EmptyBlock title={empty.title} body={empty.body} cta={empty.cta} />
@@ -432,7 +477,7 @@ export function AnalyticsResultCard({
           </StagePanel>
         ) : null}
 
-        {result.pills.length > 0 ? (
+        {result.pills.length > 0 && !readOnly ? (
           <div className="flex flex-wrap gap-2 items-center pt-1">
             {result.pills.map((pill) => (
               <PillButton
@@ -442,6 +487,39 @@ export function AnalyticsResultCard({
               />
             ))}
           </div>
+        ) : null}
+
+        {confirmOpen && !readOnly && result.pinEnabled && result.pinnable ? (
+          <PinConfirmRow
+            defaultTitle={result.title}
+            hasPinId={Boolean(result.pinId)}
+            onCancel={() => setConfirmOpen(false)}
+            onConfirm={async (title, cadence) => {
+              try {
+                await savePin({
+                  title,
+                  metricId: result.metricId,
+                  args: result.args,
+                  cadence,
+                  initialValue: {
+                    primary: result.value.primary,
+                    unit: result.value.unit,
+                    secondary: result.value.secondary,
+                  },
+                });
+                setPinSaved(true);
+                setConfirmOpen(false);
+                toast.success(
+                  result.pinId ? 'Pin updated' : 'Pinned to Lobby',
+                  { duration: 2000 },
+                );
+              } catch (err) {
+                const message =
+                  err instanceof Error ? err.message : 'Could not pin';
+                toast.error(message);
+              }
+            }}
+          />
         ) : null}
 
         <FooterRow
@@ -465,17 +543,187 @@ export function AnalyticsResultCard({
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
-function HeaderRow({ title }: { title: string }) {
+interface HeaderRowProps {
+  title: string;
+  pinEnabled?: boolean;
+  pinnable?: boolean;
+  pinSaved: boolean;
+  hasPinId: boolean;
+  readOnly: boolean;
+  onPinClick: () => void;
+  onOpenInAion?: () => void;
+}
+
+function HeaderRow({
+  title,
+  pinEnabled,
+  pinnable,
+  pinSaved,
+  hasPinId,
+  readOnly,
+  onPinClick,
+  onOpenInAion,
+}: HeaderRowProps) {
+  // Read-only mode: swap Pin → Open in Aion. Gate still requires pinEnabled so
+  // disabling the flag on an already-pinned card hides the action cleanly.
+  const showOpenInAion = readOnly && pinEnabled;
+  const showPinButton = !readOnly && pinEnabled && pinnable;
+  const pinLabel = hasPinId || pinSaved ? 'Update pin' : 'Pin to Lobby';
+  const PinIcon = pinSaved || hasPinId ? PinOff : Pin;
+
   return (
     <div className="flex items-center justify-between gap-2 min-w-0">
       <p className="stage-label font-mono select-none truncate text-[var(--stage-text-primary)]">
         {title}
       </p>
-      {/* TODO(Phase 3.2): Pin button slot. Will render <button> with Pin/PinFill lucide icons
-          and, when pinId is set, an "Open in Aion" affordance. Pin storage + refresh cron
-          land in Phase 3.2; do not wire in Phase 3.1. */}
-      <div className="flex items-center gap-2" aria-hidden />
+      <div className="flex items-center gap-2">
+        {showOpenInAion ? (
+          <button
+            type="button"
+            onClick={onOpenInAion}
+            title="Open in Aion"
+            aria-label="Open in Aion"
+            className={cn(
+              'inline-flex items-center justify-center',
+              'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
+              'transition-colors cursor-pointer',
+            )}
+            data-testid="analytics-open-in-aion"
+          >
+            <MessageSquare size={14} strokeWidth={1.75} aria-hidden />
+          </button>
+        ) : null}
+        {showPinButton ? (
+          <button
+            type="button"
+            onClick={onPinClick}
+            title={pinLabel}
+            aria-label={pinLabel}
+            className={cn(
+              'inline-flex items-center justify-center',
+              'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
+              'transition-colors cursor-pointer',
+            )}
+            data-testid="analytics-pin-button"
+            data-pin-state={pinSaved || hasPinId ? 'pinned' : 'unpinned'}
+          >
+            <PinIcon size={14} strokeWidth={1.75} aria-hidden />
+          </button>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+// ── Pin confirm row (inline, not a modal — per design §4.1) ───────────────
+
+interface PinConfirmRowProps {
+  defaultTitle: string;
+  hasPinId: boolean;
+  onCancel: () => void;
+  onConfirm: (title: string, cadence: PinCadence) => void | Promise<void>;
+}
+
+function PinConfirmRow({
+  defaultTitle,
+  hasPinId,
+  onCancel,
+  onConfirm,
+}: PinConfirmRowProps) {
+  const [title, setTitle] = React.useState(defaultTitle);
+  const [cadence, setCadence] = React.useState<PinCadence>('hourly');
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const handleConfirm = async () => {
+    const clean = title.trim();
+    if (!clean) {
+      toast.error('Pin title required');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onConfirm(clean, cadence);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmLabel = hasPinId ? 'Update pin' : 'Pin';
+
+  return (
+    <StagePanel nested padding="sm" className="flex flex-col gap-2" data-testid="analytics-pin-confirm">
+      <p className="text-xs text-[var(--stage-text-secondary)]">
+        {hasPinId ? 'Update pin' : 'Pin to Lobby'}
+      </p>
+      <label className="flex flex-col gap-1 text-xs text-[var(--stage-text-tertiary)]">
+        <span className="stage-label">Title</span>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={200}
+          disabled={submitting}
+          className={cn(
+            'w-full px-2 py-1 rounded-md',
+            'text-sm text-[var(--stage-text-primary)]',
+            'bg-[var(--ctx-well,var(--stage-surface))]',
+            'border border-[oklch(1_0_0_/_0.08)]',
+            'focus:outline-none focus:border-[oklch(1_0_0_/_0.16)]',
+          )}
+          data-testid="analytics-pin-title-input"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-[var(--stage-text-tertiary)]">
+        <span className="stage-label">Refresh</span>
+        <select
+          value={cadence}
+          onChange={(e) => setCadence(e.target.value as PinCadence)}
+          disabled={submitting}
+          className={cn(
+            'w-full px-2 py-1 rounded-md',
+            'text-sm text-[var(--stage-text-primary)]',
+            'bg-[var(--ctx-well,var(--stage-surface))]',
+            'border border-[oklch(1_0_0_/_0.08)]',
+          )}
+          data-testid="analytics-pin-cadence-select"
+        >
+          <option value="live">Live</option>
+          <option value="hourly">Hourly</option>
+          <option value="daily">Daily</option>
+          <option value="manual">Manual</option>
+        </select>
+      </label>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className={cn(
+            'px-3 py-1 rounded-full',
+            'text-xs text-[var(--stage-text-secondary)]',
+            'hover:text-[var(--stage-text-primary)] transition-colors',
+          )}
+          data-testid="analytics-pin-cancel"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={submitting}
+          className={cn(
+            'inline-flex items-center px-3 py-1 rounded-full',
+            'text-xs border border-[oklch(1_0_0_/_0.1)]',
+            'bg-[var(--stage-surface-elevated)] text-[var(--stage-text-primary)]',
+            'hover:bg-[var(--stage-surface-raised)] transition-colors',
+            submitting && 'opacity-60 cursor-wait',
+          )}
+          data-testid="analytics-pin-confirm-btn"
+        >
+          {submitting ? 'Pinning…' : confirmLabel}
+        </button>
+      </div>
+    </StagePanel>
   );
 }
 

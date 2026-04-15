@@ -34,6 +34,7 @@ import { RevenueTrendWidget } from '@/widgets/revenue-trend';
 import { EventTypeDistWidget } from '@/widgets/event-type-dist';
 import { ClientConcentrationWidget } from '@/widgets/client-concentration';
 import { QboVarianceWidget } from '@/widgets/qbo-variance';
+import { AionRefusalRateWidget } from '@/widgets/aion-refusal-rate';
 
 // Self-fetching widgets / banners.
 import { ActiveProductionWidget } from '@/widgets/active-production';
@@ -118,6 +119,17 @@ const RENDERERS: Record<string, LobbyCardRenderer> = {
   'lobby.payment_health': () => <PaymentHealthWidget />,
   'lobby.run_of_show_feed': () => <RunOfShowFeedWidget />,
   'lobby.passkey_nudge_banner': () => <PasskeyNudgeBanner />,
+
+  // Phase 3.4 — owner-only refusal rate. RPC-backed scalar with widgetKey.
+  'ops.aion_refusal_rate': ({ dashboardData, loading }) => {
+    if (dashboardData && dashboardData.aionRefusalRate === null) return null;
+    return (
+      <AionRefusalRateWidget
+        data={dashboardData?.aionRefusalRate ?? undefined}
+        loading={loading}
+      />
+    );
+  },
 };
 
 /**

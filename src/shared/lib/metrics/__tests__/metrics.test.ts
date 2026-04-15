@@ -41,7 +41,8 @@ describe('registry sanity', () => {
 
     if (isScalarMetric(def) || isTableMetric(def)) {
       expect(def.rpcName).toMatch(/^metric_/);
-      expect(def.rpcSchema).toBe('finance');
+      // Phase 1.2 metrics live in `finance`; Phase 3.4 added `ops` (refusal rate).
+      expect(['finance', 'ops']).toContain(def.rpcSchema);
     }
   });
 
@@ -64,9 +65,10 @@ describe('registry sanity', () => {
     }
   });
 
-  it('exposes all 8 Phase 1.2 RPC metrics', () => {
+  it('exposes the Phase 1.2 + 3.4 RPC metrics', () => {
     const rpcIds = METRIC_IDS.filter((id) => !isWidgetMetric(METRICS[id])).sort();
     expect(rpcIds).toEqual([
+      // Phase 1.2 — finance metrics.
       'finance.1099_worksheet',
       'finance.ar_aged_60plus',
       'finance.invoice_variance',
@@ -75,6 +77,8 @@ describe('registry sanity', () => {
       'finance.revenue_collected',
       'finance.sales_tax_worksheet',
       'finance.unreconciled_payments',
+      // Phase 3.4 — ops refusal-rate.
+      'ops.aion_refusal_rate',
     ]);
   });
 });
@@ -114,6 +118,8 @@ describe('library manifest', () => {
       // qbo-variance is an RPC-backed metric (finance.qbo_variance). It owns the
       // folder via its widgetKey property on the scalar entry.
       METRICS['finance.qbo_variance'].widgetKey,
+      // aion-refusal-rate (Phase 3.4) is also an RPC-backed scalar with a widgetKey.
+      METRICS['ops.aion_refusal_rate'].widgetKey,
       ...widgetEntries.map((d) => d.widgetKey),
     ]);
     for (const folder of folders) {

@@ -32,6 +32,10 @@ const yearSchema = z.object({
   year: z.number().int().min(2000).max(2100),
 });
 
+const daysWindowSchema = z.object({
+  days: z.number().int().min(1).max(365).optional(),
+});
+
 /**
  * Widget-kind entries use `lobby.*` IDs to namespace them away from RPC metrics.
  * They catalog existing widget folders under `src/widgets/` so the Phase 2.3
@@ -122,6 +126,29 @@ export const METRICS: Record<string, MetricDefinition> = {
       title: 'Not connected',
       body: 'Connect QuickBooks in Settings → Finance to reconcile your books.',
       cta: { label: 'Connect QuickBooks', href: '/finance/settings' },
+    },
+  },
+
+  'ops.aion_refusal_rate': {
+    id: 'ops.aion_refusal_rate',
+    kind: 'scalar',
+    rpcSchema: 'ops',
+    rpcName: 'metric_aion_refusal_rate',
+    widgetKey: 'aion-refusal-rate',
+    argsSchema: daysWindowSchema,
+    defaultArgs: { days: 30 },
+    unit: 'percent',
+    comparisonSentiment: 'negative', // up = bad
+    hasSparkline: false,
+    requiredCapabilities: ['workspace:owner'],
+    refreshability: 'daily',
+    roles: ['owner'],
+    title: 'Aion refusal rate',
+    description:
+      'Share of Aion questions where the metric was out of registry scope. Alert if above 10% over 30 days.',
+    emptyState: {
+      title: 'No refusals yet',
+      body: 'Aion has answered every question so far.',
     },
   },
 
@@ -772,6 +799,26 @@ export const METRICS: Record<string, MetricDefinition> = {
       body: '',
     },
     notes: 'Dev-only surface. Gated to owners; will likely be removed from the library in a later phase.',
+  },
+
+  // Pinned answers (Phase 3.2) ----------------------------------------------
+
+  'lobby.pinned_answers': {
+    id: 'lobby.pinned_answers',
+    kind: 'widget',
+    widgetKey: 'pinned-answers',
+    pickable: false,
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin', 'touring_coordinator', 'employee'],
+    title: 'Your pins',
+    description: 'Answers you pinned from Aion. Refresh on cadence; click to re-open in Aion.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Rendered by the Lobby when the user has ≥1 pin. Not library-pickable; the page gates the section directly on pin count + feature flag.',
   },
 
   // Event command-grid ------------------------------------------------------

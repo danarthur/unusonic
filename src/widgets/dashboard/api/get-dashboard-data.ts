@@ -11,9 +11,11 @@ import { getRevenueTrend } from './get-revenue-trend';
 import { getEventTypeDistribution } from './get-event-type-dist';
 import { getClientConcentration } from './get-client-concentration';
 import { getQboVariance } from '@/widgets/qbo-variance/api/get-qbo-variance';
+import { getAionRefusalRate } from '@/widgets/aion-refusal-rate/api/get-aion-refusal-rate';
 
 import type { UrgencyAlert } from './get-urgency-alerts';
 import type { QboVarianceDTO } from '@/widgets/qbo-variance/api/get-qbo-variance';
+import type { AionRefusalRateDTO } from '@/widgets/aion-refusal-rate/api/get-aion-refusal-rate';
 import type { ActionItem as ActionQueueItem } from './get-action-queue';
 import type { TodayScheduleResult } from './get-today-schedule';
 import type { WeekDay } from './get-week-events';
@@ -39,6 +41,8 @@ export type DashboardData = {
   clientConcentration: ClientConcentrationData;
   /** Null when the caller lacks the `finance:reconcile` capability. */
   qboVariance: QboVarianceDTO | null;
+  /** Null when the caller lacks the `workspace:owner` capability. Phase 3.4. */
+  aionRefusalRate: AionRefusalRateDTO | null;
 };
 
 // ── Orchestrator ───────────────────────────────────────────────────────────
@@ -74,6 +78,7 @@ export async function getDashboardData(period?: DashboardDataPeriod): Promise<Da
     eventTypes,
     clientConcentration,
     qboVariance,
+    aionRefusalRate,
   ] = await Promise.all([
     getUrgencyAlerts(),
     getActionQueue(),
@@ -87,6 +92,8 @@ export async function getDashboardData(period?: DashboardDataPeriod): Promise<Da
     getClientConcentration(),
     // Phase 1.4 — gated on `finance:reconcile` inside the fetcher.
     getQboVariance(),
+    // Phase 3.4 — gated on `workspace:owner` inside the fetcher.
+    getAionRefusalRate(),
   ]);
 
   return {
@@ -101,5 +108,6 @@ export async function getDashboardData(period?: DashboardDataPeriod): Promise<Da
     eventTypes,
     clientConcentration,
     qboVariance,
+    aionRefusalRate,
   };
 }

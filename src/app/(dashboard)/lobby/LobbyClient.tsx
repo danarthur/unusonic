@@ -31,6 +31,8 @@ import {
 } from './actions/lobby-layout';
 import { LOBBY_CARD_CAP } from '@/shared/lib/metrics/role-defaults';
 import type { CapabilityKey } from '@/shared/lib/permission-registry';
+import { PinnedAnswersWidget } from '@/widgets/pinned-answers';
+import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,19 @@ interface LobbyClientProps {
    * Lobby flag is off — in that case the drawer is never opened.
    */
   userCaps?: CapabilityKey[];
+  /**
+   * Phase 3.2: Lobby pins for the current user in this workspace. When
+   * `pinEnabled` is true AND this array has entries, the "Your pins" section
+   * renders — above the default grid if any pins exist, below if zero.
+   * When `pinEnabled` is false, the section is never rendered regardless.
+   */
+  pins?: LobbyPin[];
+  /**
+   * Phase 3.2: mirrors `reports.aion_pin` feature flag. Gates the "Your pins"
+   * section independently of the modular-Lobby flag so pins can ship to a
+   * workspace before rearrangeable defaults do.
+   */
+  pinEnabled?: boolean;
 }
 
 // ── Chat view ─────────────────────────────────────────────────────────────
@@ -120,6 +135,8 @@ type OverviewViewProps = {
   onOpenLibrary: () => void;
   onReorder: (newOrder: string[]) => void;
   onRemove: (id: string) => void;
+  pins: LobbyPin[];
+  pinEnabled: boolean;
 };
 
 /**
@@ -137,7 +154,15 @@ function OverviewView({
   onOpenLibrary,
   onReorder,
   onRemove,
+  pins,
+  pinEnabled,
 }: OverviewViewProps) {
+  // Per design §3: render "Your pins" above defaults when the user has ≥1
+  // pin, below defaults when zero. Flag-off workspaces never render either
+  // branch. Zero-pin section is hidden today; Phase 3.3 may flip it on as an
+  // affordance to nudge users toward the Aion pin flow.
+  const showPinsAbove = pinEnabled && pins.length > 0;
+  const showPinsBelow = false; // Zero-pin empty section suppressed in 3.2.
   return (
     <motion.div
       key="hub-overview"
@@ -183,6 +208,7 @@ function OverviewView({
             />
           </div>
         )}
+        {showPinsAbove && <PinnedAnswersWidget pins={pins} />}
         <LobbyBentoGrid
           dashboardData={dashboardData}
           cardIds={cardIds}
@@ -190,6 +216,7 @@ function OverviewView({
           onReorder={onReorder}
           onRemove={onRemove}
         />
+        {showPinsBelow && <PinnedAnswersWidget pins={pins} />}
       </motion.div>
     </motion.div>
   );
@@ -218,7 +245,13 @@ export function LobbyClient(props: LobbyClientProps) {
   );
 }
 
-function LobbyClientInner({ cardIds, modularEnabled, userCaps }: LobbyClientProps) {
+function LobbyClientInner({
+  cardIds,
+  modularEnabled,
+  userCaps,
+  pins,
+  pinEnabled,
+}: LobbyClientProps) {
   const { viewState, setViewState } = useSession();
   const { workspaceId } = useWorkspace();
   const { resolved } = useLobbyTimeRange();
@@ -334,6 +367,8 @@ function LobbyClientInner({ cardIds, modularEnabled, userCaps }: LobbyClientProp
             onOpenLibrary={() => setLibraryOpen(true)}
             onReorder={handleReorder}
             onRemove={handleRemove}
+            pins={pins ?? []}
+            pinEnabled={Boolean(pinEnabled)}
           />
         )}
 

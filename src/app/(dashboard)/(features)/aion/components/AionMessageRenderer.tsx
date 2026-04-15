@@ -10,6 +10,8 @@ import { ScorecardCard } from './ScorecardCard';
 import { ChartCard } from './ChartCard';
 import { DataTableCard } from './DataTableCard';
 import { AnalyticsResultCard } from './AnalyticsResultCard';
+import { RefusalCard } from './RefusalCard';
+import type { SuggestionChip } from '../lib/aion-chat-types';
 
 interface AionMessageRendererProps {
   contents: AionMessageContent[];
@@ -28,6 +30,16 @@ export function AionMessageRenderer({ contents, workspaceId, onDraftEdited }: Ai
     (message: string) => {
       if (!workspaceId) return;
       void sendChatMessage({ text: message, workspaceId });
+    },
+    [sendChatMessage, workspaceId],
+  );
+  // Phase 3.4: refusal suggestion chips dispatch the chip's `value` as a new
+  // user message, matching the existing `suggestions` content-type behavior.
+  // No new pipeline — reuses the chat's standard user-turn path.
+  const handleRefusalSuggestion = React.useCallback(
+    (chip: SuggestionChip) => {
+      if (!workspaceId) return;
+      void sendChatMessage({ text: chip.value, workspaceId });
     },
     [sendChatMessage, workspaceId],
   );
@@ -99,6 +111,15 @@ export function AionMessageRenderer({ contents, workspaceId, onDraftEdited }: Ai
                 key={idx}
                 result={block}
                 onArgEdit={handleArgEdit}
+              />
+            );
+          case 'refusal':
+            // Phase 3.4: sibling content type for out-of-registry questions.
+            return (
+              <RefusalCard
+                key={idx}
+                refusal={block}
+                onSuggestionTap={handleRefusalSuggestion}
               />
             );
           // text and suggestions are handled by ChatInterface

@@ -73,6 +73,7 @@ export type Database = {
           expires_at: string | null
           fact: string
           id: string
+          metadata: Json
           scope: string
           source: string | null
           updated_at: string
@@ -86,6 +87,7 @@ export type Database = {
           expires_at?: string | null
           fact: string
           id?: string
+          metadata?: Json
           scope: string
           source?: string | null
           updated_at?: string
@@ -99,6 +101,7 @@ export type Database = {
           expires_at?: string | null
           fact?: string
           id?: string
+          metadata?: Json
           scope?: string
           source?: string | null
           updated_at?: string
@@ -144,6 +147,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      aion_refusal_log: {
+        Row: {
+          attempted_metric_id: string | null
+          created_at: string
+          id: string
+          question: string
+          reason: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          attempted_metric_id?: string | null
+          created_at?: string
+          id?: string
+          question: string
+          reason: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          attempted_metric_id?: string | null
+          created_at?: string
+          id?: string
+          question?: string
+          reason?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
       }
       aion_sessions: {
         Row: {
@@ -261,6 +294,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _pin_args_hash: { Args: { p_args: Json }; Returns: string }
+      _pin_assert_membership: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       create_aion_session: {
         Args: {
           p_id?: string
@@ -274,6 +312,7 @@ export type Database = {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
       }
+      delete_lobby_pin: { Args: { p_pin_id: string }; Returns: undefined }
       delete_memory_embedding: {
         Args: { p_source_id: string; p_source_type: string }
         Returns: boolean
@@ -296,6 +335,19 @@ export type Database = {
           similarity: number
         }[]
       }
+      list_lobby_pins: {
+        Args: { p_user_id: string; p_workspace_id: string }
+        Returns: {
+          args: Json
+          cadence: string
+          last_refreshed_at: string
+          last_value: Json
+          metric_id: string
+          pin_id: string
+          position: number
+          title: string
+        }[]
+      }
       match_memory: {
         Args: {
           p_entity_ids?: string[]
@@ -314,6 +366,20 @@ export type Database = {
           source_id: string
           source_type: string
         }[]
+      }
+      record_refusal: {
+        Args: {
+          p_attempted_metric_id?: string
+          p_question: string
+          p_reason: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      reorder_lobby_pins: {
+        Args: { p_ids: string[]; p_user_id: string; p_workspace_id: string }
+        Returns: undefined
       }
       resolve_aion_insight: {
         Args: { p_entity_id: string; p_trigger_type: string }
@@ -338,12 +404,28 @@ export type Database = {
         }
         Returns: string
       }
+      save_lobby_pin: {
+        Args: {
+          p_args: Json
+          p_cadence: string
+          p_initial_value: Json
+          p_metric_id: string
+          p_title: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       update_aion_session_summary: {
         Args: {
           p_session_id: string
           p_summarized_up_to: string
           p_summary: string
         }
+        Returns: undefined
+      }
+      update_lobby_pin_value: {
+        Args: { p_pin_id: string; p_value: Json }
         Returns: undefined
       }
       upsert_aion_insight: {
@@ -2875,6 +2957,16 @@ export type Database = {
       event_status_pair_valid: {
         Args: { p_lifecycle: string; p_status: string }
         Returns: boolean
+      }
+      metric_aion_refusal_rate: {
+        Args: { p_days?: number; p_workspace_id: string }
+        Returns: {
+          comparison_label: string
+          comparison_value: number
+          primary_value: number
+          secondary_text: string
+          sparkline_values: number[]
+        }[]
       }
       patch_event_ros_data: {
         Args: { p_event_id: string; p_patch: Json }
