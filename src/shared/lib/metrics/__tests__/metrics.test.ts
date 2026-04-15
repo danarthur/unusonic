@@ -10,7 +10,7 @@ vi.mock('@/shared/api/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-import { METRICS, METRIC_IDS } from '../registry';
+import { METRICS, METRIC_IDS, RELATED_METRICS, getRelatedMetricChips } from '../registry';
 import {
   isScalarMetric,
   isTableMetric,
@@ -208,6 +208,63 @@ describe('getRoleDefaults', () => {
     const caps = new Set<MetricCapability>(['planning:view']);
     const ownerCards = getRoleDefaults(caps, 'owner');
     expect(ownerCards.some((m) => m.id === 'finance.revenue_collected')).toBe(false);
+  });
+});
+
+// ─── Phase 4.3 — related metrics / follow-ups ───────────────────────────────
+
+describe('RELATED_METRICS graph', () => {
+  it('every referenced metric id exists in the registry', () => {
+    for (const [sourceId, relatedIds] of Object.entries(RELATED_METRICS)) {
+      expect(METRICS[sourceId], `unknown source id '${sourceId}'`).toBeDefined();
+      for (const relatedId of relatedIds) {
+        expect(METRICS[relatedId], `'${sourceId}' → '${relatedId}' is not in the registry`).toBeDefined();
+      }
+    }
+  });
+
+  it('no metric includes itself as a follow-up', () => {
+    for (const [sourceId, relatedIds] of Object.entries(RELATED_METRICS)) {
+      expect(relatedIds).not.toContain(sourceId);
+    }
+  });
+
+  it('cap follow-ups at 3 per entry', () => {
+    for (const [sourceId, relatedIds] of Object.entries(RELATED_METRICS)) {
+      expect(relatedIds.length, `'${sourceId}' has > 3 follow-ups`).toBeLessThanOrEqual(3);
+    }
+  });
+});
+
+describe('getRelatedMetricChips', () => {
+  it('returns the registry-declared follow-ups for a known metric', () => {
+    const caps = new Set<string>(['finance:view', 'finance:reconcile', 'deals:read:global']);
+    const chips = getRelatedMetricChips('finance.revenue_collected', caps);
+    expect(chips.length).toBeGreaterThan(0);
+    expect(chips.length).toBeLessThanOrEqual(3);
+    // Every chip should have a non-empty label + value.
+    for (const chip of chips) {
+      expect(chip.label.length).toBeGreaterThan(0);
+      expect(chip.value).toContain('Show me ');
+      expect(METRICS[chip.metricId]).toBeDefined();
+    }
+  });
+
+  it('drops follow-ups the viewer lacks capability for', () => {
+    // Only finance:view — no reconcile. qbo_variance requires both.
+    const caps = new Set<string>(['finance:view']);
+    const chips = getRelatedMetricChips('finance.ar_aged_60plus', caps);
+    // finance.qbo_variance requires finance:reconcile — should be filtered.
+    expect(chips.some((c) => c.metricId === 'finance.qbo_variance')).toBe(false);
+  });
+
+  it('returns empty array for unknown metric id', () => {
+    expect(getRelatedMetricChips('finance.does_not_exist', new Set())).toEqual([]);
+  });
+
+  it('returns empty array for metrics with no declared follow-ups', () => {
+    // ops.aion_refusal_rate currently has no follow-ups.
+    expect(getRelatedMetricChips('ops.aion_refusal_rate', new Set(['workspace:owner']))).toEqual([]);
   });
 });
 

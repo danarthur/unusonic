@@ -15,7 +15,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { callMetric, getMetricDefinition } from '@/shared/lib/metrics/call';
-import { METRICS } from '@/shared/lib/metrics/registry';
+import { METRICS, getRelatedMetricChips } from '@/shared/lib/metrics/registry';
+import { userCapabilities } from '@/shared/lib/metrics/capabilities';
 import {
   isScalarMetric,
   isTableMetric,
@@ -105,6 +106,7 @@ function toAnalyticsResult(
   def: ScalarMetricDefinition,
   result: Awaited<ReturnType<typeof callMetric>>,
   pinEnabled: boolean,
+  followUps: Array<{ label: string; value: string; metricId: string }>,
 ): AnalyticsResult | null {
   if (!('ok' in result) || !result.ok || result.kind !== 'scalar') return null;
 
@@ -143,6 +145,9 @@ function toAnalyticsResult(
       cadence: def.refreshability,
     },
     ...(empty ? { empty } : {}),
+    ...(followUps.length > 0
+      ? { followUps: followUps.map((c) => ({ label: c.label, value: c.value })) }
+      : {}),
   };
 }
 
@@ -213,7 +218,17 @@ export async function invokeCallMetric(
     } catch {
       pinEnabled = false;
     }
-    const block = toAnalyticsResult(def, result, pinEnabled);
+    // Phase 4.3 — resolve follow-ups, filtering to what the viewer can actually
+    // call. Silent drop if capabilities resolution fails — follow-ups are
+    // optional affordance, not a load-bearing part of the answer.
+    let followUps: Array<{ label: string; value: string; metricId: string }> = [];
+    try {
+      const caps = await userCapabilities(workspaceId);
+      followUps = getRelatedMetricChips(def.id, caps as Set<string>);
+    } catch {
+      followUps = [];
+    }
+    const block = toAnalyticsResult(def, result, pinEnabled, followUps);
     if (!block) return { kind: 'error', message: 'Failed to shape scalar result.' };
     return { kind: 'analytics_result', block };
   }

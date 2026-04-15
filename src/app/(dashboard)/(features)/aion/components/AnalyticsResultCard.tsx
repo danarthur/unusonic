@@ -489,6 +489,31 @@ export function AnalyticsResultCard({
           </div>
         ) : null}
 
+        {/* Phase 4.3 — conversational follow-ups. Tap dispatches a synthetic
+            chat turn asking for the related metric. Hidden in read-only mode
+            (pinned cards on the Lobby) — follow-ups are chat-surface affordance. */}
+        {result.followUps && result.followUps.length > 0 && !readOnly ? (
+          <div
+            className="flex flex-wrap gap-2 items-center pt-1"
+            data-testid="analytics-follow-ups"
+          >
+            <span className="stage-label font-mono text-[var(--stage-text-tertiary)]">
+              Try next
+            </span>
+            {result.followUps.map((chip) => (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => onArgEdit?.(chip.value)}
+                className="px-3 py-1 text-xs rounded-full bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)] text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-raised)] hover:text-[var(--stage-text-primary)] transition-colors"
+                data-testid="analytics-follow-up-chip"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {confirmOpen && !readOnly && result.pinEnabled && result.pinnable ? (
           <PinConfirmRow
             defaultTitle={result.title}

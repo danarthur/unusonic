@@ -135,6 +135,13 @@ export type AnalyticsResult = {
   error?: { message: string; recoveryUrl?: string };
   /** When set, renders the registry's empty-state copy instead of the value block. */
   empty?: { title: string; body: string; cta?: { label: string; href: string } };
+  /**
+   * Phase 4.3 — follow-up chips rendered beneath the card. Each chip, when
+   * tapped, dispatches a synthetic chat turn asking for the related metric.
+   * Server resolves via RELATED_METRICS + capability filter, so anything that
+   * appears here is safe for the viewer to call.
+   */
+  followUps?: SuggestionChip[];
 };
 
 // =============================================================================

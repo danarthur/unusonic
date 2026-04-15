@@ -64,6 +64,19 @@ type MetricBase = {
   title: string;
   description: string;
   emptyState: MetricEmptyState;
+  /**
+   * Phase 4.3 — IDs of 2–3 metrics that make sense as conversational follow-ups
+   * after this one. When call_metric emits an analytics_result, these IDs are
+   * resolved to SuggestionChips and rendered beneath the card. Follow-ups
+   * should span domain/unit boundaries deliberately: "this month revenue" →
+   * "last month revenue" (same metric, shifted) OR "AR aged 60+" (different
+   * metric, same financial-health frame) OR "revenue by lead source" (same
+   * metric drilled down).
+   *
+   * The resolver quietly drops any IDs the viewer lacks capability for, so
+   * it's safe to list gated metrics here without leaking their existence.
+   */
+  relatedMetrics?: string[];
   /** Free-form notes, especially when the RPC reads grandfathered tables. */
   notes?: string;
 };
