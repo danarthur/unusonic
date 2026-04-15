@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useSession } from '@/shared/ui/providers/SessionContext';
 import type { AionMessageContent } from '../lib/aion-chat-types';
 import { DraftPreviewCard, type DraftEditedData } from './DraftPreviewCard';
 import { QueuePreviewCard } from './QueuePreviewCard';
@@ -8,6 +9,7 @@ import { LearnedSummaryCard } from './LearnedSummaryCard';
 import { ScorecardCard } from './ScorecardCard';
 import { ChartCard } from './ChartCard';
 import { DataTableCard } from './DataTableCard';
+import { AnalyticsResultCard } from './AnalyticsResultCard';
 
 interface AionMessageRendererProps {
   contents: AionMessageContent[];
@@ -21,6 +23,15 @@ interface AionMessageRendererProps {
  * This renderer handles the richer content types.
  */
 export function AionMessageRenderer({ contents, workspaceId, onDraftEdited }: AionMessageRendererProps) {
+  const { sendChatMessage } = useSession();
+  const handleArgEdit = React.useCallback(
+    (message: string) => {
+      if (!workspaceId) return;
+      void sendChatMessage({ text: message, workspaceId });
+    },
+    [sendChatMessage, workspaceId],
+  );
+
   return (
     <>
       {contents.map((block, idx) => {
@@ -80,6 +91,14 @@ export function AionMessageRenderer({ contents, workspaceId, onDraftEdited }: Ai
                 title={block.title}
                 columns={block.columns}
                 rows={block.rows}
+              />
+            );
+          case 'analytics_result':
+            return (
+              <AnalyticsResultCard
+                key={idx}
+                result={block}
+                onArgEdit={handleArgEdit}
               />
             );
           // text and suggestions are handled by ChatInterface

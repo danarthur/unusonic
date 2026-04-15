@@ -37,15 +37,36 @@ function resolveColor(point: ChartDataPoint, index: number): string {
 // ChartCard
 // ---------------------------------------------------------------------------
 
+export type AionChartType = 'bar' | 'line' | 'area' | 'donut';
+
 interface ChartCardProps {
-  title: string;
-  chartType: 'bar' | 'line' | 'donut';
+  title?: string;
+  chartType: AionChartType;
   data: ChartDataPoint[];
   valuePrefix?: string;
   valueSuffix?: string;
+  /** When true, omits the outer StagePanel chrome so callers can nest inside their own panel. */
+  bare?: boolean;
 }
 
-export function ChartCard({ title, chartType, data, valuePrefix = '', valueSuffix = '' }: ChartCardProps) {
+export function ChartCard({ title, chartType, data, valuePrefix = '', valueSuffix = '', bare = false }: ChartCardProps) {
+  const body = (
+    <>
+      {title ? (
+        <p className="stage-label font-mono select-none">
+          {title}
+        </p>
+      ) : null}
+      {chartType === 'bar' && <BarChart data={data} valuePrefix={valuePrefix} valueSuffix={valueSuffix} />}
+      {(chartType === 'line' || chartType === 'area') && <LineChart data={data} filled={chartType === 'area'} />}
+      {chartType === 'donut' && <DonutChart data={data} valuePrefix={valuePrefix} valueSuffix={valueSuffix} />}
+    </>
+  );
+
+  if (bare) {
+    return <div className="flex flex-col gap-3">{body}</div>;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -53,13 +74,7 @@ export function ChartCard({ title, chartType, data, valuePrefix = '', valueSuffi
       transition={STAGE_LIGHT}
     >
       <StagePanel elevated className="p-4 flex flex-col gap-3">
-        <p className="stage-label font-mono select-none">
-          {title}
-        </p>
-
-        {chartType === 'bar' && <BarChart data={data} valuePrefix={valuePrefix} valueSuffix={valueSuffix} />}
-        {chartType === 'line' && <LineChart data={data} />}
-        {chartType === 'donut' && <DonutChart data={data} valuePrefix={valuePrefix} valueSuffix={valueSuffix} />}
+        {body}
       </StagePanel>
     </motion.div>
   );
@@ -104,13 +119,13 @@ function BarChart({ data, valuePrefix, valueSuffix }: { data: ChartDataPoint[]; 
 // Line chart — SVG sparkline at full width
 // ---------------------------------------------------------------------------
 
-function LineChart({ data }: { data: ChartDataPoint[] }) {
+function LineChart({ data, filled = false }: { data: ChartDataPoint[]; filled?: boolean }) {
   const width = 400;
   const height = 80;
   const padding = 8;
 
-  const pathD = useMemo(() => {
-    if (data.length < 2) return '';
+  const { pathD, areaD } = useMemo(() => {
+    if (data.length < 2) return { pathD: '', areaD: '' };
     const vals = data.map((d) => d.value);
     const min = Math.min(...vals);
     const max = Math.max(...vals);
@@ -123,12 +138,26 @@ function LineChart({ data }: { data: ChartDataPoint[] }) {
       const y = padding + h - ((v - min) / range) * h;
       return `${x},${y}`;
     });
-    return `M ${points.join(' L ')}`;
+    const line = `M ${points.join(' L ')}`;
+    const first = points[0].split(',');
+    const last = points[points.length - 1].split(',');
+    const area = `${line} L ${last[0]},${padding + h} L ${first[0]},${padding + h} Z`;
+    return { pathD: line, areaD: area };
   }, [data]);
 
   return (
     <div className="flex flex-col gap-2">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" aria-hidden>
+        {filled ? (
+          <motion.path
+            d={areaD}
+            fill="var(--stage-accent)"
+            style={{ opacity: 0.12 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.12 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        ) : null}
         <motion.path
           d={pathD}
           fill="none"

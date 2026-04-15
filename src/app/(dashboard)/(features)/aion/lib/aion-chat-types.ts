@@ -37,6 +37,99 @@ export type DataTableColumn = {
   align?: 'left' | 'right';
 };
 
+// =============================================================================
+// analytics_result content type (Phase 3.1)
+// Wire format locked in docs/reference/pages/reports-analytics-result-design.md §1.
+// =============================================================================
+
+export type AnalyticsResultPill = {
+  /** Stable arg key matching the metric RPC parameter (e.g. 'period_start', 'client_id'). */
+  key: string;
+  /** Human-readable chip label (e.g. 'Last 30 days', 'Live Nation'). */
+  label: string;
+  /** The actual arg value passed to the RPC. Typed as unknown to support all RPC arg types. */
+  value: unknown;
+  /** False when the pill represents a pinned-context arg the user can't change (e.g. workspace_id). */
+  editable: boolean;
+  /**
+   * When editable, the choices the user can swap to. Resolved at render time from the metric
+   * registry's argsSchema — Aion doesn't enumerate them, the registry does.
+   */
+  choiceSetKey?: 'period' | 'client' | 'crew_member' | 'event' | 'tag' | 'year';
+};
+
+export type AnalyticsResultComparison = {
+  /** Human-readable label: 'vs last month', 'vs same period last year', 'vs target'. */
+  label: string;
+  /** Pre-formatted delta string: '+12.4%', '-$3,200', 'flat'. */
+  delta: string;
+  /** Direction for the arrow icon. */
+  direction: 'up' | 'down' | 'flat';
+  /**
+   * Business-meaning sentiment. Up isn't always good (overdue invoices going up = bad).
+   * The metric registry sets this; Aion doesn't infer it.
+   */
+  sentiment: 'positive' | 'negative' | 'neutral';
+};
+
+export type AnalyticsResultValue = {
+  /** Pre-formatted hero number: '$128,400', '12 shows', '41.7%'. Always ready for tabular-nums display. */
+  primary: string;
+  /** Unit hint for accessibility/screen readers. Not always rendered visibly. */
+  unit: 'currency' | 'count' | 'percent' | 'duration' | 'timestamp' | 'ratio';
+  /** Optional secondary line: '$8,200 avg', '3 of 12 paid'. */
+  secondary?: string;
+};
+
+export type AnalyticsResultFreshness = {
+  /** ISO timestamp of when the underlying RPC was called. */
+  computedAt: string;
+  /** Registry-defined refresh cadence. */
+  cadence: 'live' | 'hourly' | 'daily' | 'manual';
+};
+
+export type AnalyticsResult = {
+  type: 'analytics_result';
+  /** Short conversational intro (1 sentence max). */
+  text: string;
+  /** Stable registry ID. Pin store and refresh cron resolve metadata from this. */
+  metricId: string;
+  /** Display title from the registry (e.g. 'Revenue collected'). */
+  title: string;
+  /** Snapshot of the args used to produce this result. Identical to what gets stored on a pin. */
+  args: Record<string, unknown>;
+  /** The hero number the user looks at first. Required. */
+  value: AnalyticsResultValue;
+  /** Optional period-comparison line. Omit if registry entry has no comparison. */
+  comparison?: AnalyticsResultComparison;
+  /**
+   * Optional sparkline values, oldest → newest. Render only if length >= 7.
+   * A null/undefined sparkline means the metric simply doesn't have one.
+   */
+  sparkline?: number[];
+  /**
+   * Optional full chart payload. When present, the sparkline is hidden.
+   */
+  chart?: {
+    chartType: 'bar' | 'line' | 'area' | 'donut';
+    data: ChartDataPoint[];
+    valuePrefix?: string;
+    valueSuffix?: string;
+  };
+  /** Editable arg pills. Always include at least the period if the metric is period-bound. */
+  pills: AnalyticsResultPill[];
+  /** False when the metric isn't pinnable (e.g. a one-off computation). */
+  pinnable: boolean;
+  /** Present when this card was opened from an existing pin. */
+  pinId?: string;
+  /** Freshness info for the provenance footer. */
+  freshness: AnalyticsResultFreshness;
+  /** When set, renders the error-stripe variant with this copy instead of the value block. */
+  error?: { message: string; recoveryUrl?: string };
+  /** When set, renders the registry's empty-state copy instead of the value block. */
+  empty?: { title: string; body: string; cta?: { label: string; href: string } };
+};
+
 export type AionMessageContent =
   | { type: 'text'; text: string }
   | { type: 'suggestions'; text: string; chips: SuggestionChip[] }
@@ -44,8 +137,9 @@ export type AionMessageContent =
   | { type: 'learned_summary'; text: string; rules: string[] }
   | { type: 'follow_up_queue'; text: string; items: QueuePreviewItem[] }
   | { type: 'scorecard'; text: string; title: string; metrics: ScorecardMetric[] }
-  | { type: 'chart'; text: string; title: string; chartType: 'bar' | 'line' | 'donut'; data: ChartDataPoint[]; valuePrefix?: string; valueSuffix?: string }
-  | { type: 'data_table'; text: string; title: string; columns: DataTableColumn[]; rows: Record<string, string | number>[] };
+  | { type: 'chart'; text: string; title: string; chartType: 'bar' | 'line' | 'area' | 'donut'; data: ChartDataPoint[]; valuePrefix?: string; valueSuffix?: string }
+  | { type: 'data_table'; text: string; title: string; columns: DataTableColumn[]; rows: Record<string, string | number>[] }
+  | AnalyticsResult;
 
 // =============================================================================
 // Chat route request / response

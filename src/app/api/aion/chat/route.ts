@@ -38,6 +38,7 @@ import { createKnowledgeTools } from './tools/knowledge';
 import { createActionTools } from './tools/actions';
 import { createEntityTools } from './tools/entity';
 import { createProductionTools } from './tools/production';
+import { createAnalyticsTools, invokeCallMetric } from './tools/analytics';
 import type { AionToolContext } from './tools/types';
 
 export const runtime = 'nodejs';
@@ -77,14 +78,18 @@ function buildToolsForIntent(
   // Always include core (voice config, memory, follow-ups, drafts) + knowledge (read-only lookups)
   const core = createCoreTools(toolCtx);
   const knowledge = createKnowledgeTools(toolCtx);
+  const analytics = createAnalyticsTools(toolCtx);
 
   switch (intent) {
     // Lightweight intents — core + knowledge only (no write/entity/production tools)
     case 'greeting':
     case 'rejection':
     case 'conversational':
-    case 'simple_lookup':
       return { ...core, ...knowledge };
+
+    // Simple lookup can ask for a scalar metric (revenue, AR, sync health)
+    case 'simple_lookup':
+      return { ...core, ...knowledge, ...analytics };
 
     // Draft requests — core has draft_follow_up + regenerate_draft, knowledge for context
     case 'draft_request':
@@ -107,13 +112,14 @@ function buildToolsForIntent(
       return { ...core, ...knowledge, ...actions, ...entity };
     }
 
-    // Multi-step, analysis, strategic — full tool set
+    // Multi-step, analysis, strategic — full tool set (+ call_metric for analysis)
     case 'multi_step':
     case 'analysis':
     case 'strategic':
       return {
         ...core,
         ...knowledge,
+        ...analytics,
         ...createActionTools(toolCtx),
         ...createEntityTools(toolCtx),
         ...createProductionTools(toolCtx),
@@ -190,6 +196,18 @@ export async function POST(req: Request) {
   if (messages.length === 0) {
     const greeting = await buildGreeting(onboardingState, user.user_metadata?.full_name ?? null, workspaceId, pageContext);
     return NextResponse.json(greeting);
+  }
+
+  // 6b. Phase 3.1: synthetic pill-edit short-circuit.
+  // Pattern: `[arg-edit] <metricId> <argKey>=<value>` emitted by AnalyticsResultCard
+  // when the user picks a new pill value. We re-run callMetric with the previous
+  // args merged with the new one — no LLM invocation.
+  const lastMsg = messages[messages.length - 1];
+  if (lastMsg?.role === 'user') {
+    const argEdit = parseArgEditMessage(lastMsg.content);
+    if (argEdit) {
+      return NextResponse.json(await handleArgEdit(workspaceId, argEdit));
+    }
   }
 
   // 7. Build system prompt with workspace context + user identity
@@ -495,6 +513,19 @@ function buildResponseFromResult(
           });
           break;
         }
+
+        // Phase 3.1: call_metric emits either an analytics_result (scalar) or a data_table (table fallback).
+        case 'call_metric': {
+          if (data.analytics_result) {
+            msgs.push(data.analytics_result as AionMessageContent);
+          } else if (data.data_table) {
+            msgs.push(data.data_table as AionMessageContent);
+          } else if (data.error) {
+            // Phase 3.4 upgrades this to a proper `refusal` type.
+            msgs.push({ type: 'text', text: data.error });
+          }
+          break;
+        }
       }
     }
   }
@@ -596,6 +627,23 @@ function buildSystemPrompt(config: AionConfig, onboardingState: OnboardingState,
     '- For schedule questions, use get_entity_schedule or get_calendar_events',
     '- For financial questions, use get_entity_financial_summary or get_proposal_details',
     '- For reports and dashboards: use get_revenue_summary (financial scorecard), get_pipeline_summary (deal pipeline chart), get_revenue_trend (6-month revenue line chart), get_client_concentration (revenue by client donut chart), get_client_insights (client scorecard). These render as visual data cards with charts — use them when users ask for summaries, scorecards, reports, metrics, or dashboards.',
+    '',
+    '=== REGISTRY METRICS (call_metric) ===',
+    'When the user asks for a single scalar business metric that maps to a registry ID, call `call_metric` with the metric_id and (if required) args. Do NOT compose multiple read tools into a ScoreCard when one registry metric covers the ask — call_metric renders a first-class analytics_result card with comparison, sparkline, pills, and provenance.',
+    '',
+    'Scalar registry IDs (use call_metric for these):',
+    '- finance.revenue_collected — revenue received in a period. Args: period_start, period_end (YYYY-MM-DD).',
+    '- finance.ar_aged_60plus — outstanding receivables aged 60+ days. No args.',
+    '- finance.qbo_variance — count of invoices with QBO sync issues. No args.',
+    '- finance.qbo_sync_health — QBO connection health. No args.',
+    '',
+    'Table registry IDs (use call_metric; renders as a data_table fallback in chat, full experience on the Reconciliation surface):',
+    '- finance.unreconciled_payments — payments not reconciled with QBO. No args.',
+    '- finance.invoice_variance — invoices with sync issues. No args.',
+    '- finance.sales_tax_worksheet — sales tax by jurisdiction over a period. Args: period_start, period_end.',
+    '- finance.1099_worksheet — per-vendor totals for a calendar year. Args: year.',
+    '',
+    'Prefer call_metric over freehand composition. The legacy get_revenue_summary tool is for the broad financial scorecard; call_metric is for precise single-metric answers.',
     '',
     '=== FOLLOW-UP TRAINING ===',
     'When the user describes how they handle follow-ups — timing, channels, rules, or exceptions — treat it like onboarding a new team member:',
@@ -932,6 +980,83 @@ function extractChips(text: string): { text: string; chips: SuggestionChip[] } {
 
 function respondText(text: string): AionChatResponse {
   return { messages: [{ type: 'text', text }] };
+}
+
+// =============================================================================
+// Phase 3.1: synthetic `[arg-edit]` message handling
+// =============================================================================
+
+type ArgEdit = {
+  metricId: string;
+  argKey: string;
+  rawValue: string;
+};
+
+/** Match `[arg-edit] <metricId> <argKey>=<value>`. Value runs to end-of-line. */
+function parseArgEditMessage(content: string): ArgEdit | null {
+  const match = content.match(/^\[arg-edit\]\s+(\S+)\s+([A-Za-z_][A-Za-z0-9_]*)=([\s\S]+)$/);
+  if (!match) return null;
+  return { metricId: match[1], argKey: match[2], rawValue: match[3].trim() };
+}
+
+/** Parse a JSON-encoded period object into { period_start, period_end }. */
+function parsePeriodEdit(rawValue: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(rawValue) as { period_start?: unknown; period_end?: unknown };
+    if (!parsed || typeof parsed !== 'object') return {};
+    const out: Record<string, unknown> = {};
+    if (typeof parsed.period_start === 'string') out.period_start = parsed.period_start;
+    if (typeof parsed.period_end === 'string') out.period_end = parsed.period_end;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Best-effort parse of an arbitrary raw value (JSON if possible, else string). */
+function parseRawValue(rawValue: string): unknown {
+  try {
+    return JSON.parse(rawValue);
+  } catch {
+    return rawValue;
+  }
+}
+
+/**
+ * Build the args shape callMetric expects from a synthetic `[arg-edit]` message.
+ *
+ * Phase 3.1 note: the persisted chat history is free-text user + assistant
+ * content; tool-result payloads are emitted over the stream but not replayed
+ * verbatim in chat history. So we accept defaultArgs + the single edit; callers
+ * that need non-default prior args should re-ask from scratch.
+ */
+function argsFromEdit(edit: ArgEdit): Record<string, unknown> {
+  const { argKey, rawValue } = edit;
+  if (argKey === 'period') return parsePeriodEdit(rawValue);
+  if (argKey === 'year') {
+    const n = Number(rawValue);
+    return Number.isFinite(n) ? { year: Math.trunc(n) } : {};
+  }
+  return { [argKey]: parseRawValue(rawValue) };
+}
+
+async function handleArgEdit(
+  workspaceId: string,
+  edit: ArgEdit,
+): Promise<AionChatResponse> {
+  const nextArgs = argsFromEdit(edit);
+  const result = await invokeCallMetric(workspaceId, edit.metricId, nextArgs);
+
+  if (result.kind === 'error') {
+    return respondText(result.message);
+  }
+  if (result.kind === 'analytics_result') {
+    return { messages: [result.block as AionMessageContent] };
+  }
+  if (result.kind === 'data_table' && result.block) {
+    return { messages: [result.block as AionMessageContent] };
+  }
+  return respondText('Could not resolve that metric edit.');
 }
 
 type WorkspaceSnapshot = {
