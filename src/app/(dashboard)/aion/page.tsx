@@ -1,14 +1,17 @@
-'use client';
+import { Suspense } from 'react';
+import { AionPageClient } from './AionPageClient';
 
-import { ChatInterface } from '@/app/(dashboard)/(features)/aion/components/ChatInterface';
-import { useRequiredWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
-
+/**
+ * Aion chat page shell. Must stay a Server Component per the repo-wide
+ * no-restricted-syntax rule that forbids 'use client' on route entries.
+ *
+ * Phase 3.3 adds Suspense around the client body so the `openPin` URL param
+ * reader (useSearchParams) can mount safely.
+ */
 export default function AionPage() {
-  const workspaceId = useRequiredWorkspace();
-
   return (
-    <div className="flex flex-col h-full" data-surface="void">
-      <ChatInterface viewState="chat" workspaceId={workspaceId} />
-    </div>
+    <Suspense fallback={null}>
+      <AionPageClient />
+    </Suspense>
   );
 }

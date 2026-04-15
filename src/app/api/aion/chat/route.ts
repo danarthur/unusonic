@@ -213,6 +213,16 @@ export async function POST(req: Request) {
     if (argEdit) {
       return NextResponse.json(await handleArgEdit(workspaceId, argEdit));
     }
+    // 6c. Phase 3.3: synthetic "open pin" short-circuit.
+    // Pattern: `[open-pin] <pinId>` emitted by the Aion page when the user
+    // arrives via /aion?openPin=<id>. We resolve the pin for the current user
+    // and re-run callMetric with the stored metric_id + args, then emit an
+    // analytics_result block with pinId set (so the "Update pin" affordance
+    // lights up on the fresh card).
+    const openPin = parseOpenPinMessage(lastMsg.content);
+    if (openPin) {
+      return NextResponse.json(await handleOpenPin(workspaceId, user.id, openPin));
+    }
   }
 
   // 7. Build system prompt with workspace context + user identity
@@ -1077,6 +1087,52 @@ async function handleArgEdit(
     return { messages: [result.block as AionMessageContent] };
   }
   return respondText('Could not resolve that metric edit.');
+}
+
+// =============================================================================
+// Phase 3.3: synthetic `[open-pin]` message handling
+// =============================================================================
+
+/** Match `[open-pin] <pinId>`. Pin id runs to end-of-line (uuid-shaped). */
+function parseOpenPinMessage(content: string): string | null {
+  const match = content.match(/^\[open-pin\]\s+(\S+)\s*$/);
+  return match ? match[1] : null;
+}
+
+async function handleOpenPin(
+  workspaceId: string,
+  userId: string,
+  pinId: string,
+): Promise<AionChatResponse> {
+  // Import lazily — this path is only hit when the synthetic turn fires.
+  const { loadPinToAion } = await import(
+    '@/app/(dashboard)/(features)/aion/actions/open-pin'
+  );
+  // loadPinToAion re-resolves the user from cookies, which matches the caller
+  // (this route is already authenticated). We pass the pinId verbatim; the
+  // action filters by (workspace, user) so a cross-user pin id returns null.
+  void userId; // user scoping is enforced inside loadPinToAion
+  void workspaceId;
+
+  const pin = await loadPinToAion(pinId);
+  if (!pin) {
+    return respondText('I couldn\'t open that pin — it may have been removed.');
+  }
+
+  const result = await invokeCallMetric(workspaceId, pin.metricId, pin.args);
+  if (result.kind === 'error') {
+    return respondText(result.message);
+  }
+  if (result.kind === 'analytics_result') {
+    // Stamp the pinId onto the fresh result so the card renders with the
+    // "Update pin" affordance lit. Phase 3.2's AnalyticsResultCard reads this.
+    const block = { ...result.block, pinId: pin.pinId } as AionMessageContent;
+    return { messages: [block] };
+  }
+  if (result.kind === 'data_table' && result.block) {
+    return { messages: [result.block as AionMessageContent] };
+  }
+  return respondText('Could not reopen that pin.');
 }
 
 type WorkspaceSnapshot = {
