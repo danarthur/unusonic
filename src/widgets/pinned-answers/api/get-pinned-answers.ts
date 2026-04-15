@@ -14,12 +14,19 @@ import 'server-only';
 
 import {
   listPins,
+  listPinHealth,
   type LobbyPin,
 } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
 
 export async function getPinnedAnswers(): Promise<LobbyPin[]> {
   try {
-    return await listPins();
+    const [pins, healthMap] = await Promise.all([
+      listPins(),
+      // Phase 5.3: health is best-effort — a failure here must not blank the
+      // pins section. Swallow + return empty map so cards still render.
+      listPinHealth().catch(() => ({} as Record<string, LobbyPin['health']>)),
+    ]);
+    return pins.map((p) => ({ ...p, health: healthMap[p.pinId] ?? undefined }));
   } catch {
     // Flag-off / auth-miss / workspace-miss — all collapse to zero pins.
     return [];

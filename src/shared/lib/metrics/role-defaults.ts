@@ -20,7 +20,10 @@ export const ROLE_DEFAULTS: Record<MetricRole, string[]> = {
     'lobby.active_production',
     'lobby.deal_pipeline',
     'lobby.action_queue',
-    'lobby.client_concentration',
+    // Phase 5.1 — crew utilization added at the 8th slot. Swapped in for
+    // client_concentration, which was a low-click default in early analytics
+    // and is still available to owners via the Phase 2.3 library picker.
+    'ops.crew_utilization',
   ],
   pm: [
     'lobby.today_schedule',
@@ -46,11 +49,18 @@ export const ROLE_DEFAULTS: Record<MetricRole, string[]> = {
     'lobby.urgency_strip',
     'lobby.today_schedule',
     'lobby.action_queue',
+    // Phase 5.1 — settlement + vendor payments are the top-of-mind questions
+    // for a touring coordinator at 11pm post-load-out. Promoted above
+    // logistics so money visibility lands above the fold.
+    'lobby.settlement_tracking',
+    'lobby.vendor_payment_status',
     'lobby.real_time_logistics',
     'lobby.production_timeline',
-    'lobby.active_production',
-    'lobby.run_of_show_feed',
-    'lobby.week_strip',
+    // Phase 5.1 — replaces lobby.week_strip with the tour-specific next-markets
+    // rollup (the week strip's generic "events in 7 days" shape doesn't
+    // answer "which markets haven't been advanced yet"). active_production
+    // and run_of_show_feed drop from defaults but remain library-accessible.
+    'lobby.multi_stop_rollup',
   ],
   employee: [
     'lobby.action_queue',

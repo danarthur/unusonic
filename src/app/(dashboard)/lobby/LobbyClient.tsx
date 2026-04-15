@@ -172,7 +172,10 @@ function OverviewView({
     >
       <motion.div
         key="hub-view"
-        className="flex flex-col gap-[var(--stage-gap,8px)] p-[var(--stage-padding,16px)]"
+        // Mobile uses tighter padding/gap so narrow viewports don't waste edge
+        // space. At md+ we switch to the density-aware tokens so the desktop
+        // surface context system keeps driving padding. Phase 5.2.
+        className="flex flex-col gap-2 p-3 md:gap-[var(--stage-gap,8px)] md:p-[var(--stage-padding,16px)]"
         initial="hidden"
         animate="visible"
         exit="exit"

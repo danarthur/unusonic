@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const hoisted = vi.hoisted(() => {
   const dueRpcMock = vi.fn<(args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>>();
   const updateRpcMock = vi.fn<(args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>>();
+  const markFailureRpcMock = vi.fn<(args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>>();
   const callMetricMock = vi.fn();
   const sentryCaptureMock = vi.fn();
   const sentryBreadcrumbMock = vi.fn();
@@ -24,6 +25,7 @@ const hoisted = vi.hoisted(() => {
         rpc: (name: string, args: Record<string, unknown>) => {
           if (name === 'due_lobby_pins') return dueRpcMock(args);
           if (name === 'update_lobby_pin_value') return updateRpcMock(args);
+          if (name === 'mark_lobby_pin_failure') return markFailureRpcMock(args);
           throw new Error(`Unexpected RPC: ${name}`);
         },
       };
@@ -32,6 +34,7 @@ const hoisted = vi.hoisted(() => {
   return {
     dueRpcMock,
     updateRpcMock,
+    markFailureRpcMock,
     callMetricMock,
     sentryCaptureMock,
     sentryBreadcrumbMock,
@@ -43,6 +46,7 @@ const hoisted = vi.hoisted(() => {
 const {
   dueRpcMock,
   updateRpcMock,
+  markFailureRpcMock,
   callMetricMock,
   sentryCaptureMock,
   sentryBreadcrumbMock,
@@ -81,10 +85,12 @@ beforeEach(() => {
   schemaCalls.length = 0;
   dueRpcMock.mockReset();
   updateRpcMock.mockReset();
+  markFailureRpcMock.mockReset();
   callMetricMock.mockReset();
   sentryCaptureMock.mockReset();
   sentryBreadcrumbMock.mockReset();
   updateRpcMock.mockResolvedValue({ data: null, error: null });
+  markFailureRpcMock.mockResolvedValue({ data: null, error: null });
   // Default: successful scalar result.
   callMetricMock.mockResolvedValue({
     ok: true,
@@ -239,6 +245,12 @@ describe('pin-refresh cron — processing', () => {
     // Only the successful pin hits update_lobby_pin_value.
     expect(updateRpcMock).toHaveBeenCalledTimes(1);
     expect(updateRpcMock.mock.calls[0][0].p_pin_id).toBe('pin-ok');
+    // Phase 5.3: the failed pin's last_error is persisted via mark_lobby_pin_failure.
+    expect(markFailureRpcMock).toHaveBeenCalledTimes(1);
+    const markArgs = markFailureRpcMock.mock.calls[0][0];
+    expect(markArgs.p_pin_id).toBe('pin-fail');
+    expect(String(markArgs.p_error_message)).toContain('RPC timeout');
+    expect(typeof markArgs.p_error_at).toBe('string');
   });
 
   it('caps processing at 5 pins per workspace in a single run', async () => {
@@ -327,5 +339,7 @@ describe('pin-refresh cron — processing', () => {
     const body = await res.json();
     expect(body).toEqual({ refreshed: 0, skipped: 0, failed: 1 });
     expect(sentryCaptureMock).toHaveBeenCalled();
+    expect(markFailureRpcMock).toHaveBeenCalledTimes(1);
+    expect(markFailureRpcMock.mock.calls[0][0].p_pin_id).toBe('pin-throw');
   });
 });

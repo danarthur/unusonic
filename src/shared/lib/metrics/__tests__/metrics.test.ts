@@ -65,21 +65,37 @@ describe('registry sanity', () => {
     }
   });
 
-  it('exposes the Phase 1.2 + 3.4 RPC metrics', () => {
+  it('exposes the Phase 1.2 + 3.4 + 4.2 + 5.4 RPC metrics', () => {
     const rpcIds = METRIC_IDS.filter((id) => !isWidgetMetric(METRICS[id])).sort();
     expect(rpcIds).toEqual([
       // Phase 1.2 — finance metrics.
       'finance.1099_worksheet',
       'finance.ar_aged_60plus',
+      // Phase 4.2 — budget vs actual.
+      'finance.budget_vs_actual',
       'finance.invoice_variance',
       'finance.qbo_sync_health',
       'finance.qbo_variance',
+      // Phase 4.2 — revenue by lead source.
+      'finance.revenue_by_lead_source',
       'finance.revenue_collected',
+      // Phase 4.2 — revenue YoY.
+      'finance.revenue_yoy',
       'finance.sales_tax_worksheet',
       'finance.unreconciled_payments',
       // Phase 3.4 — ops refusal-rate.
       'ops.aion_refusal_rate',
+      // Phase 4.2 — crew utilization.
+      'ops.crew_utilization',
+      // Phase 5.4 — tour metrics.
+      'ops.multi_stop_rollup',
+      'ops.settlement_variance',
+      'ops.vendor_payment_status',
     ]);
+    // Phase 4.2 + 5.4 adds 6 metrics on top of Phase 1.2 (8) + Phase 3.4 (1) = 15.
+    // One additional RPC metric (finance.revenue_yoy) is widget-backed; the widget
+    // check treats it as an RPC metric because it has rpcName/rpcSchema.
+    expect(rpcIds.length).toBe(16);
   });
 });
 
@@ -120,6 +136,10 @@ describe('library manifest', () => {
       METRICS['finance.qbo_variance'].widgetKey,
       // aion-refusal-rate (Phase 3.4) is also an RPC-backed scalar with a widgetKey.
       METRICS['ops.aion_refusal_rate'].widgetKey,
+      // Phase 4.2 — revenue-yoy and crew-utilization are RPC-backed scalars
+      // with their own widget folders built by the Phase 5.1 parallel track.
+      METRICS['finance.revenue_yoy'].widgetKey,
+      METRICS['ops.crew_utilization'].widgetKey,
       ...widgetEntries.map((d) => d.widgetKey),
     ]);
     for (const folder of folders) {

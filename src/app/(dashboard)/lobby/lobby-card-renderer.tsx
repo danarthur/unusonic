@@ -35,6 +35,12 @@ import { EventTypeDistWidget } from '@/widgets/event-type-dist';
 import { ClientConcentrationWidget } from '@/widgets/client-concentration';
 import { QboVarianceWidget } from '@/widgets/qbo-variance';
 import { AionRefusalRateWidget } from '@/widgets/aion-refusal-rate';
+// Phase 5.1 — touring coordinator set.
+import { CrewUtilizationWidget } from '@/widgets/crew-utilization';
+import { RevenueYoyWidget } from '@/widgets/revenue-yoy';
+import { SettlementTrackingWidget } from '@/widgets/settlement-tracking';
+import { VendorPaymentStatusWidget } from '@/widgets/vendor-payment-status';
+import { MultiStopRollupWidget } from '@/widgets/multi-stop-rollup';
 
 // Self-fetching widgets / banners.
 import { ActiveProductionWidget } from '@/widgets/active-production';
@@ -126,6 +132,57 @@ const RENDERERS: Record<string, LobbyCardRenderer> = {
     return (
       <AionRefusalRateWidget
         data={dashboardData?.aionRefusalRate ?? undefined}
+        loading={loading}
+      />
+    );
+  },
+
+  // Phase 5.1 — touring coordinator set ---------------------------------------
+  // Scalar widgets ride on the RPC metric IDs (no separate widget registry
+  // entry needed). Table-backed widgets use lobby.* IDs defined in the
+  // registry. Each fetcher gates on its own capability and returns null when
+  // the viewer cannot see the card; here we hide the cell in that case.
+  'ops.crew_utilization': ({ dashboardData, loading }) => {
+    if (dashboardData && dashboardData.crewUtilization === null) return null;
+    return (
+      <CrewUtilizationWidget
+        data={dashboardData?.crewUtilization ?? undefined}
+        loading={loading}
+      />
+    );
+  },
+  'finance.revenue_yoy': ({ dashboardData, loading }) => {
+    if (dashboardData && dashboardData.revenueYoy === null) return null;
+    return (
+      <RevenueYoyWidget
+        data={dashboardData?.revenueYoy ?? undefined}
+        loading={loading}
+      />
+    );
+  },
+  'lobby.settlement_tracking': ({ dashboardData, loading }) => {
+    if (dashboardData && dashboardData.settlementTracking === null) return null;
+    return (
+      <SettlementTrackingWidget
+        data={dashboardData?.settlementTracking ?? undefined}
+        loading={loading}
+      />
+    );
+  },
+  'lobby.vendor_payment_status': ({ dashboardData, loading }) => {
+    if (dashboardData && dashboardData.vendorPaymentStatus === null) return null;
+    return (
+      <VendorPaymentStatusWidget
+        data={dashboardData?.vendorPaymentStatus ?? undefined}
+        loading={loading}
+      />
+    );
+  },
+  'lobby.multi_stop_rollup': ({ dashboardData, loading }) => {
+    if (dashboardData && dashboardData.multiStopRollup === null) return null;
+    return (
+      <MultiStopRollupWidget
+        data={dashboardData?.multiStopRollup ?? undefined}
         loading={loading}
       />
     );

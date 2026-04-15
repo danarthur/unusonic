@@ -36,6 +36,11 @@ export type PinInitialValue = {
   secondary?: string;
 };
 
+export type LobbyPinHealth = {
+  lastViewedAt: string | null;
+  lastError: { message: string; at: string } | null;
+};
+
 export type LobbyPin = {
   pinId: string;
   title: string;
@@ -45,6 +50,8 @@ export type LobbyPin = {
   lastValue: Record<string, unknown>;
   lastRefreshedAt: string | null;
   position: number;
+  /** Phase 5.3 health sidecar — view tracking + last refresh error. */
+  health?: LobbyPinHealth;
 };
 
 const CADENCES: ReadonlySet<PinCadence> = new Set([
@@ -203,6 +210,57 @@ export async function listPins(): Promise<LobbyPin[]> {
     lastRefreshedAt: r.last_refreshed_at,
     position: r.position,
   }));
+}
+
+// ─── Health sidecar (Phase 5.3) ────────────────────────────────────────────
+
+type RawHealthRow = {
+  pin_id: string;
+  last_viewed_at: string | null;
+  last_error_message: string | null;
+  last_error_at: string | null;
+};
+
+/**
+ * Returns a map of pin id → health sidecar (last_viewed_at, last_error).
+ * Used by the PinnedAnswersWidget to compute staleness and surface the
+ * refresh-error chip without touching the Phase 3.2 list_lobby_pins RPC.
+ */
+export async function listPinHealth(): Promise<Record<string, LobbyPinHealth>> {
+  const { userId, workspaceId } = await resolveContext();
+  await requireFeatureEnabled(workspaceId, FEATURE_FLAGS.REPORTS_AION_PIN);
+
+  const supabase = await createClient();
+  const { data, error } = await (supabase as unknown as {
+    schema: (s: string) => {
+      rpc: (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: { message: string } | null }>;
+    };
+  })
+    .schema('cortex')
+    .rpc('list_lobby_pin_health', {
+      p_workspace_id: workspaceId,
+      p_user_id: userId,
+    });
+
+  if (error) {
+    throw new Error(`Could not list pin health: ${error.message}`);
+  }
+
+  const rows = Array.isArray(data) ? (data as RawHealthRow[]) : [];
+  const map: Record<string, LobbyPinHealth> = {};
+  for (const r of rows) {
+    map[r.pin_id] = {
+      lastViewedAt: r.last_viewed_at,
+      lastError:
+        r.last_error_message && r.last_error_at
+          ? { message: r.last_error_message, at: r.last_error_at }
+          : null,
+    };
+  }
+  return map;
 }
 
 // ─── Delete ────────────────────────────────────────────────────────────────

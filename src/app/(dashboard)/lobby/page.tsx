@@ -10,7 +10,7 @@ import { getLobbyLayout } from './actions/lobby-layout';
 import { LobbyClient } from './LobbyClient';
 import { userCapabilities } from '@/shared/lib/metrics/capabilities';
 import type { CapabilityKey } from '@/shared/lib/permission-registry';
-import { getPinnedAnswers } from '@/widgets/pinned-answers';
+import { getPinnedAnswers } from '@/widgets/pinned-answers/api/get-pinned-answers';
 import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
 
 export const dynamic = 'force-dynamic';

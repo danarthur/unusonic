@@ -12,10 +12,21 @@ import { getEventTypeDistribution } from './get-event-type-dist';
 import { getClientConcentration } from './get-client-concentration';
 import { getQboVariance } from '@/widgets/qbo-variance/api/get-qbo-variance';
 import { getAionRefusalRate } from '@/widgets/aion-refusal-rate/api/get-aion-refusal-rate';
+// Phase 5.1 — touring coordinator widgets.
+import { getCrewUtilization } from '@/widgets/crew-utilization/api/get-crew-utilization';
+import { getRevenueYoy } from '@/widgets/revenue-yoy/api/get-revenue-yoy';
+import { getSettlementTracking } from '@/widgets/settlement-tracking/api/get-settlement-tracking';
+import { getVendorPaymentStatus } from '@/widgets/vendor-payment-status/api/get-vendor-payment-status';
+import { getMultiStopRollup } from '@/widgets/multi-stop-rollup/api/get-multi-stop-rollup';
 
 import type { UrgencyAlert } from './get-urgency-alerts';
 import type { QboVarianceDTO } from '@/widgets/qbo-variance/api/get-qbo-variance';
 import type { AionRefusalRateDTO } from '@/widgets/aion-refusal-rate/api/get-aion-refusal-rate';
+import type { CrewUtilizationDTO } from '@/widgets/crew-utilization/api/get-crew-utilization';
+import type { RevenueYoyDTO } from '@/widgets/revenue-yoy/api/get-revenue-yoy';
+import type { SettlementTrackingDTO } from '@/widgets/settlement-tracking/api/get-settlement-tracking';
+import type { VendorPaymentStatusDTO } from '@/widgets/vendor-payment-status/api/get-vendor-payment-status';
+import type { MultiStopRollupDTO } from '@/widgets/multi-stop-rollup/api/get-multi-stop-rollup';
 import type { ActionItem as ActionQueueItem } from './get-action-queue';
 import type { TodayScheduleResult } from './get-today-schedule';
 import type { WeekDay } from './get-week-events';
@@ -43,6 +54,13 @@ export type DashboardData = {
   qboVariance: QboVarianceDTO | null;
   /** Null when the caller lacks the `workspace:owner` capability. Phase 3.4. */
   aionRefusalRate: AionRefusalRateDTO | null;
+  // Phase 5.1 — touring coordinator widgets. Null when the viewer lacks the
+  // required capability; the renderer hides the card in that case.
+  crewUtilization: CrewUtilizationDTO | null;
+  revenueYoy: RevenueYoyDTO | null;
+  settlementTracking: SettlementTrackingDTO | null;
+  vendorPaymentStatus: VendorPaymentStatusDTO | null;
+  multiStopRollup: MultiStopRollupDTO | null;
 };
 
 // ── Orchestrator ───────────────────────────────────────────────────────────
@@ -79,6 +97,11 @@ export async function getDashboardData(period?: DashboardDataPeriod): Promise<Da
     clientConcentration,
     qboVariance,
     aionRefusalRate,
+    crewUtilization,
+    revenueYoy,
+    settlementTracking,
+    vendorPaymentStatus,
+    multiStopRollup,
   ] = await Promise.all([
     getUrgencyAlerts(),
     getActionQueue(),
@@ -94,6 +117,13 @@ export async function getDashboardData(period?: DashboardDataPeriod): Promise<Da
     getQboVariance(),
     // Phase 3.4 — gated on `workspace:owner` inside the fetcher.
     getAionRefusalRate(),
+    // Phase 5.1 — touring coordinator set. Each fetcher gates on its own
+    // capability and returns null when the caller is unqualified.
+    getCrewUtilization(),
+    getRevenueYoy(),
+    getSettlementTracking(),
+    getVendorPaymentStatus(),
+    getMultiStopRollup(),
   ]);
 
   return {
@@ -109,5 +139,10 @@ export async function getDashboardData(period?: DashboardDataPeriod): Promise<Da
     clientConcentration,
     qboVariance,
     aionRefusalRate,
+    crewUtilization,
+    revenueYoy,
+    settlementTracking,
+    vendorPaymentStatus,
+    multiStopRollup,
   };
 }

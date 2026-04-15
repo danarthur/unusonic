@@ -239,11 +239,38 @@ async function recordFailure(
     extra: { pinId: pin.pin_id, metricId: pin.metric_id, workspaceId: pin.workspace_id },
   });
 
-  // Phase 3.3 intentionally does NOT record metadata.last_error here. The
-  // existing update_lobby_pin_value RPC merges p_value onto metadata.last_value,
-  // which would clobber the last-good snapshot. The stale-with-error surface
-  // (Phase 5) needs its own dedicated RPC + UI; until then we rely on Sentry
-  // for observability. Leaving last_refreshed_at stale is the correct signal —
-  // the pin will be re-evaluated on the next cron tick.
+  // Phase 5.3: persist the failure onto metadata.last_error via the dedicated
+  // mark_lobby_pin_failure RPC. update_lobby_pin_value is off-limits here — it
+  // merges onto metadata.last_value and would clobber the last-good snapshot.
+  // Dual signal with Sentry is intentional: Sentry is the operator view,
+  // last_error drives the inline chip on the Lobby card.
+  try {
+    const system = getSystemClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema not in generated supabase types; .schema('cortex') requires an any-cast (CLAUDE.md PR-INFRA-2)
+    const { error: markErr } = await (system as any)
+      .schema('cortex')
+      .rpc('mark_lobby_pin_failure', {
+        p_pin_id: pin.pin_id,
+        p_error_message: message.slice(0, 500),
+        p_error_at: new Date().toISOString(),
+      });
+    if (markErr) {
+      console.error(
+        `[cron/pin-refresh] Failed to record last_error for pin ${pin.pin_id}:`,
+        markErr,
+      );
+      Sentry.captureException(markErr, {
+        tags: { cron: 'pin-refresh', stage: 'mark-failure' },
+        extra: { pinId: pin.pin_id, originalStage: stage },
+      });
+    }
+  } catch (markThrew) {
+    // Never let the failure-recorder itself break the cron loop.
+    console.error(
+      `[cron/pin-refresh] mark_lobby_pin_failure threw for pin ${pin.pin_id}:`,
+      markThrew,
+    );
+  }
+
   return 'failed';
 }

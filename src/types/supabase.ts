@@ -318,6 +318,18 @@ export type Database = {
         Returns: boolean
       }
       dismiss_aion_insight: { Args: { p_insight_id: string }; Returns: boolean }
+      due_lobby_pins: {
+        Args: { p_limit?: number }
+        Returns: {
+          args: Json
+          cadence: string
+          last_refreshed_at: string
+          metric_id: string
+          pin_id: string
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       hybrid_search: {
         Args: {
           full_text_weight?: number
@@ -335,6 +347,15 @@ export type Database = {
           similarity: number
         }[]
       }
+      list_lobby_pin_health: {
+        Args: { p_user_id: string; p_workspace_id: string }
+        Returns: {
+          last_error_at: string
+          last_error_message: string
+          last_viewed_at: string
+          pin_id: string
+        }[]
+      }
       list_lobby_pins: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: {
@@ -347,6 +368,10 @@ export type Database = {
           position: number
           title: string
         }[]
+      }
+      mark_lobby_pin_failure: {
+        Args: { p_error_at?: string; p_error_message: string; p_pin_id: string }
+        Returns: undefined
       }
       match_memory: {
         Args: {
@@ -367,6 +392,7 @@ export type Database = {
           source_type: string
         }[]
       }
+      record_lobby_pin_view: { Args: { p_pin_id: string }; Returns: undefined }
       record_refusal: {
         Args: {
           p_attempted_metric_id?: string
@@ -1486,6 +1512,22 @@ export type Database = {
           sparkline_values: number[]
         }[]
       }
+      metric_budget_vs_actual: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          actual_cost: number
+          event_id: string
+          event_title: string
+          projected_cost: number
+          variance: number
+          variance_pct: number
+        }[]
+      }
       metric_invoice_variance: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -1520,9 +1562,38 @@ export type Database = {
           sparkline_values: number[]
         }[]
       }
+      metric_revenue_by_lead_source: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          deal_count: number
+          lead_source: string
+          paid_invoice_count: number
+          revenue: number
+        }[]
+      }
       metric_revenue_collected: {
         Args: {
           p_compare?: boolean
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          comparison_label: string
+          comparison_value: number
+          primary_value: number
+          secondary_text: string
+          sparkline_values: number[]
+        }[]
+      }
+      metric_revenue_yoy: {
+        Args: {
           p_period_end: string
           p_period_start: string
           p_tz?: string
@@ -1752,6 +1823,59 @@ export type Database = {
           },
         ]
       }
+      crew_comms_log: {
+        Row: {
+          actor_user_id: string | null
+          channel: string
+          created_at: string
+          deal_crew_id: string | null
+          event_id: string | null
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          resend_message_id: string | null
+          summary: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          channel: string
+          created_at?: string
+          deal_crew_id?: string | null
+          event_id?: string | null
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          resend_message_id?: string | null
+          summary?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          channel?: string
+          created_at?: string
+          deal_crew_id?: string | null
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          resend_message_id?: string | null
+          summary?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_comms_log_deal_crew_id_fkey"
+            columns: ["deal_crew_id"]
+            isOneToOne: false
+            referencedRelation: "deal_crew"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_confirmation_tokens: {
         Row: {
           action_taken: string | null
@@ -1971,6 +2095,7 @@ export type Database = {
           entity_id: string | null
           gear_notes: string | null
           id: string
+          internal_note: string | null
           kit_fee: number | null
           notes: string | null
           payment_date: string | null
@@ -1978,6 +2103,7 @@ export type Database = {
           per_diem: number | null
           role_note: string | null
           source: string
+          status: string
           travel_stipend: number | null
           workspace_id: string
         }
@@ -1998,6 +2124,7 @@ export type Database = {
           entity_id?: string | null
           gear_notes?: string | null
           id?: string
+          internal_note?: string | null
           kit_fee?: number | null
           notes?: string | null
           payment_date?: string | null
@@ -2005,6 +2132,7 @@ export type Database = {
           per_diem?: number | null
           role_note?: string | null
           source: string
+          status?: string
           travel_stipend?: number | null
           workspace_id: string
         }
@@ -2025,6 +2153,7 @@ export type Database = {
           entity_id?: string | null
           gear_notes?: string | null
           id?: string
+          internal_note?: string | null
           kit_fee?: number | null
           notes?: string | null
           payment_date?: string | null
@@ -2032,6 +2161,7 @@ export type Database = {
           per_diem?: number | null
           role_note?: string | null
           source?: string
+          status?: string
           travel_stipend?: number | null
           workspace_id?: string
         }
@@ -2966,6 +3096,63 @@ export type Database = {
           primary_value: number
           secondary_text: string
           sparkline_values: number[]
+        }[]
+      }
+      metric_crew_utilization: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          comparison_label: string
+          comparison_value: number
+          primary_value: number
+          secondary_text: string
+          sparkline_values: number[]
+        }[]
+      }
+      metric_multi_stop_rollup: {
+        Args: { p_tz?: string; p_workspace_id: string }
+        Returns: {
+          event_date: string
+          event_id: string
+          event_title: string
+          status: string
+        }[]
+      }
+      metric_settlement_variance: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          actual_settlement: number
+          event_date: string
+          event_id: string
+          event_title: string
+          expected_settlement: number
+          status: string
+          variance: number
+        }[]
+      }
+      metric_vendor_payment_status: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_tz?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          outstanding: number
+          overdue_count: number
+          total_billed: number
+          total_paid: number
+          vendor_id: string
+          vendor_name: string
         }[]
       }
       patch_event_ros_data: {
