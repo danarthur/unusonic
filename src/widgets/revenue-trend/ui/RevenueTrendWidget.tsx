@@ -9,6 +9,9 @@ import {
   STAGE_MEDIUM,
   STAGE_STAGGER_CHILDREN,
 } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.revenue_trend'];
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,15 +29,18 @@ interface RevenueTrendWidgetProps {
 export function RevenueTrendWidget({ data, loading = false }: RevenueTrendWidgetProps) {
   const { months } = data;
   const maxRevenue = Math.max(...months.map((m) => m.revenue), 1);
-  const hasData = months.length > 0 && months.some((m) => m.revenue > 0);
+  // Registry copy says "at least two months of paid invoices" — treat a single
+  // populated month as not-enough history so the empty state matches copy.
+  const monthsWithRevenue = months.filter((m) => m.revenue > 0).length;
+  const hasData = monthsWithRevenue >= 2;
 
   return (
     <WidgetShell
       icon={TrendingUp}
-      label="Revenue Trend"
+      label={META.title}
       loading={loading}
-      empty={!hasData}
-      emptyMessage="Not enough data yet"
+      empty={!loading && !hasData}
+      emptyMessage={META.emptyState.body}
       skeletonRows={4}
     >
       <div className="flex items-end gap-2 h-full pt-2 min-h-0">

@@ -9,6 +9,9 @@ import { useRosFeed, isCueNow, isCueUpcoming, isCuePast, type CueRow } from '../
 import {
   STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.run_of_show_feed'];
 
 /**
  * State B Primary Action: Run-of-Show Feed — timeline of what should be happening now vs. what is happening.
@@ -19,13 +22,13 @@ export function RunOfShowFeedWidget() {
   return (
     <WidgetShell
       icon={RunOfShow}
-      label="Run-of-Show Feed"
+      label={META.title}
       href={eventId ? `/crm/${eventId}` : undefined}
       hrefLabel="Full run of show"
       loading={loading}
       skeletonRows={3}
       empty={!loading && cues.length === 0}
-      emptyMessage="No cues yet. Add run-of-show for the upcoming gig."
+      emptyMessage={META.emptyState.body}
     >
       <motion.div
         className="flex flex-col gap-2 overflow-y-auto"

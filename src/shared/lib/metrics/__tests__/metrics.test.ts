@@ -81,8 +81,9 @@ describe('registry sanity', () => {
 
 // ─── Library manifest coverage (Phase 2.1) ──────────────────────────────────
 
-/** Widget folders excluded from library coverage. */
-const WIDGET_EXCLUDES = new Set(['dashboard', 'shared']);
+/** Widget folders excluded from library coverage. `__tests__` holds the
+ * cross-widget empty-states pattern README added in Phase 2.5, not a widget. */
+const WIDGET_EXCLUDES = new Set(['dashboard', 'shared', '__tests__']);
 
 function listWidgetFolders(): string[] {
   const widgetsDir = join(process.cwd(), 'src', 'widgets');

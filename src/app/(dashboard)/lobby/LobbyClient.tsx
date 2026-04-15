@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { toast } from 'sonner';
 import { useSession } from '@/shared/ui/providers/SessionContext';
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -22,6 +23,14 @@ import {
   useLobbyTimeRange,
 } from './LobbyTimeRangeContext';
 import { LobbyTimeRangePicker } from './LobbyTimeRangePicker';
+import { LayoutControls } from './LayoutControls';
+import { LibraryDrawer } from './LibraryDrawer';
+import {
+  saveLobbyLayout,
+  resetLobbyLayout,
+} from './actions/lobby-layout';
+import { LOBBY_CARD_CAP } from '@/shared/lib/metrics/role-defaults';
+import type { CapabilityKey } from '@/shared/lib/permission-registry';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +47,13 @@ interface LobbyClientProps {
    * Lobbies because no widget there respects the global range yet.
    */
   modularEnabled?: boolean;
+  /**
+   * Phase 2.3: capability keys the viewer holds in this workspace. Used by
+   * the library drawer to filter the registry. Resolved server-side and
+   * passed in as a serializable string array. Absent when the modular
+   * Lobby flag is off — in that case the drawer is never opened.
+   */
+  userCaps?: CapabilityKey[];
 }
 
 // ── Chat view ─────────────────────────────────────────────────────────────
@@ -98,13 +114,30 @@ type OverviewViewProps = {
   usage: WorkspaceUsage | null | undefined;
   cardIds?: string[];
   modularEnabled?: boolean;
+  editMode: boolean;
+  onToggleEdit: () => void;
+  onReset: () => void;
+  onOpenLibrary: () => void;
+  onReorder: (newOrder: string[]) => void;
+  onRemove: (id: string) => void;
 };
 
 /**
  * Hub-overview view — banners, urgency strip, and the bento grid. Lifted out
  * so the parent component stays under the cyclomatic-complexity ratchet.
  */
-function OverviewView({ dashboardData, usage, cardIds, modularEnabled }: OverviewViewProps) {
+function OverviewView({
+  dashboardData,
+  usage,
+  cardIds,
+  modularEnabled,
+  editMode,
+  onToggleEdit,
+  onReset,
+  onOpenLibrary,
+  onReorder,
+  onRemove,
+}: OverviewViewProps) {
   return (
     <motion.div
       key="hub-overview"
@@ -138,11 +171,25 @@ function OverviewView({ dashboardData, usage, cardIds, modularEnabled }: Overvie
         />
         <UrgencyStrip alerts={dashboardData?.alerts ?? []} />
         {modularEnabled && (
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-2">
             <LobbyTimeRangePicker />
+            <LayoutControls
+              editMode={editMode}
+              onToggleEdit={onToggleEdit}
+              onReset={onReset}
+              onAddCard={onOpenLibrary}
+              cardCount={cardIds?.length ?? 0}
+              cap={LOBBY_CARD_CAP}
+            />
           </div>
         )}
-        <LobbyBentoGrid dashboardData={dashboardData} cardIds={cardIds} />
+        <LobbyBentoGrid
+          dashboardData={dashboardData}
+          cardIds={cardIds}
+          editMode={editMode}
+          onReorder={onReorder}
+          onRemove={onRemove}
+        />
       </motion.div>
     </motion.div>
   );
@@ -171,7 +218,7 @@ export function LobbyClient(props: LobbyClientProps) {
   );
 }
 
-function LobbyClientInner({ cardIds, modularEnabled }: LobbyClientProps) {
+function LobbyClientInner({ cardIds, modularEnabled, userCaps }: LobbyClientProps) {
   const { viewState, setViewState } = useSession();
   const { workspaceId } = useWorkspace();
   const { resolved } = useLobbyTimeRange();
@@ -193,6 +240,78 @@ function LobbyClientInner({ cardIds, modularEnabled }: LobbyClientProps) {
     enabled: !!workspaceId,
   });
 
+  // Phase 2.3 — local state for layout, edit mode, and library drawer.
+  // cardIds prop is the server-resolved seed; the client owns subsequent
+  // mutations and persists them through the existing server actions.
+  const [localCardIds, setLocalCardIds] = React.useState<string[] | undefined>(cardIds);
+  const [editMode, setEditMode] = React.useState(false);
+  const [libraryOpen, setLibraryOpen] = React.useState(false);
+
+  // Keep local in sync if the server prop changes (e.g. workspace switch).
+  React.useEffect(() => {
+    setLocalCardIds(cardIds);
+  }, [cardIds]);
+
+  const persistOrThrow = React.useCallback(
+    async (newOrder: string[], previous: string[]) => {
+      try {
+        await saveLobbyLayout(newOrder);
+      } catch (err) {
+        // Revert on failure — keep the optimistic state honest.
+        setLocalCardIds(previous);
+        const message =
+          err instanceof Error ? err.message : 'Could not save layout';
+        toast.error(message);
+      }
+    },
+    [],
+  );
+
+  const handleReorder = React.useCallback(
+    (newOrder: string[]) => {
+      const previous = localCardIds ?? [];
+      setLocalCardIds(newOrder);
+      void persistOrThrow(newOrder, previous);
+    },
+    [localCardIds, persistOrThrow],
+  );
+
+  const handleRemove = React.useCallback(
+    (id: string) => {
+      const previous = localCardIds ?? [];
+      const newOrder = previous.filter((c) => c !== id);
+      setLocalCardIds(newOrder);
+      void persistOrThrow(newOrder, previous);
+    },
+    [localCardIds, persistOrThrow],
+  );
+
+  const handleAdd = React.useCallback(
+    (id: string) => {
+      const previous = localCardIds ?? [];
+      if (previous.includes(id)) return;
+      const newOrder = [...previous, id];
+      setLocalCardIds(newOrder);
+      setLibraryOpen(false);
+      void persistOrThrow(newOrder, previous);
+    },
+    [localCardIds, persistOrThrow],
+  );
+
+  const handleReset = React.useCallback(async () => {
+    const previous = localCardIds ?? [];
+    try {
+      const layout = await resetLobbyLayout();
+      setLocalCardIds(layout.cardIds);
+      toast.success('Lobby reset to defaults');
+    } catch (err) {
+      setLocalCardIds(previous);
+      const message =
+        err instanceof Error ? err.message : 'Could not reset layout';
+      toast.error(message);
+    }
+  }, [localCardIds]);
+
   return (
     <div className="flex-1 min-h-0 w-full flex flex-col font-sans relative">
       {/* Ambient backdrop — single neutral gradient, no state branching */}
@@ -207,8 +326,14 @@ function LobbyClientInner({ cardIds, modularEnabled }: LobbyClientProps) {
           <OverviewView
             dashboardData={dashboardData}
             usage={usage}
-            cardIds={cardIds}
+            cardIds={localCardIds}
             modularEnabled={modularEnabled}
+            editMode={editMode}
+            onToggleEdit={() => setEditMode((v) => !v)}
+            onReset={handleReset}
+            onOpenLibrary={() => setLibraryOpen(true)}
+            onReorder={handleReorder}
+            onRemove={handleRemove}
           />
         )}
 
@@ -216,6 +341,17 @@ function LobbyClientInner({ cardIds, modularEnabled }: LobbyClientProps) {
           <ChatView onReturn={() => setViewState('overview')} />
         )}
       </AnimatePresence>
+
+      {modularEnabled && (
+        <LibraryDrawer
+          open={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          userCaps={userCaps ?? []}
+          currentCardIds={localCardIds ?? []}
+          cap={LOBBY_CARD_CAP}
+          onAdd={handleAdd}
+        />
+      )}
     </div>
   );
 }

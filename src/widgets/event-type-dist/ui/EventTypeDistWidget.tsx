@@ -9,6 +9,9 @@ import {
   STAGE_MEDIUM,
   STAGE_STAGGER_CHILDREN,
 } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.event_type_dist'];
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,10 +36,10 @@ export function EventTypeDistWidget({ data, loading = false }: EventTypeDistWidg
   return (
     <WidgetShell
       icon={PieChart}
-      label="Event Types"
+      label={META.title}
       loading={loading}
-      empty={!hasData}
-      emptyMessage="No events yet"
+      empty={!loading && !hasData}
+      emptyMessage={META.emptyState.body}
       skeletonRows={3}
     >
       <div className="flex flex-col gap-2.5 h-full justify-evenly">

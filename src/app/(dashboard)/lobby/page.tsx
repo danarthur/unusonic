@@ -8,6 +8,8 @@ import {
 } from '@/shared/lib/feature-flags';
 import { getLobbyLayout } from './actions/lobby-layout';
 import { LobbyClient } from './LobbyClient';
+import { userCapabilities } from '@/shared/lib/metrics/capabilities';
+import type { CapabilityKey } from '@/shared/lib/permission-registry';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,5 +77,16 @@ export default async function LobbyPage() {
     cardIds = undefined;
   }
 
-  return <LobbyClient cardIds={cardIds} modularEnabled />;
+  // Phase 2.3: resolve capability set so the library drawer can filter the
+  // registry without leaking RPC fanout to the client. Failure → empty set
+  // (drawer shows nothing actionable, but the rest of the Lobby is fine).
+  let userCaps: CapabilityKey[] = [];
+  try {
+    const caps = await userCapabilities(workspaceId);
+    userCaps = Array.from(caps);
+  } catch {
+    userCaps = [];
+  }
+
+  return <LobbyClient cardIds={cardIds} modularEnabled userCaps={userCaps} />;
 }

@@ -7,6 +7,9 @@ import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { formatCurrency } from '@/shared/lib/format-currency';
 import type { FinancialPulseDTO } from '@/widgets/dashboard/api';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.financial_pulse'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -60,12 +63,12 @@ export function FinancialPulseWidget({ data, loading }: FinancialPulseWidgetProp
   return (
     <WidgetShell
       icon={DollarSign}
-      label="Financial pulse"
+      label={META.title}
       href="/finance"
       hrefLabel="View finances"
       loading={loading}
       empty={isEmpty && !loading}
-      emptyMessage="No financial activity this month."
+      emptyMessage={META.emptyState.body}
       skeletonRows={3}
     >
       {data && !isEmpty && (

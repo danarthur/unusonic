@@ -8,6 +8,9 @@ import {
   STAGE_MEDIUM,
   STAGE_STAGGER_CHILDREN,
 } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.client_concentration'];
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,10 +41,10 @@ export function ClientConcentrationWidget({
   return (
     <WidgetShell
       icon={Users}
-      label="Top Clients"
+      label={META.title}
       loading={loading}
-      empty={!hasData}
-      emptyMessage="No revenue data yet"
+      empty={!loading && !hasData}
+      emptyMessage={META.emptyState.body}
       skeletonRows={3}
     >
       <div className="flex flex-col gap-1 h-full">

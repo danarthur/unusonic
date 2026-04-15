@@ -18,6 +18,9 @@ import type { ActionItem } from '@/widgets/dashboard/api';
 import {
   STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.action_queue'];
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -103,10 +106,10 @@ export function ActionQueueWidget({ data, loading }: ActionQueueWidgetProps) {
   return (
     <WidgetShell
       icon={ListChecks}
-      label="Actions"
+      label={META.title}
       loading={loading}
-      empty={data.length === 0}
-      emptyMessage="All clear — no actions needed"
+      empty={!loading && data.length === 0}
+      emptyMessage={META.emptyState.body}
       emptyIcon={CheckCircle2}
     >
       <div className="flex flex-col h-full">

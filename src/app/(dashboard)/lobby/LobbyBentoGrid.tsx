@@ -2,6 +2,21 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import type { DashboardData } from '@/widgets/dashboard/api';
 import { TodayScheduleWidget } from '@/widgets/today-schedule';
 import { WeekStripWidget } from '@/widgets/week-strip';
@@ -19,6 +34,7 @@ import {
   STAGE_STAGGER_DELAY,
 } from '@/shared/lib/motion-constants';
 import { renderLobbyCard } from './lobby-card-renderer';
+import { SortableLobbyCell } from './SortableLobbyCell';
 
 // ── Animation helpers ─────────────────────────────────────────────────────
 
@@ -47,7 +63,33 @@ interface LobbyBentoGridProps {
    * When absent, fall back to the legacy hard-coded layout below.
    */
   cardIds?: string[];
+  /**
+   * Phase 2.3: when true, the modular grid renders drag handles + remove
+   * affordances on every cell. Ignored on the legacy path.
+   */
+  editMode?: boolean;
+  /**
+   * Phase 2.3: called when the user reorders cards via drag-and-drop. The
+   * Lobby parent reconciles the new order with the server.
+   */
+  onReorder?: (newOrder: string[]) => void;
+  /**
+   * Phase 2.3: called when the user clicks the X on a card in edit mode.
+   */
+  onRemove?: (id: string) => void;
 }
+
+// Phase 2.3 manual smoke test checklist (drag mechanics aren't unit-tested
+// because dnd-kit's testing surface is fragile in jsdom/happy-dom):
+//   [ ] Toggle edit mode → handles + X buttons appear on every cell.
+//   [ ] Drag a card down two slots → other cards shift into its old slot,
+//       network round-trip fires saveLobbyLayout once.
+//   [ ] Press Escape mid-drag → card returns to origin, no save fires.
+//   [ ] Click X → card disappears optimistically, persists on next reload.
+//   [ ] Resize viewport below 768px → controls hide entirely.
+//   [ ] Reset layout → confirmation, then defaults reload.
+//   [ ] Add card from drawer → appended to end, drawer stays open at <12.
+//   [ ] Hit cap → Add button + drawer rows go disabled with tooltip.
 
 // ── Grid ──────────────────────────────────────────────────────────────────
 
@@ -75,19 +117,43 @@ interface LobbyBentoGridProps {
 function ModularBentoGrid({
   cardIds,
   dashboardData,
+  editMode = false,
+  onReorder,
+  onRemove,
 }: {
   cardIds: string[];
   dashboardData?: DashboardData;
+  editMode?: boolean;
+  onReorder?: (newOrder: string[]) => void;
+  onRemove?: (id: string) => void;
 }) {
   const loading = !dashboardData;
   const cells = cardIds
     .map((id) => ({ id, node: renderLobbyCard(id, { dashboardData, loading }) }))
     .filter((c): c is { id: string; node: React.ReactElement } => c.node !== null);
 
-  return (
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (ev: DragEndEvent) => {
+    const { active, over } = ev;
+    if (!over || active.id === over.id) return;
+    const oldIndex = cardIds.indexOf(String(active.id));
+    const newIndex = cardIds.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorder?.(arrayMove(cardIds, oldIndex, newIndex));
+  };
+
+  // Animation variants are skipped while editing so reordering springs read
+  // as drag-driven motion rather than stagger-in motion.
+  const sortableIds = cells.map((c) => c.id);
+
+  const grid = (
     <motion.div
       className="stage-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
-      initial="hidden"
+      initial={editMode ? false : 'hidden'}
       animate="visible"
       variants={gridVariants}
     >
@@ -98,10 +164,32 @@ function ModularBentoGrid({
           variants={cellVariants}
           transition={STAGE_MEDIUM}
         >
-          {node}
+          <SortableLobbyCell
+            id={id}
+            editMode={editMode}
+            onRemove={(removeId) => onRemove?.(removeId)}
+          >
+            {node}
+          </SortableLobbyCell>
         </motion.div>
       ))}
     </motion.div>
+  );
+
+  // No DndContext when not editing — keeps the cell tree byte-cheap and
+  // sidesteps any sensor activation surprises in view mode.
+  if (!editMode) return grid;
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+        {grid}
+      </SortableContext>
+    </DndContext>
   );
 }
 
@@ -258,9 +346,23 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
   );
 }
 
-export function LobbyBentoGrid({ dashboardData, cardIds }: LobbyBentoGridProps) {
+export function LobbyBentoGrid({
+  dashboardData,
+  cardIds,
+  editMode,
+  onReorder,
+  onRemove,
+}: LobbyBentoGridProps) {
   if (cardIds) {
-    return <ModularBentoGrid cardIds={cardIds} dashboardData={dashboardData} />;
+    return (
+      <ModularBentoGrid
+        cardIds={cardIds}
+        dashboardData={dashboardData}
+        editMode={editMode}
+        onReorder={onReorder}
+        onRemove={onRemove}
+      />
+    );
   }
   return <LegacyBentoGrid dashboardData={dashboardData} />;
 }

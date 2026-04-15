@@ -9,6 +9,9 @@ import {
   STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.week_strip'];
 
 // ── Day Cell ─────────────────────────────────────────────────────────────────
 
@@ -90,14 +93,16 @@ interface WeekStripWidgetProps {
 }
 
 export function WeekStripWidget({ data, loading }: WeekStripWidgetProps) {
+  const hasAnyEvents = data.some((d) => d.events.length > 0);
+  const isEmpty = data.length === 0 || !hasAnyEvents;
   return (
     <WidgetShell
       icon={CalendarDays}
-      label="This Week"
+      label={META.title}
       href="/calendar"
       loading={loading}
-      empty={data.length === 0}
-      emptyMessage="No week data available"
+      empty={!loading && isEmpty}
+      emptyMessage={META.emptyState.body}
       skeletonRows={2}
     >
       <div className="flex gap-1 overflow-x-auto h-full items-center">

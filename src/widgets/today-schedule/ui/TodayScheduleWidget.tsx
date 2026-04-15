@@ -9,6 +9,9 @@ import type { TodayScheduleResult, TodayEvent } from '@/widgets/dashboard/api';
 import {
   STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.today_schedule'];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,11 +131,11 @@ export function TodayScheduleWidget({ data, loading }: TodayScheduleWidgetProps)
   return (
     <WidgetShell
       icon={Calendar}
-      label="Today"
+      label={META.title}
       href="/calendar"
       loading={loading}
-      empty={empty}
-      emptyMessage="No upcoming events"
+      empty={!loading && empty}
+      emptyMessage={META.emptyState.body}
     >
       {hasEvents && (
         <div className="flex flex-col h-full">

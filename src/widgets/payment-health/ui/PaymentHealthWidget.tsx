@@ -12,6 +12,9 @@ import { Finance } from '@/shared/ui/icons';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { WidgetShell } from '@/widgets/shared';
 import { getPaymentHealthMetrics, type PaymentHealthMetrics } from '../api/get-payment-health';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.payment_health'];
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -44,10 +47,10 @@ export function PaymentHealthWidget() {
   return (
     <WidgetShell
       icon={Finance}
-      label="Payment Health"
+      label={META.title}
       loading={loading}
       empty={!loading && isEmpty}
-      emptyMessage="No payments due"
+      emptyMessage={META.emptyState.body}
     >
     {!metrics ? null : <motion.div
       initial={{ opacity: 0 }}

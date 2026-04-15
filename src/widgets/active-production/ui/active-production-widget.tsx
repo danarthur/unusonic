@@ -8,6 +8,9 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { createClient } from '@/shared/api/supabase/client';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { M3_DURATION_S, M3_EASING_ENTER } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.active_production'];
 
 const M3_ENTER = { duration: M3_DURATION_S, ease: M3_EASING_ENTER };
 
@@ -74,7 +77,9 @@ export function ActiveProductionWidget() {
           {loading ? (
             <StagePanel nested className="h-12 w-full stage-skeleton" padding="none" />
           ) : !hasGigs ? (
-            <div className="py-6 text-center text-xs text-[var(--stage-text-secondary)] italic leading-relaxed">No active productions</div>
+            <div className="py-6 text-center text-xs text-[var(--stage-text-secondary)] leading-relaxed">
+              {META.emptyState.body}
+            </div>
           ) : (
             <motion.div
               className="flex flex-col gap-2"

@@ -113,6 +113,14 @@ export type TableMetricDefinition = RpcMetricBase & {
 export type WidgetMetricDefinition = MetricBase & {
   kind: 'widget';
   widgetKey: string;
+  /**
+   * False for entries that exist in the registry for completeness (Aion can
+   * reference them, role-default resolver may seed them) but should not appear
+   * in the Phase 2.3 Lobby library picker — typically because they are
+   * embedded surfaces (sheets, page grids, banners) rather than standalone
+   * pickable cards. Defaults to true when omitted.
+   */
+  pickable?: boolean;
 };
 
 export type MetricDefinition =

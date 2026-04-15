@@ -19,6 +19,9 @@ import {
   STAGE_MEDIUM,
   STAGE_LIGHT,
 } from '@/shared/lib/motion-constants';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.activity_feed'];
 
 // ── Icon map ────────────────────────────────────────────────────────────────
 
@@ -71,10 +74,10 @@ export function ActivityFeedWidget({ data, loading = false }: ActivityFeedWidget
   return (
     <WidgetShell
       icon={Activity}
-      label="Recent Activity"
+      label={META.title}
       loading={loading}
-      empty={data.length === 0}
-      emptyMessage="No recent activity"
+      empty={!loading && data.length === 0}
+      emptyMessage={META.emptyState.body}
       skeletonRows={5}
     >
       <div className="flex flex-col gap-3 h-full">

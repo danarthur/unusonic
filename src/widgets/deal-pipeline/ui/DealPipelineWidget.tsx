@@ -11,6 +11,9 @@ import {
   STAGE_STAGGER_CHILDREN,
 } from '@/shared/lib/motion-constants';
 import type { DealPipelineDTO } from '@/widgets/dashboard/api';
+import { METRICS } from '@/shared/lib/metrics/registry';
+
+const META = METRICS['lobby.deal_pipeline'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -64,12 +67,12 @@ export function DealPipelineWidget({ data, loading }: DealPipelineWidgetProps) {
   return (
     <WidgetShell
       icon={GitBranch}
-      label="Pipeline"
+      label={META.title}
       href="/crm"
       hrefLabel="View all deals"
       loading={loading}
       empty={isEmpty && !loading}
-      emptyMessage="No active deals in the pipeline."
+      emptyMessage={META.emptyState.body}
       skeletonRows={4}
     >
       {data && data.stages.length > 0 && (
