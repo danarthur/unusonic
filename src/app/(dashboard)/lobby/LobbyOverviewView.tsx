@@ -26,6 +26,7 @@ import { LobbyTimeRangePicker } from './LobbyTimeRangePicker';
 import { LobbyLayoutSwitcher } from './LobbyLayoutSwitcher';
 import { LayoutControls } from './LayoutControls';
 import { PlanPromptBanner } from './PlanPromptBanner';
+import { CaptureButton } from '@/widgets/lobby-capture';
 
 // ── Preset CTA ───────────────────────────────────────────────────────────────
 
@@ -74,6 +75,8 @@ function HeaderRow({
   onCreateBlank,
   onRename,
   onDelete,
+  captureEnabled,
+  workspaceId,
 }: {
   activeLayout: LobbyLayout;
   layouts: LobbyLayout[];
@@ -86,10 +89,13 @@ function HeaderRow({
   onCreateBlank: (name: string) => Promise<void>;
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  captureEnabled: boolean;
+  workspaceId: string | null;
 }) {
   const isCustom = activeLayout.kind === 'custom';
   return (
     <div className="flex items-center justify-end gap-2">
+      {captureEnabled && workspaceId && <CaptureButton workspaceId={workspaceId} />}
       <LobbyTimeRangePicker />
       <LobbyLayoutSwitcher
         layouts={layouts}
@@ -140,6 +146,8 @@ export interface LobbyOverviewViewProps {
   onDelete: (id: string) => Promise<void>;
   pins: LobbyPin[];
   pinEnabled: boolean;
+  captureEnabled: boolean;
+  workspaceId: string | null;
 }
 
 export function LobbyOverviewView(props: LobbyOverviewViewProps) {
@@ -161,6 +169,8 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
     onDelete,
     pins,
     pinEnabled,
+    captureEnabled,
+    workspaceId,
   } = props;
   const showPinsAbove = pinEnabled && pins.length > 0;
   const showPinsBelow = false;
@@ -204,6 +214,8 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
           onCreateBlank={onCreateBlank}
           onRename={onRename}
           onDelete={onDelete}
+          captureEnabled={captureEnabled}
+          workspaceId={workspaceId}
         />
         {showPinsAbove && <PinnedAnswersWidget pins={pins} />}
         <LobbyBentoGrid

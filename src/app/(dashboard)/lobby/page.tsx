@@ -74,6 +74,7 @@ export default async function LobbyPage() {
   // Pin flag is independent of the layouts system.
   let pinEnabled = false;
   let pins: LobbyPin[] = [];
+  let captureEnabled = false;
   if (workspaceId) {
     try {
       pinEnabled = await isFeatureEnabled(
@@ -84,6 +85,14 @@ export default async function LobbyPage() {
     } catch {
       pinEnabled = false;
       pins = [];
+    }
+    try {
+      captureEnabled = await isFeatureEnabled(
+        workspaceId,
+        FEATURE_FLAGS.AION_LOBBY_CAPTURE,
+      );
+    } catch {
+      captureEnabled = false;
     }
   }
 
@@ -116,6 +125,7 @@ export default async function LobbyPage() {
       userCaps={userCaps}
       pins={pins}
       pinEnabled={pinEnabled}
+      captureEnabled={captureEnabled}
     />
   );
 }

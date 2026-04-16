@@ -25,6 +25,7 @@ export type FeatureFlagKey = `${string}.${string}`;
 export const FEATURE_FLAGS = {
   REPORTS_AION_PIN: 'reports.aion_pin',
   REPORTS_RECONCILIATION: 'reports.reconciliation',
+  AION_LOBBY_CAPTURE: 'aion.lobby_capture',
 } as const satisfies Record<string, FeatureFlagKey>;
 
 export type KnownFeatureFlag = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];

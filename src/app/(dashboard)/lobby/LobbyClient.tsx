@@ -50,6 +50,11 @@ interface LobbyClientProps {
    * section independently of the layouts system.
    */
   pinEnabled?: boolean;
+  /**
+   * Mirrors the `aion.lobby_capture` feature flag. Gates the lobby-header
+   * capture button + modal. Phase 1 of the Sales Brief v2 capture primitive.
+   */
+  captureEnabled?: boolean;
 }
 
 // ── Chat view ─────────────────────────────────────────────────────────────
@@ -123,6 +128,7 @@ function LobbyClientInner({
   userCaps,
   pins,
   pinEnabled,
+  captureEnabled,
 }: LobbyClientProps) {
   const { viewState, setViewState } = useSession();
   const { workspaceId } = useWorkspace();
@@ -196,6 +202,8 @@ function LobbyClientInner({
             onDelete={layoutsState.handleDelete}
             pins={pins ?? []}
             pinEnabled={Boolean(pinEnabled)}
+            captureEnabled={Boolean(captureEnabled)}
+            workspaceId={workspaceId ?? null}
           />
         )}
 
