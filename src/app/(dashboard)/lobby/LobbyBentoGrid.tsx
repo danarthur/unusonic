@@ -191,8 +191,16 @@ function ModularBentoGrid({
   // as drag-driven motion rather than stagger-in motion.
   const sortableIds = cells.map((c) => c.id);
 
+  // Remount the grid on view switch. Without a keyed remount Framer Motion
+  // keeps the parent at its already-resolved `visible` state, and children
+  // mounting afterward can get stuck at `hidden` (opacity 0) — cards look
+  // like they've disappeared until something forces a full unmount (e.g.
+  // switching to the legacy Default preset, which is a different component).
+  const gridKey = cells.map((c) => c.id).join('|');
+
   const grid = (
     <motion.div
+      key={gridKey}
       className="stage-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
       initial={editMode ? false : 'hidden'}
       animate="visible"

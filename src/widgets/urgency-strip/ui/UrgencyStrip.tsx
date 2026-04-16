@@ -8,7 +8,6 @@ import {
   Receipt,
   FileText,
   UserCheck,
-  AlertTriangle,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -48,7 +47,6 @@ export function UrgencyStrip({ alerts: initialAlerts }: UrgencyStripProps) {
     <AnimatePresence>
       {visible.length > 0 && (
         <motion.div
-          className="stage-panel py-2 px-4 flex flex-col gap-1"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
@@ -57,20 +55,6 @@ export function UrgencyStrip({ alerts: initialAlerts }: UrgencyStripProps) {
           role="region"
           aria-label="Needs attention"
         >
-          <div className="flex items-center gap-2 pb-1 border-b border-[var(--stage-edge-subtle)] mb-1">
-            <AlertTriangle
-              className="w-3.5 h-3.5 text-[var(--color-unusonic-warning,var(--stage-text-secondary))]"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <h2 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">
-              Needs attention
-            </h2>
-            <span className="ml-auto text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
-              {alerts.length}
-            </span>
-          </div>
-
           <motion.div
             initial="hidden"
             animate="visible"
@@ -80,7 +64,7 @@ export function UrgencyStrip({ alerts: initialAlerts }: UrgencyStripProps) {
               },
               hidden: {},
             }}
-            className="flex flex-col gap-1"
+            className="flex flex-col gap-0.5 px-1"
           >
             {visible.map((alert) => (
               <AlertRow key={alert.id} alert={alert} onDismiss={dismiss} />
@@ -88,7 +72,7 @@ export function UrgencyStrip({ alerts: initialAlerts }: UrgencyStripProps) {
           </motion.div>
 
           {overflow > 0 && (
-            <p className="stage-label pl-7 pt-1">
+            <p className="stage-label pl-8 pt-1">
               +{overflow} more
             </p>
           )}
