@@ -37,12 +37,24 @@ export async function getUrgencyAlerts(): Promise<UrgencyAlert[]> {
         fetchUnconfirmedCrewAlerts(supabase, workspaceId, now),
       ]);
 
-    return [
+    // Dedup by (type, detail). Data in the wild often has multiple active
+    // proposals on the same deal (revisions, stale drafts), and each generates
+    // its own alert — from the user's POV they read as a single "this deal
+    // needs attention" item. Keep the first occurrence; the generator order
+    // above surfaces the most urgent per type.
+    const seen = new Set<string>();
+    const merged = [
       ...crewGapAlerts,
       ...overdueAlerts,
       ...expiringAlerts,
       ...unconfirmedAlerts,
-    ];
+    ].filter((a) => {
+      const key = `${a.type}::${a.detail}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return merged;
   } catch (err) {
     console.error('[dashboard] getUrgencyAlerts unexpected error:', err);
     Sentry.captureException(err, { tags: { module: 'dashboard', action: 'getUrgencyAlerts' } });

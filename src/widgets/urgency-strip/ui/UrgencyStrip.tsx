@@ -18,8 +18,6 @@ import {
   STAGE_STAGGER_CHILDREN,
 } from '@/shared/lib/motion-constants';
 
-const MAX_VISIBLE = 5;
-
 const ICON_MAP: Record<UrgencyAlert['type'], LucideIcon> = {
   crew_gap: Users,
   overdue_invoice: Receipt,
@@ -40,18 +38,14 @@ export function UrgencyStrip({ alerts: initialAlerts }: UrgencyStripProps) {
 
   if (alerts.length === 0) return null;
 
-  const visible = alerts.slice(0, MAX_VISIBLE);
-  const overflow = alerts.length - MAX_VISIBLE;
-
   return (
     <AnimatePresence>
-      {visible.length > 0 && (
+      {alerts.length > 0 && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={STAGE_MEDIUM}
-          style={{ overflow: 'hidden' }}
           role="region"
           aria-label="Needs attention"
         >
@@ -64,18 +58,12 @@ export function UrgencyStrip({ alerts: initialAlerts }: UrgencyStripProps) {
               },
               hidden: {},
             }}
-            className="flex flex-col gap-0.5 px-1"
+            className="flex flex-col gap-0.5 px-1 max-h-60 overflow-y-auto"
           >
-            {visible.map((alert) => (
+            {alerts.map((alert) => (
               <AlertRow key={alert.id} alert={alert} onDismiss={dismiss} />
             ))}
           </motion.div>
-
-          {overflow > 0 && (
-            <p className="stage-label pl-8 pt-1">
-              +{overflow} more
-            </p>
-          )}
         </motion.div>
       )}
     </AnimatePresence>
