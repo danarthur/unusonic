@@ -241,7 +241,9 @@ Clean, scannable, no math.
 
 ### 10.1 Surface
 
-A persistent button anchored to the lobby layout (position: bottom-right floating, respects mobile safe area). Keyboard shortcut `shift + c` when the lobby is focused.
+A persistent button in the lobby header row, rendered adjacent to the existing `LobbyLayoutSwitcher`. Microphone icon, unlabeled. Keyboard shortcut `shift + c` triggers capture anywhere in the lobby.
+
+**Why not a floating action button (FAB).** Stage Engineering is a precision-instrument aesthetic — a corner FAB clashes with the surface hierarchy and the lobby's disciplined whitespace. Header placement keeps capture visible by default and consistent with the layout-switcher and time-picker pattern already established.
 
 Never inside the brief card. Capture is workspace-wide, not brief-scoped.
 
@@ -325,6 +327,13 @@ If `confidence < 0.85` or entity is ambiguous: show field-by-field review (entit
 - No mic permission → type input falls back transparently
 - Transcription fails → show raw audio preview + "type it instead"
 - Aion parse fails → save to `cortex.capture_events.status='failed'` with the transcript, keep in review queue
+
+### 10.7 Transcription architecture
+
+- **Do not reuse the existing `AionVoice` path.** That flow POSTs audio to an external N8N webhook (`src/shared/ui/providers/SessionContext.tsx:583`) which returns a chat reply. It does not expose a transcript we can parse structurally, and routing a capture through a chat pipeline conflates two different Aion surfaces.
+- **New endpoint — `POST /api/aion/capture/transcribe`.** Accepts `audio/webm` via multipart form. Calls OpenAI Whisper (`whisper-1` model) server-side using `OPENAI_API_KEY`. Returns `{ transcript: string, duration_seconds: number }`. Server-only — never exposes the key.
+- **Cost envelope.** Whisper is $0.006/minute. Expected volume (~5–20 captures per user per day × ~15s average) ≈ pennies per workspace per month. No reason to self-host.
+- **Separation of concerns.** `/api/aion/capture/transcribe` is dumb — it transcribes and returns. The parse step is a second request to `/api/aion/capture/parse` with `{ transcript, workspace_context }`. Cache the transcript client-side between calls so a failed parse can be retried without re-transcribing. Stage independently measurable.
 
 ---
 
@@ -505,14 +514,16 @@ Any insight row has a keyboard shortcut `shift + ?` (or menu item) to escalate i
 
 ---
 
-## 18. Open questions
+## 18. Resolved questions (2026-04-16 code-read pass)
 
-1. **Capture button placement.** Bottom-right floating, inside the brief card, or a persistent lobby header slot? Needs a design review pass before Phase 1 lands.
-2. **Transcription provider.** Reusing Aion Voice infra (Deepgram?) vs. a dedicated path. Confirm what's wired before Phase 1.
-3. **`workspace.median_deal_value`** — runtime RPC vs. daily-computed materialized value. Runtime is simpler; evaluate cost on workspaces with 500+ deals.
-4. **Date-hold pressure already exists in follow-up-queue cron.** Confirm whether we read it from there or recompute inside the insight evaluator (Signal Navigator flagged this — needs code read).
-5. **Does `follow_up_log.stakeholder_id` exist?** Signal Navigator said "promised addition, not yet confirmed." If missing, Phase 3 needs the migration added.
-6. **Repeat-client detection.** `deal.client_entity_id has ≥ 2 prior won deals` — where does "won" live cleanly today? Confirm before Phase 4 wires the danger-zone check.
+All six pre-build questions resolved against current main. No blockers.
+
+1. **Capture button placement** → lobby header row, adjacent to `LobbyLayoutSwitcher`. `shift+c` keyboard shortcut. Not a floating FAB. See §10.1.
+2. **Transcription provider** → existing voice path is an external N8N webhook and is NOT reusable for structured parse. Build a new first-party endpoint `/api/aion/capture/transcribe` on OpenAI Whisper (`whisper-1`). See §10.7.
+3. **`workspace.median_deal_value`** → deal value column is `public.deals.budget_estimated` (nullable). Use a runtime RPC `finance.get_workspace_median_deal_value(workspace_id)` — fine at workspace scale. Filter out null `budget_estimated`; if fewer than 5 non-null deals exist, fall back to a workspace-configurable constant rather than computing a median on thin data.
+4. **Date-hold pressure** → computed in-memory only inside the follow-up-queue cron (`src/app/api/cron/follow-up-queue/route.ts:257-264`, `workspace_id:proposed_date → Set<deal_id>`). Not persisted. Phase 3 extracts the builder into a shared helper `buildDateHoldMap(deals)` called from both the follow-up-queue cron and the insight evaluator pipeline.
+5. **`follow_up_log.stakeholder_id`** → does NOT exist today (verified against codebase). Phase 3 migration line-item: `ALTER TABLE ops.follow_up_log ADD COLUMN stakeholder_id uuid REFERENCES directory.entities(id)`. Without this, per-stakeholder awareness on compound insights is not expressible.
+6. **Repeat-client "won"** → `public.deals.status = 'won'` with `public.deals.won_at IS NOT NULL`. Client FK is `public.deals.organization_id → directory.entities`. Repeat-client check: `SELECT COUNT(*) FROM public.deals WHERE organization_id = $1 AND status = 'won'` ≥ 2. Referrer check: `public.deals.referrer_entity_id IS NOT NULL`.
 
 ---
 
@@ -527,7 +538,8 @@ Any insight row has a keyboard shortcut `shift + ?` (or menu item) to escalate i
 | `src/widgets/lobby-capture/ui/CaptureReviewCard.tsx` | Parsed review step |
 | `src/widgets/lobby-capture/api/capture-parse.ts` | Parse invocation |
 | `src/widgets/lobby-capture/api/capture-confirm.ts` | Write-paths |
-| `src/app/api/aion/capture/route.ts` | Parse endpoint |
+| `src/app/api/aion/capture/transcribe/route.ts` | Whisper transcription endpoint |
+| `src/app/api/aion/capture/parse/route.ts` | Structured-parse endpoint |
 | `src/app/api/aion/lib/evaluators/deposit-gap.ts` | New evaluator |
 | `src/app/api/aion/lib/evaluators/quote-expiring.ts` | New evaluator |
 | `src/app/api/aion/lib/evaluators/gone-quiet-with-value.ts` | New evaluator |
