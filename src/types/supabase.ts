@@ -217,6 +217,57 @@ export type Database = {
         }
         Relationships: []
       }
+      capture_events: {
+        Row: {
+          audio_storage_path: string | null
+          confirmed_at: string | null
+          created_at: string
+          created_follow_up_queue_id: string | null
+          dismissed_at: string | null
+          id: string
+          parsed_entity: Json | null
+          parsed_follow_up: Json | null
+          parsed_note: string | null
+          resolved_entity_id: string | null
+          status: string
+          transcript: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          audio_storage_path?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_follow_up_queue_id?: string | null
+          dismissed_at?: string | null
+          id?: string
+          parsed_entity?: Json | null
+          parsed_follow_up?: Json | null
+          parsed_note?: string | null
+          resolved_entity_id?: string | null
+          status?: string
+          transcript?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          audio_storage_path?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_follow_up_queue_id?: string | null
+          dismissed_at?: string | null
+          id?: string
+          parsed_entity?: Json | null
+          parsed_follow_up?: Json | null
+          parsed_note?: string | null
+          resolved_entity_id?: string | null
+          status?: string
+          transcript?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       memory: {
         Row: {
           content_header: string | null
@@ -476,6 +527,19 @@ export type Database = {
           p_metadata?: Json
           p_source_id: string
           p_source_type: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      write_capture_confirmed: {
+        Args: {
+          p_audio_storage_path?: string
+          p_created_follow_up_queue_id?: string
+          p_parsed_entity?: Json
+          p_parsed_follow_up?: Json
+          p_parsed_note?: string
+          p_resolved_entity_id?: string
+          p_transcript: string
           p_workspace_id: string
         }
         Returns: string
@@ -2025,6 +2089,36 @@ export type Database = {
           skill_tag?: string
           updated_at?: string
           verified?: boolean
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      daily_briefings: {
+        Row: {
+          body: string
+          created_at: string
+          facts_json: Json
+          generated_at: string
+          id: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          facts_json?: Json
+          generated_at?: string
+          id?: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          facts_json?: Json
+          generated_at?: string
+          id?: string
+          user_id?: string | null
           workspace_id?: string
         }
         Relationships: []
