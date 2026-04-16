@@ -168,7 +168,7 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
   return (
     <motion.div
       key="hub-overview"
-      className="relative flex-1 min-h-0 flex flex-col overflow-auto"
+      className="relative z-10 flex-1 min-h-0 flex flex-col overflow-auto"
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, transition: M3_FADE_THROUGH_EXIT }}
     >

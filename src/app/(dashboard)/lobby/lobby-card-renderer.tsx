@@ -44,6 +44,12 @@ import { MultiStopRollupWidget } from '@/widgets/multi-stop-rollup';
 
 // Self-fetching widgets / banners.
 import { ActiveProductionWidget } from '@/widgets/active-production';
+import { OwedTodayWidget } from '@/widgets/owed-today';
+import { ThisWeekWidget } from '@/widgets/this-week';
+import { TodaysBriefWidget } from '@/widgets/todays-brief';
+import { AwaitingSignatureWidget } from '@/widgets/awaiting-signature';
+import { GoneQuietWidget } from '@/widgets/gone-quiet';
+import { WeeklyTallyWidget } from '@/widgets/weekly-tally';
 import { RealTimeLogisticsWidget } from '@/widgets/real-time-logistics';
 import { PaymentHealthWidget } from '@/widgets/payment-health';
 import { RunOfShowFeedWidget } from '@/widgets/run-of-show-feed';
@@ -120,6 +126,12 @@ const RENDERERS: Record<string, LobbyCardRenderer> = {
   },
 
   // Self-fetching widgets / banners ------------------------------------------
+  'lobby.todays_brief': () => <TodaysBriefWidget />,
+  'lobby.owed_today': () => <OwedTodayWidget />,
+  'lobby.this_week': () => <ThisWeekWidget />,
+  'lobby.awaiting_signature': () => <AwaitingSignatureWidget />,
+  'lobby.gone_quiet': () => <GoneQuietWidget />,
+  'lobby.weekly_tally': () => <WeeklyTallyWidget />,
   'lobby.active_production': () => <ActiveProductionWidget />,
   'lobby.real_time_logistics': () => <RealTimeLogisticsWidget />,
   'lobby.payment_health': () => <PaymentHealthWidget />,

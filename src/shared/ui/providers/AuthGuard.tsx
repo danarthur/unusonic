@@ -19,7 +19,7 @@ import { decodeJwtExp } from '@/shared/lib/auth/decode-jwt-exp';
  * store. The SessionExpiredOverlay reads that flag and renders a lock-screen
  * re-auth overlay — no redirect, no state loss.
  *
- * @see docs/reference/auth/session-management.md
+ * @see docs/reference/code/session-management.md
  */
 
 /** Minimum idle gap (ms) before an interaction triggers a session check. */

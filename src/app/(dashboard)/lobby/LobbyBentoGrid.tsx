@@ -36,6 +36,42 @@ import {
 import { renderLobbyCard } from './lobby-card-renderer';
 import { SortableLobbyCell } from './SortableLobbyCell';
 
+// ── Bento sizing ──────────────────────────────────────────────────────────
+//
+// Cards that benefit from horizontal width (schedules, pipelines, trend
+// charts, timelines) render as "hero" — 2 of 4 columns on lg. Everything
+// else is "standard" — 1 of 4 columns. Creates the uneven bento rhythm the
+// legacy layout had, applied to any preset or custom card ordering.
+
+const HERO_WIDGET_KEYS = new Set<string>([
+  'today-schedule',
+  'deal-pipeline',
+  'financial-pulse',
+  'revenue-trend',
+  'production-timeline',
+  'real-time-logistics',
+  'settlement-tracking',
+  'vendor-payment-status',
+  'multi-stop-rollup',
+  'passive-pipeline-feed',
+  'run-of-show-feed',
+  'owed-today',
+  'this-week',
+  'todays-brief',
+]);
+
+function spanForCardId(cardId: string): 'hero' | 'standard' {
+  // cardId is either a 'lobby.<snake>' or a scalar metric id. Map to a
+  // widget key via the registry — falls back to 'standard' when unknown.
+  // Kept inline so the grid doesn't import METRICS for a simple lookup; the
+  // widget-key guess from the id is cheap and usually right.
+  const snake = cardId.startsWith('lobby.')
+    ? cardId.slice('lobby.'.length)
+    : cardId.split('.').slice(-1)[0] ?? '';
+  const kebab = snake.replace(/_/g, '-');
+  return HERO_WIDGET_KEYS.has(kebab) ? 'hero' : 'standard';
+}
+
 // ── Animation helpers ─────────────────────────────────────────────────────
 
 const gridVariants = {
@@ -165,7 +201,11 @@ function ModularBentoGrid({
       {cells.map(({ id, node }) => (
         <motion.div
           key={id}
-          className="lg:col-span-2 lg:max-h-[360px]"
+          className={
+            spanForCardId(id) === 'hero'
+              ? 'max-h-[360px] lg:col-span-2'
+              : 'max-h-80 lg:col-span-1'
+          }
           variants={cellVariants}
           transition={STAGE_MEDIUM}
         >
@@ -219,7 +259,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
       {/* Action Queue — surfaces first on mobile, third on desktop */}
       <motion.div
-        className="order-1 md:order-3 lg:order-3 lg:col-span-1 lg:max-h-80"
+        className="order-1 md:order-3 lg:order-3 max-h-80 lg:col-span-1"
         variants={cellVariants}
         transition={STAGE_MEDIUM}
       >
@@ -231,7 +271,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
       {/* Today's Schedule — hero cell, 2-col wide */}
       <motion.div
-        className="order-2 md:order-1 lg:order-1 lg:col-span-2 lg:max-h-80"
+        className="order-2 md:order-1 lg:order-1 max-h-80 lg:col-span-2"
         variants={cellVariants}
         transition={STAGE_MEDIUM}
       >
@@ -243,7 +283,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
       {/* Week Strip — compact 7-day overview */}
       <motion.div
-        className="order-3 md:order-2 lg:order-2 lg:col-span-1 lg:max-h-80"
+        className="order-3 md:order-2 lg:order-2 max-h-80 lg:col-span-1"
         variants={cellVariants}
         transition={STAGE_MEDIUM}
       >
@@ -285,7 +325,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
       {/* Activity Feed */}
       <motion.div
-        className="order-6 lg:col-span-1 lg:max-h-[360px]"
+        className="order-6 max-h-[360px] lg:col-span-1"
         variants={cellVariants}
         transition={STAGE_MEDIUM}
       >
@@ -297,7 +337,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
       {/* Revenue Trend */}
       <motion.div
-        className="order-7 lg:col-span-1 lg:max-h-[360px]"
+        className="order-7 max-h-[360px] lg:col-span-1"
         variants={cellVariants}
         transition={STAGE_MEDIUM}
       >
@@ -309,7 +349,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
       {/* Event Type Distribution */}
       <motion.div
-        className="order-8 lg:col-span-1 lg:max-h-[360px]"
+        className="order-8 max-h-[360px] lg:col-span-1"
         variants={cellVariants}
         transition={STAGE_MEDIUM}
       >
@@ -321,7 +361,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
       {/* Client Concentration */}
       <motion.div
-        className="order-9 lg:col-span-1 lg:max-h-[360px]"
+        className="order-9 max-h-[360px] lg:col-span-1"
         variants={cellVariants}
         transition={STAGE_MEDIUM}
       >
@@ -337,7 +377,7 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
        * see the skeleton rather than a layout flash. */}
       {(!dashboardData || dashboardData.qboVariance !== null) && (
         <motion.div
-          className="order-10 lg:col-span-1 lg:max-h-[360px]"
+          className="order-10 max-h-[360px] lg:col-span-1"
           variants={cellVariants}
           transition={STAGE_MEDIUM}
         >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useCallback } from 'react';
+import { useState, useTransition, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Package, AlertTriangle, ArrowLeftRight, Search, Check, Loader2 } from 'lucide-react';
@@ -77,23 +77,24 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
   const [isSearching, startSearch] = useTransition();
   const [isSwapping, startSwap] = useTransition();
 
-  // Fetch on open
-  if (open && !hasFetched) {
-    setHasFetched(true);
-    startLoad(async () => {
-      const result = await getDayResourceView(date);
-      setData(result);
-    });
-  }
-
-  // Reset when closed
-  if (!open && hasFetched) {
-    setHasFetched(false);
-    setData(null);
-    setSwapTarget(null);
-    setSwapQuery('');
-    setSwapResults([]);
-  }
+  // Fetch on open / reset on close. Previously this was done inline in the
+  // render phase which triggered "Cannot call startTransition while rendering"
+  // and cascading setState warnings under React 19 strict concurrent mode.
+  useEffect(() => {
+    if (open && !hasFetched) {
+      setHasFetched(true);
+      startLoad(async () => {
+        const result = await getDayResourceView(date);
+        setData(result);
+      });
+    } else if (!open && hasFetched) {
+      setHasFetched(false);
+      setData(null);
+      setSwapTarget(null);
+      setSwapQuery('');
+      setSwapResults([]);
+    }
+  }, [open, hasFetched, date, startLoad]);
 
   const handleRefetch = useCallback(() => {
     startLoad(async () => {

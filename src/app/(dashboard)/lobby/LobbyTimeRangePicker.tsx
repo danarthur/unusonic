@@ -14,9 +14,13 @@
  */
 
 import * as React from 'react';
-import { createPortal } from 'react-dom';
 import { ChevronDown, Calendar } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from '@/shared/ui/popover';
 import {
   RANGE_LABELS,
   useLobbyTimeRange,
@@ -127,54 +131,11 @@ function CustomRangeForm({
   );
 }
 
-function useDropdownPosition(
-  open: boolean,
-  buttonRef: React.RefObject<HTMLButtonElement | null>,
-) {
-  const [position, setPosition] = React.useState<{ top: number; left: number } | null>(null);
-
-  React.useLayoutEffect(() => {
-    if (!open || !buttonRef.current || typeof window === 'undefined') {
-      setPosition(null);
-      return;
-    }
-    const rect = buttonRef.current.getBoundingClientRect();
-    const popoverHeight = 360;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const top = spaceBelow < popoverHeight ? Math.max(8, rect.top - popoverHeight - 6) : rect.bottom + 6;
-    setPosition({ top, left: rect.left });
-  }, [open, buttonRef]);
-
-  return position;
-}
-
-function useOutsideClick(
-  open: boolean,
-  refs: Array<React.RefObject<HTMLElement | null>>,
-  onClose: () => void,
-) {
-  React.useEffect(() => {
-    if (!open) return;
-    const onPointer = (ev: MouseEvent) => {
-      const t = ev.target as Node;
-      if (refs.some((r) => r.current?.contains(t))) return;
-      onClose();
-    };
-    document.addEventListener('mousedown', onPointer);
-    return () => document.removeEventListener('mousedown', onPointer);
-  }, [open, refs, onClose]);
-}
-
 // ── Picker ───────────────────────────────────────────────────────────────────
 
 export function LobbyTimeRangePicker({ className }: { className?: string }) {
   const { range, setRange } = useLobbyTimeRange();
   const [open, setOpen] = React.useState(false);
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-  const popoverRef = React.useRef<HTMLDivElement>(null);
-
-  const position = useDropdownPosition(open, buttonRef);
-  useOutsideClick(open, [buttonRef, popoverRef], () => setOpen(false));
 
   const label = range.kind === 'custom'
     ? `${range.start} – ${range.end}`
@@ -191,72 +152,58 @@ export function LobbyTimeRangePicker({ className }: { className?: string }) {
   };
 
   return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          'inline-flex items-center gap-2 h-8 px-2.5 rounded-[var(--stage-radius-input,10px)]',
-          'text-xs font-medium tabular-nums',
-          'border border-[var(--stage-edge-subtle)]',
-          'bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]',
-          'hover:text-[var(--stage-text-primary)] transition-colors',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
-          open && 'text-[var(--stage-text-primary)]',
-          className,
-        )}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`Time range: ${label}`}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'inline-flex items-center gap-2 h-8 px-2.5 rounded-[var(--stage-radius-input,10px)]',
+            'text-xs font-medium tabular-nums',
+            'border border-[var(--stage-edge-subtle)]',
+            'bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]',
+            'hover:text-[var(--stage-text-primary)] transition-colors',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
+            open && 'text-[var(--stage-text-primary)]',
+            className,
+          )}
+          aria-label={`Time range: ${label}`}
+        >
+          <Calendar className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+          <span>{label}</span>
+          <ChevronDown className="w-3 h-3 opacity-60" strokeWidth={1.75} aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={6}
+        className="w-[240px] p-2"
+        data-surface="dropdown"
       >
-        <Calendar className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
-        <span>{label}</span>
-        <ChevronDown className="w-3 h-3 opacity-60" strokeWidth={1.75} aria-hidden />
-      </button>
-
-      {open && position && typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            ref={popoverRef}
-            data-surface="dropdown"
-            className={cn(
-              'fixed z-[200] w-[240px] rounded-[var(--stage-radius-panel,12px)]',
-              'border border-[var(--stage-edge-subtle)]',
-              'bg-[var(--stage-surface-raised)] stage-panel-nested p-2',
-              'shadow-[0_8px_24px_oklch(0_0_0/0.24)]',
-            )}
-            style={{ top: position.top, left: position.left }}
-            role="dialog"
-            aria-label="Pick time range"
-          >
-            <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
-              Preset
-            </p>
-            <div role="listbox" className="flex flex-col gap-0.5">
-              {PRESET_ORDER.map((kind) => (
-                <PresetRow
-                  key={kind}
-                  kind={kind}
-                  selected={range.kind === kind}
-                  onPick={handlePreset}
-                />
-              ))}
-            </div>
-
-            <div className="my-2 border-t border-[var(--stage-edge-subtle)]" aria-hidden />
-
-            <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
-              Custom range
-            </p>
-            <CustomRangeForm
-              initialStart={range.kind === 'custom' ? range.start : ''}
-              initialEnd={range.kind === 'custom' ? range.end : ''}
-              onApply={handleCustom}
+        <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
+          Preset
+        </p>
+        <div role="listbox" className="flex flex-col gap-0.5">
+          {PRESET_ORDER.map((kind) => (
+            <PresetRow
+              key={kind}
+              kind={kind}
+              selected={range.kind === kind}
+              onPick={handlePreset}
             />
-          </div>,
-          document.body,
-        )}
-    </>
+          ))}
+        </div>
+
+        <div className="my-2 border-t border-[var(--stage-edge-subtle)]" aria-hidden />
+
+        <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
+          Custom range
+        </p>
+        <CustomRangeForm
+          initialStart={range.kind === 'custom' ? range.start : ''}
+          initialEnd={range.kind === 'custom' ? range.end : ''}
+          onApply={handleCustom}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

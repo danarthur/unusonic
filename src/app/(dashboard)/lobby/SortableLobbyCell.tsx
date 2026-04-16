@@ -57,7 +57,7 @@ export function SortableLobbyCell({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'relative',
+        'relative h-full min-h-0',
         editMode && 'rounded-[var(--stage-radius-panel,12px)]',
         editMode &&
           'ring-1 ring-[var(--stage-edge-subtle)]',

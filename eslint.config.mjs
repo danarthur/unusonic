@@ -5,7 +5,7 @@ import sonarjs from "eslint-plugin-sonarjs";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import stageEngineering from "./eslint-plugins/stage-engineering.js";
 
-// ─── Protocol v2 (docs/reference/coding-protocol.md) ─────────────────────────
+// ─── Protocol v2 (docs/reference/code/coding-protocol.md) ────────────────────
 // This config layers rules in three postures:
 //   1. SECURITY BOUNDARIES (error from Day 0) — Supabase client selection,
 //      "use client" placement. These catch production security/architecture
@@ -148,13 +148,14 @@ const eslintConfig = defineConfig([
   },
 
   // ─── "use client" forbidden in Server-Component-only files ─────────────────
-  // Route entries (page.tsx, layout.tsx) and entities/** must be Server-safe.
-  // Push client boundaries deeper into children.
+  // Route entries (page.tsx, layout.tsx) must be Server-safe. Entities are NOT
+  // in this list — in practice they own interactive UI (cards with handlers,
+  // selection state) and are client components. Push the client boundary
+  // deeper when possible, but don't fight the layer's nature.
   {
     files: [
       "src/app/**/page.tsx",
       "src/app/**/layout.tsx",
-      "src/entities/**/*.tsx",
     ],
     rules: {
       "no-restricted-syntax": [
@@ -162,7 +163,7 @@ const eslintConfig = defineConfig([
         {
           selector: "Program > ExpressionStatement > Literal[value='use client']",
           message:
-            "'use client' forbidden here. Route entries and entities must be Server Components. Push the client boundary to a child component.",
+            "'use client' forbidden here. Route entries must be Server Components. Push the client boundary to a child component.",
         },
       ],
     },
@@ -173,7 +174,7 @@ const eslintConfig = defineConfig([
   // ═══════════════════════════════════════════════════════════════════════════
 
   // ─── File-size limits per layer ─────────────────────────────────────────────
-  // Soft limits from docs/reference/coding-protocol.md §1. ESLint warns; the
+  // Soft limits from docs/reference/code/coding-protocol.md §1. ESLint warns; the
   // baseline ratchet (scripts/eslint-baseline.mjs) prevents any file from
   // exceeding its current violation count.
 

@@ -31,6 +31,17 @@ export type DaySheetEmailProps = {
   workspaceName: string;
   /** Per-crew equipment assignments (Phase 4). Each entry = one crew member who is bringing gear. */
   equipmentAssignments?: { crewName: string; items: string[] }[];
+  /** Per-recipient time waypoints — the personalized "your times" block.
+   *  When present, renders as a dedicated section so the recipient sees their
+   *  own pickup/arrival/set-by markers instead of (or alongside) the shared
+   *  event call time. Optional; absent for shared-email sends. */
+  personalWaypoints?: {
+    label: string;
+    /** Pre-formatted for display (e.g. "08:00"). */
+    time: string;
+    location: string | null;
+    mapsUrl: string | null;
+  }[];
 };
 
 export function DaySheetEmail({
@@ -45,6 +56,7 @@ export function DaySheetEmail({
   runOfShowUrl,
   workspaceName,
   equipmentAssignments,
+  personalWaypoints,
 }: DaySheetEmailProps) {
   const previewText = `Day sheet: ${eventTitle} — ${eventDate}`;
 
@@ -97,6 +109,35 @@ export function DaySheetEmail({
                   Open in Maps
                 </Button>
               </Section>
+            )}
+
+            {/* Personal waypoints — your times for today */}
+            {personalWaypoints && personalWaypoints.length > 0 && (
+              <>
+                <Text style={sectionLabel}>Your times</Text>
+                <Section style={detailsBlock}>
+                  {personalWaypoints.map((wp, i) => (
+                    <Row key={i} style={detailRow}>
+                      <Column style={detailLabel}>
+                        <Text style={detailLabelText}>{wp.label}</Text>
+                      </Column>
+                      <Column style={detailValue}>
+                        <Text style={detailValueText}>
+                          {wp.time}
+                          {wp.location ? ` · ${wp.location}` : ''}
+                        </Text>
+                        {wp.mapsUrl && (
+                          <Text style={{ ...detailValueText, marginTop: 2 }}>
+                            <a href={wp.mapsUrl} style={{ color: '#0066cc', textDecoration: 'none' }}>
+                              Open in Maps
+                            </a>
+                          </Text>
+                        )}
+                      </Column>
+                    </Row>
+                  ))}
+                </Section>
+              </>
             )}
 
             {/* Crew list */}

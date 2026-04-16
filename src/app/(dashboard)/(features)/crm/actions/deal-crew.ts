@@ -72,6 +72,15 @@ export type DealCrewRow = {
   // Gear awareness (Phase 1)
   brings_own_gear: boolean;
   gear_notes: string | null;
+  // Crew Hub (Phase 1) — explicit state machine + comms summary. PM notes
+  // live on the existing `notes` column (surfaced as `crew_notes` above);
+  // the short-lived `internal_note` column was dropped once the rail editor
+  // was pointed at the shared notes field.
+  status: 'pending' | 'offered' | 'tentative' | 'confirmed' | 'declined' | 'replaced';
+  day_sheet_sent_count: number;
+  last_day_sheet_sent_at: string | null;
+  last_day_sheet_delivered_at: string | null;
+  last_day_sheet_bounced_at: string | null;
 };
 
 // =============================================================================
@@ -488,6 +497,11 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
       kit_fee: r.kit_fee != null ? Number(r.kit_fee) : null,
       brings_own_gear: Boolean(r.brings_own_gear),
       gear_notes: (r.gear_notes as string | null) ?? null,
+      status: ((r.status as DealCrewRow['status'] | null) ?? 'pending'),
+      day_sheet_sent_count: Number(r.day_sheet_sent_count ?? 0),
+      last_day_sheet_sent_at: (r.last_day_sheet_sent_at as string | null) ?? null,
+      last_day_sheet_delivered_at: (r.last_day_sheet_delivered_at as string | null) ?? null,
+      last_day_sheet_bounced_at: (r.last_day_sheet_bounced_at as string | null) ?? null,
       };
     });
   } catch (err) {
@@ -1349,6 +1363,41 @@ export async function updateCrewDispatch(
   try {
     const supabase = await createClient();
 
+    // Snapshot the pay fields before the update so we can diff after and log
+    // rate changes to crew_comms_log. Non-pay updates skip this step and
+    // behave exactly as before.
+    const rateKeys = ['day_rate', 'travel_stipend', 'per_diem', 'kit_fee'] as const;
+    const touchesRates = rateKeys.some((k) => k in updates);
+    let before: Record<(typeof rateKeys)[number], number | null> | null = null;
+    let eventIdForLog: string | null = null;
+    if (touchesRates) {
+      const { data: prev } = await supabase
+        .schema('ops')
+        .from('deal_crew')
+        .select('day_rate, travel_stipend, per_diem, kit_fee, deal_id')
+        .eq('id', dealCrewRowId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (prev) {
+        before = {
+          day_rate: (prev as { day_rate: number | null }).day_rate ?? null,
+          travel_stipend: (prev as { travel_stipend: number | null }).travel_stipend ?? null,
+          per_diem: (prev as { per_diem: number | null }).per_diem ?? null,
+          kit_fee: (prev as { kit_fee: number | null }).kit_fee ?? null,
+        };
+        // Resolve the event so the log row can be filtered by event.
+        const dealId = (prev as { deal_id: string }).deal_id;
+        const { data: evt } = await supabase
+          .schema('ops')
+          .from('events')
+          .select('id')
+          .eq('deal_id', dealId)
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+        eventIdForLog = (evt?.id as string) ?? null;
+      }
+    }
+
     const { error, count } = await supabase
       .schema('ops')
       .from('deal_crew')
@@ -1358,6 +1407,43 @@ export async function updateCrewDispatch(
 
     if (error) return { success: false, error: error.message };
     if (count === 0) return { success: false, error: 'Not found' };
+
+    // Log rate change if anything actually moved. We log a single rate_changed
+    // row with before/after for all four fields so the activity feed reads
+    // as one event rather than four. Failure here is non-fatal.
+    if (touchesRates && before) {
+      const after: Record<(typeof rateKeys)[number], number | null> = {
+        day_rate: 'day_rate' in updates ? (updates.day_rate ?? null) : before.day_rate,
+        travel_stipend: 'travel_stipend' in updates ? (updates.travel_stipend ?? null) : before.travel_stipend,
+        per_diem: 'per_diem' in updates ? (updates.per_diem ?? null) : before.per_diem,
+        kit_fee: 'kit_fee' in updates ? (updates.kit_fee ?? null) : before.kit_fee,
+      };
+      const changed = rateKeys.filter((k) => (before as Record<string, number | null>)[k] !== after[k]);
+      if (changed.length > 0) {
+        const beforeTotal = (before.day_rate ?? 0) + (before.travel_stipend ?? 0) + (before.per_diem ?? 0) + (before.kit_fee ?? 0);
+        const afterTotal = (after.day_rate ?? 0) + (after.travel_stipend ?? 0) + (after.per_diem ?? 0) + (after.kit_fee ?? 0);
+        const delta = afterTotal - beforeTotal;
+        const deltaLabel = delta === 0
+          ? 'rate adjusted'
+          : `total ${delta > 0 ? '+' : '−'}$${Math.abs(delta).toLocaleString()}`;
+        const { data: { user } } = await supabase.auth.getUser();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .schema('ops')
+          .from('crew_comms_log')
+          .insert({
+            workspace_id: workspaceId,
+            deal_crew_id: dealCrewRowId,
+            event_id: eventIdForLog,
+            channel: 'system',
+            event_type: 'rate_changed',
+            actor_user_id: user?.id ?? null,
+            summary: `Rate changed — ${deltaLabel}`,
+            payload: { before, after, changed_fields: changed },
+          });
+      }
+    }
+
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };

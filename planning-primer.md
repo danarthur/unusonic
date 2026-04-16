@@ -81,17 +81,17 @@ Precision instrument (Teenage Engineering / Leica / Linear). Sentence case. **No
 
 Even though you can't read them from the clone, questions may reference them. Daniel usually includes the relevant doc's key points in the queue entry's context. When a question cites one of these and you don't have context, say so in the doc.
 
-- `docs/reference/directory-schema.md` — people/companies/venues
-- `docs/reference/cortex-schema.md` — graph edges, AI memory
-- `docs/reference/finance-schema.md` — proposals, invoices, QBO
-- `docs/reference/catalog-and-aion-schema.md` — catalog + Aion AI
+- `docs/reference/code/directory-schema.md` — people/companies/venues
+- `docs/reference/code/cortex-schema.md` — graph edges, AI memory
+- `docs/reference/code/finance-schema.md` — proposals, invoices, QBO
+- `docs/reference/code/catalog-and-aion-schema.md` — catalog + Aion AI
 - `docs/reference/event-and-deal-pages-layout-and-functionality.md`
 - `docs/reference/crm-page-state-and-flow.md`
 - `docs/reference/deal-to-event-handoff-wizard-upgrade.md`
 - `docs/reference/crew-equipment-and-smart-transport-design.md`
 - `docs/reference/verified-kit-system-design.md`
 - `docs/reference/follow-up-engine-design.md` — canonical follow-up + Aion agent architecture
-- `docs/reference/auth/session-management.md`
+- `docs/reference/code/session-management.md`
 - `docs/reference/design/` — 23 documents on Stage Engineering
 - `docs/onboarding-subscription-architecture.md`
 

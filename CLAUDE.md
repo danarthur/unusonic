@@ -114,7 +114,7 @@ Layers import only from layers **below**: `App → Widgets → Features → Enti
 
 All email via Resend through `src/shared/api/email/send.ts`. Auth emails always use global `EMAIL_FROM`. Proposal emails are workspace-aware. All emails must include HTML + plain text (`toPlainText(html)` — pass the rendered string, not a React element).
 
-Full patterns: **`docs/reference/email-patterns.md`**
+Full patterns: **`docs/reference/code/email-sending.md`**
 
 ### Legacy & Grandfathered Tables
 
@@ -217,6 +217,15 @@ Call via `supabase.rpc(...)`, never raw SQL from app code:
 - `finance.get_public_invoice(token)` — public invoice read (anon-accessible, RPC-only)
 - `finance.next_invoice_number(workspace_id)` — per-workspace monotonic invoice number
 - `finance.get_fresh_qbo_token(workspace_id)` — advisory-lock-protected QBO token reader (service role only)
+- `finance.metric_revenue_collected(workspace_id, period_start, period_end, tz?, compare?)` — scalar net revenue in period with prior-period comparison
+- `finance.metric_ar_aged_60plus(workspace_id)` — scalar AR balance across invoices ≥60 days overdue
+- `finance.metric_qbo_variance(workspace_id)` — scalar count of invoices with QBO sync issues
+- `finance.metric_qbo_sync_health(workspace_id)` — scalar QBO connection state with stalled vs failed distinction
+- `finance.metric_unreconciled_payments(workspace_id)` — table of payments succeeded locally but not yet in QBO (cap 500)
+- `finance.metric_invoice_variance(workspace_id)` — table of invoices with QBO sync issues (qbo_total/delta NULL until Phase 5 live-fetch)
+- `finance.metric_sales_tax_worksheet(workspace_id, period_start, period_end, tz?)` — table of per-jurisdiction sales tax over period
+- `finance.metric_1099_worksheet(workspace_id, year)` — table of per-vendor totals from finance.bills, flags ≥$600 IRS threshold
+- `finance._metric_resolve_tz`, `finance._metric_assert_membership` — internal helpers for the metric RPCs; call via `src/shared/lib/metrics/call.ts`, never directly
 - `get_member_permissions`, `member_has_permission`, `user_has_workspace_role` — auth
 - `get_member_role_slug(p_workspace_id)` — role routing (employee portal)
 - `patch_entity_attributes` — safe JSONB merge; always validate via Zod schema first
@@ -266,23 +275,24 @@ Matte opaque surfaces, single light source, OKLCH tokens only, achromatic accent
 
 | Doc | When to read |
 |---|---|
-| `docs/reference/directory-schema.md` | People, companies, venues, entity identity |
-| `docs/reference/cortex-schema.md` | Relationships, graph edges, roles, permissions |
-| `docs/reference/finance-schema.md` | Invoices, proposals, payments, QBO |
-| `docs/reference/catalog-and-aion-schema.md` | Catalog page, Aion AI |
+| `docs/reference/code/directory-schema.md` | People, companies, venues, entity identity |
+| `docs/reference/code/cortex-schema.md` | Relationships, graph edges, roles, permissions |
+| `docs/reference/code/finance-schema.md` | Invoices, proposals, payments, QBO |
+| `docs/reference/code/catalog-and-aion-schema.md` | Catalog page, Aion AI |
 | `docs/reference/event-and-deal-pages-layout-and-functionality.md` | Event/deal pages |
 | `docs/reference/crm-page-state-and-flow.md` | CRM, Prism lenses, Plan stage flow |
 | `docs/reference/deal-to-event-handoff-wizard-upgrade.md` | Deal-to-Event Handoff |
 | `docs/reference/contact-fields.md` | Legacy contact/CRM field mapping |
 | `docs/reference/gigs-vs-events.md` | Legacy gigs/events context |
-| `docs/reference/storage-path-protocol.md` | File upload, storage paths |
+| `docs/reference/code/storage-and-uploads.md` | File upload, storage paths |
 | `docs/reference/design/` | **All UI work** (23 documents) |
-| `docs/reference/auth/session-management.md` | Sessions, inactivity logout, AuthGuard |
+| `docs/reference/code/session-management.md` | Sessions, inactivity logout, AuthGuard |
 | `docs/reference/crm-page-state-and-flow.md` §14–15 | Network detail sheet layout |
 | `docs/reference/agent-team-roles.md` | Agent team role specs, Connector data table |
-| `docs/reference/email-patterns.md` | Email sending, workspace-aware from, subject lines |
+| `docs/reference/code/email-sending.md` | Email sending, workspace-aware from, subject lines |
 | `docs/reference/crew-equipment-and-smart-transport-design.md` | Crew gear, transport modes, source tracking, pull sheets |
 | `docs/reference/verified-kit-system-design.md` | Catalog-linked equipment, verification, gap analysis, kit templates |
+| `docs/reference/aion-daily-brief-design.md` | Aion Daily Brief — dispatch API, insight evaluators, widget architecture |
 | `docs/onboarding-subscription-architecture.md` | Auth, onboarding, billing |
 
 ---

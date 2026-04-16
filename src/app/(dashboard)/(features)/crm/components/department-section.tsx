@@ -35,6 +35,7 @@ export function DepartmentSection({
   dealId,
   rateReadOnly = false,
   kitComplianceByKey,
+  onOpenDetail,
 }: {
   group: DepartmentGroup;
   collapsed: boolean;
@@ -49,6 +50,8 @@ export function DepartmentSection({
   rateReadOnly?: boolean;
   /** Batch-fetched kit-compliance results keyed by `${entityId}::${roleTag}`. */
   kitComplianceByKey?: Map<string, KitComplianceResult | null>;
+  /** When set, the row name click opens the Crew Hub detail rail. */
+  onOpenDetail?: (row: DealCrewRow) => void;
 }) {
   const { department, rows } = group;
 
@@ -129,6 +132,7 @@ export function DepartmentSection({
                       proposedDate={eventDate}
                       dealId={dealId}
                       rateReadOnly={rateReadOnly}
+                      onOpenDetail={onOpenDetail}
                       kitCompliancePrefetched={
                         kitComplianceByKey && row.entity_id && row.role_note
                           ? kitComplianceByKey.get(`${row.entity_id}::${row.role_note}`) ?? null

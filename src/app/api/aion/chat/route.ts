@@ -865,42 +865,25 @@ async function buildGreeting(state: OnboardingState, userName: string | null, wo
         responseMessages.push({ type: 'text', text: `Hey${name}. What can I help with?` });
       }
 
-      // Surface proactive insights with urgency framing
+      // Insights are now surfaced on the lobby brief card with direct actions.
+      // Keep a brief reference here so Aion acknowledges them without duplicating.
       try {
         const { getPendingInsights, markInsightsSurfaced } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
         const insights = await getPendingInsights(workspaceId ?? '', 5);
         if (insights.length > 0) {
-          const urgent = insights.filter((i) => i.urgency === 'critical' || i.urgency === 'high');
-          const rest = insights.filter((i) => i.urgency !== 'critical' && i.urgency !== 'high');
-
-          const lines: string[] = [];
-          if (urgent.length > 0) {
-            lines.push('Needs attention now:');
-            for (const i of urgent) {
-              lines.push(`- ${i.title}`);
-              if (i.suggestedAction) lines.push(`  → ${i.suggestedAction}`);
-            }
-          }
-          if (rest.length > 0) {
-            if (urgent.length > 0) lines.push('');
-            lines.push(urgent.length > 0 ? 'Also worth noting:' : 'Something to keep an eye on:');
-            for (const i of rest) {
-              lines.push(`- ${i.title}`);
-            }
-          }
-
-          responseMessages.push({ type: 'text', text: lines.join('\n') });
-
-          // Build contextual chips based on top insight
-          const topInsight = insights[0];
-          const chips: Array<{ label: string; value: string }> = [
-            { label: 'Tell me more', value: 'Tell me more about these insights' },
-          ];
-          if (topInsight.suggestedAction && topInsight.href) {
-            chips.unshift({ label: topInsight.suggestedAction, value: `Help me with: ${topInsight.title}` });
-          }
-          chips.push({ label: 'Dismiss all', value: 'Dismiss all current insights' });
-          responseMessages.push({ type: 'suggestions', text: '', chips });
+          const urgentCount = insights.filter((i) => i.urgency === 'critical' || i.urgency === 'high').length;
+          const msg = urgentCount > 0
+            ? `I surfaced ${insights.length} item${insights.length === 1 ? '' : 's'} on your brief — ${urgentCount} need${urgentCount === 1 ? 's' : ''} attention. Anything you want to dig into?`
+            : `I surfaced ${insights.length} item${insights.length === 1 ? '' : 's'} on your brief. Anything you want to dig into?`;
+          responseMessages.push({ type: 'text', text: msg });
+          responseMessages.push({
+            type: 'suggestions',
+            text: '',
+            chips: [
+              { label: 'Tell me more', value: 'Tell me more about the items on my brief' },
+              { label: 'Dismiss all', value: 'Dismiss all current insights' },
+            ],
+          });
 
           // Fire-and-forget: mark insights as surfaced
           const insightIds = insights.map((i: any) => i.id);

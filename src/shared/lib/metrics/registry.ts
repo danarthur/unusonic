@@ -658,6 +658,108 @@ export const METRICS: Record<string, MetricDefinition> = {
     notes: 'No required capability — data fetcher scopes to the viewer.',
   },
 
+  'lobby.todays_brief': {
+    id: 'lobby.todays_brief',
+    kind: 'widget',
+    widgetKey: 'todays-brief',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'daily',
+    roles: ['owner', 'pm', 'finance_admin'],
+    title: "Today's brief",
+    description: 'Aion daily brief with actionable insights. Surfaces follow-ups, crew gaps, and stale deals. Kill-switch aware.',
+    emptyState: {
+      title: 'No briefing yet',
+      body: 'The daily brief generates overnight. Check back tomorrow.',
+    },
+    notes: 'Spec: docs/reference/sales-dashboard-design.md §5.1',
+  },
+
+  'lobby.owed_today': {
+    id: 'lobby.owed_today',
+    kind: 'widget',
+    widgetKey: 'owed-today',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Owed today',
+    description: 'Ranked worklist of deals waiting on you. Phone-first — log calls, snooze, dismiss inline.',
+    emptyState: {
+      title: 'Nothing owed today',
+      body: 'Two deals are cooling — glance at Gone Quiet when you have a minute.',
+    },
+    notes: 'Replaces the post-it stack. Spec: docs/reference/sales-dashboard-design.md §5.2',
+  },
+
+  'lobby.this_week': {
+    id: 'lobby.this_week',
+    kind: 'widget',
+    widgetKey: 'this-week',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'touring_coordinator', 'employee'],
+    title: 'This week',
+    description: 'Five-day calendar ribbon. Confirmed shows + tentative date holds from open deals.',
+    emptyState: {
+      title: 'Nothing on the books this week',
+      body: 'Good time to reach out.',
+    },
+    notes: 'Sales/ops cohabitation card. Spec: docs/reference/sales-dashboard-design.md §5.3',
+  },
+
+  'lobby.awaiting_signature': {
+    id: 'lobby.awaiting_signature',
+    kind: 'widget',
+    widgetKey: 'awaiting-signature',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm', 'finance_admin'],
+    title: 'Awaiting signature / deposit',
+    description: 'Accepted proposals not yet signed + signed contracts with overdue deposits.',
+    emptyState: {
+      title: 'All current',
+      body: 'All signatures and deposits are current.',
+    },
+    notes: 'Spec: docs/reference/sales-dashboard-design.md §5.4',
+  },
+
+  'lobby.gone_quiet': {
+    id: 'lobby.gone_quiet',
+    kind: 'widget',
+    widgetKey: 'gone-quiet',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Gone quiet',
+    description: 'Stalled deals + dormant clients the post-it wall can\'t track. Capped at 5.',
+    emptyState: {
+      title: 'All active',
+      body: "No one's fallen off — you're on top of it.",
+    },
+    notes: 'Spec: docs/reference/sales-dashboard-design.md §5.5',
+  },
+
+  'lobby.weekly_tally': {
+    id: 'lobby.weekly_tally',
+    kind: 'widget',
+    widgetKey: 'weekly-tally',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'This week',
+    description: 'Outcome counts: proposals sent, deposits in, follow-ups logged, deals won. Never activity metrics.',
+    emptyState: {
+      title: 'New week',
+      body: 'Activity will tally as the week progresses.',
+    },
+    notes: 'Cross-off card. Spec: docs/reference/sales-dashboard-design.md §5.6',
+  },
+
   'lobby.activity_feed': {
     id: 'lobby.activity_feed',
     kind: 'widget',

@@ -4,7 +4,7 @@
  * Resolution order (R6 §4.2): explicit payload → venue attrs → workspace → 'UTC'.
  * All server-side. Client-side viewer tz via getViewerTimezone().
  *
- * @see docs/reference/event-timezone-storage-research.md
+ * @see docs/reference/code/archive/event-timezone-storage-research.md
  */
 
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';

@@ -167,9 +167,11 @@ function LobbyClientInner({
 
   return (
     <div className="flex-1 min-h-0 w-full flex flex-col font-sans relative">
-      {/* Ambient backdrop */}
+      {/* Ambient backdrop — pointer-events-none so it never swallows clicks
+          regardless of stacking context. The inner class also sets it, but
+          the wrapper was previously capturing clicks above the bento. */}
       {showOverview && (
-        <div className="absolute inset-0 z-0" aria-hidden>
+        <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
           <div className="lobby-ambient-growth" />
         </div>
       )}

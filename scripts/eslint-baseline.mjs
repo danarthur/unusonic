@@ -21,7 +21,7 @@
 //   - If a rule is not in baseline for a file, current count must be zero.
 //
 // Philosophy: legacy files may stay broken. They cannot get worse. New files
-// must comply. See docs/reference/coding-protocol.md §6 for rationale.
+// must comply. See docs/reference/code/coding-protocol.md §6 for rationale.
 
 import { ESLint } from "eslint";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";

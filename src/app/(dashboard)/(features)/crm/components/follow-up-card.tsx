@@ -283,6 +283,8 @@ function FullFollowUpCard({
     if (result.success) {
       toast.success(`Snoozed for ${days} day${days !== 1 ? 's' : ''}`);
       onActionComplete();
+    } else if (result.requireDecision) {
+      toast.error(result.message);
     } else {
       toast.error(result.error ?? 'Failed to snooze');
     }

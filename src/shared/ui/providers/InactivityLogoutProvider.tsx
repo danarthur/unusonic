@@ -12,7 +12,7 @@
  * The implementation is preserved for future admin-configurable re-enablement
  * (P3: workspace session policy settings for enterprise/compliance customers).
  *
- * @see docs/reference/auth/session-management.md
+ * @see docs/reference/code/session-management.md
  */
 
 export function InactivityLogoutProvider({

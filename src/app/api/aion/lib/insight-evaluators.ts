@@ -26,10 +26,13 @@ export type InsightCandidate = {
 // ── Evaluate all triggers for a workspace ────────────────────────────────────
 
 export async function evaluateAllInsights(workspaceId: string): Promise<InsightCandidate[]> {
+  // Pre-fetch shared data for crew evaluators (single batch instead of N+1)
+  const crewData = await getUpcomingDealsWithCrew(workspaceId);
+
   const results = await Promise.allSettled([
     evaluateProposalViewedUnsigned(workspaceId),
-    evaluateCrewUnconfirmed(workspaceId),
-    evaluateShowNoCrew(workspaceId),
+    evaluateCrewUnconfirmed(workspaceId, crewData),
+    evaluateShowNoCrew(workspaceId, crewData),
     evaluateDealStale(workspaceId),
   ]);
 
@@ -129,6 +132,55 @@ function eventUrgency(daysOut: number): InsightCandidate['urgency'] {
   return 'low';
 }
 
+// ── Shared data fetchers (batch queries to avoid N+1) ───────────────────────
+
+type CrewRow = { id: string; deal_id: string; confirmed_at: string | null; entity_id: string };
+type UpcomingDeal = { id: string; title: string | null; proposed_date: string; event_archetype: string | null };
+type UpcomingDealsWithCrew = {
+  deals: UpcomingDeal[];
+  crewByDealId: Map<string, CrewRow[]>;
+};
+
+/**
+ * Batch-fetch upcoming deals (within 7 days) and all their crew in two queries.
+ * Shared by evaluateCrewUnconfirmed and evaluateShowNoCrew.
+ */
+async function getUpcomingDealsWithCrew(workspaceId: string): Promise<UpcomingDealsWithCrew> {
+  const system = getSystemClient();
+  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: deals } = await system
+    .from('deals')
+    .select('id, title, proposed_date, event_archetype')
+    .eq('workspace_id', workspaceId)
+    .in('status', ['proposal', 'contract_sent', 'won'])
+    .not('proposed_date', 'is', null)
+    .lte('proposed_date', sevenDaysFromNow)
+    .gte('proposed_date', new Date().toISOString());
+
+  if (!deals?.length) return { deals: [], crewByDealId: new Map() };
+
+  const dealIds = deals.map((d: any) => d.id);
+
+  // Single batch query for all crew across all upcoming deals
+  const { data: allCrew } = await (system as any)
+    .schema('ops')
+    .from('deal_crew')
+    .select('id, deal_id, confirmed_at, entity_id')
+    .in('deal_id', dealIds)
+    .eq('workspace_id', workspaceId);
+
+  // Group crew by deal_id
+  const crewByDealId = new Map<string, CrewRow[]>();
+  for (const row of (allCrew ?? []) as CrewRow[]) {
+    const existing = crewByDealId.get(row.deal_id) ?? [];
+    existing.push(row);
+    crewByDealId.set(row.deal_id, existing);
+  }
+
+  return { deals: deals as UpcomingDeal[], crewByDealId };
+}
+
 // ── Individual evaluators ────────────────────────────────────────────────────
 
 /**
@@ -198,34 +250,21 @@ async function evaluateProposalViewedUnsigned(workspaceId: string): Promise<Insi
 /**
  * Crew members unconfirmed for events within 7 days.
  * Dynamic priority: scales with proximity to event + unconfirmed ratio.
+ * Consumes pre-fetched crew data to avoid N+1 queries.
  */
-async function evaluateCrewUnconfirmed(workspaceId: string): Promise<InsightCandidate[]> {
-  const system = getSystemClient();
-  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  const { data: deals } = await system
-    .from('deals')
-    .select('id, title, proposed_date')
-    .eq('workspace_id', workspaceId)
-    .in('status', ['proposal', 'contract_sent', 'won'])
-    .not('proposed_date', 'is', null)
-    .lte('proposed_date', sevenDaysFromNow)
-    .gte('proposed_date', new Date().toISOString());
-
-  if (!deals?.length) return [];
+async function evaluateCrewUnconfirmed(
+  _workspaceId: string,
+  crewData: UpcomingDealsWithCrew,
+): Promise<InsightCandidate[]> {
+  const { deals, crewByDealId } = crewData;
+  if (!deals.length) return [];
 
   const insights: InsightCandidate[] = [];
 
-  for (const deal of deals as any[]) {
-    const { data: crew } = await system
-      .schema('ops')
-      .from('deal_crew')
-      .select('id, confirmed_at, entity_id')
-      .eq('deal_id', deal.id)
-      .eq('workspace_id', workspaceId);
-
-    const totalCrew = crew?.length ?? 0;
-    const unconfirmed = (crew ?? []).filter((c: any) => !c.confirmed_at);
+  for (const deal of deals) {
+    const crew = crewByDealId.get(deal.id) ?? [];
+    const totalCrew = crew.length;
+    const unconfirmed = crew.filter((c) => !c.confirmed_at);
     if (unconfirmed.length === 0) continue;
 
     const daysOut = daysUntil(deal.proposed_date);
@@ -266,40 +305,27 @@ async function evaluateCrewUnconfirmed(workspaceId: string): Promise<InsightCand
 /**
  * Events within 7 days with zero crew assigned.
  * Highest base priority — dynamic escalation as event approaches.
+ * Consumes pre-fetched crew data to avoid N+1 queries.
  */
-async function evaluateShowNoCrew(workspaceId: string): Promise<InsightCandidate[]> {
-  const system = getSystemClient();
-  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  const { data: deals } = await system
-    .from('deals')
-    .select('id, title, proposed_date, event_archetype')
-    .eq('workspace_id', workspaceId)
-    .in('status', ['proposal', 'contract_sent', 'won'])
-    .not('proposed_date', 'is', null)
-    .lte('proposed_date', sevenDaysFromNow)
-    .gte('proposed_date', new Date().toISOString());
-
-  if (!deals?.length) return [];
+async function evaluateShowNoCrew(
+  _workspaceId: string,
+  crewData: UpcomingDealsWithCrew,
+): Promise<InsightCandidate[]> {
+  const { deals, crewByDealId } = crewData;
+  if (!deals.length) return [];
 
   const insights: InsightCandidate[] = [];
 
-  for (const deal of deals as any[]) {
-    const { count } = await system
-      .schema('ops')
-      .from('deal_crew')
-      .select('id', { count: 'exact', head: true })
-      .eq('deal_id', deal.id)
-      .eq('workspace_id', workspaceId);
-
-    if ((count ?? 0) > 0) continue;
+  for (const deal of deals) {
+    const crewCount = (crewByDealId.get(deal.id) ?? []).length;
+    if (crewCount > 0) continue;
 
     const daysOut = daysUntil(deal.proposed_date);
     const urg = eventUrgency(daysOut);
     const dateStr = shortDate(deal.proposed_date);
     const dealTitle = deal.title ?? 'Untitled';
 
-    // Dynamic priority: base 40, +10 if ≤3 days, +5 if tomorrow or today
+    // Dynamic priority: base 40, +10 if ≤3 days
     const dynamicPriority = Math.min(50, 40 + (daysOut <= 3 ? 10 : 0));
 
     const title = daysOut <= 1
@@ -330,6 +356,7 @@ async function evaluateShowNoCrew(workspaceId: string): Promise<InsightCandidate
 /**
  * Open deals with no activity (notes or log entries) in 14+ days.
  * Dynamic priority: longer staleness = higher priority. Deals with upcoming dates get extra weight.
+ * Uses batch queries for notes + logs to avoid N+1.
  */
 async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[]> {
   const system = getSystemClient();
@@ -344,42 +371,44 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
 
   if (!deals?.length) return [];
 
-  // Batch-fetch client org names
+  const dealIds = (deals as any[]).map((d: any) => d.id);
+
+  // Batch-fetch client org names + recent activity in parallel
   const orgIds = [...new Set((deals as any[]).map((d: any) => d.organization_id).filter(Boolean))];
-  let orgNames: Record<string, string> = {};
-  if (orgIds.length > 0) {
-    const { data: orgs } = await system
-      .schema('directory')
-      .from('entities')
-      .select('id, name')
-      .in('id', orgIds);
-    orgNames = Object.fromEntries((orgs ?? []).map((o: any) => [o.id, o.name]));
-  }
+
+  const [orgResult, notesResult, logsResult] = await Promise.all([
+    orgIds.length > 0
+      ? system.schema('directory').from('entities').select('id, name').in('id', orgIds)
+      : Promise.resolve({ data: [] as any[] }),
+    // Batch: deals with recent notes
+    (system as any).schema('ops').from('deal_notes')
+      .select('deal_id')
+      .in('deal_id', dealIds)
+      .gte('created_at', fourteenDaysAgo),
+    // Batch: deals with recent follow-up log entries
+    (system as any).schema('ops').from('follow_up_log')
+      .select('deal_id')
+      .in('deal_id', dealIds)
+      .gte('created_at', fourteenDaysAgo),
+  ]);
+
+  const orgNames: Record<string, string> = Object.fromEntries(
+    (orgResult.data ?? []).map((o: any) => [o.id, o.name]),
+  );
+
+  // Build sets of deal IDs with recent activity
+  const dealsWithRecentNotes = new Set(
+    (notesResult.data ?? []).map((r: any) => r.deal_id),
+  );
+  const dealsWithRecentLogs = new Set(
+    (logsResult.data ?? []).map((r: any) => r.deal_id),
+  );
 
   const insights: InsightCandidate[] = [];
 
   for (const deal of deals as any[]) {
-    // Check for recent notes
-    const { data: recentNotes } = await system
-      .schema('ops')
-      .from('deal_notes')
-      .select('id')
-      .eq('deal_id', deal.id)
-      .gte('created_at', fourteenDaysAgo)
-      .limit(1);
-
-    if (recentNotes?.length) continue;
-
-    // Check for recent follow-up log entries
-    const { data: recentLogs } = await system
-      .schema('ops')
-      .from('follow_up_log')
-      .select('id')
-      .eq('deal_id', deal.id)
-      .gte('created_at', fourteenDaysAgo)
-      .limit(1);
-
-    if (recentLogs?.length) continue;
+    // Skip deals with recent activity
+    if (dealsWithRecentNotes.has(deal.id) || dealsWithRecentLogs.has(deal.id)) continue;
 
     const inactiveDays = daysSince(deal.updated_at);
     if (inactiveDays < 14) continue;

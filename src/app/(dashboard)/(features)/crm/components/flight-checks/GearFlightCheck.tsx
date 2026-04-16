@@ -86,6 +86,9 @@ type GearFlightCheckProps = {
   defaultCollapsed?: boolean;
   maxVisible?: number;
   userName?: string;
+  /** Called when the supplier chip on a crew-sourced item is clicked.
+   *  Plan-lens opens the Crew Hub detail rail in response. */
+  onOpenCrewDetail?: (row: DealCrewRow) => void;
 };
 
 // =============================================================================
@@ -101,6 +104,7 @@ export function GearFlightCheck({
   defaultCollapsed = false,
   maxVisible = 5,
   userName = 'You',
+  onOpenCrewDetail,
 }: GearFlightCheckProps) {
   const [items, setItems] = useState<EventGearItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -577,6 +581,7 @@ export function GearFlightCheck({
                   onCloseMenu={() => setMenuOpen(null)}
                   onOpenOperatorPicker={() => setOperatorPickerOpen(operatorPickerOpen === item.id ? null : item.id)}
                   onAssignOperator={(entityId) => handleAssignOperator(item.id, entityId)}
+                  onOpenCrewDetail={onOpenCrewDetail}
                 />
               </motion.li>
             ))}
@@ -615,6 +620,7 @@ export function GearFlightCheck({
               onCloseMenu={() => setMenuOpen(null)}
               onOpenOperatorPicker={(id) => setOperatorPickerOpen(operatorPickerOpen === id ? null : id)}
               onAssignOperator={handleAssignOperator}
+              onOpenCrewDetail={onOpenCrewDetail}
             />
           );
         })}
@@ -675,6 +681,7 @@ function DepartmentSection({
   onCloseMenu,
   onOpenOperatorPicker,
   onAssignOperator,
+  onOpenCrewDetail,
 }: {
   group: DepartmentGearGroup;
   collapsed: boolean;
@@ -695,6 +702,7 @@ function DepartmentSection({
   onCloseMenu: () => void;
   onOpenOperatorPicker: (id: string) => void;
   onAssignOperator: (itemId: string, entityId: string | null) => void;
+  onOpenCrewDetail?: (row: DealCrewRow) => void;
 }) {
   const { department, items } = group;
   const loadedCount = items.filter(
@@ -822,6 +830,7 @@ function DepartmentSection({
                       onCloseMenu={onCloseMenu}
                       onOpenOperatorPicker={() => onOpenOperatorPicker(item.id)}
                       onAssignOperator={(entityId) => onAssignOperator(item.id, entityId)}
+                      onOpenCrewDetail={onOpenCrewDetail}
                     />
                   </motion.li>
                 ))}
@@ -854,6 +863,7 @@ type GearItemRowProps = {
   onCloseMenu: () => void;
   onOpenOperatorPicker: () => void;
   onAssignOperator: (entityId: string | null) => void;
+  onOpenCrewDetail?: (row: DealCrewRow) => void;
 };
 
 function GearItemRow({
@@ -872,6 +882,7 @@ function GearItemRow({
   onCloseMenu,
   onOpenOperatorPicker,
   onAssignOperator,
+  onOpenCrewDetail,
 }: GearItemRowProps) {
   const isBranch = isBranchState(item.status);
   const lifecycleIdx = isBranch ? -1 : getLifecycleIndex(item.status);
@@ -945,16 +956,37 @@ function GearItemRow({
           </span>
         )}
 
-        {/* Source chip */}
+        {/* Source chip — becomes a button when crew-sourced + rail wired */}
         {item.source !== 'company' && (() => {
           const chip = SOURCE_CHIP_STYLES[item.source];
+          const supplierRow = item.source === 'crew' && item.supplied_by_entity_id
+            ? crewRows.find((r) => r.entity_id === item.supplied_by_entity_id)
+            : null;
+          const clickable = !!(onOpenCrewDetail && supplierRow);
+          const content = (
+            <>
+              {chip.label}
+              {item.supplied_by_name && <span className="text-[var(--stage-text-secondary)] ml-0.5">· {item.supplied_by_name}</span>}
+            </>
+          );
+          if (clickable) {
+            return (
+              <button
+                type="button"
+                onClick={() => onOpenCrewDetail!(supplierRow!)}
+                className={`shrink-0 stage-badge-text tracking-tight px-2 py-0.5 rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ${chip.bg} ${chip.text}`}
+                title={`Open ${item.supplied_by_name ?? 'supplier'} in Crew Hub`}
+              >
+                {content}
+              </button>
+            );
+          }
           return (
             <span
               className={`shrink-0 stage-badge-text tracking-tight px-2 py-0.5 rounded-full ${chip.bg} ${chip.text}`}
               title={item.supplied_by_name ? `Supplied by ${item.supplied_by_name}` : undefined}
             >
-              {chip.label}
-              {item.supplied_by_name && <span className="text-[var(--stage-text-secondary)] ml-0.5">· {item.supplied_by_name}</span>}
+              {content}
             </span>
           );
         })()}

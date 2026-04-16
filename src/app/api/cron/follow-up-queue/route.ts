@@ -9,18 +9,13 @@
 import { NextResponse } from 'next/server';
 import type { Json } from '@/types/supabase';
 import { getSystemClient } from '@/shared/api/supabase/system';
-import { computeStallSignalFromRaw } from '@/shared/lib/stall-signal';
+import { computeFollowUpPriority } from '@/shared/lib/follow-up-priority';
+import { renderReason } from '@/shared/lib/follow-up-reasons';
 import { differenceInDays, parseISO } from 'date-fns';
 import type { AionFollowUpPlaybook, AionConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const STATUS_TO_STAGE: Record<string, number> = {
-  inquiry: 0,
-  proposal: 1,
-  contract_sent: 2,
-};
 
 // ── Playbook helpers ─────────────────────────────────────────────────────────
 
@@ -98,11 +93,6 @@ function shouldBackOff(
     if (followUpCount >= rule.structured!.max_attempts!) return true;
   }
   return false;
-}
-
-function isWithinHours(dateStr: string, hours: number): boolean {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  return diffMs >= 0 && diffMs <= hours * 3600000;
 }
 
 type ScoredDeal = {
@@ -299,7 +289,6 @@ export async function GET(req: Request) {
 
       const proposal = proposalMap.get(deal.id) ?? null;
       const lastLogEntry = lastLogMap.get(deal.id) ?? null;
-      const currentStage = STATUS_TO_STAGE[deal.status] ?? 0;
 
       // Playbook overrides
       const playbook = playbookMap.get(deal.workspace_id);
@@ -322,118 +311,52 @@ export async function GET(req: Request) {
         event_archetype: deal.event_archetype ?? null,
       });
 
-      let score = 0;
-      let topSignal = { type: 'no_activity' as string, weight: 0 };
+      const daysSinceActivity = lastLogEntry
+        ? differenceInDays(now, parseISO(lastLogEntry.created_at))
+        : null;
 
-      // Stall signal
-      const stall = computeStallSignalFromRaw({
-        status: deal.status,
-        createdAt: deal.created_at,
-        proposalCreatedAt: proposal?.created_at ?? null,
-        proposalUpdatedAt: proposal?.updated_at ?? null,
-        proposedDate: deal.proposed_date,
-        currentStage,
-        thresholdOverrides: timingOverrides,
-      });
-      if (stall) {
-        const stallScore = stall.urgent ? 15 : (stall.stalled ? 8 : 0);
-        score += stallScore;
-        if (stallScore > topSignal.weight) {
-          topSignal = { type: 'stall', weight: stallScore };
-        }
-      }
-
-      // Event proximity
-      if (deal.proposed_date) {
-        const daysUntil = Math.max(0, differenceInDays(parseISO(deal.proposed_date), now));
-        const proximityScore = Math.max(0, 30 - daysUntil) * 1.5;
-        score += proximityScore;
-        if (proximityScore > topSignal.weight) {
-          topSignal = { type: 'deadline_proximity', weight: proximityScore };
-        }
-      }
-
-      // Deal value
-      const budgetEstimated = (deal as any).budget_estimated as number | null;
-      if (budgetEstimated) {
-        score += Math.min(5, budgetEstimated / 10000);
-      }
-
-      // Engagement signals
-      if (proposal) {
-        const viewCount = (proposal as any).view_count as number | null ?? 0;
-        const lastViewedAt = (proposal as any).last_viewed_at as string | null;
-        const emailBouncedAt = (proposal as any).email_bounced_at as string | null;
-
-        if (viewCount >= 2 && lastViewedAt && isWithinHours(lastViewedAt, 48)) {
-          score += 25;
-          if (25 > topSignal.weight) {
-            topSignal = { type: 'engagement_hot', weight: 25 };
-          }
-        } else if (viewCount > 0) {
-          score += 5;
-        }
-
-        if (emailBouncedAt) {
-          score += 12;
-          if (12 > topSignal.weight) {
-            topSignal = { type: 'proposal_bounced', weight: 12 };
-          }
-        }
-      }
-
-      // No owner
-      if (!(deal as any).owner_user_id) {
-        score += 8;
-        if (8 > topSignal.weight) {
-          topSignal = { type: 'no_owner', weight: 8 };
-        }
-      }
-
-      // No recent activity
-      let daysSinceActivity: number | null = null;
-      if (lastLogEntry) {
-        daysSinceActivity = differenceInDays(now, parseISO(lastLogEntry.created_at));
-        if (daysSinceActivity > 14) {
-          score += 6;
-          if (6 > topSignal.weight) topSignal = { type: 'no_activity', weight: 6 };
-        } else if (daysSinceActivity > 7) {
-          score += 3;
-        }
-      } else {
-        score += 4;
-        if (4 > topSignal.weight) topSignal = { type: 'no_activity', weight: 4 };
-      }
-
-      // Date hold pressure: another inquiry shares this date
+      let hasContestedDate = false;
       if (deal.proposed_date) {
         const dateKey = `${deal.workspace_id}:${deal.proposed_date}`;
         const dealsOnDate = dateHoldMap.get(dateKey);
-        if (dealsOnDate && dealsOnDate.size > 1 && deal.status !== 'contract_sent') {
-          score += 10;
-          if (10 > topSignal.weight) {
-            topSignal = { type: 'date_hold_pressure', weight: 10 };
-          }
-        }
+        hasContestedDate = !!(dealsOnDate && dealsOnDate.size > 1);
       }
 
-      // Skip low-score deals
-      if (score <= 0) {
+      const scoreResult = computeFollowUpPriority({
+        deal: {
+          status: deal.status,
+          createdAt: deal.created_at,
+          proposedDate: deal.proposed_date,
+          budgetEstimated: (deal as any).budget_estimated as number | null,
+          ownerUserId: (deal as any).owner_user_id as string | null,
+        },
+        proposal: proposal
+          ? {
+              createdAt: proposal.created_at,
+              updatedAt: proposal.updated_at,
+              status: (proposal as any).status ?? null,
+              viewCount: (proposal as any).view_count ?? 0,
+              lastViewedAt: (proposal as any).last_viewed_at ?? null,
+              emailBouncedAt: (proposal as any).email_bounced_at ?? null,
+            }
+          : null,
+        daysSinceActivity,
+        hasContestedDate,
+        thresholdOverrides: timingOverrides,
+        now,
+      });
+
+      if (!scoreResult) {
         skipped++;
         continue;
       }
 
-      const daysUntilEvent = deal.proposed_date
-        ? Math.max(0, differenceInDays(parseISO(deal.proposed_date), now))
-        : null;
-
-      const reasonType = topSignal.type;
-      const { reason, suggestedAction, suggestedChannel: defaultChannel } = buildReasonText(reasonType, {
-        stall,
-        proposal,
-        daysUntilEvent,
-        daysSinceActivity,
-      });
+      const score = scoreResult.score;
+      const reasonType = scoreResult.reasonType;
+      const { reason, suggestedAction, suggestedChannel: defaultChannel } = renderReason(
+        reasonType,
+        scoreResult.reasonContext,
+      );
 
       // Channel override: entity preferences take priority, then playbook rules
       let channelOverride: string | null = null;
@@ -475,6 +398,49 @@ export async function GET(req: Request) {
         console.error(`[cron/follow-up-queue] Error scoring deal ${deal.id}:`, dealErr);
         skipped++;
       }
+    }
+
+    // 6b. Second pass: proposal-level signals (draft_aging, unsigned, deposit_overdue)
+    // Only for deals NOT already scored (to avoid overwriting higher-priority signals).
+    const alreadyScoredDealIds = new Set(scored.map((s) => s.dealId));
+
+    // Draft aging: proposals sitting in draft > 3 days
+    const { data: draftProposals } = await supabase
+      .from('proposals')
+      .select('id, deal_id, created_at, workspace_id')
+      .eq('status', 'draft')
+      .lt('created_at', new Date(now.getTime() - 3 * 86_400_000).toISOString());
+
+    for (const dp of (draftProposals ?? []) as { deal_id: string; created_at: string; workspace_id: string }[]) {
+      if (alreadyScoredDealIds.has(dp.deal_id)) continue;
+      const days = differenceInDays(now, parseISO(dp.created_at));
+      const { reason, suggestedAction, suggestedChannel } = renderReason('draft_aging', { daysSinceDraft: days });
+      scored.push({
+        dealId: dp.deal_id, workspaceId: dp.workspace_id, score: 7,
+        reasonType: 'draft_aging', reason, suggestedAction, suggestedChannel,
+        followUpCategory: 'sales', contextSnapshot: { days_since_draft: days },
+      });
+      alreadyScoredDealIds.add(dp.deal_id);
+    }
+
+    // Unsigned: accepted proposals not yet signed > 3 days
+    const { data: unsignedProposals } = await supabase
+      .from('proposals')
+      .select('id, deal_id, accepted_at, workspace_id')
+      .eq('status', 'accepted')
+      .is('signed_at', null)
+      .lt('accepted_at', new Date(now.getTime() - 3 * 86_400_000).toISOString());
+
+    for (const up of (unsignedProposals ?? []) as { deal_id: string; accepted_at: string; workspace_id: string }[]) {
+      if (alreadyScoredDealIds.has(up.deal_id)) continue;
+      const days = differenceInDays(now, parseISO(up.accepted_at));
+      const { reason, suggestedAction, suggestedChannel } = renderReason('unsigned', { daysSinceAcceptance: days });
+      scored.push({
+        dealId: up.deal_id, workspaceId: up.workspace_id, score: 9,
+        reasonType: 'unsigned', reason, suggestedAction, suggestedChannel,
+        followUpCategory: 'sales', contextSnapshot: { days_since_acceptance: days },
+      });
+      alreadyScoredDealIds.add(up.deal_id);
     }
 
     // 7. Upsert scored deals
@@ -574,118 +540,3 @@ export async function GET(req: Request) {
   return NextResponse.json({ queued, removed, skipped, insights: insightsGenerated });
 }
 
-type ReasonContext = {
-  stall: ReturnType<typeof computeStallSignalFromRaw>;
-  proposal: { status?: string } | null;
-  daysUntilEvent: number | null;
-  daysSinceActivity: number | null;
-};
-
-function buildReasonText(
-  reasonType: string,
-  ctx: ReasonContext,
-): { reason: string; suggestedAction: string | null; suggestedChannel: string | null } {
-  const { stall, daysUntilEvent, daysSinceActivity } = ctx;
-
-  switch (reasonType) {
-    case 'stall': {
-      if (!stall) return { reason: 'This deal may need attention.', suggestedAction: 'Check in with the client', suggestedChannel: 'email' };
-      const days = stall.daysInStage;
-      const stage = stall.stageName;
-      if (stage === 'Inquiry') {
-        return {
-          reason: `This inquiry has been sitting for ${days} days without a proposal. Building one gives you a reason to re-engage.`,
-          suggestedAction: 'Draft a proposal or reach out to clarify their needs',
-          suggestedChannel: 'call',
-        };
-      }
-      if (stage === 'Contract Sent') {
-        return {
-          reason: `Contract sent ${days} days ago with no response. A quick call to check if they have questions keeps it moving.`,
-          suggestedAction: 'Call to see if they need anything before signing',
-          suggestedChannel: 'call',
-        };
-      }
-      // Proposal stage (most common)
-      return {
-        reason: `The proposal has been out for ${days} days — a check-in referencing their event date gives you a natural reason to call.`,
-        suggestedAction: 'A short, specific message works better than "just checking in"',
-        suggestedChannel: 'sms',
-      };
-    }
-
-    case 'engagement_hot':
-      return {
-        reason: "They've viewed the proposal multiple times recently — they're actively considering. A quick call while it's on their mind.",
-        suggestedAction: 'Call now or send a personal text acknowledging their interest',
-        suggestedChannel: 'call',
-      };
-
-    case 'deadline_proximity': {
-      const daysOut = daysUntilEvent ?? 0;
-      if (daysOut <= 14) {
-        return {
-          reason: `The event is ${daysOut} days out with no contract signed. This is urgent — time pressure is your strongest pretext.`,
-          suggestedAction: `"We need to lock this in soon to guarantee the date"`,
-          suggestedChannel: 'call',
-        };
-      }
-      return {
-        reason: `The event is ${daysOut} days out and no contract is signed. Referencing the timeline gives you a natural reason to follow up.`,
-        suggestedAction: 'Mention the date and ask if they are ready to move forward',
-        suggestedChannel: 'sms',
-      };
-    }
-
-    case 'date_hold_pressure':
-      return {
-        reason: "You have another inquiry for this date. A date hold is the most effective follow-up line — \"I'm holding your date but have another inquiry.\"",
-        suggestedAction: 'Let them know the date may not be available much longer',
-        suggestedChannel: 'sms',
-      };
-
-    case 'no_owner':
-      return {
-        reason: 'Nobody is assigned to this deal. It needs an owner before it needs a follow-up.',
-        suggestedAction: 'Assign someone so this doesn\'t fall through the cracks',
-        suggestedChannel: 'manual',
-      };
-
-    case 'no_activity': {
-      const days = daysSinceActivity;
-      if (days !== null && days > 0) {
-        return {
-          reason: `No contact logged in ${days} days. If you've been in touch outside the system, log it so the queue stays accurate.`,
-          suggestedAction: 'A quick text or call keeps the momentum going',
-          suggestedChannel: 'sms',
-        };
-      }
-      return {
-        reason: 'No follow-up activity has been logged on this deal yet.',
-        suggestedAction: 'Reach out to start the conversation, or log a past interaction',
-        suggestedChannel: 'sms',
-      };
-    }
-
-    case 'proposal_bounced':
-      return {
-        reason: "The proposal email bounced — the client may not know you sent it. Get the right address and resend.",
-        suggestedAction: 'Call or text to confirm their email, then resend the proposal',
-        suggestedChannel: 'call',
-      };
-
-    case 'proposal_sent':
-      return {
-        reason: 'Proposal delivered — give them a few days, then check if they have had a chance to look.',
-        suggestedAction: 'Wait 2-3 days, then a short text asking if they received it',
-        suggestedChannel: 'sms',
-      };
-
-    default:
-      return {
-        reason: 'This deal could use some attention.',
-        suggestedAction: null,
-        suggestedChannel: null,
-      };
-  }
-}

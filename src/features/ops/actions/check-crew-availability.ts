@@ -39,6 +39,7 @@ export async function checkCrewAvailability(
   entityId: string,
   date: string,
   excludeDealId?: string | null,
+  excludeEventId?: string | null,
 ): Promise<CrewAvailabilityResult> {
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) {
@@ -95,6 +96,9 @@ export async function checkCrewAvailability(
       // `event:events!inner(...)` narrows to an array shape (typegen can't
       // prove 1:1 cardinality from FK alone). `!inner` guarantees at least one.
       const eventRow = Array.isArray(booking.event) ? booking.event[0] : booking.event;
+      // Skip the event we're currently looking at — otherwise post-handoff
+      // shows flag themselves as conflicts in the Crew Hub detail rail.
+      if (excludeEventId && eventRow?.id === excludeEventId) continue;
       const eventTitle = eventRow?.title ?? 'Untitled event';
       const role = booking.role ? ` · ${booking.role}` : '';
       conflicts.push({

@@ -62,6 +62,8 @@ type DispatchSummaryProps = {
   hideVitals?: boolean;
   /** Org ID for crew search (needed for swap picker). */
   sourceOrgId?: string | null;
+  /** Lifted rail handler — click a crew-sourced gear chip to open the Crew Hub. */
+  onOpenCrewDetail?: (row: DealCrewRow) => void;
 };
 
 // getCallTime and googleMapsUrl imported from ../lib/day-sheet-utils
@@ -356,6 +358,7 @@ export function DispatchSummary({
   truckStatus: truckStatusProp,
   hideVitals,
   sourceOrgId,
+  onOpenCrewDetail,
 }: DispatchSummaryProps) {
   const { conflicts, refetch: refetchConflicts } = useConflictDetection({ eventId, enabled: !!eventId });
 
@@ -626,6 +629,7 @@ export function DispatchSummary({
         onUpdated={onFlightCheckUpdated}
         defaultCollapsed={false}
         maxVisible={5}
+        onOpenCrewDetail={onOpenCrewDetail}
       />
 
       </div>

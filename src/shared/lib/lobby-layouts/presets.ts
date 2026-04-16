@@ -30,16 +30,17 @@ export const PRESETS: Record<PresetSlug, LayoutPreset> = {
     slug: 'sales',
     name: 'Sales',
     description:
-      'Pipeline, proposals, revenue attribution, client concentration.',
+      'Daily brief, worklist, calendar, signatures, pipeline, client book.',
     cardIds: [
+      'lobby.todays_brief',
+      'lobby.owed_today',
+      'lobby.this_week',
+      'lobby.awaiting_signature',
+      'lobby.gone_quiet',
+      'lobby.weekly_tally',
       'lobby.deal_pipeline',
-      'lobby.pipeline_velocity',
-      'lobby.passive_pipeline_feed',
-      'finance.revenue_collected',
-      'finance.revenue_by_lead_source',
       'lobby.client_concentration',
-      'lobby.action_queue',
-      'lobby.activity_feed',
+      'finance.revenue_collected',
     ],
     requiredCapabilities: ['deals:read:global'],
     rendererMode: 'modular',
@@ -47,8 +48,9 @@ export const PRESETS: Record<PresetSlug, LayoutPreset> = {
   production: {
     slug: 'production',
     name: 'Production',
-    description: "Today's schedule, crew, logistics, show control.",
+    description: "Today's brief, schedule, crew, logistics, show control.",
     cardIds: [
+      'lobby.todays_brief',
       'lobby.today_schedule',
       'lobby.week_strip',
       'lobby.real_time_logistics',
@@ -65,8 +67,9 @@ export const PRESETS: Record<PresetSlug, LayoutPreset> = {
     slug: 'finance',
     name: 'Finance',
     description:
-      'AR aging, QBO sync, unreconciled payments, month-end reconciliation.',
+      "Today's brief, AR aging, QBO sync, unreconciled payments, reconciliation.",
     cardIds: [
+      'lobby.todays_brief',
       'finance.qbo_sync_health',
       'finance.qbo_variance',
       'finance.ar_aged_60plus',
@@ -102,6 +105,7 @@ export const CUSTOM_LAYOUTS_PER_USER_CAP = 10;
  * immediately edit, remove, or reorder.
  */
 export const DEFAULT_DUPLICATE_SEED: string[] = [
+  'lobby.todays_brief',
   'lobby.today_schedule',
   'lobby.week_strip',
   'lobby.action_queue',

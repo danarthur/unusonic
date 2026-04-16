@@ -4,25 +4,29 @@
  * LobbyLayoutSwitcher — Lobby layouts feature. Dropdown button next to the
  * time-range picker; lists visible layouts with a checkmark on the active
  * one plus an actions section (Duplicate / New blank / Rename / Delete).
- * Portal-rendered per CLAUDE.md rule 11. Hidden when only Default is visible.
+ * Uses the shared Radix Popover primitive — same one used across the app
+ * (transport-logistics-card, plan-vitals-row, etc.) so focus, outside-click,
+ * and portal behavior are handled consistently.
+ *
+ * Hidden when only Default is visible.
  *
  * @module app/(dashboard)/lobby/LobbyLayoutSwitcher
  */
 
 import * as React from 'react';
-import { createPortal } from 'react-dom';
 import { ChevronDown, Layers } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from '@/shared/ui/popover';
 import type { LobbyLayout, PresetSlug } from '@/shared/lib/lobby-layouts/types';
 import {
   NameDialog,
   DeleteConfirmDialog,
   type NameDialogState,
 } from './LobbyLayoutDialogs';
-import {
-  useAnchoredDropdownPosition,
-  useDismissOnOutsideClick,
-} from './lobby-dropdown-hooks';
 import {
   ActionsSection,
   LayoutsSection,
@@ -56,11 +60,6 @@ export function LobbyLayoutSwitcher({
   const [open, setOpen] = React.useState(false);
   const [nameDialog, setNameDialog] = React.useState<NameDialogState | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<LobbyLayout | null>(null);
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-  const popoverRef = React.useRef<HTMLDivElement>(null);
-
-  const position = useAnchoredDropdownPosition(open, buttonRef);
-  useDismissOnOutsideClick(open, [buttonRef, popoverRef], () => setOpen(false));
 
   // Visibility gate: hide the whole component when only Default is visible.
   if (layouts.length <= 1) return null;
@@ -119,70 +118,58 @@ export function LobbyLayoutSwitcher({
 
   return (
     <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          'inline-flex items-center gap-2 h-8 px-2.5 rounded-[var(--stage-radius-input,10px)]',
-          'text-xs font-medium',
-          'border border-[var(--stage-edge-subtle)]',
-          'bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]',
-          'hover:text-[var(--stage-text-primary)] transition-colors',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
-          open && 'text-[var(--stage-text-primary)]',
-          className,
-        )}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`View: ${active.name}`}
-        data-testid="lobby-layout-switcher"
-      >
-        <Layers className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
-        <span className="truncate max-w-[160px]">{active.name}</span>
-        <ChevronDown className="w-3 h-3 opacity-60" strokeWidth={1.75} aria-hidden />
-      </button>
-
-      {open && position && typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            ref={popoverRef}
-            data-surface="dropdown"
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
             className={cn(
-              'fixed z-[200] w-[260px] rounded-[var(--stage-radius-panel,12px)]',
+              'inline-flex items-center gap-2 h-8 px-2.5 rounded-[var(--stage-radius-input,10px)]',
+              'text-xs font-medium',
               'border border-[var(--stage-edge-subtle)]',
-              'bg-[var(--stage-surface-raised)] stage-panel-nested p-2',
-              'shadow-[0_8px_24px_oklch(0_0_0/0.24)]',
+              'bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)]',
+              'hover:text-[var(--stage-text-primary)] transition-colors',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
+              open && 'text-[var(--stage-text-primary)]',
+              className,
             )}
-            style={{ top: position.top, left: position.left }}
-            role="menu"
-            aria-label="Pick a view"
+            aria-label={`View: ${active.name}`}
+            data-testid="lobby-layout-switcher"
           >
-            <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
-              Views
-            </p>
-            <LayoutsSection
-              presets={presets}
-              customs={customs}
-              activeId={active.id}
-              onPick={handlePick}
-            />
+            <Layers className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+            <span className="truncate max-w-[160px]">{active.name}</span>
+            <ChevronDown className="w-3 h-3 opacity-60" strokeWidth={1.75} aria-hidden />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          sideOffset={6}
+          className="w-[260px] p-2"
+          data-surface="dropdown"
+        >
+          <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
+            Views
+          </p>
+          <LayoutsSection
+            presets={presets}
+            customs={customs}
+            activeId={active.id}
+            onPick={handlePick}
+          />
 
-            <div className="my-2 border-t border-[var(--stage-edge-subtle)]" aria-hidden />
+          <div className="my-2 border-t border-[var(--stage-edge-subtle)]" aria-hidden />
 
-            <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
-              Actions
-            </p>
-            <ActionsSection
-              active={active}
-              onDuplicate={handleDuplicate}
-              onNewBlank={handleNewBlank}
-              onRename={handleRename}
-              onDelete={handleDelete}
-            />
-          </div>,
-          document.body,
-        )}
+          <p className="stage-label text-[var(--stage-text-tertiary)] px-2 py-1">
+            Actions
+          </p>
+          <ActionsSection
+            active={active}
+            onDuplicate={handleDuplicate}
+            onNewBlank={handleNewBlank}
+            onRename={handleRename}
+            onDelete={handleDelete}
+          />
+        </PopoverContent>
+      </Popover>
 
       <NameDialog
         state={nameDialog}

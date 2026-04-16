@@ -232,10 +232,24 @@ export async function actOnFollowUp(
   }
 }
 
+/**
+ * Hard ceiling on consecutive snoozes for the same queue item.
+ * After this many snoozes, the action returns `requireDecision` so the UI
+ * can switch to "log outcome" or "mark dead" — preventing the queue from
+ * becoming a graveyard of perpetually-deferred items.
+ * Spec: docs/reference/sales-dashboard-design.md §7.3
+ */
+const MAX_SNOOZES_BEFORE_DECISION = 2;
+
+export type SnoozeResult =
+  | { success: true; snoozeCount: number }
+  | { success: false; requireDecision: true; snoozeCount: number; message: string }
+  | { success: false; requireDecision?: false; error: string };
+
 export async function snoozeFollowUp(
   queueItemId: string,
   days: number,
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<SnoozeResult> {
   try {
     const workspaceId = await getActiveWorkspaceId();
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
@@ -255,6 +269,23 @@ export async function snoozeFollowUp(
 
     if (lookupErr || !item) return { success: false, error: 'Not authorised' };
     const queueItem = item as { id: string; deal_id: string; workspace_id: string };
+
+    const { count: priorSnoozes } = await db
+      .schema('ops')
+      .from('follow_up_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('queue_item_id', queueItemId)
+      .eq('action_type', 'snoozed');
+
+    const snoozeCount = priorSnoozes ?? 0;
+    if (snoozeCount >= MAX_SNOOZES_BEFORE_DECISION) {
+      return {
+        success: false,
+        requireDecision: true,
+        snoozeCount,
+        message: 'This has been snoozed twice already. Log an outcome or mark it dead.',
+      };
+    }
 
     const snoozedUntil = addDays(new Date(), days).toISOString();
 
@@ -280,7 +311,7 @@ export async function snoozeFollowUp(
       });
 
     revalidatePath('/crm');
-    return { success: true };
+    return { success: true, snoozeCount: snoozeCount + 1 };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Failed to snooze follow-up.' };
   }

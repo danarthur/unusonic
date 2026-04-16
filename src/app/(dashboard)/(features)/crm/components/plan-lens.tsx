@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { FileCheck, FileText, ExternalLink } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { DispatchSummary } from './dispatch-summary';
+import { CrewDetailRail } from './crew-detail-rail';
 import { DealHeaderStrip } from './deal-header-strip';
 import { DealDiaryCard } from './deal-diary-card';
 import { CompletionIndicators } from './completion-indicators';
@@ -21,7 +22,6 @@ import { ShowDayContactsCard } from './show-day-contacts-card';
 import { VenueIntelCard } from './venue-intel-card';
 import { DjPrepSummaryCard } from './dj-prep-summary-card';
 import { WrapReportCard } from './wrap-report-card';
-import { DaySheetActionStrip } from './day-sheet-action-strip';
 import { ClientUpdateStrip } from './client-update-strip';
 import { ShowControlStrip } from './show-control-strip';
 import { PlanVitalsStrip } from './plan-vitals-strip';
@@ -74,6 +74,10 @@ export function PlanLens({
   const isPostHandoff = !!eventId && !!event;
 
   const [handoffWizardOpen, setHandoffWizardOpen] = useState(false);
+
+  // Crew Hub detail rail — lifted here so both ProductionTeamCard (list rows)
+  // and GearFlightCheck (crew-sourced supplier chips) can open it.
+  const [selectedCrewRow, setSelectedCrewRow] = useState<DealCrewRow | null>(null);
 
   // Show a Retry affordance when event summary takes > 5s so owners don't
   // sit in front of an indefinite spinner if the fetch has stalled.
@@ -353,9 +357,9 @@ export function PlanLens({
             <button className="stage-btn stage-btn-secondary text-sm px-3 py-1.5" onClick={handleCancelPostHandoffSave}>Cancel</button>
           </div>
         )}
-        {/* ── Layer 1: Identity + Show Status ── */}
+
+        {/* ── Tier 1: Identity + Show Status (full width) ── */}
         {headerStrip}
-        {/* Merge 1: ShowHealthCard with ReadinessRibbon nested inside */}
         <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
           {dealId && deal && (
             <ShowHealthCard dealId={dealId} health={deal.show_health} onSaved={() => onDealUpdated?.()} inline />
@@ -367,29 +371,66 @@ export function PlanLens({
           )}
         </StagePanel>
 
-        {/* ── Layer 2: Two-column layout ── */}
+        {/* ── Tier 1.5: T-0 show control (self-gated to ~24h window) ── */}
+        {eventId && (
+          <ShowControlStrip
+            eventId={eventId}
+            status={event.status}
+            startsAt={event.starts_at}
+            endsAt={event.ends_at}
+            showStartedAt={event.show_started_at}
+            showEndedAt={event.show_ended_at}
+            archivedAt={event.archived_at}
+            onStateChanged={onEventUpdated}
+          />
+        )}
+
+        {/* ── Tier 2: At-a-glance KPIs (2-up, full width) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+          <FinancialSummaryCard
+            crewRows={crewRows}
+            proposalTotal={proposalData?.total ?? null}
+            budgetEstimated={deal?.budget_estimated ?? null}
+            ledgerActual={ledger?.totalCost ?? null}
+            ledgerCollected={ledger?.collected ?? null}
+          />
+          <PlanVitalsStrip
+            guestCountExpected={event.guest_count_expected}
+            guestCountActual={event.guest_count_actual}
+            techRequirements={event.tech_requirements}
+            logisticsDockInfo={event.logistics_dock_info}
+            logisticsPowerInfo={event.logistics_power_info}
+          />
+        </div>
+
+        {/* ── Tier 3: Advancing checklist (full width) ── */}
+        <AdvancingChecklist
+          eventId={eventId}
+          crewRows={crewRows}
+          runOfShowData={event.run_of_show_data}
+          contractStatus={contract?.status ?? null}
+          archetype={deal?.event_archetype ?? null}
+          eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null}
+          transportMode={event.run_of_show_data?.transport_mode ?? null}
+        />
+
+        {/* ── Tier 4: Workflow ↔ Reference (60/40 columns) ── */}
         <div className="flex flex-col lg:flex-row gap-6 min-h-0">
 
-          {/* ── Main column: plan → prepare → execute → reference → close ── */}
+          {/* Left: Workflow — crew, dispatch, comms, agreed scope */}
           <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-
-            {/* Plan: Advancing checklist */}
-            <AdvancingChecklist
-              eventId={eventId}
-              crewRows={crewRows}
-              runOfShowData={event.run_of_show_data}
-              contractStatus={contract?.status ?? null}
-              archetype={deal?.event_archetype ?? null}
-              eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null}
-              transportMode={event.run_of_show_data?.transport_mode ?? null}
-            />
-
-            {/* Prepare: Crew */}
             {dealId && (
-              <ProductionTeamCard dealId={dealId} sourceOrgId={sourceOrgId ?? null} eventDate={deal?.proposed_date} workspaceId={deal?.workspace_id} isLocked={isPostHandoff} />
+              <ProductionTeamCard
+                dealId={dealId}
+                sourceOrgId={sourceOrgId ?? null}
+                eventDate={deal?.proposed_date}
+                workspaceId={deal?.workspace_id}
+                isLocked={isPostHandoff}
+                eventId={eventId}
+                onOpenCrewDetail={setSelectedCrewRow}
+              />
             )}
 
-            {/* Prepare: Gear + logistics + day sheet send */}
             <DispatchSummary
               eventId={eventId}
               dealId={dealId}
@@ -399,37 +440,24 @@ export function PlanLens({
               onFlightCheckUpdated={handleCrewUpdated}
               hideVitals
               sourceOrgId={sourceOrgId ?? null}
+              onOpenCrewDetail={setSelectedCrewRow}
             />
-            {/* Crew comms — Day sheet send (lives with the crew cluster) */}
+
+            {/* Client comms — crew comms absorbed into Crew Hub header */}
             {dealId && eventId && (
               <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
                 <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-                  <p className="stage-label">Crew comms</p>
-                  <DaySheetActionStrip
+                  <p className="stage-label">Client comms</p>
+                  <ClientUpdateStrip
                     eventId={eventId}
                     dealId={dealId}
-                    crewCount={crewRows.filter((r) => r.entity_id).length}
-                    crewWithEmailCount={crewRows.filter((r) => r.entity_id && r.email).length}
+                    clientName={client?.organization?.name ?? null}
                   />
                 </div>
               </StagePanel>
             )}
-            {/* T-0 lifecycle transition — Start / End show. Date-gated to
-                render only within ~24h of starts_at; hidden once wrapped. */}
-            {eventId && (
-              <ShowControlStrip
-                eventId={eventId}
-                status={event.status}
-                startsAt={event.starts_at}
-                endsAt={event.ends_at}
-                showStartedAt={event.show_started_at}
-                showEndedAt={event.show_ended_at}
-                archivedAt={event.archived_at}
-                onStateChanged={onEventUpdated}
-              />
-            )}
 
-            {/* Merge 3: Agreed scope with contract info collapsed into header */}
+            {/* Agreed scope — proposal + contract */}
             {dealId && deal?.workspace_id && (
               <StagePanel style={{ padding: 'var(--stage-padding, 16px)' }}>
                 <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
@@ -465,69 +493,41 @@ export function PlanLens({
                 </div>
               </StagePanel>
             )}
-
-            {/* Client comms — Client update send (lives with the client cluster) */}
-            {dealId && eventId && (
-              <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
-                <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-                  <p className="stage-label">Client comms</p>
-                  <ClientUpdateStrip
-                    eventId={eventId}
-                    dealId={dealId}
-                    clientName={client?.organization?.name ?? null}
-                  />
-                </div>
-              </StagePanel>
-            )}
-
-            {/* Journal */}
-            {dealId && deal?.workspace_id && (
-              <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
-            )}
-
-            {/* Close out: Wrap report (only after event date has passed) */}
-            {event && new Date(event.starts_at) < new Date() && (
-              <WrapReportCard
-                eventId={eventId!}
-                eventStartsAt={event.starts_at}
-                crewRows={crewRows}
-                gearItems={gearItemsLive}
-                archivedAt={event.archived_at}
-              />
-            )}
           </div>
 
-          {/* ── Sidebar: context + financials + timeline ── */}
+          {/* Right: Reference — pure look-up, no actions */}
           <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-            <FinancialSummaryCard
-              crewRows={crewRows}
-              proposalTotal={proposalData?.total ?? null}
-              budgetEstimated={deal?.budget_estimated ?? null}
-              ledgerActual={ledger?.totalCost ?? null}
-              ledgerCollected={ledger?.collected ?? null}
-            />
-            <PlanVitalsStrip
-              guestCountExpected={event.guest_count_expected}
-              guestCountActual={event.guest_count_actual}
-              techRequirements={event.tech_requirements}
-              logisticsDockInfo={event.logistics_dock_info}
-              logisticsPowerInfo={event.logistics_power_info}
-            />
+            {event.venue_entity_id && (
+              <VenueIntelCard venueEntityId={event.venue_entity_id} />
+            )}
             <ShowDayContactsCard
               eventId={eventId}
               initialContacts={(event.show_day_contacts ?? []) as { role: string; name: string; phone: string | null; email: string | null }[]}
               onSaved={onEventUpdated}
             />
-            <DjPrepSummaryCard rosData={event.run_of_show_data as Record<string, unknown> | null} />
-            {event.venue_entity_id && (
-              <VenueIntelCard venueEntityId={event.venue_entity_id} />
-            )}
             {proposalData && proposalData.status !== 'draft' && (
               <ProductionTimelineWidget eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null} eventTitle={deal?.title ?? event.title} paymentMilestones={paymentMilestones} dealMilestones={dealMilestones} />
             )}
+            <DjPrepSummaryCard rosData={event.run_of_show_data as Record<string, unknown> | null} />
             <RunOfShowIndexCard eventId={eventId} startsAt={event?.starts_at} />
           </div>
         </div>
+
+        {/* ── Tier 5: Journal (full width) ── */}
+        {dealId && deal?.workspace_id && (
+          <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
+        )}
+
+        {/* ── Tier 6: Wrap report (full width, post-event only) ── */}
+        {event && new Date(event.starts_at) < new Date() && (
+          <WrapReportCard
+            eventId={eventId!}
+            eventStartsAt={event.starts_at}
+            crewRows={crewRows}
+            gearItems={gearItemsLive}
+            archivedAt={event.archived_at}
+          />
+        )}
       </div>
     );
   } else if (eventId && !event) {
@@ -607,6 +607,19 @@ export function PlanLens({
           />
         )}
       </AnimatePresence>
+      {/* Crew Hub Detail Rail — opens from ProductionTeamCard row clicks
+          AND from crew-sourced gear supplier chips in GearFlightCheck. */}
+      <CrewDetailRail
+        row={selectedCrewRow}
+        eventId={eventId}
+        sourceOrgId={sourceOrgId ?? null}
+        workspaceId={deal?.workspace_id ?? null}
+        eventDate={deal?.proposed_date ?? event?.starts_at?.slice(0, 10) ?? null}
+        eventStartsAt={event?.starts_at ?? null}
+        dealId={dealId}
+        onClose={() => setSelectedCrewRow(null)}
+        onRowChanged={handleCrewUpdated}
+      />
     </>
   );
 }

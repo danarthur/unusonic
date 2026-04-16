@@ -2164,6 +2164,62 @@ export type Database = {
         }
         Relationships: []
       }
+      deal_crew_waypoints: {
+        Row: {
+          actual_time: string | null
+          created_at: string
+          custom_label: string | null
+          deal_crew_id: string
+          id: string
+          kind: string
+          location_address: string | null
+          location_name: string | null
+          notes: string | null
+          sort_order: number
+          time: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          actual_time?: string | null
+          created_at?: string
+          custom_label?: string | null
+          deal_crew_id: string
+          id?: string
+          kind: string
+          location_address?: string | null
+          location_name?: string | null
+          notes?: string | null
+          sort_order?: number
+          time: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          actual_time?: string | null
+          created_at?: string
+          custom_label?: string | null
+          deal_crew_id?: string
+          id?: string
+          kind?: string
+          location_address?: string | null
+          location_name?: string | null
+          notes?: string | null
+          sort_order?: number
+          time?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_crew_waypoints_deal_crew_id_fkey"
+            columns: ["deal_crew_id"]
+            isOneToOne: false
+            referencedRelation: "deal_crew"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_notes: {
         Row: {
           attachments: Json | null
