@@ -4,14 +4,15 @@
  * LobbyOverviewView — the hub-overview render branch for LobbyClient.
  *
  * Extracted so the client component stays under the file-size ratchet.
- * Owns the banner + three-row header composition (identity / view tabs /
- * controls) + urgency strip + bento grid + pins. State is fully lifted;
- * this is a pure presentational shell.
+ * Owns the plan banner + single-row header + conditional edit-mode chips +
+ * pins + bento grid. State is fully lifted; this is a pure presentational
+ * shell.
  *
- * Three-row header composition (top-to-bottom):
- *   Row 1 — LobbyHeader        (h1 title + fire-dot + capture mic + ⌘K)
- *   Row 2 — LobbyViewTabs       (tab strip; replaces the old switcher chip)
- *   Row 3 — LobbyControlsBar    (time range + custom-view edit controls)
+ * Top strip is one row (LobbyHeader): fire-dot, view tabs (selected tab is
+ * the title), time range, capture mic, ⌘K. The optional edit-mode row
+ * appears only when a custom view is active and the user has clicked "Edit
+ * layout" — cap/add/reset/done sit directly above the grid so they're near
+ * the cards they mutate.
  *
  * @module app/(dashboard)/lobby/LobbyOverviewView
  */
@@ -28,8 +29,7 @@ import { LOBBY_CARD_CAP } from '@/shared/lib/lobby-layouts/presets';
 import { LobbyBentoGrid } from './LobbyBentoGrid';
 import { PlanPromptBanner } from './PlanPromptBanner';
 import { LobbyHeader } from './LobbyHeader';
-import { LobbyViewTabs } from './LobbyViewTabs';
-import { LobbyControlsBar } from './LobbyControlsBar';
+import { LayoutControls } from './LayoutControls';
 
 // ── Overview view ────────────────────────────────────────────────────────────
 
@@ -109,15 +109,11 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
         />
 
         <LobbyHeader
-          title={activeLayout.name}
+          activeLayout={activeLayout}
+          layouts={layouts}
           alerts={alerts}
           captureEnabled={captureEnabled}
           workspaceId={workspaceId}
-        />
-
-        <LobbyViewTabs
-          layouts={layouts}
-          activeLayoutId={activeLayout.id}
           onActivate={onActivate}
           onDuplicatePreset={onDuplicatePreset}
           onDuplicateActive={onDuplicateActive}
@@ -126,19 +122,22 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
           onDelete={onDelete}
         />
 
-        <LobbyControlsBar
-          isCustom={isCustom}
-          editMode={editMode}
-          onToggleEdit={onToggleEdit}
-          onOpenLibrary={onOpenLibrary}
-          onReset={() => {
-            /* Reset-to-preset-defaults is not meaningful on a custom — the
-             * user created this view. Left as a no-op; the tab's ⋯ Delete is
-             * the graceful exit path. */
-          }}
-          cardCount={activeLayout.cardIds.length}
-          cap={LOBBY_CARD_CAP}
-        />
+        {isCustom && (
+          <div className="flex items-center justify-end">
+            <LayoutControls
+              editMode={editMode}
+              onToggleEdit={onToggleEdit}
+              onReset={() => {
+                /* Reset-to-preset-defaults is not meaningful on a custom —
+                 * the user created this view. No-op; the tab's ⋯ Delete is
+                 * the graceful exit path. */
+              }}
+              onAddCard={onOpenLibrary}
+              cardCount={activeLayout.cardIds.length}
+              cap={LOBBY_CARD_CAP}
+            />
+          </div>
+        )}
 
         {showPinsAbove && <PinnedAnswersWidget pins={pins} />}
 

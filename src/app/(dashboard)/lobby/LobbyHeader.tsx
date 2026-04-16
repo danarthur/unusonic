@@ -1,15 +1,19 @@
 'use client';
 
 /**
- * LobbyHeader — identity row for the lobby.
+ * LobbyHeader — single-row top strip for the lobby.
  *
- * Owns the active view name (h1), the fire-dot alert indicator, and the
- * trailing cluster of cross-app actions (capture mic, command palette).
+ * Composition, left → right:
+ *   • LobbyFireDot       quiet-when-healthy urgency indicator (popover triage)
+ *   • LobbyViewTabs      active view is the identity — selected tab IS the title
+ *   • Time-range picker  lens on the dashboard data
+ *   • CaptureButton      mic for dictating to Aion (feature-flagged)
+ *   • SearchChip         opens CommandSpine (⌘K)
  *
- * Row 1 of the three-row lobby header composition:
- *   Row 1: identity + cross-app actions   (this file)
- *   Row 2: view tabs                      (LobbyViewTabs)
- *   Row 3: contextual controls            (LobbyControlsBar)
+ * No separate h1 — that would duplicate the selected tab. No separate
+ * controls row — time range joins the trailing tools cluster since it's the
+ * same semantic category (workspace-level controls). Edit-mode chips render
+ * on a conditional row above the grid in LobbyOverviewView.
  *
  * @module app/(dashboard)/lobby/LobbyHeader
  */
@@ -20,7 +24,10 @@ import { cn } from '@/shared/lib/utils';
 import { CaptureButton } from '@/widgets/lobby-capture';
 import { openCommandPalette } from '@/shared/ui/command-spine/open';
 import type { UrgencyAlert } from '@/widgets/dashboard/api/get-urgency-alerts';
+import type { LobbyLayout, PresetSlug } from '@/shared/lib/lobby-layouts/types';
 import { LobbyFireDot } from './LobbyFireDot';
+import { LobbyViewTabs } from './LobbyViewTabs';
+import { LobbyTimeRangePicker } from './LobbyTimeRangePicker';
 
 // ── Search chip (opens CommandSpine) ─────────────────────────────────────────
 
@@ -70,39 +77,52 @@ function SearchChip() {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 export interface LobbyHeaderProps {
-  /** Active view name — renders as the h1. */
-  title: string;
-  /** Urgency alerts used to drive the fire-dot indicator. */
+  activeLayout: LobbyLayout;
+  layouts: LobbyLayout[];
   alerts: UrgencyAlert[];
-  /** When true, renders the CaptureButton. Mirrors the `aion.lobby_capture` flag. */
   captureEnabled: boolean;
-  /** Workspace id required by CaptureButton. */
   workspaceId: string | null;
+  onActivate: (id: string) => Promise<void>;
+  onDuplicatePreset: (slug: PresetSlug, name: string) => Promise<void>;
+  onDuplicateActive: () => void;
+  onCreateBlank: (name: string) => Promise<void>;
+  onRename: (id: string, name: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }
 
 export function LobbyHeader({
-  title,
+  activeLayout,
+  layouts,
   alerts,
   captureEnabled,
   workspaceId,
+  onActivate,
+  onDuplicatePreset,
+  onDuplicateActive,
+  onCreateBlank,
+  onRename,
+  onDelete,
 }: LobbyHeaderProps) {
   return (
     <div
-      className="flex items-center justify-between gap-3 min-w-0"
+      className="flex items-center gap-2 min-w-0"
       data-testid="lobby-header"
     >
-      <div className="flex items-center gap-2.5 min-w-0">
-        <h1
-          className={cn(
-            'truncate text-[22px] md:text-[26px] leading-tight font-medium tracking-tight',
-            'text-[var(--stage-text-primary)]',
-          )}
-        >
-          {title}
-        </h1>
-        <LobbyFireDot alerts={alerts} />
+      <LobbyFireDot alerts={alerts} />
+      <div className="flex-1 min-w-0">
+        <LobbyViewTabs
+          layouts={layouts}
+          activeLayoutId={activeLayout.id}
+          onActivate={onActivate}
+          onDuplicatePreset={onDuplicatePreset}
+          onDuplicateActive={onDuplicateActive}
+          onCreateBlank={onCreateBlank}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
       </div>
       <div className="flex items-center gap-2 shrink-0">
+        <LobbyTimeRangePicker />
         {captureEnabled && workspaceId && <CaptureButton workspaceId={workspaceId} />}
         <SearchChip />
       </div>
