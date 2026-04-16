@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import {
@@ -29,43 +29,53 @@ interface UrgencyStripProps {
   alerts: UrgencyAlert[];
 }
 
-export function UrgencyStrip({ alerts: initialAlerts }: UrgencyStripProps) {
-  const [alerts, setAlerts] = useState(initialAlerts);
+export function UrgencyStrip({ alerts }: UrgencyStripProps) {
+  // Dismissed ids live outside the derived list so the strip re-syncs with
+  // every prop change — useState(initialAlerts) only captured the first
+  // render's value, and when the dashboard query resolved after mount the
+  // strip stayed frozen at its initial (usually empty) snapshot.
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const visible = useMemo(
+    () => alerts.filter((a) => !dismissedIds.has(a.id)),
+    [alerts, dismissedIds],
+  );
 
   const dismiss = (id: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   };
 
-  if (alerts.length === 0) return null;
+  if (visible.length === 0) return null;
 
   return (
     <AnimatePresence>
-      {alerts.length > 0 && (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        exit={{ opacity: 0, height: 0 }}
+        transition={STAGE_MEDIUM}
+        role="region"
+        aria-label="Needs attention"
+      >
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={STAGE_MEDIUM}
-          role="region"
-          aria-label="Needs attention"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            visible: {
+              transition: { staggerChildren: STAGE_STAGGER_CHILDREN },
+            },
+            hidden: {},
+          }}
+          className="flex flex-col gap-0.5 px-1 max-h-60 overflow-y-auto"
         >
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={{
-              visible: {
-                transition: { staggerChildren: STAGE_STAGGER_CHILDREN },
-              },
-              hidden: {},
-            }}
-            className="flex flex-col gap-0.5 px-1 max-h-60 overflow-y-auto"
-          >
-            {alerts.map((alert) => (
-              <AlertRow key={alert.id} alert={alert} onDismiss={dismiss} />
-            ))}
-          </motion.div>
+          {visible.map((alert) => (
+            <AlertRow key={alert.id} alert={alert} onDismiss={dismiss} />
+          ))}
         </motion.div>
-      )}
+      </motion.div>
     </AnimatePresence>
   );
 }
