@@ -34,6 +34,8 @@ The brief and the capture are two sides of the same loop: capture is input, brie
 
 ### 3.1 Changes to the brief card
 
+- **Capture composer at the top of the card** — inline voice/text affordance with a first-run explanatory state that compacts after first use. Replaces the standalone lobby-header mic button (see §10.1).
+- **Insight-row reordering by active layout's domains** — layout-aware *ordering*, not filtering. Sales preset puts sales-domain insights first; cross-domain rows always visible below. Paragraph stays workspace-wide. See §6.5.
 - **Five sales evaluators** (replaces the 2 sales-relevant ones in v1).
 - **Compound-story synthesis** — a single insight row can reference multiple underlying triggers.
 - **Inline-editable drafts** in the insight row for email/SMS follow-ups. Sheet remains for reversible-but-costly actions only.
@@ -55,9 +57,10 @@ The brief and the capture are two sides of the same loop: capture is input, brie
 
 ### 3.3 Explicitly out of scope for v2
 
+- **Layout-aware paragraph composition.** Rejected by the 2026-04-16 research pass #2 — User Advocate + Field Expert + Critic all flagged narrative whiplash, custom-layout pathology, and "confidently narrating past the user's actual worry." The paragraph stays workspace-wide. Insight-row reordering delivers ~80% of the view-aware intent at 0% of the composer-infrastructure cost. See §20 decision 11.
 - Multi-snooze ceiling with forced modal. Replaced with soft "park" tray (see §11).
 - Finance and production evaluators (remain v1 set until this lands).
-- Seasonal-peak-prep, hot-lead multi-view, deal-stuck-in-stage evaluators (deferred to v3 — measure act-rate on v2 set first).
+- Seasonal-peak-prep, deal-stuck-in-stage evaluators (deferred to v3 — measure act-rate on v2 set first).
 - Auto-send to repeat clients or deals above a value threshold (see §8).
 - Full sentiment mining of reply text (design debt tracked separately).
 
@@ -139,6 +142,23 @@ Hovering an insight (focus on keyboard) shows a two-line tooltip:
 - **What knocked it down:** "ranked below Stern because Stern's deposit is 4d overdue and the payment lane is tighter right now"
 
 Makes the ranking auditable. Prevents black-box distrust.
+
+### 6.4 Layout-aware ordering (not filtering)
+
+The brief's paragraph stays workspace-wide. What becomes layout-aware is **the order of insight rows**. This delivers the "Aion knows what I'm looking at" feeling without the narrative-whiplash failure mode that killed the layout-aware paragraph proposal (see §20 decision 11).
+
+**Mechanism:**
+
+1. Every metric registry entry picks up an optional `domain?: Domain[]` tag where `Domain ∈ { sales, finance, production, crew, ops, meta }`. Array, not single-value — a card like `lobby.action_queue` is legitimately cross-domain.
+2. Each insight's `trigger_type` maps deterministically to a domain via a const table in code (`INSIGHT_TRIGGER_DOMAINS`). Example: `proposal_viewed_unsigned → sales`, `crew_unconfirmed → crew`, `deposit_gap → sales` (the owner tracks deposits as part of closing, not as finance hygiene).
+3. On lobby load, `getBriefAndInsights` receives the active layout's `cardIds`, resolves to the set `activeDomains = ⋃ domains(card) for card in cardIds`, then stable-sorts insights so rows whose trigger-domain is in `activeDomains` come first. Priority score breaks ties inside each bucket.
+4. Cross-domain insights (those whose trigger-domain is NOT in `activeDomains`) always remain visible, they just fall below the layout-matching rows. No filtering, no hiding — a crew emergency on a Finance preset still surfaces, just ranked below the Finance-matching rows.
+
+**Pin-to-top (§6.2) always wins.** User judgment overrides layout-aware ordering.
+
+**Cross-domain card voting rule (v1):** a card votes its domain set into `activeDomains` indiscriminately. If `lobby.action_queue` has `domain: ['sales', 'production']`, both sales and production insights rank up on any layout that includes it. Simple and permissive — measure and iterate. If this over-promotes cross-domain rows, tighten to "primary domain only" in a future pass.
+
+**Default preset** uses the legacy bento (no explicit `cardIds`). For ordering purposes, Default's `activeDomains` is `{ sales, finance, production, crew, ops }` — effectively "rank everything equally" (ties break by score, same as today).
 
 ---
 
@@ -239,21 +259,48 @@ Clean, scannable, no math.
 
 ## 10. The lobby capture primitive
 
-### 10.1 Surface
+### 10.1 Surface — capture composer in the brief card
 
-A persistent button in the lobby header row, rendered adjacent to the existing `LobbyLayoutSwitcher`. Microphone icon, unlabeled. Keyboard shortcut `shift + c` triggers capture anywhere in the lobby.
+The capture affordance is a **composer row at the top of the brief card** (above the paragraph, above the insight rows). It has two states driven by whether the user has ever confirmed a capture:
 
-**Why not a floating action button (FAB).** Stage Engineering is a precision-instrument aesthetic — a corner FAB clashes with the surface hierarchy and the lobby's disciplined whitespace. Header placement keeps capture visible by default and consistent with the layout-switcher and time-picker pattern already established.
+**First-run state** (zero captures ever for this user in this workspace):
+```
+┌─ Brief ─────────────────────────────────────┐
+│ 🎙  Hey — tap here or press Shift+C and     │
+│     tell me what's on your mind. A client,  │
+│     a meeting, a thought you don't want to  │
+│     forget. I'll figure out who it's about  │
+│     and remind you when it matters.         │
+└─────────────────────────────────────────────┘
+```
 
-Never inside the brief card. Capture is workspace-wide, not brief-scoped.
+Voice: warm + instrumental. Explanatory enough to recruit first use without feeling like onboarding spam.
+
+**Compact state** (after first capture):
+```
+┌─ Brief ─────────────────────────────────────┐
+│ 🎙  Tell Aion something…                     │
+└─────────────────────────────────────────────┘
+```
+
+Always present. Same tap-or-Shift+C interaction, collapsed to the minimum visual footprint the card's other rows can sit below.
+
+**Keyboard shortcut `Shift+C`** works anywhere on the lobby — it's mounted at the lobby-client level (via `CaptureProvider`, §10.3), not bound to the composer row's visibility. This matters for the Default preset and for the moments the user is scrolled past the brief card.
+
+**Why in the card, not in the lobby header (revised).** The original §10.1 put the mic in the header row next to the layout switcher. Dogfooding surfaced that a bare mic icon reads as "open mic input" — generic, no explanation, no Aion mental model. Research pass #2 (2026-04-16) confirmed the pattern bank: HoneyBook Priority Lists, Day.ai, OnePageCRM Action Stream all co-locate capture with the AI surface because that's where the user has the "AI has already done the thinking" frame. Moving the composer into the brief card gives Aion a voice that explains the affordance. See §20 decision 12.
+
+**Why not both (header + card).** Belt-and-suspenders recreates the "what is this icon" ambiguity the move is trying to fix. Users learn the composer in the card; `Shift+C` covers always-accessible.
+
+**Default-preset parity.** The brief card is added to the Default preset (via `LobbyBentoGrid` legacy-bento edit) so the composer is present on every preset. No fallback header button needed.
 
 ### 10.2 Flow
 
 ```
-[capture button]
-  → [record audio (Web Audio API, 60s max)]
-  → [stop + transcribe (existing Aion Voice infra)]
-  → [parse via Aion with capture-context prompt]
+[composer tap OR Shift+C]
+  → CaptureProvider.openCapture()
+  → [CaptureModal mounts — record audio (Web Audio API, 60s max)]
+  → [stop + transcribe via /api/aion/capture/transcribe (Whisper)]
+  → [parse via /api/aion/capture/parse (Claude Haiku structured output)]
   → [review card]
     - Entity: "Jim Henderson (Country Club Catering) — new contact?"
       [yes, create] [different person] [edit]
@@ -261,7 +308,7 @@ Never inside the brief card. Capture is workspace-wide, not brief-scoped.
       [save to entity]
     - Follow-up: "Reach out next week about summer event"
       [schedule for Mon] [edit] [don't schedule]
-  → [confirm] → writes
+  → [confirm] → writes via cortex.write_capture_confirmed
 ```
 
 - Audio stored to Supabase Storage under `captures/{workspace_id}/{capture_id}.webm`
@@ -448,28 +495,48 @@ Any insight row has a keyboard shortcut `shift + ?` (or menu item) to escalate i
 
 ---
 
-## 16. Phased build plan
+## 16. Phased build plan (revised 2026-04-16 post research pass #2)
 
-**Phase 1 — Capture primitive (independent of brief).** 5–7 days.
-- `cortex.capture_events` table + RLS + RPCs
-- Audio recording UI + Supabase Storage upload
-- Transcription wire (reuse Aion Voice infra)
-- Parse prompt + structured output + review card
-- Write paths: entity creation, follow-up queue seed, note attach
-- Ship behind a feature flag; dogfood internally
+**Phase 1 — Capture primitive (shipped 2026-04-16, commit `864a559`).**
+- `cortex.capture_events` table + RLS + `write_capture_confirmed` RPC
+- `captures` storage bucket
+- `/api/aion/capture/transcribe` (Whisper whisper-1)
+- `/api/aion/capture/parse` (Claude Haiku, structured output via Zod)
+- `confirmCapture` server action — entity resolution + capture row write
+- CaptureButton in lobby header (superseded in Phase 2)
+- Feature flag `aion.lobby_capture`, dogfooded by Daniel on 2026-04-16
 
-**Phase 2 — Evaluator upgrade.** 3–5 days.
-- Add `proposals.expires_at` column + default backfill
-- Rewire `deposit_gap` evaluator to read from `finance.payments`
-- Add `quote_expiring`, `gone_quiet_with_value`, `hot_lead_multi_view` evaluators
-- Remove sales-unrelated evaluators from the sales preset weighting
-- Workspace median-deal-value computation (runtime RPC)
+**Phase 2 — Composer move + insight reordering + evaluator expansion.** 4–5 days. *Three commits.*
+
+- *Commit 1 — composer move + Default-preset parity + design doc.*
+  - `CaptureProvider` context (owns `Shift+C` listener + `CaptureModal` mount)
+  - `CaptureComposer` component in `TodaysBriefWidget` top row — first-run explanatory / compact states
+  - `getHasEverCaptured()` server action, threaded from lobby page via props
+  - Remove `CaptureButton` from `LobbyHeader`; delete the file
+  - Add `lobby.todays_brief` to Default preset via legacy-bento edit in `LobbyBentoGrid`
+  - Update design doc §3.1, §3.3, §6.4, §10.1, §10.2, §16, §18, §19, §20
+  - Update memory
+
+- *Commit 2 — metric registry `domain` + layout-aware insight reordering.*
+  - Add `domain?: Domain[]` to `MetricBase` + populate across ~45 registry entries
+  - `INSIGHT_TRIGGER_DOMAINS` const map in `src/app/api/aion/lib/`
+  - Thread `activeLayout.cardIds` into `TodaysBriefWidget` via renderer context (widen `RendererInput`)
+  - Reorder logic in `getBriefAndInsights` — stable-sort by (in-active-domains, priority)
+  - Default preset: `activeDomains = { sales, finance, production, crew, ops }` (no narrowing)
+
+- *Commit 3 — evaluator expansion (the original Phase 2 scope).*
+  - Add `proposals.expires_at` column + backfill
+  - Rewire `deposit_gap` evaluator to read from `finance.payments` (not `proposals.deposit_paid_at`)
+  - Add `quote_expiring`, `gone_quiet_with_value`, `hot_lead_multi_view` evaluators
+  - Workspace median-deal-value computation (runtime RPC)
+  - Register new evaluators in `INSIGHT_TRIGGER_DOMAINS`
 
 **Phase 3 — Cross-card synthesis.** 3–4 days.
 - Compound-story collapse pass (post-evaluator)
 - Cross-deal client aggregation
-- Date-hold pressure wiring
+- Date-hold pressure wiring (extract `buildDateHoldMap` from follow-up-queue cron)
 - Insight schema: `component_triggers jsonb` for audit
+- Migration: `ALTER TABLE ops.follow_up_log ADD COLUMN stakeholder_id uuid REFERENCES directory.entities(id);`
 
 **Phase 4 — UI changes.** 4–5 days.
 - Inline-editable drafts in `InsightRow`
@@ -488,7 +555,12 @@ Any insight row has a keyboard shortcut `shift + ?` (or menu item) to escalate i
 - Telemetry on: act-rate per evaluator, snooze distribution, pin usage, capture confirm rate, empty-state frequency
 - 30-day review gate before considering v3 evaluators
 
-**Total: ~20–25 working days**, roughly 4–5 weeks. Shippable in phases — Phase 1 alone is a meaningful user-visible improvement.
+**Phase 2 deferred (from original plan):**
+- Follow-up queue seeding from captures — blocked by `ops.follow_up_queue.deal_id NOT NULL` + `reason_type` CHECK constraint expansion
+- Audio upload to `captures` storage bucket — infra exists, orchestration not wired
+- `cortex.aion_memory` note attach on resolved entity
+
+**Total: ~18–22 working days**, roughly 4 weeks. Capture primitive (Phase 1) shipped — user-visible improvement live behind flag today.
 
 ---
 
@@ -514,51 +586,85 @@ Any insight row has a keyboard shortcut `shift + ?` (or menu item) to escalate i
 
 ---
 
-## 18. Resolved questions (2026-04-16 code-read pass)
+## 18. Resolved questions
+
+### Pass 1 — code-read (2026-04-16)
 
 All six pre-build questions resolved against current main. No blockers.
 
-1. **Capture button placement** → lobby header row, adjacent to `LobbyLayoutSwitcher`. `shift+c` keyboard shortcut. Not a floating FAB. See §10.1.
+1. **Capture button placement** → lobby header row (superseded by pass 2 — moved into brief card).
 2. **Transcription provider** → existing voice path is an external N8N webhook and is NOT reusable for structured parse. Build a new first-party endpoint `/api/aion/capture/transcribe` on OpenAI Whisper (`whisper-1`). See §10.7.
 3. **`workspace.median_deal_value`** → deal value column is `public.deals.budget_estimated` (nullable). Use a runtime RPC `finance.get_workspace_median_deal_value(workspace_id)` — fine at workspace scale. Filter out null `budget_estimated`; if fewer than 5 non-null deals exist, fall back to a workspace-configurable constant rather than computing a median on thin data.
 4. **Date-hold pressure** → computed in-memory only inside the follow-up-queue cron (`src/app/api/cron/follow-up-queue/route.ts:257-264`, `workspace_id:proposed_date → Set<deal_id>`). Not persisted. Phase 3 extracts the builder into a shared helper `buildDateHoldMap(deals)` called from both the follow-up-queue cron and the insight evaluator pipeline.
 5. **`follow_up_log.stakeholder_id`** → does NOT exist today (verified against codebase). Phase 3 migration line-item: `ALTER TABLE ops.follow_up_log ADD COLUMN stakeholder_id uuid REFERENCES directory.entities(id)`. Without this, per-stakeholder awareness on compound insights is not expressible.
 6. **Repeat-client "won"** → `public.deals.status = 'won'` with `public.deals.won_at IS NOT NULL`. Client FK is `public.deals.organization_id → directory.entities`. Repeat-client check: `SELECT COUNT(*) FROM public.deals WHERE organization_id = $1 AND status = 'won'` ≥ 2. Referrer check: `public.deals.referrer_entity_id IS NOT NULL`.
 
+### Pass 2 — research panel on layout-aware paragraph (2026-04-16)
+
+Triggered by Daniel's dogfood observation that a bare mic icon in the lobby header lacked context, and by his proposal that the brief's paragraph should "draw from the cards displayed." Panel: User Advocate + Field Expert + Signal Navigator + Critic.
+
+1. **Should the brief paragraph become layout-aware?** → **No.** Three of four panel members rejected it. User Advocate: the paragraph narrating narrow-view facts while the user's actual worry is elsewhere is "confidently narrating past his real problem." Critic: narrative whiplash on view switch reads as "the software can't make up its mind" to a first-time user. Field Expert: no shipping product solves custom-layout paragraph synthesis well — all degrade to framing-sentence + bullets. Decision: paragraph stays workspace-wide.
+2. **Should insight rows filter by layout?** → **No, reorder instead.** Confirmed Option A from the earlier discussion. Sales preset puts sales-domain insights first; cross-domain rows always visible below. Delivers the "Aion knows what I'm looking at" feeling without burying cross-domain emergencies. See §6.4.
+3. **Capture button in header or brief card?** → **Brief card.** Dogfood + panel confirmed the mic icon in header reads as generic "voice input" without Aion mental model. HoneyBook, Day.ai, OnePageCRM all co-locate capture with the AI surface. See §10.1.
+4. **Domain field on registry — single or array?** → **Array** (`domain?: Domain[]`). Signal Navigator flagged `lobby.action_queue`, `lobby.activity_feed` as legitimately cross-domain. Array + ANY-match voting rule for v1.
+5. **Cache for paragraph composition?** → **Not needed** — paragraph stays workspace-wide, existing `ops.daily_briefings.body` cron write is correct.
+6. **Brief card on Default preset?** → **Yes**, via legacy-bento edit (Signal Navigator's Option a). `DEFAULT_DUPLICATE_SEED` already includes `lobby.todays_brief` at position 0, so custom-from-Default users already get it; only the legacy render path needs the addition.
+
 ---
 
-## 19. File map (anticipated)
+## 19. File map
 
-### New files
+### Shipped in Phase 1 (commit `864a559`)
 
 | File | Purpose |
 |------|---------|
-| `supabase/migrations/20260417_capture_events_and_expiry.sql` | `cortex.capture_events`, `proposals.expires_at`, RPCs |
-| `src/widgets/lobby-capture/ui/CaptureButton.tsx` | Lobby capture surface |
-| `src/widgets/lobby-capture/ui/CaptureReviewCard.tsx` | Parsed review step |
-| `src/widgets/lobby-capture/api/capture-parse.ts` | Parse invocation |
-| `src/widgets/lobby-capture/api/capture-confirm.ts` | Write-paths |
+| `supabase/migrations/20260416170000_capture_events.sql` | `cortex.capture_events`, `write_capture_confirmed` RPC, `captures` bucket |
 | `src/app/api/aion/capture/transcribe/route.ts` | Whisper transcription endpoint |
 | `src/app/api/aion/capture/parse/route.ts` | Structured-parse endpoint |
-| `src/app/api/aion/lib/evaluators/deposit-gap.ts` | New evaluator |
-| `src/app/api/aion/lib/evaluators/quote-expiring.ts` | New evaluator |
-| `src/app/api/aion/lib/evaluators/gone-quiet-with-value.ts` | New evaluator |
-| `src/app/api/aion/lib/evaluators/hot-lead-multi-view.ts` | New evaluator |
-| `src/app/api/aion/lib/collapse-compound-insights.ts` | Synthesis pass |
-| `src/app/api/aion/lib/cross-deal-aggregation.ts` | Client-level group pass |
+| `src/widgets/lobby-capture/api/confirm-capture.ts` | Entity resolution + write paths |
+| ~~`src/widgets/lobby-capture/ui/CaptureButton.tsx`~~ | Superseded in Phase 2 (→ `CaptureComposer` in brief card) |
+| `src/widgets/lobby-capture/ui/CaptureModal.tsx` | Recording + review flow (retained) |
 
-### Modified files
+### Phase 2 — new files
+
+| File | Purpose |
+|------|---------|
+| `src/widgets/lobby-capture/ui/CaptureProvider.tsx` | Context + modal mount + global `Shift+C` listener |
+| `src/widgets/todays-brief/ui/CaptureComposer.tsx` | In-card composer — first-run + compact states |
+| `src/widgets/todays-brief/api/get-has-ever-captured.ts` | Drives composer state from `cortex.capture_events` count |
+| `src/app/api/aion/lib/insight-trigger-domains.ts` | `INSIGHT_TRIGGER_DOMAINS` const map |
+| `supabase/migrations/{timestamp}_proposals_expires_at.sql` | Phase 2 commit 3 — quote-expiring evaluator |
+| `src/app/api/aion/lib/evaluators/deposit-gap.ts` | Phase 2 commit 3 |
+| `src/app/api/aion/lib/evaluators/quote-expiring.ts` | Phase 2 commit 3 |
+| `src/app/api/aion/lib/evaluators/gone-quiet-with-value.ts` | Phase 2 commit 3 |
+| `src/app/api/aion/lib/evaluators/hot-lead-multi-view.ts` | Phase 2 commit 3 |
+
+### Phase 2 — modified files
 
 | File | Change |
 |------|--------|
-| `src/widgets/todays-brief/ui/InsightRow.tsx` | Inline-editable draft, pin, hover-rationale, park |
-| `src/widgets/todays-brief/ui/TodaysBriefWidget.tsx` | Parked tray, cold-start branch |
-| `src/widgets/todays-brief/api/get-brief-and-insights.ts` | Compound + cross-deal surfacing |
-| `src/app/api/aion/dispatch/lib/dispatch-handlers.ts` | Deal-Lens deep-link branch, danger-zone check |
-| `src/app/api/aion/lib/insight-evaluators.ts` | Register new evaluators, remove v1 stubs |
-| `src/shared/lib/lobby-layouts/presets.ts` | Sales preset weighting annotation |
-| `src/app/(dashboard)/(features)/crm/components/follow-up-card.tsx` | Seed support for brief → deal-lens handoff |
-| `src/app/(dashboard)/(features)/aion/ui/ChatInterface.tsx` | Read seed from localStorage |
+| `src/widgets/lobby-capture/index.ts` | Export `CaptureProvider` + `useCapture` hook; remove `CaptureButton` |
+| `src/app/(dashboard)/lobby/LobbyHeader.tsx` | Remove `CaptureButton`; remove `captureEnabled` + `workspaceId` props |
+| `src/app/(dashboard)/lobby/LobbyClient.tsx` | Wrap content in `CaptureProvider` when flag enabled |
+| `src/app/(dashboard)/lobby/LobbyBentoGrid.tsx` | Add `TodaysBriefWidget` to legacy-bento render path (Default preset parity) |
+| `src/app/(dashboard)/lobby/page.tsx` | Fetch `hasEverCaptured` server-side, pass through |
+| `src/widgets/todays-brief/ui/TodaysBriefWidget.tsx` | Render `CaptureComposer` at top |
+| `src/widgets/todays-brief/api/get-brief-and-insights.ts` | Accept active layout's `cardIds`, reorder insights by domain |
+| `src/shared/lib/metrics/types.ts` | Add `Domain` type + `domain?: Domain[]` on `MetricBase` |
+| `src/shared/lib/metrics/registry.ts` | Populate `domain` across ~45 entries |
+| `src/app/api/aion/lib/insight-evaluators.ts` | Register new evaluators |
+| `src/app/(dashboard)/lobby/lobby-card-renderer.tsx` | Widen `RendererInput` to pass `activeLayout` |
+
+### Phase 3+ — planned
+
+| File | Phase |
+|------|-------|
+| `src/widgets/todays-brief/ui/InsightRow.tsx` | Inline-editable draft, pin, hover-rationale, park (Phase 4) |
+| `src/app/api/aion/lib/collapse-compound-insights.ts` | Synthesis pass (Phase 3) |
+| `src/app/api/aion/lib/cross-deal-aggregation.ts` | Client-level group pass (Phase 3) |
+| `src/app/api/aion/dispatch/lib/dispatch-handlers.ts` | Deal-Lens deep-link branch, danger-zone check (Phase 4) |
+| `src/app/(dashboard)/(features)/crm/components/follow-up-card.tsx` | Brief → deal-lens handoff (Phase 4) |
+| `src/app/(dashboard)/(features)/aion/ui/ChatInterface.tsx` | Read seed from localStorage (Phase 4) |
 
 ---
 
@@ -574,6 +680,8 @@ All six pre-build questions resolved against current main. No blockers.
 8. **Kill switch degrades gracefully.** Evaluators keep running when Aion-drafting is off. The brief stays useful even in fully-manual mode.
 9. **Cold start = onboarding tasks.** Empty "Nothing urgent" on day 1 reads as broken. Onboarding-as-insights preserves the pattern and builds the habit.
 10. **Continue-in-chat via localStorage seed.** Existing session state is already in localStorage per the Aion chat docs. Re-use that lane. Don't invent a new session-handoff mechanism.
+11. **Paragraph stays workspace-wide; only insight rows reorder by layout.** Research pass #2 (2026-04-16) rejected layout-aware paragraph composition. Three failure modes: narrative whiplash on view switch (User Advocate, Critic), confident narration past the user's real worry on narrow presets (User Advocate), and cross-domain custom-layout pathology that no shipping product has solved (Field Expert). Layout-aware insight-row *reordering* delivers the relevance intent without the composer-infrastructure cost or the whiplash UX. Paragraph stays a single workspace-wide cron output. See §6.4, §18 pass 2.
+12. **Capture composer in brief card, not header.** Original §10.1 put the capture mic in the lobby header. Dogfooding surfaced that a bare mic icon reads as generic "voice input" without the Aion mental model to interpret it. HoneyBook Priority Lists, Day.ai, OnePageCRM Action Stream all co-locate capture with their AI surface for this exact reason. Moving the composer into the brief card — with a first-run explanatory state that compacts after first use — gives Aion a voice that explains the affordance. `Shift+C` still works globally via `CaptureProvider`. See §10.1.
 
 ---
 
@@ -587,4 +695,6 @@ All six pre-build questions resolved against current main. No blockers.
 - `docs/reference/directory-schema.md` — Ghost Protocol rules for capture-created entities
 - `docs/reference/cortex-schema.md` — relationships, memory, write protection
 
-Research pass (2026-04-16) triangulated by User Advocate, Field Expert, Signal Navigator, and Critic. Points of convergence are baked into the spec; points of tension are resolved in §3.3, §7, §8, §11.
+Research pass #1 (2026-04-16) triangulated by User Advocate, Field Expert, Signal Navigator, and Critic. Points of convergence are baked into the spec; points of tension are resolved in §3.3, §7, §8, §11.
+
+Research pass #2 (2026-04-16, post-Phase-1-dogfood) stress-tested the proposed layout-aware paragraph composer. Panel rejected as specified (User Advocate + Field Expert + Critic); Fork 1 (paragraph stays workspace-wide, insight rows reorder by layout domain, capture moves into brief card) adopted. See §18 pass 2 and §20 decisions 11–12.
