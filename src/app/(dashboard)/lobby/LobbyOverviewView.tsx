@@ -19,7 +19,6 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
 import { M3_FADE_THROUGH_EXIT } from '@/shared/lib/motion-constants';
-import { UrgencyStrip } from '@/widgets/urgency-strip';
 import { PinnedAnswersWidget } from '@/widgets/pinned-answers';
 import type { DashboardData } from '@/widgets/dashboard/api';
 import type { WorkspaceUsage } from '@/app/(dashboard)/settings/plan/actions';
@@ -28,7 +27,7 @@ import type { LobbyLayout, PresetSlug } from '@/shared/lib/lobby-layouts/types';
 import { LOBBY_CARD_CAP } from '@/shared/lib/lobby-layouts/presets';
 import { LobbyBentoGrid } from './LobbyBentoGrid';
 import { PlanPromptBanner } from './PlanPromptBanner';
-import { LobbyHeader, LOBBY_URGENCY_ANCHOR_ID } from './LobbyHeader';
+import { LobbyHeader } from './LobbyHeader';
 import { LobbyViewTabs } from './LobbyViewTabs';
 import { LobbyControlsBar } from './LobbyControlsBar';
 
@@ -126,10 +125,6 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
           onRename={onRename}
           onDelete={onDelete}
         />
-
-        <div id={LOBBY_URGENCY_ANCHOR_ID}>
-          <UrgencyStrip alerts={alerts} />
-        </div>
 
         <LobbyControlsBar
           isCustom={isCustom}

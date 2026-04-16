@@ -20,58 +20,7 @@ import { cn } from '@/shared/lib/utils';
 import { CaptureButton } from '@/widgets/lobby-capture';
 import { openCommandPalette } from '@/shared/ui/command-spine/open';
 import type { UrgencyAlert } from '@/widgets/dashboard/api/get-urgency-alerts';
-
-// ── Fire dot ─────────────────────────────────────────────────────────────────
-
-const FIRE_DOT_ANCHOR_ID = 'lobby-urgency-anchor';
-
-/**
- * Shared anchor id the fire dot scrolls to. UrgencyStrip's wrapper renders
- * this id so clicking the dot jumps focus to the triage list.
- */
-export const LOBBY_URGENCY_ANCHOR_ID = FIRE_DOT_ANCHOR_ID;
-
-function FireDot({ alerts }: { alerts: UrgencyAlert[] }) {
-  if (alerts.length === 0) return null;
-
-  const hasCritical = alerts.some((a) => a.severity === 'critical');
-  const count = alerts.length;
-  const display = count > 9 ? '9+' : String(count);
-
-  const handleClick = () => {
-    const el = document.getElementById(FIRE_DOT_ANCHOR_ID);
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label={`${count} ${count === 1 ? 'item needs' : 'items need'} attention`}
-      className={cn(
-        'inline-flex items-center gap-1.5 h-6 px-1.5 rounded-full',
-        'text-[11px] font-medium tabular-nums',
-        'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
-        hasCritical
-          ? 'bg-[oklch(0.65_0.22_25/0.12)] text-[var(--color-unusonic-error,oklch(0.70_0.18_25))] hover:bg-[oklch(0.65_0.22_25/0.18)]'
-          : 'bg-[oklch(0.78_0.14_60/0.10)] text-[var(--color-unusonic-warning,oklch(0.78_0.14_60))] hover:bg-[oklch(0.78_0.14_60/0.16)]',
-      )}
-      data-testid="lobby-fire-dot"
-    >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          hasCritical
-            ? 'bg-[var(--color-unusonic-error,oklch(0.70_0.18_25))]'
-            : 'bg-[var(--color-unusonic-warning,oklch(0.78_0.14_60))]',
-        )}
-        aria-hidden
-      />
-      <span>{display}</span>
-    </button>
-  );
-}
+import { LobbyFireDot } from './LobbyFireDot';
 
 // ── Search chip (opens CommandSpine) ─────────────────────────────────────────
 
@@ -151,7 +100,7 @@ export function LobbyHeader({
         >
           {title}
         </h1>
-        <FireDot alerts={alerts} />
+        <LobbyFireDot alerts={alerts} />
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {captureEnabled && workspaceId && <CaptureButton workspaceId={workspaceId} />}

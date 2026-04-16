@@ -2,38 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import Link from 'next/link';
-import {
-  Users,
-  Receipt,
-  FileText,
-  UserCheck,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
 import type { UrgencyAlert } from '@/widgets/dashboard/api/get-urgency-alerts';
 import {
   STAGE_MEDIUM,
-  STAGE_LIGHT,
   STAGE_STAGGER_CHILDREN,
 } from '@/shared/lib/motion-constants';
-
-const ICON_MAP: Record<UrgencyAlert['type'], LucideIcon> = {
-  crew_gap: Users,
-  overdue_invoice: Receipt,
-  expiring_proposal: FileText,
-  unconfirmed_crew: UserCheck,
-};
+import { AlertRow } from './AlertRow';
 
 interface UrgencyStripProps {
   alerts: UrgencyAlert[];
 }
 
+/**
+ * Optional bento card rendering the full urgency list inline. The lobby
+ * header's fire-dot popover is the default surface; this component is here
+ * for users who want a persistent triage card on their dashboard.
+ */
 export function UrgencyStrip({ alerts }: UrgencyStripProps) {
-  // Dismissed ids live outside the derived list so the strip re-syncs with
-  // every prop change — useState(initialAlerts) only captured the first
-  // render's value, and when the dashboard query resolved after mount the
-  // strip stayed frozen at its initial (usually empty) snapshot.
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const visible = useMemo(
     () => alerts.filter((a) => !dismissedIds.has(a.id)),
@@ -77,72 +62,5 @@ export function UrgencyStrip({ alerts }: UrgencyStripProps) {
         </motion.div>
       </motion.div>
     </AnimatePresence>
-  );
-}
-
-function AlertRow({
-  alert,
-  onDismiss,
-}: {
-  alert: UrgencyAlert;
-  onDismiss: (id: string) => void;
-}) {
-  const Icon = ICON_MAP[alert.type];
-  const isCritical = alert.severity === 'critical';
-
-  return (
-    <motion.div
-      variants={{
-        hidden: { opacity: 0, y: 6 },
-        visible: { opacity: 1, y: 0 },
-      }}
-      transition={STAGE_LIGHT}
-      className="flex items-center gap-3 py-1 group"
-    >
-      <Icon
-        className="w-4 h-4 shrink-0"
-        strokeWidth={1.5}
-        style={{
-          color: isCritical
-            ? 'var(--color-unusonic-error)'
-            : 'var(--color-unusonic-warning)',
-        }}
-        aria-hidden
-      />
-
-      <span
-        className="stage-readout-sm shrink-0"
-        style={{
-          color: isCritical
-            ? 'var(--color-unusonic-error)'
-            : 'var(--color-unusonic-warning)',
-        }}
-      >
-        {alert.title}
-      </span>
-
-      <span className="stage-label truncate min-w-0">
-        {alert.detail}
-      </span>
-
-      <span className="flex-1" />
-
-      <Link
-        href={alert.actionUrl}
-        className="text-xs font-medium shrink-0 transition-colors text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]"
-      >
-        View
-      </Link>
-
-      <button
-        type="button"
-        onClick={() => onDismiss(alert.id)}
-        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ color: 'var(--stage-text-tertiary)' }}
-        aria-label={`Dismiss alert: ${alert.title}`}
-      >
-        <X className="w-3.5 h-3.5" strokeWidth={1.5} />
-      </button>
-    </motion.div>
   );
 }
