@@ -3,9 +3,8 @@
 /**
  * CaptureButton — lobby header affordance.
  *
- * Opens the CaptureModal. Matches the header-row styling used by
- * LobbyTimeRangePicker / LobbyLayoutSwitcher so it sits visually in the same
- * row as an equal peer.
+ * Opens the CaptureModal. Renders in LobbyHeader's trailing cluster alongside
+ * the Search chip — an always-accessible cross-app action.
  *
  * Global keyboard shortcut: Shift+C when the lobby is focused.
  *

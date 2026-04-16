@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { searchGlobal, type SearchGlobalResult } from '@/shared/actions/search-global';
 import { useCommandPaletteOrg } from '@/shared/ui/providers/CommandPaletteContext';
+import { COMMAND_SPINE_OPEN_EVENT } from './open';
 
 /** Minimal org shape for command palette network search (injected from app/feature layer). */
 export interface CommandSpineNetworkOrg {
@@ -91,8 +92,18 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
         }
       }
     };
+    const openFromEvent = () => {
+      setOpen(true);
+      setSearch('');
+      setSearchResults(null);
+      setNetworkOrgs([]);
+    };
     document.addEventListener('keydown', down);
-    return () => document.removeEventListener('keydown', down);
+    window.addEventListener(COMMAND_SPINE_OPEN_EVENT, openFromEvent);
+    return () => {
+      document.removeEventListener('keydown', down);
+      window.removeEventListener(COMMAND_SPINE_OPEN_EVENT, openFromEvent);
+    };
   }, [open]);
 
   const runSearch = useCallback(async (query: string) => {

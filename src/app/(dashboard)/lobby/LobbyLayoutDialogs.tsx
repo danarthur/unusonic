@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * Dialogs used by LobbyLayoutSwitcher — name input (duplicate/blank/rename)
- * and delete confirmation. Extracted so the switcher stays under the
+ * Dialogs used by LobbyViewTabs — name input (duplicate/blank/rename) and
+ * delete confirmation. Extracted so the tab component stays under the
  * file-size ratchet.
  *
  * @module app/(dashboard)/lobby/LobbyLayoutDialogs

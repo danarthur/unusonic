@@ -4,8 +4,14 @@
  * LobbyOverviewView — the hub-overview render branch for LobbyClient.
  *
  * Extracted so the client component stays under the file-size ratchet.
- * Owns the banner + urgency strip + header control row + bento grid + pins
- * composition. State is fully lifted; this is a pure presentational shell.
+ * Owns the banner + three-row header composition (identity / view tabs /
+ * controls) + urgency strip + bento grid + pins. State is fully lifted;
+ * this is a pure presentational shell.
+ *
+ * Three-row header composition (top-to-bottom):
+ *   Row 1 — LobbyHeader        (h1 title + fire-dot + capture mic + ⌘K)
+ *   Row 2 — LobbyViewTabs       (tab strip; replaces the old switcher chip)
+ *   Row 3 — LobbyControlsBar    (time range + custom-view edit controls)
  *
  * @module app/(dashboard)/lobby/LobbyOverviewView
  */
@@ -13,7 +19,6 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
 import { M3_FADE_THROUGH_EXIT } from '@/shared/lib/motion-constants';
-import { cn } from '@/shared/lib/utils';
 import { UrgencyStrip } from '@/widgets/urgency-strip';
 import { PinnedAnswersWidget } from '@/widgets/pinned-answers';
 import type { DashboardData } from '@/widgets/dashboard/api';
@@ -22,109 +27,10 @@ import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-act
 import type { LobbyLayout, PresetSlug } from '@/shared/lib/lobby-layouts/types';
 import { LOBBY_CARD_CAP } from '@/shared/lib/lobby-layouts/presets';
 import { LobbyBentoGrid } from './LobbyBentoGrid';
-import { LobbyTimeRangePicker } from './LobbyTimeRangePicker';
-import { LobbyLayoutSwitcher } from './LobbyLayoutSwitcher';
-import { LayoutControls } from './LayoutControls';
 import { PlanPromptBanner } from './PlanPromptBanner';
-import { CaptureButton } from '@/widgets/lobby-capture';
-
-// ── Preset CTA ───────────────────────────────────────────────────────────────
-
-/**
- * Presets are frozen — you can't edit them. When the active layout is a
- * preset, the edit chrome is replaced by a single CTA that duplicates the
- * preset into a custom the user can then edit.
- */
-function DuplicatePresetCTA({ onDuplicate }: { onDuplicate: () => void }) {
-  return (
-    <div
-      className="hidden md:flex items-center gap-2"
-      data-testid="lobby-preset-cta"
-    >
-      <button
-        type="button"
-        onClick={onDuplicate}
-        className={cn(
-          'inline-flex items-center gap-1.5 h-8 px-2.5 rounded-[var(--stage-radius-input,10px)]',
-          'text-xs font-medium',
-          'border border-[var(--stage-edge-subtle)]',
-          'bg-[var(--stage-surface-elevated)]',
-          'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
-          'transition-colors',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
-        )}
-        aria-label="Duplicate this view to customize"
-      >
-        <span>Duplicate this view to customize</span>
-      </button>
-    </div>
-  );
-}
-
-// ── Header row ───────────────────────────────────────────────────────────────
-
-function HeaderRow({
-  activeLayout,
-  layouts,
-  editMode,
-  onToggleEdit,
-  onOpenLibrary,
-  onActivate,
-  onDuplicateActive,
-  onDuplicatePreset,
-  onCreateBlank,
-  onRename,
-  onDelete,
-  captureEnabled,
-  workspaceId,
-}: {
-  activeLayout: LobbyLayout;
-  layouts: LobbyLayout[];
-  editMode: boolean;
-  onToggleEdit: () => void;
-  onOpenLibrary: () => void;
-  onActivate: (id: string) => Promise<void>;
-  onDuplicateActive: () => void;
-  onDuplicatePreset: (slug: PresetSlug, name: string) => Promise<void>;
-  onCreateBlank: (name: string) => Promise<void>;
-  onRename: (id: string, name: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-  captureEnabled: boolean;
-  workspaceId: string | null;
-}) {
-  const isCustom = activeLayout.kind === 'custom';
-  return (
-    <div className="flex items-center justify-end gap-2">
-      {captureEnabled && workspaceId && <CaptureButton workspaceId={workspaceId} />}
-      <LobbyTimeRangePicker />
-      <LobbyLayoutSwitcher
-        layouts={layouts}
-        activeLayoutId={activeLayout.id}
-        onActivate={onActivate}
-        onDuplicatePreset={onDuplicatePreset}
-        onCreateBlank={onCreateBlank}
-        onRename={onRename}
-        onDelete={onDelete}
-      />
-      {isCustom ? (
-        <LayoutControls
-          editMode={editMode}
-          onToggleEdit={onToggleEdit}
-          onReset={() => {
-            /* Reset-to-preset-defaults is not meaningful on a custom — the user
-             * created this view. Left as a no-op; the switcher's Delete is the
-             * graceful exit path. */
-          }}
-          onAddCard={onOpenLibrary}
-          cardCount={activeLayout.cardIds.length}
-          cap={LOBBY_CARD_CAP}
-        />
-      ) : (
-        <DuplicatePresetCTA onDuplicate={onDuplicateActive} />
-      )}
-    </div>
-  );
-}
+import { LobbyHeader, LOBBY_URGENCY_ANCHOR_ID } from './LobbyHeader';
+import { LobbyViewTabs } from './LobbyViewTabs';
+import { LobbyControlsBar } from './LobbyControlsBar';
 
 // ── Overview view ────────────────────────────────────────────────────────────
 
@@ -173,8 +79,9 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
     workspaceId,
   } = props;
   const showPinsAbove = pinEnabled && pins.length > 0;
-  const showPinsBelow = false;
   const isCustom = activeLayout.kind === 'custom';
+  const alerts = dashboardData?.alerts ?? [];
+
   return (
     <motion.div
       key="hub-overview"
@@ -201,23 +108,45 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
           showUsage={usage?.showUsage}
           showLimit={usage?.showLimit}
         />
-        <UrgencyStrip alerts={dashboardData?.alerts ?? []} />
-        <HeaderRow
-          activeLayout={activeLayout}
-          layouts={layouts}
-          editMode={editMode}
-          onToggleEdit={onToggleEdit}
-          onOpenLibrary={onOpenLibrary}
-          onActivate={onActivate}
-          onDuplicateActive={onDuplicateActive}
-          onDuplicatePreset={onDuplicatePreset}
-          onCreateBlank={onCreateBlank}
-          onRename={onRename}
-          onDelete={onDelete}
+
+        <LobbyHeader
+          title={activeLayout.name}
+          alerts={alerts}
           captureEnabled={captureEnabled}
           workspaceId={workspaceId}
         />
+
+        <LobbyViewTabs
+          layouts={layouts}
+          activeLayoutId={activeLayout.id}
+          onActivate={onActivate}
+          onDuplicatePreset={onDuplicatePreset}
+          onDuplicateActive={onDuplicateActive}
+          onCreateBlank={onCreateBlank}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+
+        <div id={LOBBY_URGENCY_ANCHOR_ID}>
+          <UrgencyStrip alerts={alerts} />
+        </div>
+
+        <LobbyControlsBar
+          isCustom={isCustom}
+          editMode={editMode}
+          onToggleEdit={onToggleEdit}
+          onOpenLibrary={onOpenLibrary}
+          onReset={() => {
+            /* Reset-to-preset-defaults is not meaningful on a custom — the
+             * user created this view. Left as a no-op; the tab's ⋯ Delete is
+             * the graceful exit path. */
+          }}
+          cardCount={activeLayout.cardIds.length}
+          cap={LOBBY_CARD_CAP}
+        />
+
         {showPinsAbove && <PinnedAnswersWidget pins={pins} />}
+
         <LobbyBentoGrid
           dashboardData={dashboardData}
           rendererMode={activeLayout.rendererMode}
@@ -226,7 +155,6 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
           onReorder={onReorder}
           onRemove={onRemove}
         />
-        {showPinsBelow && <PinnedAnswersWidget pins={pins} />}
       </motion.div>
     </motion.div>
   );
