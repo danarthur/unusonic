@@ -6,24 +6,26 @@ import {
   FEATURE_FLAGS,
   isFeatureEnabled,
 } from '@/shared/lib/feature-flags';
-import { getLobbyLayout } from './actions/lobby-layout';
+import { listVisibleLayouts } from './actions/lobby-layouts';
 import { LobbyClient } from './LobbyClient';
 import { userCapabilities } from '@/shared/lib/metrics/capabilities';
 import type { CapabilityKey } from '@/shared/lib/permission-registry';
 import { getPinnedAnswers } from '@/widgets/pinned-answers/api/get-pinned-answers';
 import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
+import type { LobbyLayout } from '@/shared/lib/lobby-layouts/types';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Lobby route entry — server wrapper.
  *
- * Resolves the current workspace + modular-Lobby feature flag at request
- * time. When the flag is ON for the workspace, we pass the caller's
- * resolved card ordering into `LobbyClient` (persisted layout, or seeded
- * defaults if no row exists). When the flag is OFF, `cardIds` is undefined
- * and `LobbyBentoGrid` renders the legacy hard-coded layout — no behavior
- * change for any workspace until a flag flip.
+ * Resolves the viewer's visible layouts (presets they have capability for,
+ * plus their customs) and passes them to the client. Exactly one layout is
+ * flagged active in the returned list; if no row has ever been persisted,
+ * backend seeds Default as active.
+ *
+ * The old modular-lobby feature flag is retired — layouts are the new
+ * default. The `REPORTS_AION_PIN` flag remains independent.
  */
 async function resolveWorkspaceId(): Promise<string | null> {
   try {
@@ -50,61 +52,67 @@ async function resolveWorkspaceId(): Promise<string | null> {
   }
 }
 
+/**
+ * Fallback layout shown when the server can't resolve anything (no workspace,
+ * transient error, etc.). Default preset, legacy renderer — byte-identical to
+ * the pre-layouts experience for these degraded cases.
+ */
+function defaultFallbackLayout(): LobbyLayout {
+  return {
+    id: 'default',
+    kind: 'preset',
+    name: 'Default',
+    cardIds: [],
+    isActive: true,
+    rendererMode: 'legacy',
+  };
+}
+
 export default async function LobbyPage() {
   const workspaceId = await resolveWorkspaceId();
 
-  // Flag-off path: hand control to the client shell with no cardIds. The
-  // existing LobbyBentoGrid layout renders unchanged.
-  if (!workspaceId) {
-    return <LobbyClient />;
-  }
-
-  // Phase 3.2: pin feature flag is checked independently of the modular
-  // Lobby flag. A workspace may ship pins before modular Lobby, or vice versa.
-  const pinEnabled = await isFeatureEnabled(
-    workspaceId,
-    FEATURE_FLAGS.REPORTS_AION_PIN,
-  );
+  // Pin flag is independent of the layouts system.
+  let pinEnabled = false;
   let pins: LobbyPin[] = [];
-  if (pinEnabled) {
-    pins = await getPinnedAnswers();
+  if (workspaceId) {
+    try {
+      pinEnabled = await isFeatureEnabled(
+        workspaceId,
+        FEATURE_FLAGS.REPORTS_AION_PIN,
+      );
+      if (pinEnabled) pins = await getPinnedAnswers();
+    } catch {
+      pinEnabled = false;
+      pins = [];
+    }
   }
 
-  const modularEnabled = await isFeatureEnabled(
-    workspaceId,
-    FEATURE_FLAGS.REPORTS_MODULAR_LOBBY,
-  );
-  if (!modularEnabled) {
-    return <LobbyClient pins={pins} pinEnabled={pinEnabled} />;
-  }
-
-  // Flag-on path: resolve persisted layout or seeded defaults, pass to client.
-  // getLobbyLayout is self-contained (reads cookies + caller's role), so a
-  // try/catch keeps the Lobby renderable even if layout resolution fails.
-  // Resolve outside the JSX expression to satisfy the no-JSX-in-try rule.
-  let cardIds: string[] | undefined;
-  try {
-    const layout = await getLobbyLayout();
-    cardIds = layout.cardIds;
-  } catch {
-    cardIds = undefined;
-  }
-
-  // Phase 2.3: resolve capability set so the library drawer can filter the
-  // registry without leaking RPC fanout to the client. Failure → empty set
-  // (drawer shows nothing actionable, but the rest of the Lobby is fine).
+  // Resolve visible layouts + caps. Either failing degrades to a Default-only
+  // render — the Lobby stays usable even when lobby_layouts is unreachable.
+  let layouts: LobbyLayout[] = [defaultFallbackLayout()];
   let userCaps: CapabilityKey[] = [];
-  try {
-    const caps = await userCapabilities(workspaceId);
-    userCaps = Array.from(caps);
-  } catch {
-    userCaps = [];
+  if (workspaceId) {
+    try {
+      const resolved = await listVisibleLayouts();
+      if (resolved.length > 0) layouts = resolved;
+    } catch {
+      layouts = [defaultFallbackLayout()];
+    }
+    try {
+      const caps = await userCapabilities(workspaceId);
+      userCaps = Array.from(caps);
+    } catch {
+      userCaps = [];
+    }
   }
+
+  const active =
+    layouts.find((l) => l.isActive) ?? layouts[0] ?? defaultFallbackLayout();
 
   return (
     <LobbyClient
-      cardIds={cardIds}
-      modularEnabled
+      layouts={layouts}
+      activeLayoutId={active.id}
       userCaps={userCaps}
       pins={pins}
       pinEnabled={pinEnabled}

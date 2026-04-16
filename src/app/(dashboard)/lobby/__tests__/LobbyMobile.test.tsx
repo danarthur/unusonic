@@ -73,6 +73,7 @@ describe('Lobby mobile (Phase 5.2)', () => {
   it('LobbyBentoGrid (modular) uses grid-cols-1 at mobile and grid-cols-X at md+', () => {
     const { container } = render(
       <LobbyBentoGrid
+        rendererMode="modular"
         cardIds={['lobby.action_queue', 'lobby.today_schedule']}
         dashboardData={undefined}
         editMode={false}
@@ -90,7 +91,9 @@ describe('Lobby mobile (Phase 5.2)', () => {
   });
 
   it('LobbyBentoGrid (legacy) uses grid-cols-1 at mobile and grid-cols-X at md+', () => {
-    const { container } = render(<LobbyBentoGrid dashboardData={undefined} />);
+    const { container } = render(
+      <LobbyBentoGrid rendererMode="legacy" dashboardData={undefined} />,
+    );
     const grid = container.querySelector('.stage-grid');
     expect(grid).not.toBeNull();
     expect(grid!.className).toContain('grid-cols-1');

@@ -2095,7 +2095,6 @@ export type Database = {
           entity_id: string | null
           gear_notes: string | null
           id: string
-          internal_note: string | null
           kit_fee: number | null
           notes: string | null
           payment_date: string | null
@@ -2124,7 +2123,6 @@ export type Database = {
           entity_id?: string | null
           gear_notes?: string | null
           id?: string
-          internal_note?: string | null
           kit_fee?: number | null
           notes?: string | null
           payment_date?: string | null
@@ -2153,7 +2151,6 @@ export type Database = {
           entity_id?: string | null
           gear_notes?: string | null
           id?: string
-          internal_note?: string | null
           kit_fee?: number | null
           notes?: string | null
           payment_date?: string | null
@@ -3869,6 +3866,47 @@ export type Database = {
         }
         Relationships: []
       }
+      lobby_layouts: {
+        Row: {
+          card_ids: string[]
+          created_at: string
+          id: string
+          name: string
+          source_preset_slug: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          card_ids: string[]
+          created_at?: string
+          id?: string
+          name: string
+          source_preset_slug?: string | null
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          card_ids?: string[]
+          created_at?: string
+          id?: string
+          name?: string
+          source_preset_slug?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_layouts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string | null
@@ -4634,31 +4672,28 @@ export type Database = {
         }
         Relationships: []
       }
-      user_lobby_layout: {
+      user_lobby_active: {
         Row: {
-          card_ids: string[]
-          role_slug: string
+          layout_key: string
           updated_at: string
           user_id: string
           workspace_id: string
         }
         Insert: {
-          card_ids: string[]
-          role_slug: string
+          layout_key?: string
           updated_at?: string
           user_id: string
           workspace_id: string
         }
         Update: {
-          card_ids?: string[]
-          role_slug?: string
+          layout_key?: string
           updated_at?: string
           user_id?: string
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "user_lobby_layout_workspace_id_fkey"
+            foreignKeyName: "user_lobby_active_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

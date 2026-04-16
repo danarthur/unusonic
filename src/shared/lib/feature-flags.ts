@@ -23,7 +23,6 @@ export type FeatureFlagKey = `${string}.${string}`;
  * Using the constant guards against typos at the call site.
  */
 export const FEATURE_FLAGS = {
-  REPORTS_MODULAR_LOBBY: 'reports.modular_lobby',
   REPORTS_AION_PIN: 'reports.aion_pin',
   REPORTS_RECONCILIATION: 'reports.reconciliation',
 } as const satisfies Record<string, FeatureFlagKey>;

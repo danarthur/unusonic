@@ -58,23 +58,28 @@ const cellVariants = {
 interface LobbyBentoGridProps {
   dashboardData?: DashboardData;
   /**
-   * Phase 2.2: when present, render exactly these registry IDs in order
-   * (modular Lobby path, behind the `reports.modular_lobby` feature flag).
-   * When absent, fall back to the legacy hard-coded layout below.
+   * Dispatch key: 'legacy' renders the frozen hand-coded bento (Default
+   * preset), 'modular' renders the registry-backed grid (every other preset
+   * and all customs). Driven by the active layout's rendererMode.
+   */
+  rendererMode: 'legacy' | 'modular';
+  /**
+   * Ordered registry IDs — required when `rendererMode === 'modular'`.
+   * Ignored on the legacy path.
    */
   cardIds?: string[];
   /**
-   * Phase 2.3: when true, the modular grid renders drag handles + remove
-   * affordances on every cell. Ignored on the legacy path.
+   * When true, the modular grid renders drag handles + remove affordances
+   * on every cell. Ignored on the legacy path (Default is non-editable).
    */
   editMode?: boolean;
   /**
-   * Phase 2.3: called when the user reorders cards via drag-and-drop. The
-   * Lobby parent reconciles the new order with the server.
+   * Called when the user reorders cards via drag-and-drop. The parent
+   * reconciles the new order with the server.
    */
   onReorder?: (newOrder: string[]) => void;
   /**
-   * Phase 2.3: called when the user clicks the X on a card in edit mode.
+   * Called when the user clicks the X on a card in edit mode.
    */
   onRemove?: (id: string) => void;
 }
@@ -348,21 +353,22 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
 
 export function LobbyBentoGrid({
   dashboardData,
+  rendererMode,
   cardIds,
   editMode,
   onReorder,
   onRemove,
 }: LobbyBentoGridProps) {
-  if (cardIds) {
-    return (
-      <ModularBentoGrid
-        cardIds={cardIds}
-        dashboardData={dashboardData}
-        editMode={editMode}
-        onReorder={onReorder}
-        onRemove={onRemove}
-      />
-    );
+  if (rendererMode === 'legacy') {
+    return <LegacyBentoGrid dashboardData={dashboardData} />;
   }
-  return <LegacyBentoGrid dashboardData={dashboardData} />;
+  return (
+    <ModularBentoGrid
+      cardIds={cardIds ?? []}
+      dashboardData={dashboardData}
+      editMode={editMode}
+      onReorder={onReorder}
+      onRemove={onRemove}
+    />
+  );
 }

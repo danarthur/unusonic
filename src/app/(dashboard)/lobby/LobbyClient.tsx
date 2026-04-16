@@ -1,82 +1,59 @@
 'use client';
 
 import React from 'react';
-import { toast } from 'sonner';
-import { useSession } from '@/shared/ui/providers/SessionContext';
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useSession } from '@/shared/ui/providers/SessionContext';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import {
   STAGE_LIGHT,
   M3_FADE_THROUGH_EXIT,
 } from '@/shared/lib/motion-constants';
-import { UrgencyStrip } from '@/widgets/urgency-strip';
-import { LobbyBentoGrid } from './LobbyBentoGrid';
 import { ChatInterface } from '@/app/(dashboard)/(features)/aion/components/ChatInterface';
-import { PlanPromptBanner } from './PlanPromptBanner';
 import { dashboardQueries } from '@/widgets/dashboard/api/queries';
-import type { DashboardData } from '@/widgets/dashboard/api';
-import type { WorkspaceUsage } from '@/app/(dashboard)/settings/plan/actions';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
+import { LOBBY_CARD_CAP } from '@/shared/lib/lobby-layouts/presets';
+import type { CapabilityKey } from '@/shared/lib/permission-registry';
+import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
+import type { LobbyLayout } from '@/shared/lib/lobby-layouts/types';
 import {
   LobbyTimeRangeProvider,
   useLobbyTimeRange,
 } from './LobbyTimeRangeContext';
-import { LobbyTimeRangePicker } from './LobbyTimeRangePicker';
-import { LayoutControls } from './LayoutControls';
 import { LibraryDrawer } from './LibraryDrawer';
-import {
-  saveLobbyLayout,
-  resetLobbyLayout,
-} from './actions/lobby-layout';
-import { LOBBY_CARD_CAP } from '@/shared/lib/metrics/role-defaults';
-import type { CapabilityKey } from '@/shared/lib/permission-registry';
-import { PinnedAnswersWidget } from '@/widgets/pinned-answers';
-import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
+import { LobbyOverviewView } from './LobbyOverviewView';
+import { useLobbyLayouts } from './useLobbyLayouts';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
 interface LobbyClientProps {
   /**
-   * Resolved Lobby card ordering for the current user. Present only when the
-   * `reports.modular_lobby` feature flag is enabled on the workspace; absent
-   * when the flag is off (the existing hard-coded layout is used instead).
+   * Every layout the viewer can see (presets + their customs), with exactly
+   * one flagged active. Resolved by the server page from listVisibleLayouts().
    */
-  cardIds?: string[];
+  layouts: LobbyLayout[];
+  /** Convenience — the id of the active layout (mirrors isActive: true). */
+  activeLayoutId: string;
   /**
-   * True when the modular Lobby feature flag is enabled. Drives the
-   * time-range picker visibility — we don't show the picker on legacy
-   * Lobbies because no widget there respects the global range yet.
-   */
-  modularEnabled?: boolean;
-  /**
-   * Phase 2.3: capability keys the viewer holds in this workspace. Used by
-   * the library drawer to filter the registry. Resolved server-side and
-   * passed in as a serializable string array. Absent when the modular
-   * Lobby flag is off — in that case the drawer is never opened.
+   * Capability keys the viewer holds in this workspace. Used by the library
+   * drawer to filter the registry. Resolved server-side.
    */
   userCaps?: CapabilityKey[];
   /**
-   * Phase 3.2: Lobby pins for the current user in this workspace. When
-   * `pinEnabled` is true AND this array has entries, the "Your pins" section
-   * renders — above the default grid if any pins exist, below if zero.
-   * When `pinEnabled` is false, the section is never rendered regardless.
+   * Lobby pins for the current user in this workspace. When `pinEnabled` is
+   * true AND this array has entries, the "Your pins" section renders above
+   * the default grid.
    */
   pins?: LobbyPin[];
   /**
-   * Phase 3.2: mirrors `reports.aion_pin` feature flag. Gates the "Your pins"
-   * section independently of the modular-Lobby flag so pins can ship to a
-   * workspace before rearrangeable defaults do.
+   * Mirrors the `reports.aion_pin` feature flag. Gates the "Your pins"
+   * section independently of the layouts system.
    */
   pinEnabled?: boolean;
 }
 
 // ── Chat view ─────────────────────────────────────────────────────────────
 
-/**
- * Aion chat surface and "return to dashboard" affordance. Lifted out so the
- * top-level Lobby component stays under the cyclomatic-complexity ratchet.
- */
 function ChatView({ onReturn }: { onReturn: () => void }) {
   return (
     <motion.div
@@ -122,125 +99,17 @@ function ChatView({ onReturn }: { onReturn: () => void }) {
   );
 }
 
-// ── Overview view ─────────────────────────────────────────────────────────
-
-type OverviewViewProps = {
-  dashboardData: DashboardData | undefined;
-  usage: WorkspaceUsage | null | undefined;
-  cardIds?: string[];
-  modularEnabled?: boolean;
-  editMode: boolean;
-  onToggleEdit: () => void;
-  onReset: () => void;
-  onOpenLibrary: () => void;
-  onReorder: (newOrder: string[]) => void;
-  onRemove: (id: string) => void;
-  pins: LobbyPin[];
-  pinEnabled: boolean;
-};
-
-/**
- * Hub-overview view — banners, urgency strip, and the bento grid. Lifted out
- * so the parent component stays under the cyclomatic-complexity ratchet.
- */
-function OverviewView({
-  dashboardData,
-  usage,
-  cardIds,
-  modularEnabled,
-  editMode,
-  onToggleEdit,
-  onReset,
-  onOpenLibrary,
-  onReorder,
-  onRemove,
-  pins,
-  pinEnabled,
-}: OverviewViewProps) {
-  // Per design §3: render "Your pins" above defaults when the user has ≥1
-  // pin, below defaults when zero. Flag-off workspaces never render either
-  // branch. Zero-pin section is hidden today; Phase 3.3 may flip it on as an
-  // affordance to nudge users toward the Aion pin flow.
-  const showPinsAbove = pinEnabled && pins.length > 0;
-  const showPinsBelow = false; // Zero-pin empty section suppressed in 3.2.
-  return (
-    <motion.div
-      key="hub-overview"
-      className="relative flex-1 min-h-0 flex flex-col overflow-auto"
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: M3_FADE_THROUGH_EXIT }}
-    >
-      <motion.div
-        key="hub-view"
-        // Mobile uses tighter padding/gap so narrow viewports don't waste edge
-        // space. At md+ we switch to the density-aware tokens so the desktop
-        // surface context system keeps driving padding. Phase 5.2.
-        className="flex flex-col gap-2 p-3 md:gap-[var(--stage-gap,8px)] md:p-[var(--stage-padding,16px)]"
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        variants={{
-          visible: {
-            transition: { staggerChildren: 0.03 },
-          },
-          hidden: {},
-          exit: {
-            opacity: 0,
-            transition: M3_FADE_THROUGH_EXIT,
-          },
-        }}
-      >
-        <PlanPromptBanner
-          billingStatus={usage?.billingStatus}
-          seatUsage={usage?.seatUsage}
-          seatLimit={usage?.seatLimit}
-          showUsage={usage?.showUsage}
-          showLimit={usage?.showLimit}
-        />
-        <UrgencyStrip alerts={dashboardData?.alerts ?? []} />
-        {modularEnabled && (
-          <div className="flex items-center justify-end gap-2">
-            <LobbyTimeRangePicker />
-            <LayoutControls
-              editMode={editMode}
-              onToggleEdit={onToggleEdit}
-              onReset={onReset}
-              onAddCard={onOpenLibrary}
-              cardCount={cardIds?.length ?? 0}
-              cap={LOBBY_CARD_CAP}
-            />
-          </div>
-        )}
-        {showPinsAbove && <PinnedAnswersWidget pins={pins} />}
-        <LobbyBentoGrid
-          dashboardData={dashboardData}
-          cardIds={cardIds}
-          editMode={editMode}
-          onReorder={onReorder}
-          onRemove={onRemove}
-        />
-        {showPinsBelow && <PinnedAnswersWidget pins={pins} />}
-      </motion.div>
-    </motion.div>
-  );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 /**
- * Unusonic Hub (Lobby) — Temporal Hierarchy Dashboard.
- * Single ambient backdrop, urgency strip at top, bento grid below.
- * Chat view toggles via session viewState.
+ * Unusonic Hub (Lobby). Single ambient backdrop, urgency strip at top, bento
+ * grid below. Chat view toggles via session viewState.
  *
- * When `cardIds` is provided (modular Lobby feature flag ON), `LobbyBentoGrid`
- * renders exactly those cards in that order. Otherwise it falls back to the
- * legacy hard-coded layout — no visible difference for flag-off workspaces.
+ * The active layout decides the renderer: 'legacy' (Default preset) keeps the
+ * frozen hand-coded bento; 'modular' renders an ordered registry-backed grid.
+ * Only customs are editable — presets force a Duplicate-first flow.
  */
 export function LobbyClient(props: LobbyClientProps) {
-  // The provider mounts unconditionally so context is always available, but
-  // the picker only renders when modularEnabled. Picker-less mounts are
-  // harmless: useLobbyTimeRange resolves to defaults, and consumers that
-  // don't pass `period` to the dashboard query keep their legacy behavior.
   return (
     <LobbyTimeRangeProvider>
       <LobbyClientInner {...props} />
@@ -249,8 +118,8 @@ export function LobbyClient(props: LobbyClientProps) {
 }
 
 function LobbyClientInner({
-  cardIds,
-  modularEnabled,
+  layouts,
+  activeLayoutId,
   userCaps,
   pins,
   pinEnabled,
@@ -259,13 +128,9 @@ function LobbyClientInner({
   const { workspaceId } = useWorkspace();
   const { resolved } = useLobbyTimeRange();
   const showOverview = viewState !== 'chat';
+  const [libraryOpen, setLibraryOpen] = React.useState(false);
 
-  // Period is only threaded into the query when the modular Lobby is on —
-  // otherwise we keep the legacy queryKey shape so existing cache entries
-  // remain warm and behavior is byte-identical for unaffected workspaces.
-  const period = modularEnabled
-    ? { periodStart: resolved.start, periodEnd: resolved.end }
-    : undefined;
+  const period = { periodStart: resolved.start, periodEnd: resolved.end };
 
   const { data: dashboardData } = useQuery({
     ...dashboardQueries.all(workspaceId ?? '', period),
@@ -276,81 +141,33 @@ function LobbyClientInner({
     enabled: !!workspaceId,
   });
 
-  // Phase 2.3 — local state for layout, edit mode, and library drawer.
-  // cardIds prop is the server-resolved seed; the client owns subsequent
-  // mutations and persists them through the existing server actions.
-  const [localCardIds, setLocalCardIds] = React.useState<string[] | undefined>(cardIds);
-  const [editMode, setEditMode] = React.useState(false);
-  const [libraryOpen, setLibraryOpen] = React.useState(false);
+  const layoutsState = useLobbyLayouts({
+    initialLayouts: layouts,
+    initialActiveId: activeLayoutId,
+  });
 
-  // Keep local in sync if the server prop changes (e.g. workspace switch).
-  React.useEffect(() => {
-    setLocalCardIds(cardIds);
-  }, [cardIds]);
+  const { activeLayout } = layoutsState;
 
-  const persistOrThrow = React.useCallback(
-    async (newOrder: string[], previous: string[]) => {
-      try {
-        await saveLobbyLayout(newOrder);
-      } catch (err) {
-        // Revert on failure — keep the optimistic state honest.
-        setLocalCardIds(previous);
-        const message =
-          err instanceof Error ? err.message : 'Could not save layout';
-        toast.error(message);
-      }
-    },
-    [],
-  );
+  // Fail-safe: if there's no active layout the UI can't render.
+  if (!activeLayout) {
+    return (
+      <div className="flex-1 min-h-0 w-full flex items-center justify-center text-[var(--stage-text-tertiary)] text-sm">
+        No views available.
+      </div>
+    );
+  }
 
-  const handleReorder = React.useCallback(
-    (newOrder: string[]) => {
-      const previous = localCardIds ?? [];
-      setLocalCardIds(newOrder);
-      void persistOrThrow(newOrder, previous);
-    },
-    [localCardIds, persistOrThrow],
-  );
-
-  const handleRemove = React.useCallback(
-    (id: string) => {
-      const previous = localCardIds ?? [];
-      const newOrder = previous.filter((c) => c !== id);
-      setLocalCardIds(newOrder);
-      void persistOrThrow(newOrder, previous);
-    },
-    [localCardIds, persistOrThrow],
-  );
-
-  const handleAdd = React.useCallback(
-    (id: string) => {
-      const previous = localCardIds ?? [];
-      if (previous.includes(id)) return;
-      const newOrder = [...previous, id];
-      setLocalCardIds(newOrder);
-      setLibraryOpen(false);
-      void persistOrThrow(newOrder, previous);
-    },
-    [localCardIds, persistOrThrow],
-  );
-
-  const handleReset = React.useCallback(async () => {
-    const previous = localCardIds ?? [];
-    try {
-      const layout = await resetLobbyLayout();
-      setLocalCardIds(layout.cardIds);
-      toast.success('Lobby reset to defaults');
-    } catch (err) {
-      setLocalCardIds(previous);
-      const message =
-        err instanceof Error ? err.message : 'Could not reset layout';
-      toast.error(message);
-    }
-  }, [localCardIds]);
+  const isCustom = activeLayout.kind === 'custom';
+  // Close the library drawer whenever a card is added, so the next open reads
+  // the fresh cardIds instead of the stale snapshot.
+  const handleAdd = (id: string) => {
+    layoutsState.handleAdd(id);
+    setLibraryOpen(false);
+  };
 
   return (
     <div className="flex-1 min-h-0 w-full flex flex-col font-sans relative">
-      {/* Ambient backdrop — single neutral gradient, no state branching */}
+      {/* Ambient backdrop */}
       {showOverview && (
         <div className="absolute inset-0 z-0" aria-hidden>
           <div className="lobby-ambient-growth" />
@@ -359,17 +176,22 @@ function LobbyClientInner({
 
       <AnimatePresence mode="wait">
         {showOverview && (
-          <OverviewView
+          <LobbyOverviewView
             dashboardData={dashboardData}
             usage={usage}
-            cardIds={localCardIds}
-            modularEnabled={modularEnabled}
-            editMode={editMode}
-            onToggleEdit={() => setEditMode((v) => !v)}
-            onReset={handleReset}
+            activeLayout={activeLayout}
+            layouts={layoutsState.layouts}
+            editMode={layoutsState.editMode}
+            onToggleEdit={() => layoutsState.setEditMode((v) => !v)}
             onOpenLibrary={() => setLibraryOpen(true)}
-            onReorder={handleReorder}
-            onRemove={handleRemove}
+            onReorder={layoutsState.handleReorder}
+            onRemove={layoutsState.handleRemove}
+            onActivate={layoutsState.handleActivate}
+            onDuplicateActive={layoutsState.handleDuplicateActive}
+            onDuplicatePreset={layoutsState.handleDuplicatePreset}
+            onCreateBlank={layoutsState.handleCreateBlank}
+            onRename={layoutsState.handleRename}
+            onDelete={layoutsState.handleDelete}
             pins={pins ?? []}
             pinEnabled={Boolean(pinEnabled)}
           />
@@ -380,12 +202,12 @@ function LobbyClientInner({
         )}
       </AnimatePresence>
 
-      {modularEnabled && (
+      {isCustom && (
         <LibraryDrawer
           open={libraryOpen}
           onOpenChange={setLibraryOpen}
           userCaps={userCaps ?? []}
-          currentCardIds={localCardIds ?? []}
+          currentCardIds={activeLayout.cardIds}
           cap={LOBBY_CARD_CAP}
           onAdd={handleAdd}
         />
