@@ -112,7 +112,10 @@ export async function handoverDeal(
 
   const status = (r.status as string) ?? '';
   if (!['contract_signed', 'deposit_received', 'won'].includes(status as string)) {
-    return { success: false, error: 'Contract must be signed before handover.' };
+    return {
+      success: false,
+      error: 'Deal must have a signed contract, received deposit, or be marked won before handover.',
+    };
   }
 
   const { data: projects, error: projErr } = await supabase
@@ -179,6 +182,9 @@ export async function handoverDeal(
     }
     if (!endAt || Number.isNaN(endMs)) {
       return { success: false, error: 'Invalid end_at in handoff payload.' };
+    }
+    if (startMs >= endMs) {
+      return { success: false, error: 'End time must be after start time.' };
     }
   } else {
     eventName = title;
@@ -256,11 +262,25 @@ export async function handoverDeal(
   const eventId = (event as { id: string }).id;
 
   if (clientEntityId) {
-    await supabase
+    const { error: projectClientErr } = await supabase
       .schema('ops')
       .from('projects')
       .update({ client_entity_id: clientEntityId })
       .eq('id', projectId);
+    if (projectClientErr) {
+      // Non-fatal, but callers that filter ops.projects by client_entity_id
+      // will be out of sync with ops.events until someone re-saves the deal.
+      // Surface so the PM knows they may need to correct project-scoped
+      // reporting later.
+      Sentry.logger.error('crm.handoverDeal.projectClientEntityUpdateFailed', {
+        dealId,
+        eventId: (event as { id: string }).id,
+        workspaceId,
+        projectId,
+        clientEntityId,
+        error: projectClientErr.message,
+      });
+    }
   }
 
   // Post-handoff sync tasks — crew sync is awaited (critical for portal),
