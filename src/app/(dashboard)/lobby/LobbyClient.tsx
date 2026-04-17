@@ -16,6 +16,7 @@ import { LOBBY_CARD_CAP } from '@/shared/lib/lobby-layouts/presets';
 import type { CapabilityKey } from '@/shared/lib/permission-registry';
 import type { LobbyPin } from '@/app/(dashboard)/(features)/aion/actions/pin-actions';
 import type { LobbyLayout } from '@/shared/lib/lobby-layouts/types';
+import { CaptureProvider } from '@/widgets/lobby-capture/ui/CaptureProvider';
 import {
   LobbyTimeRangeProvider,
   useLobbyTimeRange,
@@ -171,57 +172,66 @@ function LobbyClientInner({
     setLibraryOpen(false);
   };
 
-  return (
-    <div className="flex-1 min-h-0 w-full flex flex-col font-sans relative">
-      {/* Ambient backdrop — pointer-events-none so it never swallows clicks
-          regardless of stacking context. The inner class also sets it, but
-          the wrapper was previously capturing clicks above the bento. */}
-      {showOverview && (
-        <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
-          <div className="lobby-ambient-growth" />
-        </div>
-      )}
+  // Gate the capture provider on both the flag and a resolved workspace —
+  // without a workspace, the modal can't write and Shift+C would no-op.
+  const captureActive = Boolean(captureEnabled) && Boolean(workspaceId);
 
-      <AnimatePresence mode="wait">
+  const body = (
+    <div className="flex-1 min-h-0 w-full flex flex-col font-sans relative">
+        {/* Ambient backdrop — pointer-events-none so it never swallows clicks
+            regardless of stacking context. The inner class also sets it, but
+            the wrapper was previously capturing clicks above the bento. */}
         {showOverview && (
-          <LobbyOverviewView
-            dashboardData={dashboardData}
-            usage={usage}
-            activeLayout={activeLayout}
-            layouts={layoutsState.layouts}
-            editMode={layoutsState.editMode}
-            onToggleEdit={() => layoutsState.setEditMode((v) => !v)}
-            onOpenLibrary={() => setLibraryOpen(true)}
-            onReorder={layoutsState.handleReorder}
-            onRemove={layoutsState.handleRemove}
-            onActivate={layoutsState.handleActivate}
-            onDuplicateActive={layoutsState.handleDuplicateActive}
-            onDuplicatePreset={layoutsState.handleDuplicatePreset}
-            onCreateBlank={layoutsState.handleCreateBlank}
-            onRename={layoutsState.handleRename}
-            onDelete={layoutsState.handleDelete}
-            pins={pins ?? []}
-            pinEnabled={Boolean(pinEnabled)}
-            captureEnabled={Boolean(captureEnabled)}
-            workspaceId={workspaceId ?? null}
+          <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
+            <div className="lobby-ambient-growth" />
+          </div>
+        )}
+
+        <AnimatePresence mode="wait">
+          {showOverview && (
+            <LobbyOverviewView
+              dashboardData={dashboardData}
+              usage={usage}
+              activeLayout={activeLayout}
+              layouts={layoutsState.layouts}
+              editMode={layoutsState.editMode}
+              onToggleEdit={() => layoutsState.setEditMode((v) => !v)}
+              onOpenLibrary={() => setLibraryOpen(true)}
+              onReorder={layoutsState.handleReorder}
+              onRemove={layoutsState.handleRemove}
+              onActivate={layoutsState.handleActivate}
+              onDuplicateActive={layoutsState.handleDuplicateActive}
+              onDuplicatePreset={layoutsState.handleDuplicatePreset}
+              onCreateBlank={layoutsState.handleCreateBlank}
+              onRename={layoutsState.handleRename}
+              onDelete={layoutsState.handleDelete}
+              pins={pins ?? []}
+              pinEnabled={Boolean(pinEnabled)}
+            />
+          )}
+
+          {viewState === 'chat' && (
+            <ChatView onReturn={() => setViewState('overview')} />
+          )}
+        </AnimatePresence>
+
+        {isCustom && (
+          <LibraryDrawer
+            open={libraryOpen}
+            onOpenChange={setLibraryOpen}
+            userCaps={userCaps ?? []}
+            currentCardIds={activeLayout.cardIds}
+            cap={LOBBY_CARD_CAP}
+            onAdd={handleAdd}
           />
         )}
-
-        {viewState === 'chat' && (
-          <ChatView onReturn={() => setViewState('overview')} />
-        )}
-      </AnimatePresence>
-
-      {isCustom && (
-        <LibraryDrawer
-          open={libraryOpen}
-          onOpenChange={setLibraryOpen}
-          userCaps={userCaps ?? []}
-          currentCardIds={activeLayout.cardIds}
-          cap={LOBBY_CARD_CAP}
-          onAdd={handleAdd}
-        />
-      )}
-    </div>
+      </div>
   );
+
+  if (captureActive) {
+    return (
+      <CaptureProvider workspaceId={workspaceId as string}>{body}</CaptureProvider>
+    );
+  }
+  return body;
 }

@@ -7,7 +7,6 @@
  *   • LobbyFireDot       quiet-when-healthy urgency indicator (popover triage)
  *   • LobbyViewTabs      active view is the identity — selected tab IS the title
  *   • Time-range picker  lens on the dashboard data
- *   • CaptureButton      mic for dictating to Aion (feature-flagged)
  *   • SearchChip         opens CommandSpine (⌘K)
  *
  * No separate h1 — that would duplicate the selected tab. No separate
@@ -15,13 +14,16 @@
  * same semantic category (workspace-level controls). Edit-mode chips render
  * on a conditional row above the grid in LobbyOverviewView.
  *
+ * Capture affordance lives in the brief card as CaptureComposer (see
+ * sales-brief-v2-design.md §10.1 decision 12). `Shift+C` is handled
+ * globally by CaptureProvider.
+ *
  * @module app/(dashboard)/lobby/LobbyHeader
  */
 
 import * as React from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { CaptureButton } from '@/widgets/lobby-capture';
 import { openCommandPalette } from '@/shared/ui/command-spine/open';
 import type { UrgencyAlert } from '@/widgets/dashboard/api/get-urgency-alerts';
 import type { LobbyLayout, PresetSlug } from '@/shared/lib/lobby-layouts/types';
@@ -80,8 +82,6 @@ export interface LobbyHeaderProps {
   activeLayout: LobbyLayout;
   layouts: LobbyLayout[];
   alerts: UrgencyAlert[];
-  captureEnabled: boolean;
-  workspaceId: string | null;
   onActivate: (id: string) => Promise<void>;
   onDuplicatePreset: (slug: PresetSlug, name: string) => Promise<void>;
   onDuplicateActive: () => void;
@@ -94,8 +94,6 @@ export function LobbyHeader({
   activeLayout,
   layouts,
   alerts,
-  captureEnabled,
-  workspaceId,
   onActivate,
   onDuplicatePreset,
   onDuplicateActive,
@@ -123,7 +121,6 @@ export function LobbyHeader({
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <LobbyTimeRangePicker />
-        {captureEnabled && workspaceId && <CaptureButton workspaceId={workspaceId} />}
         <SearchChip />
       </div>
     </div>

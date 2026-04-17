@@ -28,6 +28,7 @@ import { RevenueTrendWidget } from '@/widgets/revenue-trend';
 import { EventTypeDistWidget } from '@/widgets/event-type-dist';
 import { ClientConcentrationWidget } from '@/widgets/client-concentration';
 import { QboVarianceWidget } from '@/widgets/qbo-variance';
+import { TodaysBriefWidget } from '@/widgets/todays-brief';
 import {
   STAGE_MEDIUM,
   STAGE_STAGGER_CHILDREN,
@@ -260,6 +261,21 @@ function LegacyBentoGrid({ dashboardData }: { dashboardData?: DashboardData }) {
       animate="visible"
       variants={gridVariants}
     >
+      {/* ── Row 0: Today's Brief ───────────────────────────────
+       * Added 2026-04-16 (Fork 1 of Sales Brief v2) so Default-preset
+       * users see the brief card + capture composer. Spans full width
+       * on desktop since the brief contains the paragraph + composer
+       * + insight rows. On mobile it naturally sits above everything.
+       * See docs/reference/sales-brief-v2-design.md §10.1.
+       * ──────────────────────────────────────────────────────── */}
+      <motion.div
+        className="order-0 lg:col-span-4"
+        variants={cellVariants}
+        transition={STAGE_MEDIUM}
+      >
+        <TodaysBriefWidget />
+      </motion.div>
+
       {/* ── Row 1: Now → This Week → Action Queue ──────────────
        * Max 320px on desktop — lists scroll internally.
        * Mobile: uncapped (stacked, no row-height contention).

@@ -8,8 +8,11 @@ import { AnimatePresence } from 'framer-motion';
 import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import { METRICS } from '@/shared/lib/metrics/registry';
 import { dismissInsight, markInsightsSurfaced } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
+import { useOptionalCapture } from '@/widgets/lobby-capture/ui/CaptureProvider';
 import { getBriefAndInsights, type BriefAndInsights, type AionInsight } from '../api/get-brief-and-insights';
+import { getHasEverCaptured } from '../api/get-has-ever-captured';
 import { InsightRow } from './InsightRow';
+import { CaptureComposer } from './CaptureComposer';
 
 const ActionFlowSheet = dynamic(
   () => import('./ActionFlowSheet').then((m) => ({ default: m.ActionFlowSheet })),
@@ -22,9 +25,17 @@ export function TodaysBriefWidget() {
   const [data, setData] = useState<BriefAndInsights | undefined>(undefined);
   const [activeInsight, setActiveInsight] = useState<AionInsight | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  // `null` until the server resolves. Default-true-on-unknown would flicker
+  // a compact composer for a frame; default-false-on-unknown shows the
+  // first-run state briefly and settles. Pick first-run; it's the louder
+  // surface and errs on the side of discoverability.
+  const [hasEverCaptured, setHasEverCaptured] = useState<boolean>(false);
   const surfacedRef = useRef(false);
 
-  // ── Fetch brief + insights ──────────────────────────────────────────────
+  // Null when the capture feature flag is off — composer hides entirely.
+  const captureCtx = useOptionalCapture();
+
+  // ── Fetch brief + insights + capture state ──────────────────────────────
 
   useEffect(() => {
     let active = true;
@@ -33,6 +44,15 @@ export function TodaysBriefWidget() {
       .catch(() => { if (active) setData({ brief: null, insights: [], workspaceId: null }); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!captureCtx) return;
+    let active = true;
+    void getHasEverCaptured()
+      .then((v) => { if (active) setHasEverCaptured(v); })
+      .catch(() => { /* keep default false → first-run state */ });
+    return () => { active = false; };
+  }, [captureCtx]);
 
   // ── Mark insights as surfaced (once) ────────────────────────────────────
 
@@ -66,7 +86,10 @@ export function TodaysBriefWidget() {
   const insights = (data?.insights ?? []).filter((i) => !dismissedIds.has(i.id));
   const hasBrief = brief && brief.body !== '';
   const hasInsights = insights.length > 0;
-  const empty = !hasBrief && !hasInsights;
+  // The composer row makes the card never truly empty when the capture
+  // flag is on. Only fall back to the empty message when there's no
+  // composer AND no brief AND no insights.
+  const empty = !hasBrief && !hasInsights && !captureCtx;
 
   return (
     <WidgetShell
@@ -78,6 +101,11 @@ export function TodaysBriefWidget() {
       freshness={brief?.generatedAt}
     >
       <div className="flex flex-col gap-3">
+        {/* Capture composer — first-run explanatory or compact depending on
+            whether the user has ever captured. Renders null when the flag
+            is off (no CaptureProvider mounted). */}
+        <CaptureComposer hasEverCaptured={hasEverCaptured} />
+
         {/* Brief paragraph */}
         {hasBrief && (
           <p className="text-sm text-[var(--stage-text-primary)] leading-relaxed">

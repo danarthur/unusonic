@@ -51,8 +51,6 @@ export interface LobbyOverviewViewProps {
   onDelete: (id: string) => Promise<void>;
   pins: LobbyPin[];
   pinEnabled: boolean;
-  captureEnabled: boolean;
-  workspaceId: string | null;
 }
 
 export function LobbyOverviewView(props: LobbyOverviewViewProps) {
@@ -74,8 +72,6 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
     onDelete,
     pins,
     pinEnabled,
-    captureEnabled,
-    workspaceId,
   } = props;
   const showPinsAbove = pinEnabled && pins.length > 0;
   const isCustom = activeLayout.kind === 'custom';
@@ -112,8 +108,6 @@ export function LobbyOverviewView(props: LobbyOverviewViewProps) {
           activeLayout={activeLayout}
           layouts={layouts}
           alerts={alerts}
-          captureEnabled={captureEnabled}
-          workspaceId={workspaceId}
           onActivate={onActivate}
           onDuplicatePreset={onDuplicatePreset}
           onDuplicateActive={onDuplicateActive}

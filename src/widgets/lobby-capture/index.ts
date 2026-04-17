@@ -1,2 +1,6 @@
-export { CaptureButton } from './ui/CaptureButton';
-export type { CaptureButtonProps } from './ui/CaptureButton';
+export {
+  CaptureProvider,
+  useCapture,
+  useOptionalCapture,
+} from './ui/CaptureProvider';
+export type { CaptureProviderProps } from './ui/CaptureProvider';
