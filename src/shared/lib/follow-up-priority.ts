@@ -9,6 +9,8 @@ export type FollowUpScoreInput = {
     proposedDate: string | null;
     budgetEstimated: number | null;
     ownerUserId: string | null;
+    /** Workspace-owned stall threshold on the deal's current stage. Phase 2c. */
+    stageRottingDays?: number | null;
   };
   proposal: {
     createdAt: string | null;
@@ -107,6 +109,7 @@ function buildStallInput(input: FollowUpScoreInput): Parameters<typeof computeSt
     proposedDate: deal.proposedDate,
     currentStage: STALL_STAGE_META[deal.status as StallableStatus]?.stageOrdinal ?? 0,
     thresholdOverrides,
+    stageRottingDaysOverride: deal.stageRottingDays ?? null,
   };
 }
 

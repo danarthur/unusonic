@@ -55,6 +55,10 @@ function urgentThreshold(base: number, slug: StallableStatus): number {
 /**
  * Computes whether a deal is stalling in its current pipeline stage.
  * Accepts scalar params (for server-side cron use).
+ *
+ * Phase 2c: `stageRottingDaysOverride` — when present (e.g. from the workspace's
+ * ops.pipeline_stages.rotting_days column), it replaces the hardcoded
+ * STALL_STAGE_META threshold. Same urgent-halving + floor rules apply.
  */
 export function computeStallSignalFromRaw(params: {
   status: string;
@@ -64,8 +68,9 @@ export function computeStallSignalFromRaw(params: {
   proposedDate: string | null;
   currentStage: number;
   thresholdOverrides?: ThresholdOverrides;
+  stageRottingDaysOverride?: number | null;
 }): StallSignal | null {
-  const { proposedDate, currentStage, thresholdOverrides } = params;
+  const { proposedDate, currentStage, thresholdOverrides, stageRottingDaysOverride } = params;
 
   const slug = STALL_STAGE_BY_ORDINAL[currentStage];
   if (!slug) return null;
@@ -76,7 +81,11 @@ export function computeStallSignalFromRaw(params: {
   const daysUntilEvent = eventDate ? Math.ceil((eventDate - now) / 86400000) : null;
   const urgent = daysUntilEvent !== null && daysUntilEvent <= 60;
 
-  const base = thresholdOverrides?.[slug] ?? meta.rottingDays;
+  // Resolution order: playbook threshold override → workspace stage.rotting_days → hardcoded default.
+  const base =
+    thresholdOverrides?.[slug]
+    ?? (stageRottingDaysOverride != null ? stageRottingDaysOverride : null)
+    ?? meta.rottingDays;
   const threshold = urgent ? urgentThreshold(base, slug) : base;
 
   const stageStartMs = pickStageStartMs(slug, params);

@@ -11,6 +11,7 @@ import { evaluateQuoteExpiring } from './evaluators/quote-expiring';
 import { evaluateHotLeadMultiView } from './evaluators/hot-lead-multi-view';
 import { evaluateDepositGap } from './evaluators/deposit-gap';
 import { evaluateGoneQuietWithValue } from './evaluators/gone-quiet-with-value';
+import { OPEN_DEAL_STATUSES } from '@/shared/lib/pipeline-stages/constants';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -374,19 +375,20 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
 
   const { data: deals } = await system
     .from('deals')
-    .select('id, title, status, updated_at, proposed_date, organization_id')
+    .select('id, title, status, stage_id, updated_at, proposed_date, organization_id')
     .eq('workspace_id', workspaceId)
-    .in('status', ['inquiry', 'proposal', 'contract_sent'])
+    .in('status', [...OPEN_DEAL_STATUSES])
     .is('archived_at', null);
 
   if (!deals?.length) return [];
 
   const dealIds = (deals as any[]).map((d: any) => d.id);
+  const stageIds = [...new Set((deals as any[]).map((d: any) => d.stage_id).filter(Boolean))];
 
-  // Batch-fetch client org names + recent activity in parallel
+  // Batch-fetch client org names + recent activity + stage labels in parallel
   const orgIds = [...new Set((deals as any[]).map((d: any) => d.organization_id).filter(Boolean))];
 
-  const [orgResult, notesResult, logsResult] = await Promise.all([
+  const [orgResult, notesResult, logsResult, stageResult] = await Promise.all([
     orgIds.length > 0
       ? system.schema('directory').from('entities').select('id, name').in('id', orgIds)
       : Promise.resolve({ data: [] as any[] }),
@@ -400,10 +402,18 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
       .select('deal_id')
       .in('deal_id', dealIds)
       .gte('created_at', fourteenDaysAgo),
+    // Phase 2c: batch-fetch stage labels so copy is rename-safe
+    stageIds.length > 0
+      ? (system as any).schema('ops').from('pipeline_stages').select('id, label').in('id', stageIds)
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
   const orgNames: Record<string, string> = Object.fromEntries(
     (orgResult.data ?? []).map((o: any) => [o.id, o.name]),
+  );
+
+  const stageLabels: Record<string, string> = Object.fromEntries(
+    ((stageResult.data ?? []) as Array<{ id: string; label: string }>).map((s) => [s.id, s.label]),
   );
 
   // Build sets of deal IDs with recent activity
@@ -440,7 +450,15 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
           ? 'medium'
           : 'low';
 
-    const stageLabel = deal.status === 'inquiry' ? 'inquiry' : deal.status === 'proposal' ? 'proposal' : 'contract sent';
+    // Phase 2c: preserve the grammatically-clean hardcoded copy for seeded
+    // slugs; fall back to the workspace stage label for custom slugs (future).
+    const stageLabel =
+      deal.status === 'inquiry' ? 'inquiry' :
+      deal.status === 'proposal' ? 'proposal' :
+      deal.status === 'contract_sent' ? 'contract sent' :
+      (deal.stage_id && stageLabels[deal.stage_id])
+        ? stageLabels[deal.stage_id].toLowerCase()
+        : 'deal';
 
     insights.push({
       triggerType: 'deal_stale',

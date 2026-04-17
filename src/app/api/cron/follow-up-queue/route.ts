@@ -132,12 +132,30 @@ export async function GET(req: Request) {
     // 1. Fetch all open deals
     const { data: deals, error: dealsErr } = await supabase
       .from('deals')
-      .select('id, workspace_id, status, created_at, proposed_date, budget_estimated, title, organization_id, owner_user_id, event_archetype')
+      .select('id, workspace_id, status, stage_id, created_at, proposed_date, budget_estimated, title, organization_id, owner_user_id, event_archetype')
       .in('status', [...OPEN_DEAL_STATUSES])
       .is('archived_at', null);
 
     if (dealsErr || !deals?.length) {
       return NextResponse.json({ queued: 0, removed: 0, skipped: 0, note: 'No open deals' });
+    }
+
+    // 1b. Fetch per-stage rotting_days for every stage the current deal set
+    //     references. Phase 2c: lets workspaces tune stall thresholds via their
+    //     own ops.pipeline_stages.rotting_days column. Falls back to the
+    //     hardcoded STALL_STAGE_META values (via follow-up-priority) when a
+    //     stage or its rotting_days is missing.
+    const stageIds = [...new Set(deals.map((d) => (d as { stage_id: string | null }).stage_id).filter(Boolean) as string[])];
+    const stageRottingMap = new Map<string, number | null>();
+    if (stageIds.length > 0) {
+      const { data: stageRows } = await (supabase as any)
+        .schema('ops')
+        .from('pipeline_stages')
+        .select('id, rotting_days')
+        .in('id', stageIds);
+      for (const row of (stageRows ?? []) as Array<{ id: string; rotting_days: number | null }>) {
+        stageRottingMap.set(row.id, row.rotting_days);
+      }
     }
 
     // Track workspace IDs for Phase 2 insight evaluation (separate try block).
@@ -323,6 +341,9 @@ export async function GET(req: Request) {
         hasContestedDate = !!(dealsOnDate && dealsOnDate.size > 1);
       }
 
+      const dealStageId = (deal as { stage_id: string | null }).stage_id;
+      const stageRottingDays = dealStageId ? (stageRottingMap.get(dealStageId) ?? null) : null;
+
       const scoreResult = computeFollowUpPriority({
         deal: {
           status: deal.status,
@@ -330,6 +351,7 @@ export async function GET(req: Request) {
           proposedDate: deal.proposed_date,
           budgetEstimated: (deal as any).budget_estimated as number | null,
           ownerUserId: (deal as any).owner_user_id as string | null,
+          stageRottingDays,
         },
         proposal: proposal
           ? {

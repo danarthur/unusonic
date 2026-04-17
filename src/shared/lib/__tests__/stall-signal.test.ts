@@ -177,6 +177,50 @@ describe('computeStallSignalFromRaw', () => {
     });
   });
 
+  describe('stageRottingDaysOverride (Phase 2c workspace-owned threshold)', () => {
+    it('uses stage override when provided and no playbook override is set', () => {
+      const signal = computeStallSignalFromRaw({
+        status: 'inquiry',
+        createdAt: daysAgo(5),
+        proposalCreatedAt: null,
+        proposalUpdatedAt: null,
+        proposedDate: null,
+        currentStage: 0,
+        stageRottingDaysOverride: 3,
+      });
+      expect(signal?.threshold).toBe(3);
+      expect(signal?.stalled).toBe(true);
+    });
+
+    it('playbook override beats stage override', () => {
+      const signal = computeStallSignalFromRaw({
+        status: 'inquiry',
+        createdAt: daysAgo(10),
+        proposalCreatedAt: null,
+        proposalUpdatedAt: null,
+        proposedDate: null,
+        currentStage: 0,
+        thresholdOverrides: { inquiry: 20 },
+        stageRottingDaysOverride: 3,
+      });
+      expect(signal?.threshold).toBe(20);
+      expect(signal?.stalled).toBe(false);
+    });
+
+    it('falls back to hardcoded default when override is null', () => {
+      const signal = computeStallSignalFromRaw({
+        status: 'inquiry',
+        createdAt: daysAgo(3),
+        proposalCreatedAt: null,
+        proposalUpdatedAt: null,
+        proposedDate: null,
+        currentStage: 0,
+        stageRottingDaysOverride: null,
+      });
+      expect(signal?.threshold).toBe(7);
+    });
+  });
+
   describe('thresholdOverrides', () => {
     it('applies inquiry override', () => {
       const signal = computeStallSignalFromRaw({
