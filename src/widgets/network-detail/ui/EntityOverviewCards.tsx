@@ -26,6 +26,7 @@ import { CaptureTimelinePanel } from './CaptureTimelinePanel';
 import { WorkingNotesCard } from './WorkingNotesCard';
 import { TeamCard } from './TeamCard';
 import { PersonProductionsPanel } from './PersonProductionsPanel';
+import { PersonStatsCard } from './PersonStatsCard';
 import { ReferralsCard } from './ReferralsCard';
 import { PromotedMetricsRow } from './PromotedMetricsRow';
 import { VenueSpecsCompactCard } from './VenueSpecsCompactCard';
@@ -74,6 +75,13 @@ export function EntityOverviewCards({
           entityId={entityId}
           entityType={entityType}
         />
+      )}
+      {/* Stats card sits between the thin promoted row and the AI brief so
+          the verdict + tiles earn prime real estate without displacing the
+          narrative summary below. Person/couple only in Phase 1 — see
+          docs/reference/person-stats-card-design.md §10. */}
+      {(entityType === 'person' || entityType === 'couple') && (
+        <PersonStatsCard workspaceId={workspaceId} entityId={entityId} />
       )}
       <EntitySummaryCard
         workspaceId={workspaceId}

@@ -13,6 +13,7 @@
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
+import { getPersonRelationshipStats } from './get-person-relationship-stats';
 
 export type PersonMetrics = {
   kind: 'person';
@@ -80,44 +81,21 @@ export async function getPromotedMetrics(
 // ── Person ───────────────────────────────────────────────────────────────────
 
 async function getPersonMetrics(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  _supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
   entityId: string,
 ): Promise<GetPromotedMetricsResult> {
-  // Shows: count of ops.deal_crew rows for this person (each represents a
-  // show assignment). Best proxy for "shows worked together" without schema
-  // changes. Only count non-declined.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: crewCount, error: crewErr } = await (supabase as any)
-    .schema('ops')
-    .from('deal_crew')
-    .select('id', { count: 'exact', head: true })
-    .eq('workspace_id', workspaceId)
-    .eq('entity_id', entityId)
-    .not('status', 'eq', 'declined');
-
-  if (crewErr) return { ok: false, error: (crewErr as { message: string }).message };
-
-  // Last contact: most recent capture about the person.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lastCapture } = await (supabase as any)
-    .schema('cortex')
-    .from('capture_events')
-    .select('created_at')
-    .eq('workspace_id', workspaceId)
-    .eq('resolved_entity_id', entityId)
-    .eq('status', 'confirmed')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
+  // Delegates to the shared fetcher so this row can never silently drift from
+  // the Person Stats card or the dormant_client evaluator.
+  // docs/reference/person-stats-card-design.md §5.1, §7.
+  const result = await getPersonRelationshipStats(workspaceId, entityId);
+  if (!result.ok) return { ok: false, error: result.error };
   return {
     ok: true,
     metrics: {
       kind: 'person',
-      showCount: (crewCount as number | null) ?? 0,
-      lastContactAt:
-        (lastCapture as { created_at: string } | null)?.created_at ?? null,
+      showCount: result.stats.showsCountAllTime,
+      lastContactAt: result.stats.lastContactAt,
     },
   };
 }
