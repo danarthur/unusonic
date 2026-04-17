@@ -7,6 +7,15 @@ const configSchema = z.object({
 
 type Config = z.infer<typeof configSchema>;
 
+/**
+ * Idempotency (see TriggerPrimitive.run): satisfied by delegating to
+ * `finance.spawn_invoices_from_proposal`, which is itself idempotent
+ * (see CLAUDE.md: "idempotent invoice generation from accepted proposal").
+ * A second call with the same proposal returns the already-spawned invoice
+ * IDs rather than creating duplicates. The send-email step must additionally
+ * dedup on (invoice_id, 'initial_send') against the finance send log before
+ * re-sending. The stub has no side-effect so is trivially idempotent today.
+ */
 export const sendDepositInvoicePrimitive: TriggerPrimitive<Config> = {
   type: 'send_deposit_invoice',
   tier: 'outbound',

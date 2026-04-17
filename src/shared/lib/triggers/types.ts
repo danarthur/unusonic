@@ -60,6 +60,30 @@ export interface TriggerPrimitive<Config> {
   label: string;
   description: string;
   configSchema: z.ZodType<Config>;
+  /**
+   * Execute the primitive's side-effect.
+   *
+   * **Idempotency is required.** The Phase 3c dispatcher delivers
+   * at-least-once: `ops.claim_pending_transitions` uses `FOR UPDATE SKIP
+   * LOCKED`, but the row lock releases at claim-RPC commit — well before
+   * `mark_transition_dispatched` stamps the row. A crashed or overlapping
+   * cron tick can re-claim the same transition and call `run` again with
+   * the same `ctx.transitionId`. Implementations MUST short-circuit on
+   * work that has already been applied. Acceptable strategies:
+   *
+   *   1. Check the target artifact's existence before creating it
+   *      (e.g. "does this deal already have an `ops.events` row?",
+   *       "does this proposal already have a deposit invoice?").
+   *   2. Dedup on `(ctx.dealId, primitive.type, ctx.transitionId)` against
+   *      `ops.deal_activity_log` or a per-primitive dedup key before
+   *      emitting the side-effect.
+   *   3. Delegate to a downstream RPC that is itself idempotent
+   *      (e.g. `finance.spawn_invoices_from_proposal`).
+   *
+   * Returning `ok: true` from a second invocation that found the work
+   * already done is correct — the activity log will record one
+   * "applied" and one "no-op" entry, not duplicate side-effects.
+   */
   run: (config: Config, ctx: TriggerContext) => Promise<TriggerResult>;
   undo?: (undoToken: string, ctx: TriggerContext) => Promise<TriggerResult>;
 }

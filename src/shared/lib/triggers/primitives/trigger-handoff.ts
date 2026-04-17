@@ -5,6 +5,15 @@ const configSchema = z.object({});
 
 type Config = z.infer<typeof configSchema>;
 
+/**
+ * Idempotency (see TriggerPrimitive.run): the dispatcher is at-least-once, so
+ * this primitive MUST check whether the deal has already been handed off
+ * before opening/surfacing the wizard. Real implementation will query
+ * `ops.events` for a row with `deal_id = ctx.dealId` (handoverDeal writes
+ * this linkage in src/app/(dashboard)/(features)/crm/actions/handover-deal.ts)
+ * and short-circuit with ok:true if one exists. The stub has no side-effect
+ * so is trivially idempotent today.
+ */
 export const triggerHandoffPrimitive: TriggerPrimitive<Config> = {
   type: 'trigger_handoff',
   tier: 'outbound',

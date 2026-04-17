@@ -8,6 +8,15 @@ const configSchema = z.object({
 
 type Config = z.infer<typeof configSchema>;
 
+/**
+ * Idempotency (see TriggerPrimitive.run): satisfied by construction — an
+ * UPDATE that writes the same value a second time is a no-op at the row
+ * level. The real implementation should still guard against overwriting a
+ * user's subsequent edit (e.g. don't clobber a manually-set won_at with a
+ * now() stamped by a re-claimed transition): use `UPDATE ... WHERE field
+ * IS DISTINCT FROM :value` or check-before-write against ctx.transitionId
+ * ordering. The stub has no side-effect so is trivially idempotent today.
+ */
 export const updateDealFieldPrimitive: TriggerPrimitive<Config> = {
   type: 'update_deal_field',
   tier: 'internal',

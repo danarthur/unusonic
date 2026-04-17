@@ -8,6 +8,15 @@ const configSchema = z.object({
 
 type Config = z.infer<typeof configSchema>;
 
+/**
+ * Idempotency (see TriggerPrimitive.run): the dispatcher is at-least-once,
+ * so the real implementation MUST dedup on
+ * (ctx.dealId, 'create_task', ctx.transitionId) before inserting — either
+ * via a unique index on the dedup tuple (preferred) or by looking up an
+ * existing task row tagged with ctx.transitionId and returning ok:true
+ * without creating a duplicate. The stub has no side-effect so is
+ * trivially idempotent today.
+ */
 export const createTaskPrimitive: TriggerPrimitive<Config> = {
   type: 'create_task',
   tier: 'internal',

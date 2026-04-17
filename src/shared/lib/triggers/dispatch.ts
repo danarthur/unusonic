@@ -11,14 +11,20 @@
  *     has already committed by the time this module runs, this is structurally
  *     guaranteed. The module further guards against in-loop throws so a single
  *     misbehaving primitive can't wedge the batch.
- *   • Exactly-once via two guards, not just the row-lock: (1) `FOR UPDATE SKIP
- *     LOCKED` in `claim_pending_transitions` disjoints concurrent claim
- *     batches within a single RPC call; (2) `mark_transition_dispatched` /
- *     `mark_transition_failed` both re-check `triggers_dispatched_at IS NULL
- *     AND triggers_failed_at IS NULL` and raise if a row was already stamped.
- *     The mark guard is the structural backstop if a row is somehow re-claimed
- *     after the claim transaction commits — the row lock is released at that
- *     point. Re-invocation on a failed batch just re-claims.
+ *   • At-least-once delivery. `FOR UPDATE SKIP LOCKED` in
+ *     `claim_pending_transitions` disjoints concurrent claim RPC calls that
+ *     are in flight at the same instant, but the row lock releases when
+ *     the claim RPC commits — well before this dispatcher has finished
+ *     running primitives and called `mark_transition_dispatched`. If a
+ *     cron tick crashes mid-batch, or two ticks overlap and the first is
+ *     slow enough that its lock has already dropped, a later tick CAN
+ *     re-claim the same transition and re-invoke its primitives. The
+ *     `triggers_dispatched_at IS NULL AND triggers_failed_at IS NULL`
+ *     guard on `mark_transition_dispatched` / `mark_transition_failed`
+ *     only prevents double-stamping the bookkeeping row — it does NOT
+ *     prevent primitive side-effects from running twice. Every primitive
+ *     MUST therefore be idempotent (see `./types.ts` on
+ *     `TriggerPrimitive.run` for the contract).
  *   • Dedup (§7.5): 5s bounce window. Computed by the claim RPC; the
  *     dispatcher consumes the row + emits a 'pending' activity entry.
  *

@@ -102,13 +102,19 @@ COMMENT ON FUNCTION public.record_deal_transition() IS
 --    TS dispatcher consumes the row (stamps dispatched) without running
 --    primitives + writes a 'pending' activity log entry for visibility.
 --
---    FOR UPDATE SKIP LOCKED prevents two concurrent claim calls from
---    returning the same row. The row lock is released at this RPC's
---    transaction commit — it is NOT held across the dispatcher's primitive
---    loop. The structural backstop against double-processing is the
+--    FOR UPDATE SKIP LOCKED prevents two concurrent claim calls that are
+--    in flight at the same instant from returning the same row. The row
+--    lock releases at this RPC's transaction commit — well before the TS
+--    dispatcher has invoked primitives and called mark_transition_*.
+--    If a cron tick crashes mid-batch, or two ticks overlap and the first
+--    is slow enough that its lock has already dropped, a later tick CAN
+--    re-claim the same row and re-run its primitives. Delivery is
+--    therefore at-least-once, not exactly-once. Primitives MUST be
+--    idempotent (see src/shared/lib/triggers/types.ts). The
 --    mark_transition_* helpers' WHERE triggers_dispatched_at IS NULL AND
---    triggers_failed_at IS NULL guard, which raises if the row was already
---    stamped by an earlier tick.
+--    triggers_failed_at IS NULL guard only prevents double-stamping the
+--    bookkeeping row; it does NOT prevent primitive side-effects from
+--    running twice.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION ops.claim_pending_transitions(
@@ -178,7 +184,7 @@ REVOKE EXECUTE ON FUNCTION ops.claim_pending_transitions(integer) FROM authentic
 GRANT EXECUTE ON FUNCTION ops.claim_pending_transitions(integer) TO service_role;
 
 COMMENT ON FUNCTION ops.claim_pending_transitions(integer) IS
-  'Phase 3c: claim pending deal_transitions rows for the trigger dispatcher. FOR UPDATE SKIP LOCKED prevents concurrent cron ticks from double-processing. Filters to workspaces with feature_flags[pipelines.triggers_enabled]=true. Returns each row with its target stage''s triggers JSONB inline + a dedup_skip flag (§7.5: 5s bounce window). Service-role only.';
+  'Phase 3c: claim pending deal_transitions rows for the trigger dispatcher. FOR UPDATE SKIP LOCKED disjoints concurrent claim RPC calls that are in flight simultaneously, but the row lock releases at this RPC''s commit — well before the dispatcher runs primitives. Delivery to primitives is at-least-once, so every primitive must be idempotent. Filters to workspaces with feature_flags[pipelines.triggers_enabled]=true. Returns each row with its target stage''s triggers JSONB inline + a dedup_skip flag (§7.5: 5s bounce window). Service-role only.';
 
 
 -- =============================================================================
