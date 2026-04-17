@@ -76,7 +76,13 @@ export async function createPipelineStage(input: CreateStageInput): Promise<Stag
     p_hide_from_portal: input.hide_from_portal ?? false,
   } as never);
 
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    // 23505: unique_violation on (pipeline_id, slug). Surface a friendly msg.
+    if (error.code === '23505') {
+      return { success: false, error: 'A stage with that name already exists in this pipeline.' };
+    }
+    return { success: false, error: error.message };
+  }
 
   revalidatePath('/settings/pipeline');
   revalidatePath('/crm');

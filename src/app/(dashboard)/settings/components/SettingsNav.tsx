@@ -16,6 +16,7 @@ import {
   Tags,
   Paintbrush,
   Fingerprint,
+  Workflow,
 } from 'lucide-react';
 
 type NavItem = { href: string; label: string; icon: typeof Settings };
@@ -40,6 +41,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Production',
     items: [
+      { href: '/settings/pipeline', label: 'Deal flow', icon: Workflow },
       { href: '/settings/call-times', label: 'Call times', icon: Clock },
       { href: '/settings/lead-sources', label: 'Lead sources', icon: Signpost },
       { href: '/settings/network-tags', label: 'Tags', icon: Tags },
