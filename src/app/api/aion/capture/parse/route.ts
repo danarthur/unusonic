@@ -31,8 +31,8 @@ export const maxDuration = 30;
 const CaptureParseSchema = z.object({
   entity: z
     .object({
-      type: z.enum(['person', 'company', 'ambiguous']),
-      name: z.string().describe('The person or company name as spoken in the transcript'),
+      type: z.enum(['person', 'company', 'venue', 'ambiguous']),
+      name: z.string().describe('The person, company, or venue name as spoken in the transcript'),
       matched_entity_id: z
         .string()
         .nullable()
@@ -42,11 +42,11 @@ const CaptureParseSchema = z.object({
       new_entity_proposal: z
         .object({
           name: z.string(),
-          type: z.enum(['person', 'company']),
+          type: z.enum(['person', 'company', 'venue']),
           role_hint: z
             .string()
             .nullable()
-            .describe('Any role/title mentioned (e.g. "GM", "event planner"). Null if none.'),
+            .describe('Any role/title mentioned (e.g. "GM", "event planner"). Null if none or if venue.'),
           organization_hint: z
             .string()
             .nullable()
@@ -253,12 +253,28 @@ function buildSystemPrompt(
     'Recent open deals (use to disambiguate):',
     dealLines || '(none)',
     '',
+    'Entity types:',
+    '- person: an individual human. Examples: "Alexa Infranca", "Matthew Arthur".',
+    '- company: an organization, agency, or business. Examples: "Pure Lavish',
+    '  Events", "Brandi Jane Events".',
+    '- venue: a place, building, or address. Examples: "Swanner House", "Pasea",',
+    '  "Waterfront Hilton", "17 Montage Way". Any physical location where an',
+    '  event happens.',
+    '',
+    'Picking the primary subject when multiple entities are mentioned:',
+    '- "Met Alexa at Pasea" → primary is Alexa (person). Pasea goes in the',
+    '  note as context.',
+    '- "Pasea needs new lighting" → primary is Pasea (venue). The note is the',
+    '  rest.',
+    '- "Booking Swanner House for June" → primary is Swanner House (venue).',
+    '- "Called Jim, he\'s booking Swanner House" → primary is Jim (person).',
+    '',
     'Matching rules — BE AGGRESSIVE ABOUT MATCHING. Proposing a new ghost when',
-    'the person already exists creates a duplicate and is the worst failure mode:',
+    'the entity already exists creates a duplicate and is the worst failure mode:',
     '- If a first name OR last name in the transcript uniquely identifies ONE',
     '  entity in the list, MATCH IT. "Alexa" → Alexa Infranca when she\'s the',
-    '  only Alexa; "Henderson" → Henderson Wedding when that\'s the only',
-    '  Henderson. Set matched_entity_id to her id.',
+    '  only Alexa; "Swanner" → Swanner House when that\'s the only Swanner.',
+    '  Set matched_entity_id to the matched id.',
     '- When the transcript adds organization context ("Alexa from Pure Lavish"),',
     '  use the `at X` affiliation notes in the entity list to CONFIRM a match.',
     '  Don\'t require perfect organization-name matches — "Pure Lavish" matches',
@@ -269,7 +285,8 @@ function buildSystemPrompt(
     '- If 2+ entities plausibly match, populate match_candidates with each',
     '  (entity_id, name, confidence) and leave matched_entity_id null so the',
     '  user can pick.',
-    '- If the transcript names no person or company at all, set entity to null.',
+    '- If the transcript names no person, company, or venue at all, set',
+    '  entity to null.',
     '',
     'Confidence:',
     '- ≥0.85: clear entity match, clear intent, no ambiguity.',
@@ -287,16 +304,54 @@ function buildSystemPrompt(
 // ── Server-side fuzzy fallback ──────────────────────────────────────────────
 
 /**
+ * Token-based scoring against a stored display_name. Replaces the earlier
+ * ILIKE substring match which over-matched short fragments — e.g. "Ed"
+ * would substring-match "Frederic" (false positive). Token scoring splits
+ * the stored name on whitespace and checks each token independently:
+ *
+ *   - exact full-string match              → 1.0
+ *   - candidate token equals entity token  → adds 1.0 per token
+ *   - entity token STARTS WITH cand token  → adds 0.7 per token
+ *
+ * Final score is the sum divided by candidate-token count, so "Jim" vs
+ * "Jim Henderson" = 1.0 (single-token exact), "Al" vs "Alex Barnhart" =
+ * 0.7 (prefix only), "Ed" vs "Frederic Pascal" = 0 (no token starts with Ed).
+ *
+ * A score of 0.5 is the inclusion threshold for surfacing as a candidate.
+ */
+function fuzzyScore(candidate: string, displayName: string): number {
+  const c = candidate.toLowerCase().trim();
+  const d = displayName.toLowerCase().trim();
+  if (!c || !d) return 0;
+  if (c === d) return 1.0;
+
+  const cTokens = c.split(/\s+/).filter(Boolean);
+  const dTokens = d.split(/\s+/).filter(Boolean);
+  if (cTokens.length === 0) return 0;
+
+  let weight = 0;
+  for (const ct of cTokens) {
+    if (dTokens.some((dt) => dt === ct)) {
+      weight += 1;
+    } else if (dTokens.some((dt) => dt.startsWith(ct) && ct.length >= 2)) {
+      weight += 0.7;
+    }
+  }
+  return Math.min(0.95, weight / cTokens.length);
+}
+
+/**
  * After the LLM returns, if no entity was matched but a name was extracted,
- * run an ILIKE substring query against the workspace's entities as a safety
- * net. Handles the case where the LLM is too conservative about first-name-
- * only matches ("Alexa" → "Alexa Infranca").
+ * run a server-side token scoring pass against workspace entities. Handles:
+ *   - LLM too conservative about first-name-only matches (Alexa → Alexa Infranca)
+ *   - Entities miscategorized in the directory (e.g. a person stored as
+ *     `type='company'`) — we don't filter by type, so the match still lands
  *
  * Strategy:
- * - If exactly 1 match → override matched_entity_id, clear new_entity_proposal
- * - If 2+ matches     → populate match_candidates so the review card can
- *                       show them and let the user pick
- * - If 0 matches      → leave the LLM's proposal in place (truly a new ghost)
+ *   - If exactly 1 match with score ≥ 0.8 → promote to matched_entity_id
+ *   - If 2+ matches ≥ 0.5                 → populate match_candidates,
+ *                                            user picks in review card
+ *   - Otherwise                           → leave LLM's proposal in place
  */
 async function augmentWithFuzzyMatches(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -333,62 +388,66 @@ async function augmentWithFuzzyMatches(
     return parsed;
   }
 
-  // Path 2: LLM did NOT match. Fall back to server-side ILIKE on the name
-  // the LLM extracted. Covers the conservative-match failure mode.
+  // Path 2: LLM did NOT match. Fall back to token-based scoring. No type
+  // filter — a miscategorized entity (e.g. "Ashley" stored as `company`
+  // when she's a person) should still match so the review card can surface
+  // her rather than create a duplicate.
   const candidate =
     entity.new_entity_proposal?.name?.trim() ??
     entity.name?.trim() ??
     '';
   if (candidate.length < 2) return parsed;
 
-  const type = entity.type === 'person' || entity.type === 'company'
-    ? entity.type
-    : null;
-
-  let query = supabase
+  const { data } = await supabase
     .schema('directory')
     .from('entities')
     .select('id, display_name, type')
     .eq('owner_workspace_id', workspaceId)
-    .ilike('display_name', `%${candidate.replace(/[%_]/g, (m) => `\\${m}`)}%`)
     .not('display_name', 'is', null)
-    .limit(5);
+    .order('updated_at', { ascending: false })
+    .limit(200);
 
-  if (type) query = query.eq('type', type);
+  type Row = { id: string; display_name: string | null; type: string | null };
+  const scored = ((data ?? []) as Row[])
+    .filter((r): r is { id: string; display_name: string; type: string | null } => Boolean(r.display_name))
+    .map((r) => ({ row: r, score: fuzzyScore(candidate, r.display_name) }))
+    .filter((x) => x.score >= 0.5)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
 
-  const { data } = await query;
-  const matches = ((data ?? []) as { id: string; display_name: string | null; type: string | null }[])
-    .filter((r): r is { id: string; display_name: string; type: string | null } => !!r.display_name);
-
-  if (matches.length === 0) {
+  if (scored.length === 0) {
     return parsed;
   }
 
-  if (matches.length === 1) {
-    // Unique match — promote over the LLM's proposal.
+  // Unique high-confidence match — promote directly.
+  if (scored.length === 1 && scored[0].score >= 0.8) {
     return {
       ...parsed,
       entity: {
         ...entity,
-        matched_entity_id: matches[0].id,
+        matched_entity_id: scored[0].row.id,
         new_entity_proposal: null,
         match_candidates: [
-          { entity_id: matches[0].id, name: matches[0].display_name, confidence: 0.9 },
+          {
+            entity_id: scored[0].row.id,
+            name: scored[0].row.display_name,
+            confidence: scored[0].score,
+          },
         ],
       },
     };
   }
 
-  // 2+ matches — surface them for user pick.
+  // 2+ matches (or one low-confidence match) — surface them for user pick.
   return {
     ...parsed,
     entity: {
       ...entity,
       type: 'ambiguous',
-      match_candidates: matches.map((m) => ({
-        entity_id: m.id,
-        name: m.display_name,
-        confidence: 0.6,
+      match_candidates: scored.map((x) => ({
+        entity_id: x.row.id,
+        name: x.row.display_name,
+        confidence: x.score,
       })),
     },
   };

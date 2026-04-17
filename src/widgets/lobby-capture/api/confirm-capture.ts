@@ -38,7 +38,7 @@ export type ConfirmCaptureInput = {
     /** If set and no resolvedEntityId, user edited the ghost proposal name. */
     newEntityName?: string | null;
     /** If set and no resolvedEntityId, user chose the ghost proposal type. */
-    newEntityType?: 'person' | 'company' | null;
+    newEntityType?: 'person' | 'company' | 'venue' | null;
     /** Edited note text. Empty string clears. */
     note?: string | null;
     /** Edited follow-up text. Empty string clears. */
@@ -62,7 +62,7 @@ async function createGhostFromParse(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
   name: string,
-  type: 'person' | 'company',
+  type: 'person' | 'company' | 'venue',
   proposal: CaptureParseResult['entity'] extends infer E
     ? E extends { new_entity_proposal: infer P }
       ? P
@@ -83,7 +83,11 @@ async function createGhostFromParse(
     if (last) attributes.last_name = last;
   }
 
-  if (proposal?.role_hint) attributes.role_hint = proposal.role_hint;
+  // Venues and companies use display_name as-is — no first/last split,
+  // no role_hint (doesn't apply to locations or orgs).
+  if (type === 'person' && proposal?.role_hint) {
+    attributes.role_hint = proposal.role_hint;
+  }
   if (proposal?.organization_hint) attributes.organization_hint = proposal.organization_hint;
 
   const { data, error } = await supabase

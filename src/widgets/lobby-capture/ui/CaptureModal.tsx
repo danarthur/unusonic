@@ -285,7 +285,7 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
   async function handleConfirm(edits: {
     resolvedEntityId?: string | null;
     newEntityName?: string | null;
-    newEntityType?: 'person' | 'company' | null;
+    newEntityType?: 'person' | 'company' | 'venue' | null;
     note?: string | null;
     followUpText?: string | null;
   }) {
@@ -575,7 +575,7 @@ function ReviewStage({
   onConfirm: (edits: {
     resolvedEntityId?: string | null;
     newEntityName?: string | null;
-    newEntityType?: 'person' | 'company' | null;
+    newEntityType?: 'person' | 'company' | 'venue' | null;
     note?: string | null;
     followUpText?: string | null;
   }) => void;
@@ -586,12 +586,16 @@ function ReviewStage({
     parsedEntity?.new_entity_proposal?.name ??
     parsedEntity?.name ??
     '';
-  const initialType: 'person' | 'company' =
+  const initialType: 'person' | 'company' | 'venue' =
     parsedEntity?.new_entity_proposal?.type ??
-    (parsedEntity?.type === 'company' ? 'company' : 'person');
+    (parsedEntity?.type === 'company'
+      ? 'company'
+      : parsedEntity?.type === 'venue'
+        ? 'venue'
+        : 'person');
 
   const [entityName, setEntityName] = React.useState(initialName);
-  const [entityType, setEntityType] = React.useState<'person' | 'company'>(initialType);
+  const [entityType, setEntityType] = React.useState<'person' | 'company' | 'venue'>(initialType);
   const [note, setNote] = React.useState(parse.note ?? '');
   const [followUpText, setFollowUpText] = React.useState(parse.follow_up?.text ?? '');
   // User's explicit pick from the match-candidates picker. null = "it's new",
@@ -640,7 +644,7 @@ function ReviewStage({
                   onClick={() => setPickedCandidateId(null)}
                   className="ml-auto text-[11px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] underline-offset-2 hover:underline"
                 >
-                  Different person
+                  Not this one
                 </button>
               )}
             </div>
@@ -680,7 +684,7 @@ function ReviewStage({
                         'transition-colors',
                       )}
                     >
-                      New person
+                      New entity
                     </button>
                   </div>
                 </div>
@@ -699,7 +703,7 @@ function ReviewStage({
                 />
                 <select
                   value={entityType}
-                  onChange={(e) => setEntityType(e.target.value as 'person' | 'company')}
+                  onChange={(e) => setEntityType(e.target.value as 'person' | 'company' | 'venue')}
                   className={cn(
                     'text-xs px-2 py-1.5 rounded-md',
                     'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]',
@@ -708,6 +712,7 @@ function ReviewStage({
                 >
                   <option value="person">Person</option>
                   <option value="company">Company</option>
+                  <option value="venue">Venue</option>
                 </select>
               </div>
             </>
