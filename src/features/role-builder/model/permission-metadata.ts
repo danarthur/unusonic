@@ -45,6 +45,7 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   // Deals & Pipeline
   { key: 'deals:read:global', label: 'View deals', supportsScope: true, module: 'deals' },
   { key: 'deals:edit:global', label: 'Edit deals', supportsScope: false, module: 'deals' },
+  { key: 'pipelines:manage', label: 'Manage deal flow', description: 'Create and edit pipeline stages, triggers, and automations', supportsScope: false, module: 'deals' },
   // Proposals
   { key: 'proposals:view', label: 'View proposals', supportsScope: true, module: 'proposals_ros' },
   { key: 'proposals:send', label: 'Send to client', supportsScope: false, module: 'proposals_ros' },
