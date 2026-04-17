@@ -2312,6 +2312,65 @@ export type Database = {
           },
         ]
       }
+      deal_activity_log: {
+        Row: {
+          action_summary: string
+          actor_kind: string
+          actor_user_id: string | null
+          created_at: string
+          deal_id: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          pipeline_stage_id: string | null
+          status: string
+          trigger_type: string | null
+          undo_token: string | null
+          undone_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          action_summary: string
+          actor_kind: string
+          actor_user_id?: string | null
+          created_at?: string
+          deal_id: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_stage_id?: string | null
+          status: string
+          trigger_type?: string | null
+          undo_token?: string | null
+          undone_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          action_summary?: string
+          actor_kind?: string
+          actor_user_id?: string | null
+          created_at?: string
+          deal_id?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_stage_id?: string | null
+          status?: string
+          trigger_type?: string | null
+          undo_token?: string | null
+          undone_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_activity_log_pipeline_stage_id_fkey"
+            columns: ["pipeline_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_crew: {
         Row: {
           acknowledged_at: string | null
@@ -3566,6 +3625,25 @@ export type Database = {
       event_status_pair_valid: {
         Args: { p_lifecycle: string; p_status: string }
         Returns: boolean
+      }
+      log_deal_activity: {
+        Args: {
+          p_action_summary: string
+          p_actor_kind: string
+          p_actor_user_id?: string
+          p_deal_id: string
+          p_error_message?: string
+          p_metadata?: Json
+          p_pipeline_stage_id?: string
+          p_status: string
+          p_trigger_type?: string
+          p_undo_token?: string
+        }
+        Returns: string
+      }
+      mark_deal_activity_undone: {
+        Args: { p_activity_id: string }
+        Returns: undefined
       }
       metric_aion_refusal_rate: {
         Args: { p_days?: number; p_workspace_id: string }

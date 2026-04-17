@@ -37,6 +37,7 @@ import { FollowUpCard } from './follow-up-card';
 import { FollowUpActionLog } from './follow-up-action-log';
 import { getFollowUpForDeal, type FollowUpQueueItem } from '../actions/follow-up-actions';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
+import { getDealActivity, type DealActivityEntry } from '../actions/get-deal-activity';
 
 
 // Legacy fallback used while the workspace's pipeline is loading (first paint)
@@ -101,6 +102,21 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
     });
     return () => { cancelled = true; };
   }, []);
+
+  // Phase 3b: deal activity log (trigger side effects + manual notes).
+  // null = not yet fetched; [] = fetched, no entries.
+  const [activity, setActivity] = useState<DealActivityEntry[] | null>(null);
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setActivity(null);
+    getDealActivity(deal.id).then((entries) => {
+      if (!cancelled) setActivity(entries);
+    }).catch(() => {
+      if (!cancelled) setActivity([]);
+    });
+    return () => { cancelled = true; };
+  }, [deal.id]);
 
 
   // Scalar field local mirrors (for inline editing in DealHeaderStrip)
@@ -390,6 +406,22 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
           <PipelineTracker
             currentStage={currentStage}
             stages={trackerStages}
+          />
+        </StagePanel>
+      </motion.div>
+
+      {/* Position 2b: Activity log — Phase 3b infra. Phase 3c populates rows. */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={STAGE_MEDIUM}
+      >
+        <StagePanel elevated className="p-5">
+          <p className="stage-label mb-4">Activity</p>
+          <DealActivitySection
+            entries={activity}
+            expanded={activityExpanded}
+            onToggleExpanded={() => setActivityExpanded((v) => !v)}
           />
         </StagePanel>
       </motion.div>
@@ -874,5 +906,113 @@ function ProposalStatusPill({ status }: { status: string }) {
       />
       {style.label}
     </span>
+  );
+}
+
+// =============================================================================
+// DealActivitySection — Phase 3b deal activity log renderer.
+// Read-only: shows trigger side effects written by the Phase 3c dispatcher.
+// Collapses to 10 rows; "Show more" reveals the rest of the fetched slice.
+// =============================================================================
+
+const ACTIVITY_COLLAPSED_CAP = 10;
+
+function DealActivitySection({
+  entries,
+  expanded,
+  onToggleExpanded,
+}: {
+  entries: DealActivityEntry[] | null;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+}) {
+  if (entries === null) {
+    return (
+      <p
+        className="text-sm"
+        style={{ color: 'var(--stage-text-tertiary)' }}
+      >
+        Loading…
+      </p>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <p
+        className="text-sm"
+        style={{ color: 'var(--stage-text-tertiary)' }}
+      >
+        No activity yet
+      </p>
+    );
+  }
+
+  const visible = expanded ? entries : entries.slice(0, ACTIVITY_COLLAPSED_CAP);
+  const hiddenCount = entries.length - visible.length;
+
+  return (
+    <div className="flex flex-col" style={{ gap: 'var(--stage-gap, 6px)' }}>
+      {visible.map((entry) => (
+        <DealActivityRow key={entry.id} entry={entry} />
+      ))}
+      {(hiddenCount > 0 || (expanded && entries.length > ACTIVITY_COLLAPSED_CAP)) && (
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          className="self-start text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
+          style={{
+            color: 'var(--stage-text-tertiary)',
+            marginTop: 'var(--stage-gap, 6px)',
+          }}
+        >
+          {expanded ? 'Show less' : `Show ${hiddenCount} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DealActivityRow({ entry }: { entry: DealActivityEntry }) {
+  const isFailed = entry.status === 'failed';
+  const isUndone = entry.status === 'undone';
+  const isPending = entry.status === 'pending';
+  return (
+    <div className="flex items-baseline justify-between gap-3 min-w-0">
+      <div className="min-w-0 flex-1">
+        <p
+          className="text-sm tracking-tight leading-tight truncate"
+          style={{
+            color: 'var(--stage-text-primary)',
+            textDecoration: isUndone ? 'line-through' : undefined,
+            opacity: isUndone ? 0.7 : 1,
+          }}
+        >
+          {entry.actionSummary}
+          {isPending && (
+            <span
+              className="ml-2 text-xs"
+              style={{ color: 'var(--stage-text-tertiary)' }}
+            >
+              pending
+            </span>
+          )}
+        </p>
+        {isFailed && entry.errorMessage && (
+          <p
+            className="text-xs leading-tight mt-0.5 break-words"
+            style={{ color: 'var(--color-unusonic-error)' }}
+          >
+            {entry.errorMessage}
+          </p>
+        )}
+      </div>
+      <p
+        className="stage-label shrink-0 tabular-nums"
+        style={{ color: 'var(--stage-text-tertiary)' }}
+      >
+        {formatRelTime(entry.createdAt)}
+      </p>
+    </div>
   );
 }
