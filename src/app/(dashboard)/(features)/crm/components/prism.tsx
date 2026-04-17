@@ -11,7 +11,8 @@ import { getDealClientContext, type DealClientContext } from '../actions/get-dea
 import { getDealStakeholders } from '../actions/deal-stakeholders';
 import { getEventSummaryForPrism } from '../actions/get-event-summary';
 import { handoverDeal } from '../actions/handover-deal';
-import { updateDealStatus } from '../actions/update-deal-status';
+import { updateDealStatus, type DealStatus } from '../actions/update-deal-status';
+import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
 import { getEventLedger } from '@/features/finance/api/get-event-ledger';
 import { MarkAsLostModal } from './mark-as-lost-modal';
@@ -150,7 +151,22 @@ export function Prism({
   const [statusChanging, setStatusChanging] = useState(false);
   const [lostModalOpen, setLostModalOpen] = useState(false);
   const [pendingOverrideStatus, setPendingOverrideStatus] = useState<string | null>(null);
+  const [pipelineStages, setPipelineStages] = useState<WorkspacePipelineStage[] | null>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Phase 2b: fetch the workspace's pipeline stages once per session so the
+  // dropdown renders the workspace-owned stage labels/flags instead of a
+  // hardcoded constant. Fallback to the legacy hardcoded list while loading.
+  useEffect(() => {
+    let cancelled = false;
+    getWorkspacePipelineStages().then((result) => {
+      if (cancelled) return;
+      setPipelineStages(result?.stages ?? []);
+    }).catch(() => {
+      if (!cancelled) setPipelineStages([]);
+    });
+    return () => { cancelled = true; };
+  }, []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const crmDebug = searchParams.get('crm_debug') === '1';
@@ -276,11 +292,13 @@ export function Prism({
     return () => document.removeEventListener('mousedown', handler);
   }, [statusDropdownOpen]);
 
-  const handleStatusChange = async (status: 'inquiry' | 'proposal' | 'contract_sent') => {
+  const handleStatusChange = async (status: string) => {
     if (!deal) return;
     setStatusDropdownOpen(false);
     setStatusChanging(true);
-    const result = await updateDealStatus(deal.id, status);
+    // Cast is safe: Phase 2b stage slugs are still the legacy seven. Phase 2d
+    // stage CRUD will widen updateDealStatus's accepted set.
+    const result = await updateDealStatus(deal.id, status as DealStatus);
     setStatusChanging(false);
     if (result.success) {
       setDeal((prev) => prev ? { ...prev, status } : prev);
@@ -455,50 +473,75 @@ export function Prism({
                       boxShadow: 'inset 0 1px 0 0 var(--stage-edge-top), 0 16px 48px oklch(0 0 0 / 0.7)',
                     }}
                   >
-                    {([
-                      { value: 'inquiry', label: 'Inquiry' },
-                      { value: 'proposal', label: 'Proposal' },
-                      { value: 'contract_sent', label: 'Sent' },
-                    ] as const).map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => handleStatusChange(value)}
-                        className="w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors hover:bg-[var(--stage-accent-muted)] focus:outline-none"
-                      >
-                        <span className="flex-1 tracking-tight text-[var(--stage-text-primary)]">{label}</span>
-                        {deal.status === value && <Check size={11} className="shrink-0" style={{ color: 'var(--stage-text-primary)' }} />}
-                      </button>
-                    ))}
-                    <div className="mx-3 border-t border-[oklch(1_0_0_/_0.06)] my-1" />
-                    {/* Override statuses — bypass system flows with confirmation */}
-                    {([
-                      { value: 'contract_signed', label: 'Signed' },
-                      { value: 'deposit_received', label: 'Deposit received' },
-                      { value: 'won', label: 'Won' },
-                    ] as const).map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => { setStatusDropdownOpen(false); setPendingOverrideStatus(value); }}
-                        className="w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors hover:bg-[var(--stage-accent-muted)] focus:outline-none"
-                      >
-                        <span className="flex-1 tracking-tight text-[var(--stage-text-secondary)]">{label}</span>
-                        {deal.status === value
-                          ? <Check size={11} className="shrink-0" style={{ color: 'var(--stage-text-primary)' }} />
-                          : <span className="stage-micro shrink-0">override</span>
-                        }
-                      </button>
-                    ))}
-                    <div className="mx-3 border-t border-[oklch(1_0_0_/_0.06)] my-1" />
-                    <button
-                      type="button"
-                      onClick={() => { setStatusDropdownOpen(false); setLostModalOpen(true); }}
-                      className="w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors hover:bg-[var(--color-unusonic-error)]/5 focus:outline-none"
-                    >
-                      <span className="flex-1 tracking-tight text-[var(--color-unusonic-error)]">Lost</span>
-                      {deal.status === 'lost' && <Check size={11} className="text-[var(--color-unusonic-error)] shrink-0" />}
-                    </button>
+                    {(() => {
+                      // Fallback to the legacy hardcoded list until the workspace
+                      // stages load (preserves the three-group UX exactly).
+                      const working = pipelineStages
+                        ? pipelineStages.filter((s) => s.kind === 'working')
+                        : [
+                            { slug: 'inquiry', label: 'Inquiry', requires_confirmation: false },
+                            { slug: 'proposal', label: 'Proposal', requires_confirmation: false },
+                            { slug: 'contract_sent', label: 'Sent', requires_confirmation: false },
+                            { slug: 'contract_signed', label: 'Signed', requires_confirmation: true },
+                            { slug: 'deposit_received', label: 'Deposit received', requires_confirmation: true },
+                          ] as const;
+                      const normal = working.filter((s) => !s.requires_confirmation);
+                      const override = working.filter((s) => s.requires_confirmation);
+                      const wonStage = pipelineStages?.find((s) => s.kind === 'won') ?? { slug: 'won', label: 'Won', requires_confirmation: true };
+                      const lostStage = pipelineStages?.find((s) => s.kind === 'lost') ?? { slug: 'lost', label: 'Lost' };
+                      return (
+                        <>
+                          {normal.map((s) => (
+                            <button
+                              key={s.slug}
+                              type="button"
+                              onClick={() => handleStatusChange(s.slug as DealStatus)}
+                              className="w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors hover:bg-[var(--stage-accent-muted)] focus:outline-none"
+                            >
+                              <span className="flex-1 tracking-tight text-[var(--stage-text-primary)]">{s.label}</span>
+                              {deal.status === s.slug && <Check size={11} className="shrink-0" style={{ color: 'var(--stage-text-primary)' }} />}
+                            </button>
+                          ))}
+                          <div className="mx-3 border-t border-[oklch(1_0_0_/_0.06)] my-1" />
+                          {/* Override stages — bypass system flows with confirmation */}
+                          {override.map((s) => (
+                            <button
+                              key={s.slug}
+                              type="button"
+                              onClick={() => { setStatusDropdownOpen(false); setPendingOverrideStatus(s.slug); }}
+                              className="w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors hover:bg-[var(--stage-accent-muted)] focus:outline-none"
+                            >
+                              <span className="flex-1 tracking-tight text-[var(--stage-text-secondary)]">{s.label}</span>
+                              {deal.status === s.slug
+                                ? <Check size={11} className="shrink-0" style={{ color: 'var(--stage-text-primary)' }} />
+                                : <span className="stage-micro shrink-0">override</span>
+                              }
+                            </button>
+                          ))}
+                          <button
+                            key={wonStage.slug}
+                            type="button"
+                            onClick={() => { setStatusDropdownOpen(false); setPendingOverrideStatus(wonStage.slug); }}
+                            className="w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors hover:bg-[var(--stage-accent-muted)] focus:outline-none"
+                          >
+                            <span className="flex-1 tracking-tight text-[var(--stage-text-secondary)]">{wonStage.label}</span>
+                            {deal.status === wonStage.slug
+                              ? <Check size={11} className="shrink-0" style={{ color: 'var(--stage-text-primary)' }} />
+                              : <span className="stage-micro shrink-0">override</span>
+                            }
+                          </button>
+                          <div className="mx-3 border-t border-[oklch(1_0_0_/_0.06)] my-1" />
+                          <button
+                            type="button"
+                            onClick={() => { setStatusDropdownOpen(false); setLostModalOpen(true); }}
+                            className="w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition-colors hover:bg-[var(--color-unusonic-error)]/5 focus:outline-none"
+                          >
+                            <span className="flex-1 tracking-tight text-[var(--color-unusonic-error)]">{lostStage.label}</span>
+                            {deal.status === lostStage.slug && <Check size={11} className="text-[var(--color-unusonic-error)] shrink-0" />}
+                          </button>
+                        </>
+                      );
+                    })()}
                   </motion.div>
                   </>
                 )}
