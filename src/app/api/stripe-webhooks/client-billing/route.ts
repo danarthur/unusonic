@@ -341,6 +341,12 @@ async function advanceDealFromStripeWebhook(args: {
   // Atomic guarded advance — RPC SET LOCALs the webhook session vars and fires
   // record_deal_transition with metadata.source='webhook' + actor_kind='webhook'.
   // Returns false if guard rejected (deal already past target, or in won/lost).
+  //
+  // Phase 3h: switch from literal slug list to tag-overlap guard so workspaces
+  // that rename their stages still auto-advance correctly. The pre-states for
+  // deposit_received are any working stage before it: initial_contact,
+  // proposal_sent, contract_out, contract_signed. Legacy slug guard set to
+  // NULL — the tag guard is strictly more expressive and covers renamed stages.
   const { data: advanced, error: advanceErr } = await supabase
     .schema('ops')
     .rpc('advance_deal_stage_from_webhook', {
@@ -349,7 +355,8 @@ async function advanceDealFromStripeWebhook(args: {
       p_new_status_slug: stageSlug,
       p_webhook_source: 'stripe',
       p_webhook_event_id: stripeEventId,
-      p_only_if_status_in: ['inquiry', 'proposal', 'contract_sent', 'contract_signed'],
+      p_only_if_status_in: null,
+      p_only_if_tags_any: ['initial_contact', 'proposal_sent', 'contract_out', 'contract_signed'],
     });
 
   if (advanceErr) {

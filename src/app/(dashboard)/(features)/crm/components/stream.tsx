@@ -20,74 +20,18 @@ import {
   type StreamSort,
 } from './stream-sort-control';
 import type { OptimisticUpdate } from './crm-production-queue';
+import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
+import { filterByMode, type StreamMode } from './stream-filter';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
-import { readEventStatusFromLifecycle } from '@/shared/lib/event-status/read-event-status';
 
-export type StreamMode = 'inquiry' | 'active' | 'past';
+export type { StreamMode };
 
 const STREAM_TABS = [
   { value: 'inquiry' as const, label: 'Inquiry' },
   { value: 'active' as const, label: 'Active' },
   { value: 'past' as const, label: 'Past' },
 ] as const;
-
-function filterByMode(items: StreamCardItem[], mode: StreamMode): StreamCardItem[] {
-  const today = new Date().toISOString().slice(0, 10);
-  if (mode === 'inquiry') {
-    // Only pre-sale deals that haven't passed their date yet (or have no date)
-    return items.filter(
-      (i) =>
-        i.source === 'deal' &&
-        (i.status === 'inquiry' || i.status === 'proposal') &&
-        (i.event_date == null || i.event_date >= today)
-    );
-  }
-  if (mode === 'active') {
-    return items.filter(
-      (i) =>
-        // Pass 3 Phase 4: archived events are out of the active pile. The
-        // "past" tab below still includes them so users can look back.
-        (i.source === 'event' &&
-          i.archived_at == null &&
-          readEventStatusFromLifecycle(i.lifecycle_status) !== 'cancelled' &&
-          (i.event_date == null || i.event_date >= today)) ||
-        (i.source === 'deal' &&
-          (i.status === 'contract_sent' || i.status === 'contract_signed' || i.status === 'deposit_received') &&
-          (i.event_date == null || i.event_date >= today)) ||
-        // Won deals with future dates stay active (still need handoff/production work)
-        (i.source === 'deal' &&
-          i.status === 'won' &&
-          (i.event_date == null || i.event_date >= today))
-    );
-  }
-  if (mode === 'past') {
-    return items.filter(
-      (i) => {
-        const eventPhase = i.source === 'event' ? readEventStatusFromLifecycle(i.lifecycle_status) : null;
-        return (
-          // Lost deals always past
-          (i.source === 'deal' && i.status === 'lost') ||
-          // Won deals with past dates go to past
-          (i.source === 'deal' && i.status === 'won' && i.event_date != null && i.event_date < today) ||
-          // Past-dated deals that never converted (any pre-handover status)
-          (i.source === 'deal' &&
-            (i.status === 'inquiry' || i.status === 'proposal' || i.status === 'contract_sent' || i.status === 'contract_signed' || i.status === 'deposit_received') &&
-            i.event_date != null &&
-            i.event_date < today) ||
-          // Cancelled events (regardless of date)
-          (i.source === 'event' && eventPhase === 'cancelled') ||
-          // Past-dated events (must have a date — dateless events stay in Active)
-          (i.source === 'event' &&
-            eventPhase !== 'cancelled' &&
-            i.event_date != null &&
-            i.event_date < today)
-        );
-      }
-    );
-  }
-  return items;
-}
 
 export function Stream({
   items,
@@ -98,6 +42,7 @@ export function Stream({
   mode,
   onModeChange,
   sourceOrgId,
+  pipelineStages,
   className,
 }: {
   items: StreamCardItem[];
@@ -108,6 +53,8 @@ export function Stream({
   mode: StreamMode;
   onModeChange: (mode: StreamMode) => void;
   sourceOrgId?: string | null;
+  /** Phase 3h: workspace pipeline stages — drives Stream tab classification. */
+  pipelineStages?: readonly WorkspacePipelineStage[];
   className?: string;
 }) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -147,7 +94,7 @@ export function Stream({
     return { ...i, mode: tag };
   });
 
-  const modeFiltered = filterByMode(tagged, mode);
+  const modeFiltered = filterByMode(tagged, mode, pipelineStages ?? []);
 
   // Layer 1: apply chip filters
   const chipFiltered = applyFilters(modeFiltered, filters);

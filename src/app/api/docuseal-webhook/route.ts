@@ -437,6 +437,10 @@ async function advanceDealFromDocuSealWebhook(args: {
   // the closest-to-unique correlator per the webhook payload.
   const webhookEventId = `docuseal_submission_${submissionId}`;
 
+  // Phase 3h: switch from literal slug list to tag-overlap guard so workspaces
+  // that rename their stages still auto-advance correctly. The pre-states for
+  // contract_signed are any working stage before it: initial_contact,
+  // proposal_sent, contract_out. Legacy slug guard set to NULL.
   const { data: advanced, error: advanceErr } = await supabase
     .schema('ops')
     .rpc('advance_deal_stage_from_webhook', {
@@ -445,7 +449,8 @@ async function advanceDealFromDocuSealWebhook(args: {
       p_new_status_slug: stageSlug,
       p_webhook_source: 'docuseal',
       p_webhook_event_id: webhookEventId,
-      p_only_if_status_in: ['inquiry', 'proposal', 'contract_sent'],
+      p_only_if_status_in: null,
+      p_only_if_tags_any: ['initial_contact', 'proposal_sent', 'contract_out'],
     });
 
   if (advanceErr) {

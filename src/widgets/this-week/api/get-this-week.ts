@@ -72,6 +72,18 @@ function placeDeals(rows: DealRow[], dayIndex: Map<string, ThisWeekDay>) {
   }
 }
 
+/**
+ * Phase 3h: "tentative" deal stages are resolved via pipeline tags instead of
+ * literal status slugs. A deal is tentative when its current stage carries
+ * initial_contact, proposal_sent, OR contract_out. This keeps the widget
+ * rename-resilient for workspaces with custom pipelines.
+ *
+ * Stock workspaces (initial_contact→`inquiry`, proposal_sent→`proposal`,
+ * contract_out→`contract_sent`) produce the same deal set as the legacy
+ * literal-slug filter.
+ */
+const TENTATIVE_STAGE_TAGS = ['initial_contact', 'proposal_sent', 'contract_out'];
+
 export async function getThisWeek(): Promise<ThisWeekDay[]> {
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) return [];
@@ -81,6 +93,31 @@ export async function getThisWeek(): Promise<ThisWeekDay[]> {
   const dayIndex = new Map(days.map((d) => [d.date, d]));
 
   try {
+    // Resolve stage_ids for the workspace's tentative stages. Two-step lookup
+    // (default pipeline first, then its stages with the tentative tags) — more
+    // straightforward than a join filter on PostgREST and keeps the query
+    // shape identical to other pipeline-reading surfaces.
+    const { data: defaultPipeline } = await supabase
+      .schema('ops')
+      .from('pipelines')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('is_default', true)
+      .eq('is_archived', false)
+      .maybeSingle();
+
+    let tentativeStageIds: string[] = [];
+    if (defaultPipeline) {
+      const { data: tentativeStages } = await supabase
+        .schema('ops')
+        .from('pipeline_stages')
+        .select('id')
+        .eq('pipeline_id', (defaultPipeline as { id: string }).id)
+        .eq('is_archived', false)
+        .overlaps('tags', TENTATIVE_STAGE_TAGS);
+      tentativeStageIds = (tentativeStages ?? []).map((s: { id: string }) => s.id);
+    }
+
     const [eventsResult, dealsResult] = await Promise.all([
       supabase.schema('ops').from('events')
         .select('id, title, starts_at, venue_name, deal_id, lifecycle_status, status')
@@ -88,12 +125,17 @@ export async function getThisWeek(): Promise<ThisWeekDay[]> {
         .or('lifecycle_status.in.(confirmed,production,live),and(lifecycle_status.is.null,status.eq.confirmed)')
         .gte('starts_at', today.toISOString()).lt('starts_at', windowEnd.toISOString())
         .order('starts_at', { ascending: true }),
-      supabase.from('deals')
-        .select('id, title, proposed_date, status')
-        .eq('workspace_id', workspaceId)
-        .in('status', ['inquiry', 'proposal', 'contract_sent'])
-        .gte('proposed_date', isoDate(today)).lt('proposed_date', isoDate(windowEnd))
-        .is('archived_at', null).order('proposed_date', { ascending: true }),
+      // Tag-based filter: tentative deals are those whose stage carries one of
+      // the pre-sale tags. Empty stage list means no tentative stages configured
+      // (shouldn't happen post-Phase-1); .in('stage_id', []) evaluates false.
+      tentativeStageIds.length > 0
+        ? supabase.from('deals')
+            .select('id, title, proposed_date, status')
+            .eq('workspace_id', workspaceId)
+            .in('stage_id', tentativeStageIds)
+            .gte('proposed_date', isoDate(today)).lt('proposed_date', isoDate(windowEnd))
+            .is('archived_at', null).order('proposed_date', { ascending: true })
+        : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     ]);
 
     placeEvents((eventsResult.data ?? []) as EventRow[], dayIndex);

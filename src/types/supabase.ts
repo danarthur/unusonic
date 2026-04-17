@@ -3614,6 +3614,7 @@ export type Database = {
           p_new_stage_id: string
           p_new_status_slug: string
           p_only_if_status_in: string[]
+          p_only_if_tags_any?: string[]
           p_webhook_event_id: string
           p_webhook_source: string
         }

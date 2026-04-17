@@ -26,6 +26,8 @@ export type StreamCardItem = {
   lifecycle_status?: string | null;
   /** Pass 3 Phase 4: set when the event has been wrapped. Used by stream.tsx filters. */
   archived_at?: string | null;
+  /** Phase 3h: the deal's current pipeline stage id. Used by tag-based Stream tab filters. Events have no stage_id. */
+  stage_id?: string | null;
   /** Sales = amber, Ops = blue, Finance = rose */
   mode?: 'sales' | 'ops' | 'finance';
   /** Payment health signal — computed from proposal data. */
