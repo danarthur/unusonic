@@ -42,6 +42,7 @@ import type { EventSummaryForPrism } from '../actions/get-event-summary';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
+import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
 
 type PlanLensProps = {
   eventId: string | null;
@@ -516,6 +517,16 @@ export function PlanLens({
         {/* ── Tier 5: Journal (full width) ── */}
         {dealId && deal?.workspace_id && (
           <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
+        )}
+
+        {/* ── Tier 5b: Captures linked to this event (inc. predecessor deal) ── */}
+        {eventId && deal?.workspace_id && (
+          <ProductionCapturesPanel
+            workspaceId={deal.workspace_id}
+            kind="event"
+            productionId={eventId}
+            predecessorDealId={dealId}
+          />
         )}
 
         {/* ── Tier 6: Wrap report (full width, post-event only) ── */}

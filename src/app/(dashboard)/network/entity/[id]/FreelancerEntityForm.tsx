@@ -12,6 +12,7 @@ import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
 import { AccordionSection } from './entity-studio-panels';
+import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { softDeleteGhostRelationship } from '@/features/network-data';
 import { updatePreferredPerson } from '@/features/network-data/api/update-preferred-person';
 import {
@@ -227,6 +228,17 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
 
       {/* Body */}
       <div className="mx-auto max-w-2xl px-6 py-8 pb-32 space-y-3">
+
+          {/* Overview cards — Brief, Working notes, Captures, Productions */}
+          {workspaceId && entityId && (
+            <EntityOverviewCards
+              workspaceId={workspaceId}
+              entityId={entityId}
+              entityType="person"
+              entityName={details.identity.name ?? null}
+              density="page"
+            />
+          )}
 
           {/* Profile */}
           <AccordionSection label="Profile" icon={User} defaultOpen>

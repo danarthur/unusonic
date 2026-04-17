@@ -36,6 +36,7 @@ import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-m
 import { FollowUpCard } from './follow-up-card';
 import { FollowUpActionLog } from './follow-up-action-log';
 import { getFollowUpForDeal, type FollowUpQueueItem } from '../actions/follow-up-actions';
+import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
 
 
 const DEAL_PIPELINE_STAGES = ['Inquiry', 'Proposal', 'Sent', 'Signed', 'Won'] as const;
@@ -405,6 +406,15 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
           {/* Deal diary */}
           <DealDiaryCard dealId={deal.id} dealTitle={deal.title} workspaceId={deal.workspace_id} />
+
+          {/* Captures linked to this deal */}
+          {deal.workspace_id && (
+            <ProductionCapturesPanel
+              workspaceId={deal.workspace_id}
+              kind="deal"
+              productionId={deal.id}
+            />
+          )}
 
           {/* Follow-up action log */}
           <FollowUpActionLog dealId={deal.id} />

@@ -1,28 +1,33 @@
 'use client';
 
 /**
- * CaptureComposer — inline capture affordance at the top of the brief card.
+ * CaptureComposer — dual-mode capture affordance at the top of the brief card.
  *
- * Two states driven by `CaptureProvider.hasEverCaptured`:
+ * One unified input row that accepts both typed and voice input:
  *
- *   • first-run: one-liner invitation + keyboard hint
- *   • compact:   placeholder-only "Tell Aion something…"
+ *   ┌─────────────────────────────────────────────┬──────┐
+ *   │  Tell Aion something…                       │  🎤  │
+ *   └─────────────────────────────────────────────┴──────┘
  *
- * Switches the instant a confirm lands (provider bumps `hasEverCaptured` on
- * successful write — no page reload required).
+ *   • Type + Enter       → parses the text directly (skips mic)
+ *   • Click mic          → opens the modal at idle, auto-starts recording
+ *   • Shift+C (anywhere) → global keyboard shortcut, handled by CaptureProvider
  *
- * Taps trigger the lobby-level CaptureProvider. If no provider is mounted
- * (feature flag off), this component renders nothing. `Shift+C` is handled
- * globally by the provider.
+ * Both paths land in the same review card — the modal handles everything
+ * downstream. The composer is just the on-ramp.
+ *
+ * Two density tiers driven by `CaptureProvider.hasEverCaptured`:
+ *   • first-run: input + mic + one-line hint above — louder discoverability
+ *   • compact:   input + mic only
+ *
+ * No provider → feature flag off → renders nothing.
  *
  * See docs/reference/sales-brief-v2-design.md §10.1.
  */
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
-import { Mic } from 'lucide-react';
+import { Mic, ArrowRight } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { useOptionalCapture } from '@/widgets/lobby-capture/ui/CaptureProvider';
 
 export interface CaptureComposerProps {
@@ -31,93 +36,106 @@ export interface CaptureComposerProps {
 
 export function CaptureComposer({ className }: CaptureComposerProps) {
   const capture = useOptionalCapture();
+  const [value, setValue] = React.useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // No provider → flag off. Render nothing; the brief card still shows
-  // paragraph + insight rows below.
   if (!capture) return null;
 
   const { openCapture, hasEverCaptured } = capture;
+  const trimmed = value.trim();
+  const canSubmit = trimmed.length >= 3;
 
-  if (!hasEverCaptured) {
-    return <FirstRunState onOpen={openCapture} className={className} />;
-  }
-  return <CompactState onOpen={openCapture} className={className} />;
-}
+  const submitTyped = () => {
+    if (!canSubmit) return;
+    openCapture({ initialText: trimmed });
+    setValue('');
+    inputRef.current?.blur();
+  };
 
-// ── States ───────────────────────────────────────────────────────────────────
+  const startVoice = () => {
+    // Any in-progress typed draft is discarded — picking up the mic is a
+    // clear intent to restart. The placeholder returns immediately.
+    setValue('');
+    openCapture();
+  };
 
-function FirstRunState({
-  onOpen,
-  className,
-}: {
-  onOpen: () => void;
-  className?: string;
-}) {
   return (
-    <motion.button
-      type="button"
-      onClick={onOpen}
-      transition={STAGE_LIGHT}
-      whileHover={{ backgroundColor: 'var(--stage-surface-raised)' }}
-      className={cn(
-        'w-full text-left inline-flex items-center gap-3 px-3 py-2.5',
-        'rounded-md border border-dashed border-[var(--stage-edge-subtle)]',
-        'bg-[var(--stage-surface-elevated)]',
-        'text-[var(--stage-text-secondary)]',
-        'hover:text-[var(--stage-text-primary)] transition-colors',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
-        className,
+    <div className={cn('w-full space-y-1.5', className)}>
+      {!hasEverCaptured && (
+        <p className="px-1 text-[11px] text-[var(--stage-text-tertiary)]">
+          Tell Aion a client, a meeting, a thought — I&rsquo;ll remember.
+        </p>
       )}
-      data-testid="capture-composer-first-run"
-      aria-label="Tell Aion something — capture a thought"
-    >
-      <Mic
-        className="w-4 h-4 shrink-0 text-[var(--stage-text-tertiary)]"
-        aria-hidden
-      />
-      <span className="text-sm">
-        Tell Aion a client, a meeting, a thought — I&rsquo;ll remember.
-      </span>
-      <kbd
+
+      <div
         className={cn(
-          'ml-auto inline-flex items-center h-5 px-1.5 text-[10px] font-mono rounded',
-          'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well,var(--stage-surface))]',
-          'text-[var(--stage-text-tertiary)]',
+          'w-full flex items-center gap-1 rounded-md',
+          'border border-[var(--stage-edge-subtle)]',
+          'bg-[var(--stage-surface-elevated)]',
+          'focus-within:border-[var(--stage-accent)]/40',
+          'transition-colors',
         )}
-        aria-hidden
+        data-surface="elevated"
       >
-        Shift C
-      </kbd>
-    </motion.button>
-  );
-}
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && canSubmit) {
+              e.preventDefault();
+              submitTyped();
+            }
+          }}
+          placeholder="Tell Aion something…"
+          aria-label="Capture a thought — type or press the mic"
+          className={cn(
+            'flex-1 min-w-0 bg-transparent border-none outline-none',
+            'px-3 py-2 text-sm',
+            'text-[var(--stage-text-primary)]',
+            'placeholder:text-[var(--stage-text-tertiary)]',
+          )}
+          data-testid="capture-composer-input"
+        />
 
-function CompactState({
-  onOpen,
-  className,
-}: {
-  onOpen: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        'w-full text-left inline-flex items-center gap-2 px-3 py-2',
-        'rounded-md border border-[var(--stage-edge-subtle)]',
-        'bg-[var(--stage-surface-elevated)]',
-        'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
-        'transition-colors',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
-        className,
-      )}
-      data-testid="capture-composer-compact"
-      aria-label="Tell Aion something"
-      title="Tell Aion something (Shift+C)"
-    >
-      <Mic className="w-3.5 h-3.5 shrink-0" aria-hidden />
-      <span className="text-xs">Tell Aion something…</span>
-    </button>
+        {canSubmit ? (
+          <button
+            type="button"
+            onClick={submitTyped}
+            aria-label="Send to Aion"
+            title="Send (Enter)"
+            className={cn(
+              'shrink-0 inline-flex items-center justify-center',
+              'w-8 h-8 rounded-md mr-1',
+              'text-[var(--stage-text-primary)]',
+              'hover:bg-[oklch(1_0_0/0.08)] transition-colors',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
+            )}
+            data-testid="capture-composer-send"
+          >
+            <ArrowRight className="w-4 h-4" strokeWidth={1.75} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={startVoice}
+            aria-label="Record voice note"
+            title="Record voice note (Shift+C)"
+            className={cn(
+              'shrink-0 inline-flex items-center justify-center',
+              'w-8 h-8 rounded-md mr-1',
+              'text-[var(--stage-text-secondary)]',
+              'hover:text-[var(--stage-text-primary)]',
+              'hover:bg-[oklch(1_0_0/0.08)] transition-colors',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
+            )}
+            data-testid="capture-composer-mic"
+          >
+            <Mic className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

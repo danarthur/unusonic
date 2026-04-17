@@ -1,13 +1,17 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Mail, User } from 'lucide-react';
+import { UserPlus, Mail, User, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { addContactToGhostOrg } from '@/features/network-data';
 import { getContactFieldLabel } from '@/shared/lib/contact-field-labels';
 import { STAGE_MEDIUM, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
+import { withFrom } from '@/shared/lib/smart-back';
+import { useCurrentHref } from '@/shared/lib/smart-back-client';
+import { cn } from '@/shared/lib/utils';
 
 import type { NodeDetailCrewMember } from '@/features/network-data';
 
@@ -27,6 +31,7 @@ export function NodeCrewList({
   isEditable,
   onAdded,
 }: NodeCrewListProps) {
+  const origin = useCurrentHref();
   const [showForm, setShowForm] = React.useState(false);
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [error, setError] = React.useState<string | null>(null);
@@ -50,7 +55,7 @@ export function NodeCrewList({
       form.reset();
       setShowForm(false);
       const name = [firstName || 'Contact', lastName].filter(Boolean).join(' ').trim() || 'Contact';
-      onAdded?.({ id: `pending-${Date.now()}`, name, email: email ?? null, role: null, jobTitle: null, avatarUrl: null, phone: null });
+      onAdded?.({ id: `pending-${Date.now()}`, subjectEntityId: null, name, email: email ?? null, role: null, jobTitle: null, avatarUrl: null, phone: null });
     } else {
       setStatus('error');
       setError(result.error ?? 'Couldn’t add contact.');
@@ -68,28 +73,70 @@ export function NodeCrewList({
             No contacts yet.
           </li>
         )}
-        {crew.map((m) => (
-          <li
-            key={m.id}
-            className="flex items-center gap-3 rounded-xl border border-[var(--stage-edge-top)] bg-[var(--stage-surface-elevated)] px-4 py-3"
-          >
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface)] border border-[var(--stage-edge-top)]">
-              <User className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{m.name?.trim() || 'Contact'}</p>
-              {(m.email?.trim() || null) && (
-                <p className="flex items-center gap-1.5 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
-                  <Mail className="size-3" strokeWidth={1.5} />
-                  {m.email}
+        {crew.map((m) => {
+          // Optimistic pending rows don't yet have a real entity id.
+          const href = m.subjectEntityId
+            ? withFrom(`/network/entity/${m.subjectEntityId}`, origin)
+            : null;
+          const content = (
+            <>
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--stage-surface)] border border-[var(--stage-edge-top)]">
+                <User className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
+                  {m.name?.trim() || 'Contact'}
                 </p>
+                {(m.email?.trim() || null) && (
+                  <p className="flex items-center gap-1.5 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
+                    <Mail className="size-3" strokeWidth={1.5} />
+                    {m.email}
+                  </p>
+                )}
+                {m.role && (
+                  <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
+                    {m.role}
+                  </p>
+                )}
+              </div>
+              {href && (
+                <ArrowUpRight
+                  className="size-4 shrink-0 text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity"
+                  strokeWidth={1.5}
+                />
               )}
-              {m.role && (
-                <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">{m.role}</p>
+            </>
+          );
+
+          return (
+            <li key={m.id}>
+              {href ? (
+                <Link
+                  href={href}
+                  className={cn(
+                    'group flex items-center gap-3 rounded-xl border border-[var(--stage-edge-top)]',
+                    'bg-[var(--stage-surface-elevated)] px-4 py-3',
+                    'hover:border-[var(--stage-accent)]/40 hover:bg-[oklch(1_0_0/0.06)]',
+                    'transition-colors',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
+                  )}
+                >
+                  {content}
+                </Link>
+              ) : (
+                <div
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl border border-dashed border-[var(--stage-edge-top)]',
+                    'bg-[var(--stage-surface-elevated)] px-4 py-3 opacity-70',
+                  )}
+                  title="Saving…"
+                >
+                  {content}
+                </div>
               )}
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       {isEditable && (

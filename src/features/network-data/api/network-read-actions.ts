@@ -456,7 +456,17 @@ export async function searchNetworkOrgs(
 // ---------------------------------------------------------------------------
 
 export type NodeDetailCrewMember = {
+  /**
+   * Relationship id (cortex.relationships.id) — used by existing write paths
+   * like addContactToGhostOrg. NOT a directory.entities id; do NOT route on it.
+   */
   id: string;
+  /**
+   * The person's actual directory.entities id. Use this for navigation
+   * (e.g. `/network/entity/{subjectEntityId}`). May be null only for
+   * synthetic rows (optimistic pending adds before the server refetches).
+   */
+  subjectEntityId: string | null;
   name: string;
   email?: string | null;
   role?: string | null;
@@ -872,6 +882,7 @@ export async function getNetworkNodeDetails(
           'Contact';
         return {
           id: r.id,
+          subjectEntityId: r.source_entity_id,
           name,
           email: (attrs[PERSON_ATTR.email] as string | null) ?? null,
           role: (ctx.role as string | null) ?? null,

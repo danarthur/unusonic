@@ -15,13 +15,14 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Square, Loader2, AlertCircle, Check, X, Keyboard } from 'lucide-react';
+import { Mic, Square, Loader2, AlertCircle, Check, X, Keyboard, Lock, Users, CalendarCheck2, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
-import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
 import type { CaptureParseResult } from '@/app/api/aion/capture/parse/route';
-import { confirmCapture } from '../api/confirm-capture';
+import { confirmCapture, type CaptureVisibility } from '../api/confirm-capture';
+import { detectVisibilityHint } from '@/shared/lib/capture-visibility';
 import { useOptionalCapture } from './CaptureProvider';
 
 const MAX_RECORDING_MS = 60_000;
@@ -33,17 +34,31 @@ type Stage =
   | { kind: 'processing' }
   | { kind: 'review'; transcript: string; parse: CaptureParseResult }
   | { kind: 'saving'; transcript: string; parse: CaptureParseResult }
-  | { kind: 'done' }
+  | { kind: 'done'; entityName: string | null }
   | { kind: 'error'; message: string };
 
 export interface CaptureModalProps {
   workspaceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * When provided and ≥3 chars, opens the modal straight into parsing this
+   * text (skips mic + recording). Used by the inline CaptureComposer's
+   * typed-submit flow so users don't have to wait on an unused microphone.
+   */
+  initialText?: string;
 }
 
-export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalProps) {
-  const [stage, setStage] = React.useState<Stage>({ kind: 'idle' });
+export function CaptureModal({ workspaceId, open, onOpenChange, initialText }: CaptureModalProps) {
+  // Initialize directly to 'processing' when the modal was opened with typed
+  // text — prevents the idle "Starting mic…" frame from flashing for one
+  // render before the kickoff effect fires.
+  const [stage, setStage] = React.useState<Stage>(() =>
+    initialText && initialText.trim().length >= 3
+      ? { kind: 'processing' }
+      : { kind: 'idle' },
+  );
+  const typedKickoffRef = React.useRef<string | null>(null);
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const chunksRef = React.useRef<Blob[]>([]);
@@ -112,6 +127,22 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
     if (!open) releaseMic();
   }, [open, releaseMic]);
 
+  // Typed-text kickoff: when the modal opens with initialText, skip mic
+  // entirely and go straight to parse. Tracked via a ref so we only fire
+  // once per open, even if initialText re-renders.
+  React.useEffect(() => {
+    if (!open) {
+      typedKickoffRef.current = null;
+      return;
+    }
+    const text = initialText?.trim();
+    if (!text || text.length < 3) return;
+    if (typedKickoffRef.current === text) return;
+    typedKickoffRef.current = text;
+    void runParse(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runParse is stable within the modal instance
+  }, [open, initialText]);
+
   // Auto-start recording when the modal opens fresh. Uses a cancellation
   // token to survive React 18 StrictMode's mount → fake-unmount → mount
   // cycle in dev: if the effect tears down while getUserMedia is still
@@ -120,6 +151,9 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
   // tab-level mic indicator lit after a successful save.
   React.useEffect(() => {
     if (!open || stage.kind !== 'idle') return;
+    // Skip mic when the modal was opened with typed text — that path goes
+    // directly to parse via the kickoff effect above.
+    if (initialText && initialText.trim().length >= 3) return;
 
     let cancelled = false;
 
@@ -184,7 +218,7 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally auto-start on open only, stage.kind gates the re-entry inside
-  }, [open]);
+  }, [open, initialText]);
 
   function stopRecording() {
     if (autoStopRef.current) {
@@ -288,6 +322,8 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
     newEntityType?: 'person' | 'company' | 'venue' | null;
     note?: string | null;
     followUpText?: string | null;
+    visibility?: CaptureVisibility;
+    linkedProduction?: { kind: 'deal' | 'event'; id: string } | null;
   }) {
     if (stage.kind !== 'review') return;
     const { transcript, parse } = stage;
@@ -317,9 +353,11 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
     // compacts immediately on next render, without waiting for a reload.
     captureCtx?.markCaptured();
 
-    setStage({ kind: 'done' });
-    toast.success('Captured.');
-    setTimeout(handleClose, 900);
+    // The in-modal success state is the primary confirmation — no duplicate
+    // toast needed. Fades out to handleClose at 1.1s, long enough to read
+    // "Logged to <entity>" without feeling slow.
+    setStage({ kind: 'done', entityName: result.resolvedEntityName });
+    setTimeout(handleClose, 1100);
   }
 
   return (
@@ -394,9 +432,7 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
             )}
 
             {stage.kind === 'done' && (
-              <StageCard key="done">
-                <Check className="w-6 h-6 text-[var(--stage-accent)]" />
-              </StageCard>
+              <DoneStage key="done" entityName={stage.entityName} />
             )}
 
             {stage.kind === 'error' && (
@@ -442,6 +478,50 @@ function StageCard({ children }: { children: React.ReactNode }) {
       className="flex-1 flex flex-col items-center justify-center py-6"
     >
       {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Success state — precision-instrument voice. Check in a muted chip, then a
+ * short "Logged" label followed by the entity name. No celebratory color, no
+ * exclamation, no duplicate toast.
+ */
+function DoneStage({ entityName }: { entityName: string | null }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={STAGE_LIGHT}
+      className="flex-1 flex flex-col items-center justify-center py-8 gap-3"
+    >
+      <motion.div
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.04, ...STAGE_MEDIUM }}
+        className={cn(
+          'w-9 h-9 rounded-full flex items-center justify-center',
+          'bg-[oklch(1_0_0/0.06)] border border-[var(--stage-edge-subtle)]',
+        )}
+      >
+        <Check className="w-4 h-4 text-[var(--stage-text-primary)]" strokeWidth={2} />
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 2 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.14, ...STAGE_LIGHT }}
+        className="flex flex-col items-center gap-0.5"
+      >
+        <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
+          Logged
+        </p>
+        {entityName && (
+          <p className="text-[11px] text-[var(--stage-text-tertiary)] tabular-nums">
+            to {entityName}
+          </p>
+        )}
+      </motion.div>
     </motion.div>
   );
 }
@@ -578,6 +658,8 @@ function ReviewStage({
     newEntityType?: 'person' | 'company' | 'venue' | null;
     note?: string | null;
     followUpText?: string | null;
+    visibility?: CaptureVisibility;
+    linkedProduction?: { kind: 'deal' | 'event'; id: string } | null;
   }) => void;
   onCancel: () => void;
 }) {
@@ -601,6 +683,17 @@ function ReviewStage({
   // User's explicit pick from the match-candidates picker. null = "it's new",
   // undefined = "no pick yet (defer to parse-supplied matched_entity_id)."
   const [pickedCandidateId, setPickedCandidateId] = React.useState<string | null | undefined>(undefined);
+  // Visibility seeds from verbal marker detection, falls back to 'user'.
+  // Private by default — promotion to workspace is explicit (design §10).
+  const [visibility, setVisibility] = React.useState<CaptureVisibility>(
+    () => detectVisibilityHint(transcript) ?? 'user',
+  );
+  // Linked production seeds from parse; user can clear with X. No picker in
+  // v1 — changing a wrong link is post-save via relink_capture_production.
+  const parsedLink = parse.linked_production;
+  const [linkedProduction, setLinkedProduction] = React.useState<
+    { kind: 'deal' | 'event'; id: string; title: string | null } | null
+  >(parsedLink ?? null);
 
   const candidates = (parsedEntity?.match_candidates ?? []).filter(
     (c) => c.entity_id && c.name,
@@ -737,6 +830,41 @@ function ReviewStage({
         </div>
       )}
 
+      {linkedProduction && (
+        <div className="space-y-1">
+          <Label>Production</Label>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 px-2 py-1 rounded-md',
+                'border border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0/0.04)]',
+                'text-xs text-[var(--stage-text-secondary)]',
+              )}
+            >
+              {linkedProduction.kind === 'event' ? (
+                <CalendarCheck2 className="size-3" strokeWidth={1.5} />
+              ) : (
+                <Briefcase className="size-3" strokeWidth={1.5} />
+              )}
+              <span className="text-[var(--stage-text-primary)]">
+                {linkedProduction.title ?? 'untitled'}
+              </span>
+              <span className="text-[10px] uppercase tracking-wider text-[var(--stage-text-tertiary)]">
+                {linkedProduction.kind}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setLinkedProduction(null)}
+              aria-label="Unlink production"
+              className="text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] transition-colors p-0.5"
+            >
+              <X className="size-3" strokeWidth={1.5} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {note.length > 0 && (
         <div className="space-y-1">
           <Label>Note</Label>
@@ -754,7 +882,7 @@ function ReviewStage({
         </div>
       )}
 
-      <div className="flex justify-between items-center mt-auto pt-2">
+      <div className="flex justify-between items-center mt-auto pt-2 gap-2">
         <button
           type="button"
           onClick={onCancel}
@@ -764,24 +892,71 @@ function ReviewStage({
           <X className="w-3 h-3" />
           Discard
         </button>
-        <button
-          type="button"
-          onClick={() =>
-            onConfirm({
-              resolvedEntityId: effectiveMatchedId,
-              newEntityName: effectiveMatchedId ? null : entityName,
-              newEntityType: effectiveMatchedId ? null : entityType,
-              note: note.trim() || null,
-              followUpText: followUpText.trim() || null,
-            })
-          }
-          disabled={!effectiveMatchedId && entityName.trim().length < 1 && !note && !followUpText}
-          className="stage-btn stage-btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Save
-        </button>
+        <div className="flex items-center gap-2">
+          <VisibilityToggle value={visibility} onChange={setVisibility} />
+          <button
+            type="button"
+            onClick={() =>
+              onConfirm({
+                resolvedEntityId: effectiveMatchedId,
+                newEntityName: effectiveMatchedId ? null : entityName,
+                newEntityType: effectiveMatchedId ? null : entityType,
+                note: note.trim() || null,
+                followUpText: followUpText.trim() || null,
+                visibility,
+                linkedProduction: linkedProduction
+                  ? { kind: linkedProduction.kind, id: linkedProduction.id }
+                  : null,
+              })
+            }
+            disabled={!effectiveMatchedId && entityName.trim().length < 1 && !note && !followUpText}
+            className="stage-btn stage-btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Save
+          </button>
+        </div>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * Private / Team toggle. Renders as a small pill next to Save so the user
+ * sees the privacy tier at commit time. Private (owner-only) is default.
+ * Promotion to workspace is explicit — design §10.
+ */
+function VisibilityToggle({
+  value,
+  onChange,
+}: {
+  value: CaptureVisibility;
+  onChange: (v: CaptureVisibility) => void;
+}) {
+  const isPrivate = value === 'user';
+  const Icon = isPrivate ? Lock : Users;
+  const label = isPrivate ? 'Private' : 'Team';
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(isPrivate ? 'workspace' : 'user')}
+      aria-pressed={!isPrivate}
+      aria-label={`Visibility: ${label}. Click to switch to ${isPrivate ? 'team' : 'private'}.`}
+      title={
+        isPrivate
+          ? 'Only you can see this capture. Click to share with the team.'
+          : 'Team members can see this capture. Click to make private.'
+      }
+      className={cn(
+        'inline-flex items-center gap-1 px-2 py-1 rounded-md',
+        'border border-[var(--stage-edge-subtle)]',
+        'text-[11px] text-[var(--stage-text-secondary)]',
+        'hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-raised)]',
+        'transition-colors',
+      )}
+    >
+      <Icon className="w-3 h-3" strokeWidth={1.5} />
+      <span>{label}</span>
+    </button>
   );
 }
 

@@ -540,9 +540,26 @@ export type Database = {
           p_parsed_note?: string
           p_resolved_entity_id?: string
           p_transcript: string
+          p_visibility?: string
           p_workspace_id: string
         }
         Returns: string
+      }
+      reassign_capture: {
+        Args: { p_capture_id: string; p_new_entity_id?: string }
+        Returns: boolean
+      }
+      update_capture_content: {
+        Args: { p_capture_id: string; p_transcript?: string; p_parsed_note?: string }
+        Returns: boolean
+      }
+      update_capture_visibility: {
+        Args: { p_capture_id: string; p_visibility: string }
+        Returns: boolean
+      }
+      dismiss_capture: {
+        Args: { p_capture_id: string }
+        Returns: boolean
       }
     }
     Enums: {

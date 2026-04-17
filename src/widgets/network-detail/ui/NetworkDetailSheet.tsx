@@ -37,6 +37,8 @@ import { UpcomingAssignments } from './UpcomingAssignments';
 import { AvailabilityCheck } from './AvailabilityCheck';
 import { QuickBookAction } from './QuickBookAction';
 import { CrewKitSection } from './CrewKitSection';
+import { EntityOverviewCards } from './EntityOverviewCards';
+import { PromotedMetricsRow } from './PromotedMetricsRow';
 
 type TabId = 'transmission' | 'crew';
 
@@ -659,6 +661,23 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
               onSummonSuccess={handleRefresh}
             />
 
+            {/* Promoted metrics — two that earn inline placement per §10 */}
+            {workspaceId && details.subjectEntityId && (() => {
+              const t = details.entityDirectoryType;
+              if (t !== 'person' && t !== 'company' && t !== 'venue' && t !== 'couple') {
+                return null;
+              }
+              return (
+                <div className="px-6 pb-3">
+                  <PromotedMetricsRow
+                    workspaceId={workspaceId}
+                    entityId={details.subjectEntityId}
+                    entityType={t}
+                  />
+                </div>
+              );
+            })()}
+
             {/* Contact strip — always visible, outside tabs */}
             {(() => {
               const showEmployeeStrip = !isPartner;
@@ -1023,6 +1042,23 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
                   {isPartner && details.subjectEntityId && (
                     <DealHistoryPanel entityId={details.subjectEntityId} />
                   )}
+
+                  {/* ── AI Brief + Working notes / Team + Timeline + Productions ── */}
+                  {workspaceId && details.subjectEntityId && (() => {
+                    const t = details.entityDirectoryType;
+                    if (t !== 'person' && t !== 'company' && t !== 'venue' && t !== 'couple') {
+                      return null;
+                    }
+                    return (
+                      <EntityOverviewCards
+                        workspaceId={workspaceId}
+                        entityId={details.subjectEntityId}
+                        entityType={t}
+                        entityName={details.identity.name ?? null}
+                        density="sheet"
+                      />
+                    );
+                  })()}
 
                   {/* ── Notes card ── */}
                   <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">

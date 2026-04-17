@@ -25,6 +25,20 @@ export const queryKeys = {
       ["entities", wsId, "list", type] as const,
     detail: (wsId: string, entityId: string) =>
       ["entities", wsId, "detail", entityId] as const,
+    captures: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "captures"] as const,
+    summary: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "summary"] as const,
+    workingNotes: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "workingNotes"] as const,
+    teamPreview: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "teamPreview"] as const,
+    productions: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "productions"] as const,
+    referrals: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "referrals"] as const,
+    venueSpecs: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "venueSpecs"] as const,
   },
 
   catalog: {
