@@ -1,10 +1,15 @@
 /**
  * Send an email via Resend and log the follow-up action.
  * Used by dispatch handlers after the user confirms a draft.
+ *
+ * Uses getWorkspaceFrom so Aion-initiated messages honour the workspace's
+ * verified custom sending domain — matching the proposal/reminder path —
+ * instead of falling through to the global EMAIL_FROM.
  */
 
 import { logFollowUpAction } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
 import { recordAionAction } from '@/features/intelligence/lib/aion-gate';
+import { getResend, getWorkspaceFrom } from '@/shared/api/email/core';
 
 export async function sendDispatchEmail(opts: {
   to: string;
@@ -16,9 +21,11 @@ export async function sendDispatchEmail(opts: {
   const { to, subject, body, dealId, workspaceId } = opts;
 
   try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const from = process.env.EMAIL_FROM ?? 'noreply@unusonic.com';
+    const resend = getResend();
+    if (!resend) {
+      return { sent: false, error: 'Email not configured (RESEND_API_KEY missing).' };
+    }
+    const from = await getWorkspaceFrom(workspaceId);
 
     const { error } = await resend.emails.send({
       from,

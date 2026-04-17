@@ -13,6 +13,7 @@
 import 'server-only';
 
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getClientPortalContext } from '@/shared/lib/client-portal';
@@ -66,7 +67,11 @@ export default async function ClientEventPage({
 }) {
   const { id } = await params;
   const context = await getClientPortalContext();
-  if (context.kind === 'none' || !context.activeEntity) return null;
+  // The portal layout redirects `kind === 'none'` sessions to /client/sign-in,
+  // so landing here without an active entity means the redirect did not fire.
+  // Surface 404 the way /client/home does so Vercel/Sentry actually log it,
+  // instead of returning a silent blank screen.
+  if (context.kind === 'none' || !context.activeEntity) notFound();
 
   const workspaceId = context.activeEntity.ownerWorkspaceId;
   const supabase = getSystemClient();
