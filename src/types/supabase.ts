@@ -3608,6 +3608,24 @@ export type Database = {
       }
     }
     Functions: {
+      claim_pending_transitions: {
+        Args: { p_batch_size?: number }
+        Returns: {
+          actor_kind: string
+          actor_user_id: string
+          deal_id: string
+          dedup_skip: boolean
+          entered_at: string
+          from_stage_id: string
+          pipeline_id: string
+          stage_kind: string
+          stage_slug: string
+          stage_triggers: Json
+          to_stage_id: string
+          transition_id: string
+          workspace_id: string
+        }[]
+      }
       create_pipeline_stage: {
         Args: {
           p_color_token?: string
@@ -3643,6 +3661,14 @@ export type Database = {
       }
       mark_deal_activity_undone: {
         Args: { p_activity_id: string }
+        Returns: undefined
+      }
+      mark_transition_dispatched: {
+        Args: { p_transition_id: string }
+        Returns: undefined
+      }
+      mark_transition_failed: {
+        Args: { p_error: string; p_transition_id: string }
         Returns: undefined
       }
       metric_aion_refusal_rate: {
