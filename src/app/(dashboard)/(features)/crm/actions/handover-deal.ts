@@ -13,6 +13,7 @@ import { resolveEventTimezone, toVenueInstant } from '@/shared/lib/timezone';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import { COUPLE_ATTR } from '@/entities/directory/model/attribute-keys';
 import { publishDomainEvent } from '@/shared/lib/domain-events/publish-domain-event';
+import { resolveStageByKind } from '@/shared/lib/pipeline-stages/resolve-stage';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -84,6 +85,14 @@ export async function handoverDeal(
     .limit(1)
     .maybeSingle();
 
+  // Phase 3i: look up the workspace's won stage once — used by both the orphan
+  // recovery path and the main handover write below. Resolving by kind keeps
+  // this rename-resilient.
+  const wonStage = await resolveStageByKind(supabase, workspaceId, 'won');
+  if (!wonStage) {
+    return { success: false, error: 'Workspace has no won stage in its default pipeline.' };
+  }
+
   if (existingEvent) {
     // Fix the orphan: link the existing event to the deal. Re-verify the
     // event belongs to this workspace before re-linking — deal_id alone
@@ -101,7 +110,12 @@ export async function handoverDeal(
     }
     await supabase
       .from('deals')
-      .update({ status: 'won', event_id: eid, won_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({
+        stage_id: wonStage.stageId,
+        event_id: eid,
+        won_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', dealId)
       .eq('workspace_id', workspaceId);
     revalidatePath('/crm');
@@ -110,8 +124,20 @@ export async function handoverDeal(
     return { success: true, eventId: eid };
   }
 
+  // Phase 3i: gate accepts legacy slugs during the rollout window AND the
+  // post-collapse kind ('won' covers contract_signed/deposit_received/won
+  // after the BEFORE trigger derives). A deal still in a pre-signing stage
+  // (status 'working' with a tagged stage other than the contract_signed
+  // chain) would also land here — operators expect the wizard to guard
+  // against that via UI gating anyway.
   const status = (r.status as string) ?? '';
-  if (!['contract_signed', 'deposit_received', 'won'].includes(status as string)) {
+  const validHandoverStates = new Set([
+    // Post-collapse kinds:
+    'won',
+    // Legacy pre-collapse slugs still active during rollout:
+    'contract_signed', 'deposit_received',
+  ]);
+  if (!validHandoverStates.has(status)) {
     return { success: false, error: 'Contract must be signed before handover.' };
   }
 
@@ -357,7 +383,12 @@ export async function handoverDeal(
 
   const { error: updateErr } = await supabase
     .from('deals')
-    .update({ status: 'won', event_id: eventId, won_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .update({
+      stage_id: wonStage.stageId,
+      event_id: eventId,
+      won_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', dealId)
     .eq('workspace_id', workspaceId);
 

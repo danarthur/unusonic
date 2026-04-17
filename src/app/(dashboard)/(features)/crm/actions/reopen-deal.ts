@@ -3,14 +3,21 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { resolveStageByTag } from '@/shared/lib/pipeline-stages/resolve-stage';
 
 export type ReopenDealResult =
   | { success: true }
   | { success: false; error: string };
 
 /**
- * Reopens a deal by resetting its status to 'inquiry' and clearing archived_at.
- * Moves the deal back into the CRM stream's Inquiry tab.
+ * Reopens a deal by moving it back to the workspace's initial-contact stage
+ * (tag `initial_contact`) and clearing archived_at.
+ *
+ * Phase 3i: writes stage_id directly; the BEFORE trigger derives status from
+ * stage.kind (will be 'working'). The tag lookup makes this rename-resilient:
+ * a workspace that renames "Inquiry" to "Lead" still reopens into the right
+ * stage as long as the tag is preserved.
+ *
  * Ownership is verified via workspace_id before any write.
  */
 export async function reopenDeal(dealId: string): Promise<ReopenDealResult> {
@@ -22,7 +29,6 @@ export async function reopenDeal(dealId: string): Promise<ReopenDealResult> {
 
     const supabase = await createClient();
 
-    // Verify the deal belongs to this workspace
     const { data: deal, error: lookupError } = await supabase
       .from('deals')
       .select('id')
@@ -39,9 +45,18 @@ export async function reopenDeal(dealId: string): Promise<ReopenDealResult> {
       return { success: false, error: 'Not authorised' };
     }
 
+    // Phase 3i: resolve the workspace's initial-contact stage via tag.
+    const initialStage = await resolveStageByTag(supabase, workspaceId, 'initial_contact');
+    if (!initialStage) {
+      return {
+        success: false,
+        error: 'No stage tagged initial_contact in this workspace\'s default pipeline.',
+      };
+    }
+
     const { error: updateError } = await supabase
       .from('deals')
-      .update({ status: 'inquiry', archived_at: null })
+      .update({ stage_id: initialStage.stageId, archived_at: null })
       .eq('id', dealId);
 
     if (updateError) {

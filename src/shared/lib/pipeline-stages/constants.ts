@@ -62,11 +62,16 @@ export const STALL_STAGE_BY_ORDINAL: readonly StallableStatus[] = [
 ];
 
 /**
- * Status slugs considered "open" by the follow-up queue cron — the set of
+ * Statuses considered "open" by the follow-up queue cron — the set of
  * deals evaluated for stall/engagement/proximity signals each run.
+ *
+ * Phase 3i: after the status collapse migration, `status` is one of
+ * {'working','won','lost'} — so "open" == "working". Stage-level
+ * distinctions (inquiry vs proposal vs contract_sent) now come from
+ * ops.pipeline_stages.tags / slug, not from status.
+ *
+ * The value type is widened to `string` (vs the narrower StallableStatus
+ * union) because it no longer describes a legacy slug. The cron filters
+ * still call `.in('status', [...OPEN_DEAL_STATUSES])` — one element now.
  */
-export const OPEN_DEAL_STATUSES: readonly StallableStatus[] = [
-  'inquiry',
-  'proposal',
-  'contract_sent',
-];
+export const OPEN_DEAL_STATUSES: readonly string[] = ['working'];

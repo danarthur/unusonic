@@ -3608,6 +3608,15 @@ export type Database = {
       }
     }
     Functions: {
+      advance_deal_stage: {
+        Args: {
+          p_deal_id: string
+          p_new_stage_id: string
+          p_only_if_status_in?: string[]
+          p_only_if_tags_any?: string[]
+        }
+        Returns: boolean
+      }
       advance_deal_stage_from_webhook: {
         Args: {
           p_deal_id: string

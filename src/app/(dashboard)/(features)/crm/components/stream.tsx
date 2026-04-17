@@ -84,10 +84,18 @@ export function Stream({
   };
 
   const today = new Date().toISOString().slice(0, 10);
+  // Phase 3i: mode-tagging keys on stage.kind ('won' | 'lost') rather than
+  // the legacy status slug. Fall back to status for deals whose stage_id
+  // isn't in the pipelineStages lookup (seeded legacy data, etc.).
+  const stageKindById = new Map<string, 'working' | 'won' | 'lost'>();
+  for (const s of pipelineStages ?? []) stageKindById.set(s.id, s.kind);
   const tagged: StreamCardItem[] = items.map((i) => {
     let tag: 'sales' | 'ops' | 'finance' = 'ops';
     if (i.source === 'deal') {
-      tag = i.status === 'won' || i.status === 'lost' ? 'ops' : 'sales';
+      const kind = i.stage_id ? stageKindById.get(i.stage_id) : undefined;
+      const terminal = kind === 'won' || kind === 'lost'
+        || i.status === 'won' || i.status === 'lost';
+      tag = terminal ? 'ops' : 'sales';
     } else {
       tag = (i.event_date ?? '') < today ? 'finance' : 'ops';
     }
