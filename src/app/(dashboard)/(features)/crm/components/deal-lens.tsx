@@ -38,6 +38,7 @@ import { FollowUpActionLog } from './follow-up-action-log';
 import { getFollowUpForDeal, type FollowUpQueueItem } from '../actions/follow-up-actions';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { getDealActivity, type DealActivityEntry } from '../actions/get-deal-activity';
+import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
 
 
 // Legacy fallback used while the workspace's pipeline is loading (first paint)
@@ -491,6 +492,15 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
           {/* Deal diary */}
           <DealDiaryCard dealId={deal.id} dealTitle={deal.title} workspaceId={deal.workspace_id} />
+
+          {/* Captures linked to this deal */}
+          {deal.workspace_id && (
+            <ProductionCapturesPanel
+              workspaceId={deal.workspace_id}
+              kind="deal"
+              productionId={deal.id}
+            />
+          )}
 
           {/* Follow-up action log */}
           <FollowUpActionLog dealId={deal.id} />

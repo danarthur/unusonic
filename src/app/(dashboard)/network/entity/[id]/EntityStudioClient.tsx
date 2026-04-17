@@ -39,6 +39,7 @@ import { VenueSpecsEditor } from './VenueSpecsEditor';
 import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
 import { ColorTuner } from '@/features/org-identity';
 import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
+import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import type { ScoutResult } from '@/features/intelligence';
@@ -406,6 +407,20 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-3">
+          {/* Overview cards — Brief, Team, Captures */}
+          {workspaceId && details.subjectEntityId && (() => {
+            const t = details.entityDirectoryType === 'venue' ? 'venue' : 'company';
+            return (
+              <EntityOverviewCards
+                workspaceId={workspaceId}
+                entityId={details.subjectEntityId}
+                entityType={t}
+                entityName={name || details.identity.name || null}
+                density="page"
+              />
+            );
+          })()}
+
           <AccordionSection label="Identity" icon={Building2} defaultOpen>
             <div className="space-y-3">
               <div className="flex items-center gap-4">

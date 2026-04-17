@@ -31,7 +31,12 @@ const CaptureModal = dynamic(
 
 interface CaptureContextValue {
   open: boolean;
-  openCapture: () => void;
+  /**
+   * Open the capture modal. Passing `initialText` skips mic recording and
+   * routes directly to parse — used by the inline composer's typed-submit.
+   * Empty or missing `initialText` opens to the idle/recording flow.
+   */
+  openCapture: (opts?: { initialText?: string }) => void;
   closeCapture: () => void;
   workspaceId: string;
   /**
@@ -75,9 +80,17 @@ export interface CaptureProviderProps {
 export function CaptureProvider({ workspaceId, children }: CaptureProviderProps) {
   const [open, setOpen] = React.useState(false);
   const [hasEverCaptured, setHasEverCaptured] = React.useState(false);
+  const [initialText, setInitialText] = React.useState<string | undefined>(undefined);
 
-  const openCapture = React.useCallback(() => setOpen(true), []);
-  const closeCapture = React.useCallback(() => setOpen(false), []);
+  const openCapture = React.useCallback((opts?: { initialText?: string }) => {
+    setInitialText(opts?.initialText);
+    setOpen(true);
+  }, []);
+  const closeCapture = React.useCallback(() => {
+    setOpen(false);
+    // Clear the seed so the next manual open doesn't accidentally re-use it.
+    setInitialText(undefined);
+  }, []);
   const markCaptured = React.useCallback(() => setHasEverCaptured(true), []);
 
   // Hydrate from the server on mount. Default-false means the composer
@@ -105,6 +118,7 @@ export function CaptureProvider({ workspaceId, children }: CaptureProviderProps)
         return;
       }
       e.preventDefault();
+      setInitialText(undefined);
       setOpen(true);
     }
     window.addEventListener('keydown', onKey);
@@ -124,6 +138,7 @@ export function CaptureProvider({ workspaceId, children }: CaptureProviderProps)
           workspaceId={workspaceId}
           open={open}
           onOpenChange={(v) => (v ? openCapture() : closeCapture())}
+          initialText={initialText}
         />
       )}
     </CaptureContext.Provider>

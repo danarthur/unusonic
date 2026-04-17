@@ -85,7 +85,54 @@ const CaptureParseSchema = z.object({
     .string()
     .nullable()
     .describe(
-      'A short durable fact about the entity (role, context, preference). Null if none.',
+      'A short durable fact about the entity (role, context, preference, quirk, or a production-specific detail). Null if none. Do NOT restate information already captured by the entity identity (the name, the organization the entity belongs to, or the role the entity already has) — that would be redundant with the Who field. Focus on what this capture adds beyond identity.',
+    ),
+
+  linked_production: z
+    .object({
+      kind: z.enum(['deal', 'event']),
+      id: z.string().describe(
+        'Must be one of the ids from the provided list (deals or events). Do not invent.',
+      ),
+      title: z.string().nullable().describe(
+        'The display title of the matched production — server-replaces this with the canonical title after validation. Can be null; LLM may leave empty.',
+      ),
+    })
+    .nullable()
+    .describe(
+      'When the transcript mentions a specific production ("Ally Emily wedding", "the Hilton gig"), pick the matching deal OR event from the provided lists. Null when no production is mentioned or no match is confident.',
+    ),
+
+  working_notes_signals: z
+    .object({
+      communication_style: z
+        .string()
+        .nullable()
+        .describe(
+          'A DURABLE communication preference about the person (how to contact them, their style, quirks). ≤100 chars, lowercase imperative ("prefers text over email", "anxious about audio — over-confirm", "decisive, skip the long pitch"). Null when the transcript does not state one. Do NOT invent; only populate when the transcript explicitly signals a preference.',
+        ),
+      dnr_reason: z
+        .enum(['paid_late', 'unreliable', 'abuse', 'contractual', 'other'])
+        .nullable()
+        .describe(
+          'When the transcript explicitly flags this person as do-not-rebook / avoid / blacklist / never work with again, choose the closest reason. Null when the transcript does not flag them.',
+        ),
+      dnr_note: z
+        .string()
+        .nullable()
+        .describe(
+          'Free-text justification for the DNR flag (≤120 chars). Only set when dnr_reason is set. Null otherwise.',
+        ),
+      preferred_channel: z
+        .enum(['call', 'email', 'sms'])
+        .nullable()
+        .describe(
+          'The channel the person prefers for contact. Only set when the transcript EXPLICITLY says so ("just text her", "call only, no email"). Null when no explicit preference is stated.',
+        ),
+    })
+    .nullable()
+    .describe(
+      'Durable facts about how to work with this person. These populate the Working Notes card on the entity page. Return null when the transcript contains no working-notes signals (most captures will be null — only populate when signals are clear and explicit).',
     ),
 
   confidence: z
@@ -112,6 +159,12 @@ type OpenDeal = {
   organization_id: string | null;
 };
 
+type UpcomingEvent = {
+  id: string;
+  title: string | null;
+  starts_at: string | null;
+};
+
 /**
  * Relationship types that indicate a person's affiliation with a company
  * — used to enrich the prompt so the LLM can match "Alexa from Pure Lavish"
@@ -135,13 +188,17 @@ type RelRow = {
 async function fetchWorkspaceContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
-): Promise<{ entities: WorkspaceEntity[]; deals: OpenDeal[] }> {
+): Promise<{
+  entities: WorkspaceEntity[];
+  deals: OpenDeal[];
+  events: UpcomingEvent[];
+}> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   const callerUserId = user?.id ?? null;
 
-  const [entitiesRes, dealsRes] = await Promise.all([
+  const [entitiesRes, dealsRes, eventsRes] = await Promise.all([
     supabase
       .schema('directory')
       .from('entities')
@@ -157,6 +214,18 @@ async function fetchWorkspaceContext(
       .eq('workspace_id', workspaceId)
       .eq('status', 'working')
       .order('updated_at', { ascending: false })
+      .limit(30),
+    // ops.events is not in generated types (cortex/ops/directory/finance
+    // schemas are not PostgREST-exposed for types) — cast through any.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .schema('ops')
+      .from('events')
+      .select('id, title, starts_at')
+      .eq('workspace_id', workspaceId)
+      .neq('status', 'completed')
+      .not('title', 'is', null)
+      .order('starts_at', { ascending: true, nullsFirst: false })
       .limit(30),
   ]);
 
@@ -218,12 +287,14 @@ async function fetchWorkspaceContext(
   return {
     entities,
     deals: (dealsRes.data ?? []) as OpenDeal[],
+    events: (eventsRes.data ?? []) as UpcomingEvent[],
   };
 }
 
 function buildSystemPrompt(
   entities: WorkspaceEntity[],
   deals: OpenDeal[],
+  events: UpcomingEvent[],
   nowIso: string,
 ): string {
   const entityLines = entities
@@ -241,10 +312,21 @@ function buildSystemPrompt(
     .map((d) => `- deal=${d.id} · "${d.title ?? 'untitled'}"`)
     .join('\n');
 
+  const eventLines = events
+    .slice(0, 30)
+    .map((e) => {
+      const when = e.starts_at
+        ? ` · ${new Date(e.starts_at).toISOString().slice(0, 10)}`
+        : '';
+      return `- event=${e.id} · "${e.title ?? 'untitled'}"${when}`;
+    })
+    .join('\n');
+
   return [
     'You parse a user-spoken note from a production-company owner into structured capture data.',
     '',
-    'Goal: extract the person/company mentioned, any follow-up implied, and a durable note.',
+    'Goal: extract the person/company mentioned, any follow-up implied, a durable note,',
+    'and the production (deal or event) the note is about, if one is mentioned.',
     'Do NOT draft messages. The follow-up `text` is a short reminder for the user, not client-facing.',
     '',
     `Current time (ISO): ${nowIso}`,
@@ -252,8 +334,11 @@ function buildSystemPrompt(
     'Workspace entities (match these before proposing a new ghost):',
     entityLines || '(none)',
     '',
-    'Recent open deals (use to disambiguate):',
+    'Open deals (use to disambiguate AND as candidates for linked_production):',
     dealLines || '(none)',
+    '',
+    'Upcoming / active events (use as candidates for linked_production):',
+    eventLines || '(none)',
     '',
     'Entity types:',
     '- person: an individual human. Examples: "Alexa Infranca", "Matthew Arthur".',
@@ -300,6 +385,51 @@ function buildSystemPrompt(
     '- "email" if mentioned email or a send.',
     '- "sms" if mentioned text.',
     '- "unspecified" otherwise (the user will pick).',
+    '',
+    'Working-notes signals (DURABLE facts about how to work with the person):',
+    '- Extract ONLY when the transcript explicitly states the fact. Never infer',
+    '  from tone, never guess. These will be surfaced as permanent profile fields,',
+    '  so a wrong extraction is worse than no extraction.',
+    '- communication_style — lowercase imperative phrase, ≤100 chars. Examples:',
+    '    "she only texts, no emails"       → "prefers text over email"',
+    '    "over-confirm, she gets anxious"  → "over-confirm; gets anxious"',
+    '    "cut the pitch, she\'s decisive"   → "decisive — skip the long pitch"',
+    '    transcript is neutral/factual     → null',
+    '- dnr_reason / dnr_note — ONLY when the transcript explicitly flags the',
+    '  person as do-not-rebook, avoid, blacklist, or equivalent ("don\'t book her',
+    '  again", "never work with him"). Pick reason:',
+    '    paid late / slow to pay           → paid_late',
+    '    missed calls / no-showed / flaky  → unreliable',
+    '    unsafe / abusive                  → abuse',
+    '    contract / legal dispute          → contractual',
+    '    other                             → other',
+    '  Put the specific context in dnr_note.',
+    '- preferred_channel — ONLY when transcript says "just text / call only /',
+    '  email only" explicitly. Never infer from "I\'ll text her" (that\'s a plan,',
+    '  not a preference).',
+    '- When in doubt, return null for the signal. Most captures should have no',
+    '  working-notes signals at all — we\'re looking for the rare durable fact,',
+    '  not manufacturing context.',
+    '',
+    'Linked production (deal or event):',
+    '- If the transcript names a specific production, try to match it against the',
+    '  deals and events lists. Prefer EVENTS when a confirmed show is named, DEALS',
+    '  when an inquiry/proposal-stage deal is named.',
+    '- Matching rule — the NAMES must share at least one distinguishing word.',
+    '  "Distinguishing" = client name, artist name, or venue name. Words like',
+    '  "wedding", "reception", "ceremony", "gig", "show", "party", "event" do NOT',
+    '  count — they are too generic. Examples:',
+    '    "Ally Emily wedding"  matches  "Ally & Emily Wedding"       ✓ (Ally, Emily)',
+    '    "Ally Emily wedding"  matches  "Bond Wedding"                ✗ (only "wedding")',
+    '    "Hilton gig"          matches  "Waterfront Hilton 9/20"      ✓ (Hilton)',
+    '    "Sarah reception"     matches  "Bond Wedding"                ✗ (no overlap)',
+    '- When no production in the lists shares a distinguishing word with the',
+    '  transcript, set linked_production to null. A missing link is far better',
+    '  than a wrong one — a misfiled note is harder to find than an unfiled one.',
+    '- Only populate linked_production when the id you return IS in one of the',
+    '  provided lists. Do not invent ids.',
+    '- linked_production is independent of the entity — a capture can be about a',
+    '  person AND reference the production they are working on. Both get linked.',
   ].join('\n');
 }
 
@@ -455,6 +585,88 @@ async function augmentWithFuzzyMatches(
   };
 }
 
+// ── Linked-production validation ─────────────────────────────────────────────
+
+/**
+ * Strip any linked_production whose id doesn't appear in the provided lists.
+ * The LLM is conservative here because the schema description says "Must be
+ * one of the ids from the provided list" — but it occasionally invents under
+ * pressure, especially when the transcript is ambiguous. Server-side guard
+ * prevents a non-existent id from landing in the DB.
+ */
+/**
+ * Generic production words that don't distinguish one production from another.
+ * A match that only overlaps on these is treated as no match — "Ally Emily
+ * wedding" should NOT match "Bond Wedding" just because both are weddings.
+ */
+const GENERIC_PRODUCTION_TOKENS = new Set<string>([
+  'wedding', 'ceremony', 'reception', 'party', 'event', 'gig', 'show',
+  'concert', 'performance', 'festival', 'fundraiser', 'gala', 'mitzvah',
+  'bar', 'bat', 'anniversary', 'birthday', 'graduation',
+  'the', 'a', 'an', 'and', '&', 'at', 'of', 'with', 'for', 'on',
+]);
+
+/** Tokenize a title/transcript into lower-case alphanumeric words. */
+function tokenize(s: string): string[] {
+  return s
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2);
+}
+
+/** Distinguishing tokens — non-generic words that identify a specific production. */
+function distinguishingTokens(s: string): Set<string> {
+  const out = new Set<string>();
+  for (const t of tokenize(s)) {
+    if (!GENERIC_PRODUCTION_TOKENS.has(t)) out.add(t);
+  }
+  return out;
+}
+
+function validateLinkedProduction(
+  parsed: CaptureParseResult,
+  transcript: string,
+  deals: OpenDeal[],
+  events: UpcomingEvent[],
+): CaptureParseResult {
+  const link = parsed.linked_production;
+  if (!link) return parsed;
+
+  const canonical =
+    link.kind === 'deal'
+      ? deals.find((d) => d.id === link.id)
+      : events.find((e) => e.id === link.id);
+
+  if (!canonical || !canonical.title) {
+    return { ...parsed, linked_production: null };
+  }
+
+  // Require at least one distinguishing-token overlap between the transcript
+  // and the canonical production title. Prevents the LLM from matching on
+  // category alone ("wedding" ↔ "wedding") which produces misfiled notes.
+  const transcriptTokens = distinguishingTokens(transcript);
+  const titleTokens = distinguishingTokens(canonical.title);
+  let hasOverlap = false;
+  for (const t of titleTokens) {
+    if (transcriptTokens.has(t)) {
+      hasOverlap = true;
+      break;
+    }
+  }
+  if (!hasOverlap) {
+    return { ...parsed, linked_production: null };
+  }
+
+  return {
+    ...parsed,
+    linked_production: {
+      kind: link.kind,
+      id: link.id,
+      title: canonical.title,
+    },
+  };
+}
+
 // ── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -503,13 +715,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Aion is paused for this workspace' }, { status: 403 });
   }
 
-  const { entities, deals } = await fetchWorkspaceContext(supabase, workspaceId);
+  const { entities, deals, events } = await fetchWorkspaceContext(supabase, workspaceId);
 
   try {
     const { object } = await generateObject({
       model: getModel('fast'),
       schema: CaptureParseSchema,
-      system: buildSystemPrompt(entities, deals, new Date().toISOString()),
+      system: buildSystemPrompt(entities, deals, events, new Date().toISOString()),
       prompt: `Transcript:\n"""${transcript}"""`,
       temperature: 0.2,
     });
@@ -520,7 +732,12 @@ export async function POST(req: Request) {
     // decision 14.
     const augmented = await augmentWithFuzzyMatches(supabase, workspaceId, object);
 
-    return NextResponse.json({ parse: augmented });
+    // linked_production validation: (a) strip invented ids, (b) reject
+    // category-only matches by requiring distinguishing-token overlap between
+    // the transcript and the canonical title.
+    const validated = validateLinkedProduction(augmented, transcript, deals, events);
+
+    return NextResponse.json({ parse: validated });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Parse failed';
     return NextResponse.json({ error: message }, { status: 502 });

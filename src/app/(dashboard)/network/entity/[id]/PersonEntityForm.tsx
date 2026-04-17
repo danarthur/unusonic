@@ -12,6 +12,7 @@ import type { IndividualAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
 import { DealsPanel, FinancePanel } from './entity-studio-panels';
 import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
+import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { toast } from 'sonner';
 
@@ -116,6 +117,16 @@ export function PersonEntityForm({
       </header>
 
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+        {details.subjectEntityId && workspaceId && (
+          <EntityOverviewCards
+            workspaceId={workspaceId}
+            entityId={details.subjectEntityId}
+            entityType="person"
+            entityName={displayName || null}
+            density="page"
+          />
+        )}
+
         <section className="stage-panel rounded-2xl p-6 space-y-5" data-surface="surface">
           <h3 className="stage-label border-b border-[var(--stage-edge-subtle)] pb-4">
             Contact details

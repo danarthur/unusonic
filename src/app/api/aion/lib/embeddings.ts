@@ -16,7 +16,7 @@ const voyage = createVoyage({ apiKey: process.env.VOYAGE_API_KEY! });
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type SourceType = 'deal_note' | 'follow_up' | 'proposal' | 'event_note';
+export type SourceType = 'deal_note' | 'follow_up' | 'proposal' | 'event_note' | 'capture';
 
 export type ContextHeaderInput = {
   dealTitle?: string | null;
@@ -82,6 +82,10 @@ export function buildContextHeader(
     case 'event_note':
       parts.push('This is an event note');
       if (input.eventTitle) parts.push(`for "${input.eventTitle}"`);
+      break;
+    case 'capture':
+      parts.push('This is a voice/text capture');
+      if (input.entityName) parts.push(`about ${input.entityName}`);
       break;
   }
 
@@ -202,7 +206,16 @@ export async function searchMemory(
 
     if (error || !data) return [];
 
-    return (data as any[]).map((r) => ({
+    type RawMatchRow = {
+      id: string;
+      content_text: string;
+      content_header: string | null;
+      source_type: string;
+      source_id: string;
+      metadata: Record<string, unknown> | null;
+      similarity: number;
+    };
+    return (data as RawMatchRow[]).map((r) => ({
       id: r.id,
       content: r.content_text,
       header: r.content_header,

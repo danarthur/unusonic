@@ -45,6 +45,7 @@ import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
 import { AccordionSection } from './entity-studio-panels';
+import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import type { CrewSkillDTO, SkillLevel } from '@/entities/talent';
 import { coiStatus } from '@/shared/lib/crew-profile';
 
@@ -443,6 +444,17 @@ export function EmployeeEntityForm({
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-4">
+
+        {/* 0a — Overview cards (Brief, Working notes, Captures, Productions) */}
+        {workspaceId && (
+          <EntityOverviewCards
+            workspaceId={workspaceId}
+            entityId={entityId}
+            entityType="person"
+            entityName={displayName || null}
+            density="page"
+          />
+        )}
 
         {/* 0 — Avatar */}
         <div className="stage-panel rounded-2xl flex flex-col items-center gap-3 py-6" data-surface="surface">
