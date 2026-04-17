@@ -60,6 +60,16 @@ import { PasskeyNudgeBanner } from '@/widgets/passkey-nudge-banner';
 type RendererInput = {
   dashboardData?: DashboardData;
   loading: boolean;
+  /**
+   * The active layout's ordered card IDs, or `undefined` for the legacy
+   * default bento (where the preset has no explicit cardIds list).
+   *
+   * Phase 2 commit 2 (Sales Brief v2): TodaysBriefWidget reads this to
+   * compute the active domain set for layout-aware insight-row reordering.
+   * Other widgets ignore it today; the field is optional to keep the
+   * renderer surface narrow.
+   */
+  activeCardIds?: readonly string[];
 };
 
 type LobbyCardRenderer = (input: RendererInput) => React.ReactElement | null;
@@ -126,7 +136,9 @@ const RENDERERS: Record<string, LobbyCardRenderer> = {
   },
 
   // Self-fetching widgets / banners ------------------------------------------
-  'lobby.todays_brief': () => <TodaysBriefWidget />,
+  'lobby.todays_brief': ({ activeCardIds }) => (
+    <TodaysBriefWidget activeCardIds={activeCardIds} />
+  ),
   'lobby.owed_today': () => <OwedTodayWidget />,
   'lobby.this_week': () => <ThisWeekWidget />,
   'lobby.awaiting_signature': () => <AwaitingSignatureWidget />,

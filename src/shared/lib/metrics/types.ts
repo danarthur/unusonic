@@ -32,6 +32,31 @@ export type MetricRefreshCadence = 'live' | 'hourly' | 'daily' | 'manual';
 export type MetricRole = 'owner' | 'pm' | 'finance_admin' | 'touring_coordinator' | 'employee';
 
 /**
+ * Semantic domain a card reports against. Drives layout-aware insight-row
+ * ordering in the brief card (see docs/reference/sales-brief-v2-design.md §6.4).
+ *
+ * - sales       — deals, proposals, clients, pipeline, follow-ups
+ * - finance     — invoices, payments, AR aging, QBO, reconciliation
+ * - production  — shows, logistics, production timeline, show-control
+ * - crew        — staffing, assignments, availability, day sheets
+ * - ops         — schedule, calendar, activity spanning domains
+ * - meta        — utility/pinned/action surfaces with no single domain
+ *
+ * A card may declare MULTIPLE domains when legitimately cross-cutting
+ * (`lobby.action_queue`, `lobby.activity_feed`, `lobby.todays_brief` itself).
+ * The brief reorder pass treats the card's domain set as a vote: if ANY
+ * declared domain matches the active layout's aggregate domain set, the
+ * card's votes propagate. See §6.4 for the voting rule.
+ */
+export type Domain =
+  | 'sales'
+  | 'finance'
+  | 'production'
+  | 'crew'
+  | 'ops'
+  | 'meta';
+
+/**
  * Business-meaning sentiment for the comparison delta.
  * 'positive': up = good (revenue going up).
  * 'negative': up = bad (overdue going up).
@@ -79,6 +104,14 @@ type MetricBase = {
   relatedMetrics?: string[];
   /** Free-form notes, especially when the RPC reads grandfathered tables. */
   notes?: string;
+  /**
+   * Domain(s) this metric reports against. Drives layout-aware insight-row
+   * ordering in the brief card. Cards may declare multiple domains when
+   * legitimately cross-cutting. Omit (or declare `['meta']`) for utility
+   * cards with no semantic domain. See `Domain` above and
+   * docs/reference/sales-brief-v2-design.md §6.4.
+   */
+  domain?: Domain[];
 };
 
 /** RPC-backed metric base: adds RPC name/schema plus an optional widget render hint. */

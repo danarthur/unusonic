@@ -21,7 +21,17 @@ const ActionFlowSheet = dynamic(
 
 const META = METRICS['lobby.todays_brief'];
 
-export function TodaysBriefWidget() {
+export interface TodaysBriefWidgetProps {
+  /**
+   * The active layout's cardIds — drives layout-aware insight-row reordering
+   * in `getBriefAndInsights`. `undefined` (legacy bento / Default preset) or
+   * `[]` skips the reorder pass and returns priority-only order. See
+   * docs/reference/sales-brief-v2-design.md §6.4.
+   */
+  activeCardIds?: readonly string[];
+}
+
+export function TodaysBriefWidget({ activeCardIds }: TodaysBriefWidgetProps = {}) {
   const [data, setData] = useState<BriefAndInsights | undefined>(undefined);
   const [activeInsight, setActiveInsight] = useState<AionInsight | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
@@ -35,15 +45,20 @@ export function TodaysBriefWidget() {
   // Null when the capture feature flag is off — composer hides entirely.
   const captureCtx = useOptionalCapture();
 
+  // Stable stringified key so the effect only refires when the card set
+  // genuinely changes (not on every layout-reference identity change).
+  const cardIdsKey = activeCardIds ? activeCardIds.join('|') : '';
+
   // ── Fetch brief + insights + capture state ──────────────────────────────
 
   useEffect(() => {
     let active = true;
-    void getBriefAndInsights()
+    const ids = cardIdsKey ? cardIdsKey.split('|') : undefined;
+    void getBriefAndInsights(ids)
       .then((d) => { if (active) setData(d); })
       .catch(() => { if (active) setData({ brief: null, insights: [], workspaceId: null }); });
     return () => { active = false; };
-  }, []);
+  }, [cardIdsKey]);
 
   useEffect(() => {
     if (!captureCtx) return;

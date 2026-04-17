@@ -2,6 +2,8 @@
 
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { activeDomainsFor } from '@/shared/lib/metrics/domains';
+import { domainForTrigger } from '@/app/api/aion/lib/insight-trigger-domains';
 
 // Re-export so consumers don't need to import from the actions file directly
 export type { AionInsight } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
@@ -25,20 +27,65 @@ export type BriefAndInsights = {
  * Uses the system client because ops/cortex schemas are not exposed via
  * PostgREST — the authenticated client's .schema() calls silently fail.
  * Workspace scoping is enforced by the WHERE clause.
+ *
+ * When `cardIds` is provided, insight rows are stable-sorted so rows whose
+ * trigger-domain is in the active layout's aggregate domain set come first.
+ * Cross-domain rows stay visible below — no filtering. See
+ * docs/reference/sales-brief-v2-design.md §6.4.
  */
-export async function getBriefAndInsights(): Promise<BriefAndInsights> {
+export async function getBriefAndInsights(
+  cardIds?: readonly string[],
+): Promise<BriefAndInsights> {
   const workspaceId = await getActiveWorkspaceId();
-  console.log('[brief-debug] workspaceId:', workspaceId);
   if (!workspaceId) return { brief: null, insights: [], workspaceId: null };
 
   // Fetch independently so one failure doesn't take down both
-  const [brief, insights] = await Promise.all([
-    fetchBrief(workspaceId).catch((e) => { console.error('[brief-debug] fetchBrief error:', e); return null; }),
-    fetchInsights(workspaceId).catch((e) => { console.error('[brief-debug] fetchInsights error:', e); return []; }),
+  const [brief, insightsRaw] = await Promise.all([
+    fetchBrief(workspaceId).catch(() => null),
+    fetchInsights(workspaceId).catch(() => []),
   ]);
 
-  console.log('[brief-debug] brief:', brief ? 'found' : 'null', 'insights:', insights.length);
+  const insights = reorderInsightsByLayout(insightsRaw, cardIds ?? []);
   return { brief, insights, workspaceId };
+}
+
+// ── Reorder by layout domain ────────────────────────────────────────────────
+
+/**
+ * Stable-sort insights so layout-matching rows come first. Priority (DESC)
+ * breaks ties inside each bucket. Matches the priority-first order the
+ * original query returned when no cardIds are provided (Default preset /
+ * legacy bento — activeDomainsFor(empty) returns the full non-meta set,
+ * so every row "matches").
+ *
+ * Meta-domain triggers (currently none by default) always rank with the
+ * cross-domain set since they have no specific domain to match against.
+ */
+function reorderInsightsByLayout(
+  insights: AionInsight[],
+  cardIds: readonly string[],
+): AionInsight[] {
+  if (insights.length <= 1) return insights;
+
+  const activeDomains = activeDomainsFor(cardIds);
+
+  // Partition into "layout-matching" and "cross-domain-only" while
+  // preserving the original priority-DESC order inside each partition.
+  const matching: AionInsight[] = [];
+  const crossDomain: AionInsight[] = [];
+
+  for (const insight of insights) {
+    const domain = domainForTrigger(insight.triggerType);
+    // meta triggers and unknown triggers fall into the cross-domain bucket
+    // so they never displace layout-matching rows.
+    if (domain !== 'meta' && activeDomains.has(domain)) {
+      matching.push(insight);
+    } else {
+      crossDomain.push(insight);
+    }
+  }
+
+  return [...matching, ...crossDomain];
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────
@@ -46,7 +93,24 @@ export async function getBriefAndInsights(): Promise<BriefAndInsights> {
 async function fetchBrief(workspaceId: string): Promise<BriefData | null> {
   const system = getSystemClient();
 
-  const { data, error } = await (system as any)
+  const { data, error } = await (system as unknown as {
+    schema(s: string): {
+      from(t: string): {
+        select(cols: string): {
+          eq(c: string, v: string): {
+            order(c: string, o: { ascending: boolean }): {
+              limit(n: number): {
+                maybeSingle(): Promise<{
+                  data: { body: string; facts_json: Record<string, unknown>; generated_at: string } | null;
+                  error: unknown;
+                }>;
+              };
+            };
+          };
+        };
+      };
+    };
+  })
     .schema('ops')
     .from('daily_briefings')
     .select('body, facts_json, generated_at')
@@ -55,13 +119,9 @@ async function fetchBrief(workspaceId: string): Promise<BriefData | null> {
     .limit(1)
     .maybeSingle();
 
-  console.log('[brief-debug] fetchBrief result:', { data, error: error?.message ?? null });
   if (error || !data) return null;
-
-  const row = data as { body: string; facts_json: Record<string, unknown>; generated_at: string };
-  if (!row.body) return null;
-
-  return { body: row.body, factsJson: row.facts_json, generatedAt: row.generated_at };
+  if (!data.body) return null;
+  return { body: data.body, factsJson: data.facts_json, generatedAt: data.generated_at };
 }
 
 async function fetchInsights(workspaceId: string): Promise<AionInsight[]> {
@@ -76,11 +136,20 @@ async function fetchInsights(workspaceId: string): Promise<AionInsight[]> {
     .order('priority', { ascending: false })
     .limit(5);
 
-  console.log('[brief-debug] fetchInsights result:', { count: data?.length ?? 0, error: error?.message ?? null });
   if (error || !data) return [];
 
-  return (data as any[]).map((r) => {
-    const ctx = r.context ?? {};
+  return (data as Array<{
+    id: string;
+    trigger_type: string;
+    entity_type: string;
+    entity_id: string;
+    title: string;
+    context: Record<string, unknown> | null;
+    priority: number;
+    status: string;
+    created_at: string;
+  }>).map((r) => {
+    const ctx = (r.context ?? {}) as Record<string, unknown>;
     return {
       id: r.id,
       triggerType: r.trigger_type,
@@ -89,9 +158,9 @@ async function fetchInsights(workspaceId: string): Promise<AionInsight[]> {
       title: r.title,
       context: ctx,
       priority: r.priority,
-      suggestedAction: ctx.suggestedAction ?? null,
-      href: ctx.href ?? null,
-      urgency: ctx.urgency ?? 'low',
+      suggestedAction: (ctx.suggestedAction as string | undefined) ?? null,
+      href: (ctx.href as string | undefined) ?? null,
+      urgency: (ctx.urgency as 'high' | 'medium' | 'low' | undefined) ?? 'low',
       status: r.status,
       createdAt: r.created_at,
     };

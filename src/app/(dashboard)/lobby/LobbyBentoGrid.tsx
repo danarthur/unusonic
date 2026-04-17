@@ -171,7 +171,10 @@ function ModularBentoGrid({
 }) {
   const loading = !dashboardData;
   const cells = cardIds
-    .map((id) => ({ id, node: renderLobbyCard(id, { dashboardData, loading }) }))
+    .map((id) => ({
+      id,
+      node: renderLobbyCard(id, { dashboardData, loading, activeCardIds: cardIds }),
+    }))
     .filter((c): c is { id: string; node: React.ReactElement } => c.node !== null);
 
   const sensors = useSensors(
