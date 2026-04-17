@@ -45,20 +45,72 @@ export interface CaptureModalProps {
 export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalProps) {
   const [stage, setStage] = React.useState<Stage>({ kind: 'idle' });
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
   const chunksRef = React.useRef<Blob[]>([]);
   const autoStopRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const captureCtx = useOptionalCapture();
 
-  const resetToIdle = React.useCallback(() => {
-    if (autoStopRef.current) clearTimeout(autoStopRef.current);
-    setStage({ kind: 'idle' });
+  /**
+   * Release every mic resource this modal owns. Safe to call repeatedly —
+   * MediaRecorder.stop() and track.stop() are idempotent when the object
+   * is already inactive/ended. Covers three close paths: Escape, backdrop
+   * click, and explicit handleClose — all of which previously left the
+   * stream running and lit the OS-level mic indicator indefinitely.
+   */
+  const releaseMic = React.useCallback(() => {
+    if (autoStopRef.current) {
+      clearTimeout(autoStopRef.current);
+      autoStopRef.current = null;
+    }
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try {
+        rec.stop();
+      } catch {
+        /* recorder already stopped */
+      }
+    }
+    mediaRecorderRef.current = null;
+    const stream = streamRef.current;
+    if (stream) {
+      for (const track of stream.getTracks()) {
+        try {
+          track.stop();
+        } catch {
+          /* track already ended */
+        }
+      }
+      streamRef.current = null;
+    }
+    chunksRef.current = [];
   }, []);
 
+  const resetToIdle = React.useCallback(() => {
+    releaseMic();
+    setStage({ kind: 'idle' });
+  }, [releaseMic]);
+
   const handleClose = React.useCallback(() => {
+    releaseMic();
     onOpenChange(false);
     // Defer reset so the exit animation doesn't flicker during stage change.
     setTimeout(() => setStage({ kind: 'idle' }), 200);
-  }, [onOpenChange]);
+  }, [onOpenChange, releaseMic]);
+
+  // Hard stop on unmount — covers navigation-away and parent unmount cases
+  // that onOpenChange alone won't catch.
+  React.useEffect(() => {
+    return () => {
+      releaseMic();
+    };
+  }, [releaseMic]);
+
+  // Release the mic immediately when the dialog's `open` flips to false
+  // via a route outside handleClose (Escape / backdrop click on the Radix
+  // dialog primitive). Idempotent — safe even when handleClose already ran.
+  React.useEffect(() => {
+    if (!open) releaseMic();
+  }, [open, releaseMic]);
 
   // Auto-start recording when the modal opens fresh.
   React.useEffect(() => {
@@ -70,6 +122,7 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       const rec = new MediaRecorder(stream);
       chunksRef.current = [];
       mediaRecorderRef.current = rec;
@@ -78,7 +131,14 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       rec.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
+        // Release the mic the moment recording stops, regardless of whether
+        // the stop was explicit (user hit Stop) or implicit (modal closed).
+        if (streamRef.current) {
+          for (const track of streamRef.current.getTracks()) {
+            try { track.stop(); } catch { /* already ended */ }
+          }
+          streamRef.current = null;
+        }
         void processAudio();
       };
       rec.start();

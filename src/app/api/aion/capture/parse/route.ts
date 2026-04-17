@@ -79,9 +79,9 @@ const CaptureParseSchema = z.object({
 
   confidence: z
     .number()
-    .min(0)
-    .max(1)
-    .describe('0-1. Drives whether the review card auto-saves or asks for review.'),
+    .describe(
+      'A float from 0 to 1. Use ≥0.85 only when the entity match is unambiguous and the intent is clear. Below 0.5 when ambiguous or low signal. Drives whether the review card auto-saves or asks for review.',
+    ),
 });
 
 export type CaptureParseResult = z.infer<typeof CaptureParseSchema>;

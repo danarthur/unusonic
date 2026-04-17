@@ -72,7 +72,7 @@ function FirstRunState({
       aria-label="Tell Aion something — capture a thought"
     >
       <Mic
-        className="w-4 h-4 shrink-0 text-[var(--stage-text-primary)]"
+        className="w-4 h-4 shrink-0 text-[var(--stage-text-tertiary)]"
         aria-hidden
       />
       <span className="text-sm">
