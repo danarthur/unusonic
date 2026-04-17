@@ -1,20 +1,27 @@
 /**
- * Capture — Transcribe.
+ * Capture — Transcribe (Deepgram Nova-3 with Keyterm Prompting).
  *
  * POST /api/aion/capture/transcribe
  *
- * Accepts an audio blob via multipart form (field: `audio`), calls OpenAI
- * Whisper, returns the transcript. Stateless — nothing is persisted at this
- * stage. The transcript is held client-side and then POSTed to /parse.
+ * Accepts an audio blob via multipart form (field: `audio`), injects the
+ * workspace's known entity names as Nova-3 keyterms (up to 100 — a
+ * vendor-specific mechanism that lifts proper-noun recall up to 90% per
+ * Deepgram's published tests), then returns the transcript. Stateless —
+ * nothing is persisted here. The transcript is held client-side then
+ * POSTed to /parse.
  *
- * Split from /parse so a failed parse can be retried without re-transcribing
- * (and so each stage is independently measurable).
- *
- * See docs/reference/sales-brief-v2-design.md §10.7.
+ * Why Deepgram Nova-3 over OpenAI Whisper: the previous Whisper impl
+ * relied on OpenAI's `prompt` param (224-token limit, OpenAI's own cookbook
+ * says it's unreliable for proper nouns) — and this workspace uses heavy
+ * client-name vocabulary where transcription accuracy is load-bearing
+ * (a wrong name breaks downstream entity matching in /parse). Research
+ * pass 2026-04-16 converged on Nova-3's Keyterm Prompting as the
+ * purpose-built mechanism for this exact failure mode. See
+ * docs/reference/sales-brief-v2-design.md §10.7 + §20 decision 13.
  */
 
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { DeepgramClient } from '@deepgram/sdk';
 import { createClient } from '@/shared/api/supabase/server';
 import { canExecuteAionAction } from '@/features/intelligence/lib/aion-gate';
 import { getAionConfigForWorkspace } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
@@ -22,8 +29,9 @@ import { getAionConfigForWorkspace } from '@/app/(dashboard)/(features)/aion/act
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-const WHISPER_MODEL = 'whisper-1';
-const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // matches storage bucket cap
+const MODEL = 'nova-3';
+const KEYTERM_CAP = 100;
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
   'audio/webm',
   'audio/ogg',
@@ -32,12 +40,54 @@ const ALLOWED_MIME = new Set([
   'audio/wav',
 ]);
 
-function getOpenAI(): OpenAI {
-  const key = process.env.OPENAI_API_KEY?.trim();
+function getDeepgram(): DeepgramClient {
+  const key = process.env.DEEPGRAM_API_KEY?.trim();
   if (!key) {
-    throw new Error('OPENAI_API_KEY not configured');
+    throw new Error('DEEPGRAM_API_KEY not configured');
   }
-  return new OpenAI({ apiKey: key });
+  return new DeepgramClient({ apiKey: key });
+}
+
+/**
+ * Fetch the workspace's most-recently-touched entity display names for use
+ * as Deepgram `keyterm`s. Nova-3 caps at 100 terms — we order by
+ * `updated_at DESC` so the capture covers whoever's been active recently.
+ *
+ * Non-fatal: a failure (schema drift, RLS edge case, network blip) yields
+ * an empty keyterms array and the transcription falls back to Nova-3's
+ * default vocabulary. The user still gets a transcript.
+ */
+async function fetchWorkspaceKeyterms(workspaceId: string): Promise<string[]> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('display_name')
+      .eq('owner_workspace_id', workspaceId)
+      .not('display_name', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(KEYTERM_CAP);
+
+    const names = ((data ?? []) as { display_name: string | null }[])
+      .map((r) => r.display_name)
+      .filter((n): n is string => n !== null && n.trim().length > 0);
+
+    // Dedupe preserving order, trim whitespace, reject empties.
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const n of names) {
+      if (!n) continue;
+      const t = n.trim();
+      if (!t || seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+      if (out.length >= KEYTERM_CAP) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 export async function POST(req: Request) {
@@ -78,8 +128,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Unsupported mime: ${audio.type}` }, { status: 415 });
   }
 
-  // Tier gate — captures share the Aion-actions budget since they trigger
-  // a Whisper call + downstream LLM parse.
+  // Tier gate + kill switch — unchanged from Whisper implementation.
   const gate = await canExecuteAionAction(workspaceId, 'active');
   if (!gate.allowed) {
     return NextResponse.json(
@@ -93,36 +142,62 @@ export async function POST(req: Request) {
     );
   }
 
-  // Kill switch
   const aionConfig = await getAionConfigForWorkspace(workspaceId);
   if (aionConfig.kill_switch) {
     return NextResponse.json({ error: 'Aion is paused for this workspace' }, { status: 403 });
   }
 
-  // Call Whisper
-  let openai: OpenAI;
+  // Pull keyterms in parallel with the Deepgram client init — both are cheap,
+  // the keyterms query is a ~50ms read against directory.entities.
+  let deepgram: DeepgramClient;
   try {
-    openai = getOpenAI();
+    deepgram = getDeepgram();
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'LLM not configured' },
+      { error: err instanceof Error ? err.message : 'STT provider not configured' },
       { status: 500 },
     );
   }
 
+  const keyterms = await fetchWorkspaceKeyterms(workspaceId);
+
   try {
-    const result = await openai.audio.transcriptions.create({
-      file: audio,
-      model: WHISPER_MODEL,
-      response_format: 'verbose_json',
-    });
+    const audioBuffer = Buffer.from(await audio.arrayBuffer());
+    const response = await deepgram.listen.v1.media.transcribeFile(
+      audioBuffer,
+      {
+        model: MODEL,
+        keyterm: keyterms.length > 0 ? keyterms : undefined,
+        punctuate: true,
+        smart_format: true,
+        numerals: true,
+      },
+      {
+        headers: {
+          // Advertise the mime so Deepgram parses WebM/Opus correctly.
+          'Content-Type': audio.type || 'audio/webm',
+        },
+      },
+    );
+
+    // Nova-3 returns synchronously — not the async accepted-response shape.
+    type Alternative = { transcript?: string };
+    type Channel = { alternatives?: Alternative[] };
+    type Results = { channels?: Channel[]; utterances?: unknown[] };
+    type Metadata = { duration?: number };
+    const result = response as unknown as {
+      results?: Results;
+      metadata?: Metadata;
+    };
+
+    const transcript =
+      result.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? '';
+    const duration_seconds = result.metadata?.duration ?? null;
 
     return NextResponse.json({
-      transcript: result.text ?? '',
-      duration_seconds:
-        typeof (result as { duration?: number }).duration === 'number'
-          ? (result as { duration: number }).duration
-          : null,
+      transcript: transcript.trim(),
+      duration_seconds,
+      keyterms_count: keyterms.length,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Transcription failed';
