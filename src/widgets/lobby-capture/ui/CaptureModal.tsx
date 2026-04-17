@@ -112,62 +112,79 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
     if (!open) releaseMic();
   }, [open, releaseMic]);
 
-  // Auto-start recording when the modal opens fresh.
+  // Auto-start recording when the modal opens fresh. Uses a cancellation
+  // token to survive React 18 StrictMode's mount → fake-unmount → mount
+  // cycle in dev: if the effect tears down while getUserMedia is still
+  // pending, we stop the resolved stream on arrival instead of orphaning
+  // it in memory. The orphan-stream leak is what was keeping Daniel's
+  // tab-level mic indicator lit after a successful save.
   React.useEffect(() => {
     if (!open || stage.kind !== 'idle') return;
-    void startRecording();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally auto-start on open only, not every stage/startRecording identity change
-  }, [open]);
 
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const rec = new MediaRecorder(stream);
-      chunksRef.current = [];
-      mediaRecorderRef.current = rec;
+    let cancelled = false;
 
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      rec.onstop = () => {
-        // Release the mic the moment recording stops, regardless of whether
-        // the stop was explicit (user hit Stop) or implicit (modal closed).
-        // Also null out refs and detach event handlers so the MediaRecorder
-        // can be garbage-collected — Chrome's tab-level mic indicator
-        // occasionally persists while the MediaRecorder object is still
-        // reachable from the page, even with inactive tracks.
-        if (streamRef.current) {
-          for (const track of streamRef.current.getTracks()) {
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        if (cancelled) {
+          // Effect torn down during await. The stream resolved anyway —
+          // release it immediately so the mic indicator doesn't linger.
+          for (const track of stream.getTracks()) {
             try { track.stop(); } catch { /* already ended */ }
           }
-          streamRef.current = null;
+          return;
         }
-        if (rec.ondataavailable) rec.ondataavailable = null;
-        if (rec.onstop) rec.onstop = null;
-        if (mediaRecorderRef.current === rec) {
-          mediaRecorderRef.current = null;
-        }
-        void processAudio();
-      };
-      rec.start();
-      setStage({ kind: 'recording', startedAt: Date.now() });
 
-      autoStopRef.current = setTimeout(() => {
-        if (mediaRecorderRef.current?.state === 'recording') {
-          mediaRecorderRef.current.stop();
+        streamRef.current = stream;
+        const rec = new MediaRecorder(stream);
+        chunksRef.current = [];
+        mediaRecorderRef.current = rec;
+
+        rec.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+        rec.onstop = () => {
+          // Defense-in-depth: stopRecording already stops tracks
+          // synchronously, but this covers the auto-stop timer and the
+          // Escape/backdrop-close paths where stopRecording isn't invoked.
+          if (streamRef.current) {
+            for (const track of streamRef.current.getTracks()) {
+              try { track.stop(); } catch { /* already ended */ }
+            }
+            streamRef.current = null;
+          }
+          if (rec.ondataavailable) rec.ondataavailable = null;
+          if (rec.onstop) rec.onstop = null;
+          if (mediaRecorderRef.current === rec) {
+            mediaRecorderRef.current = null;
+          }
+          void processAudio();
+        };
+        rec.start();
+        setStage({ kind: 'recording', startedAt: Date.now() });
+
+        autoStopRef.current = setTimeout(() => {
+          if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+        }, MAX_RECORDING_MS);
+      } catch (err) {
+        if (cancelled) return;
+        const name = err instanceof Error ? err.name : '';
+        if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'NotFoundError') {
+          setStage({ kind: 'typing', draft: '' });
+        } else {
+          setStage({ kind: 'error', message: 'Mic unavailable. Try typing instead.' });
         }
-      }, MAX_RECORDING_MS);
-    } catch (err) {
-      // Fall back to typing on permission denial.
-      const name = err instanceof Error ? err.name : '';
-      if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'NotFoundError') {
-        setStage({ kind: 'typing', draft: '' });
-      } else {
-        setStage({ kind: 'error', message: 'Mic unavailable. Try typing instead.' });
       }
-    }
-  }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally auto-start on open only, stage.kind gates the re-entry inside
+  }, [open]);
 
   function stopRecording() {
     if (autoStopRef.current) {
