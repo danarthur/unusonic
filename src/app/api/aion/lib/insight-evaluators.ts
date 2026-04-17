@@ -7,6 +7,10 @@
  */
 
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { evaluateQuoteExpiring } from './evaluators/quote-expiring';
+import { evaluateHotLeadMultiView } from './evaluators/hot-lead-multi-view';
+import { evaluateDepositGap } from './evaluators/deposit-gap';
+import { evaluateGoneQuietWithValue } from './evaluators/gone-quiet-with-value';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,10 +34,16 @@ export async function evaluateAllInsights(workspaceId: string): Promise<InsightC
   const crewData = await getUpcomingDealsWithCrew(workspaceId);
 
   const results = await Promise.allSettled([
+    // v1 set
     evaluateProposalViewedUnsigned(workspaceId),
     evaluateCrewUnconfirmed(workspaceId, crewData),
     evaluateShowNoCrew(workspaceId, crewData),
     evaluateDealStale(workspaceId),
+    // Phase 2 commit 3 — sales-specific evaluators
+    evaluateQuoteExpiring(workspaceId),
+    evaluateHotLeadMultiView(workspaceId),
+    evaluateDepositGap(workspaceId),
+    evaluateGoneQuietWithValue(workspaceId),
   ]);
 
   return results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
@@ -107,25 +117,25 @@ export async function resolveStaleInsights(workspaceId: string): Promise<void> {
   } catch { /* best effort */ }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers (exported for evaluators/*.ts) ──────────────────────────────────
 
 /** Days from now to a future date (negative if past). */
-function daysUntil(date: string | Date): number {
+export function daysUntil(date: string | Date): number {
   return Math.ceil((new Date(date).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
 /** Days since a past date. */
-function daysSince(date: string | Date): number {
+export function daysSince(date: string | Date): number {
   return Math.floor((Date.now() - new Date(date).getTime()) / (24 * 60 * 60 * 1000));
 }
 
 /** Human-readable short date: "Apr 12" */
-function shortDate(date: string | Date): string {
+export function shortDate(date: string | Date): string {
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 /** Urgency from days-until-event. */
-function eventUrgency(daysOut: number): InsightCandidate['urgency'] {
+export function eventUrgency(daysOut: number): InsightCandidate['urgency'] {
   if (daysOut <= 1) return 'critical';
   if (daysOut <= 3) return 'high';
   if (daysOut <= 5) return 'medium';
