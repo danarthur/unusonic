@@ -2,6 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { getPrimitive } from '@/shared/lib/triggers';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -37,6 +38,16 @@ export type UpdateStagePatch = {
   opens_handoff_wizard?: boolean;
   hide_from_portal?: boolean;
 };
+
+/**
+ * A single stage-trigger entry, as stored in `ops.pipeline_stages.triggers`.
+ *
+ * `type` must match a primitive registered in `src/shared/lib/triggers/`.
+ * `config` is the primitive-specific config object; validated against
+ * `primitive.configSchema` at save time so the dispatcher never encounters
+ * a broken config at fire time (see design doc §7.2, §12 Phase 3).
+ */
+export type TriggerEntry = { type: string; config: Record<string, unknown> };
 
 // ── Capability gate helper ─────────────────────────────────────────────────
 
@@ -184,4 +195,74 @@ export async function reorderPipelineStages(
   revalidatePath('/settings/pipeline');
   revalidatePath('/crm');
   return { success: true };
+}
+
+// ── updatePipelineStageTriggers ────────────────────────────────────────────
+
+/**
+ * Replace the full `triggers` array on a stage.
+ *
+ * Validation matches the dispatcher's runtime contract
+ * (src/shared/lib/triggers/dispatch.ts):
+ *   - every entry.type must resolve via `getPrimitive(type)`
+ *   - every entry.config must parse against `primitive.configSchema`
+ *
+ * Fails fast on either so admins can't ship a config that would only
+ * break at dispatch time. Writes the array as a replacement — callers
+ * build the new array client-side (add/edit/remove) and send it whole.
+ */
+export async function updatePipelineStageTriggers(
+  stageId: string,
+  triggers: TriggerEntry[],
+): Promise<StageResult> {
+  const gate = await assertManagePipelines();
+  if (!gate.ok) return { success: false, error: gate.error };
+
+  if (!Array.isArray(triggers)) {
+    return { success: false, error: 'Triggers must be an array.' };
+  }
+
+  const validated: TriggerEntry[] = [];
+  for (let i = 0; i < triggers.length; i++) {
+    const entry = triggers[i];
+    if (!entry || typeof entry !== 'object' || typeof entry.type !== 'string') {
+      return { success: false, error: `Trigger #${i + 1} is malformed.` };
+    }
+
+    const primitive = getPrimitive(entry.type);
+    if (!primitive) {
+      return { success: false, error: `Unknown trigger type: "${entry.type}".` };
+    }
+
+    const parsed = primitive.configSchema.safeParse(entry.config ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path.join('.') || '(root)';
+      const msg = issue?.message ?? 'invalid config';
+      return {
+        success: false,
+        error: `Invalid config for "${entry.type}" at ${path}: ${msg}`,
+      };
+    }
+
+    // Persist the parsed config so Zod defaults are baked in (e.g.
+    // `amount_basis: 'deposit'` for send_deposit_invoice) — keeps the
+    // stored shape in lockstep with what the dispatcher will read.
+    validated.push({
+      type: entry.type,
+      config: parsed.data as Record<string, unknown>,
+    });
+  }
+
+  const { error } = await (gate.supabase as any)
+    .schema('ops')
+    .from('pipeline_stages')
+    .update({ triggers: validated })
+    .eq('id', stageId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath('/settings/pipeline');
+  revalidatePath('/crm');
+  return { success: true, stageId };
 }

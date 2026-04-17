@@ -9,6 +9,7 @@ import { Workflow } from 'lucide-react';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { PipelineEditor } from './pipeline-editor';
+import type { TriggerEntry } from '@/features/pipeline-settings/api/actions';
 
 export const metadata = {
   title: 'Deal flow | Unusonic',
@@ -28,6 +29,7 @@ type EditorStage = {
   tags: string[];
   color_token: string | null;
   rotting_days: number | null;
+  triggers: TriggerEntry[];
 };
 
 type PipelineWithStages = {
@@ -54,7 +56,7 @@ export default async function PipelineSettingsPage() {
     .schema('ops')
     .from('pipelines')
     .select(
-      'id, name, pipeline_stages(id, slug, label, kind, sort_order, requires_confirmation, opens_handoff_wizard, hide_from_portal, tags, color_token, rotting_days, is_archived)',
+      'id, name, pipeline_stages(id, slug, label, kind, sort_order, requires_confirmation, opens_handoff_wizard, hide_from_portal, tags, color_token, rotting_days, triggers, is_archived)',
     )
     .eq('workspace_id', workspaceId)
     .eq('is_default', true)
@@ -83,7 +85,30 @@ export default async function PipelineSettingsPage() {
     tags: string[] | null;
     color_token: string | null;
     rotting_days: number | null;
+    triggers: unknown;
     is_archived: boolean;
+  };
+
+  // `triggers` is `jsonb` — defensively coerce unknown shapes to [].
+  // Malformed rows shouldn't brick the editor; admins can overwrite.
+  const normalizeTriggers = (raw: unknown): TriggerEntry[] => {
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((entry): TriggerEntry[] => {
+      if (
+        entry &&
+        typeof entry === 'object' &&
+        typeof (entry as { type?: unknown }).type === 'string'
+      ) {
+        const cfg = (entry as { config?: unknown }).config;
+        return [
+          {
+            type: (entry as { type: string }).type,
+            config: (cfg && typeof cfg === 'object' ? cfg : {}) as Record<string, unknown>,
+          },
+        ];
+      }
+      return [];
+    });
   };
 
   const raw = pipelineRow as { id: string; name: string; pipeline_stages?: StageRow[] };
@@ -102,6 +127,7 @@ export default async function PipelineSettingsPage() {
       tags: s.tags ?? [],
       color_token: s.color_token,
       rotting_days: s.rotting_days,
+      triggers: normalizeTriggers(s.triggers),
     }));
 
   const pipeline: PipelineWithStages = {
