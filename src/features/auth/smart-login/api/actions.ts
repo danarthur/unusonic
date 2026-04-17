@@ -388,8 +388,21 @@ export async function sendOtpAction(
   if (error) {
     // Don't reveal whether the email exists
     if (error.message.includes('not found') || error.message.includes('not registered')) {
-      return { ok: true }; // Silent success to prevent email enumeration
+      // Silent success to prevent email enumeration — but log so we can tell
+      // "no account" from a genuine delivery failure that happens to stringify
+      // the same way.
+      Sentry.captureMessage('sendOtpAction: silent success path', {
+        level: 'info',
+        tags: { area: 'auth.otp', reason: 'enumeration-guard' },
+        extra: { code: error.code, message: error.message },
+      });
+      return { ok: true };
     }
+    Sentry.captureMessage('sendOtpAction: delivery failed', {
+      level: 'warning',
+      tags: { area: 'auth.otp' },
+      extra: { code: error.code, message: error.message },
+    });
     return { ok: false, error: 'Failed to send code. Try again.' };
   }
 

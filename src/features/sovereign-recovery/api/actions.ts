@@ -30,17 +30,24 @@ export async function saveRecoveryShards(
 
   const byEmail = new Map((guardians ?? []).map((g) => [g.guardian_email.toLowerCase(), g.id]));
 
+  // A legitimate encrypted BIP39 shard + salt rounds out to a few hundred bytes.
+  // Reject anything that would blow past a safety ceiling before it hits the DB.
+  const MAX_SHARD_BYTES = 16 * 1024;
+
   for (const { guardianEmail, encrypted, salt } of shards) {
     const guardianId = byEmail.get(guardianEmail.toLowerCase());
     if (!guardianId) {
       return { ok: false, error: `Guardian ${guardianEmail} not found. Invite them first.` };
+    }
+    const encryptedShard = JSON.stringify({ encrypted, salt });
+    if (Buffer.byteLength(encryptedShard, 'utf8') > MAX_SHARD_BYTES) {
+      return { ok: false, error: 'Encrypted shard is too large. Regenerate your recovery kit.' };
     }
     await supabase
       .from('recovery_shards')
       .delete()
       .eq('owner_id', user.id)
       .eq('guardian_id', guardianId);
-    const encryptedShard = JSON.stringify({ encrypted, salt });
     const { error } = await supabase.from('recovery_shards').insert({
       owner_id: user.id,
       guardian_id: guardianId,

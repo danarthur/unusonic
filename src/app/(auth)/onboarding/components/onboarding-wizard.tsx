@@ -203,7 +203,13 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
               >
                 {avatarUrl ? (
                   <>
-                    <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      loading="lazy"
+                      onError={() => setAvatarUrl(null)}
+                      className="w-full h-full object-cover"
+                    />
                     <div className="absolute inset-0 bg-[oklch(0.10_0_0_/_0.50)] opacity-40 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Camera className="w-5 h-5 text-[var(--stage-text-primary)]" />
                     </div>
