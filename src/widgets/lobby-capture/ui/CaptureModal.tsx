@@ -133,11 +133,20 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
       rec.onstop = () => {
         // Release the mic the moment recording stops, regardless of whether
         // the stop was explicit (user hit Stop) or implicit (modal closed).
+        // Also null out refs and detach event handlers so the MediaRecorder
+        // can be garbage-collected — Chrome's tab-level mic indicator
+        // occasionally persists while the MediaRecorder object is still
+        // reachable from the page, even with inactive tracks.
         if (streamRef.current) {
           for (const track of streamRef.current.getTracks()) {
             try { track.stop(); } catch { /* already ended */ }
           }
           streamRef.current = null;
+        }
+        if (rec.ondataavailable) rec.ondataavailable = null;
+        if (rec.onstop) rec.onstop = null;
+        if (mediaRecorderRef.current === rec) {
+          mediaRecorderRef.current = null;
         }
         void processAudio();
       };
@@ -236,6 +245,13 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
   }) {
     if (stage.kind !== 'review') return;
     const { transcript, parse } = stage;
+
+    // Belt-and-suspenders: release every mic resource the moment the user
+    // commits to save. rec.onstop already released tracks at the record →
+    // processing transition, but this catches any lingering MediaRecorder
+    // reference that Chrome's tab-level indicator can latch onto. Idempotent.
+    releaseMic();
+
     setStage({ kind: 'saving', transcript, parse });
 
     const result = await confirmCapture({
