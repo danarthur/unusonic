@@ -29,4 +29,8 @@ export const sendDepositInvoicePrimitive: TriggerPrimitive<Config> = {
       summary: `send_deposit_invoice stub fired for deal ${ctx.dealId}`,
     };
   },
+  preview(config) {
+    const kind = config.amount_basis === 'balance' ? 'full balance' : 'deposit';
+    return `Generate and send a ${kind} invoice to the client.`;
+  },
 };

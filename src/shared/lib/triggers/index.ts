@@ -11,3 +11,6 @@ export {
   listAllPrimitives,
   listByTier,
 } from './registry';
+
+export { normalizeTriggers } from './normalize';
+export type { TriggerEntry } from './normalize';

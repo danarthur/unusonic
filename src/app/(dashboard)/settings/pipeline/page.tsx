@@ -10,6 +10,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { PipelineEditor } from './pipeline-editor';
 import type { TriggerEntry } from '@/features/pipeline-settings/api/actions';
+import { normalizeTriggers } from '@/shared/lib/triggers/normalize';
 
 export const metadata = {
   title: 'Deal flow | Unusonic',
@@ -87,28 +88,6 @@ export default async function PipelineSettingsPage() {
     rotting_days: number | null;
     triggers: unknown;
     is_archived: boolean;
-  };
-
-  // `triggers` is `jsonb` — defensively coerce unknown shapes to [].
-  // Malformed rows shouldn't brick the editor; admins can overwrite.
-  const normalizeTriggers = (raw: unknown): TriggerEntry[] => {
-    if (!Array.isArray(raw)) return [];
-    return raw.flatMap((entry): TriggerEntry[] => {
-      if (
-        entry &&
-        typeof entry === 'object' &&
-        typeof (entry as { type?: unknown }).type === 'string'
-      ) {
-        const cfg = (entry as { config?: unknown }).config;
-        return [
-          {
-            type: (entry as { type: string }).type,
-            config: (cfg && typeof cfg === 'object' ? cfg : {}) as Record<string, unknown>,
-          },
-        ];
-      }
-      return [];
-    });
   };
 
   const raw = pipelineRow as { id: string; name: string; pipeline_stages?: StageRow[] };

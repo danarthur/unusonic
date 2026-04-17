@@ -31,4 +31,8 @@ export const notifyRolePrimitive: TriggerPrimitive<Config> = {
       summary: `notify_role stub fired for deal ${ctx.dealId}`,
     };
   },
+  preview(config) {
+    const suffix = config.message ? `: "${config.message}"` : '';
+    return `Notify ${config.role_slug} in this workspace${suffix}.`;
+  },
 };

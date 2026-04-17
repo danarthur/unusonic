@@ -30,4 +30,8 @@ export const createTaskPrimitive: TriggerPrimitive<Config> = {
       summary: `create_task stub fired for deal ${ctx.dealId}`,
     };
   },
+  preview(config) {
+    const assignee = config.assignee_rule.replace('_', ' ');
+    return `Create a task: "${config.title}" assigned to the ${assignee}.`;
+  },
 };

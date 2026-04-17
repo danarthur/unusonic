@@ -3,6 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { getPrimitive } from '@/shared/lib/triggers';
+import type { TriggerEntry } from '@/shared/lib/triggers/normalize';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -46,8 +47,12 @@ export type UpdateStagePatch = {
  * `config` is the primitive-specific config object; validated against
  * `primitive.configSchema` at save time so the dispatcher never encounters
  * a broken config at fire time (see design doc §7.2, §12 Phase 3).
+ *
+ * The canonical definition lives in Shared (`@/shared/lib/triggers/normalize`)
+ * so App-layer consumers (e.g. the Prism confirm modal) don't have to reach
+ * up into Features. This re-export preserves the historical import path.
  */
-export type TriggerEntry = { type: string; config: Record<string, unknown> };
+export type { TriggerEntry } from '@/shared/lib/triggers/normalize';
 
 // ── Capability gate helper ─────────────────────────────────────────────────
 

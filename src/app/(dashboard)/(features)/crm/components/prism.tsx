@@ -13,6 +13,7 @@ import { getEventSummaryForPrism } from '../actions/get-event-summary';
 import { handoverDeal } from '../actions/handover-deal';
 import { updateDealStatus, type DealStatus } from '../actions/update-deal-status';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
+import { getPrimitive, type TriggerEntry } from '@/shared/lib/triggers';
 import { getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
 import { getEventLedger } from '@/features/finance/api/get-event-ledger';
 import { MarkAsLostModal } from './mark-as-lost-modal';
@@ -53,15 +54,29 @@ const OVERRIDE_STATUS_MESSAGES: Record<string, string> = {
 
 function OverrideStatusConfirm({
   status,
+  triggers = [],
   onConfirm,
   onCancel,
   submitting,
 }: {
   status: string;
+  /**
+   * Target stage's configured triggers (from `ops.pipeline_stages.triggers`).
+   * Phase 3f: when any outbound triggers are present, they render as a
+   * "This will also:" list so the user sees side-effects before confirming.
+   * Empty array preserves Phase 2b behavior (legacy OVERRIDE_STATUS_MESSAGES).
+   */
+  triggers?: TriggerEntry[];
   onConfirm: () => void;
   onCancel: () => void;
   submitting: boolean;
 }) {
+  // Only outbound primitives (invoices, emails, handoff wizard) preview here.
+  // Internal primitives fire silently in the future undo-toast flow.
+  const outboundTriggers = triggers.filter((t) => getPrimitive(t.type)?.tier === 'outbound');
+  const legacyMessage = OVERRIDE_STATUS_MESSAGES[status];
+  const hasOutbound = outboundTriggers.length > 0;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
@@ -89,9 +104,32 @@ function OverrideStatusConfirm({
                 Set status to &ldquo;{DEAL_STATUS_LABELS[status] ?? status}&rdquo;?
               </h2>
             </div>
-            <p className="stage-field-label leading-relaxed">
-              {OVERRIDE_STATUS_MESSAGES[status]}
-            </p>
+            {legacyMessage && (
+              <p className="stage-field-label leading-relaxed">{legacyMessage}</p>
+            )}
+            {hasOutbound && (
+              <div className="flex flex-col gap-2">
+                <p className="stage-label text-[var(--stage-text-secondary)]">This will also:</p>
+                <ul className="flex flex-col gap-1.5">
+                  {outboundTriggers.map((t, i) => {
+                    const primitive = getPrimitive(t.type);
+                    const sentence = primitive?.preview?.(t.config) ?? t.type;
+                    return (
+                      <li
+                        key={`${t.type}-${i}`}
+                        className="stage-field-label leading-relaxed flex items-start gap-2"
+                      >
+                        <span
+                          aria-hidden
+                          className="mt-[0.55em] h-1 w-1 shrink-0 rounded-full bg-[var(--stage-text-secondary)]"
+                        />
+                        <span>{sentence}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
@@ -851,6 +889,7 @@ export function Prism({
     {pendingOverrideStatus && (
       <OverrideStatusConfirm
         status={pendingOverrideStatus}
+        triggers={pipelineStages?.find((s) => s.slug === pendingOverrideStatus)?.triggers ?? []}
         onConfirm={handleOverrideConfirm}
         onCancel={() => setPendingOverrideStatus(null)}
         submitting={statusChanging}

@@ -30,4 +30,7 @@ export const updateDealFieldPrimitive: TriggerPrimitive<Config> = {
       summary: `update_deal_field stub fired for deal ${ctx.dealId}`,
     };
   },
+  preview(config) {
+    return `Set ${config.field} to ${JSON.stringify(config.value)}.`;
+  },
 };

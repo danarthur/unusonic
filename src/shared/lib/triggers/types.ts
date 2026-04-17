@@ -86,4 +86,15 @@ export interface TriggerPrimitive<Config> {
    */
   run: (config: Config, ctx: TriggerContext) => Promise<TriggerResult>;
   undo?: (undoToken: string, ctx: TriggerContext) => Promise<TriggerResult>;
+  /**
+   * Return a human-readable sentence describing what this primitive will do
+   * with the given config. Used by the confirmation modal to show side-effects
+   * before the user commits a stage change.
+   *
+   * MUST be synchronous and pure — no DB fetches, no network. If the primitive
+   * needs runtime context (e.g. which contact will be emailed), the preview
+   * can describe the shape without binding ("Send deposit invoice to the
+   * deal's main contact"). Runtime binding happens in run().
+   */
+  preview?: (config: Config) => string;
 }

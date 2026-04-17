@@ -27,4 +27,7 @@ export const triggerHandoffPrimitive: TriggerPrimitive<Config> = {
       summary: `trigger_handoff stub fired for deal ${ctx.dealId}`,
     };
   },
+  preview() {
+    return 'Open the deal-to-event handoff wizard for this deal.';
+  },
 };

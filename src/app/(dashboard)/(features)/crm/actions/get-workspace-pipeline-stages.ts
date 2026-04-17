@@ -2,6 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { normalizeTriggers, type TriggerEntry } from '@/shared/lib/triggers/normalize';
 
 export type WorkspacePipelineStage = {
   id: string;
@@ -14,6 +15,7 @@ export type WorkspacePipelineStage = {
   hide_from_portal: boolean;
   tags: string[];
   color_token: string | null;
+  triggers: TriggerEntry[];
 };
 
 export type WorkspacePipeline = {
@@ -38,7 +40,7 @@ export async function getWorkspacePipelineStages(): Promise<WorkspacePipeline | 
     .schema('ops')
     .from('pipelines')
     .select(
-      'id, name, pipeline_stages(id, slug, label, kind, sort_order, requires_confirmation, opens_handoff_wizard, hide_from_portal, tags, color_token, is_archived)',
+      'id, name, pipeline_stages(id, slug, label, kind, sort_order, requires_confirmation, opens_handoff_wizard, hide_from_portal, tags, color_token, triggers, is_archived)',
     )
     .eq('workspace_id', workspaceId)
     .eq('is_default', true)
@@ -58,6 +60,7 @@ export async function getWorkspacePipelineStages(): Promise<WorkspacePipeline | 
     hide_from_portal: boolean;
     tags: string[] | null;
     color_token: string | null;
+    triggers: unknown;
     is_archived: boolean;
   };
 
@@ -76,6 +79,7 @@ export async function getWorkspacePipelineStages(): Promise<WorkspacePipeline | 
       hide_from_portal: s.hide_from_portal,
       tags: s.tags ?? [],
       color_token: s.color_token,
+      triggers: normalizeTriggers(s.triggers),
     }));
 
   return {
