@@ -280,4 +280,29 @@ describe('filterByMode — fallback to legacy slugs', () => {
     const past = filterByMode(deals, 'past', [], NOW_ISO).map((i) => i.id).sort();
     expect(past).toEqual(['d-lost'].sort());
   });
+
+  // Phase 3i regression: deals.status collapsed to kind ('working' / 'won' /
+  // 'lost'). When pipelineStages is unavailable, the fallback MUST recognize
+  // the collapsed 'working' value or pre-handover deals disappear.
+  it('post-3i collapsed status: working deals land in Active tab via fallback', () => {
+    const deals = [
+      dealItem({ id: 'd-working-1', status: 'working', stage_id: null, event_date: FUTURE_DATE }),
+      dealItem({ id: 'd-working-2', status: 'working', stage_id: 'bad-id', event_date: FUTURE_DATE }),
+      dealItem({ id: 'd-won', status: 'won', stage_id: null, event_date: FUTURE_DATE }),
+      dealItem({ id: 'd-lost', status: 'lost', stage_id: null, event_date: FUTURE_DATE }),
+    ];
+    // No pipelineStages → legacy fallback fires.
+    const active = filterByMode(deals, 'active', [], NOW_ISO).map((i) => i.id).sort();
+    expect(active).toEqual(['d-won', 'd-working-1', 'd-working-2'].sort());
+    // Inquiry is narrower — working deals do NOT sweep into it via fallback.
+    const inq = filterByMode(deals, 'inquiry', [], NOW_ISO).map((i) => i.id);
+    expect(inq).toEqual([]);
+    // Past-dated working deals land in Past via the 'working' legacy addition.
+    const pastDealsMixed = [
+      dealItem({ id: 'd-work-past', status: 'working', stage_id: null, event_date: PAST_DATE }),
+      dealItem({ id: 'd-lost-past', status: 'lost', stage_id: null, event_date: PAST_DATE }),
+    ];
+    const past = filterByMode(pastDealsMixed, 'past', [], NOW_ISO).map((i) => i.id).sort();
+    expect(past).toEqual(['d-lost-past', 'd-work-past'].sort());
+  });
 });

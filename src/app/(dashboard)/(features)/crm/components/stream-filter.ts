@@ -33,12 +33,17 @@ export type StreamMode = 'inquiry' | 'active' | 'past';
  *  one of these falls into Active. */
 const INQUIRY_TAGS = ['initial_contact', 'proposal_sent'] as const;
 
-/** Legacy fallback slug sets — used only when stage lookup fails. Kept in
- *  sync with the tags above for stock-seeded workspaces. */
+/** Legacy fallback slug sets — used only when stage lookup fails.
+ *  Phase 3i collapsed every working-stage legacy slug to the single 'working'
+ *  value, so the fallback must also recognize 'working' or else post-3i deals
+ *  silently disappear from the Active + Past tabs when pipelineStages is
+ *  unavailable. 'working' is added to the Active + Past sets (biases toward
+ *  showing rather than hiding); Inquiry keeps the narrow legacy pair so we
+ *  don't sweep every working deal into Inquiry when the lookup fails. */
 const LEGACY_INQUIRY_SLUGS = new Set(['inquiry', 'proposal']);
-const LEGACY_ACTIVE_DEAL_SLUGS = new Set(['contract_sent', 'contract_signed', 'deposit_received']);
+const LEGACY_ACTIVE_DEAL_SLUGS = new Set(['working', 'contract_sent', 'contract_signed', 'deposit_received']);
 const LEGACY_PAST_PRE_HANDOVER_SLUGS = new Set([
-  'inquiry', 'proposal', 'contract_sent', 'contract_signed', 'deposit_received',
+  'working', 'inquiry', 'proposal', 'contract_sent', 'contract_signed', 'deposit_received',
 ]);
 
 export type StageLookup = {
