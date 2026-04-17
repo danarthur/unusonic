@@ -22,6 +22,7 @@
 
 import * as React from 'react';
 import dynamic from 'next/dynamic';
+import { getHasEverCaptured } from '@/widgets/todays-brief/api/get-has-ever-captured';
 
 const CaptureModal = dynamic(
   () => import('./CaptureModal').then((m) => m.CaptureModal),
@@ -33,6 +34,15 @@ interface CaptureContextValue {
   openCapture: () => void;
   closeCapture: () => void;
   workspaceId: string;
+  /**
+   * True once the current user has confirmed at least one capture in this
+   * workspace. Drives the CaptureComposer's first-run → compact transition.
+   * Flips from false → true the moment `markCaptured()` is called after a
+   * successful confirm, so the UI compacts without a page reload.
+   */
+  hasEverCaptured: boolean;
+  /** Called by CaptureModal after a successful confirm. Idempotent. */
+  markCaptured: () => void;
 }
 
 const CaptureContext = React.createContext<CaptureContextValue | null>(null);
@@ -64,9 +74,22 @@ export interface CaptureProviderProps {
 
 export function CaptureProvider({ workspaceId, children }: CaptureProviderProps) {
   const [open, setOpen] = React.useState(false);
+  const [hasEverCaptured, setHasEverCaptured] = React.useState(false);
 
   const openCapture = React.useCallback(() => setOpen(true), []);
   const closeCapture = React.useCallback(() => setOpen(false), []);
+  const markCaptured = React.useCallback(() => setHasEverCaptured(true), []);
+
+  // Hydrate from the server on mount. Default-false means the composer
+  // briefly shows the first-run state for existing users before the fetch
+  // settles, which is acceptable — it's louder, errs on discoverability.
+  React.useEffect(() => {
+    let active = true;
+    void getHasEverCaptured()
+      .then((v) => { if (active && v) setHasEverCaptured(true); })
+      .catch(() => { /* keep default false */ });
+    return () => { active = false; };
+  }, []);
 
   // Global Shift+C — lifted from the retired CaptureButton so it fires
   // regardless of whether any capture affordance is visible. Skips when the
@@ -89,8 +112,8 @@ export function CaptureProvider({ workspaceId, children }: CaptureProviderProps)
   }, []);
 
   const value = React.useMemo<CaptureContextValue>(
-    () => ({ open, openCapture, closeCapture, workspaceId }),
-    [open, openCapture, closeCapture, workspaceId],
+    () => ({ open, openCapture, closeCapture, workspaceId, hasEverCaptured, markCaptured }),
+    [open, openCapture, closeCapture, workspaceId, hasEverCaptured, markCaptured],
   );
 
   return (

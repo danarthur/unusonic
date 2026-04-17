@@ -3,12 +3,13 @@
 /**
  * CaptureComposer — inline capture affordance at the top of the brief card.
  *
- * Two states driven by whether the user has ever confirmed a capture:
+ * Two states driven by `CaptureProvider.hasEverCaptured`:
  *
- *   • first-run (hasEverCaptured=false): warm + instrumental explanation,
- *     recruits first use without feeling like onboarding spam.
- *   • compact     (hasEverCaptured=true):  minimum visual footprint,
- *     placeholder-only "Tell Aion something…".
+ *   • first-run: one-liner invitation + keyboard hint
+ *   • compact:   placeholder-only "Tell Aion something…"
+ *
+ * Switches the instant a confirm lands (provider bumps `hasEverCaptured` on
+ * successful write — no page reload required).
  *
  * Taps trigger the lobby-level CaptureProvider. If no provider is mounted
  * (feature flag off), this component renders nothing. `Shift+C` is handled
@@ -25,18 +26,17 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { useOptionalCapture } from '@/widgets/lobby-capture/ui/CaptureProvider';
 
 export interface CaptureComposerProps {
-  hasEverCaptured: boolean;
   className?: string;
 }
 
-export function CaptureComposer({ hasEverCaptured, className }: CaptureComposerProps) {
+export function CaptureComposer({ className }: CaptureComposerProps) {
   const capture = useOptionalCapture();
 
   // No provider → flag off. Render nothing; the brief card still shows
   // paragraph + insight rows below.
   if (!capture) return null;
 
-  const { openCapture } = capture;
+  const { openCapture, hasEverCaptured } = capture;
 
   if (!hasEverCaptured) {
     return <FirstRunState onOpen={openCapture} className={className} />;
@@ -60,7 +60,7 @@ function FirstRunState({
       transition={STAGE_LIGHT}
       whileHover={{ backgroundColor: 'var(--stage-surface-raised)' }}
       className={cn(
-        'w-full text-left flex items-start gap-3 p-4',
+        'w-full text-left inline-flex items-center gap-3 px-3 py-2.5',
         'rounded-md border border-dashed border-[var(--stage-edge-subtle)]',
         'bg-[var(--stage-surface-elevated)]',
         'text-[var(--stage-text-secondary)]',
@@ -72,18 +72,22 @@ function FirstRunState({
       aria-label="Tell Aion something — capture a thought"
     >
       <Mic
-        className="w-4 h-4 mt-0.5 shrink-0 text-[var(--stage-text-primary)]"
+        className="w-4 h-4 shrink-0 text-[var(--stage-text-primary)]"
         aria-hidden
       />
-      <span className="text-sm leading-snug">
-        Hey &mdash; tap here or press{' '}
-        <kbd className="inline-flex items-center h-4 px-1 mx-0.5 text-[10px] font-mono rounded border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well,var(--stage-surface))] text-[var(--stage-text-tertiary)]">
-          Shift C
-        </kbd>{' '}
-        and tell me what&rsquo;s on your mind. A client, a meeting, a thought
-        you don&rsquo;t want to forget. I&rsquo;ll figure out who it&rsquo;s
-        about and remind you when it matters.
+      <span className="text-sm">
+        Tell Aion a client, a meeting, a thought — I&rsquo;ll remember.
       </span>
+      <kbd
+        className={cn(
+          'ml-auto inline-flex items-center h-5 px-1.5 text-[10px] font-mono rounded',
+          'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well,var(--stage-surface))]',
+          'text-[var(--stage-text-tertiary)]',
+        )}
+        aria-hidden
+      >
+        Shift C
+      </kbd>
     </motion.button>
   );
 }

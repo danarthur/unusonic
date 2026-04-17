@@ -10,7 +10,6 @@ import { METRICS } from '@/shared/lib/metrics/registry';
 import { dismissInsight, markInsightsSurfaced } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
 import { useOptionalCapture } from '@/widgets/lobby-capture/ui/CaptureProvider';
 import { getBriefAndInsights, type BriefAndInsights, type AionInsight } from '../api/get-brief-and-insights';
-import { getHasEverCaptured } from '../api/get-has-ever-captured';
 import { InsightRow } from './InsightRow';
 import { CaptureComposer } from './CaptureComposer';
 
@@ -35,21 +34,18 @@ export function TodaysBriefWidget({ activeCardIds }: TodaysBriefWidgetProps = {}
   const [data, setData] = useState<BriefAndInsights | undefined>(undefined);
   const [activeInsight, setActiveInsight] = useState<AionInsight | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  // `null` until the server resolves. Default-true-on-unknown would flicker
-  // a compact composer for a frame; default-false-on-unknown shows the
-  // first-run state briefly and settles. Pick first-run; it's the louder
-  // surface and errs on the side of discoverability.
-  const [hasEverCaptured, setHasEverCaptured] = useState<boolean>(false);
   const surfacedRef = useRef(false);
 
   // Null when the capture feature flag is off — composer hides entirely.
+  // The composer itself reads `hasEverCaptured` from context; we only need
+  // the ctx reference here to decide whether the empty state should show.
   const captureCtx = useOptionalCapture();
 
   // Stable stringified key so the effect only refires when the card set
   // genuinely changes (not on every layout-reference identity change).
   const cardIdsKey = activeCardIds ? activeCardIds.join('|') : '';
 
-  // ── Fetch brief + insights + capture state ──────────────────────────────
+  // ── Fetch brief + insights ──────────────────────────────────────────────
 
   useEffect(() => {
     let active = true;
@@ -59,15 +55,6 @@ export function TodaysBriefWidget({ activeCardIds }: TodaysBriefWidgetProps = {}
       .catch(() => { if (active) setData({ brief: null, insights: [], workspaceId: null }); });
     return () => { active = false; };
   }, [cardIdsKey]);
-
-  useEffect(() => {
-    if (!captureCtx) return;
-    let active = true;
-    void getHasEverCaptured()
-      .then((v) => { if (active) setHasEverCaptured(v); })
-      .catch(() => { /* keep default false → first-run state */ });
-    return () => { active = false; };
-  }, [captureCtx]);
 
   // ── Mark insights as surfaced (once) ────────────────────────────────────
 
@@ -118,8 +105,10 @@ export function TodaysBriefWidget({ activeCardIds }: TodaysBriefWidgetProps = {}
       <div className="flex flex-col gap-3">
         {/* Capture composer — first-run explanatory or compact depending on
             whether the user has ever captured. Renders null when the flag
-            is off (no CaptureProvider mounted). */}
-        <CaptureComposer hasEverCaptured={hasEverCaptured} />
+            is off (no CaptureProvider mounted). State is read from context;
+            the modal flips it on successful confirm, so no reload is
+            needed to move from first-run to compact. */}
+        <CaptureComposer />
 
         {/* Brief paragraph */}
         {hasBrief && (

@@ -22,6 +22,7 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
 import type { CaptureParseResult } from '@/app/api/aion/capture/parse/route';
 import { confirmCapture } from '../api/confirm-capture';
+import { useOptionalCapture } from './CaptureProvider';
 
 const MAX_RECORDING_MS = 60_000;
 
@@ -46,6 +47,7 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const chunksRef = React.useRef<Blob[]>([]);
   const autoStopRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const captureCtx = useOptionalCapture();
 
   const resetToIdle = React.useCallback(() => {
     if (autoStopRef.current) clearTimeout(autoStopRef.current);
@@ -188,6 +190,10 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
       setStage({ kind: 'review', transcript, parse });
       return;
     }
+
+    // Flip the provider's hasEverCaptured flag so the brief-card composer
+    // compacts immediately on next render, without waiting for a reload.
+    captureCtx?.markCaptured();
 
     setStage({ kind: 'done' });
     toast.success('Captured.');
