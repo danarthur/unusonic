@@ -532,8 +532,19 @@ function ReviewStage({
   const [entityType, setEntityType] = React.useState<'person' | 'company'>(initialType);
   const [note, setNote] = React.useState(parse.note ?? '');
   const [followUpText, setFollowUpText] = React.useState(parse.follow_up?.text ?? '');
+  // User's explicit pick from the match-candidates picker. null = "it's new",
+  // undefined = "no pick yet (defer to parse-supplied matched_entity_id)."
+  const [pickedCandidateId, setPickedCandidateId] = React.useState<string | null | undefined>(undefined);
 
-  const isMatchedExisting = Boolean(parsedEntity?.matched_entity_id);
+  const candidates = (parsedEntity?.match_candidates ?? []).filter(
+    (c) => c.entity_id && c.name,
+  );
+  const hasCandidates = candidates.length > 0 && !parsedEntity?.matched_entity_id;
+  const effectiveMatchedId =
+    pickedCandidateId !== undefined
+      ? pickedCandidateId
+      : parsedEntity?.matched_entity_id ?? null;
+  const isMatchedExisting = Boolean(effectiveMatchedId);
 
   return (
     <motion.div
@@ -551,41 +562,93 @@ function ReviewStage({
       </div>
 
       {parsedEntity && (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label>Who</Label>
           {isMatchedExisting ? (
-            <div className="text-sm text-[var(--stage-text-primary)]">
-              {parsedEntity.name}
-              <span className="ml-2 text-[11px] text-[var(--stage-text-tertiary)] uppercase tracking-wide">
+            <div className="text-sm text-[var(--stage-text-primary)] flex items-center gap-2">
+              {effectiveMatchedId === parsedEntity.matched_entity_id
+                ? parsedEntity.name
+                : candidates.find((c) => c.entity_id === effectiveMatchedId)?.name ?? parsedEntity.name}
+              <span className="text-[11px] text-[var(--stage-text-tertiary)] uppercase tracking-wide">
                 existing
               </span>
+              {hasCandidates && (
+                <button
+                  type="button"
+                  onClick={() => setPickedCandidateId(null)}
+                  className="ml-auto text-[11px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] underline-offset-2 hover:underline"
+                >
+                  Different person
+                </button>
+              )}
             </div>
           ) : (
-            <div className="flex gap-2 items-center">
-              <input
-                type="text"
-                value={entityName}
-                onChange={(e) => setEntityName(e.target.value)}
-                className={cn(
-                  'flex-1 text-sm px-2 py-1.5 rounded-md',
-                  'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]',
-                  'text-[var(--stage-text-primary)]',
-                  'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
-                )}
-              />
-              <select
-                value={entityType}
-                onChange={(e) => setEntityType(e.target.value as 'person' | 'company')}
-                className={cn(
-                  'text-xs px-2 py-1.5 rounded-md',
-                  'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]',
-                  'text-[var(--stage-text-primary)]',
-                )}
-              >
-                <option value="person">Person</option>
-                <option value="company">Company</option>
-              </select>
-            </div>
+            <>
+              {hasCandidates && (
+                <div className="space-y-1">
+                  <div className="text-[11px] text-[var(--stage-text-tertiary)]">
+                    Did you mean:
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {candidates.map((c) => (
+                      <button
+                        key={c.entity_id}
+                        type="button"
+                        onClick={() => setPickedCandidateId(c.entity_id)}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 px-2 py-1 rounded-md',
+                          'border border-[var(--stage-edge-subtle)]',
+                          'bg-[var(--stage-surface-elevated)]',
+                          'text-xs text-[var(--stage-text-secondary)]',
+                          'hover:text-[var(--stage-text-primary)] hover:bg-[var(--stage-surface-raised)]',
+                          'transition-colors',
+                        )}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setPickedCandidateId(null)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-2 py-1 rounded-md',
+                        'border border-dashed border-[var(--stage-edge-subtle)]',
+                        'text-xs text-[var(--stage-text-tertiary)]',
+                        'hover:text-[var(--stage-text-secondary)]',
+                        'transition-colors',
+                      )}
+                    >
+                      New person
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={entityName}
+                  onChange={(e) => setEntityName(e.target.value)}
+                  className={cn(
+                    'flex-1 text-sm px-2 py-1.5 rounded-md',
+                    'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]',
+                    'text-[var(--stage-text-primary)]',
+                    'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
+                  )}
+                />
+                <select
+                  value={entityType}
+                  onChange={(e) => setEntityType(e.target.value as 'person' | 'company')}
+                  className={cn(
+                    'text-xs px-2 py-1.5 rounded-md',
+                    'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]',
+                    'text-[var(--stage-text-primary)]',
+                  )}
+                >
+                  <option value="person">Person</option>
+                  <option value="company">Company</option>
+                </select>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -638,16 +701,14 @@ function ReviewStage({
           type="button"
           onClick={() =>
             onConfirm({
-              resolvedEntityId: isMatchedExisting
-                ? parsedEntity?.matched_entity_id ?? null
-                : null,
-              newEntityName: isMatchedExisting ? null : entityName,
-              newEntityType: isMatchedExisting ? null : entityType,
+              resolvedEntityId: effectiveMatchedId,
+              newEntityName: effectiveMatchedId ? null : entityName,
+              newEntityType: effectiveMatchedId ? null : entityType,
               note: note.trim() || null,
               followUpText: followUpText.trim() || null,
             })
           }
-          disabled={!isMatchedExisting && entityName.trim().length < 1 && !note && !followUpText}
+          disabled={!effectiveMatchedId && entityName.trim().length < 1 && !note && !followUpText}
           className="stage-btn stage-btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Save

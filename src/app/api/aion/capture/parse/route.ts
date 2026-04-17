@@ -54,6 +54,17 @@ const CaptureParseSchema = z.object({
         })
         .nullable()
         .describe('Only populate when matched_entity_id is null — this becomes a ghost entity.'),
+      match_candidates: z
+        .array(
+          z.object({
+            entity_id: z.string(),
+            name: z.string(),
+            confidence: z.number(),
+          }),
+        )
+        .describe(
+          'Candidate existing entities when the LLM is unsure. Also populated server-side after an ILIKE fallback match. The review card shows these as picker buttons when `matched_entity_id` is null. Empty array when no plausible candidates.',
+        ),
     })
     .nullable()
     .describe('Null if the transcript names no person or company at all.'),
@@ -92,6 +103,7 @@ type WorkspaceEntity = {
   id: string;
   display_name: string | null;
   type: string | null;
+  affiliations?: string[];
 };
 
 type OpenDeal = {
@@ -100,28 +112,93 @@ type OpenDeal = {
   organization_id: string | null;
 };
 
+/**
+ * Relationship types that indicate a person's affiliation with a company
+ * — used to enrich the prompt so the LLM can match "Alexa from Pure Lavish"
+ * to an entity like `Alexa Infranca (MEMBER of Pure Lavish Events)` instead
+ * of proposing a duplicate ghost.
+ */
+const AFFILIATION_RELATIONSHIP_TYPES = [
+  'MEMBER',
+  'ROSTER_MEMBER',
+  'PARTNER',
+  'WORKS_FOR',
+  'EMPLOYED_AT',
+];
+
+type RelRow = {
+  source_entity_id: string;
+  target_entity_id: string;
+  relationship_type: string;
+};
+
 async function fetchWorkspaceContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
 ): Promise<{ entities: WorkspaceEntity[]; deals: OpenDeal[] }> {
-  const entitiesRes = await supabase
-    .schema('directory')
-    .from('entities')
-    .select('id, display_name, type')
-    .eq('owner_workspace_id', workspaceId)
-    .order('updated_at', { ascending: false })
-    .limit(80);
+  const [entitiesRes, dealsRes] = await Promise.all([
+    supabase
+      .schema('directory')
+      .from('entities')
+      .select('id, display_name, type')
+      .eq('owner_workspace_id', workspaceId)
+      .order('updated_at', { ascending: false })
+      .limit(80),
+    supabase
+      .from('deals')
+      .select('id, title, organization_id')
+      .eq('workspace_id', workspaceId)
+      .in('status', ['inquiry', 'proposal', 'contract_sent', 'contract_signed'])
+      .order('updated_at', { ascending: false })
+      .limit(30),
+  ]);
 
-  const dealsRes = await supabase
-    .from('deals')
-    .select('id, title, organization_id')
-    .eq('workspace_id', workspaceId)
-    .in('status', ['inquiry', 'proposal', 'contract_sent', 'contract_signed'])
-    .order('updated_at', { ascending: false })
-    .limit(30);
+  const entities = ((entitiesRes.data ?? []) as WorkspaceEntity[]).filter(
+    (e) => e.display_name,
+  );
+
+  // Enrich with affiliations — best-effort, never fatal.
+  try {
+    const ids = entities.map((e) => e.id);
+    if (ids.length > 0) {
+      const { data: rels } = await supabase
+        .schema('cortex')
+        .from('relationships')
+        .select('source_entity_id, target_entity_id, relationship_type')
+        .in('relationship_type', AFFILIATION_RELATIONSHIP_TYPES)
+        .or(
+          `source_entity_id.in.(${ids.join(',')}),target_entity_id.in.(${ids.join(',')})`,
+        );
+
+      const byId = new Map(entities.map((e) => [e.id, e]));
+      const affiliations = new Map<string, Set<string>>();
+      for (const r of (rels ?? []) as RelRow[]) {
+        const source = byId.get(r.source_entity_id);
+        const target = byId.get(r.target_entity_id);
+        if (!source || !target) continue;
+        // person ↔ company edge in either direction → the person is affiliated
+        // with the company. Skip company↔company edges (PARTNER between orgs).
+        if (source.type === 'person' && target.type === 'company' && target.display_name) {
+          if (!affiliations.has(source.id)) affiliations.set(source.id, new Set());
+          affiliations.get(source.id)!.add(target.display_name);
+        } else if (source.type === 'company' && target.type === 'person' && source.display_name) {
+          if (!affiliations.has(target.id)) affiliations.set(target.id, new Set());
+          affiliations.get(target.id)!.add(source.display_name);
+        }
+      }
+      for (const e of entities) {
+        const aff = affiliations.get(e.id);
+        if (aff && aff.size > 0) {
+          e.affiliations = Array.from(aff).slice(0, 2);
+        }
+      }
+    }
+  } catch {
+    /* affiliations are best-effort enrichment — fall back to plain entity list */
+  }
 
   return {
-    entities: ((entitiesRes.data ?? []) as WorkspaceEntity[]).filter((e) => e.display_name),
+    entities,
     deals: (dealsRes.data ?? []) as OpenDeal[],
   };
 }
@@ -133,7 +210,12 @@ function buildSystemPrompt(
 ): string {
   const entityLines = entities
     .slice(0, 80)
-    .map((e) => `- id=${e.id} · ${e.type ?? '?'} · "${e.display_name}"`)
+    .map((e) => {
+      const aff = e.affiliations && e.affiliations.length > 0
+        ? ` · at ${e.affiliations.join(', ')}`
+        : '';
+      return `- id=${e.id} · ${e.type ?? '?'} · "${e.display_name}"${aff}`;
+    })
     .join('\n');
 
   const dealLines = deals
@@ -155,11 +237,23 @@ function buildSystemPrompt(
     'Recent open deals (use to disambiguate):',
     dealLines || '(none)',
     '',
-    'Matching rules:',
-    '- If the spoken name clearly matches an entity in the list, set matched_entity_id.',
-    '- If partially matches or ambiguous, set entity.type = "ambiguous" and leave matched_entity_id null.',
-    '- If clearly a new person/company, populate new_entity_proposal.',
-    '- If the transcript names no person or company, set entity to null.',
+    'Matching rules — BE AGGRESSIVE ABOUT MATCHING. Proposing a new ghost when',
+    'the person already exists creates a duplicate and is the worst failure mode:',
+    '- If a first name OR last name in the transcript uniquely identifies ONE',
+    '  entity in the list, MATCH IT. "Alexa" → Alexa Infranca when she\'s the',
+    '  only Alexa; "Henderson" → Henderson Wedding when that\'s the only',
+    '  Henderson. Set matched_entity_id to her id.',
+    '- When the transcript adds organization context ("Alexa from Pure Lavish"),',
+    '  use the `at X` affiliation notes in the entity list to CONFIRM a match.',
+    '  Don\'t require perfect organization-name matches — "Pure Lavish" matches',
+    '  "Pure Lavish Events".',
+    '- Only set new_entity_proposal when the name is clearly absent from the',
+    '  list. A transcript name that overlaps with ANY list entity\'s name is not',
+    '  a new ghost — it\'s a match.',
+    '- If 2+ entities plausibly match, populate match_candidates with each',
+    '  (entity_id, name, confidence) and leave matched_entity_id null so the',
+    '  user can pick.',
+    '- If the transcript names no person or company at all, set entity to null.',
     '',
     'Confidence:',
     '- ≥0.85: clear entity match, clear intent, no ambiguity.',
@@ -172,6 +266,116 @@ function buildSystemPrompt(
     '- "sms" if mentioned text.',
     '- "unspecified" otherwise (the user will pick).',
   ].join('\n');
+}
+
+// ── Server-side fuzzy fallback ──────────────────────────────────────────────
+
+/**
+ * After the LLM returns, if no entity was matched but a name was extracted,
+ * run an ILIKE substring query against the workspace's entities as a safety
+ * net. Handles the case where the LLM is too conservative about first-name-
+ * only matches ("Alexa" → "Alexa Infranca").
+ *
+ * Strategy:
+ * - If exactly 1 match → override matched_entity_id, clear new_entity_proposal
+ * - If 2+ matches     → populate match_candidates so the review card can
+ *                       show them and let the user pick
+ * - If 0 matches      → leave the LLM's proposal in place (truly a new ghost)
+ */
+async function augmentWithFuzzyMatches(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  parsed: CaptureParseResult,
+): Promise<CaptureParseResult> {
+  const entity = parsed.entity;
+  if (!entity) return parsed;
+
+  // Path 1: LLM already matched. Enrich match_candidates with the real
+  // display_name so the review card labels the "existing" badge with the
+  // actual entity name, not the fragment the speaker used ("Alexa" →
+  // "Alexa Infranca").
+  if (entity.matched_entity_id) {
+    const { data } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id, display_name')
+      .eq('id', entity.matched_entity_id)
+      .eq('owner_workspace_id', workspaceId)
+      .maybeSingle();
+    const row = data as { id: string; display_name: string | null } | null;
+    if (row?.display_name) {
+      return {
+        ...parsed,
+        entity: {
+          ...entity,
+          match_candidates: [
+            { entity_id: row.id, name: row.display_name, confidence: 0.9 },
+          ],
+        },
+      };
+    }
+    return parsed;
+  }
+
+  // Path 2: LLM did NOT match. Fall back to server-side ILIKE on the name
+  // the LLM extracted. Covers the conservative-match failure mode.
+  const candidate =
+    entity.new_entity_proposal?.name?.trim() ??
+    entity.name?.trim() ??
+    '';
+  if (candidate.length < 2) return parsed;
+
+  const type = entity.type === 'person' || entity.type === 'company'
+    ? entity.type
+    : null;
+
+  let query = supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name, type')
+    .eq('owner_workspace_id', workspaceId)
+    .ilike('display_name', `%${candidate.replace(/[%_]/g, (m) => `\\${m}`)}%`)
+    .not('display_name', 'is', null)
+    .limit(5);
+
+  if (type) query = query.eq('type', type);
+
+  const { data } = await query;
+  const matches = ((data ?? []) as { id: string; display_name: string | null; type: string | null }[])
+    .filter((r): r is { id: string; display_name: string; type: string | null } => !!r.display_name);
+
+  if (matches.length === 0) {
+    return parsed;
+  }
+
+  if (matches.length === 1) {
+    // Unique match — promote over the LLM's proposal.
+    return {
+      ...parsed,
+      entity: {
+        ...entity,
+        matched_entity_id: matches[0].id,
+        new_entity_proposal: null,
+        match_candidates: [
+          { entity_id: matches[0].id, name: matches[0].display_name, confidence: 0.9 },
+        ],
+      },
+    };
+  }
+
+  // 2+ matches — surface them for user pick.
+  return {
+    ...parsed,
+    entity: {
+      ...entity,
+      type: 'ambiguous',
+      match_candidates: matches.map((m) => ({
+        entity_id: m.id,
+        name: m.display_name,
+        confidence: 0.6,
+      })),
+    },
+  };
 }
 
 // ── Route handler ────────────────────────────────────────────────────────────
@@ -233,7 +437,13 @@ export async function POST(req: Request) {
       temperature: 0.2,
     });
 
-    return NextResponse.json({ parse: object });
+    // Safety net: server-side ILIKE match to catch cases where the LLM was
+    // too conservative (e.g. proposed a ghost for "Alexa" when
+    // "Alexa Infranca" is already in the workspace). See §10.4 + §20
+    // decision 14.
+    const augmented = await augmentWithFuzzyMatches(supabase, workspaceId, object);
+
+    return NextResponse.json({ parse: augmented });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Parse failed';
     return NextResponse.json({ error: message }, { status: 502 });
