@@ -124,7 +124,7 @@ export async function getKitTemplateForRole(
     .from('kit_templates')
     .select('id, role_tag, name, items')
     .eq('workspace_id', workspaceId)
-    .eq('role_tag', roleTag)
+    .eq('role_tag', roleTag.trim().toLowerCase())
     .maybeSingle();
 
   if (!data) return null;
@@ -159,13 +159,21 @@ export async function upsertKitTemplate(
 
   const supabase = await createClient();
 
+  // Normalize role_tag so "DJ" / "dj" / " DJ " can't spawn duplicate templates —
+  // role_tag is the join key for compliance checks on crew rows, and typos
+  // silently bifurcate the readiness view.
+  const normalizedRoleTag = parsed.data.role_tag.trim().toLowerCase();
+  if (!normalizedRoleTag) {
+    return { ok: false, error: 'Role tag is required.' };
+  }
+
   const { data, error } = await supabase
     .schema('ops')
     .from('kit_templates')
     .upsert(
       {
         workspace_id: auth.workspaceId,
-        role_tag: parsed.data.role_tag.trim(),
+        role_tag: normalizedRoleTag,
         name: parsed.data.name.trim(),
         items: parsed.data.items,
       },
@@ -237,7 +245,7 @@ export async function getKitComplianceForEntity(
     .from('kit_templates')
     .select('items')
     .eq('workspace_id', workspaceId)
-    .eq('role_tag', roleTag)
+    .eq('role_tag', roleTag.trim().toLowerCase())
     .maybeSingle();
 
   if (!template) return null;
@@ -323,7 +331,9 @@ export async function getKitComplianceBatch(
 
   const supabase = await createClient();
 
-  const uniqueRoles = [...new Set(pairs.map((p) => p.roleTag))];
+  // Normalize roleTags on lookup so pre-normalization callers still resolve.
+  const normalizeRole = (r: string) => r.trim().toLowerCase();
+  const uniqueRoles = [...new Set(pairs.map((p) => normalizeRole(p.roleTag)))];
   const uniqueEntities = [...new Set(pairs.map((p) => p.entityId))];
 
   // 1. Templates for every role in one query
@@ -364,8 +374,11 @@ export async function getKitComplianceBatch(
 
   // 3. Compute compliance per pair
   for (const { entityId, roleTag } of pairs) {
+    const normalized = normalizeRole(roleTag);
+    // Key on the caller's original tag so result Map lookups match what they
+    // passed in — normalization is a storage concern, not a display concern.
     const key = `${entityId}::${roleTag}`;
-    const templateItems = templatesByRole.get(roleTag);
+    const templateItems = templatesByRole.get(normalized);
     if (!templateItems) {
       result.set(key, null);
       continue;
