@@ -36,10 +36,14 @@ import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-m
 import { FollowUpCard } from './follow-up-card';
 import { FollowUpActionLog } from './follow-up-action-log';
 import { getFollowUpForDeal, type FollowUpQueueItem } from '../actions/follow-up-actions';
+import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 
 
-const DEAL_PIPELINE_STAGES = ['Inquiry', 'Proposal', 'Sent', 'Signed', 'Won'] as const;
-const STATUS_TO_STAGE: Record<string, number> = {
+// Legacy fallback used while the workspace's pipeline is loading (first paint)
+// and for any deal whose status doesn't match a known stage slug. Phase 2d-3:
+// once stages load, we render the workspace's actual working+won stages.
+const DEAL_PIPELINE_STAGES_FALLBACK = ['Inquiry', 'Proposal', 'Sent', 'Signed', 'Won'] as const;
+const STATUS_TO_STAGE_FALLBACK: Record<string, number> = {
   inquiry: 0,
   proposal: 1,
   contract_sent: 2,
@@ -83,6 +87,20 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
   // Mark as lost modal
   const [lostModalOpen, setLostModalOpen] = useState(false);
+
+  // Phase 2d-3: workspace pipeline stages for the Deal Lens tracker.
+  // null = loading (use hardcoded fallback); [] = no pipeline (fallback).
+  const [pipelineStages, setPipelineStages] = useState<WorkspacePipelineStage[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getWorkspacePipelineStages().then((result) => {
+      if (cancelled) return;
+      setPipelineStages(result?.stages ?? []);
+    }).catch(() => {
+      if (!cancelled) setPipelineStages([]);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
 
   // Scalar field local mirrors (for inline editing in DealHeaderStrip)
@@ -285,13 +303,49 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
   // deal.status is authoritative but may be stale (the deal prop is not refetched after sendForSignature).
   // initialProposal IS refetched after every send, so use it to derive a minimum stage in real-time.
-  const dealStage = STATUS_TO_STAGE[deal.status] ?? 0;
+  // Phase 2d-3: once pipeline stages load, the tracker renders the workspace's
+  // actual ordered working+won stages and currentStage is derived from slug /
+  // tag lookups. Until then we fall back to the hardcoded 5-step visual.
+  const trackerStages: string[] =
+    pipelineStages && pipelineStages.length > 0
+      ? pipelineStages.filter((s) => s.kind !== 'lost').map((s) => s.label)
+      : [...DEAL_PIPELINE_STAGES_FALLBACK];
+
+  const findStageIndexByTag = (tag: string): number => {
+    if (!pipelineStages) return -1;
+    const filtered = pipelineStages.filter((s) => s.kind !== 'lost');
+    return filtered.findIndex((s) => s.tags?.includes(tag));
+  };
+
+  const dealStage = (() => {
+    if (pipelineStages && pipelineStages.length > 0) {
+      const filtered = pipelineStages.filter((s) => s.kind !== 'lost');
+      const idx = filtered.findIndex((s) => s.slug === deal.status);
+      return idx >= 0 ? idx : (STATUS_TO_STAGE_FALLBACK[deal.status] ?? 0);
+    }
+    return STATUS_TO_STAGE_FALLBACK[deal.status] ?? 0;
+  })();
+
   const proposalImpliedStage = (() => {
     if (!initialProposal) return 0;
-    if (proposalStatus === 'accepted') return 3; // signed → "Signed" stage
-    if (proposalStatus === 'sent' || proposalStatus === 'viewed') return 2; // sent/viewed → "Sent" stage
-    return 1; // draft exists → at least "Proposal" stage
+    if (pipelineStages && pipelineStages.length > 0) {
+      // Tag-based lookup: accepted → contract_signed stage, sent/viewed →
+      // proposal_sent stage, draft → also proposal_sent (stage the workspace
+      // associates with "proposal out" work).
+      if (proposalStatus === 'accepted') {
+        const i = findStageIndexByTag('contract_signed');
+        if (i >= 0) return i;
+      }
+      const i = findStageIndexByTag('proposal_sent');
+      if (i >= 0) return i;
+      return 0;
+    }
+    // Fallback ordinal mapping when pipeline stages are still loading.
+    if (proposalStatus === 'accepted') return 3;
+    if (proposalStatus === 'sent' || proposalStatus === 'viewed') return 2;
+    return 1;
   })();
+
   const currentStage = Math.max(dealStage, proposalImpliedStage);
 
   return (
@@ -335,7 +389,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
           </p>
           <PipelineTracker
             currentStage={currentStage}
-            stages={[...DEAL_PIPELINE_STAGES]}
+            stages={trackerStages}
           />
         </StagePanel>
       </motion.div>
