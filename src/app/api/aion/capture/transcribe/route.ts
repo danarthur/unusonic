@@ -53,6 +53,14 @@ function getDeepgram(): DeepgramClient {
  * as Deepgram `keyterm`s. Nova-3 caps at 100 terms — we order by
  * `updated_at DESC` so the capture covers whoever's been active recently.
  *
+ * Filters to keep the keyterm list clean:
+ *   • Drops emails (display_name contains "@") — caller's own user entity
+ *     may have an email as a placeholder display_name; boosting it as a
+ *     keyterm is noise because nobody speaks their email aloud.
+ *   • Drops explicit "(duplicate)" markers — pre-existing dedup debt.
+ *   • Drops the caller's own claimed entity — users don't say their own
+ *     name in self-directed notes.
+ *
  * Non-fatal: a failure (schema drift, RLS edge case, network blip) yields
  * an empty keyterms array and the transcription falls back to Nova-3's
  * default vocabulary. The user still gets a transcript.
@@ -60,26 +68,39 @@ function getDeepgram(): DeepgramClient {
 async function fetchWorkspaceKeyterms(workspaceId: string): Promise<string[]> {
   try {
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const callerUserId = user?.id ?? null;
+
+    // Fetch extra so the filter has headroom without running another query.
     const { data } = await supabase
       .schema('directory')
       .from('entities')
-      .select('display_name')
+      .select('display_name, claimed_by_user_id')
       .eq('owner_workspace_id', workspaceId)
       .not('display_name', 'is', null)
       .order('updated_at', { ascending: false })
-      .limit(KEYTERM_CAP);
+      .limit(KEYTERM_CAP * 2);
 
-    const names = ((data ?? []) as { display_name: string | null }[])
-      .map((r) => r.display_name)
-      .filter((n): n is string => n !== null && n.trim().length > 0);
+    const rows = (data ?? []) as {
+      display_name: string | null;
+      claimed_by_user_id: string | null;
+    }[];
 
-    // Dedupe preserving order, trim whitespace, reject empties.
     const seen = new Set<string>();
     const out: string[] = [];
-    for (const n of names) {
-      if (!n) continue;
-      const t = n.trim();
-      if (!t || seen.has(t)) continue;
+    for (const r of rows) {
+      if (!r.display_name) continue;
+      const t = r.display_name.trim();
+      if (!t) continue;
+
+      // Filters — see header comment.
+      if (t.includes('@')) continue;
+      if (/\(duplicate\)\s*$/i.test(t)) continue;
+      if (callerUserId && r.claimed_by_user_id === callerUserId) continue;
+
+      if (seen.has(t)) continue;
       seen.add(t);
       out.push(t);
       if (out.length >= KEYTERM_CAP) break;

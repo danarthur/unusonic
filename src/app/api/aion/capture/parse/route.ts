@@ -136,11 +136,16 @@ async function fetchWorkspaceContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
 ): Promise<{ entities: WorkspaceEntity[]; deals: OpenDeal[] }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const callerUserId = user?.id ?? null;
+
   const [entitiesRes, dealsRes] = await Promise.all([
     supabase
       .schema('directory')
       .from('entities')
-      .select('id, display_name, type')
+      .select('id, display_name, type, claimed_by_user_id')
       .eq('owner_workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(80),
@@ -153,9 +158,20 @@ async function fetchWorkspaceContext(
       .limit(30),
   ]);
 
-  const entities = ((entitiesRes.data ?? []) as WorkspaceEntity[]).filter(
-    (e) => e.display_name,
-  );
+  // Same filters as the transcribe route's keyterm fetcher — drops emails,
+  // explicit duplicates, and the caller's own claimed entity. Keeps the
+  // list Aion sees legible and prevents false-positive matches against
+  // self/noise. See /api/aion/capture/transcribe/route.ts.
+  const entities = (
+    (entitiesRes.data ?? []) as (WorkspaceEntity & { claimed_by_user_id: string | null })[]
+  ).filter((e) => {
+    const name = e.display_name?.trim() ?? '';
+    if (!name) return false;
+    if (name.includes('@')) return false;
+    if (/\(duplicate\)\s*$/i.test(name)) return false;
+    if (callerUserId && e.claimed_by_user_id === callerUserId) return false;
+    return true;
+  });
 
   // Enrich with affiliations — best-effort, never fatal.
   try {
