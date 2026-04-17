@@ -170,9 +170,38 @@ export function CaptureModal({ workspaceId, open, onOpenChange }: CaptureModalPr
   }
 
   function stopRecording() {
-    if (autoStopRef.current) clearTimeout(autoStopRef.current);
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    if (autoStopRef.current) {
+      clearTimeout(autoStopRef.current);
+      autoStopRef.current = null;
+    }
+
+    // Stop the mic stream tracks SYNCHRONOUSLY, right now — do not wait on
+    // rec.onstop to fire async. Two reasons:
+    //   1. The OS/browser mic indicator is tied to live tracks. Async release
+    //      means the indicator lingers for seconds after the user clicks Stop
+    //      (observed in dogfood: indicator persisted past save).
+    //   2. MediaRecorder continues buffering audio until its tracks end. If
+    //      the user's Stop click → track.stop() is delayed by the onstop
+    //      round-trip, the final blob can capture audio from AFTER the user
+    //      thought they were done (observed: Deepgram logs showed audio
+    //      longer than the user's recording window).
+    // MediaRecorder will still finalize and emit its buffered data via
+    // rec.onstop even when tracks end before rec.stop() is called.
+    const rec = mediaRecorderRef.current;
+    const stream = rec?.stream ?? streamRef.current;
+    if (stream) {
+      for (const track of stream.getTracks()) {
+        try { track.stop(); } catch { /* already ended */ }
+      }
+      streamRef.current = null;
+    }
+
+    if (rec && rec.state !== 'inactive') {
+      try {
+        rec.stop();
+      } catch {
+        /* recorder already stopped — fine, onstop will still clean up */
+      }
     }
   }
 
