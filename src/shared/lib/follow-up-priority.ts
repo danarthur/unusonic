@@ -1,11 +1,6 @@
 import { differenceInDays, parseISO } from 'date-fns';
 import { computeStallSignalFromRaw, type StallSignal } from './stall-signal';
-
-const STATUS_TO_STAGE: Record<string, number> = {
-  inquiry: 0,
-  proposal: 1,
-  contract_sent: 2,
-};
+import { STALL_STAGE_META, type StallableStatus } from './pipeline-stages/constants';
 
 export type FollowUpScoreInput = {
   deal: {
@@ -110,7 +105,7 @@ function buildStallInput(input: FollowUpScoreInput): Parameters<typeof computeSt
     proposalCreatedAt: proposal?.createdAt ?? null,
     proposalUpdatedAt: proposal?.updatedAt ?? null,
     proposedDate: deal.proposedDate,
-    currentStage: STATUS_TO_STAGE[deal.status] ?? 0,
+    currentStage: STALL_STAGE_META[deal.status as StallableStatus]?.stageOrdinal ?? 0,
     thresholdOverrides,
   };
 }

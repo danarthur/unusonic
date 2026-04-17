@@ -1,3 +1,9 @@
+import {
+  STALL_STAGE_BY_ORDINAL,
+  STALL_STAGE_META,
+  type StallableStatus,
+} from './pipeline-stages/constants';
+
 export type StallSignal = {
   stalled: boolean;
   daysInStage: number;
@@ -26,6 +32,26 @@ export function computeStallSignal(
   });
 }
 
+type ThresholdOverrides = Partial<Record<StallableStatus, number>>;
+
+function pickStageStartMs(
+  slug: StallableStatus,
+  params: { createdAt: string; proposalCreatedAt: string | null; proposalUpdatedAt: string | null },
+): number | null {
+  if (slug === 'inquiry') return new Date(params.createdAt).getTime();
+  if (slug === 'proposal') {
+    return params.proposalCreatedAt ? new Date(params.proposalCreatedAt).getTime() : null;
+  }
+  return params.proposalUpdatedAt ? new Date(params.proposalUpdatedAt).getTime() : null;
+}
+
+function urgentThreshold(base: number, slug: StallableStatus): number {
+  // contract_sent floors at 1 to preserve legacy behavior for low overrides;
+  // inquiry/proposal match the pre-refactor branches verbatim.
+  if (slug === 'contract_sent') return Math.max(1, Math.ceil(base / 2));
+  return Math.ceil(base / 2);
+}
+
 /**
  * Computes whether a deal is stalling in its current pipeline stage.
  * Accepts scalar params (for server-side cron use).
@@ -37,44 +63,34 @@ export function computeStallSignalFromRaw(params: {
   proposalUpdatedAt: string | null;
   proposedDate: string | null;
   currentStage: number;
-  thresholdOverrides?: { inquiry?: number; proposal?: number; contract_sent?: number };
+  thresholdOverrides?: ThresholdOverrides;
 }): StallSignal | null {
-  const { createdAt, proposalCreatedAt, proposalUpdatedAt, proposedDate, currentStage, thresholdOverrides } = params;
+  const { proposedDate, currentStage, thresholdOverrides } = params;
+
+  const slug = STALL_STAGE_BY_ORDINAL[currentStage];
+  if (!slug) return null;
+
+  const meta = STALL_STAGE_META[slug];
   const now = Date.now();
   const eventDate = proposedDate ? new Date(proposedDate + 'T00:00:00').getTime() : null;
   const daysUntilEvent = eventDate ? Math.ceil((eventDate - now) / 86400000) : null;
   const urgent = daysUntilEvent !== null && daysUntilEvent <= 60;
 
-  let stageStartMs: number | null = null;
-  let threshold: number;
-  let stageName: string;
-  let suggestion: string;
+  const base = thresholdOverrides?.[slug] ?? meta.rottingDays;
+  const threshold = urgent ? urgentThreshold(base, slug) : base;
 
-  if (currentStage === 0) {
-    stageStartMs = new Date(createdAt).getTime();
-    const base = thresholdOverrides?.inquiry ?? 7;
-    threshold = urgent ? Math.ceil(base / 2) : base;
-    stageName = 'Inquiry';
-    suggestion = 'Build a proposal to move this forward.';
-  } else if (currentStage === 1) {
-    stageStartMs = proposalCreatedAt ? new Date(proposalCreatedAt).getTime() : null;
-    const base = thresholdOverrides?.proposal ?? 14;
-    threshold = urgent ? Math.ceil(base / 2) : base;
-    stageName = 'Proposal';
-    suggestion = 'Send the proposal to the client.';
-  } else if (currentStage === 2) {
-    stageStartMs = proposalUpdatedAt ? new Date(proposalUpdatedAt).getTime() : null;
-    const base = thresholdOverrides?.contract_sent ?? 5;
-    threshold = urgent ? Math.max(1, Math.ceil(base / 2)) : base;
-    stageName = 'Contract sent';
-    suggestion = 'Follow up — the client may need a nudge.';
-  } else {
-    return null;
-  }
-
+  const stageStartMs = pickStageStartMs(slug, params);
   if (stageStartMs === null) return null;
+
   const daysInStage = Math.floor((now - stageStartMs) / 86400000);
   if (daysInStage < 0) return null;
 
-  return { stalled: daysInStage >= threshold, daysInStage, threshold, urgent, stageName, suggestion };
+  return {
+    stalled: daysInStage >= threshold,
+    daysInStage,
+    threshold,
+    urgent,
+    stageName: meta.stageName,
+    suggestion: meta.suggestion,
+  };
 }

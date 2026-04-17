@@ -11,6 +11,7 @@ import type { Json } from '@/types/supabase';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { computeFollowUpPriority } from '@/shared/lib/follow-up-priority';
 import { renderReason } from '@/shared/lib/follow-up-reasons';
+import { OPEN_DEAL_STATUSES } from '@/shared/lib/pipeline-stages/constants';
 import { differenceInDays, parseISO } from 'date-fns';
 import type { AionFollowUpPlaybook, AionConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 
@@ -132,7 +133,7 @@ export async function GET(req: Request) {
     const { data: deals, error: dealsErr } = await supabase
       .from('deals')
       .select('id, workspace_id, status, created_at, proposed_date, budget_estimated, title, organization_id, owner_user_id, event_archetype')
-      .in('status', ['inquiry', 'proposal', 'contract_sent'])
+      .in('status', [...OPEN_DEAL_STATUSES])
       .is('archived_at', null);
 
     if (dealsErr || !deals?.length) {
