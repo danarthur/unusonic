@@ -3549,6 +3549,20 @@ export type Database = {
       }
     }
     Functions: {
+      create_pipeline_stage: {
+        Args: {
+          p_color_token?: string
+          p_hide_from_portal?: boolean
+          p_label: string
+          p_opens_handoff_wizard?: boolean
+          p_pipeline_id: string
+          p_requires_confirmation?: boolean
+          p_rotting_days?: number
+          p_slug: string
+          p_tags?: string[]
+        }
+        Returns: string
+      }
       event_status_pair_valid: {
         Args: { p_lifecycle: string; p_status: string }
         Returns: boolean
@@ -3622,6 +3636,10 @@ export type Database = {
       }
       patch_event_ros_data: {
         Args: { p_event_id: string; p_patch: Json }
+        Returns: undefined
+      }
+      reorder_pipeline_stages: {
+        Args: { p_pipeline_id: string; p_stage_ids: string[] }
         Returns: undefined
       }
       resolve_stage_by_tag: {
