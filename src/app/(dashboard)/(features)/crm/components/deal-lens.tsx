@@ -789,6 +789,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             proposal={initialProposal}
             stakeholders={stakeholders}
             crewCount={crewCount}
+            stage={pipelineStages?.find((s) => s.id === deal.stage_id) ?? null}
           />
         </div>
       </div>

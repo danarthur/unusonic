@@ -160,11 +160,15 @@ async function getUpcomingDealsWithCrew(workspaceId: string): Promise<UpcomingDe
   const system = getSystemClient();
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  // Phase 3i: status now holds kind. 'working' captures every pre-handover
+  // deal (inquiry / proposal / contract_sent / contract_signed / deposit_received
+  // all collapsed here) + 'won' for post-handover. The outer proposed_date
+  // window is the real gate for "relevant to nudge about crew".
   const { data: deals } = await system
     .from('deals')
     .select('id, title, proposed_date, event_archetype')
     .eq('workspace_id', workspaceId)
-    .in('status', ['proposal', 'contract_sent', 'won'])
+    .in('status', ['working', 'won'])
     .not('proposed_date', 'is', null)
     .lte('proposed_date', sevenDaysFromNow)
     .gte('proposed_date', new Date().toISOString());
@@ -450,15 +454,14 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
           ? 'medium'
           : 'low';
 
-    // Phase 2c: preserve the grammatically-clean hardcoded copy for seeded
-    // slugs; fall back to the workspace stage label for custom slugs (future).
-    const stageLabel =
-      deal.status === 'inquiry' ? 'inquiry' :
-      deal.status === 'proposal' ? 'proposal' :
-      deal.status === 'contract_sent' ? 'contract sent' :
-      (deal.stage_id && stageLabels[deal.stage_id])
-        ? stageLabels[deal.stage_id].toLowerCase()
-        : 'deal';
+    // Phase 3i: deal.status now collapses to kind ('working' / 'won' / 'lost'),
+    // so the legacy-slug ternary never matches. Resolve the stage label
+    // directly from the per-deal stage_id (batched at the top of this
+    // function) for rename-safe copy. Fall back to 'deal' when the stage
+    // label is unavailable.
+    const stageLabel = (deal.stage_id && stageLabels[deal.stage_id])
+      ? stageLabels[deal.stage_id].toLowerCase()
+      : 'deal';
 
     insights.push({
       triggerType: 'deal_stale',

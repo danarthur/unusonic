@@ -149,11 +149,13 @@ async function fetchWorkspaceContext(
       .eq('owner_workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(80),
+    // Phase 3i: status now holds kind ('working' / 'won' / 'lost').
+    // "Pre-handover active deals" = kind='working'.
     supabase
       .from('deals')
       .select('id, title, organization_id')
       .eq('workspace_id', workspaceId)
-      .in('status', ['inquiry', 'proposal', 'contract_sent', 'contract_signed'])
+      .eq('status', 'working')
       .order('updated_at', { ascending: false })
       .limit(30),
   ]);
