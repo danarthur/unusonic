@@ -3608,6 +3608,17 @@ export type Database = {
       }
     }
     Functions: {
+      advance_deal_stage_from_webhook: {
+        Args: {
+          p_deal_id: string
+          p_new_stage_id: string
+          p_new_status_slug: string
+          p_only_if_status_in: string[]
+          p_webhook_event_id: string
+          p_webhook_source: string
+        }
+        Returns: boolean
+      }
       claim_pending_transitions: {
         Args: { p_batch_size?: number }
         Returns: {
