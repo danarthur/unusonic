@@ -3624,6 +3624,10 @@ export type Database = {
         Args: { p_event_id: string; p_patch: Json }
         Returns: undefined
       }
+      resolve_stage_by_tag: {
+        Args: { p_pipeline_id: string; p_tag: string }
+        Returns: string
+      }
       seed_default_pipeline: {
         Args: { p_workspace_id: string }
         Returns: string
