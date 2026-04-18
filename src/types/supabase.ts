@@ -4125,6 +4125,24 @@ export type Database = {
           status: string
         }[]
       }
+      metric_owner_cadence_profile: {
+        Args: {
+          p_archetype: string
+          p_lookback_days?: number
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          computed_at: string
+          oldest_sample_age_days: number
+          preferred_channel_by_stage_tag: Json
+          sample_size: number
+          stddev_days_between_followups: number
+          stddev_days_proposal_to_first_followup: number
+          typical_days_between_followups: number
+          typical_days_proposal_to_first_followup: number
+        }[]
+      }
       metric_settlement_variance: {
         Args: {
           p_period_end: string
