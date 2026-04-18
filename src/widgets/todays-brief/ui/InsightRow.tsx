@@ -5,7 +5,7 @@ import { X, ExternalLink, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
-import type { AionInsight } from '../api/get-brief-and-insights';
+import type { AionInsight } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
 
 const URGENCY_STRIPE: Record<string, string> = {
   critical: 'stage-stripe-error',

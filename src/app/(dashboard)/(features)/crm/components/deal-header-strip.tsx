@@ -60,6 +60,8 @@ import {
   OwnerPickerPortal,
 } from './deal-header-strip-scalar-pickers';
 import { ClientContactPickerSheet } from './deal-header-strip-client-sheet';
+import { PeopleStrip } from './people-strip';
+import { resolveDealHosts, type DealHost } from '../actions/resolve-deal-hosts';
 
 // =============================================================================
 // Types
@@ -164,7 +166,34 @@ export function DealHeaderStrip({
   const billTo = stakeholders.find((s) => s.role === 'bill_to') ?? null;
   const venueSt = stakeholders.find((s) => s.role === 'venue_contact') ?? null;
   const plannerSt = stakeholders.find((s) => s.role === 'planner') ?? null;
+  const dayOfPocSt = stakeholders.find((s) => s.role === 'day_of_poc') ?? null;
   const hasLegacyClient = !billTo && !!client?.organization;
+
+  // ── Hosts (P0 client-field redesign) ─────────────────────────────────────
+  // resolveDealHosts returns the host-role rows for new deals, or synthesizes
+  // partner chips from a legacy couple entity. Empty array → no hosts yet,
+  // fall back to the bill_to / legacy client display.
+  const [hosts, setHosts] = useState<DealHost[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    resolveDealHosts(deal.id).then((rows) => {
+      if (!cancelled) setHosts(rows);
+    });
+    return () => { cancelled = true; };
+  }, [deal.id, stakeholders.length]);
+
+  const primaryHost = hosts.find((h) => h.is_primary) ?? hosts[0] ?? null;
+  // Bill-to is "secondary" only if it points at an entity different from the
+  // primary host (e.g. parent company pays for the partners' wedding).
+  const billToIsSeparate =
+    billTo != null
+    && primaryHost != null
+    && (billTo.entity_id ?? billTo.organization_id) !== primaryHost.entity_id;
+  const peopleStripSecondary = [
+    ...(dayOfPocSt ? [{ role: 'day_of_poc' as const, display: dayOfPocSt }] : []),
+    ...(plannerSt ? [{ role: 'planner' as const, display: plannerSt }] : []),
+    ...(billToIsSeparate && billTo ? [{ role: 'bill_to' as const, display: billTo }] : []),
+  ];
 
   // ── Owner ────────────────────────────────────────────────────────────────
   const [ownerEntityId, setOwnerEntityId] = useState<string | null>(deal.owner_entity_id ?? null);
@@ -601,8 +630,10 @@ export function DealHeaderStrip({
                   className={cn(fieldBlock, 'w-full', !readOnly && fieldBlockInteractive)}
                   onClick={!readOnly ? () => handleOpenSlot('client', clientTriggerRef) : undefined}
                 >
-                  <p className={fieldLabel}>Client</p>
-                  {billTo ? (
+                  <p className={fieldLabel}>{hosts.length > 1 ? 'Hosts' : 'Client'}</p>
+                  {hosts.length > 0 ? (
+                    <PeopleStrip hosts={hosts} secondary={peopleStripSecondary} readOnly={readOnly} />
+                  ) : billTo ? (
                     renderStakeholderChip(billTo)
                   ) : hasLegacyClient ? (
                     <div className="flex items-center gap-1.5 min-w-0">

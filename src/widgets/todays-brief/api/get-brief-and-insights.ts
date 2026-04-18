@@ -5,8 +5,9 @@ import { getSystemClient } from '@/shared/api/supabase/system';
 import { activeDomainsFor } from '@/shared/lib/metrics/domains';
 import { domainForTrigger } from '@/app/api/aion/lib/insight-trigger-domains';
 
-// Re-export so consumers don't need to import from the actions file directly
-export type { AionInsight } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
+// Do NOT re-export `AionInsight` — Next 16 server-action registry throws
+// `ReferenceError` on type-only re-exports from 'use server' files. Consumers
+// import the type directly from `@/app/(dashboard)/(features)/aion/actions/aion-insight-actions`.
 import type { AionInsight } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
 
 export type BriefData = {

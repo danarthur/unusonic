@@ -17,7 +17,7 @@ import { Button } from '@/shared/ui/button';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { DraftPreview } from './DraftPreview';
 import { CrewPreview } from './CrewPreview';
-import type { AionInsight } from '../api/get-brief-and-insights';
+import type { AionInsight } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
 
 // ── Types matching dispatch API response ────────────────────────────────────
 

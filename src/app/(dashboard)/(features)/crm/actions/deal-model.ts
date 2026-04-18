@@ -29,48 +29,103 @@ export const DEAL_ARCHETYPE_LABELS: Record<DealArchetype, string> = {
   charity_gala: 'Charity Gala',
 };
 
+/**
+ * P0 client-field redesign: a deal is created with a *cast* of stakeholders.
+ * The UI translates its Q1/Q2 answers into this shape, the server action
+ * forwards it to public.create_deal_complete (which is the only writer).
+ *
+ * - hostKind = 'individual' → 1 person host
+ * - hostKind = 'couple'     → 2 person hosts (CO_HOST edge auto-written)
+ * - hostKind = 'company'    → 1 company host
+ * - hostKind = 'venue_concert' → 1 host (company OR person — performer playing
+ *   a venue/promoter contract). Ships as 'company' shape; venue itself is
+ *   captured separately in venueId/venueName.
+ */
+export const HOST_KINDS = ['individual', 'couple', 'company', 'venue_concert'] as const;
+export type HostKind = (typeof HOST_KINDS)[number];
+
+const personHostSchema = z.object({
+  existingId: z.string().uuid().optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+});
+export type PersonHostInput = z.infer<typeof personHostSchema>;
+
+const companyHostSchema = z.object({
+  existingId: z.string().uuid().optional(),
+  name: z.string().max(300).optional(),
+  /** Optional contact-person ghost id (legacy mainContactId path). */
+  mainContactId: z.string().uuid().nullable().optional(),
+});
+export type CompanyHostInput = z.infer<typeof companyHostSchema>;
+
+const pocSchema = z.object({
+  /** When set, POC reuses an existing entity (e.g. one of the hosts). */
+  existingId: z.string().uuid().optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+});
+export type PocInput = z.infer<typeof pocSchema>;
+
+const plannerSchema = z.object({
+  existingId: z.string().uuid().optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  email: z.string().email().nullable().optional(),
+});
+export type PlannerInput = z.infer<typeof plannerSchema>;
+
 export const createDealSchema = z.object({
   proposedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be yyyy-MM-dd'),
   eventArchetype: z.enum(DEAL_ARCHETYPES).nullable().optional(),
   title: z.string().max(500).nullable().optional(),
-  organizationId: z.string().uuid().nullable().optional(),
-  mainContactId: z.string().uuid().nullable().optional(),
-  /** Freetext client name — used to create a ghost org when no organizationId is provided */
-  clientName: z.string().max(300).nullable().optional(),
-  /** Client type: controls which ghost entity type is created */
-  clientType: z.enum(['company', 'individual', 'couple']).default('company'),
-  /** Individual client fields */
-  clientFirstName: z.string().max(100).nullable().optional(),
-  clientLastName: z.string().max(100).nullable().optional(),
-  clientEmail: z.string().email().nullable().optional(),
-  clientPhone: z.string().max(50).nullable().optional(),
-  /** Couple: Partner B fields (Partner A uses clientFirstName/clientLastName/clientEmail) */
-  partnerBFirstName: z.string().max(100).nullable().optional(),
-  partnerBLastName: z.string().max(100).nullable().optional(),
-  partnerBEmail: z.string().email().nullable().optional(),
+
+  // ── Host cast ───────────────────────────────────────────────────────────
+  hostKind: z.enum(HOST_KINDS),
+  /** When hostKind = 'couple', exactly 2 entries; otherwise 1. */
+  personHosts: z.array(personHostSchema).optional(),
+  /** When hostKind = 'company' or 'venue_concert', a single entry. */
+  companyHost: companyHostSchema.optional(),
+  /** Couple pairing — only meaningful when hostKind = 'couple'. */
+  pairing: z.enum(['romantic', 'co_host', 'family']).default('romantic'),
+  /** Couple display name (auto-derived if absent). */
+  coupleDisplayName: z.string().max(300).nullable().optional(),
+
+  // ── Point of contact ────────────────────────────────────────────────────
+  /** When set, identifies which host is the day_of_poc by display_order (1-based). */
+  pocFromHostIndex: z.number().int().min(1).nullable().optional(),
+  /** Otherwise, an independent person becomes day_of_poc. */
+  poc: pocSchema.optional(),
+
+  // ── Additive planner ────────────────────────────────────────────────────
+  /** Independent of POC. Hidden by UX when POC is already a planner. */
+  planner: plannerSchema.optional(),
+
   status: z.enum(['inquiry', 'proposal', 'contract_sent', 'won', 'lost']).default('inquiry'),
   budgetEstimated: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
   venueId: z.string().uuid().nullable().optional(),
-  /** Freetext venue name — used to create a ghost venue when no venueId is provided */
   venueName: z.string().max(300).nullable().optional(),
+
   /** How this inquiry arrived (legacy text enum). */
   leadSource: z.enum(['referral', 'repeat_client', 'website', 'social', 'direct']).nullable().optional(),
-  /** Structured lead source — references ops.workspace_lead_sources */
   leadSourceId: z.string().uuid().nullable().optional(),
-  /** Freetext detail / context about the lead source */
   leadSourceDetail: z.string().max(500).nullable().optional(),
-  /** Entity who referred this client (for referral sources) */
   referrerEntityId: z.string().uuid().nullable().optional(),
-  /** Planner / coordinator entity linked to this deal */
-  plannerEntityId: z.string().uuid().nullable().optional(),
-  /** Event start time as HH:MM (24h) */
+
+  /** Event start / end in HH:MM. */
   eventStartTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
-  /** Event end time as HH:MM (24h) */
   eventEndTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
 });
 
-export type CreateDealInput = z.infer<typeof createDealSchema>;
+// Use z.input so callers can omit fields that have schema-level defaults
+// (status, pairing). Without this the inferred type requires every defaulted
+// field, defeating the purpose of providing defaults.
+export type CreateDealInput = z.input<typeof createDealSchema>;
 export type CreateDealResult =
   | { success: true; dealId: string; warning?: 'approaching_show_limit' }
   | { success: false; error: string }

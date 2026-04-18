@@ -32,7 +32,12 @@ export type EventSummaryForPrism = {
   archived_at: string | null;
 };
 
-export type { RunOfShowData };
+// NOTE: do NOT re-export `RunOfShowData` from this file.
+// Next.js 16 bundles 'use server' files through a server-action registry that
+// tries to produce a value-level re-export for every symbol listed in an
+// `export { X }` / `export type { X }` block, even when prefixed with `type`.
+// Type-only re-exports throw `ReferenceError: <Name> is not defined` at runtime.
+// Consumers should import the type directly from `@/entities/event/api/get-event-summary`.
 
 export async function getEventSummaryForPrism(
   eventId: string
