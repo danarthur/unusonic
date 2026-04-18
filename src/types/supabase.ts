@@ -22,6 +22,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           expires_at: string | null
+          hide_from_portal: boolean
           id: string
           priority: number | null
           resolved_at: string | null
@@ -38,6 +39,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           expires_at?: string | null
+          hide_from_portal?: boolean
           id?: string
           priority?: number | null
           resolved_at?: string | null
@@ -54,6 +56,7 @@ export type Database = {
           entity_id?: string
           entity_type?: string
           expires_at?: string | null
+          hide_from_portal?: boolean
           id?: string
           priority?: number | null
           resolved_at?: string | null
@@ -429,7 +432,60 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      portal_aion_insights: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          dismissed_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          expires_at: string | null
+          hide_from_portal: boolean | null
+          id: string | null
+          priority: number | null
+          resolved_at: string | null
+          status: string | null
+          surfaced_at: string | null
+          title: string | null
+          trigger_type: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          expires_at?: string | null
+          hide_from_portal?: boolean | null
+          id?: string | null
+          priority?: number | null
+          resolved_at?: string | null
+          status?: string | null
+          surfaced_at?: string | null
+          title?: string | null
+          trigger_type?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          expires_at?: string | null
+          hide_from_portal?: boolean | null
+          id?: string | null
+          priority?: number | null
+          resolved_at?: string | null
+          status?: string | null
+          surfaced_at?: string | null
+          title?: string | null
+          trigger_type?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _pin_args_hash: { Args: { p_args: Json }; Returns: string }
@@ -2649,6 +2705,7 @@ export type Database = {
           id: string
           metadata: Json
           pipeline_id: string
+          suggestion_insight_id: string | null
           to_stage_id: string
           triggers_dispatched_at: string | null
           triggers_error: string | null
@@ -2665,6 +2722,7 @@ export type Database = {
           id?: string
           metadata?: Json
           pipeline_id: string
+          suggestion_insight_id?: string | null
           to_stage_id: string
           triggers_dispatched_at?: string | null
           triggers_error?: string | null
@@ -2681,6 +2739,7 @@ export type Database = {
           id?: string
           metadata?: Json
           pipeline_id?: string
+          suggestion_insight_id?: string | null
           to_stage_id?: string
           triggers_dispatched_at?: string | null
           triggers_error?: string | null
@@ -3146,6 +3205,7 @@ export type Database = {
           hide_from_portal: boolean
           id: string
           last_escalated_at: string | null
+          linked_insight_id: string | null
           originating_stage_id: string | null
           originating_transition_id: string | null
           primitive_key: string | null
@@ -3172,6 +3232,7 @@ export type Database = {
           hide_from_portal?: boolean
           id?: string
           last_escalated_at?: string | null
+          linked_insight_id?: string | null
           originating_stage_id?: string | null
           originating_transition_id?: string | null
           primitive_key?: string | null
@@ -3198,6 +3259,7 @@ export type Database = {
           hide_from_portal?: boolean
           id?: string
           last_escalated_at?: string | null
+          linked_insight_id?: string | null
           originating_stage_id?: string | null
           originating_transition_id?: string | null
           primitive_key?: string | null
@@ -4103,6 +4165,17 @@ export type Database = {
       patch_event_ros_data: {
         Args: { p_event_id: string; p_patch: Json }
         Returns: undefined
+      }
+      record_deal_transition_with_actor: {
+        Args: {
+          p_actor_id?: string
+          p_actor_kind: string
+          p_deal_id: string
+          p_reason?: string
+          p_suggestion_insight_id?: string
+          p_to_stage_id: string
+        }
+        Returns: string
       }
       rename_workspace_event_archetype: {
         Args: { p_new_label: string; p_slug: string; p_workspace_id: string }
