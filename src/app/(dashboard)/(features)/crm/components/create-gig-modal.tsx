@@ -1144,6 +1144,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                                       onChange={(v) => setBudgetEstimated(v === '' ? undefined : Number(v))}
                                       placeholder="25,000"
                                       step={100}
+                                      align="left"
                                     />
                                   </div>
                                   <div>

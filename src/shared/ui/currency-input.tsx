@@ -10,6 +10,12 @@ export interface CurrencyInputProps extends Omit<React.ComponentProps<'input'>, 
   onChange: (value: string) => void;
   /** Optional wrapper class (e.g. for catalog inputClass). */
   inputClassName?: string;
+  /**
+   * Text alignment. `right` (default) suits columns of prices where
+   * magnitudes line up; `left` keeps the `$` adjacent to the digits for
+   * single inline budget fields.
+   */
+  align?: 'left' | 'right';
 }
 
 /**
@@ -27,8 +33,10 @@ export function CurrencyInput({
   step = 0.01,
   required,
   disabled,
+  align = 'right',
   ...props
 }: CurrencyInputProps) {
+  const isLeft = align === 'left';
   return (
     <div
       className={cn(
@@ -36,7 +44,13 @@ export function CurrencyInput({
         className
       )}
     >
-      <span className="pl-4 text-sm text-[var(--stage-text-secondary)] tabular-nums shrink-0" aria-hidden>
+      <span
+        className={cn(
+          'text-sm text-[var(--stage-text-secondary)] tabular-nums shrink-0 select-none',
+          isLeft ? 'pl-3 pr-1' : 'pl-4',
+        )}
+        aria-hidden
+      >
         $
       </span>
       <input
@@ -51,8 +65,9 @@ export function CurrencyInput({
         disabled={disabled}
         id={id}
         className={cn(
-          'w-full min-w-0 py-2.5 pr-4 text-[var(--stage-text-primary)] text-sm bg-transparent border-0 focus:outline-none focus:ring-0 tabular-nums text-right placeholder:text-[var(--stage-text-secondary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
-          inputClassName
+          'w-full min-w-0 py-2.5 text-[var(--stage-text-primary)] text-sm bg-transparent border-0 focus:outline-none focus:ring-0 tabular-nums placeholder:text-[var(--stage-text-secondary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+          isLeft ? 'pl-0 pr-4 text-left' : 'pr-4 text-right',
+          inputClassName,
         )}
         {...props}
       />
