@@ -124,6 +124,10 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
 
     const {
       proposedDate,
+      proposedEndDate,
+      dateKind,
+      seriesRule,
+      seriesArchetype,
       eventArchetype,
       title,
       hostKind,
@@ -146,6 +150,32 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       eventStartTime,
       eventEndTime,
     } = parsed.data;
+
+    // Shape the (p_date_kind, p_date) pair that the v3 RPC expects.
+    // single:    p_date is null (proposed_date in p_deal carries the day)
+    // multi_day: p_date = { end_date }
+    // series:    p_date = { series_rule, series_archetype }
+    let datePayload: Record<string, unknown> | null = null;
+    if (dateKind === 'multi_day') {
+      if (!proposedEndDate) {
+        return { success: false, error: 'Multi-day requires an end date.' };
+      }
+      if (proposedEndDate < proposedDate) {
+        return { success: false, error: 'End date must be on or after the start date.' };
+      }
+      datePayload = { end_date: proposedEndDate };
+    } else if (dateKind === 'series') {
+      if (!seriesRule) {
+        return { success: false, error: 'Series date kind requires a series rule.' };
+      }
+      if (seriesRule.rdates.length === 0) {
+        return { success: false, error: 'Series must include at least one show.' };
+      }
+      datePayload = {
+        series_rule: seriesRule,
+        series_archetype: seriesArchetype ?? null,
+      };
+    }
 
     // ── Build hosts[] ──────────────────────────────────────────────────────
     const hosts: EntityShape[] = [];
@@ -253,6 +283,8 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       p_deal: dealPayload as unknown as Json,
       p_note: notePayload as unknown as Json,
       p_pairing: pairing,
+      p_date_kind: dateKind,
+      p_date: datePayload as unknown as Json,
     });
 
     if (error) {

@@ -5345,6 +5345,8 @@ export type Database = {
       create_deal_complete: {
         Args: {
           p_bill_to?: Json
+          p_date?: Json
+          p_date_kind?: string
           p_deal?: Json
           p_hosts: Json
           p_note?: Json

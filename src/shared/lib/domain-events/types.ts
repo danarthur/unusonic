@@ -41,6 +41,10 @@ export type DomainEventPayload = {
     archetype: string | null;
     startsAt: string | null;
     endsAt: string | null;
+    /** True when the deal handed off as a series; eventId is the first show. */
+    isSeries?: boolean;
+    /** For series: number of events created at handover. 1 for singletons/multi-day. */
+    seriesEventCount?: number;
   };
   'show.started': {
     startedAt: string;

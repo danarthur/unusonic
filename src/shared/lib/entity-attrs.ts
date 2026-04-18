@@ -93,6 +93,33 @@ const SocialLinksSchema = z
   .optional();
 
 /**
+ * Billing preferences on a company or individual client. Pre-fills a new deal's
+ * invoice fan-out mode; owner can always override per-deal. Typical pattern:
+ * corporations set `monthly_rollup` for residencies, weddings leave as default
+ * deposit_final.
+ *
+ * `default_mode` values match `finance.spawn_invoices_from_proposal.p_mode`:
+ *   - lump: one invoice for the whole deal
+ *   - deposit_final: deposit + final (legacy default)
+ *   - per_event: deposit + final per event row
+ *   - monthly_rollup: one invoice per calendar month covering a window
+ *
+ * `deposit_pct` is 0..1 (e.g. 0.35 = 35%). Only read when `default_mode = 'deposit_final'`.
+ * `rollup_day_of_month` is 1..31 and is the day of the NEXT month on which the
+ * rollup invoice is generated for the previous month's shows. Only read when
+ * `default_mode = 'monthly_rollup'`.
+ */
+const BillingPreferencesSchema = z
+  .object({
+    default_mode: z.enum(['lump', 'deposit_final', 'per_event', 'monthly_rollup']),
+    deposit_pct: z.number().min(0).max(1).nullable().optional(),
+    rollup_day_of_month: z.number().int().min(1).max(31).nullable().optional(),
+    notes: z.string().nullable().optional(),
+  })
+  .nullable()
+  .optional();
+
+/**
  * EmergencyContact sub-object (person attributes.emergency_contact).
  */
 const EmergencyContactSchema = z
@@ -186,6 +213,7 @@ export const CompanyAttrsSchema = z.object({
   [COMPANY_ATTR.coi_expiry]: optStr,
   [COMPANY_ATTR.payment_terms]: optStr,
   [COMPANY_ATTR.billing_email]: optStr,
+  billing_preferences: BillingPreferencesSchema,
 });
 
 /**
@@ -268,6 +296,7 @@ export const IndividualAttrsSchema = z.object({
   [INDIVIDUAL_ATTR.email]: optStr,
   [INDIVIDUAL_ATTR.phone]: optStr,
   [INDIVIDUAL_ATTR.category]: optStr,
+  billing_preferences: BillingPreferencesSchema,
 });
 
 /**

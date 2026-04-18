@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SeriesRuleSchema, SERIES_ARCHETYPES } from '@/shared/lib/series-rule';
 
 /** Event archetype values for deals. Shared by createDeal schema and UI. */
 export const DEAL_ARCHETYPES = [
@@ -79,8 +80,28 @@ const plannerSchema = z.object({
 });
 export type PlannerInput = z.infer<typeof plannerSchema>;
 
+/**
+ * Date shape for a new deal — one of three:
+ *   - single:    one show, proposedDate carries the day
+ *   - multi_day: contiguous envelope (Fri–Sun), proposedEndDate required
+ *   - series:    N independent shows sharing a contract (residency, tour, run)
+ *
+ * The UI's Stage 1 three-tab control selects dateKind; the server action
+ * translates this into the RPC's (p_date_kind, p_date) pair.
+ */
+export const DATE_KINDS = ['single', 'multi_day', 'series'] as const;
+export type DateKind = (typeof DATE_KINDS)[number];
+
 export const createDealSchema = z.object({
   proposedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be yyyy-MM-dd'),
+  /** When dateKind = 'multi_day', the inclusive end date (yyyy-MM-dd, >= proposedDate). */
+  proposedEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  /** Date shape. Defaults to 'single'. 'series' requires `seriesRule`. */
+  dateKind: z.enum(DATE_KINDS).default('single'),
+  /** Required when dateKind = 'series'. rdates is the authoritative list. */
+  seriesRule: SeriesRuleSchema.nullable().optional(),
+  /** Optional archetype label for series (residency/tour/run/weekend/custom). */
+  seriesArchetype: z.enum(SERIES_ARCHETYPES).nullable().optional(),
   eventArchetype: z.enum(DEAL_ARCHETYPES).nullable().optional(),
   title: z.string().max(500).nullable().optional(),
 

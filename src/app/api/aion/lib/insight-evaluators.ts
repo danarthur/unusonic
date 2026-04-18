@@ -31,7 +31,7 @@ export type InsightCandidate = {
 
 export async function evaluateAllInsights(workspaceId: string): Promise<InsightCandidate[]> {
   // Pre-fetch shared data for crew evaluators (single batch instead of N+1)
-  const crewData = await getUpcomingDealsWithCrew(workspaceId);
+  const crewData = await getUpcomingShowsWithCrew(workspaceId);
 
   const results = await Promise.allSettled([
     // v1 set
@@ -144,51 +144,72 @@ export function eventUrgency(daysOut: number): InsightCandidate['urgency'] {
 
 // ── Shared data fetchers (batch queries to avoid N+1) ───────────────────────
 
-type CrewRow = { id: string; deal_id: string; confirmed_at: string | null; entity_id: string };
-type UpcomingDeal = { id: string; title: string | null; proposed_date: string; event_archetype: string | null };
-type UpcomingDealsWithCrew = {
-  deals: UpcomingDeal[];
-  crewByDealId: Map<string, CrewRow[]>;
+type CrewRow = { id: string; deal_id: string | null; event_id: string | null; confirmed_at: string | null; entity_id: string };
+type UpcomingShow = {
+  eventId: string;
+  dealId: string | null;
+  title: string | null;
+  proposedDate: string;
+  eventArchetype: string | null;
+};
+type UpcomingShowsWithCrew = {
+  shows: UpcomingShow[];
+  crewByEventId: Map<string, CrewRow[]>;
 };
 
 /**
- * Batch-fetch upcoming deals (within 7 days) and all their crew in two queries.
+ * Batch-fetch upcoming shows (within 7 days) and all their crew in two
+ * queries. This is EVENT-scoped after the multi-date P0 work: series deals
+ * surface one candidate insight per upcoming show rather than one per deal,
+ * because crew and production readiness differ per show.
+ *
  * Shared by evaluateCrewUnconfirmed and evaluateShowNoCrew.
  */
-async function getUpcomingDealsWithCrew(workspaceId: string): Promise<UpcomingDealsWithCrew> {
+async function getUpcomingShowsWithCrew(workspaceId: string): Promise<UpcomingShowsWithCrew> {
   const system = getSystemClient();
+  const nowIso = new Date().toISOString();
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data: deals } = await system
-    .from('deals')
-    .select('id, title, proposed_date, event_archetype')
+  const { data: events } = await (system as any)
+    .schema('ops')
+    .from('events')
+    .select('id, deal_id, title, starts_at, event_archetype, archived_at, lifecycle_status')
     .eq('workspace_id', workspaceId)
-    .in('status', ['proposal', 'contract_sent', 'won'])
-    .not('proposed_date', 'is', null)
-    .lte('proposed_date', sevenDaysFromNow)
-    .gte('proposed_date', new Date().toISOString());
+    .is('archived_at', null)
+    .gte('starts_at', nowIso)
+    .lte('starts_at', sevenDaysFromNow);
 
-  if (!deals?.length) return { deals: [], crewByDealId: new Map() };
+  if (!events?.length) return { shows: [], crewByEventId: new Map() };
 
-  const dealIds = deals.map((d: any) => d.id);
+  const eventIds = (events as any[]).map((e) => e.id as string);
 
-  // Single batch query for all crew across all upcoming deals
+  // Single batch query: event-scoped crew rows only.
   const { data: allCrew } = await (system as any)
     .schema('ops')
     .from('deal_crew')
-    .select('id, deal_id, confirmed_at, entity_id')
-    .in('deal_id', dealIds)
+    .select('id, deal_id, event_id, confirmed_at, entity_id')
+    .in('event_id', eventIds)
     .eq('workspace_id', workspaceId);
 
-  // Group crew by deal_id
-  const crewByDealId = new Map<string, CrewRow[]>();
+  const crewByEventId = new Map<string, CrewRow[]>();
   for (const row of (allCrew ?? []) as CrewRow[]) {
-    const existing = crewByDealId.get(row.deal_id) ?? [];
+    if (!row.event_id) continue;
+    const existing = crewByEventId.get(row.event_id) ?? [];
     existing.push(row);
-    crewByDealId.set(row.deal_id, existing);
+    crewByEventId.set(row.event_id, existing);
   }
 
-  return { deals: deals as UpcomingDeal[], crewByDealId };
+  const shows: UpcomingShow[] = (events as any[]).map((e) => ({
+    eventId: e.id as string,
+    dealId: (e.deal_id as string | null) ?? null,
+    title: (e.title as string | null) ?? null,
+    // Use the event's own date, not the deal's proposed_date — in a series
+    // these differ, and the deal proposed_date tracks only the first live show.
+    proposedDate: (e.starts_at as string).slice(0, 10),
+    eventArchetype: (e.event_archetype as string | null) ?? null,
+  }));
+
+  return { shows, crewByEventId };
 }
 
 // ── Individual evaluators ────────────────────────────────────────────────────
@@ -264,47 +285,47 @@ async function evaluateProposalViewedUnsigned(workspaceId: string): Promise<Insi
  */
 async function evaluateCrewUnconfirmed(
   _workspaceId: string,
-  crewData: UpcomingDealsWithCrew,
+  crewData: UpcomingShowsWithCrew,
 ): Promise<InsightCandidate[]> {
-  const { deals, crewByDealId } = crewData;
-  if (!deals.length) return [];
+  const { shows, crewByEventId } = crewData;
+  if (!shows.length) return [];
 
   const insights: InsightCandidate[] = [];
 
-  for (const deal of deals) {
-    const crew = crewByDealId.get(deal.id) ?? [];
+  for (const show of shows) {
+    const crew = crewByEventId.get(show.eventId) ?? [];
     const totalCrew = crew.length;
     const unconfirmed = crew.filter((c) => !c.confirmed_at);
     if (unconfirmed.length === 0) continue;
 
-    const daysOut = daysUntil(deal.proposed_date);
+    const daysOut = daysUntil(show.proposedDate);
     const urg = eventUrgency(daysOut);
 
-    // Dynamic priority: base 30, +10 if ≤3 days, +5 if all crew unconfirmed
     const allUnconfirmed = unconfirmed.length === totalCrew;
     const dynamicPriority = Math.min(50, 30 + (daysOut <= 3 ? 10 : 0) + (allUnconfirmed ? 5 : 0));
 
-    const dateStr = shortDate(deal.proposed_date);
+    const dateStr = shortDate(show.proposedDate);
     const title = allUnconfirmed
-      ? `All ${totalCrew} crew unconfirmed for ${deal.title ?? 'Untitled'} on ${dateStr}`
-      : `${unconfirmed.length} of ${totalCrew} crew unconfirmed for ${deal.title ?? 'Untitled'} on ${dateStr}`;
+      ? `All ${totalCrew} crew unconfirmed for ${show.title ?? 'Untitled'} on ${dateStr}`
+      : `${unconfirmed.length} of ${totalCrew} crew unconfirmed for ${show.title ?? 'Untitled'} on ${dateStr}`;
 
     insights.push({
       triggerType: 'crew_unconfirmed',
       entityType: 'deal',
-      entityId: deal.id,
+      entityId: show.dealId ?? show.eventId,
       title,
       context: {
-        dealTitle: deal.title,
+        eventId: show.eventId,
+        dealTitle: show.title,
         unconfirmedCount: unconfirmed.length,
         totalCrew,
         allUnconfirmed,
-        eventDate: deal.proposed_date,
+        eventDate: show.proposedDate,
         daysUntilEvent: daysOut,
       },
       priority: dynamicPriority,
       suggestedAction: 'Confirm crew assignments or send reminders',
-      href: `/crm/deal/${deal.id}`,
+      href: show.dealId ? `/crm/deal/${show.dealId}` : `/events/${show.eventId}`,
       urgency: urg,
     });
   }
@@ -319,23 +340,22 @@ async function evaluateCrewUnconfirmed(
  */
 async function evaluateShowNoCrew(
   _workspaceId: string,
-  crewData: UpcomingDealsWithCrew,
+  crewData: UpcomingShowsWithCrew,
 ): Promise<InsightCandidate[]> {
-  const { deals, crewByDealId } = crewData;
-  if (!deals.length) return [];
+  const { shows, crewByEventId } = crewData;
+  if (!shows.length) return [];
 
   const insights: InsightCandidate[] = [];
 
-  for (const deal of deals) {
-    const crewCount = (crewByDealId.get(deal.id) ?? []).length;
+  for (const show of shows) {
+    const crewCount = (crewByEventId.get(show.eventId) ?? []).length;
     if (crewCount > 0) continue;
 
-    const daysOut = daysUntil(deal.proposed_date);
+    const daysOut = daysUntil(show.proposedDate);
     const urg = eventUrgency(daysOut);
-    const dateStr = shortDate(deal.proposed_date);
-    const dealTitle = deal.title ?? 'Untitled';
+    const dateStr = shortDate(show.proposedDate);
+    const dealTitle = show.title ?? 'Untitled';
 
-    // Dynamic priority: base 40, +10 if ≤3 days
     const dynamicPriority = Math.min(50, 40 + (daysOut <= 3 ? 10 : 0));
 
     const title = daysOut <= 1
@@ -345,17 +365,18 @@ async function evaluateShowNoCrew(
     insights.push({
       triggerType: 'show_no_crew',
       entityType: 'deal',
-      entityId: deal.id,
+      entityId: show.dealId ?? show.eventId,
       title,
       context: {
+        eventId: show.eventId,
         dealTitle,
-        eventDate: deal.proposed_date,
+        eventDate: show.proposedDate,
         daysUntilEvent: daysOut,
-        eventType: deal.event_archetype ?? null,
+        eventType: show.eventArchetype ?? null,
       },
       priority: dynamicPriority,
       suggestedAction: 'Assign crew to this show',
-      href: `/crm/deal/${deal.id}`,
+      href: show.dealId ? `/crm/deal/${show.dealId}` : `/events/${show.eventId}`,
       urgency: urg,
     });
   }

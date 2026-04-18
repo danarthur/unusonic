@@ -36,9 +36,9 @@ import {
   type CompanyClientSelection,
 } from './create-gig-modal/host-cast-forms';
 import { CastSummary } from './create-gig-modal/cast-summary';
+import { DateStage, type DateKind } from './create-gig-modal/date-stage';
+import type { SeriesRule, SeriesArchetype } from '@/shared/lib/series-rule';
 import { CurrencyInput } from '@/shared/ui/currency-input';
-
-const EVENT_ARCHETYPES = DEAL_ARCHETYPES.map((value) => ({ value, label: DEAL_ARCHETYPE_LABELS[value] }));
 
 interface CreateGigModalProps {
   open: boolean;
@@ -61,9 +61,12 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   const [stage, setStage] = useState<1 | 2>(1);
   const [eventDate, setEventDate] = useState('');
   const [eventArchetype, setEventArchetype] = useState<string | null>(null);
-  const [archetypeOpen, setArchetypeOpen] = useState(false);
   const [feasibility, setFeasibility] = useState<CheckDateFeasibilityResult | null>(null);
   const [feasibilityLoading, setFeasibilityLoading] = useState(false);
+  const [dateKind, setDateKind] = useState<DateKind>('single');
+  const [proposedEndDate, setProposedEndDate] = useState('');
+  const [seriesRule, setSeriesRule] = useState<SeriesRule | null>(null);
+  const [seriesArchetype, setSeriesArchetype] = useState<SeriesArchetype | null>(null);
   const [title, setTitle] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -125,10 +128,8 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   const [, setVenueLoading] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<{ id: string; name: string; address?: string | null } | null>(null);
 
-  const [calendarExpanded, setCalendarExpanded] = useState(false);
   const dateBlockRef = useRef<HTMLDivElement>(null);
   const modalContentRef = useRef<HTMLDivElement>(null);
-  const archetypeTriggerRef = useRef<HTMLButtonElement>(null);
   const venueTriggerRef = useRef<HTMLInputElement>(null);
   const plannerTriggerRef = useRef<HTMLInputElement>(null);
   const pocTriggerRef = useRef<HTMLButtonElement>(null);
@@ -137,22 +138,8 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   useModalLayer({ open, onClose, containerRef: modalContentRef });
 
   useEffect(() => {
-    if (!open) setCalendarExpanded(false);
-  }, [open]);
-
-  useEffect(() => {
     if (open) { setError(null); setShowLimitData(null); }
   }, [open]);
-
-  useEffect(() => {
-    if (!calendarExpanded) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dateBlockRef.current?.contains(e.target as Node)) return;
-      setCalendarExpanded(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [calendarExpanded]);
 
   const goToStage = (next: 1 | 2) => {
     setError(null);
@@ -241,9 +228,10 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
     return () => clearTimeout(t);
   }, [plannerQuery]);
 
-  // Feasibility check
+  // Feasibility check — single-day only; multi-day and series each get their
+  // own per-date feasibility rendering inside DateStage.
   useEffect(() => {
-    if (!eventDate || !eventArchetype || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    if (dateKind !== 'single' || !eventDate || !eventArchetype || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
       setFeasibility(null);
       return;
     }
@@ -253,7 +241,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
       .then((res) => { if (!cancelled) setFeasibility(res); })
       .finally(() => { if (!cancelled) setFeasibilityLoading(false); });
     return () => { cancelled = true; };
-  }, [eventDate, eventArchetype]);
+  }, [eventDate, eventArchetype, dateKind]);
 
   useEffect(() => {
     if (!open) return;
@@ -423,8 +411,23 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
       setError('No workspace selected. Complete onboarding first.');
       return;
     }
-    if (!eventDate || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
-      setError('Select a proposed date.');
+
+    // Resolve the proposed date per tab: single/multi_day use `eventDate`; series
+    // uses the rule's primary_date (first active show). The RPC mirrors this
+    // resolution server-side, but we still need a date for the optimistic card.
+    const effectiveProposedDate =
+      dateKind === 'series' ? (seriesRule?.primary_date ?? '') : eventDate;
+
+    if (!effectiveProposedDate || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveProposedDate)) {
+      setError(
+        dateKind === 'series'
+          ? 'Add at least one show to the series.'
+          : 'Select a proposed date.'
+      );
+      return;
+    }
+    if (dateKind === 'multi_day' && (!proposedEndDate || proposedEndDate < eventDate)) {
+      setError('Pick an end date on or after the start date.');
       return;
     }
 
@@ -438,7 +441,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
       id: tempId,
       title: resolvedTitle || null,
       status: 'inquiry' as const,
-      event_date: eventDate,
+      event_date: effectiveProposedDate,
       location: locationStr.trim() || null,
       client_name: optimisticClientName.trim() || null,
     };
@@ -448,7 +451,11 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
 
       // Build the input for the new RPC contract.
       const dealInput: CreateDealInput = {
-        proposedDate: eventDate,
+        proposedDate: effectiveProposedDate,
+        proposedEndDate: dateKind === 'multi_day' ? proposedEndDate : null,
+        dateKind,
+        seriesRule: dateKind === 'series' ? seriesRule : null,
+        seriesArchetype: dateKind === 'series' ? seriesArchetype : null,
         eventArchetype: (eventArchetype ?? undefined) as CreateDealInput['eventArchetype'],
         title: resolvedTitle || undefined,
         hostKind,
@@ -564,8 +571,11 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
 
   function resetForm() {
     setStage(1);
-    setCalendarExpanded(false);
     setEventDate('');
+    setProposedEndDate('');
+    setDateKind('single');
+    setSeriesRule(null);
+    setSeriesArchetype(null);
     setEventArchetype(null);
     setFeasibility(null);
     setTitle('');
@@ -662,166 +672,27 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                 <div className="relative flex-1 overflow-y-auto overflow-x-hidden px-6 py-2 min-h-0 min-w-0">
                   <div className="grid grid-cols-1 gap-4 auto-rows-auto pb-4 min-w-0">
                     {stage === 1 && (
-                      <motion.div
-                        key="stage1"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={STAGE_MEDIUM}
-                        className="flex flex-col min-w-0" style={{ gap: 'var(--stage-gap-wide, 12px)' }}
-                      >
-                        <div ref={dateBlockRef} className="flex flex-col min-w-0" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label htmlFor="create-gig-proposed-date" className="block stage-label mb-1.5">Proposed date</label>
-                              <button
-                                id="create-gig-proposed-date"
-                                type="button"
-                                onClick={() => setCalendarExpanded((o) => !o)}
-                                aria-expanded={calendarExpanded}
-                                aria-haspopup="dialog"
-                                className={cn(
-                                  'flex w-full min-w-0 items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] text-left transition-colors duration-75',
-                                  calendarExpanded
-                                    ? 'border-[var(--stage-accent)] bg-[var(--ctx-well)] ring-1 ring-[var(--stage-accent)]'
-                                    : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] hover:border-[oklch(1_0_0_/_0.20)]',
-                                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
-                                )}
-                              >
-                                <Calendar size={14} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} aria-hidden />
-                                <span className={cn('flex-1 min-w-0 truncate tracking-tight', eventDate ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-tertiary)]')}>
-                                  {eventDate ? format(parseLocalDateString(eventDate), 'PPP') : 'Select date'}
-                                </span>
-                                <ChevronDown size={14} className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-[80ms]', calendarExpanded && 'rotate-180')} aria-hidden />
-                              </button>
-                            </div>
-                            <div>
-                              <label htmlFor="create-gig-event-archetype" className="block stage-label mb-1.5">Type</label>
-                              <div className="relative">
-                                <button
-                                  ref={archetypeTriggerRef}
-                                  id="create-gig-event-archetype"
-                                  type="button"
-                                  onClick={() => setArchetypeOpen((o) => !o)}
-                                  onBlur={() => setTimeout(() => setArchetypeOpen(false), 180)}
-                                  aria-expanded={archetypeOpen}
-                                  aria-haspopup="listbox"
-                                  className={cn(
-                                    'flex w-full min-w-0 items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] text-left transition-colors duration-75',
-                                    archetypeOpen
-                                      ? 'border-[var(--stage-accent)] bg-[var(--ctx-well)] ring-1 ring-[var(--stage-accent)]'
-                                      : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] hover:border-[oklch(1_0_0_/_0.20)]',
-                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
-                                  )}
-                                >
-                                  <span className={cn('flex-1 min-w-0 truncate tracking-tight', eventArchetype ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-tertiary)]')}>
-                                    {eventArchetype ? DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS] : 'Select type'}
-                                  </span>
-                                  <ChevronDown size={14} className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-[80ms]', archetypeOpen && 'rotate-180')} aria-hidden />
-                                </button>
-                                {archetypeOpen && createPortal(
-                                  <div
-                                    className="fixed inset-0 z-[60]"
-                                    onMouseDown={() => setArchetypeOpen(false)}
-                                  >
-                                    <motion.div
-                                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                                      transition={STAGE_LIGHT}
-                                      role="listbox"
-                                      aria-label="Show archetype"
-                                      data-surface="raised"
-                                      onMouseDown={(e) => e.stopPropagation()}
-                                      style={(() => {
-                                        const rect = archetypeTriggerRef.current?.getBoundingClientRect();
-                                        if (!rect) return {};
-                                        const spaceBelow = window.innerHeight - rect.bottom;
-                                        const dropUp = spaceBelow < 260;
-                                        return {
-                                          position: 'fixed' as const,
-                                          left: rect.left,
-                                          width: rect.width,
-                                          ...(dropUp
-                                            ? { bottom: window.innerHeight - rect.top + 4 }
-                                            : { top: rect.bottom + 4 }),
-                                        };
-                                      })()}
-                                      className="max-h-[240px] overflow-y-auto rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
-                                    >
-                                      {EVENT_ARCHETYPES.map((a) => (
-                                        <button
-                                          key={a.value}
-                                          type="button"
-                                          role="option"
-                                          aria-selected={eventArchetype === a.value}
-                                          onMouseDown={(e) => {
-                                            e.stopPropagation();
-                                            setEventArchetype(a.value);
-                                            setArchetypeOpen(false);
-                                          }}
-                                          className={cn(
-                                            'flex w-full items-center px-3 py-2.5 text-left text-[length:var(--stage-input-font-size,13px)] tracking-tight transition-colors min-w-0',
-                                            eventArchetype === a.value
-                                              ? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)] font-medium'
-                                              : 'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                                          )}
-                                        >
-                                          {a.label}
-                                        </button>
-                                      ))}
-                                    </motion.div>
-                                  </div>,
-                                  document.body
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <AnimatePresence>
-                            {eventDate && !calendarExpanded && (
-                              <motion.div
-                                key="time-row"
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                transition={STAGE_LIGHT}
-                                className="grid grid-cols-2 gap-4 overflow-hidden"
-                              >
-                                <div>
-                                  <label htmlFor="create-gig-start-time" className="block stage-label mb-1.5">Start time</label>
-                                  <TimePicker value={startTime || null} onChange={(v) => setStartTime(v ?? '')} placeholder="Start time" context="evening" />
-                                </div>
-                                <div>
-                                  <label htmlFor="create-gig-end-time" className="block stage-label mb-1.5">End time</label>
-                                  <TimePicker value={endTime || null} onChange={(v) => setEndTime(v ?? '')} placeholder="End time" context="evening" />
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                          <AnimatePresence>
-                            {calendarExpanded && (
-                              <motion.div
-                                key="calendar-row"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={STAGE_NAV_CROSSFADE}
-                                className="w-full min-w-0"
-                              >
-                                <CalendarPanel
-                                  value={eventDate}
-                                  onChange={(d) => {
-                                    setEventDate(d);
-                                    setCalendarExpanded(false);
-                                  }}
-                                  onClose={() => setCalendarExpanded(false)}
-                                />
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                        {eventDate && eventArchetype && (
-                          <div className="flex items-center gap-2 min-w-0">
+                      <div ref={dateBlockRef}>
+                        <DateStage
+                          dateKind={dateKind}
+                          setDateKind={setDateKind}
+                          eventDate={eventDate}
+                          setEventDate={setEventDate}
+                          proposedEndDate={proposedEndDate}
+                          setProposedEndDate={setProposedEndDate}
+                          seriesRule={seriesRule}
+                          setSeriesRule={setSeriesRule}
+                          seriesArchetype={seriesArchetype}
+                          setSeriesArchetype={setSeriesArchetype}
+                          eventArchetype={eventArchetype}
+                          setEventArchetype={setEventArchetype}
+                          startTime={startTime}
+                          setStartTime={setStartTime}
+                          endTime={endTime}
+                          setEndTime={setEndTime}
+                        />
+                        {dateKind === 'single' && eventDate && eventArchetype && (
+                          <div className="flex items-center gap-2 min-w-0 mt-3">
                             {feasibilityLoading ? (
                               <span className="text-sm text-[var(--stage-text-secondary)]">Checking availability…</span>
                             ) : feasibility ? (
@@ -829,7 +700,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                             ) : null}
                           </div>
                         )}
-                      </motion.div>
+                      </div>
                     )}
 
                     {stage === 2 && (
@@ -1339,7 +1210,14 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                         </button>
                         <button
                           type="button"
-                          disabled={!hasWorkspace || !eventDate || !eventArchetype || feasibilityLoading}
+                          disabled={
+                            !hasWorkspace
+                            || !eventArchetype
+                            || feasibilityLoading
+                            || (dateKind === 'single' && !eventDate)
+                            || (dateKind === 'multi_day' && (!eventDate || !proposedEndDate || proposedEndDate < eventDate))
+                            || (dateKind === 'series' && (!seriesRule || seriesRule.rdates.length === seriesRule.exdates.length))
+                          }
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();

@@ -50,6 +50,16 @@ export type StreamCardItem = {
   followUpReasonType?: string | null;
   /** Production readiness signals — present for won deals with events. */
   readiness?: ReadinessData | null;
+  /** Series metadata — present on deal cards whose project has is_series = true. */
+  is_series?: boolean;
+  /** Active (non-archived) show count. For singletons this is 1 or undefined. */
+  series_show_count?: number;
+  /** ISO date (yyyy-MM-dd) of the first upcoming show, falling back to the last show. */
+  series_next_upcoming?: string | null;
+  /** ISO date of the last show in the series. */
+  series_last_date?: string | null;
+  /** Series archetype label (residency, tour, …) when set. */
+  series_archetype?: string | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -275,7 +285,13 @@ export function StreamCard({
                 <span className="truncate">{item.client_name}</span>
               </span>
             )}
-            {item.event_date && (
+            {item.is_series ? (
+              <span className="flex items-center gap-1 shrink-0" title={item.series_archetype ?? 'Series'}>
+                <Clock size={11} className="shrink-0 text-[var(--stage-text-tertiary)]" aria-hidden />
+                {item.series_show_count ?? 0} show{item.series_show_count === 1 ? '' : 's'}
+                {item.series_next_upcoming ? ` · next ${formatEventDate(item.series_next_upcoming)}` : ''}
+              </span>
+            ) : item.event_date && (
               <span className="flex items-center gap-1 shrink-0">
                 <Clock size={11} className="shrink-0 text-[var(--stage-text-tertiary)]" aria-hidden />
                 {formatEventDate(item.event_date)}
