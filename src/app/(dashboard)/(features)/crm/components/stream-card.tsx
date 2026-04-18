@@ -14,6 +14,7 @@ import { reopenDeal } from '../actions/reopen-deal';
 import { rescheduleEvent } from '../actions/reschedule-event';
 import { updateDealStatus } from '../actions/update-deal-status';
 import { readEventStatusFromLifecycle } from '@/shared/lib/event-status/read-event-status';
+import { AionSuggestionRow } from './aion-suggestion-row';
 
 export type StreamCardItem = {
   id: string;
@@ -473,6 +474,16 @@ export function StreamCard({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Aion stage-move suggestion — only renders on the selected card
+              so the pipeline view doesn't N+1-fetch insights across every
+              tile. The component self-fetches on mount and returns null
+              when there's nothing to surface. */}
+          {selected && item.source === 'deal' && (
+            <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+              <AionSuggestionRow dealId={item.id} />
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

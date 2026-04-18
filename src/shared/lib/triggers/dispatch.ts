@@ -70,19 +70,37 @@ export interface DispatchSummary {
 }
 
 /**
- * Stage-trigger entries stored on `ops.pipeline_stages.triggers`. Phase 3e
- * introduces the UI to populate these. Today they're empty for every stage.
+ * Stage-trigger entries stored on `ops.pipeline_stages.triggers`. Parsed
+ * shape is a forward-compatible subset: if a new optional field lands on
+ * the schema, this parser ignores it rather than wedging the dispatcher.
  */
-type StageTrigger = { type: string; config?: Record<string, unknown> };
+type StageTrigger = {
+  type: string;
+  event: 'on_enter' | 'on_exit' | 'dwell_sla';
+  dwell_days?: number;
+  primitive_key?: string;
+  config: Record<string, unknown>;
+};
 
 function parseStageTriggers(raw: Json | null | undefined): StageTrigger[] {
   if (!raw || !Array.isArray(raw)) return [];
   const out: StageTrigger[] = [];
   for (const entry of raw) {
     if (entry && typeof entry === 'object' && !Array.isArray(entry) && typeof (entry as { type?: unknown }).type === 'string') {
-      const e = entry as { type: string; config?: unknown };
+      const e = entry as {
+        type: string;
+        event?: unknown;
+        dwell_days?: unknown;
+        primitive_key?: unknown;
+        config?: unknown;
+      };
+      const event =
+        e.event === 'on_exit' || e.event === 'dwell_sla' ? e.event : 'on_enter';
       out.push({
         type: e.type,
+        event,
+        dwell_days: typeof e.dwell_days === 'number' ? e.dwell_days : undefined,
+        primitive_key: typeof e.primitive_key === 'string' ? e.primitive_key : undefined,
         config: e.config && typeof e.config === 'object' && !Array.isArray(e.config)
           ? (e.config as Record<string, unknown>)
           : {},
@@ -140,14 +158,13 @@ async function runTriggersForRow(
   summary: DispatchSummary,
 ): Promise<void> {
   const actorUserId = row.actor_user_id && row.actor_user_id.length > 0 ? row.actor_user_id : null;
-  const ctxBase: TriggerContext = {
-    source: 'stage_trigger',
-    transitionId: row.transition_id,
-    dealId: row.deal_id,
-    workspaceId: row.workspace_id,
-    actorUserId,
-    actorKind: asActorKind(row.actor_kind),
-  };
+  const stageTags = Array.isArray((row as unknown as { stage_tags?: unknown }).stage_tags)
+    ? ((row as unknown as { stage_tags: string[] }).stage_tags)
+    : undefined;
+
+  // Only fire on_enter primitives from this path. dwell_sla and on_exit are
+  // handled elsewhere (dwell-sla cron + exit-dispatch hook, both P0).
+  const enterTriggers = triggers.filter((t) => t.event === 'on_enter');
 
   // Build the common activity-log args for this row once; per-trigger calls
   // only need to vary action_summary, status, trigger_type, error, undo_token.
@@ -158,8 +175,19 @@ async function runTriggersForRow(
     pipelineStageId: row.to_stage_id,
   };
 
-  for (const trigger of triggers) {
+  for (const trigger of enterTriggers) {
     const primitive = getPrimitive(trigger.type);
+    const ctxBase: TriggerContext = {
+      source: 'stage_trigger',
+      transitionId: row.transition_id,
+      dealId: row.deal_id,
+      workspaceId: row.workspace_id,
+      actorUserId,
+      actorKind: asActorKind(row.actor_kind),
+      primitiveKey: trigger.primitive_key,
+      event: trigger.event,
+      stageTags,
+    };
     if (!primitive) {
       summary.failed_triggers++;
       await logActivity(db, {

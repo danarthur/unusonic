@@ -25,6 +25,20 @@ export type TriggerContext =
       workspaceId: string;
       actorUserId: string | null;
       actorKind: 'user' | 'webhook' | 'system' | 'aion';
+      /**
+       * Stable admin-authored identifier for this trigger on this stage.
+       * Primitives that need cross-run dedup (e.g. `enroll_in_follow_up`)
+       * read this as the DB-level uniqueness key. Optional because the
+       * dispatcher tolerates legacy triggers that pre-date the key.
+       */
+      primitiveKey?: string;
+      /** 'on_enter' | 'dwell_sla' | 'on_exit' — lets a primitive vary
+       * behavior by dispatch kind without another registry lookup. */
+      event?: 'on_enter' | 'on_exit' | 'dwell_sla';
+      /** Set to the snapshot of the stage tags so primitives can gate on
+       * semantic identifiers (proposal_sent, awaiting_signature) rather
+       * than slug/label. */
+      stageTags?: string[];
     }
   | {
       /**

@@ -31,6 +31,7 @@ import { getEventLoadDates } from '../actions/get-event-summary';
 import { formatRelTime } from '@/shared/lib/format-currency';
 import { updateDealScalars } from '../actions/update-deal-scalars';
 import { ProductionTeamCard } from './production-team-card';
+import { AionSuggestionRow } from './aion-suggestion-row';
 import { DealShowsList } from './deal-shows-list';
 import { SeriesCrewAffordance } from './series-crew-affordance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
@@ -410,6 +411,10 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             currentStage={currentStage}
             stages={trackerStages}
           />
+          {/* Aion stage-move suggestion — self-hides when no suggestion. */}
+          <div className="mt-4">
+            <AionSuggestionRow dealId={deal.id} />
+          </div>
         </StagePanel>
       </motion.div>
 

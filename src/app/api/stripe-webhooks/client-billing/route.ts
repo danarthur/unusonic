@@ -377,6 +377,25 @@ async function advanceDealFromStripeWebhook(args: {
       pipelineId,
       resolvedStageId,
     });
+    return;
+  }
+
+  // Dispatch triggers synchronously so deposit_received's on_enter primitives
+  // (trigger_handoff + thank_you enrollment) run without waiting for the
+  // per-minute cron. Primitives are idempotent (dedup unique index on
+  // `ops.follow_up_queue (originating_transition_id, primitive_key)`), so a
+  // later cron tick that re-claims the same transition is a no-op.
+  //
+  // Failures are swallowed — the stage advance already committed, and the
+  // cron is the safety net.
+  try {
+    const { dispatchPendingTransitions } = await import('@/shared/lib/triggers/dispatch');
+    await dispatchPendingTransitions(supabase);
+  } catch (dispatchErr) {
+    Sentry.logger.warn('stripe.clientBilling.dispatchTriggersFailed', {
+      dealId,
+      error: dispatchErr instanceof Error ? dispatchErr.message : String(dispatchErr),
+    });
   }
 }
 

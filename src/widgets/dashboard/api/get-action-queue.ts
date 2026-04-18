@@ -99,6 +99,7 @@ async function fetchFollowUpItems(
     .select('id, deal_id, reason, priority_score, created_at')
     .eq('workspace_id', workspaceId)
     .eq('status', 'pending')
+    .is('superseded_at', null)
     .order('priority_score', { ascending: false })
     .limit(20);
 

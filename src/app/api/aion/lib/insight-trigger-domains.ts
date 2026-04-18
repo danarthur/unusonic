@@ -27,6 +27,9 @@ export const INSIGHT_TRIGGER_DOMAINS: Record<string, Domain> = {
   quote_expiring:           'sales',
   gone_quiet_with_value:    'sales',
   hot_lead_multi_view:      'sales',
+
+  // P0 follow-up engine
+  stage_advance_suggestion: 'sales',
 };
 
 /** Look up the domain for an insight trigger_type. Unknown → 'meta'. */

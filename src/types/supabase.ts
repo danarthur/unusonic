@@ -1059,6 +1059,9 @@ export type Database = {
           bill_to_entity_id: string
           bill_to_snapshot: Json
           billing_email: string | null
+          billing_mode: string | null
+          billing_period_end: string | null
+          billing_period_start: string | null
           created_at: string
           created_by_user_id: string | null
           currency: string
@@ -1109,6 +1112,9 @@ export type Database = {
           bill_to_entity_id: string
           bill_to_snapshot?: Json
           billing_email?: string | null
+          billing_mode?: string | null
+          billing_period_end?: string | null
+          billing_period_start?: string | null
           created_at?: string
           created_by_user_id?: string | null
           currency?: string
@@ -1159,6 +1165,9 @@ export type Database = {
           bill_to_entity_id?: string
           bill_to_snapshot?: Json
           billing_email?: string | null
+          billing_mode?: string | null
+          billing_period_end?: string | null
+          billing_period_start?: string | null
           created_at?: string
           created_by_user_id?: string | null
           currency?: string
@@ -1873,7 +1882,7 @@ export type Database = {
         Returns: string
       }
       spawn_invoices_from_proposal: {
-        Args: { p_proposal_id: string }
+        Args: { p_mode?: string; p_proposal_id: string }
         Returns: {
           invoice_id: string
           invoice_kind: string
@@ -2363,6 +2372,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "deal_activity_log_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "deal_activity_log_pipeline_stage_id_fkey"
             columns: ["pipeline_stage_id"]
             isOneToOne: false
@@ -2387,6 +2403,7 @@ export type Database = {
           department: string | null
           dispatch_status: string | null
           entity_id: string | null
+          event_id: string | null
           gear_notes: string | null
           id: string
           kit_fee: number | null
@@ -2415,6 +2432,7 @@ export type Database = {
           department?: string | null
           dispatch_status?: string | null
           entity_id?: string | null
+          event_id?: string | null
           gear_notes?: string | null
           id?: string
           kit_fee?: number | null
@@ -2443,6 +2461,7 @@ export type Database = {
           department?: string | null
           dispatch_status?: string | null
           entity_id?: string | null
+          event_id?: string | null
           gear_notes?: string | null
           id?: string
           kit_fee?: number | null
@@ -2456,7 +2475,22 @@ export type Database = {
           travel_stipend?: number | null
           workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "deal_crew_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_crew_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deal_crew_waypoints: {
         Row: {
@@ -2551,7 +2585,15 @@ export type Database = {
           updated_at?: string | null
           workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "deal_notes_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deal_stakeholders: {
         Row: {
@@ -2587,7 +2629,15 @@ export type Database = {
           organization_id?: string | null
           role?: Database["public"]["Enums"]["deal_stakeholder_role"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "deal_stakeholders_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deal_transitions: {
         Row: {
@@ -2603,6 +2653,7 @@ export type Database = {
           triggers_dispatched_at: string | null
           triggers_error: string | null
           triggers_failed_at: string | null
+          triggers_snapshot: Json | null
           workspace_id: string
         }
         Insert: {
@@ -2618,6 +2669,7 @@ export type Database = {
           triggers_dispatched_at?: string | null
           triggers_error?: string | null
           triggers_failed_at?: string | null
+          triggers_snapshot?: Json | null
           workspace_id: string
         }
         Update: {
@@ -2633,9 +2685,17 @@ export type Database = {
           triggers_dispatched_at?: string | null
           triggers_error?: string | null
           triggers_failed_at?: string | null
+          triggers_snapshot?: Json | null
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "deal_transitions_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "deal_transitions_from_stage_id_fkey"
             columns: ["from_stage_id"]
@@ -2875,6 +2935,7 @@ export type Database = {
           dates_load_in: string | null
           dates_load_out: string | null
           deal_id: string | null
+          diverged_from_series_at: string | null
           ends_at: string
           event_archetype: string | null
           guest_count_actual: number | null
@@ -2900,6 +2961,7 @@ export type Database = {
           tech_requirements: Json | null
           timezone: string
           title: string
+          unit_price_snapshot: number | null
           updated_at: string | null
           venue_address: string | null
           venue_entity_id: string | null
@@ -2922,6 +2984,7 @@ export type Database = {
           dates_load_in?: string | null
           dates_load_out?: string | null
           deal_id?: string | null
+          diverged_from_series_at?: string | null
           ends_at: string
           event_archetype?: string | null
           guest_count_actual?: number | null
@@ -2947,6 +3010,7 @@ export type Database = {
           tech_requirements?: Json | null
           timezone?: string
           title: string
+          unit_price_snapshot?: number | null
           updated_at?: string | null
           venue_address?: string | null
           venue_entity_id?: string | null
@@ -2969,6 +3033,7 @@ export type Database = {
           dates_load_in?: string | null
           dates_load_out?: string | null
           deal_id?: string | null
+          diverged_from_series_at?: string | null
           ends_at?: string
           event_archetype?: string | null
           guest_count_actual?: number | null
@@ -2994,6 +3059,7 @@ export type Database = {
           tech_requirements?: Json | null
           timezone?: string
           title?: string
+          unit_price_snapshot?: number | null
           updated_at?: string | null
           venue_address?: string | null
           venue_entity_id?: string | null
@@ -3003,6 +3069,13 @@ export type Database = {
           wrap_report?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "events_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "events_project_id_fkey"
             columns: ["project_id"]
@@ -3067,8 +3140,16 @@ export type Database = {
           context_snapshot: Json | null
           created_at: string
           deal_id: string
+          dismissal_reason: string | null
+          escalation_count: number
           follow_up_category: string
+          hide_from_portal: boolean
           id: string
+          last_escalated_at: string | null
+          originating_stage_id: string | null
+          originating_transition_id: string | null
+          primitive_key: string | null
+          priority_ceiling: number
           priority_score: number
           reason: string
           reason_type: string
@@ -3076,6 +3157,7 @@ export type Database = {
           status: string
           suggested_action: string | null
           suggested_channel: string | null
+          superseded_at: string | null
           workspace_id: string
         }
         Insert: {
@@ -3084,8 +3166,16 @@ export type Database = {
           context_snapshot?: Json | null
           created_at?: string
           deal_id: string
+          dismissal_reason?: string | null
+          escalation_count?: number
           follow_up_category?: string
+          hide_from_portal?: boolean
           id?: string
+          last_escalated_at?: string | null
+          originating_stage_id?: string | null
+          originating_transition_id?: string | null
+          primitive_key?: string | null
+          priority_ceiling?: number
           priority_score?: number
           reason: string
           reason_type: string
@@ -3093,6 +3183,7 @@ export type Database = {
           status?: string
           suggested_action?: string | null
           suggested_channel?: string | null
+          superseded_at?: string | null
           workspace_id: string
         }
         Update: {
@@ -3101,8 +3192,16 @@ export type Database = {
           context_snapshot?: Json | null
           created_at?: string
           deal_id?: string
+          dismissal_reason?: string | null
+          escalation_count?: number
           follow_up_category?: string
+          hide_from_portal?: boolean
           id?: string
+          last_escalated_at?: string | null
+          originating_stage_id?: string | null
+          originating_transition_id?: string | null
+          primitive_key?: string | null
+          priority_ceiling?: number
           priority_score?: number
           reason?: string
           reason_type?: string
@@ -3110,6 +3209,7 @@ export type Database = {
           status?: string
           suggested_action?: string | null
           suggested_channel?: string | null
+          superseded_at?: string | null
           workspace_id?: string
         }
         Relationships: []
@@ -3255,9 +3355,14 @@ export type Database = {
         Row: {
           client_entity_id: string | null
           created_at: string | null
+          deal_id: string | null
           end_date: string | null
           id: string
+          is_series: boolean
           name: string
+          series_archetype: string | null
+          series_crew_template: Json | null
+          series_rule: Json | null
           start_date: string | null
           status: string | null
           workspace_id: string
@@ -3265,9 +3370,14 @@ export type Database = {
         Insert: {
           client_entity_id?: string | null
           created_at?: string | null
+          deal_id?: string | null
           end_date?: string | null
           id?: string
+          is_series?: boolean
           name: string
+          series_archetype?: string | null
+          series_crew_template?: Json | null
+          series_rule?: Json | null
           start_date?: string | null
           status?: string | null
           workspace_id: string
@@ -3275,9 +3385,14 @@ export type Database = {
         Update: {
           client_entity_id?: string | null
           created_at?: string | null
+          deal_id?: string | null
           end_date?: string | null
           id?: string
+          is_series?: boolean
           name?: string
+          series_archetype?: string | null
+          series_crew_template?: Json | null
+          series_rule?: Json | null
           start_date?: string | null
           status?: string | null
           workspace_id?: string
@@ -3353,6 +3468,42 @@ export type Database = {
           id?: string
           sort_order?: number
           workspace_id?: string
+        }
+        Relationships: []
+      }
+      workspace_event_archetypes: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by_user_id: string | null
+          id: string
+          is_system: boolean
+          label: string
+          slug: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          is_system?: boolean
+          label: string
+          slug: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          is_system?: boolean
+          label?: string
+          slug?: string
+          updated_at?: string
+          workspace_id?: string | null
         }
         Relationships: []
       }
@@ -3571,6 +3722,68 @@ export type Database = {
       }
     }
     Views: {
+      active_deals: {
+        Row: {
+          archived_at: string | null
+          budget_estimated: number | null
+          created_at: string | null
+          event_archetype: string | null
+          event_end_time: string | null
+          event_id: string | null
+          event_start_time: string | null
+          id: string | null
+          lead_source: string | null
+          lead_source_detail: string | null
+          lead_source_id: string | null
+          lost_at: string | null
+          lost_reason: string | null
+          lost_to_competitor_name: string | null
+          main_contact_id: string | null
+          notes: string | null
+          organization_id: string | null
+          owner_entity_id: string | null
+          owner_user_id: string | null
+          pipeline_id: string | null
+          preferred_crew: Json | null
+          proposed_date: string | null
+          proposed_end_date: string | null
+          proposed_end_time: string | null
+          proposed_start_time: string | null
+          referrer_entity_id: string | null
+          show_health: Json | null
+          stage_id: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+          venue_id: string | null
+          venue_name: string | null
+          won_at: string | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_lead_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entity_crew_schedule: {
         Row: {
           assignee_name: string | null
@@ -3610,10 +3823,99 @@ export type Database = {
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "events_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      portal_follow_up_queue: {
+        Row: {
+          acted_at: string | null
+          acted_by: string | null
+          context_snapshot: Json | null
+          created_at: string | null
+          deal_id: string | null
+          dismissal_reason: string | null
+          escalation_count: number | null
+          follow_up_category: string | null
+          hide_from_portal: boolean | null
+          id: string | null
+          last_escalated_at: string | null
+          originating_stage_id: string | null
+          originating_transition_id: string | null
+          primitive_key: string | null
+          priority_ceiling: number | null
+          priority_score: number | null
+          reason: string | null
+          reason_type: string | null
+          snoozed_until: string | null
+          status: string | null
+          suggested_action: string | null
+          suggested_channel: string | null
+          superseded_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          acted_at?: string | null
+          acted_by?: string | null
+          context_snapshot?: Json | null
+          created_at?: string | null
+          deal_id?: string | null
+          dismissal_reason?: string | null
+          escalation_count?: number | null
+          follow_up_category?: string | null
+          hide_from_portal?: boolean | null
+          id?: string | null
+          last_escalated_at?: string | null
+          originating_stage_id?: string | null
+          originating_transition_id?: string | null
+          primitive_key?: string | null
+          priority_ceiling?: number | null
+          priority_score?: number | null
+          reason?: string | null
+          reason_type?: string | null
+          snoozed_until?: string | null
+          status?: string | null
+          suggested_action?: string | null
+          suggested_channel?: string | null
+          superseded_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          acted_at?: string | null
+          acted_by?: string | null
+          context_snapshot?: Json | null
+          created_at?: string | null
+          deal_id?: string | null
+          dismissal_reason?: string | null
+          escalation_count?: number | null
+          follow_up_category?: string | null
+          hide_from_portal?: boolean | null
+          id?: string | null
+          last_escalated_at?: string | null
+          originating_stage_id?: string | null
+          originating_transition_id?: string | null
+          primitive_key?: string | null
+          priority_ceiling?: number | null
+          priority_score?: number | null
+          reason?: string | null
+          reason_type?: string | null
+          snoozed_until?: string | null
+          status?: string | null
+          suggested_action?: string | null
+          suggested_channel?: string | null
+          superseded_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
+      _expand_series_rule: { Args: { p_series_rule: Json }; Returns: string[] }
       advance_deal_stage: {
         Args: {
           p_deal_id: string
@@ -3635,6 +3937,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      archive_workspace_event_archetype: {
+        Args: { p_slug: string; p_workspace_id: string }
+        Returns: undefined
+      }
       claim_pending_transitions: {
         Args: { p_batch_size?: number }
         Returns: {
@@ -3647,6 +3953,7 @@ export type Database = {
           pipeline_id: string
           stage_kind: string
           stage_slug: string
+          stage_tags: string[]
           stage_triggers: Json
           to_stage_id: string
           transition_id: string
@@ -3667,8 +3974,24 @@ export type Database = {
         }
         Returns: string
       }
+      evaluate_dwell_sla: {
+        Args: { p_batch_size?: number }
+        Returns: {
+          deal_id: string
+          pipeline_id: string
+          stage_tags: string[]
+          to_stage_id: string
+          transition_id: string
+          trigger_payload: Json
+          workspace_id: string
+        }[]
+      }
       event_status_pair_valid: {
         Args: { p_lifecycle: string; p_status: string }
+        Returns: boolean
+      }
+      has_primitive_fired: {
+        Args: { p_primitive: string; p_transition_id: string }
         Returns: boolean
       }
       log_deal_activity: {
@@ -3697,6 +4020,14 @@ export type Database = {
       mark_transition_failed: {
         Args: { p_error: string; p_transition_id: string }
         Returns: undefined
+      }
+      merge_workspace_event_archetypes: {
+        Args: {
+          p_source_slug: string
+          p_target_slug: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       metric_aion_refusal_rate: {
         Args: { p_days?: number; p_workspace_id: string }
@@ -3765,8 +4096,16 @@ export type Database = {
           vendor_name: string
         }[]
       }
+      normalize_event_archetype_label: {
+        Args: { p_label: string }
+        Returns: string
+      }
       patch_event_ros_data: {
         Args: { p_event_id: string; p_patch: Json }
+        Returns: undefined
+      }
+      rename_workspace_event_archetype: {
+        Args: { p_new_label: string; p_slug: string; p_workspace_id: string }
         Returns: undefined
       }
       reorder_pipeline_stages: {
@@ -3780,6 +4119,18 @@ export type Database = {
       seed_default_pipeline: {
         Args: { p_workspace_id: string }
         Returns: string
+      }
+      seed_default_triggers: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      unarchive_workspace_event_archetype: {
+        Args: { p_slug: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      upsert_workspace_event_archetype: {
+        Args: { p_label: string; p_workspace_id: string }
+        Returns: Json
       }
     }
     Enums: {
@@ -4333,6 +4684,7 @@ export type Database = {
           pipeline_id: string | null
           preferred_crew: Json | null
           proposed_date: string
+          proposed_end_date: string | null
           proposed_end_time: string | null
           proposed_start_time: string | null
           referrer_entity_id: string | null
@@ -4369,6 +4721,7 @@ export type Database = {
           pipeline_id?: string | null
           preferred_crew?: Json | null
           proposed_date: string
+          proposed_end_date?: string | null
           proposed_end_time?: string | null
           proposed_start_time?: string | null
           referrer_entity_id?: string | null
@@ -4405,6 +4758,7 @@ export type Database = {
           pipeline_id?: string | null
           preferred_crew?: Json | null
           proposed_date?: string
+          proposed_end_date?: string | null
           proposed_end_time?: string | null
           proposed_start_time?: string | null
           referrer_entity_id?: string | null
@@ -5542,6 +5896,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_books_for_edge: {
+        Args: {
+          p_company_id: string
+          p_person_id: string
+          p_since?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       add_catalog_item_assignee: {
         Args: {
           p_entity_id: string
@@ -5553,6 +5916,16 @@ export type Database = {
       add_catalog_role_assignee: {
         Args: { p_package_id: string; p_role_note: string }
         Returns: string
+      }
+      add_co_host_edge: {
+        Args: {
+          p_anniversary?: string
+          p_pairing?: string
+          p_partner_a_id: string
+          p_partner_b_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       add_contact_to_ghost_org:
         | {
@@ -5587,6 +5960,16 @@ export type Database = {
           p_last_name: string
           p_org_id: string
           p_role: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      add_represents_edge: {
+        Args: {
+          p_principal_id: string
+          p_representative_id: string
+          p_scope?: string
+          p_since?: string
           p_workspace_id: string
         }
         Returns: Json
@@ -5813,35 +6196,6 @@ export type Database = {
           p_poc?: Json
           p_venue_entity?: Json
           p_workspace_id: string
-        }
-        Returns: Json
-      }
-      add_co_host_edge: {
-        Args: {
-          p_workspace_id: string
-          p_partner_a_id: string
-          p_partner_b_id: string
-          p_pairing?: string
-          p_anniversary?: string
-        }
-        Returns: Json
-      }
-      add_represents_edge: {
-        Args: {
-          p_workspace_id: string
-          p_representative_id: string
-          p_principal_id: string
-          p_scope?: string
-          p_since?: string
-        }
-        Returns: Json
-      }
-      add_books_for_edge: {
-        Args: {
-          p_workspace_id: string
-          p_person_id: string
-          p_company_id: string
-          p_since?: string
         }
         Returns: Json
       }

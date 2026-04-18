@@ -8,6 +8,7 @@ import { getDeal } from './get-deal';
 import { getDealClientContext } from './get-deal-client';
 import { getProposalForDeal } from '@/features/sales/api/proposal-actions';
 import { upsertEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
+import { DismissalReasonSchema, type DismissalReason } from '@/shared/lib/triggers/schema';
 
 // =============================================================================
 // Types
@@ -61,6 +62,7 @@ export async function getFollowUpQueue(): Promise<FollowUpQueueItem[]> {
     .select('*')
     .eq('workspace_id', workspaceId)
     .in('status', ['pending', 'snoozed'])
+    .is('superseded_at', null)
     .order('priority_score', { ascending: false });
 
   if (error) {
@@ -89,6 +91,8 @@ export async function getFollowUpForDeal(dealId: string): Promise<FollowUpQueueI
     .eq('deal_id', dealId)
     .eq('workspace_id', workspaceId)
     .in('status', ['pending', 'snoozed'])
+    .is('superseded_at', null)
+    .order('priority_score', { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -206,7 +210,12 @@ export async function actOnFollowUp(
     const { error: updateErr } = await db
       .schema('ops')
       .from('follow_up_queue')
-      .update({ status: 'acted', acted_at: now, acted_by: user.id })
+      .update({
+        status: 'acted',
+        acted_at: now,
+        acted_by: user.id,
+        escalation_count: 0,
+      })
       .eq('id', queueItemId);
 
     if (updateErr) return { success: false, error: updateErr.message };
@@ -292,7 +301,12 @@ export async function snoozeFollowUp(
     const { error: updateErr } = await db
       .schema('ops')
       .from('follow_up_queue')
-      .update({ status: 'snoozed', snoozed_until: snoozedUntil })
+      .update({
+        status: 'snoozed',
+        snoozed_until: snoozedUntil,
+        escalation_count: 0,
+        last_escalated_at: null,
+      })
       .eq('id', queueItemId);
 
     if (updateErr) return { success: false, error: updateErr.message };
@@ -319,10 +333,21 @@ export async function snoozeFollowUp(
 
 export async function dismissFollowUp(
   queueItemId: string,
+  reason?: DismissalReason,
+  reasonText?: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     const workspaceId = await getActiveWorkspaceId();
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
+
+    // Validate the dismissal reason — enum-scoped app-side, also enforced
+    // by the DB CHECK constraint on ops.follow_up_queue.dismissal_reason.
+    let validatedReason: DismissalReason | null = null;
+    if (reason) {
+      const parsed = DismissalReasonSchema.safeParse(reason);
+      if (!parsed.success) return { success: false, error: 'Invalid dismissal reason.' };
+      validatedReason = parsed.data;
+    }
 
     const supabase = await createClient();
     const db = supabase;
@@ -343,10 +368,21 @@ export async function dismissFollowUp(
     const { error: updateErr } = await db
       .schema('ops')
       .from('follow_up_queue')
-      .update({ status: 'dismissed' })
+      .update({
+        status: 'dismissed',
+        dismissal_reason: validatedReason,
+        escalation_count: 0,
+        last_escalated_at: null,
+      })
       .eq('id', queueItemId);
 
     if (updateErr) return { success: false, error: updateErr.message };
+
+    // Human-readable summary folds the enum reason into the log entry so the
+    // activity surface doesn't need to translate.
+    const summaryParts = ['Dismissed from follow-up queue'];
+    if (validatedReason) summaryParts.push(`(${validatedReason.replace(/_/g, ' ')})`);
+    if (validatedReason === 'other' && reasonText) summaryParts.push(`— ${reasonText.slice(0, 200)}`);
 
     await db
       .schema('ops')
@@ -357,7 +393,8 @@ export async function dismissFollowUp(
         actor_user_id: user.id,
         action_type: 'dismissed',
         channel: 'manual',
-        summary: 'Dismissed from follow-up queue',
+        summary: summaryParts.join(' '),
+        content: validatedReason === 'other' ? reasonText?.slice(0, 2000) : null,
         queue_item_id: queueItemId,
       });
 
