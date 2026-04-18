@@ -42,6 +42,7 @@ import type { EventSummaryForPrism } from '../actions/get-event-summary';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
+import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
 
 type PlanLensProps = {
@@ -90,6 +91,22 @@ export function PlanLens({
     }
     setLoadTimedOut(false);
   }, [eventId, event]);
+
+  // Phase 3i: resolve the deal's current stage for tag-driven checklist /
+  // handoff eligibility. null during load.
+  const [pipelineStages, setPipelineStages] = useState<WorkspacePipelineStage[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getWorkspacePipelineStages().then((result) => {
+      if (!cancelled) setPipelineStages(result?.stages ?? []);
+    }).catch(() => {
+      if (!cancelled) setPipelineStages([]);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  const currentStage = deal?.stage_id
+    ? (pipelineStages?.find((s) => s.id === deal.stage_id) ?? null)
+    : null;
 
   // ── Scalar editing (same pattern as DealLens, with confirmation for post-handoff) ──
   const [localTitle, setLocalTitle] = useState(deal?.title ?? '');
@@ -579,12 +596,13 @@ export function PlanLens({
 
         <div className="flex flex-col lg:flex-row gap-6 min-h-0">
           <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-            <CompletionIndicators deal={deal} stakeholders={stakeholders} crewRows={crewRows} hasProposal={!!proposalData?.hasItems} />
+            <CompletionIndicators deal={deal} stakeholders={stakeholders} crewRows={crewRows} hasProposal={!!proposalData?.hasItems} stage={currentStage} />
             {onHandoverSuccess && (
               <HandoffConfirmStrip
                 deal={deal}
                 stakeholders={stakeholders}
                 onOpenWizard={() => setHandoffWizardOpen(true)}
+                stage={currentStage}
               />
             )}
             {deal.workspace_id && <DealDiaryCard dealId={deal.id} workspaceId={deal.workspace_id} phaseTag="plan" />}

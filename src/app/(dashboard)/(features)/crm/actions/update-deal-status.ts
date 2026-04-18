@@ -4,9 +4,11 @@ import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { DealIds, EntityIds, type DealId, type EntityId } from '@/shared/types/branded-ids';
+import { resolveStageByKind, resolveStageBySlug } from '@/shared/lib/pipeline-stages/resolve-stage';
 import type { LostReason } from './get-deal';
 
-// Standard statuses settable through normal flows
+// Standard statuses settable through normal flows (kept as the action's
+// external interface — Prism dropdown still hands these in).
 export type DealStatus = 'lost' | 'inquiry' | 'proposal' | 'contract_sent';
 // Override statuses — bypasses system flows (DocuSeal, Stripe, handoff wizard)
 export type DealStatusOverride = 'contract_signed' | 'deposit_received' | 'won';
@@ -22,6 +24,17 @@ export type MarkAsLostInput = {
 
 /**
  * Updates the status of a deal.
+ *
+ * Phase 3i: resolves the legacy status slug to the workspace's stage_id (via
+ * the default pipeline) and writes stage_id directly. The BEFORE trigger
+ * (`public.sync_deal_status_from_stage`) derives deals.status = stage.kind.
+ *
+ * External API is unchanged — callers still pass a slug string like 'inquiry'
+ * or 'won'. That keeps Prism, deal-lens, stream-card, and the Aion tool at
+ * parity. When workspaces rename stages in a future phase, the dropdown will
+ * hand in whatever slug the workspace's default pipeline uses; `resolveStageBySlug`
+ * handles both stock slugs and workspace-renamed slugs uniformly.
+ *
  * When marking as lost, requires a reason and optionally the competitor name.
  * When override=true, allows setting contract_signed/deposit_received/won
  * without running the normal system flows (for offline contracts, manual payments, etc.).
@@ -60,7 +73,35 @@ export async function updateDealStatus(
       return { success: false, error: 'Use the handoff wizard or system flows to set this status, or pass override=true to force it.' };
     }
 
-    const patch: Record<string, unknown> = { status };
+    // Phase 3i: resolve the slug to a stage_id in the workspace's default
+    // pipeline. 'won' / 'lost' resolve by kind (partial-unique indexes
+    // guarantee exactly one per pipeline); working slugs resolve by slug.
+    let resolvedStageId: string | null = null;
+    if (status === 'won') {
+      const won = await resolveStageByKind(supabase, workspaceId, 'won');
+      resolvedStageId = won?.stageId ?? null;
+    } else if (status === 'lost') {
+      const lost = await resolveStageByKind(supabase, workspaceId, 'lost');
+      resolvedStageId = lost?.stageId ?? null;
+    } else {
+      const match = await resolveStageBySlug(supabase, workspaceId, status);
+      resolvedStageId = match?.stageId ?? null;
+    }
+
+    if (!resolvedStageId) {
+      return {
+        success: false,
+        error: `No stage matching '${status}' in this workspace's default pipeline.`,
+      };
+    }
+
+    const patch: {
+      stage_id: string;
+      won_at?: string;
+      lost_reason?: string;
+      lost_to_competitor_name?: string | null;
+      lost_at?: string;
+    } = { stage_id: resolvedStageId };
 
     if (status === 'won') {
       patch.won_at = new Date().toISOString();

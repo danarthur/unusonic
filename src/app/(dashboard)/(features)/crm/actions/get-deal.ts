@@ -11,6 +11,10 @@ export type DealDetail = {
   workspace_id: string;
   title: string | null;
   status: string;
+  /** Phase 3i: the deal's current pipeline stage. Post-3i, this (not status)
+   *  is how consumers should identify which pipeline position the deal is in.
+   *  The legacy `status` column now collapses to kind (working / won / lost). */
+  stage_id: string | null;
   created_at: string;
   proposed_date: string | null;
   event_archetype: string | null;
@@ -50,7 +54,7 @@ export async function getDeal(dealId: string): Promise<DealDetail | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('deals')
-    .select('id, workspace_id, title, status, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
+    .select('id, workspace_id, title, status, stage_id, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
     .eq('id', dealId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -61,7 +65,8 @@ export async function getDeal(dealId: string): Promise<DealDetail | null> {
     id: r.id as string,
     workspace_id: (r.workspace_id as string) ?? workspaceId,
     title: (r.title as string) ?? null,
-    status: (r.status as string) ?? 'inquiry',
+    status: (r.status as string) ?? 'working',
+    stage_id: (r.stage_id as string) ?? null,
     created_at: (r.created_at as string) ?? new Date().toISOString(),
     proposed_date: r.proposed_date ? String(r.proposed_date) : null,
     event_archetype: (r.event_archetype as string) ?? null,
@@ -95,7 +100,7 @@ export async function getDealByEventId(eventId: string): Promise<DealDetail | nu
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('deals')
-    .select('id, workspace_id, title, status, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
+    .select('id, workspace_id, title, status, stage_id, created_at, proposed_date, event_archetype, notes, budget_estimated, event_id, organization_id, main_contact_id, venue_id, owner_user_id, owner_entity_id, lead_source, lead_source_id, lead_source_detail, referrer_entity_id, event_start_time, event_end_time, lost_reason, lost_to_competitor_name, won_at, lost_at, show_health')
     .eq('event_id', eventId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -106,7 +111,8 @@ export async function getDealByEventId(eventId: string): Promise<DealDetail | nu
     id: r.id as string,
     workspace_id: (r.workspace_id as string) ?? workspaceId,
     title: (r.title as string) ?? null,
-    status: (r.status as string) ?? 'inquiry',
+    status: (r.status as string) ?? 'working',
+    stage_id: (r.stage_id as string) ?? null,
     created_at: (r.created_at as string) ?? new Date().toISOString(),
     proposed_date: r.proposed_date ? String(r.proposed_date) : null,
     event_archetype: (r.event_archetype as string) ?? null,

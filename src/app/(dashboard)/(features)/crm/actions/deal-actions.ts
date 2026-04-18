@@ -6,6 +6,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { INDIVIDUAL_ATTR, COUPLE_ATTR } from '@/features/network-data/model/attribute-keys';
 import { canCreateShow } from '@/shared/lib/show-limits';
 import { instrument } from '@/shared/lib/instrumentation';
+import { resolveStageByTag } from '@/shared/lib/pipeline-stages/resolve-stage';
 import { createDealSchema, type CreateDealInput, type CreateDealResult } from './deal-model';
 
 /**
@@ -192,6 +193,25 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
     const notePayload = notes?.trim() ? { content: notes.trim(), phase_tag: 'general' } : null;
 
     // ── One atomic call ───────────────────────────────────────────────────
+    // Phase 3i: create_deal_complete still receives the legacy slug in
+    // p_deal.status (typically 'inquiry'). The Phase 3i BEFORE trigger
+    // (public.sync_deal_status_from_stage) catches the INSERT-with-status-only
+    // case: it resolves the matching stage from the workspace's default
+    // pipeline, populates stage_id + pipeline_id, and promotes the slug to
+    // its kind ('working'). Explicit server-side resolution is a short-term
+    // backstop — we call it here to surface any "workspace has no
+    // initial_contact stage" configuration issue upfront rather than letting
+    // the trigger silently skip the stage assignment.
+    if (status === 'inquiry') {
+      const initial = await resolveStageByTag(supabase, workspaceId, 'initial_contact');
+      if (!initial) {
+        return {
+          success: false,
+          error: 'Workspace has no stage tagged initial_contact in its default pipeline.',
+        };
+      }
+    }
+
     const { data, error } = await supabase.rpc('create_deal_complete', {
       p_workspace_id: workspaceId,
       p_client_entity: clientEntity,

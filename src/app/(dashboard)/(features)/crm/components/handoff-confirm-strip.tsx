@@ -4,17 +4,23 @@ import { ArrowRight, Calendar, MapPin, Building2 } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
+import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 
 type HandoffConfirmStripProps = {
   deal: DealDetail;
   stakeholders: DealStakeholderDisplay[];
   onOpenWizard: () => void;
+  /** The deal's current stage. Drives handoff eligibility: either the stage
+   *  signals handoff-readiness (tags contract_signed / deposit_received /
+   *  ready_for_handoff) or the deal is already kind='won'. */
+  stage: WorkspacePipelineStage | null;
 };
 
 export function HandoffConfirmStrip({
   deal,
   stakeholders,
   onOpenWizard,
+  stage,
 }: HandoffConfirmStripProps) {
   const venue = stakeholders.find((s) => s.role === 'venue_contact');
   const client = stakeholders.find((s) => s.role === 'bill_to');
@@ -27,7 +33,12 @@ export function HandoffConfirmStrip({
       })
     : 'No date set';
 
-  const canHandoff = ['contract_signed', 'deposit_received', 'won'].includes(deal.status);
+  const tags = stage?.tags ?? [];
+  const handoffReadyTag =
+    tags.includes('contract_signed')
+    || tags.includes('deposit_received')
+    || tags.includes('ready_for_handoff');
+  const canHandoff = handoffReadyTag || stage?.kind === 'won' || deal.status === 'won';
   if (!canHandoff) return null;
 
   return (

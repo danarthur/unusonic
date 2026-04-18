@@ -11,6 +11,7 @@ import { evaluateQuoteExpiring } from './evaluators/quote-expiring';
 import { evaluateHotLeadMultiView } from './evaluators/hot-lead-multi-view';
 import { evaluateDepositGap } from './evaluators/deposit-gap';
 import { evaluateGoneQuietWithValue } from './evaluators/gone-quiet-with-value';
+import { OPEN_DEAL_STATUSES } from '@/shared/lib/pipeline-stages/constants';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,11 +160,15 @@ async function getUpcomingDealsWithCrew(workspaceId: string): Promise<UpcomingDe
   const system = getSystemClient();
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  // Phase 3i: status now holds kind. 'working' captures every pre-handover
+  // deal (inquiry / proposal / contract_sent / contract_signed / deposit_received
+  // all collapsed here) + 'won' for post-handover. The outer proposed_date
+  // window is the real gate for "relevant to nudge about crew".
   const { data: deals } = await system
     .from('deals')
     .select('id, title, proposed_date, event_archetype')
     .eq('workspace_id', workspaceId)
-    .in('status', ['proposal', 'contract_sent', 'won'])
+    .in('status', ['working', 'won'])
     .not('proposed_date', 'is', null)
     .lte('proposed_date', sevenDaysFromNow)
     .gte('proposed_date', new Date().toISOString());
@@ -374,19 +379,20 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
 
   const { data: deals } = await system
     .from('deals')
-    .select('id, title, status, updated_at, proposed_date, organization_id')
+    .select('id, title, status, stage_id, updated_at, proposed_date, organization_id')
     .eq('workspace_id', workspaceId)
-    .in('status', ['inquiry', 'proposal', 'contract_sent'])
+    .in('status', [...OPEN_DEAL_STATUSES])
     .is('archived_at', null);
 
   if (!deals?.length) return [];
 
   const dealIds = (deals as any[]).map((d: any) => d.id);
+  const stageIds = [...new Set((deals as any[]).map((d: any) => d.stage_id).filter(Boolean))];
 
-  // Batch-fetch client org names + recent activity in parallel
+  // Batch-fetch client org names + recent activity + stage labels in parallel
   const orgIds = [...new Set((deals as any[]).map((d: any) => d.organization_id).filter(Boolean))];
 
-  const [orgResult, notesResult, logsResult] = await Promise.all([
+  const [orgResult, notesResult, logsResult, stageResult] = await Promise.all([
     orgIds.length > 0
       ? system.schema('directory').from('entities').select('id, name').in('id', orgIds)
       : Promise.resolve({ data: [] as any[] }),
@@ -400,10 +406,18 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
       .select('deal_id')
       .in('deal_id', dealIds)
       .gte('created_at', fourteenDaysAgo),
+    // Phase 2c: batch-fetch stage labels so copy is rename-safe
+    stageIds.length > 0
+      ? (system as any).schema('ops').from('pipeline_stages').select('id, label').in('id', stageIds)
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
   const orgNames: Record<string, string> = Object.fromEntries(
     (orgResult.data ?? []).map((o: any) => [o.id, o.name]),
+  );
+
+  const stageLabels: Record<string, string> = Object.fromEntries(
+    ((stageResult.data ?? []) as Array<{ id: string; label: string }>).map((s) => [s.id, s.label]),
   );
 
   // Build sets of deal IDs with recent activity
@@ -440,7 +454,14 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
           ? 'medium'
           : 'low';
 
-    const stageLabel = deal.status === 'inquiry' ? 'inquiry' : deal.status === 'proposal' ? 'proposal' : 'contract sent';
+    // Phase 3i: deal.status now collapses to kind ('working' / 'won' / 'lost'),
+    // so the legacy-slug ternary never matches. Resolve the stage label
+    // directly from the per-deal stage_id (batched at the top of this
+    // function) for rename-safe copy. Fall back to 'deal' when the stage
+    // label is unavailable.
+    const stageLabel = (deal.stage_id && stageLabels[deal.stage_id])
+      ? stageLabels[deal.stage_id].toLowerCase()
+      : 'deal';
 
     insights.push({
       triggerType: 'deal_stale',

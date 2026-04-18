@@ -4,6 +4,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { resolveEventTimezone, toVenueInstant } from '@/shared/lib/timezone';
+import { resolveStageByKind } from '@/shared/lib/pipeline-stages/resolve-stage';
 
 export type CrystallizeResult =
   | { success: true; eventId: string }
@@ -37,8 +38,17 @@ export async function crystallizeDeal(dealId: string): Promise<CrystallizeResult
     return { success: true, eventId: r.event_id as string };
   }
 
+  // Phase 3i: crystallize requires the deal to be in a working stage. After
+  // the collapse migration, status ∈ {'working', 'won', 'lost'} — the legacy
+  // slugs 'inquiry' / 'proposal' / 'contract_sent' / 'contract_signed' /
+  // 'deposit_received' are still valid pre-collapse for safety.
   const status = (r.status as string) ?? '';
-  if (status !== 'inquiry' && status !== 'proposal' && status !== 'contract_sent') {
+  const crystallizable = new Set([
+    'working',
+    // Legacy — still valid during dual-write rollout window:
+    'inquiry', 'proposal', 'contract_sent', 'contract_signed', 'deposit_received',
+  ]);
+  if (!crystallizable.has(status)) {
     return { success: false, error: 'Deal is not in a crystallizable state.' };
   }
 
@@ -85,9 +95,22 @@ export async function crystallizeDeal(dealId: string): Promise<CrystallizeResult
 
   const eventId = (event as { id: string }).id;
 
+  // Phase 3i: look up the workspace's won stage and write stage_id. The BEFORE
+  // trigger derives deals.status = 'won' (kind). Covers renamed-stage workspaces
+  // because we resolve by kind, not slug.
+  const wonStage = await resolveStageByKind(supabase, workspaceId, 'won');
+  if (!wonStage) {
+    console.error('[CRM] crystallizeDeal: workspace has no won stage in default pipeline');
+    return { success: false, error: 'Workspace has no won stage in its default pipeline.' };
+  }
+
   const { error: updateErr } = await supabase
     .from('deals')
-    .update({ status: 'won', event_id: eventId, updated_at: new Date().toISOString() })
+    .update({
+      stage_id: wonStage.stageId,
+      event_id: eventId,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', dealId)
     .eq('workspace_id', workspaceId);
 

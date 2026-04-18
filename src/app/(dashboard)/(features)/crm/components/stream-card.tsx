@@ -26,6 +26,8 @@ export type StreamCardItem = {
   lifecycle_status?: string | null;
   /** Pass 3 Phase 4: set when the event has been wrapped. Used by stream.tsx filters. */
   archived_at?: string | null;
+  /** Phase 3h: the deal's current pipeline stage id. Used by tag-based Stream tab filters. Events have no stage_id. */
+  stage_id?: string | null;
   /** Sales = amber, Ops = blue, Finance = rose */
   mode?: 'sales' | 'ops' | 'finance';
   /** Payment health signal — computed from proposal data. */
@@ -52,14 +54,21 @@ export type StreamCardItem = {
   readiness?: ReadinessData | null;
 };
 
-const STATUS_LABELS: Record<string, string> = {
+// Phase 3i: STATUS_LABELS is now a post-collapse kind map. The card also
+// receives a stageLabel prop (resolved at render time from pipelineStages)
+// for working-stage deals so a workspace that renamed "Proposal" to "Pitch"
+// surfaces the right label. Kind labels are the fallback for legacy deals
+// that pre-date stage_id wiring.
+const KIND_LABELS: Record<string, string> = {
+  working: 'In progress',
+  won: 'Won',
+  lost: 'Lost',
+  // Legacy slug labels preserved so pre-collapse rows still render:
   inquiry: 'Inquiry',
   proposal: 'Proposal',
   contract_sent: 'Contract sent',
   contract_signed: 'Signed',
   deposit_received: 'Deposit received',
-  won: 'Won',
-  lost: 'Lost',
 };
 
 function formatEventDate(iso: string): string {
@@ -189,14 +198,20 @@ export function StreamCard({
 
   const isEvent = item.source === 'event';
   const isDeal = item.source === 'deal';
+  // Phase 3i: kind-based status checks. Post-collapse, `status` holds kind
+  // ('working' | 'won' | 'lost'); the legacy slugs still pass during the
+  // rollout window so we include them in the working-stage set.
+  const WORKING_STATUSES = new Set([
+    'working',
+    'inquiry', 'proposal', 'contract_sent', 'contract_signed', 'deposit_received',
+  ]);
   const isLost = item.status === 'lost';
-  const showDealArchiveButtons =
-    isDeal && ['inquiry', 'proposal', 'contract_sent', 'contract_signed', 'deposit_received'].includes(item.status ?? '');
+  const showDealArchiveButtons = isDeal && WORKING_STATUSES.has(item.status ?? '');
   const showDealLostButton = showDealArchiveButtons;
   const showReopenButton = isDeal && isLost;
   const showActions = hovered || selected || !!confirmAction || rescheduleOpen;
 
-  const statusLabel = item.status ? (STATUS_LABELS[item.status] ?? item.status.replace(/_/g, ' ')) : null;
+  const statusLabel = item.status ? (KIND_LABELS[item.status] ?? item.status.replace(/_/g, ' ')) : null;
 
   return (
     <motion.div

@@ -44,6 +44,45 @@ let mockClient: ReturnType<typeof createMockSupabaseClient>;
 let lookupBuilder: ReturnType<typeof createQueryBuilder>;
 let mutationBuilder: ReturnType<typeof createQueryBuilder>;
 
+/**
+ * Phase 3i: updateDealStatus + reopenDeal now call resolveStageBy{Kind,Tag,Slug}
+ * from `@/shared/lib/pipeline-stages/resolve-stage`, which hits
+ * supabase.schema('ops').from('pipelines') and
+ * supabase.schema('ops').from('pipeline_stages'). Stub those to return
+ * a minimal in-memory pipeline + stage set so the action reaches the
+ * `.from('deals').update(...)` assertion path.
+ */
+function stubPipelineStageLookups(client: ReturnType<typeof createMockSupabaseClient>) {
+  client.schema.mockImplementation((schemaName: string) => {
+    if (schemaName !== 'ops') {
+      return { from: vi.fn().mockImplementation(() => createQueryBuilder()) };
+    }
+    return {
+      from: vi.fn().mockImplementation((table: string) => {
+        const b = createQueryBuilder();
+        if (table === 'pipelines') {
+          b.maybeSingle.mockResolvedValue({ data: { id: 'pipe-1' }, error: null });
+        } else if (table === 'pipeline_stages') {
+          // Return a generic stage — any slug/kind/tag lookup in the tests
+          // resolves to this single row. Tests that need to distinguish per
+          // slug override per case.
+          b.maybeSingle.mockResolvedValue({
+            data: {
+              id: 'stage-1',
+              pipeline_id: 'pipe-1',
+              slug: 'inquiry',
+              kind: 'working',
+              tags: ['initial_contact'],
+            },
+            error: null,
+          });
+        }
+        return b;
+      }),
+    };
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockClient = createMockSupabaseClient();
@@ -58,6 +97,8 @@ beforeEach(() => {
     callCount++;
     return (callCount === 1 ? lookupBuilder : mutationBuilder) as any;
   });
+
+  stubPipelineStageLookups(mockClient);
 
   // Default: deal found
   lookupBuilder.maybeSingle.mockResolvedValue({
@@ -85,8 +126,10 @@ describe('updateDealStatus', () => {
   it('updates to inquiry successfully', async () => {
     const r = await updateDealStatus('deal-1', 'inquiry');
     expect(r).toEqual({ success: true });
+    // Phase 3i: writer sets stage_id, not status. The BEFORE trigger derives
+    // status from stage.kind.
     expect(mutationBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'inquiry' }),
+      expect.objectContaining({ stage_id: 'stage-1' }),
     );
   });
 
@@ -99,8 +142,9 @@ describe('updateDealStatus', () => {
   it('allows override statuses with override=true', async () => {
     const r = await updateDealStatus('deal-1', 'won', undefined, true);
     expect(r).toEqual({ success: true });
+    // Phase 3i: stage_id replaces status in the patch. won_at is still set.
     expect(mutationBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'won', won_at: expect.any(String) }),
+      expect.objectContaining({ stage_id: 'stage-1', won_at: expect.any(String) }),
     );
   });
 
@@ -115,9 +159,10 @@ describe('updateDealStatus', () => {
       lost_to_competitor_name: 'Acme Events',
     });
     expect(r).toEqual({ success: true });
+    // Phase 3i: stage_id replaces status in the patch. Lost fields still set.
     expect(mutationBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: 'lost',
+        stage_id: 'stage-1',
         lost_reason: 'competitor',
         lost_to_competitor_name: 'Acme Events',
         lost_at: expect.any(String),
@@ -233,8 +278,11 @@ describe('reopenDeal', () => {
   it('resets status to inquiry and clears archived_at', async () => {
     const r = await reopenDeal('deal-1');
     expect(r).toEqual({ success: true });
+    // Phase 3i: reopen now writes stage_id (the initial_contact-tagged stage)
+    // rather than the legacy status slug. The BEFORE trigger derives
+    // status='working' from stage.kind.
     expect(mutationBuilder.update).toHaveBeenCalledWith({
-      status: 'inquiry',
+      stage_id: 'stage-1',
       archived_at: null,
     });
   });
