@@ -322,6 +322,29 @@ export async function handoverDeal(
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const eventId = sortedEvents[0].id;
 
+  // Link any pre-handover deal_crew rows (event_id still NULL) to the first
+  // event. For singletons/multi-day this is the canonical event. For series
+  // it's the first chronological show — the owner then clicks "Set for whole
+  // series" to fan the template to the rest. Keeps event-scoped reads
+  // consistent without losing rows the owner assigned pre-handover.
+  {
+    const { error: crewLinkErr } = await supabase
+      .schema('ops')
+      .from('deal_crew')
+      .update({ event_id: eventId })
+      .eq('deal_id', dealId)
+      .eq('workspace_id', workspaceId)
+      .is('event_id', null);
+    if (crewLinkErr) {
+      Sentry.logger.error('crm.handoverDeal.linkPreHandoverCrewFailed', {
+        dealId,
+        eventId,
+        workspaceId,
+        error: crewLinkErr.message,
+      });
+    }
+  }
+
   if (clientEntityId) {
     const { error: projectClientErr } = await supabase
       .schema('ops')
