@@ -21,14 +21,6 @@ vi.mock('@/features/network-data/model/attribute-keys', () => ({
     email: 'email',
     phone: 'phone',
   },
-  COUPLE_ATTR: {
-    partner_a_first: 'partner_a_first',
-    partner_a_last: 'partner_a_last',
-    partner_a_email: 'partner_a_email',
-    partner_b_first: 'partner_b_first',
-    partner_b_last: 'partner_b_last',
-    partner_b_email: 'partner_b_email',
-  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -44,27 +36,28 @@ type MockClient = ReturnType<typeof createMockSupabaseClient>;
 // ---------------------------------------------------------------------------
 // Test setup
 //
-// Post-PR 6 (C4 fix): createDeal now makes a single atomic call to the
-// `create_deal_complete` RPC. The tests mock `.rpc(...)` and verify:
+// P0 client-field redesign: createDeal calls public.create_deal_complete with
+// the new cast-of-stakeholders contract:
+//   p_workspace_id, p_hosts (array), p_poc, p_bill_to, p_planner,
+//   p_venue_entity, p_deal, p_note, p_pairing
+// Tests verify:
 //   1. Input validation runs before any DB work
-//   2. The RPC is called with the correct payload shape for each clientType
+//   2. The RPC is called with the correct payload shape per host kind
 //   3. Workspace/show-limit gates still short-circuit before the RPC
-//   4. Errors from the RPC propagate through to the CreateDealResult
-//
-// The old per-step insert mocks are gone because the inserts now live inside
-// the RPC body (PL/pgSQL) — atomicity is a database property, not something
-// we can meaningfully unit-test at the TS caller level. Actual rollback
-// behavior is proven by the live MCP scenarios documented in the plan doc.
+//   4. Errors from the RPC propagate to CreateDealResult
 // ---------------------------------------------------------------------------
 
-const VALID_INPUT = { proposedDate: '2026-04-07' };
-const UUID_ORG = 'a0000000-0000-4000-a000-000000000001';
+const BASE_INDIVIDUAL = {
+  proposedDate: '2026-04-07',
+  hostKind: 'individual' as const,
+  personHosts: [{ firstName: 'Jane', lastName: 'Doe' }],
+};
 const UUID_VENUE = 'b0000000-0000-4000-a000-000000000001';
+const UUID_EXISTING_PERSON = 'a0000000-0000-4000-a000-000000000001';
 
-/** Default: mock the RPC to return a valid deal_id payload. */
 function mockRpcSuccess(client: MockClient, dealId = 'deal-test-1') {
   client.rpc.mockResolvedValue({
-    data: { deal_id: dealId, client_entity_id: 'ghost-ent-1', venue_entity_id: null },
+    data: { deal_id: dealId, primary_host_entity_id: 'ghost-ent-1', venue_entity_id: null },
     error: null,
   });
 }
@@ -116,27 +109,19 @@ describe('createDeal', () => {
     mockRpcSuccess(mockClient);
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Validation
-  // ───────────────────────────────────────────────────────────────────────────
-
   it('rejects invalid input (bad date format)', async () => {
-    const result = await createDeal({ proposedDate: 'bad' } as unknown as Parameters<typeof createDeal>[0]);
+    const result = await createDeal({
+      ...BASE_INDIVIDUAL,
+      proposedDate: 'bad',
+    } as unknown as Parameters<typeof createDeal>[0]);
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain('Date must be yyyy-MM-dd');
-    }
-    expect(createClient).not.toHaveBeenCalled();
+    if (!result.success) expect(result.error).toContain('Date must be yyyy-MM-dd');
     expect(mockClient.rpc).not.toHaveBeenCalled();
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Workspace guard
-  // ───────────────────────────────────────────────────────────────────────────
-
   it('returns error when no active workspace', async () => {
     vi.mocked(getActiveWorkspaceId).mockResolvedValue(null as unknown as string);
-    const result = await createDeal(VALID_INPUT as unknown as Parameters<typeof createDeal>[0]);
+    const result = await createDeal(BASE_INDIVIDUAL);
     expect(result).toEqual({
       success: false,
       error: 'No active workspace. Complete onboarding or select a workspace.',
@@ -144,142 +129,110 @@ describe('createDeal', () => {
     expect(mockClient.rpc).not.toHaveBeenCalled();
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Show-limit enforcement
-  // ───────────────────────────────────────────────────────────────────────────
-
   it('returns show_limit_reached when quota exceeded', async () => {
     vi.mocked(canCreateShow).mockResolvedValue({
-      allowed: false,
-      current: 10,
-      limit: 10,
-      atWarning: false,
+      allowed: false, current: 10, limit: 10, atWarning: false,
     });
-    const result = await createDeal(VALID_INPUT as unknown as Parameters<typeof createDeal>[0]);
+    const result = await createDeal(BASE_INDIVIDUAL);
     expect(result).toMatchObject({
-      success: false,
-      error: 'show_limit_reached',
-      current: 10,
-      limit: 10,
+      success: false, error: 'show_limit_reached', current: 10, limit: 10,
     });
     expect(mockClient.rpc).not.toHaveBeenCalled();
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // RPC payload — existing organization (passes through as existing_id)
-  // ───────────────────────────────────────────────────────────────────────────
-
-  it('calls RPC with existing_id when organizationId is provided', async () => {
-    const result = await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+  it('builds individual host payload as a single-element p_hosts array', async () => {
+    const result = await createDeal(BASE_INDIVIDUAL);
     expect(result).toMatchObject({ success: true, dealId: 'deal-test-1' });
     expect(mockClient.rpc).toHaveBeenCalledTimes(1);
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
       expect.objectContaining({
         p_workspace_id: 'ws-test-123',
-        p_client_entity: { existing_id: UUID_ORG },
-        p_venue_entity: null,
-      }),
-    );
-  });
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // RPC payload — ghost company
-  // ───────────────────────────────────────────────────────────────────────────
-
-  it('builds company client_entity payload when clientName provided', async () => {
-    await createDeal({
-      ...VALID_INPUT,
-      clientName: 'Acme Corp',
-    } as unknown as Parameters<typeof createDeal>[0]);
-
-    expect(mockClient.rpc).toHaveBeenCalledWith(
-      'create_deal_complete',
-      expect.objectContaining({
-        p_client_entity: {
-          type: 'company',
-          display_name: 'Acme Corp',
-          attributes: { is_ghost: true, category: 'client' },
-        },
-      }),
-    );
-  });
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // RPC payload — ghost individual
-  // ───────────────────────────────────────────────────────────────────────────
-
-  it('builds person client_entity payload for individual client type', async () => {
-    await createDeal({
-      ...VALID_INPUT,
-      clientType: 'individual',
-      clientFirstName: 'Jane',
-      clientLastName: 'Doe',
-      clientEmail: 'jane@example.com',
-    } as unknown as Parameters<typeof createDeal>[0]);
-
-    expect(mockClient.rpc).toHaveBeenCalledWith(
-      'create_deal_complete',
-      expect.objectContaining({
-        p_client_entity: expect.objectContaining({
-          type: 'person',
-          display_name: 'Jane Doe',
-          attributes: expect.objectContaining({
-            is_ghost: true,
-            category: 'client',
-            first_name: 'Jane',
-            last_name: 'Doe',
-            email: 'jane@example.com',
+        p_hosts: [
+          expect.objectContaining({
+            type: 'person',
+            display_name: 'Jane Doe',
+            attributes: expect.objectContaining({
+              is_ghost: true,
+              category: 'client',
+              first_name: 'Jane',
+              last_name: 'Doe',
+            }),
           }),
-        }),
+        ],
+        p_pairing: 'romantic',
       }),
     );
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // RPC payload — couple with same last name formatting
-  // ───────────────────────────────────────────────────────────────────────────
-
-  it('builds couple client_entity with same-last-name formatting', async () => {
+  it('builds couple host payload as a two-element p_hosts array', async () => {
     await createDeal({
-      ...VALID_INPUT,
-      clientType: 'couple',
-      clientFirstName: 'Alex',
-      clientLastName: 'Smith',
-      partnerBFirstName: 'Jordan',
-      partnerBLastName: 'Smith',
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+      proposedDate: '2026-04-07',
+      hostKind: 'couple',
+      pairing: 'romantic',
+      personHosts: [
+        { firstName: 'Alex', lastName: 'Smith' },
+        { firstName: 'Jordan', lastName: 'Smith' },
+      ],
+    });
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
       expect.objectContaining({
-        p_client_entity: expect.objectContaining({
-          type: 'couple',
-          display_name: 'Alex & Jordan Smith',
-          attributes: expect.objectContaining({
-            partner_a_first: 'Alex',
-            partner_b_first: 'Jordan',
-          }),
-        }),
+        p_hosts: [
+          expect.objectContaining({ display_name: 'Alex Smith' }),
+          expect.objectContaining({ display_name: 'Jordan Smith' }),
+        ],
+        p_pairing: 'romantic',
       }),
     );
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // RPC payload — venue
-  // ───────────────────────────────────────────────────────────────────────────
-
-  it('builds venue_entity payload when venueName provided', async () => {
+  it('builds company host payload as a single-element p_hosts array', async () => {
     await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-      venueName: 'The Grand Ballroom',
-    } as unknown as Parameters<typeof createDeal>[0]);
+      proposedDate: '2026-04-07',
+      hostKind: 'company',
+      companyHost: { name: 'Acme Corp' },
+    });
+    expect(mockClient.rpc).toHaveBeenCalledWith(
+      'create_deal_complete',
+      expect.objectContaining({
+        p_hosts: [
+          {
+            type: 'company',
+            display_name: 'Acme Corp',
+            attributes: { is_ghost: true, category: 'client' },
+          },
+        ],
+      }),
+    );
+  });
 
+  it('passes existing_id when company host has existingId', async () => {
+    await createDeal({
+      proposedDate: '2026-04-07',
+      hostKind: 'company',
+      companyHost: { existingId: UUID_EXISTING_PERSON },
+    });
+    expect(mockClient.rpc).toHaveBeenCalledWith(
+      'create_deal_complete',
+      expect.objectContaining({
+        p_hosts: [{ existing_id: UUID_EXISTING_PERSON }],
+      }),
+    );
+  });
+
+  it('passes venue_entity existing_id when venueId provided', async () => {
+    await createDeal({ ...BASE_INDIVIDUAL, venueId: UUID_VENUE });
+    expect(mockClient.rpc).toHaveBeenCalledWith(
+      'create_deal_complete',
+      expect.objectContaining({
+        p_venue_entity: { existing_id: UUID_VENUE },
+      }),
+    );
+  });
+
+  it('builds venue_entity payload from venueName', async () => {
+    await createDeal({ ...BASE_INDIVIDUAL, venueName: 'The Grand Ballroom' });
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
       expect.objectContaining({
@@ -291,77 +244,66 @@ describe('createDeal', () => {
     );
   });
 
-  it('passes venue existing_id when venueId provided', async () => {
-    await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-      venueId: UUID_VENUE,
-    } as unknown as Parameters<typeof createDeal>[0]);
+  it('forwards POC by host index when pocFromHostIndex is set', async () => {
+    await createDeal({ ...BASE_INDIVIDUAL, pocFromHostIndex: 1 });
+    const call = mockClient.rpc.mock.calls[0]?.[1] as { p_hosts: unknown[]; p_poc: unknown };
+    expect(call?.p_poc).toEqual(call?.p_hosts[0]);
+  });
 
+  it('builds independent POC payload from poc fields', async () => {
+    await createDeal({
+      ...BASE_INDIVIDUAL,
+      poc: { firstName: 'Sam', lastName: 'Planner', email: 'sam@plan.com' },
+    });
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
       expect.objectContaining({
-        p_venue_entity: { existing_id: UUID_VENUE },
+        p_poc: expect.objectContaining({
+          type: 'person',
+          display_name: 'Sam Planner',
+          attributes: expect.objectContaining({
+            email: 'sam@plan.com',
+            category: 'client_contact',
+          }),
+        }),
       }),
     );
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Planner stakeholder extras
-  // ───────────────────────────────────────────────────────────────────────────
-
-  it('passes plannerEntityId through p_stakeholder_extras', async () => {
-    const PLANNER = 'd0000000-0000-4000-a000-000000000001';
+  it('builds planner payload from planner fields', async () => {
     await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-      plannerEntityId: PLANNER,
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+      ...BASE_INDIVIDUAL,
+      planner: { firstName: 'Pat', lastName: 'L', email: 'pat@plan.com' },
+    });
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
       expect.objectContaining({
-        p_stakeholder_extras: { planner_entity_id: PLANNER },
+        p_planner: expect.objectContaining({
+          type: 'person',
+          display_name: 'Pat L',
+          attributes: expect.objectContaining({ category: 'planner' }),
+        }),
       }),
     );
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Notes payload
-  // ───────────────────────────────────────────────────────────────────────────
-
-  it('passes notes through p_note when provided', async () => {
-    await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-      notes: 'Initial inquiry from web form',
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+  it('passes notes through p_note', async () => {
+    await createDeal({ ...BASE_INDIVIDUAL, notes: 'Initial inquiry' });
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
       expect.objectContaining({
-        p_note: { content: 'Initial inquiry from web form', phase_tag: 'general' },
+        p_note: { content: 'Initial inquiry', phase_tag: 'general' },
       }),
     );
   });
 
   it('passes null p_note when notes is empty', async () => {
-    await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+    await createDeal(BASE_INDIVIDUAL);
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
-      expect.objectContaining({
-        p_note: null,
-      }),
+      expect.objectContaining({ p_note: null }),
     );
   });
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Lead source label denormalization (pre-RPC SELECT)
-  // ───────────────────────────────────────────────────────────────────────────
 
   it('resolves lead source label from leadSourceId before calling RPC', async () => {
     const LEAD_SOURCE_UUID = 'c0000000-0000-4000-a000-000000000001';
@@ -390,13 +332,7 @@ describe('createDeal', () => {
         return qb;
       }),
     }));
-
-    await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-      leadSourceId: LEAD_SOURCE_UUID,
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+    await createDeal({ ...BASE_INDIVIDUAL, leadSourceId: LEAD_SOURCE_UUID });
     expect(mockClient.rpc).toHaveBeenCalledWith(
       'create_deal_complete',
       expect.objectContaining({
@@ -408,45 +344,22 @@ describe('createDeal', () => {
     );
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Show-limit warning
-  // ───────────────────────────────────────────────────────────────────────────
-
   it('includes warning when approaching show limit', async () => {
     vi.mocked(canCreateShow).mockResolvedValue({
-      allowed: true,
-      current: 8,
-      limit: 10,
-      atWarning: true,
+      allowed: true, current: 8, limit: 10, atWarning: true,
     });
-
-    const result = await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+    const result = await createDeal(BASE_INDIVIDUAL);
     expect(result).toMatchObject({
-      success: true,
-      dealId: 'deal-test-1',
-      warning: 'approaching_show_limit',
+      success: true, dealId: 'deal-test-1', warning: 'approaching_show_limit',
     });
   });
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // RPC error propagation
-  // ───────────────────────────────────────────────────────────────────────────
 
   it('returns error when RPC returns an error', async () => {
     mockClient.rpc.mockResolvedValue({
       data: null,
       error: { message: 'create_deal_complete: caller is not a member of workspace ws-test-123' },
     });
-
-    const result = await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+    const result = await createDeal(BASE_INDIVIDUAL);
     expect(result).toEqual({
       success: false,
       error: 'create_deal_complete: caller is not a member of workspace ws-test-123',
@@ -455,12 +368,7 @@ describe('createDeal', () => {
 
   it('returns error when RPC returns null data (malformed response)', async () => {
     mockClient.rpc.mockResolvedValue({ data: null, error: null });
-
-    const result = await createDeal({
-      ...VALID_INPUT,
-      organizationId: UUID_ORG,
-    } as unknown as Parameters<typeof createDeal>[0]);
-
+    const result = await createDeal(BASE_INDIVIDUAL);
     expect(result).toEqual({
       success: false,
       error: 'create_deal_complete returned no deal_id',

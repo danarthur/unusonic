@@ -34,7 +34,7 @@ Each agent is a read-only inspector. Pure code inspection — do NOT run the dev
 - Next.js 16 async-params misuse: `params.x` / `searchParams.x` / `cookies().x` without `await`
 - Inconsistent copy tone: exclamation marks, Title Case where sentence case belongs, "event" instead of "show" in owner-facing UI, "resources" instead of "crew", "Gig" leaking into UI
 - Broken empty states, user-visible "coming soon" / "not implemented" / "WIP"
-- **Tailwind v4 wildcard landmine: `bg-[var(--token-*)]` anywhere** (including docs/comments/ESLint messages — Tailwind v4 scans everything)
+- **Tailwind v4 wildcard landmine: never write a literal Tailwind arbitrary-value class with a placeholder character inside the brackets.** Tailwind v4 scans every file (markdown, comments, ESLint messages) and emits CSS for whatever it finds — a placeholder character becomes invalid CSS that turbopack rejects. Always use the real token name, or describe the rule in prose.
 - RLS gaps, `service_role` leaks to client bundles (`system.ts` imported outside server files)
 - `SECURITY DEFINER` RPCs missing `REVOKE FROM PUBLIC` / `anon` in migrations
 - Ghost Protocol violations (gating on sign-up for adds; `ROSTER_MEMBER` for freelancers vs. `PARTNER` with `tier: 'preferred'`)

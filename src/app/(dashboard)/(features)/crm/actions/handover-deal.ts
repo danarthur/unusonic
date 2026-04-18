@@ -14,6 +14,7 @@ import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import { COUPLE_ATTR } from '@/entities/directory/model/attribute-keys';
 import { publishDomainEvent } from '@/shared/lib/domain-events/publish-domain-event';
 import { resolveStageByKind } from '@/shared/lib/pipeline-stages/resolve-stage';
+import { SeriesRuleSchema, expandSeriesRule, type SeriesRule } from '@/shared/lib/series-rule';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -62,7 +63,7 @@ export async function handoverDeal(
 
   const { data: deal, error: dealErr } = await supabase
     .from('deals')
-    .select('id, title, status, proposed_date, workspace_id, event_id, event_start_time, event_end_time')
+    .select('id, title, status, proposed_date, proposed_end_date, workspace_id, event_id, event_start_time, event_end_time, event_archetype')
     .eq('id', dealId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -144,30 +145,46 @@ export async function handoverDeal(
     };
   }
 
-  const { data: projects, error: projErr } = await supabase
+  // Every deal created via `create_deal_complete` v3 has its own project (deal_id set).
+  // For legacy deals without one, we lazily create here. Series carry `is_series=true`
+  // + `series_rule` on the project row; handover expands the rule into N events.
+  const { data: dealProject, error: projErr } = await supabase
     .schema('ops')
     .from('projects')
-    .select('id')
+    .select('id, is_series, series_rule')
+    .eq('deal_id', dealId)
     .eq('workspace_id', workspaceId)
-    .limit(1);
+    .maybeSingle();
 
   if (projErr) {
     return { success: false, error: projErr.message };
   }
 
   let projectId: string;
+  let isSeries = false;
+  let seriesRule: SeriesRule | null = null;
 
-  if (projects?.length) {
-    projectId = (projects[0] as { id: string }).id;
+  if (dealProject) {
+    projectId = (dealProject as { id: string }).id;
+    isSeries = Boolean((dealProject as { is_series?: boolean }).is_series);
+    if (isSeries) {
+      const raw = (dealProject as { series_rule?: unknown }).series_rule;
+      const parsed = SeriesRuleSchema.safeParse(raw);
+      if (!parsed.success) {
+        return { success: false, error: `Series rule on project is malformed: ${parsed.error.message}` };
+      }
+      seriesRule = parsed.data;
+    }
   } else {
-    // No project for workspace: create a default so the user can build proposals without a manual "add project" step
+    // Legacy path — deal predates create_deal_complete v3 and has no project yet.
     const { data: inserted, error: insertErr } = await supabase
       .schema('ops')
       .from('projects')
       .insert({
         workspace_id: workspaceId,
-        name: 'Production',
+        name: (r.title as string)?.trim() || 'Production',
         status: 'lead',
+        deal_id: dealId,
       })
       .select('id')
       .single();
@@ -236,14 +253,50 @@ export async function handoverDeal(
     locationName = (venueEntity as { display_name?: string | null } | null)?.display_name ?? null;
   }
 
-  // Legacy path (no handoff wizard payload): convert deal's local times to UTC via venue tz
-  if (!payload?.vitals) {
-    startAt = toVenueInstant(proposedDate, (r.event_start_time as string) ?? '08:00', eventTimezone);
-    endAt = toVenueInstant(proposedDate, (r.event_end_time as string) ?? '18:00', eventTimezone);
-  }
+  // Build the list of (starts_at, ends_at) pairs we'll materialize. One of three shapes:
+  //   - series:    N pairs, one per date in expanded series_rule; same start/end time each day
+  //   - multi_day: ONE pair spanning proposed_date → proposed_end_date
+  //   - single:   ONE pair on proposed_date
+  //
+  // Legacy path (no handoff wizard): use deal's start/end_time with proposedDate fallback.
+  const proposedEndDate = r.proposed_end_date ? String(r.proposed_end_date) : null;
 
-  // Crew is managed via ops.deal_crew — Plan tab reads from it directly and the
-  // handoff wizard no longer collects crew_roles, so runOfShowData passes through unchanged.
+  type EventDraft = { starts_at: string; ends_at: string };
+  const eventDrafts: EventDraft[] = [];
+
+  if (isSeries && seriesRule) {
+    const dates = expandSeriesRule(seriesRule);
+    if (dates.length === 0) {
+      return { success: false, error: 'Series rule expanded to zero dates.' };
+    }
+    const startTime = (r.event_start_time as string) ?? '08:00';
+    const endTime = (r.event_end_time as string) ?? '18:00';
+    for (const d of dates) {
+      eventDrafts.push({
+        starts_at: toVenueInstant(d, startTime, eventTimezone),
+        ends_at: toVenueInstant(d, endTime, eventTimezone),
+      });
+    }
+  } else if (payload?.vitals) {
+    // Handoff wizard supplied vitals for a singleton
+    eventDrafts.push({ starts_at: startAt, ends_at: endAt });
+  } else if (proposedEndDate && proposedEndDate !== proposedDate) {
+    // Multi-day single event: span proposed_date → proposed_end_date
+    const startTime = (r.event_start_time as string) ?? '08:00';
+    const endTime = (r.event_end_time as string) ?? '18:00';
+    eventDrafts.push({
+      starts_at: toVenueInstant(proposedDate, startTime, eventTimezone),
+      ends_at: toVenueInstant(proposedEndDate, endTime, eventTimezone),
+    });
+  } else {
+    // Singleton legacy path
+    const startTime = (r.event_start_time as string) ?? '08:00';
+    const endTime = (r.event_end_time as string) ?? '18:00';
+    eventDrafts.push({
+      starts_at: toVenueInstant(proposedDate, startTime, eventTimezone),
+      ends_at: toVenueInstant(proposedDate, endTime, eventTimezone),
+    });
+  }
 
   // Pass 4 Phase 0.5 (rescan fix N1): set status + lifecycle_status explicitly on handoff.
   // Before this fix, lifecycle_status defaulted to NULL, which silently failed the
@@ -253,39 +306,70 @@ export async function handoverDeal(
   // on the Lobby and urgency surfaces until someone manually advanced the lifecycle.
   // The ('planned', 'production') pair is valid per ops.event_status_pair_valid (see
   // src/shared/lib/event-status/pair-valid.ts and the corresponding DB trigger).
-  const { data: event, error: eventErr } = await supabase
+  const archetypeForEvents = (deal as Record<string, unknown>).event_archetype as string | null;
+  const insertRows = eventDrafts.map((d) => ({
+    project_id: projectId,
+    workspace_id: workspaceId,
+    deal_id: dealId,
+    title: eventName,
+    starts_at: d.starts_at,
+    ends_at: d.ends_at,
+    status: 'planned',
+    lifecycle_status: 'production',
+    timezone: eventTimezone,
+    venue_entity_id: venueEntityId,
+    client_entity_id: clientEntityId,
+    location_name: locationName,
+    event_archetype: archetypeForEvents,
+    run_of_show_data: runOfShowData,
+  }));
+
+  const { data: insertedEvents, error: eventErr } = await supabase
     .schema('ops')
     .from('events')
-    .insert({
-      project_id: projectId,
-      workspace_id: workspaceId,
-      deal_id: dealId,
-      title: eventName,
-      starts_at: startAt,
-      ends_at: endAt,
-      status: 'planned',
-      lifecycle_status: 'production',
-      timezone: eventTimezone,
-      venue_entity_id: venueEntityId,
-      client_entity_id: clientEntityId,
-      location_name: locationName,
-      event_archetype: (deal as Record<string, unknown>).event_archetype as string | null,
-      run_of_show_data: runOfShowData,
-    })
-    .select('id')
-    .single();
+    .insert(insertRows)
+    .select('id, starts_at');
 
-  if (eventErr) {
+  if (eventErr || !insertedEvents || insertedEvents.length === 0) {
     Sentry.logger.error('crm.handoverDeal.insertEventFailed', {
       dealId,
       workspaceId,
       projectId,
-      error: eventErr.message,
+      isSeries,
+      eventCount: insertRows.length,
+      error: eventErr?.message ?? 'no events inserted',
     });
-    return { success: false, error: eventErr.message };
+    return { success: false, error: eventErr?.message ?? 'Could not create events for deal.' };
   }
 
-  const eventId = (event as { id: string }).id;
+  // Sort by starts_at to pick the first show as the canonical deal.event_id —
+  // .insert() returns in insert order, but for series we want chronological.
+  const sortedEvents = [...(insertedEvents as Array<{ id: string; starts_at: string }>)]
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const eventId = sortedEvents[0].id;
+
+  // Link any pre-handover deal_crew rows (event_id still NULL) to the first
+  // event. For singletons/multi-day this is the canonical event. For series
+  // it's the first chronological show — the owner then clicks "Set for whole
+  // series" to fan the template to the rest. Keeps event-scoped reads
+  // consistent without losing rows the owner assigned pre-handover.
+  {
+    const { error: crewLinkErr } = await supabase
+      .schema('ops')
+      .from('deal_crew')
+      .update({ event_id: eventId })
+      .eq('deal_id', dealId)
+      .eq('workspace_id', workspaceId)
+      .is('event_id', null);
+    if (crewLinkErr) {
+      Sentry.logger.error('crm.handoverDeal.linkPreHandoverCrewFailed', {
+        dealId,
+        eventId,
+        workspaceId,
+        error: crewLinkErr.message,
+      });
+    }
+  }
 
   if (clientEntityId) {
     const { error: projectClientErr } = await supabase
@@ -300,7 +384,7 @@ export async function handoverDeal(
       // reporting later.
       Sentry.logger.error('crm.handoverDeal.projectClientEntityUpdateFailed', {
         dealId,
-        eventId: (event as { id: string }).id,
+        eventId,
         workspaceId,
         projectId,
         clientEntityId,
@@ -317,6 +401,7 @@ export async function handoverDeal(
   // Engine when it lands, audit-log readers today) see the handoff. Fire-and-
   // forget: publishDomainEvent swallows errors to Sentry so a publish failure
   // never rolls back the handoff itself.
+  const firstStartsAt = sortedEvents[0]?.starts_at ?? startAt ?? null;
   publishDomainEvent({
     workspaceId,
     eventId,
@@ -326,8 +411,13 @@ export async function handoverDeal(
       dealId,
       clientEntityId,
       archetype,
-      startsAt: startAt || null,
-      endsAt: endAt || null,
+      startsAt: firstStartsAt,
+      // For series, endsAt of the first show; domain consumers interested in
+      // the full date span should read ops.events directly. isSeries flag here
+      // is what a consumer (Follow-Up Engine) needs to differentiate.
+      endsAt: eventDrafts[0]?.ends_at ?? endAt ?? null,
+      isSeries,
+      seriesEventCount: eventDrafts.length,
     },
   }).catch((err) => {
     Sentry.logger.error('crm.handoverDeal.domainEventPublishFailed', {

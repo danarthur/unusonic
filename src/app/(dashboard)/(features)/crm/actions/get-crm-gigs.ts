@@ -42,6 +42,74 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
   const venueByDealId = new Map<string, string>(); // deal_id → venue org entity ID
   const clientByDealId = new Map<string, string>(); // deal_id → client org entity ID
 
+  // Series metadata per deal — aggregated from ops.events for shows on a
+  // series project. Keyed by deal_id so the card renderer doesn't need a
+  // second round-trip.
+  type SeriesMeta = {
+    isSeries: true;
+    archetype: string | null;
+    activeCount: number;
+    firstDate: string | null;
+    lastDate: string | null;
+    nextUpcoming: string | null;
+  };
+  const seriesByDealId = new Map<string, SeriesMeta>();
+
+  if (dealIds.length > 0) {
+    const { data: seriesProjects } = await supabase
+      .schema('ops')
+      .from('projects')
+      .select('deal_id, is_series, series_archetype')
+      .in('deal_id', dealIds)
+      .eq('is_series', true);
+
+    const seriesDealIds = new Set<string>(
+      ((seriesProjects ?? []) as Array<{ deal_id: string | null }>)
+        .map((p) => p.deal_id)
+        .filter((id): id is string => typeof id === 'string'),
+    );
+
+    if (seriesDealIds.size > 0) {
+      // Pull live events for just the series deals (archived_at IS NULL).
+      const { data: seriesEvents } = await supabase
+        .schema('ops')
+        .from('events')
+        .select('deal_id, starts_at, archived_at')
+        .in('deal_id', [...seriesDealIds])
+        .is('archived_at', null);
+
+      const archetypeByDeal = new Map<string, string | null>();
+      for (const p of (seriesProjects ?? []) as Array<{ deal_id: string | null; series_archetype: string | null }>) {
+        if (p.deal_id) archetypeByDeal.set(p.deal_id, p.series_archetype);
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const eventsByDeal = new Map<string, string[]>();
+      for (const e of (seriesEvents ?? []) as Array<{ deal_id: string | null; starts_at: string | null }>) {
+        if (!e.deal_id || !e.starts_at) continue;
+        const d = e.starts_at.slice(0, 10);
+        const arr = eventsByDeal.get(e.deal_id) ?? [];
+        arr.push(d);
+        eventsByDeal.set(e.deal_id, arr);
+      }
+
+      for (const dealId of seriesDealIds) {
+        const dates = (eventsByDeal.get(dealId) ?? []).slice().sort();
+        const firstDate = dates[0] ?? null;
+        const lastDate = dates[dates.length - 1] ?? null;
+        const upcoming = dates.find((d) => d >= today) ?? lastDate ?? null;
+        seriesByDealId.set(dealId, {
+          isSeries: true,
+          archetype: archetypeByDeal.get(dealId) ?? null,
+          activeCount: dates.length,
+          firstDate,
+          lastDate,
+          nextUpcoming: upcoming,
+        });
+      }
+    }
+  }
+
   // Stakeholders + proposals in parallel (proposals only needs dealIds, not stakeholder results)
   type ProposalPaymentRow = {
     deal_id: string;
@@ -130,12 +198,15 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
     const venueId = venueByDealId.get(dealId) ?? (d.venue_id as string | null);
     const clientId = clientByDealId.get(dealId) ?? (d.organization_id as string | null);
     const ownerId = d.owner_entity_id as string | null;
+    const series = seriesByDealId.get(dealId);
     return {
       id: dealId,
       title: (d.title as string) ?? null,
       status: (d.status as string) ?? null,
       stage_id: (d.stage_id as string) ?? null,
-      event_date: d.proposed_date ? String(d.proposed_date) : null,
+      // For series, surface the next-upcoming show so sorting uses "what's coming next"
+      // rather than the first historical show. Singletons and multi-day keep proposed_date.
+      event_date: series?.nextUpcoming ?? (d.proposed_date ? String(d.proposed_date) : null),
       location: venueId ? (entityNameMap.get(venueId) ?? null) : null,
       client_name: clientId ? (entityNameMap.get(clientId) ?? null) : null,
       source: 'deal' as const,
@@ -147,6 +218,15 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
       owner_name: ownerId ? (entityNameMap.get(ownerId) ?? null) : null,
       created_at: (d.created_at as string) ?? null,
       show_health_status: (d.show_health as Record<string, unknown> | null)?.status as StreamCardItem['show_health_status'] ?? null,
+      ...(series
+        ? {
+            is_series: true as const,
+            series_show_count: series.activeCount,
+            series_next_upcoming: series.nextUpcoming,
+            series_last_date: series.lastDate,
+            series_archetype: series.archetype,
+          }
+        : null),
     };
   });
 

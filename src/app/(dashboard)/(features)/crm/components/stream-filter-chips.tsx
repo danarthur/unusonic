@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { DEAL_ARCHETYPE_LABELS, type DealArchetype } from '../actions/deal-model';
+import { humanizeSlug } from '@/shared/lib/event-archetype';
 import type { StreamCardItem } from './stream-card';
 
 /* ─── Filter State Types ─── */
@@ -279,7 +280,10 @@ export function FilterChipBar({
           <CheckboxList
             options={availableArchetypes.map((a) => ({
               value: a,
-              label: DEAL_ARCHETYPE_LABELS[a as DealArchetype] ?? a,
+              // System slugs resolve via DEAL_ARCHETYPE_LABELS; custom slugs
+              // (any user-added type) fall through to a humanized form so the
+              // filter chip reads "Cigar Tasting" instead of "cigar_tasting".
+              label: DEAL_ARCHETYPE_LABELS[a as DealArchetype] ?? humanizeSlug(a),
             }))}
             selected={filters.archetypes}
             onChange={(archetypes) => onFiltersChange({ ...filters, archetypes })}

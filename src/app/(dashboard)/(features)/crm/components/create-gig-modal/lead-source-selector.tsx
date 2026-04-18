@@ -1,10 +1,10 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Building2, User, Plus, Loader2, X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type { WorkspaceLeadSource } from '@/features/lead-sources';
 import type { ReferrerSearchResult } from '../../actions/search-referrer';
 import { createGhostReferrerEntity } from '../../actions/lookup';
@@ -19,7 +19,6 @@ interface LeadSourceSelectorProps {
   leadSourceDetail: string;
   setLeadSourceDetail: (v: string) => void;
   // Referrer state
-  showReferrerPicker: boolean;
   referrerEntityId: string | null;
   setReferrerEntityId: (v: string | null) => void;
   referrerName: string;
@@ -36,99 +35,29 @@ interface LeadSourceSelectorProps {
 export function LeadSourceSelector({
   leadSources, selectedLeadSourceId, setSelectedLeadSourceId,
   leadSource, setLeadSource, leadSourceDetail, setLeadSourceDetail,
-  showReferrerPicker, referrerEntityId, setReferrerEntityId,
+  referrerEntityId, setReferrerEntityId,
   referrerName, setReferrerName, referrerQuery, setReferrerQuery,
   referrerResults, setReferrerResults, referrerSearching, referrerCreating, setReferrerCreating,
 }: LeadSourceSelectorProps) {
   const referrerTriggerRef = useRef<HTMLInputElement>(null);
 
+  // Selected = elevated (lighter than the modal surface). Inactive = subtle
+  // border on transparent so the pill reads as "selectable, not yet chosen."
+  // Same pattern as the host-kind pills above.
   const pillClass = (active: boolean) => cn(
     'rounded-[var(--stage-radius-input,6px)] border px-3 py-1.5 text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight transition-colors duration-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
     active
-      ? 'border-[oklch(1_0_0_/_0.20)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)]'
-      : 'border-[oklch(1_0_0_/_0.08)] bg-transparent text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.16)] hover:bg-[var(--ctx-well)]'
+      ? 'border-[oklch(1_0_0_/_0.16)] bg-[var(--ctx-card)] text-[var(--stage-text-primary)] shadow-sm'
+      : 'border-[oklch(1_0_0_/_0.08)] bg-transparent text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.16)] hover:bg-[oklch(1_0_0_/_0.04)]'
   );
 
   return (
     <div>
-      <label className="block stage-label mb-1.5">Lead source</label>
-
-      {leadSources.length > 0 ? (
-        <div className="space-y-2.5">
-          {(['referral', 'digital', 'marketplace', 'offline', 'relationship', 'custom'] as const).map((cat) => {
-            const group = leadSources.filter((s) => s.category === cat);
-            if (group.length === 0) return null;
-            return (
-              <div key={cat}>
-                <span className="block stage-micro text-[var(--stage-text-tertiary)] mb-1">
-                  {cat}
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {group.map((source) => (
-                    <button
-                      key={source.id}
-                      type="button"
-                      onClick={() => {
-                        if (selectedLeadSourceId === source.id) {
-                          setSelectedLeadSourceId(null);
-                          setLeadSource(null);
-                          setReferrerEntityId(null);
-                          setReferrerName('');
-                          setReferrerQuery('');
-                        } else {
-                          setSelectedLeadSourceId(source.id);
-                          setLeadSource(null);
-                          if (!source.is_referral) {
-                            setReferrerEntityId(null);
-                            setReferrerName('');
-                            setReferrerQuery('');
-                          }
-                        }
-                      }}
-                      className={pillClass(selectedLeadSourceId === source.id)}
-                    >
-                      {source.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {([
-            { value: 'referral', label: 'Referral' },
-            { value: 'repeat_client', label: 'Repeat client' },
-            { value: 'website', label: 'Website' },
-            { value: 'social', label: 'Social' },
-            { value: 'direct', label: 'Direct' },
-          ] as const).map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setLeadSource(leadSource === value ? null : value)}
-              className={pillClass(leadSource === value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Referrer picker */}
-      <AnimatePresence>
-        {showReferrerPicker && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={STAGE_MEDIUM}
-            className="overflow-hidden mt-2.5"
-          >
-            <label className="block stage-micro text-[var(--stage-text-tertiary)] mb-1">
-              Referred by
-            </label>
+      {/* Referred by — leads, because "who sent this client" is the most
+          actionable signal. Source pills sit below it as classification. */}
+      <label htmlFor="referrer-input" className="block stage-label mb-1.5">
+        Referred by <span className="text-[var(--stage-text-tertiary)] font-normal">(optional)</span>
+      </label>
             {referrerEntityId ? (
               <div className="flex items-center gap-2 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] px-3 py-2">
                 <User className="size-3.5 text-[var(--stage-text-secondary)]/60 shrink-0" />
@@ -261,9 +190,65 @@ export function LeadSourceSelector({
                 )}
               </div>
             )}
-          </motion.div>
+
+      {/* Lead source — classification, sits below the referrer */}
+      <div className="mt-3">
+        <label className="block stage-label mb-1.5">Lead source</label>
+        {leadSources.length > 0 ? (
+          <div className="space-y-2.5">
+            {(['referral', 'digital', 'marketplace', 'offline', 'relationship', 'custom'] as const).map((cat) => {
+              const group = leadSources.filter((s) => s.category === cat);
+              if (group.length === 0) return null;
+              return (
+                <div key={cat}>
+                  <span className="block stage-micro text-[var(--stage-text-tertiary)] mb-1">
+                    {cat}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.map((source) => (
+                      <button
+                        key={source.id}
+                        type="button"
+                        onClick={() => {
+                          if (selectedLeadSourceId === source.id) {
+                            setSelectedLeadSourceId(null);
+                            setLeadSource(null);
+                          } else {
+                            setSelectedLeadSourceId(source.id);
+                            setLeadSource(null);
+                          }
+                        }}
+                        className={pillClass(selectedLeadSourceId === source.id)}
+                      >
+                        {source.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {([
+              { value: 'referral', label: 'Referral' },
+              { value: 'repeat_client', label: 'Repeat client' },
+              { value: 'website', label: 'Website' },
+              { value: 'social', label: 'Social' },
+              { value: 'direct', label: 'Direct' },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setLeadSource(leadSource === value ? null : value)}
+                className={pillClass(leadSource === value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 }

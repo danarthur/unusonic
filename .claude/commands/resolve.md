@@ -14,7 +14,7 @@ For each slice:
 2. **Group fixes by file.** Many findings touch the same file — coalesce into one Edit pass per file when possible.
 3. **Honor the project rules.** Especially:
    - ESLint `no-restricted-syntax` bans the variable name `attrs` in actions/api files. When introducing `readEntityAttrs(...)`, name the result by entity type (`companyAttrs`, `coupleAttrs`, `venueAttrs`) — never `attrs`.
-   - Tailwind v4 wildcard landmine — never write `bg-[var(--token-*)]` anywhere.
+   - Tailwind v4 wildcard landmine — never write a literal Tailwind arbitrary-value class (the form starting with `bg-`, `text-`, `border-`, etc. followed by a square-bracketed CSS expression) with a placeholder character inside the brackets. Tailwind v4 scans every file (incl. markdown, comments, ESLint messages) and generates a class for whatever it finds — placeholder characters become invalid CSS that turbopack rejects. Always substitute the real token name, or describe the pattern in prose without the literal class form.
    - Five-schema rule: no new tables in `public`. Direct subquery RLS for `public`, `get_my_workspace_ids()` for `directory`/`ops`/`finance`/`cortex`.
    - Cortex writes via `SECURITY DEFINER` RPC only.
    - Brand enforcement: `Signal` → `Unusonic`, `ION` → `Aion` (with the documented exceptions in CLAUDE.md).

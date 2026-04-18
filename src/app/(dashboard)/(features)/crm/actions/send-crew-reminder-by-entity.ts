@@ -5,7 +5,9 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { sendCrewReminder } from '@/features/crew-notifications/api/send-reminder-email';
 import type { SendReminderResult } from '@/features/crew-notifications/api/send-reminder-email';
 
-export type { SendReminderResult };
+// Do NOT re-export `SendReminderResult` — Next 16 server-action registry
+// throws `ReferenceError` on type-only re-exports. Consumers should import
+// the type directly from `@/features/crew-notifications/api/send-reminder-email`.
 
 /**
  * Sends a reminder email for a crew assignment identified by event + entity.

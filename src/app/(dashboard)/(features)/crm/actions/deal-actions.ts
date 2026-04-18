@@ -3,16 +3,97 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import { INDIVIDUAL_ATTR, COUPLE_ATTR } from '@/features/network-data/model/attribute-keys';
+import { INDIVIDUAL_ATTR } from '@/features/network-data/model/attribute-keys';
 import { canCreateShow } from '@/shared/lib/show-limits';
 import { instrument } from '@/shared/lib/instrumentation';
 import { resolveStageByTag } from '@/shared/lib/pipeline-stages/resolve-stage';
-import { createDealSchema, type CreateDealInput, type CreateDealResult } from './deal-model';
+import {
+  createDealSchema,
+  type CreateDealInput,
+  type CreateDealResult,
+  type PersonHostInput,
+  type CompanyHostInput,
+  type PocInput,
+  type PlannerInput,
+} from './deal-model';
+
+type EntityShape =
+  | { existing_id: string }
+  | { type: 'person' | 'company'; display_name: string; attributes: Record<string, unknown> };
+
+function buildPersonShape(p: PersonHostInput): EntityShape | null {
+  if (p.existingId) return { existing_id: p.existingId };
+  const first = p.firstName?.trim() ?? '';
+  const last = p.lastName?.trim() ?? '';
+  const display = [first, last].filter(Boolean).join(' ');
+  if (!display) return null;
+  return {
+    type: 'person',
+    display_name: display,
+    attributes: {
+      is_ghost: true,
+      [INDIVIDUAL_ATTR.category]: 'client',
+      [INDIVIDUAL_ATTR.first_name]: first || null,
+      [INDIVIDUAL_ATTR.last_name]: last || null,
+      [INDIVIDUAL_ATTR.email]: p.email ?? null,
+      [INDIVIDUAL_ATTR.phone]: p.phone ?? null,
+    },
+  };
+}
+
+function buildCompanyShape(c: CompanyHostInput): EntityShape | null {
+  if (c.existingId) return { existing_id: c.existingId };
+  const name = c.name?.trim() ?? '';
+  if (!name) return null;
+  return {
+    type: 'company',
+    display_name: name,
+    attributes: { is_ghost: true, category: 'client' },
+  };
+}
+
+function buildPocShape(p: PocInput): EntityShape | null {
+  if (p.existingId) return { existing_id: p.existingId };
+  const first = p.firstName?.trim() ?? '';
+  const last = p.lastName?.trim() ?? '';
+  const display = [first, last].filter(Boolean).join(' ');
+  if (!display) return null;
+  return {
+    type: 'person',
+    display_name: display,
+    attributes: {
+      is_ghost: true,
+      [INDIVIDUAL_ATTR.category]: 'client_contact',
+      [INDIVIDUAL_ATTR.first_name]: first || null,
+      [INDIVIDUAL_ATTR.last_name]: last || null,
+      [INDIVIDUAL_ATTR.email]: p.email ?? null,
+      [INDIVIDUAL_ATTR.phone]: p.phone ?? null,
+    },
+  };
+}
+
+function buildPlannerShape(p: PlannerInput): EntityShape | null {
+  if (p.existingId) return { existing_id: p.existingId };
+  const first = p.firstName?.trim() ?? '';
+  const last = p.lastName?.trim() ?? '';
+  const display = [first, last].filter(Boolean).join(' ');
+  if (!display) return null;
+  return {
+    type: 'person',
+    display_name: display,
+    attributes: {
+      is_ghost: true,
+      [INDIVIDUAL_ATTR.category]: 'planner',
+      [INDIVIDUAL_ATTR.first_name]: first || null,
+      [INDIVIDUAL_ATTR.last_name]: last || null,
+      [INDIVIDUAL_ATTR.email]: p.email ?? null,
+    },
+  };
+}
 
 /**
- * Creates a new deal (inquiry) in the active workspace.
- * Writes to Deals table only. No Event row until deal is signed (Phase 2).
- * Supports company, individual, and couple client types.
+ * Creates a new deal (inquiry) in the active workspace via the
+ * P0 cast-of-stakeholders contract on public.create_deal_complete.
  */
 export async function createDeal(input: CreateDealInput): Promise<CreateDealResult> {
   return instrument('createDeal', async () => {
@@ -31,7 +112,6 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       };
     }
 
-    // Show limit enforcement
     const showCheck = await canCreateShow(workspaceId);
     if (!showCheck.allowed) {
       return {
@@ -45,19 +125,20 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
 
     const {
       proposedDate,
+      proposedEndDate,
+      dateKind,
+      seriesRule,
+      seriesArchetype,
       eventArchetype,
       title,
-      organizationId,
-      mainContactId,
-      clientName,
-      clientType,
-      clientFirstName,
-      clientLastName,
-      clientEmail,
-      clientPhone,
-      partnerBFirstName,
-      partnerBLastName,
-      partnerBEmail,
+      hostKind,
+      personHosts,
+      companyHost,
+      pairing,
+      coupleDisplayName,
+      pocFromHostIndex,
+      poc,
+      planner,
       status,
       budgetEstimated,
       notes,
@@ -67,89 +148,80 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       leadSourceId,
       leadSourceDetail,
       referrerEntityId,
-      plannerEntityId,
       eventStartTime,
       eventEndTime,
     } = parsed.data;
 
-    const supabase = await createClient();
-
-    // ── Build the RPC payload ─────────────────────────────────────────────
-    // Rescan fix C4 (2026-04-11): migrated from 7 sequential inserts to a
-    // single atomic SECURITY DEFINER RPC. See rescan doc §2 and migration
-    // 20260411210000_create_deal_complete_rpc.sql for the full contract.
-    // The per-step error paths that used to live here (Sentry captures for
-    // stakeholder / note insert failures) are gone because partial failure
-    // is now physically impossible — any error inside the RPC rolls back the
-    // entire transaction.
-
-    // p_client_entity: shape depends on clientType. Skipped entirely when the
-    // caller passed an existing organizationId.
-    let clientEntity: Record<string, unknown> | null = null;
-    if (organizationId) {
-      clientEntity = { existing_id: organizationId };
-    } else if (
-      clientType === 'individual' &&
-      (clientFirstName?.trim() || clientLastName?.trim() || clientName?.trim())
-    ) {
-      const displayName =
-        [clientFirstName?.trim(), clientLastName?.trim()].filter(Boolean).join(' ') ||
-        clientName?.trim() ||
-        'Individual Client';
-      clientEntity = {
-        type: 'person',
-        display_name: displayName,
-        attributes: {
-          is_ghost: true,
-          [INDIVIDUAL_ATTR.category]: 'client',
-          [INDIVIDUAL_ATTR.first_name]: clientFirstName ?? null,
-          [INDIVIDUAL_ATTR.last_name]: clientLastName ?? null,
-          [INDIVIDUAL_ATTR.email]: clientEmail ?? null,
-          [INDIVIDUAL_ATTR.phone]: clientPhone ?? null,
-        },
-      };
-    } else if (clientType === 'couple') {
-      const partnerAFirst = clientFirstName?.trim() ?? '';
-      const partnerALast = clientLastName?.trim() ?? '';
-      const partnerBFirst = partnerBFirstName?.trim() ?? '';
-      const partnerBLast = partnerBLastName?.trim() ?? '';
-
-      let coupleDisplayName = clientName?.trim() ?? '';
-      if (!coupleDisplayName) {
-        const sameLast =
-          partnerALast && partnerBLast && partnerALast.toLowerCase() === partnerBLast.toLowerCase();
-        if (sameLast) {
-          coupleDisplayName = `${partnerAFirst} & ${partnerBFirst} ${partnerALast}`.trim();
-        } else {
-          const a = [partnerAFirst, partnerALast].filter(Boolean).join(' ');
-          const b = [partnerBFirst, partnerBLast].filter(Boolean).join(' ');
-          coupleDisplayName = [a, b].filter(Boolean).join(' & ');
-        }
-        if (!coupleDisplayName) coupleDisplayName = 'Couple';
+    // Shape the (p_date_kind, p_date) pair that the v3 RPC expects.
+    // single:    p_date is null (proposed_date in p_deal carries the day)
+    // multi_day: p_date = { end_date }
+    // series:    p_date = { series_rule, series_archetype }
+    let datePayload: Record<string, unknown> | null = null;
+    if (dateKind === 'multi_day') {
+      if (!proposedEndDate) {
+        return { success: false, error: 'Multi-day requires an end date.' };
       }
-      clientEntity = {
-        type: 'couple',
-        display_name: coupleDisplayName,
-        attributes: {
-          is_ghost: true,
-          category: 'client',
-          [COUPLE_ATTR.partner_a_first]: partnerAFirst || null,
-          [COUPLE_ATTR.partner_a_last]: partnerALast || null,
-          [COUPLE_ATTR.partner_a_email]: clientEmail ?? null,
-          [COUPLE_ATTR.partner_b_first]: partnerBFirst || null,
-          [COUPLE_ATTR.partner_b_last]: partnerBLast || null,
-          [COUPLE_ATTR.partner_b_email]: partnerBEmail ?? null,
-        },
-      };
-    } else if (clientName?.trim()) {
-      clientEntity = {
-        type: 'company',
-        display_name: clientName.trim(),
-        attributes: { is_ghost: true, category: 'client' },
+      if (proposedEndDate < proposedDate) {
+        return { success: false, error: 'End date must be on or after the start date.' };
+      }
+      datePayload = { end_date: proposedEndDate };
+    } else if (dateKind === 'series') {
+      if (!seriesRule) {
+        return { success: false, error: 'Series date kind requires a series rule.' };
+      }
+      if (seriesRule.rdates.length === 0) {
+        return { success: false, error: 'Series must include at least one show.' };
+      }
+      datePayload = {
+        series_rule: seriesRule,
+        series_archetype: seriesArchetype ?? null,
       };
     }
 
-    // p_venue_entity: null unless a venueId was passed OR a venueName was typed.
+    // ── Build hosts[] ──────────────────────────────────────────────────────
+    const hosts: EntityShape[] = [];
+    if (hostKind === 'individual') {
+      const p = personHosts?.[0];
+      if (!p) return { success: false, error: 'Individual host requires name fields.' };
+      const shape = buildPersonShape(p);
+      if (!shape) return { success: false, error: 'Enter at least a first or last name for the host.' };
+      hosts.push(shape);
+    } else if (hostKind === 'couple') {
+      const a = personHosts?.[0];
+      const b = personHosts?.[1];
+      if (!a || !b) return { success: false, error: 'Couple host requires both partners.' };
+      const aShape = buildPersonShape(a);
+      const bShape = buildPersonShape(b);
+      if (!aShape || !bShape) {
+        return { success: false, error: 'Both partners need at least a first or last name.' };
+      }
+      hosts.push(aShape, bShape);
+    } else if (hostKind === 'company' || hostKind === 'venue_concert') {
+      if (!companyHost) return { success: false, error: 'Company host requires a name or existing client.' };
+      const shape = buildCompanyShape(companyHost);
+      if (!shape) return { success: false, error: 'Enter a company name or pick an existing client.' };
+      hosts.push(shape);
+    }
+
+    // ── POC ────────────────────────────────────────────────────────────────
+    // pocFromHostIndex (1-based) → reuse that host's resolved entity. The RPC
+    // resolves the host first, so we pass the same shape — RPC creates ONE
+    // entity but writes both `host` and `day_of_poc` stakeholder rows.
+    let pocPayload: EntityShape | null = null;
+    if (typeof pocFromHostIndex === 'number') {
+      const idx = pocFromHostIndex - 1;
+      if (idx >= 0 && idx < hosts.length) {
+        pocPayload = hosts[idx];
+      }
+    }
+    if (!pocPayload && poc) {
+      pocPayload = buildPocShape(poc);
+    }
+
+    // ── Planner ────────────────────────────────────────────────────────────
+    const plannerPayload = planner ? buildPlannerShape(planner) : null;
+
+    // ── Venue ──────────────────────────────────────────────────────────────
     let venueEntity: Record<string, unknown> | null = null;
     if (venueId) {
       venueEntity = { existing_id: venueId };
@@ -160,8 +232,8 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       };
     }
 
-    // Lead source label denormalization stays outside the RPC — it's a read,
-    // not a write, and doesn't need atomicity with the insert sequence.
+    // ── Lead source label (denormalized text on public.deals) ─────────────
+    const supabase = await createClient();
     let resolvedLeadSourceText: string | null = leadSource ?? null;
     if (leadSourceId) {
       const { data: lsRow } = await supabase
@@ -173,11 +245,21 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       if (lsRow?.label) resolvedLeadSourceText = lsRow.label;
     }
 
+    // ── Couple display name override ──────────────────────────────────────
+    // Tag the first host shape's display_name with the user-provided couple
+    // name so the couple reads as a single chip when desired (e.g. for
+    // proposal-builder readouts).
+    if (hostKind === 'couple' && coupleDisplayName?.trim() && hosts[0] && 'display_name' in hosts[0]) {
+      // The primary host keeps their personal name; the couple display name is
+      // intentionally NOT collapsed onto a single entity (per P0 design — each
+      // partner is their own Node). Down-stream readouts derive the combined
+      // string from the two entities. No-op here, kept for self-documentation.
+    }
+
     const dealPayload = {
       proposed_date: proposedDate,
       event_archetype: eventArchetype ?? null,
       title: title?.trim() ?? null,
-      main_contact_id: mainContactId ?? null,
       status,
       budget_estimated: budgetEstimated ?? null,
       notes: notes?.trim() ?? null,
@@ -189,10 +271,8 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       event_end_time: eventEndTime ?? null,
     };
 
-    const stakeholderExtras = plannerEntityId ? { planner_entity_id: plannerEntityId } : null;
     const notePayload = notes?.trim() ? { content: notes.trim(), phase_tag: 'general' } : null;
 
-    // ── One atomic call ───────────────────────────────────────────────────
     // Phase 3i: create_deal_complete still receives the legacy slug in
     // p_deal.status (typically 'inquiry'). The Phase 3i BEFORE trigger
     // (public.sync_deal_status_from_stage) catches the INSERT-with-status-only
@@ -212,13 +292,19 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       }
     }
 
+    type Json = import('@/types/supabase').Json;
     const { data, error } = await supabase.rpc('create_deal_complete', {
       p_workspace_id: workspaceId,
-      p_client_entity: clientEntity,
-      p_venue_entity: venueEntity,
-      p_deal: dealPayload,
-      p_stakeholder_extras: stakeholderExtras,
-      p_note: notePayload,
+      p_hosts: hosts as unknown as Json,
+      p_poc: pocPayload as unknown as Json,
+      p_bill_to: null,
+      p_planner: plannerPayload as unknown as Json,
+      p_venue_entity: venueEntity as unknown as Json,
+      p_deal: dealPayload as unknown as Json,
+      p_note: notePayload as unknown as Json,
+      p_pairing: pairing,
+      p_date_kind: dateKind,
+      p_date: datePayload as unknown as Json,
     });
 
     if (error) {
@@ -226,7 +312,7 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
       return { success: false, error: error.message };
     }
 
-    const result = data as { deal_id: string; client_entity_id: string | null; venue_entity_id: string | null } | null;
+    const result = data as { deal_id?: string } | null;
     if (!result?.deal_id) {
       return { success: false, error: 'create_deal_complete returned no deal_id' };
     }

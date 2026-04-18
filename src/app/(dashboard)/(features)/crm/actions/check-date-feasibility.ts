@@ -12,6 +12,9 @@ export type CheckDateFeasibilityResult = {
   dealsCount?: number;
 };
 
+/** Per-date feasibility row. `date` is the input (yyyy-MM-dd) for chip correlation. */
+export type DatedFeasibilityResult = CheckDateFeasibilityResult & { date: string };
+
 const BADGE_MESSAGES: Record<FeasibilityStatus, string> = {
   clear: 'Prime Availability. Top 3 Leads Available.',
   caution: 'Date Congested. 2+ Inquiries Pending. Staffing Tight.',
@@ -125,4 +128,50 @@ export async function checkDateFeasibility(
       dealsCount: 0,
     };
   }
+}
+
+/**
+ * Batch feasibility check for a series (multiple dates) or multi-day range.
+ *
+ * - Pass an array of `yyyy-MM-dd` strings for series dates (returns one result per date).
+ * - Pass `{ start, end }` for a multi-day range (returns one aggregated result).
+ *
+ * Returns a parallel array of {date, status, message, ...}. Callers render each
+ * entry as a colored chip (clear/caution/critical) in the Stage 1 chip strip.
+ *
+ * Implementation is a single round-trip per date — for long tours (30+ shows)
+ * we can batch-query in the future, but P0 correctness beats premature batching.
+ */
+export async function checkDatesFeasibility(
+  input: string[] | { start: string; end: string },
+  workspaceIdOverride?: string
+): Promise<DatedFeasibilityResult[]> {
+  const workspaceId = workspaceIdOverride ?? (await getActiveWorkspaceId());
+  if (!workspaceId) return [];
+
+  const dates = Array.isArray(input)
+    ? input
+    : expandDateRangeToList(input.start, input.end);
+
+  // Run one query per date concurrently. The server action is cheap (head+count).
+  const results = await Promise.all(
+    dates.map(async (d): Promise<DatedFeasibilityResult> => {
+      const r = await checkDateFeasibility(d, workspaceId);
+      return { ...r, date: d };
+    })
+  );
+  return results;
+}
+
+/** Internal: expand a yyyy-MM-dd inclusive range to a list of all days. */
+function expandDateRangeToList(startIso: string, endIso: string): string[] {
+  const start = new Date(`${startIso}T00:00:00Z`);
+  const end = new Date(`${endIso}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+  if (end < start) return [];
+  const out: string[] = [];
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
 }

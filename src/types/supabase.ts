@@ -2555,8 +2555,10 @@ export type Database = {
       }
       deal_stakeholders: {
         Row: {
+          added_at: string
           created_at: string
           deal_id: string
+          display_order: number | null
           entity_id: string | null
           id: string
           is_primary: boolean
@@ -2564,8 +2566,10 @@ export type Database = {
           role: Database["public"]["Enums"]["deal_stakeholder_role"]
         }
         Insert: {
+          added_at?: string
           created_at?: string
           deal_id: string
+          display_order?: number | null
           entity_id?: string | null
           id?: string
           is_primary?: boolean
@@ -2573,8 +2577,10 @@ export type Database = {
           role?: Database["public"]["Enums"]["deal_stakeholder_role"]
         }
         Update: {
+          added_at?: string
           created_at?: string
           deal_id?: string
+          display_order?: number | null
           entity_id?: string | null
           id?: string
           is_primary?: boolean
@@ -5796,12 +5802,46 @@ export type Database = {
       count_team_seats: { Args: { p_workspace_id: string }; Returns: number }
       create_deal_complete: {
         Args: {
-          p_client_entity: Json
-          p_deal: Json
+          p_bill_to?: Json
+          p_date?: Json
+          p_date_kind?: string
+          p_deal?: Json
+          p_hosts: Json
           p_note?: Json
-          p_stakeholder_extras?: Json
-          p_venue_entity: Json
+          p_pairing?: string
+          p_planner?: Json
+          p_poc?: Json
+          p_venue_entity?: Json
           p_workspace_id: string
+        }
+        Returns: Json
+      }
+      add_co_host_edge: {
+        Args: {
+          p_workspace_id: string
+          p_partner_a_id: string
+          p_partner_b_id: string
+          p_pairing?: string
+          p_anniversary?: string
+        }
+        Returns: Json
+      }
+      add_represents_edge: {
+        Args: {
+          p_workspace_id: string
+          p_representative_id: string
+          p_principal_id: string
+          p_scope?: string
+          p_since?: string
+        }
+        Returns: Json
+      }
+      add_books_for_edge: {
+        Args: {
+          p_workspace_id: string
+          p_person_id: string
+          p_company_id: string
+          p_since?: string
         }
         Returns: Json
       }
@@ -6046,7 +6086,16 @@ export type Database = {
       confidentiality_level: "public" | "private" | "secret"
       contract_status: "draft" | "sent" | "signed"
       cue_type: "stage" | "audio" | "lighting" | "video" | "logistics"
-      deal_stakeholder_role: "bill_to" | "planner" | "venue_contact" | "vendor"
+      deal_stakeholder_role:
+        | "bill_to"
+        | "planner"
+        | "venue_contact"
+        | "vendor"
+        | "host"
+        | "day_of_poc"
+        | "booker"
+        | "principal"
+        | "representative"
       employment_status: "internal_employee" | "external_contractor"
       event_lifecycle_status:
         | "lead"
@@ -6277,7 +6326,17 @@ export const Constants = {
       confidentiality_level: ["public", "private", "secret"],
       contract_status: ["draft", "sent", "signed"],
       cue_type: ["stage", "audio", "lighting", "video", "logistics"],
-      deal_stakeholder_role: ["bill_to", "planner", "venue_contact", "vendor"],
+      deal_stakeholder_role: [
+        "bill_to",
+        "planner",
+        "venue_contact",
+        "vendor",
+        "host",
+        "day_of_poc",
+        "booker",
+        "principal",
+        "representative",
+      ],
       employment_status: ["internal_employee", "external_contractor"],
       event_lifecycle_status: [
         "lead",

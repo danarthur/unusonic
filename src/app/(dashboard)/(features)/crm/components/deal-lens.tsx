@@ -31,6 +31,8 @@ import { getEventLoadDates } from '../actions/get-event-summary';
 import { formatRelTime } from '@/shared/lib/format-currency';
 import { updateDealScalars } from '../actions/update-deal-scalars';
 import { ProductionTeamCard } from './production-team-card';
+import { DealShowsList } from './deal-shows-list';
+import { SeriesCrewAffordance } from './series-crew-affordance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
 import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-milestones';
 import { FollowUpCard } from './follow-up-card';
@@ -486,6 +488,13 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
               }}
             />
           )}
+
+          {/* Shows list — visible only for series deals (is_series=true on the project).
+              For singletons / multi-day this is a no-op render. */}
+          <DealShowsList dealId={deal.id} isLocked={isLocked} />
+
+          {/* Series-only affordance: apply first show's crew to all shows + persist template */}
+          <SeriesCrewAffordance dealId={deal.id} isLocked={isLocked} />
 
           {/* Production team */}
           <ProductionTeamCard dealId={deal.id} sourceOrgId={sourceOrgId ?? null} eventDate={deal.proposed_date} workspaceId={deal.workspace_id} isLocked={isLocked} />

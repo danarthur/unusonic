@@ -6,7 +6,12 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { ExpenseCategory } from '../model/types';
 
-export type { ExpenseCategory };
+// NOTE: do NOT re-export `ExpenseCategory` from this file.
+// Next.js 16 bundles 'use server' files through a server-action registry that
+// tries to produce a value-level re-export for every symbol listed in an
+// `export { X }` / `export type { X }` block. Type-only re-exports throw
+// `ReferenceError: ExpenseCategory is not defined` at runtime. Consumers should
+// import the type directly from `../model/types`.
 
 export type ExpensePaymentType =
   | 'bill'

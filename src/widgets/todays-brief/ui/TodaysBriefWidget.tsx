@@ -7,9 +7,9 @@ import { Sparkles, MessageCircle } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import { METRICS } from '@/shared/lib/metrics/registry';
-import { dismissInsight, markInsightsSurfaced } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
+import { dismissInsight, markInsightsSurfaced, type AionInsight } from '@/app/(dashboard)/(features)/aion/actions/aion-insight-actions';
 import { useOptionalCapture } from '@/widgets/lobby-capture/ui/CaptureProvider';
-import { getBriefAndInsights, type BriefAndInsights, type AionInsight } from '../api/get-brief-and-insights';
+import { getBriefAndInsights, type BriefAndInsights } from '../api/get-brief-and-insights';
 import { InsightRow } from './InsightRow';
 import { CaptureComposer } from './CaptureComposer';
 

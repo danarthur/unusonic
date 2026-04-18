@@ -37,15 +37,22 @@ export function createActionTools(ctx: AionToolContext) {
     }),
     execute: async (params) => {
       if (!canWrite) return WRITE_DENIED;
+      // Aion creates deals with the new cast-of-stakeholders contract.
+      // For the chat path we only know one client; treat it as an individual
+      // host. The user can refine into a couple/company via the deal lens.
+      const fallbackName = params.clientName ?? 'Client';
+      const [first, ...rest] = fallbackName.trim().split(/\s+/);
       return createDeal({
         proposedDate: params.proposedDate,
         title: params.title,
-        eventArchetype: params.eventArchetype as any,
-        clientName: params.clientName,
-        clientEmail: params.clientEmail,
-        clientPhone: params.clientPhone,
-        clientType: 'individual' as const,
-        status: 'inquiry' as const,
+        eventArchetype: params.eventArchetype as 'wedding' | 'corporate_gala' | 'product_launch' | 'private_dinner' | 'concert' | 'festival' | 'awards_show' | 'conference' | 'birthday' | 'charity_gala' | undefined,
+        hostKind: 'individual',
+        personHosts: [{
+          firstName: first,
+          lastName: rest.join(' ') || undefined,
+          email: params.clientEmail ?? null,
+          phone: params.clientPhone ?? null,
+        }],
         budgetEstimated: params.budgetEstimated,
         notes: params.notes,
         venueName: params.venueName,
