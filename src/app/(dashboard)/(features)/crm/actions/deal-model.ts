@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { SeriesRuleSchema, SERIES_ARCHETYPES } from '@/shared/lib/series-rule';
+import { eventArchetypeSlugSchema } from '@/shared/lib/event-archetype';
 
-/** Event archetype values for deals. Shared by createDeal schema and UI. */
+/**
+ * Legacy archetype slugs. Retained for (a) fallback label rendering when the
+ * workspace archetype table is unavailable, (b) seed data in tests / fixtures.
+ * After the 2026-04-18 workspace-event-types feature these live as is_system
+ * rows in ops.workspace_event_archetypes; owners can extend with any custom
+ * slug via the EventTypeCombobox.
+ */
 export const DEAL_ARCHETYPES = [
   'wedding',
   'corporate_gala',
@@ -19,15 +26,15 @@ export type DealArchetype = typeof DEAL_ARCHETYPES[number];
 
 export const DEAL_ARCHETYPE_LABELS: Record<DealArchetype, string> = {
   wedding: 'Wedding',
-  corporate_gala: 'Corporate Gala',
-  product_launch: 'Product Launch',
-  private_dinner: 'Private Dinner',
+  corporate_gala: 'Corporate gala',
+  product_launch: 'Product launch',
+  private_dinner: 'Private dinner',
   concert: 'Concert',
   festival: 'Festival',
-  awards_show: 'Awards Show',
+  awards_show: 'Awards show',
   conference: 'Conference',
   birthday: 'Birthday',
-  charity_gala: 'Charity Gala',
+  charity_gala: 'Charity gala',
 };
 
 /**
@@ -102,7 +109,12 @@ export const createDealSchema = z.object({
   seriesRule: SeriesRuleSchema.nullable().optional(),
   /** Optional archetype label for series (residency/tour/run/weekend/custom). */
   seriesArchetype: z.enum(SERIES_ARCHETYPES).nullable().optional(),
-  eventArchetype: z.enum(DEAL_ARCHETYPES).nullable().optional(),
+  /**
+   * Event archetype slug. Not bounded to the legacy enum any more — may be a
+   * system slug (`wedding`, `concert`, ...) OR a workspace-custom slug minted
+   * via `upsert_workspace_event_archetype` through the EventTypeCombobox.
+   */
+  eventArchetype: eventArchetypeSlugSchema.nullable().optional(),
   title: z.string().max(500).nullable().optional(),
 
   // ── Host cast ───────────────────────────────────────────────────────────

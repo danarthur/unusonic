@@ -36,6 +36,7 @@ import {
   type CompanyClientSelection,
 } from './create-gig-modal/host-cast-forms';
 import { CastSummary } from './create-gig-modal/cast-summary';
+import { humanizeSlug } from '@/shared/lib/event-archetype';
 import { DateStage, type DateKind } from './create-gig-modal/date-stage';
 import type { SeriesRule, SeriesArchetype } from '@/shared/lib/series-rule';
 import { CurrencyInput } from '@/shared/ui/currency-input';
@@ -301,8 +302,11 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   // ("Marlow Wedding", "Acme Corp Product Launch", etc.) the user can accept
   // by leaving the field blank, or override by typing.
   const titlePlaceholder = useMemo(() => {
+    // Custom workspace archetypes aren't in DEAL_ARCHETYPE_LABELS. Fall back to
+    // a humanized slug ("cigar_tasting" → "Cigar Tasting") so the title
+    // suggestion stays readable for owner-defined types.
     const archetypeLabel = eventArchetype
-      ? DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS]
+      ? (DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS] ?? humanizeSlug(eventArchetype))
       : '';
     let lastName = '';
     if (hostKind === 'individual') {
@@ -647,7 +651,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                         ? 'Set the date'
                         : `New ${
                             eventArchetype
-                              ? DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS].toLowerCase()
+                              ? (DEAL_ARCHETYPE_LABELS[eventArchetype as keyof typeof DEAL_ARCHETYPE_LABELS] ?? humanizeSlug(eventArchetype)).toLowerCase()
                               : 'production'
                           }`}
                     </h2>

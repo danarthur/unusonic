@@ -10,6 +10,7 @@ import { cn } from '@/shared/lib/utils';
 import { STAGE_LIGHT, STAGE_MEDIUM, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { TimePicker } from '@/shared/ui/time-picker';
 import { CalendarPanel, parseLocalDateString } from '../ceramic-date-picker';
+import { TourCalendar } from './tour-calendar';
 import {
   checkDatesFeasibility,
   type DatedFeasibilityResult,
@@ -17,7 +18,7 @@ import {
 } from '../../actions/check-date-feasibility';
 import type { SeriesRule, SeriesArchetype } from '@/shared/lib/series-rule';
 import { expandSeriesRule, SERIES_ARCHETYPES } from '@/shared/lib/series-rule';
-import { DEAL_ARCHETYPES, DEAL_ARCHETYPE_LABELS } from '../../actions/deal-model';
+import { EventTypeCombobox } from './event-type-combobox';
 
 export type DateKind = 'single' | 'multi_day' | 'series';
 
@@ -50,10 +51,32 @@ const TAB_LABELS: Record<DateKind, string> = {
   series: 'Series',
 };
 
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/**
+ * Weekday indices are 0=Sunday..6=Saturday (matches JS Date.getDay and rrule's
+ * SU,MO,TU,WE,TH,FR,SA constants). The chip strip RENDERS Mon-first per
+ * production-industry convention (see User Advocate research) — owners think
+ * in work-week order, not consumer-calendar order — but the underlying data is
+ * still 0-6 Sun-indexed so we never drift from the RRULE vocabulary.
+ */
+const WEEKDAY_CHIP_ORDER = [1, 2, 3, 4, 5, 6, 0] as const; // Mon, Tue, ..., Sun
+const WEEKDAY_SHORT = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const WEEKDAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const EVENT_ARCHETYPES = DEAL_ARCHETYPES.map((value) => ({ value, label: DEAL_ARCHETYPE_LABELS[value] }));
+/**
+ * Industry-named presets. Naming follows production vocabulary, not consumer
+ * calendar vocabulary: "Weekend run" = Fri+Sat because that's how production
+ * owners say it (nightclub DJs and wedding weekends both hit Sat hardest, Fri
+ * as the runup). "Three-day" = Thu+Fri+Sat for festivals / nightclub runs.
+ * "Weekday" = Mon-Fri for corporate lunch series and conferences.
+ *
+ * Workspaces can override in P2 if owners want per-shop presets. For now these
+ * three cover ~80% of multi-day residency patterns.
+ */
+const PATTERN_PRESETS: Array<{ label: string; days: number[] }> = [
+  { label: 'Weekend run', days: [5, 6] },      // Fri, Sat
+  { label: 'Three-day', days: [4, 5, 6] },      // Thu, Fri, Sat
+  { label: 'Weekday', days: [1, 2, 3, 4, 5] },  // Mon-Fri
+];
 
 /**
  * Resolve the browser's IANA timezone so series rules carry it forward to the
@@ -69,26 +92,31 @@ function resolveBrowserTimezone(): string {
 }
 
 /**
- * Compose an RRULE string from a weekly pattern (one weekday) + inclusive
+ * Compose an RRULE string from a weekly pattern (1+ weekdays) + inclusive
  * start/end dates. Expand to yyyy-MM-dd date strings using the `rrule`
- * package — this runs once on user edits and the result is persisted to
- * series_rule.rdates. Pass tz so the rule is timezone-aware.
+ * package — runs on user edits and the result is persisted to
+ * series_rule.rdates. Empty weekdays array returns no dates (treat as invalid).
  */
 function buildWeeklyPatternDates(
-  weekday: number,
+  weekdays: number[],
   startIso: string,
-  endIso: string
+  endIso: string,
+  intervalWeeks: number = 1
 ): { rrule: string; dates: string[] } {
-  if (!startIso || !endIso) return { rrule: '', dates: [] };
+  if (weekdays.length === 0 || !startIso || !endIso) return { rrule: '', dates: [] };
   const start = new Date(`${startIso}T12:00:00Z`);
   const end = new Date(`${endIso}T12:00:00Z`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return { rrule: '', dates: [] };
   if (end < start) return { rrule: '', dates: [] };
 
+  const interval = Math.max(1, Math.min(52, Math.floor(intervalWeeks || 1)));
   const WEEKDAY_MAP: Weekday[] = [RRule.SU, RRule.MO, RRule.TU, RRule.WE, RRule.TH, RRule.FR, RRule.SA];
+  // Dedup + sort so the serialized RRULE string is stable regardless of click order.
+  const uniqSorted = Array.from(new Set(weekdays)).sort((a, b) => a - b);
   const rule = new RRule({
     freq: Frequency.WEEKLY,
-    byweekday: [WEEKDAY_MAP[weekday]],
+    byweekday: uniqSorted.map((d) => WEEKDAY_MAP[d]),
+    interval,
     dtstart: start,
     until: end,
   });
@@ -129,9 +157,7 @@ export function DateStage({
   setSeriesArchetype,
 }: DateStageProps) {
   // ── Refs for portaled dropdowns
-  const archetypeTriggerRef = useRef<HTMLButtonElement>(null);
   const seriesArchetypeTriggerRef = useRef<HTMLButtonElement>(null);
-  const [archetypeOpen, setArchetypeOpen] = useState(false);
   const [seriesArchetypeOpen, setSeriesArchetypeOpen] = useState(false);
 
   // ── Single-day calendar expansion
@@ -145,12 +171,21 @@ export function DateStage({
   const multiEndRef = useRef<HTMLDivElement>(null);
   const seriesStartRef = useRef<HTMLDivElement>(null);
   const seriesEndRef = useRef<HTMLDivElement>(null);
+  // Dedicated refs for each CalendarPanel so outside-click handling treats
+  // the panel (prev/next arrows, day cells) as "inside" — the panel renders
+  // as a sibling to the trigger button, not a child, so the trigger's ref
+  // alone misses it.
+  const singleCalPanelRef = useRef<HTMLDivElement>(null);
+  const multiCalPanelRef = useRef<HTMLDivElement>(null);
+  const seriesCalPanelRef = useRef<HTMLDivElement>(null);
 
   // ── Series builder
   const [seriesMode, setSeriesMode] = useState<'pattern' | 'custom'>('pattern');
-  const [patternWeekday, setPatternWeekday] = useState<number>(6); // Saturday default
+  const [patternWeekdays, setPatternWeekdays] = useState<number[]>([6]); // Saturday default
   const [patternStart, setPatternStart] = useState('');
   const [patternEnd, setPatternEnd] = useState('');
+  /** RRULE INTERVAL — 1 = every week, 2 = every other week, 3 = every 3rd week, … */
+  const [patternInterval, setPatternInterval] = useState<number>(1);
   const [customDates, setCustomDates] = useState<string[]>([]);
   const [exdates, setExdates] = useState<string[]>([]);
   const [extraDates, setExtraDates] = useState<string[]>([]); // add-one-off dates
@@ -170,7 +205,7 @@ export function DateStage({
     let rdates: string[] = [];
 
     if (seriesMode === 'pattern') {
-      const result = buildWeeklyPatternDates(patternWeekday, patternStart, patternEnd);
+      const result = buildWeeklyPatternDates(patternWeekdays, patternStart, patternEnd, patternInterval);
       rrule = result.rrule || null;
       rdates = result.dates;
     } else {
@@ -199,7 +234,7 @@ export function DateStage({
       tz,
       primary_date: primary,
     };
-  }, [dateKind, seriesMode, patternWeekday, patternStart, patternEnd, customDates, extraDates, exdates, tz]);
+  }, [dateKind, seriesMode, patternWeekdays, patternStart, patternEnd, patternInterval, customDates, extraDates, exdates, tz]);
 
   // Hoist computedSeriesRule to parent whenever it changes.
   useEffect(() => {
@@ -211,6 +246,7 @@ export function DateStage({
     if (dateKind !== 'series') {
       setExdates([]);
       setExtraDates([]);
+      setPatternInterval(1);
     }
   }, [dateKind]);
 
@@ -250,16 +286,28 @@ export function DateStage({
     };
   }, [feasibilityInputs]);
 
-  // Close calendars on outside click
+  // Close calendars on outside click. Each open calendar has two "inside"
+  // regions: its trigger button wrapper AND the CalendarPanel itself (rendered
+  // as a sibling). Without the panel check, clicking the month nav arrows
+  // closes the picker, which is what a user would reasonably call a bug.
   useEffect(() => {
     if (!singleCalOpen && !multiStartCalOpen && !multiEndCalOpen && !seriesStartCalOpen && !seriesEndCalOpen) return;
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (singleCalOpen && singleCalRef.current?.contains(t)) return;
-      if (multiStartCalOpen && multiStartRef.current?.contains(t)) return;
-      if (multiEndCalOpen && multiEndRef.current?.contains(t)) return;
-      if (seriesStartCalOpen && seriesStartRef.current?.contains(t)) return;
-      if (seriesEndCalOpen && seriesEndRef.current?.contains(t)) return;
+      if (singleCalOpen) {
+        if (singleCalRef.current?.contains(t)) return;
+        if (singleCalPanelRef.current?.contains(t)) return;
+      }
+      if (multiStartCalOpen || multiEndCalOpen) {
+        if (multiStartRef.current?.contains(t)) return;
+        if (multiEndRef.current?.contains(t)) return;
+        if (multiCalPanelRef.current?.contains(t)) return;
+      }
+      if (seriesStartCalOpen || seriesEndCalOpen) {
+        if (seriesStartRef.current?.contains(t)) return;
+        if (seriesEndRef.current?.contains(t)) return;
+        if (seriesCalPanelRef.current?.contains(t)) return;
+      }
       setSingleCalOpen(false);
       setMultiStartCalOpen(false);
       setMultiEndCalOpen(false);
@@ -330,18 +378,13 @@ export function DateStage({
                 <ChevronDown size={14} className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-[80ms]', singleCalOpen && 'rotate-180')} aria-hidden />
               </button>
             </div>
-            <ArchetypeSelect
-              value={eventArchetype}
-              onChange={setEventArchetype}
-              triggerRef={archetypeTriggerRef}
-              open={archetypeOpen}
-              setOpen={setArchetypeOpen}
-            />
+            <EventTypeCombobox value={eventArchetype} onChange={setEventArchetype} />
           </div>
           <AnimatePresence>
             {singleCalOpen && (
               <motion.div
                 key="single-cal"
+                ref={singleCalPanelRef}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -392,6 +435,7 @@ export function DateStage({
             {(multiStartCalOpen || multiEndCalOpen) && (
               <motion.div
                 key="multi-cal"
+                ref={multiCalPanelRef}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -419,13 +463,7 @@ export function DateStage({
             )}
           </AnimatePresence>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <ArchetypeSelect
-              value={eventArchetype}
-              onChange={setEventArchetype}
-              triggerRef={archetypeTriggerRef}
-              open={archetypeOpen}
-              setOpen={setArchetypeOpen}
-            />
+            <EventTypeCombobox value={eventArchetype} onChange={setEventArchetype} />
             {eventDate && proposedEndDate && (
               <MultiDayBadge
                 feasibility={perDateFeasibility}
@@ -445,13 +483,7 @@ export function DateStage({
       {dateKind === 'series' && (
         <div className="flex flex-col min-w-0" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <ArchetypeSelect
-              value={eventArchetype}
-              onChange={setEventArchetype}
-              triggerRef={archetypeTriggerRef}
-              open={archetypeOpen}
-              setOpen={setArchetypeOpen}
-            />
+            <EventTypeCombobox value={eventArchetype} onChange={setEventArchetype} />
             <SeriesArchetypeSelect
               value={seriesArchetype}
               onChange={setSeriesArchetype}
@@ -480,34 +512,69 @@ export function DateStage({
           </div>
 
           {seriesMode === 'pattern' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr] gap-3 items-end">
-              <div>
-                <label className="block stage-label mb-1.5">Every</label>
-                <WeekdayPill value={patternWeekday} onChange={setPatternWeekday} />
-              </div>
-              <div ref={seriesStartRef}>
-                <label className="block stage-label mb-1.5">From</label>
-                <DateButton
-                  value={patternStart}
-                  placeholder="Start"
-                  open={seriesStartCalOpen}
-                  onToggle={() => setSeriesStartCalOpen((o) => !o)}
+            <div className="flex flex-col gap-3 min-w-0">
+              {/* Weekday strip + presets + interval */}
+              <div className="flex flex-col gap-2 min-w-0">
+                <div className="flex items-center justify-between gap-3 min-w-0 flex-wrap">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <label className="stage-label shrink-0">Every</label>
+                    <IntervalStepper
+                      value={patternInterval}
+                      onChange={setPatternInterval}
+                    />
+                    <span className="stage-label shrink-0 text-[var(--stage-text-tertiary)]">
+                      {patternInterval === 1 ? 'week on' : 'weeks on'}
+                    </span>
+                  </div>
+                  <PresetRow
+                    activeDays={patternWeekdays}
+                    onApply={setPatternWeekdays}
+                  />
+                </div>
+                <WeekdayStrip
+                  value={patternWeekdays}
+                  onChange={setPatternWeekdays}
                 />
               </div>
-              <div ref={seriesEndRef}>
-                <label className="block stage-label mb-1.5">To</label>
-                <DateButton
-                  value={patternEnd}
-                  placeholder="End"
-                  open={seriesEndCalOpen}
-                  onToggle={() => setSeriesEndCalOpen((o) => !o)}
-                />
+              {/* Range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div ref={seriesStartRef}>
+                  <label className="block stage-label mb-1.5">From</label>
+                  <DateButton
+                    value={patternStart}
+                    placeholder="Start"
+                    open={seriesStartCalOpen}
+                    onToggle={() => setSeriesStartCalOpen((o) => !o)}
+                  />
+                </div>
+                <div ref={seriesEndRef}>
+                  <label className="block stage-label mb-1.5">To</label>
+                  <DateButton
+                    value={patternEnd}
+                    placeholder="End"
+                    open={seriesEndCalOpen}
+                    onToggle={() => setSeriesEndCalOpen((o) => !o)}
+                  />
+                </div>
               </div>
+              {/* Inline pattern-summary — the guardrail: spell out the weekdays
+                  right next to the picker so a "Fri" in a Sat-only series is
+                  immediately catchable without scrolling to the chip strip. */}
+              {patternWeekdays.length > 0 && (
+                <span className="stage-label text-[var(--stage-text-tertiary)]">
+                  {summarizeWeekdays(patternWeekdays, patternInterval)}
+                </span>
+              )}
+              {patternWeekdays.length === 0 && (
+                <span className="stage-label text-[var(--color-unusonic-warning,oklch(0.80_0.14_73))]">
+                  Select at least one weekday.
+                </span>
+              )}
             </div>
           ) : (
-            <CustomDatesBuilder
-              customDates={customDates}
-              setCustomDates={setCustomDates}
+            <TourCalendar
+              selectedDates={customDates}
+              onChange={(next) => setCustomDates(() => next)}
             />
           )}
 
@@ -515,6 +582,7 @@ export function DateStage({
             {(seriesStartCalOpen || seriesEndCalOpen) && (
               <motion.div
                 key="series-cal"
+                ref={seriesCalPanelRef}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -656,155 +724,210 @@ function DateButton({
   );
 }
 
-function WeekdayPill({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+/**
+ * Weekday toggle strip. Seven equal-width chips in Mon-first production order.
+ * Selected state is a fill on the --ctx-card surface (achromatic brightness
+ * accent per Stage Engineering); unselected chips are recessed on --ctx-well.
+ *
+ * Keyboard: roving tabindex. Arrow keys move focus; Space/Enter toggles;
+ * Home / End jump to Mon / Sun.
+ */
+function WeekdayStrip({ value, onChange }: { value: number[]; onChange: (v: number[]) => void }) {
+  const selected = useMemo(() => new Set(value), [value]);
+  const toggle = (day: number) => {
+    const next = new Set(selected);
+    if (next.has(day)) next.delete(day);
+    else next.add(day);
+    onChange([...next].sort((a, b) => a - b));
+  };
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  const handleKey = (e: React.KeyboardEvent<HTMLButtonElement>, idxInOrder: number) => {
+    if (!stripRef.current) return;
+    const buttons = Array.from(stripRef.current.querySelectorAll<HTMLButtonElement>('button[data-weekday-chip]'));
+    let nextIdx: number | null = null;
+    if (e.key === 'ArrowRight') nextIdx = (idxInOrder + 1) % buttons.length;
+    else if (e.key === 'ArrowLeft') nextIdx = (idxInOrder - 1 + buttons.length) % buttons.length;
+    else if (e.key === 'Home') nextIdx = 0;
+    else if (e.key === 'End') nextIdx = buttons.length - 1;
+    if (nextIdx !== null) {
+      e.preventDefault();
+      buttons[nextIdx]?.focus();
+    }
+  };
+
   return (
-    <div className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          'flex min-w-[110px] items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] text-left transition-colors duration-75',
-          open
-            ? 'border-[var(--stage-accent)] bg-[var(--ctx-well)] ring-1 ring-[var(--stage-accent)]'
-            : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] hover:border-[oklch(1_0_0_/_0.20)]'
-        )}
-      >
-        <span className="flex-1 min-w-0 truncate text-[var(--stage-text-primary)] tracking-tight">{WEEKDAY_FULL[value]}</span>
-        <ChevronDown size={14} className="shrink-0 text-[var(--stage-text-tertiary)]" aria-hidden />
-      </button>
-      {open && createPortal(
-        <div className="fixed inset-0 z-[60]" onMouseDown={() => setOpen(false)}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={STAGE_LIGHT}
-            data-surface="raised"
-            onMouseDown={(e) => e.stopPropagation()}
-            style={(() => {
-              const rect = triggerRef.current?.getBoundingClientRect();
-              if (!rect) return {};
-              const spaceBelow = window.innerHeight - rect.bottom;
-              const dropUp = spaceBelow < 260;
-              return {
-                position: 'fixed' as const,
-                left: rect.left,
-                width: Math.max(rect.width, 140),
-                ...(dropUp ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
-              };
-            })()}
-            className="max-h-[240px] overflow-y-auto rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
+    <div
+      ref={stripRef}
+      role="group"
+      aria-label="Repeats on"
+      className="grid grid-cols-7 gap-1 min-w-0 p-1 rounded-[var(--stage-radius-input,6px)] bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.06)]"
+    >
+      {WEEKDAY_CHIP_ORDER.map((day, i) => {
+        const on = selected.has(day);
+        return (
+          <button
+            key={day}
+            type="button"
+            data-weekday-chip
+            role="switch"
+            aria-checked={on}
+            aria-label={WEEKDAY_FULL[day]}
+            onClick={() => toggle(day)}
+            onKeyDown={(e) => handleKey(e, i)}
+            className={cn(
+              'h-[calc(var(--stage-input-height,34px)-4px)] min-w-0 rounded-[calc(var(--stage-radius-input,6px)-2px)] border text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight transition-colors duration-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+              on
+                ? 'bg-[var(--ctx-card)] text-[var(--stage-text-primary)] border-[oklch(1_0_0_/_0.14)] shadow-sm'
+                : 'bg-transparent text-[var(--stage-text-secondary)] border-transparent hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]',
+            )}
           >
-            {WEEKDAY_FULL.map((wd, i) => (
-              <button
-                key={wd}
-                type="button"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  onChange(i);
-                  setOpen(false);
-                }}
-                className={cn(
-                  'flex w-full items-center px-3 py-2 text-left text-[length:var(--stage-input-font-size,13px)] tracking-tight transition-colors',
-                  value === i
-                    ? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)] font-medium'
-                    : 'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                )}
-              >
-                {wd}
-              </button>
-            ))}
-          </motion.div>
-        </div>,
-        document.body,
-      )}
+            {WEEKDAY_SHORT[day]}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function ArchetypeSelect({
-  value,
-  onChange,
-  triggerRef,
-  open,
-  setOpen,
+/**
+ * Preset quick-applies above the weekday strip. Tapping a preset whose
+ * selection already matches clears the weekdays — presets act as toggles
+ * rather than one-shot commits, per the Field Expert + User Advocate brief.
+ */
+function PresetRow({
+  activeDays,
+  onApply,
 }: {
-  value: string | null;
-  onChange: (v: string | null) => void;
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
-  open: boolean;
-  setOpen: (v: boolean | ((o: boolean) => boolean)) => void;
+  activeDays: number[];
+  onApply: (days: number[]) => void;
 }) {
+  const active = useMemo(() => new Set(activeDays), [activeDays]);
+  const matches = (days: number[]) =>
+    days.length === active.size && days.every((d) => active.has(d));
   return (
-    <div>
-      <label className="block stage-label mb-1.5">Show type</label>
-      <div className="relative">
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className={cn(
-            'flex w-full min-w-0 items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] text-left transition-colors duration-75',
-            open
-              ? 'border-[var(--stage-accent)] bg-[var(--ctx-well)] ring-1 ring-[var(--stage-accent)]'
-              : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] hover:border-[oklch(1_0_0_/_0.20)]'
-          )}
-        >
-          <span className={cn('flex-1 min-w-0 truncate tracking-tight', value ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-tertiary)]')}>
-            {value ? DEAL_ARCHETYPE_LABELS[value as keyof typeof DEAL_ARCHETYPE_LABELS] : 'Select type'}
-          </span>
-          <ChevronDown size={14} className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-[80ms]', open && 'rotate-180')} aria-hidden />
-        </button>
-        {open && createPortal(
-          <div className="fixed inset-0 z-[60]" onMouseDown={() => setOpen(false)}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -4 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={STAGE_LIGHT}
-              data-surface="raised"
-              onMouseDown={(e) => e.stopPropagation()}
-              style={(() => {
-                const rect = triggerRef.current?.getBoundingClientRect();
-                if (!rect) return {};
-                const spaceBelow = window.innerHeight - rect.bottom;
-                const dropUp = spaceBelow < 260;
-                return {
-                  position: 'fixed' as const,
-                  left: rect.left,
-                  width: rect.width,
-                  ...(dropUp ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
-                };
-              })()}
-              className="max-h-[240px] overflow-y-auto rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
-            >
-              {EVENT_ARCHETYPES.map((a) => (
-                <button
-                  key={a.value}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    onChange(a.value);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'flex w-full items-center px-3 py-2.5 text-left text-[length:var(--stage-input-font-size,13px)] tracking-tight transition-colors min-w-0',
-                    value === a.value
-                      ? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)] font-medium'
-                      : 'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                  )}
-                >
-                  {a.label}
-                </button>
-              ))}
-            </motion.div>
-          </div>,
-          document.body,
-        )}
-      </div>
+    <div className="flex items-center gap-1 shrink-0">
+      {PATTERN_PRESETS.map((p) => {
+        const on = matches(p.days);
+        return (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => onApply(on ? [] : p.days)}
+            className={cn(
+              'px-2 py-0.5 rounded-[var(--stage-radius-input,6px)] text-[11px] tracking-tight transition-colors duration-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+              on
+                ? 'bg-[var(--ctx-card)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.14)]'
+                : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] border border-transparent',
+            )}
+          >
+            {p.label}
+          </button>
+        );
+      })}
     </div>
   );
+}
+
+/**
+ * Compact numeric stepper for RRULE INTERVAL. Min 1, max 52. Always shows a
+ * value; defaults to 1. Keyboard: ArrowUp/ArrowDown adjusts by 1.
+ */
+function IntervalStepper({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  const clamp = (n: number) => Math.max(1, Math.min(52, Math.floor(n || 1)));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') return;
+    onChange(clamp(parseInt(raw, 10)));
+  };
+  return (
+    <div className="flex items-center rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] h-[calc(var(--stage-input-height,34px)-4px)] px-1 shrink-0">
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value - 1))}
+        disabled={value <= 1}
+        className="px-1.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-30 disabled:pointer-events-none leading-none text-[length:var(--stage-input-font-size,13px)]"
+        aria-label="Decrease interval"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        min={1}
+        max={52}
+        value={value}
+        onChange={handleChange}
+        className="w-7 bg-transparent text-center text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight text-[var(--stage-text-primary)] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        aria-label="Week interval"
+      />
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value + 1))}
+        disabled={value >= 52}
+        className="px-1.5 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] disabled:opacity-30 disabled:pointer-events-none leading-none text-[length:var(--stage-input-font-size,13px)]"
+        aria-label="Increase interval"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Collapse a weekday selection + interval into a human phrase. Mirrors how
+ * production owners say it out loud so the UI confirms their mental model
+ * before they commit dates. Examples (interval = 1):
+ *   [6]            → "Every Saturday"
+ *   [5,6]          → "Every Friday & Saturday"
+ *   [1,2,3,4,5]    → "Every weekday"
+ * Examples (interval = 2):
+ *   [6]            → "Every other Saturday"
+ *   [5,6]          → "Every other Friday & Saturday"
+ * Examples (interval ≥ 3):
+ *   [6]            → "Every 3rd Saturday"
+ */
+function summarizeWeekdays(days: number[], interval: number = 1): string {
+  if (days.length === 0) return '';
+  const set = new Set(days);
+
+  const prefix = (() => {
+    if (interval <= 1) return 'Every ';
+    if (interval === 2) return 'Every other ';
+    return `Every ${ordinal(interval)} `;
+  })();
+
+  // Named phrases — only use them for interval=1 because "Every other weekday"
+  // is both grammatically fine and semantically ambiguous (bi-weekly? alternate
+  // weekdays?). Safer to fall through to the explicit list when interval > 1.
+  if (interval === 1) {
+    if (set.size === 7) return 'Every day';
+    if (set.size === 5 && [1, 2, 3, 4, 5].every((d) => set.has(d))) return 'Every weekday';
+    if (set.size === 2 && set.has(5) && set.has(6)) return 'Every weekend (Fri & Sat)';
+    if (set.size === 3 && [4, 5, 6].every((d) => set.has(d))) return 'Every Thu, Fri, Sat';
+  }
+
+  const labels = Array.from(set).sort((a, b) => a - b).map((d) => WEEKDAY_FULL[d]);
+  if (labels.length === 1) return `${prefix}${labels[0]}`;
+  if (labels.length === 2) return `${prefix}${labels[0]} & ${labels[1]}`;
+  const short = Array.from(set).sort((a, b) => a - b).map((d) => WEEKDAY_FULL[d].slice(0, 3));
+  return `${prefix}${short.join(', ')}`;
+}
+
+/** English ordinal suffix. Handles 1st/2nd/3rd and 11th–13th edge cases. */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  const mod10 = n % 10;
+  if (mod10 === 1) return `${n}st`;
+  if (mod10 === 2) return `${n}nd`;
+  if (mod10 === 3) return `${n}rd`;
+  return `${n}th`;
 }
 
 function SeriesArchetypeSelect({
@@ -907,69 +1030,6 @@ function SeriesArchetypeSelect({
           document.body,
         )}
       </div>
-    </div>
-  );
-}
-
-function CustomDatesBuilder({
-  customDates,
-  setCustomDates,
-}: {
-  customDates: string[];
-  setCustomDates: (updater: (prev: string[]) => string[]) => void;
-}) {
-  const [calOpen, setCalOpen] = useState(false);
-  const [pending, setPending] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sorted = useMemo(() => [...customDates].sort(), [customDates]);
-  return (
-    <div className="flex flex-col gap-2" ref={containerRef}>
-      <div className="flex flex-wrap gap-1.5">
-        {sorted.length === 0 && (
-          <span className="text-[length:var(--stage-input-font-size,13px)] text-[var(--stage-text-tertiary)]">No dates yet — tap to add.</span>
-        )}
-        {sorted.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => setCustomDates((xs) => xs.filter((x) => x !== d))}
-            className="group flex items-center gap-1.5 px-2 py-1 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-card)] hover:bg-[oklch(1_0_0_/_0.08)] text-[length:var(--stage-input-font-size,13px)]"
-          >
-            <span className="text-[var(--stage-text-primary)]">{format(parseLocalDateString(d), 'EEE MMM d')}</span>
-            <X size={12} className="shrink-0 text-[var(--stage-text-tertiary)] group-hover:text-[var(--stage-text-primary)]" strokeWidth={1.5} />
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => setCalOpen((o) => !o)}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-[var(--stage-radius-input,6px)] border border-dashed border-[oklch(1_0_0_/_0.14)] text-[length:var(--stage-input-font-size,13px)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)]"
-        >
-          <Plus size={12} strokeWidth={1.5} />
-          Add date
-        </button>
-      </div>
-      <AnimatePresence>
-        {calOpen && (
-          <motion.div
-            key="custom-dates-cal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={STAGE_NAV_CROSSFADE}
-            className="w-full min-w-0"
-          >
-            <CalendarPanel
-              value={pending}
-              onChange={(d) => {
-                setPending(d);
-                setCustomDates((xs) => (xs.includes(d) ? xs : [...xs, d]));
-                setCalOpen(false);
-              }}
-              onClose={() => setCalOpen(false)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
