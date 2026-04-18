@@ -34,6 +34,14 @@ import { ProductionTeamCard } from './production-team-card';
 import { AionSuggestionRow } from './aion-suggestion-row';
 import { AionDealCard } from './aion-deal-card';
 import { getAionCardBundle, type AionCardBundle } from '../actions/get-aion-card-bundle';
+import {
+  acceptAionCardAdvance,
+  revertAionCardAdvance,
+  dismissAionCardPipeline,
+  logAionCardEvent,
+} from '../actions/aion-card-actions';
+import type { OutboundRow, PipelineRow } from '../actions/get-aion-card-for-deal';
+import { snoozeFollowUp, dismissFollowUp } from '../actions/follow-up-actions';
 import { DealShowsList } from './deal-shows-list';
 import { SeriesCrewAffordance } from './series-crew-affordance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
@@ -431,7 +439,121 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
               single-row suggestion. */}
           <div className="mt-4">
             {aionBundle.enabled && aionBundle.data ? (
-              <AionDealCard data={aionBundle.data} />
+              <AionDealCard
+                data={aionBundle.data}
+                onAcceptAdvance={async (row) => {
+                  if (!row.suggestedStageTag) {
+                    toast.error('No target stage on this suggestion.');
+                    return;
+                  }
+                  const targetStage = pipelineStages?.find(
+                    (s) => Array.isArray(s.tags) && s.tags.includes(row.suggestedStageTag!),
+                  );
+                  if (!targetStage) {
+                    toast.error('Target stage not found in this pipeline.');
+                    return;
+                  }
+                  const result = await acceptAionCardAdvance(
+                    deal.id,
+                    row.insightId,
+                    targetStage.id,
+                  );
+                  if (!result.success) {
+                    toast.error(result.error ?? 'Could not move stage.');
+                    // Refetch to restore the card from server truth.
+                    getAionCardBundle(deal.id).then(setAionBundle);
+                    return;
+                  }
+                  if (result.transitionId === null) {
+                    toast(`Already at ${targetStage.label}.`, { duration: 3000 });
+                    getAionCardBundle(deal.id).then(setAionBundle);
+                    return;
+                  }
+                  // Success — 10s undo window.
+                  const priorStageId = result.priorStageId;
+                  toast(`Moved to ${targetStage.label}.`, {
+                    duration: 10_000,
+                    action: priorStageId
+                      ? {
+                          label: 'Undo',
+                          onClick: async () => {
+                            const revertResult = await revertAionCardAdvance(
+                              deal.id,
+                              priorStageId,
+                            );
+                            if (!revertResult.success) {
+                              toast.error(revertResult.error ?? 'Could not undo.');
+                              return;
+                            }
+                            toast.success('Reverted.');
+                            getAionCardBundle(deal.id).then(setAionBundle);
+                          },
+                        }
+                      : undefined,
+                  });
+                  getAionCardBundle(deal.id).then(setAionBundle);
+                }}
+                onDismissAdvance={async (row) => {
+                  const result = await dismissAionCardPipeline(deal.id, row.insightId);
+                  if (!result.success) {
+                    toast.error(result.error ?? 'Could not dismiss.');
+                    return;
+                  }
+                  getAionCardBundle(deal.id).then(setAionBundle);
+                }}
+                onDraftNudge={async (row) => {
+                  // v1: record the intent + scroll the owner to the existing
+                  // draft surface. A direct compose-preview replaces this in
+                  // a follow-up.
+                  await logAionCardEvent({
+                    action: 'draft_nudge',
+                    dealId: deal.id,
+                    cardVariant: aionBundle.data?.variant ?? 'outbound_only',
+                    source: 'deal_lens',
+                    followUpId: row.followUpId,
+                    insightId: row.linkedInsightId ?? undefined,
+                  });
+                  toast('Opening draft…');
+                }}
+                onDismissNudge={async (row) => {
+                  const result = await dismissFollowUp(row.followUpId, 'other');
+                  if (!result.success) {
+                    toast.error(result.error ?? 'Could not dismiss.');
+                    return;
+                  }
+                  await logAionCardEvent({
+                    action: 'dismiss_nudge',
+                    dealId: deal.id,
+                    cardVariant: aionBundle.data?.variant ?? 'outbound_only',
+                    source: 'deal_lens',
+                    followUpId: row.followUpId,
+                  });
+                  getAionCardBundle(deal.id).then(setAionBundle);
+                }}
+                onSnoozeNudge={async (row, days) => {
+                  const result = await snoozeFollowUp(row.followUpId, days);
+                  if (!result.success) {
+                    // Two-shape failure: requireDecision (snooze cap reached)
+                    // vs plain error. Surface either the message or error.
+                    const msg = 'requireDecision' in result && result.requireDecision
+                      ? result.message
+                      : 'error' in result
+                        ? result.error
+                        : 'Could not snooze.';
+                    toast.error(msg ?? 'Could not snooze.');
+                    return;
+                  }
+                  await logAionCardEvent({
+                    action: 'snooze_nudge',
+                    dealId: deal.id,
+                    cardVariant: aionBundle.data?.variant ?? 'outbound_only',
+                    source: 'deal_lens',
+                    followUpId: row.followUpId,
+                  });
+                  toast.success(`Snoozed for ${days} ${days === 1 ? 'day' : 'days'}.`);
+                  getAionCardBundle(deal.id).then(setAionBundle);
+                }}
+              />
             ) : (
               <AionSuggestionRow dealId={deal.id} />
             )}
