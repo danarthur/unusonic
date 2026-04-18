@@ -52,6 +52,16 @@ export type AionConfig = {
   follow_up_playbook?: AionFollowUpPlaybook;
   onboarding_state?: string;
   kill_switch?: boolean;
+  /**
+   * Fork C, Ext B — owner-cadence learning opt-in. Default false. When true,
+   * `ops.metric_owner_cadence_profile` feeds `src/shared/lib/owner-cadence.ts`
+   * which personalizes the unified Aion deal card's voice + priority.
+   * GDPR Art 22 compliance — must be opt-in, never opt-out.
+   *
+   * Disabling schedules 30-day purge of `cortex.aion_memory` facts with
+   * `scope='semantic' AND fact LIKE 'Owner cadence%'` (Phase 4 cron).
+   */
+  learn_owner_cadence?: boolean;
 };
 
 // =============================================================================
@@ -95,6 +105,42 @@ export async function getAionConfigForWorkspace(workspaceId: string): Promise<Ai
 // =============================================================================
 // Mutations
 // =============================================================================
+
+/**
+ * Fork C, Ext B — toggle the `learn_owner_cadence` opt-in.
+ *
+ * When disabled, the deal-card reader stops personalizing (falls back to
+ * archetype defaults silently). Phase 4 cron soft-deletes existing cadence
+ * memories then hard-purges after 30 days.
+ */
+export async function setLearnOwnerCadence(
+  enabled: boolean,
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const workspaceId = await getActiveWorkspaceId();
+    if (!workspaceId) return { success: false, error: 'No active workspace.' };
+
+    const supabase = await createClient();
+    const current = await getAionConfig();
+    const updated: AionConfig = { ...current, learn_owner_cadence: enabled };
+
+    const { error } = await supabase
+      .from('workspaces')
+      .update({ aion_config: updated })
+      .eq('id', workspaceId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/aion');
+    revalidatePath('/crm');
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to update cadence opt-in.',
+    };
+  }
+}
 
 export async function saveAionVoiceConfig(
   voice: AionVoiceConfig,

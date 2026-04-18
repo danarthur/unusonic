@@ -32,6 +32,8 @@ import { formatRelTime } from '@/shared/lib/format-currency';
 import { updateDealScalars } from '../actions/update-deal-scalars';
 import { ProductionTeamCard } from './production-team-card';
 import { AionSuggestionRow } from './aion-suggestion-row';
+import { AionDealCard } from './aion-deal-card';
+import { getAionCardBundle, type AionCardBundle } from '../actions/get-aion-card-bundle';
 import { DealShowsList } from './deal-shows-list';
 import { SeriesCrewAffordance } from './series-crew-affordance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
@@ -81,6 +83,12 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
   const [crewRows, setCrewRows] = useState<DealCrewRow[]>([]);
   const [eventDates, setEventDates] = useState<{ loadIn: string | null; loadOut: string | null }>({ loadIn: null, loadOut: null });
   const [queueItem, setQueueItem] = useState<FollowUpQueueItem | null>(null);
+
+  // Fork C: unified Aion deal card — gated by `crm.unified_aion_card` flag.
+  // When `enabled=true`, `<AionDealCard>` replaces the four legacy surfaces
+  // (AionSuggestionRow, FollowUpCard, stall badge, NextActionsCard). When
+  // `enabled=false`, legacy chain renders as before.
+  const [aionBundle, setAionBundle] = useState<AionCardBundle>({ enabled: false, data: null });
 
   // Hard delete state — only relevant when deal has no event_id
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -226,6 +234,13 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
   useEffect(() => {
     if (deal?.id) {
       getFollowUpForDeal(deal.id).then(setQueueItem);
+    }
+  }, [deal?.id]);
+
+  // Fork C bundle — flag check + card data in one round-trip.
+  useEffect(() => {
+    if (deal?.id) {
+      getAionCardBundle(deal.id).then(setAionBundle);
     }
   }, [deal?.id]);
 
@@ -411,9 +426,15 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             currentStage={currentStage}
             stages={trackerStages}
           />
-          {/* Aion stage-move suggestion — self-hides when no suggestion. */}
+          {/* Aion stage-move suggestion — flag ON renders the unified card
+              directly below the pipeline tracker. Flag OFF keeps the legacy
+              single-row suggestion. */}
           <div className="mt-4">
-            <AionSuggestionRow dealId={deal.id} />
+            {aionBundle.enabled && aionBundle.data ? (
+              <AionDealCard data={aionBundle.data} />
+            ) : (
+              <AionSuggestionRow dealId={deal.id} />
+            )}
           </div>
         </StagePanel>
       </motion.div>
@@ -437,8 +458,9 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
       {/* Scalar pickers (date, archetype, budget) moved into DealHeaderStrip as portaled dropdowns */}
 
 
-      {/* Follow-up card — replaces inline stall warning with actionable follow-up */}
-      {!isLocked && initialProposal !== undefined && (
+      {/* Follow-up card — flag ON: suppressed (the unified card above carries
+          the Outbound rows). Flag OFF: legacy stall + follow-up affordance. */}
+      {!isLocked && initialProposal !== undefined && !aionBundle.enabled && (
         <FollowUpCard
           deal={deal}
           queueItem={queueItem}
@@ -807,14 +829,17 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             initialProposal={initialProposal}
           />
 
-          {/* Next actions */}
-          <NextActionsCard
-            deal={deal}
-            proposal={initialProposal}
-            stakeholders={stakeholders}
-            crewCount={crewCount}
-            stage={pipelineStages?.find((s) => s.id === deal.stage_id) ?? null}
-          />
+          {/* Next actions — flag ON: suppressed (absorbed by the unified
+              Aion card at the top of Deal Lens). Flag OFF: legacy next-actions. */}
+          {!aionBundle.enabled && (
+            <NextActionsCard
+              deal={deal}
+              proposal={initialProposal}
+              stakeholders={stakeholders}
+              crewCount={crewCount}
+              stage={pipelineStages?.find((s) => s.id === deal.stage_id) ?? null}
+            />
+          )}
         </div>
       </div>
 

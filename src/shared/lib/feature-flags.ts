@@ -26,6 +26,14 @@ export const FEATURE_FLAGS = {
   REPORTS_AION_PIN: 'reports.aion_pin',
   REPORTS_RECONCILIATION: 'reports.reconciliation',
   AION_LOBBY_CAPTURE: 'aion.lobby_capture',
+  /**
+   * Unified Aion deal card (Fork C, Phase 3). When true, Deal Lens renders
+   * `<AionDealCard>` instead of the four legacy surfaces (follow-up card,
+   * AionSuggestionRow, computeStallSignal badge, NextActionsCard). Data
+   * layer (Phase 1 migrations + Phase 2 reader) ships regardless — this
+   * flag only gates Phase 3 UI for rollback safety.
+   */
+  CRM_UNIFIED_AION_CARD: 'crm.unified_aion_card',
 } as const satisfies Record<string, FeatureFlagKey>;
 
 export type KnownFeatureFlag = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
