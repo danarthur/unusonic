@@ -32,6 +32,7 @@ export const CAPABILITY_KEYS = [
   // Deals & pipeline
   'deals:read:global',
   'deals:edit:global',
+  'pipelines:manage',
   // Proposals
   'proposals:view',
   'proposals:send',

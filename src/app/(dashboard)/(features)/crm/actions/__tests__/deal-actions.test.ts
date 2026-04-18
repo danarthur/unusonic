@@ -84,10 +84,32 @@ describe('createDeal', () => {
       atWarning: false,
     });
     // Default: lead-source lookup returns empty. Individual tests override.
-    mockClient.schema.mockImplementation(() => ({
-      from: vi.fn().mockImplementation(() => {
+    // Phase 3i: createDeal now calls resolveStageByTag(workspace, 'initial_contact')
+    // before the RPC — stub supabase.schema('ops').from('pipelines') +
+    // .from('pipeline_stages') to return a valid default pipeline + stage so
+    // the action reaches the rpc('create_deal_complete', ...) call.
+    mockClient.schema.mockImplementation((schemaName: string) => ({
+      from: vi.fn().mockImplementation((table: string) => {
         const qb = createQueryBuilder();
-        qb.maybeSingle.mockResolvedValue({ data: null, error: null });
+        if (schemaName === 'ops' && table === 'pipelines') {
+          qb.maybeSingle.mockResolvedValue({
+            data: { id: 'pipe-default' },
+            error: null,
+          });
+        } else if (schemaName === 'ops' && table === 'pipeline_stages') {
+          qb.maybeSingle.mockResolvedValue({
+            data: {
+              id: 'stage-initial-contact',
+              pipeline_id: 'pipe-default',
+              slug: 'inquiry',
+              kind: 'working',
+              tags: ['initial_contact'],
+            },
+            error: null,
+          });
+        } else {
+          qb.maybeSingle.mockResolvedValue({ data: null, error: null });
+        }
         return qb;
       }),
     }));
@@ -348,6 +370,20 @@ describe('createDeal', () => {
         const qb = createQueryBuilder();
         if (s === 'ops' && table === 'workspace_lead_sources') {
           qb.maybeSingle.mockResolvedValue({ data: { label: 'Instagram Ads' }, error: null });
+        } else if (s === 'ops' && table === 'pipelines') {
+          // Phase 3i: createDeal resolves the initial_contact stage
+          qb.maybeSingle.mockResolvedValue({ data: { id: 'pipe-default' }, error: null });
+        } else if (s === 'ops' && table === 'pipeline_stages') {
+          qb.maybeSingle.mockResolvedValue({
+            data: {
+              id: 'stage-initial-contact',
+              pipeline_id: 'pipe-default',
+              slug: 'inquiry',
+              kind: 'working',
+              tags: ['initial_contact'],
+            },
+            error: null,
+          });
         } else {
           qb.maybeSingle.mockResolvedValue({ data: null, error: null });
         }

@@ -995,13 +995,27 @@ export async function sendForSignature(
 
   const { publicToken, publicUrl } = publishResult;
 
-  // 2b. Advance deal status to 'contract_sent' — only if it hasn't already passed that stage
-  await supabase
-    .from('deals')
-    .update({ status: 'contract_sent' })
-    .eq('id', dealId)
-    .eq('workspace_id', workspaceMembership)
-    .in('status', ['inquiry', 'proposal']);
+  // 2b. Advance deal to the workspace's contract-out stage — only when it is
+  // still in one of the pre-contract-out stages. Phase 3i: use the
+  // ops.advance_deal_stage RPC with a tag-overlap guard so the guard is
+  // rename-resilient AND post-collapse correct. The RPC derives status from
+  // the target stage's kind via the BEFORE trigger.
+  //
+  // Guard tags: initial_contact OR proposal_sent — any working stage before
+  // contract_out. A deal already tagged contract_out / contract_signed /
+  // deposit_received / won / lost silently no-ops (RPC returns false).
+  const { resolveStageByTag } = await import('@/shared/lib/pipeline-stages/resolve-stage');
+  const contractOutStage = await resolveStageByTag(supabase, workspaceMembership, 'contract_out');
+  if (contractOutStage) {
+    await supabase
+      .schema('ops')
+      .rpc('advance_deal_stage', {
+        p_deal_id: dealId,
+        p_new_stage_id: contractOutStage.stageId,
+        p_only_if_status_in: undefined,
+        p_only_if_tags_any: ['initial_contact', 'proposal_sent'],
+      });
+  }
 
   // 3. Fetch deal title + workspace name for branding
   const { data: dealRow } = await supabase

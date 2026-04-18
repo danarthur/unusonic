@@ -213,12 +213,15 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
     })
     .eq('id', proposalId);
 
-  // Advance deal status to contract_signed (only if not already further along)
-  await db
-    .from('deals')
-    .update({ status: 'contract_signed' })
-    .eq('id', p.deal_id)
-    .in('status', ['inquiry', 'proposal', 'contract_sent']); // only advance, never regress
+  // Advance deal status to the workspace's contract_signed stage. Phase 3d:
+  // resolve via tag instead of writing a literal slug so renamed stages still
+  // auto-advance. Failure must not throw out of the handler (DocuSeal retries
+  // would pile up).
+  await advanceDealFromDocuSealWebhook({
+    supabase: db,
+    dealId: p.deal_id,
+    submissionId: payload.id,
+  });
 
   // Spawn draft invoices from the accepted proposal (PR-CLIENT-1).
   // Idempotent: returns existing invoices if already spawned for this proposal.
@@ -348,6 +351,125 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
   }
 
   console.log('[docuseal-webhook] Submission completed for proposal:', proposalId);
+}
+
+// ── Phase 3d: tag-based stage advance ──────────────────────────────────────────
+// Resolves the workspace's contract_signed stage via tag and advances the deal
+// through the ops.advance_deal_stage_from_webhook RPC (which stamps webhook
+// metadata on the generated deal_transitions row). Failures log and return —
+// the webhook must always ack so DocuSeal doesn't retry indefinitely.
+
+async function advanceDealFromDocuSealWebhook(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST types
+  supabase: any;
+  dealId: string;
+  submissionId: number;
+}): Promise<void> {
+  const { supabase, dealId, submissionId } = args;
+
+  const { data: deal, error: fetchErr } = await supabase
+    .from('deals')
+    .select('id, pipeline_id')
+    .eq('id', dealId)
+    .maybeSingle();
+
+  if (fetchErr || !deal) {
+    Sentry.logger.warn('docuseal.webhook.dealLookupFailed', {
+      dealId,
+      error: fetchErr?.message ?? 'deal not found',
+    });
+    return;
+  }
+
+  const pipelineId = (deal as { pipeline_id: string | null }).pipeline_id;
+  if (!pipelineId) {
+    Sentry.logger.warn('docuseal.webhook.dealMissingPipelineId', { dealId });
+    return;
+  }
+
+  const { data: resolvedStageId, error: resolveErr } = await supabase
+    .schema('ops')
+    .rpc('resolve_stage_by_tag', {
+      p_pipeline_id: pipelineId,
+      p_tag: 'contract_signed',
+    });
+
+  if (resolveErr) {
+    Sentry.logger.warn('docuseal.webhook.stageResolveFailed', {
+      dealId,
+      pipelineId,
+      tag: 'contract_signed',
+      error: resolveErr.message,
+    });
+    return;
+  }
+
+  if (!resolvedStageId) {
+    // Workspace removed the contract_signed tag from every stage — opted out.
+    Sentry.logger.info('docuseal.webhook.stageTagNotPresent', {
+      dealId,
+      pipelineId,
+      tag: 'contract_signed',
+      action: 'skipped auto-advance; workspace opted out',
+    });
+    return;
+  }
+
+  const { data: stageRow, error: stageFetchErr } = await supabase
+    .schema('ops')
+    .from('pipeline_stages')
+    .select('slug')
+    .eq('id', resolvedStageId)
+    .maybeSingle();
+
+  if (stageFetchErr || !stageRow) {
+    Sentry.logger.warn('docuseal.webhook.stageSlugFetchFailed', {
+      dealId,
+      resolvedStageId,
+      error: stageFetchErr?.message ?? 'stage row not found',
+    });
+    return;
+  }
+
+  const stageSlug = (stageRow as { slug: string }).slug;
+
+  // DocuSeal doesn't give us a stable event_id like Stripe — submission.id is
+  // the closest-to-unique correlator per the webhook payload.
+  const webhookEventId = `docuseal_submission_${submissionId}`;
+
+  // Phase 3h: switch from literal slug list to tag-overlap guard so workspaces
+  // that rename their stages still auto-advance correctly. The pre-states for
+  // contract_signed are any working stage before it: initial_contact,
+  // proposal_sent, contract_out. Legacy slug guard set to NULL.
+  const { data: advanced, error: advanceErr } = await supabase
+    .schema('ops')
+    .rpc('advance_deal_stage_from_webhook', {
+      p_deal_id: dealId,
+      p_new_stage_id: resolvedStageId,
+      p_new_status_slug: stageSlug,
+      p_webhook_source: 'docuseal',
+      p_webhook_event_id: webhookEventId,
+      p_only_if_status_in: null,
+      p_only_if_tags_any: ['initial_contact', 'proposal_sent', 'contract_out'],
+    });
+
+  if (advanceErr) {
+    Sentry.logger.warn('docuseal.webhook.dealStatusUpdateFailed', {
+      dealId,
+      pipelineId,
+      resolvedStageId,
+      error: advanceErr.message,
+    });
+    return;
+  }
+
+  if (advanced !== true) {
+    Sentry.logger.info('docuseal.webhook.dealAlreadyAdvanced', {
+      dealId,
+      pipelineId,
+      resolvedStageId,
+    });
+  }
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────

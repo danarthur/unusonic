@@ -225,6 +225,8 @@ export type Database = {
           created_follow_up_queue_id: string | null
           dismissed_at: string | null
           id: string
+          linked_deal_id: string | null
+          linked_event_id: string | null
           parsed_entity: Json | null
           parsed_follow_up: Json | null
           parsed_note: string | null
@@ -232,6 +234,7 @@ export type Database = {
           status: string
           transcript: string | null
           user_id: string
+          visibility: string
           workspace_id: string
         }
         Insert: {
@@ -241,6 +244,8 @@ export type Database = {
           created_follow_up_queue_id?: string | null
           dismissed_at?: string | null
           id?: string
+          linked_deal_id?: string | null
+          linked_event_id?: string | null
           parsed_entity?: Json | null
           parsed_follow_up?: Json | null
           parsed_note?: string | null
@@ -248,6 +253,7 @@ export type Database = {
           status?: string
           transcript?: string | null
           user_id: string
+          visibility?: string
           workspace_id: string
         }
         Update: {
@@ -257,6 +263,8 @@ export type Database = {
           created_follow_up_queue_id?: string | null
           dismissed_at?: string | null
           id?: string
+          linked_deal_id?: string | null
+          linked_event_id?: string | null
           parsed_entity?: Json | null
           parsed_follow_up?: Json | null
           parsed_note?: string | null
@@ -264,6 +272,46 @@ export type Database = {
           status?: string
           transcript?: string | null
           user_id?: string
+          visibility?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      entity_working_notes: {
+        Row: {
+          auto_filled_fields: string[]
+          communication_style: string | null
+          dnr_flagged: boolean
+          dnr_note: string | null
+          dnr_reason: string | null
+          entity_id: string
+          preferred_channel: string | null
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          auto_filled_fields?: string[]
+          communication_style?: string | null
+          dnr_flagged?: boolean
+          dnr_note?: string | null
+          dnr_reason?: string | null
+          entity_id: string
+          preferred_channel?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          auto_filled_fields?: string[]
+          communication_style?: string | null
+          dnr_flagged?: boolean
+          dnr_note?: string | null
+          dnr_reason?: string | null
+          entity_id?: string
+          preferred_channel?: string | null
+          updated_at?: string
+          updated_by?: string | null
           workspace_id?: string
         }
         Relationships: []
@@ -306,6 +354,45 @@ export type Database = {
           source_id?: string
           source_type?: string
           updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          client_entity_id: string | null
+          client_name: string | null
+          counterparty_entity_id: string
+          created_at: string
+          created_by: string | null
+          direction: string
+          id: string
+          note: string | null
+          related_deal_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_entity_id?: string | null
+          client_name?: string | null
+          counterparty_entity_id: string
+          created_at?: string
+          created_by?: string | null
+          direction: string
+          id?: string
+          note?: string | null
+          related_deal_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_entity_id?: string | null
+          client_name?: string | null
+          counterparty_entity_id?: string
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          id?: string
+          note?: string | null
+          related_deal_id?: string | null
           workspace_id?: string
         }
         Relationships: []
@@ -368,7 +455,9 @@ export type Database = {
         Args: { p_source_id: string; p_source_type: string }
         Returns: boolean
       }
+      delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       dismiss_aion_insight: { Args: { p_insight_id: string }; Returns: boolean }
+      dismiss_capture: { Args: { p_capture_id: string }; Returns: boolean }
       due_lobby_pins: {
         Args: { p_limit?: number }
         Returns: {
@@ -420,6 +509,18 @@ export type Database = {
           title: string
         }[]
       }
+      log_referral: {
+        Args: {
+          p_client_entity_id?: string
+          p_client_name?: string
+          p_counterparty_entity_id: string
+          p_direction: string
+          p_note?: string
+          p_related_deal_id?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       mark_lobby_pin_failure: {
         Args: { p_error_at?: string; p_error_message: string; p_pin_id: string }
         Returns: undefined
@@ -443,6 +544,10 @@ export type Database = {
           source_type: string
         }[]
       }
+      reassign_capture: {
+        Args: { p_capture_id: string; p_new_entity_id: string }
+        Returns: boolean
+      }
       record_lobby_pin_view: { Args: { p_pin_id: string }; Returns: undefined }
       record_refusal: {
         Args: {
@@ -453,6 +558,14 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      relink_capture_production: {
+        Args: {
+          p_capture_id: string
+          p_linked_deal_id?: string
+          p_linked_event_id?: string
+        }
+        Returns: boolean
       }
       reorder_lobby_pins: {
         Args: { p_ids: string[]; p_user_id: string; p_workspace_id: string }
@@ -501,6 +614,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_capture_content: {
+        Args: {
+          p_capture_id: string
+          p_parsed_note?: string
+          p_transcript?: string
+        }
+        Returns: boolean
+      }
+      update_capture_visibility: {
+        Args: { p_capture_id: string; p_visibility: string }
+        Returns: boolean
+      }
       update_lobby_pin_value: {
         Args: { p_pin_id: string; p_value: Json }
         Returns: undefined
@@ -517,6 +642,19 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      upsert_entity_working_notes: {
+        Args: {
+          p_communication_style?: string
+          p_dnr_flagged?: boolean
+          p_dnr_note?: string
+          p_dnr_reason?: string
+          p_entity_id: string
+          p_preferred_channel?: string
+          p_source?: string
+          p_workspace_id: string
+        }
+        Returns: boolean
       }
       upsert_memory_embedding: {
         Args: {
@@ -535,6 +673,8 @@ export type Database = {
         Args: {
           p_audio_storage_path?: string
           p_created_follow_up_queue_id?: string
+          p_linked_deal_id?: string
+          p_linked_event_id?: string
           p_parsed_entity?: Json
           p_parsed_follow_up?: Json
           p_parsed_note?: string
@@ -544,22 +684,6 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
-      }
-      reassign_capture: {
-        Args: { p_capture_id: string; p_new_entity_id?: string }
-        Returns: boolean
-      }
-      update_capture_content: {
-        Args: { p_capture_id: string; p_transcript?: string; p_parsed_note?: string }
-        Returns: boolean
-      }
-      update_capture_visibility: {
-        Args: { p_capture_id: string; p_visibility: string }
-        Returns: boolean
-      }
-      dismiss_capture: {
-        Args: { p_capture_id: string }
-        Returns: boolean
       }
     }
     Enums: {
@@ -2188,6 +2312,65 @@ export type Database = {
           },
         ]
       }
+      deal_activity_log: {
+        Row: {
+          action_summary: string
+          actor_kind: string
+          actor_user_id: string | null
+          created_at: string
+          deal_id: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          pipeline_stage_id: string | null
+          status: string
+          trigger_type: string | null
+          undo_token: string | null
+          undone_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          action_summary: string
+          actor_kind: string
+          actor_user_id?: string | null
+          created_at?: string
+          deal_id: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_stage_id?: string | null
+          status: string
+          trigger_type?: string | null
+          undo_token?: string | null
+          undone_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          action_summary?: string
+          actor_kind?: string
+          actor_user_id?: string | null
+          created_at?: string
+          deal_id?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_stage_id?: string | null
+          status?: string
+          trigger_type?: string | null
+          undo_token?: string | null
+          undone_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_activity_log_pipeline_stage_id_fkey"
+            columns: ["pipeline_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_crew: {
         Row: {
           acknowledged_at: string | null
@@ -2399,6 +2582,76 @@ export type Database = {
           role?: Database["public"]["Enums"]["deal_stakeholder_role"]
         }
         Relationships: []
+      }
+      deal_transitions: {
+        Row: {
+          actor_kind: string
+          actor_user_id: string | null
+          deal_id: string
+          entered_at: string
+          from_stage_id: string | null
+          id: string
+          metadata: Json
+          pipeline_id: string
+          to_stage_id: string
+          triggers_dispatched_at: string | null
+          triggers_error: string | null
+          triggers_failed_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_kind: string
+          actor_user_id?: string | null
+          deal_id: string
+          entered_at?: string
+          from_stage_id?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_id: string
+          to_stage_id: string
+          triggers_dispatched_at?: string | null
+          triggers_error?: string | null
+          triggers_failed_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actor_kind?: string
+          actor_user_id?: string | null
+          deal_id?: string
+          entered_at?: string
+          from_stage_id?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_id?: string
+          to_stage_id?: string
+          triggers_dispatched_at?: string | null
+          triggers_error?: string | null
+          triggers_failed_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_transitions_from_stage_id_fkey"
+            columns: ["from_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_transitions_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_transitions_to_stage_id_fkey"
+            columns: ["to_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       domain_events: {
         Row: {
@@ -2885,6 +3138,113 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_stages: {
+        Row: {
+          color_token: string | null
+          created_at: string
+          description: string | null
+          hide_from_portal: boolean
+          id: string
+          is_archived: boolean
+          kind: string
+          label: string
+          opens_handoff_wizard: boolean
+          pipeline_id: string
+          requires_confirmation: boolean
+          rotting_days: number | null
+          slug: string
+          sort_order: number
+          tags: string[]
+          triggers: Json
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          color_token?: string | null
+          created_at?: string
+          description?: string | null
+          hide_from_portal?: boolean
+          id?: string
+          is_archived?: boolean
+          kind: string
+          label: string
+          opens_handoff_wizard?: boolean
+          pipeline_id: string
+          requires_confirmation?: boolean
+          rotting_days?: number | null
+          slug: string
+          sort_order: number
+          tags?: string[]
+          triggers?: Json
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          color_token?: string | null
+          created_at?: string
+          description?: string | null
+          hide_from_portal?: boolean
+          id?: string
+          is_archived?: boolean
+          kind?: string
+          label?: string
+          opens_handoff_wizard?: boolean
+          pipeline_id?: string
+          requires_confirmation?: boolean
+          rotting_days?: number | null
+          slug?: string
+          sort_order?: number
+          tags?: string[]
+          triggers?: Json
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipelines: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_archived: boolean
+          is_default: boolean
+          name: string
+          slug: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          is_default?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          is_default?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           client_entity_id: string | null
@@ -3248,9 +3608,89 @@ export type Database = {
       }
     }
     Functions: {
+      advance_deal_stage: {
+        Args: {
+          p_deal_id: string
+          p_new_stage_id: string
+          p_only_if_status_in?: string[]
+          p_only_if_tags_any?: string[]
+        }
+        Returns: boolean
+      }
+      advance_deal_stage_from_webhook: {
+        Args: {
+          p_deal_id: string
+          p_new_stage_id: string
+          p_new_status_slug: string
+          p_only_if_status_in: string[]
+          p_only_if_tags_any?: string[]
+          p_webhook_event_id: string
+          p_webhook_source: string
+        }
+        Returns: boolean
+      }
+      claim_pending_transitions: {
+        Args: { p_batch_size?: number }
+        Returns: {
+          actor_kind: string
+          actor_user_id: string
+          deal_id: string
+          dedup_skip: boolean
+          entered_at: string
+          from_stage_id: string
+          pipeline_id: string
+          stage_kind: string
+          stage_slug: string
+          stage_triggers: Json
+          to_stage_id: string
+          transition_id: string
+          workspace_id: string
+        }[]
+      }
+      create_pipeline_stage: {
+        Args: {
+          p_color_token?: string
+          p_hide_from_portal?: boolean
+          p_label: string
+          p_opens_handoff_wizard?: boolean
+          p_pipeline_id: string
+          p_requires_confirmation?: boolean
+          p_rotting_days?: number
+          p_slug: string
+          p_tags?: string[]
+        }
+        Returns: string
+      }
       event_status_pair_valid: {
         Args: { p_lifecycle: string; p_status: string }
         Returns: boolean
+      }
+      log_deal_activity: {
+        Args: {
+          p_action_summary: string
+          p_actor_kind: string
+          p_actor_user_id?: string
+          p_deal_id: string
+          p_error_message?: string
+          p_metadata?: Json
+          p_pipeline_stage_id?: string
+          p_status: string
+          p_trigger_type?: string
+          p_undo_token?: string
+        }
+        Returns: string
+      }
+      mark_deal_activity_undone: {
+        Args: { p_activity_id: string }
+        Returns: undefined
+      }
+      mark_transition_dispatched: {
+        Args: { p_transition_id: string }
+        Returns: undefined
+      }
+      mark_transition_failed: {
+        Args: { p_error: string; p_transition_id: string }
+        Returns: undefined
       }
       metric_aion_refusal_rate: {
         Args: { p_days?: number; p_workspace_id: string }
@@ -3322,6 +3762,18 @@ export type Database = {
       patch_event_ros_data: {
         Args: { p_event_id: string; p_patch: Json }
         Returns: undefined
+      }
+      reorder_pipeline_stages: {
+        Args: { p_pipeline_id: string; p_stage_ids: string[] }
+        Returns: undefined
+      }
+      resolve_stage_by_tag: {
+        Args: { p_pipeline_id: string; p_tag: string }
+        Returns: string
+      }
+      seed_default_pipeline: {
+        Args: { p_workspace_id: string }
+        Returns: string
       }
     }
     Enums: {
@@ -3872,12 +4324,14 @@ export type Database = {
           organization_id: string | null
           owner_entity_id: string | null
           owner_user_id: string | null
+          pipeline_id: string | null
           preferred_crew: Json | null
           proposed_date: string
           proposed_end_time: string | null
           proposed_start_time: string | null
           referrer_entity_id: string | null
           show_health: Json | null
+          stage_id: string | null
           status: string
           title: string | null
           updated_at: string
@@ -3906,12 +4360,14 @@ export type Database = {
           organization_id?: string | null
           owner_entity_id?: string | null
           owner_user_id?: string | null
+          pipeline_id?: string | null
           preferred_crew?: Json | null
           proposed_date: string
           proposed_end_time?: string | null
           proposed_start_time?: string | null
           referrer_entity_id?: string | null
           show_health?: Json | null
+          stage_id?: string | null
           status?: string
           title?: string | null
           updated_at?: string
@@ -3940,12 +4396,14 @@ export type Database = {
           organization_id?: string | null
           owner_entity_id?: string | null
           owner_user_id?: string | null
+          pipeline_id?: string | null
           preferred_crew?: Json | null
           proposed_date?: string
           proposed_end_time?: string | null
           proposed_start_time?: string | null
           referrer_entity_id?: string | null
           show_health?: Json | null
+          stage_id?: string | null
           status?: string
           title?: string | null
           updated_at?: string

@@ -4,6 +4,11 @@
  * Next Actions card — stage-aware computed checklist.
  * Items auto-derive from deal state. Nothing is manually toggled.
  * Answers the PM's #1 question: "What do I need to do next?"
+ *
+ * Phase 3i cleanup: keys off the deal's current stage's tags + kind rather
+ * than the denormalized `deals.status` column (which collapsed to
+ * 'working' | 'won' | 'lost' in Phase 3i). Stable tags are the only
+ * rename-safe signal for "which stage-specific checklist applies".
  */
 
 import { motion } from 'framer-motion';
@@ -14,6 +19,7 @@ import { cn } from '@/shared/lib/utils';
 import type { DealDetail } from '../actions/get-deal';
 import type { ProposalWithItems } from '@/features/sales/model/types';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
+import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 
 // =============================================================================
 // Types
@@ -27,17 +33,20 @@ type ActionItem = {
   detail?: string | null;
 };
 
+const hasTag = (stage: WorkspacePipelineStage | null, tag: string): boolean =>
+  !!stage && (stage.tags ?? []).includes(tag);
+
 // =============================================================================
 // Compute actions per stage
 // =============================================================================
 
-function computeActions(
+export function computeActions(
   deal: DealDetail,
   proposal: ProposalWithItems | null | undefined,
   stakeholders: DealStakeholderDisplay[],
   crewCount: number,
+  stage: WorkspacePipelineStage | null,
 ): ActionItem[] {
-  const status = deal.status;
   const items: ActionItem[] = [];
 
   // ── Always relevant (all pre-handover stages) ──
@@ -63,9 +72,9 @@ function computeActions(
       : null,
   });
 
-  // ── Inquiry stage ──
+  // ── Inquiry stage (tag: initial_contact) ──
 
-  if (status === 'inquiry') {
+  if (hasTag(stage, 'initial_contact')) {
     items.push({
       id: 'budget',
       label: 'Set budget estimate',
@@ -84,9 +93,9 @@ function computeActions(
     });
   }
 
-  // ── Proposal stage ──
+  // ── Proposal stage (tag: proposal_sent) ──
 
-  if (status === 'proposal') {
+  if (hasTag(stage, 'proposal_sent')) {
     const hasItems = (proposal?.items?.length ?? 0) > 0;
     items.push({
       id: 'items',
@@ -103,9 +112,9 @@ function computeActions(
     });
   }
 
-  // ── Contract sent ──
+  // ── Contract sent (tag: contract_out) ──
 
-  if (status === 'contract_sent') {
+  if (hasTag(stage, 'contract_out')) {
     const viewCount = proposal?.view_count ?? 0;
     items.push({
       id: 'opened',
@@ -129,9 +138,16 @@ function computeActions(
     });
   }
 
-  // ── Contract signed / deposit received ──
+  // ── Contract signed / deposit received / ready for handoff ──
+  //     Tags: contract_signed OR deposit_received OR ready_for_handoff.
+  //     The default seed puts deposit_received + ready_for_handoff together
+  //     on the same stage; custom workspaces may split them.
 
-  if (status === 'contract_signed' || status === 'deposit_received') {
+  if (
+    hasTag(stage, 'contract_signed')
+    || hasTag(stage, 'deposit_received')
+    || hasTag(stage, 'ready_for_handoff')
+  ) {
     const depositRequired = (proposal?.deposit_percent ?? 0) > 0;
     const depositPaid = !!proposal?.deposit_paid_at;
 
@@ -166,7 +182,7 @@ function computeActions(
 
   // ── Won (post-handover) ──
 
-  if (status === 'won') {
+  if (stage?.kind === 'won') {
     items.push({
       id: 'handed_over',
       label: 'Handed over to production',
@@ -186,6 +202,10 @@ export type NextActionsCardProps = {
   proposal: ProposalWithItems | null | undefined;
   stakeholders: DealStakeholderDisplay[];
   crewCount: number;
+  /** The deal's current pipeline stage. When null, only the two always-relevant
+   *  items (client + date) render. Callers should resolve via
+   *  `pipelineStages.find(s => s.id === deal.stage_id) ?? null`. */
+  stage: WorkspacePipelineStage | null;
 };
 
 export function NextActionsCard({
@@ -193,8 +213,9 @@ export function NextActionsCard({
   proposal,
   stakeholders,
   crewCount,
+  stage,
 }: NextActionsCardProps) {
-  const actions = computeActions(deal, proposal, stakeholders, crewCount);
+  const actions = computeActions(deal, proposal, stakeholders, crewCount, stage);
   const doneCount = actions.filter((a) => a.done).length;
   const totalCount = actions.length;
   const allDone = doneCount === totalCount;

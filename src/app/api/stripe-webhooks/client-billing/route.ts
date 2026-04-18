@@ -240,21 +240,144 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     }
 
     if (existing.deal_id) {
-      const { error: dealError } = await supabase.from('deals')
-        .update({ status: 'deposit_received' })
-        .eq('id', existing.deal_id)
-        .in('status', ['inquiry', 'proposal', 'contract_sent', 'contract_signed']);
-
-      if (dealError) {
-        Sentry.logger.warn('stripe.clientBilling.dealStatusUpdateFailed', {
-          dealId: existing.deal_id,
-          error: dealError.message,
-        });
-      }
+      await advanceDealFromStripeWebhook({
+        supabase,
+        dealId: existing.deal_id,
+        stripeEventId: paymentIntent.id,
+      });
     }
   }
 
   return json({ received: true });
+}
+
+// =============================================================================
+// Phase 3d — Custom Pipelines: resolve the deposit_received stage via the
+// workspace's default pipeline tags instead of writing a literal slug, so
+// workspaces that rename "Deposit Received" still auto-advance. Failures log
+// and return — they must never throw out of the webhook handler.
+// =============================================================================
+
+async function advanceDealFromStripeWebhook(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST types
+  supabase: any;
+  dealId: string;
+  stripeEventId: string;
+}): Promise<void> {
+  const { supabase, dealId, stripeEventId } = args;
+
+  // Fetch the deal's pipeline context. Phase 1 backfill guarantees pipeline_id
+  // is populated for every deal; defensive code handles NULL anyway.
+  const { data: deal, error: fetchErr } = await supabase
+    .from('deals')
+    .select('id, pipeline_id')
+    .eq('id', dealId)
+    .maybeSingle();
+
+  if (fetchErr || !deal) {
+    Sentry.logger.warn('stripe.clientBilling.dealLookupFailed', {
+      dealId,
+      error: fetchErr?.message ?? 'deal not found',
+    });
+    return;
+  }
+
+  const pipelineId = (deal as { pipeline_id: string | null }).pipeline_id;
+  if (!pipelineId) {
+    Sentry.logger.warn('stripe.clientBilling.dealMissingPipelineId', { dealId });
+    return;
+  }
+
+  // Resolve the workspace's "deposit_received" stage via tag.
+  const { data: resolvedStageId, error: resolveErr } = await supabase
+    .schema('ops')
+    .rpc('resolve_stage_by_tag', {
+      p_pipeline_id: pipelineId,
+      p_tag: 'deposit_received',
+    });
+
+  if (resolveErr) {
+    Sentry.logger.warn('stripe.clientBilling.stageResolveFailed', {
+      dealId,
+      pipelineId,
+      tag: 'deposit_received',
+      error: resolveErr.message,
+    });
+    return;
+  }
+
+  if (!resolvedStageId) {
+    // Workspace intentionally removed the deposit_received tag from every
+    // stage — opted out of auto-advance. Log and skip; don't fail the webhook.
+    Sentry.logger.info('stripe.clientBilling.stageTagNotPresent', {
+      dealId,
+      pipelineId,
+      tag: 'deposit_received',
+      action: 'skipped auto-advance; workspace opted out',
+    });
+    return;
+  }
+
+  // Fetch the resolved stage's slug so we can dual-write deals.status (the
+  // denormalized fast path legacy surfaces still read). Phase 3i drops this.
+  const { data: stageRow, error: stageFetchErr } = await supabase
+    .schema('ops')
+    .from('pipeline_stages')
+    .select('slug')
+    .eq('id', resolvedStageId)
+    .maybeSingle();
+
+  if (stageFetchErr || !stageRow) {
+    Sentry.logger.warn('stripe.clientBilling.stageSlugFetchFailed', {
+      dealId,
+      resolvedStageId,
+      error: stageFetchErr?.message ?? 'stage row not found',
+    });
+    return;
+  }
+
+  const stageSlug = (stageRow as { slug: string }).slug;
+
+  // Atomic guarded advance — RPC SET LOCALs the webhook session vars and fires
+  // record_deal_transition with metadata.source='webhook' + actor_kind='webhook'.
+  // Returns false if guard rejected (deal already past target, or in won/lost).
+  //
+  // Phase 3h: switch from literal slug list to tag-overlap guard so workspaces
+  // that rename their stages still auto-advance correctly. The pre-states for
+  // deposit_received are any working stage before it: initial_contact,
+  // proposal_sent, contract_out, contract_signed. Legacy slug guard set to
+  // NULL — the tag guard is strictly more expressive and covers renamed stages.
+  const { data: advanced, error: advanceErr } = await supabase
+    .schema('ops')
+    .rpc('advance_deal_stage_from_webhook', {
+      p_deal_id: dealId,
+      p_new_stage_id: resolvedStageId,
+      p_new_status_slug: stageSlug,
+      p_webhook_source: 'stripe',
+      p_webhook_event_id: stripeEventId,
+      p_only_if_status_in: null,
+      p_only_if_tags_any: ['initial_contact', 'proposal_sent', 'contract_out', 'contract_signed'],
+    });
+
+  if (advanceErr) {
+    Sentry.logger.warn('stripe.clientBilling.dealStatusUpdateFailed', {
+      dealId,
+      pipelineId,
+      resolvedStageId,
+      error: advanceErr.message,
+    });
+    return;
+  }
+
+  if (advanced !== true) {
+    // Guard rejected — deal was already in deposit_received / won / lost.
+    // Not an error; Stripe replays are idempotent by design.
+    Sentry.logger.info('stripe.clientBilling.dealAlreadyAdvanced', {
+      dealId,
+      pipelineId,
+      resolvedStageId,
+    });
+  }
 }
 
 // =============================================================================

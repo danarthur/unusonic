@@ -8,6 +8,7 @@ import { Prism } from './prism';
 import type { StreamCardItem } from './stream-card';
 import type { OptimisticUpdate } from './crm-production-queue';
 import type { StreamMode } from '../page';
+import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { crmQueries } from '@/features/crm/api/queries';
 import { queryKeys } from '@/shared/api/query-keys';
@@ -49,9 +50,11 @@ type ProductionGridShellProps = {
   currentOrgId?: string | null;
   /** When set, render a banner above the stream so users see the empty grid is a failure, not "no deals yet." */
   loadError?: string | null;
+  /** Phase 3h: workspace pipeline stages — drives Stream tab filters by kind/tags. */
+  pipelineStages?: WorkspacePipelineStage[];
 };
 
-export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId, loadError }: ProductionGridShellProps) {
+export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId, loadError, pipelineStages }: ProductionGridShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { workspaceId } = useWorkspace();
@@ -136,6 +139,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
           mode={currentStream}
           onModeChange={setStreamMode}
           sourceOrgId={currentOrgId}
+          pipelineStages={pipelineStages ?? []}
         />
       </aside>
 

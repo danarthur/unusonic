@@ -55,6 +55,33 @@ export async function checkDateFeasibility(
 
     const supabase = await createClient();
 
+    // Phase 3i: "tentative / pending" stages (pre-contract) resolved by tag
+    // rather than literal status slugs, which all collapsed to 'working'.
+    // Query the workspace's default pipeline's stages tagged with
+    // initial_contact or proposal_sent, then count deals in those stages.
+    const { data: tentativePipeline } = await (supabase as any)
+      .schema('ops')
+      .from('pipelines')
+      .select('id, pipeline_stages(id, tags, is_archived)')
+      .eq('workspace_id', workspaceId)
+      .eq('is_default', true)
+      .eq('is_archived', false)
+      .maybeSingle();
+
+    const tentativeStageIds = ((tentativePipeline?.pipeline_stages ?? []) as Array<{ id: string; tags: string[] | null; is_archived: boolean }>)
+      .filter((s) => !s.is_archived && (s.tags ?? []).some((t) => t === 'initial_contact' || t === 'proposal_sent'))
+      .map((s) => s.id);
+
+    const dealsQuery = tentativeStageIds.length > 0
+      ? supabase
+          .from('deals')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .is('archived_at', null)
+          .eq('proposed_date', dateStr)
+          .in('stage_id', tentativeStageIds)
+      : Promise.resolve({ count: 0 } as { count: number | null });
+
     const [eventsRes, dealsRes] = await Promise.all([
       supabase
             .schema('ops')
@@ -63,13 +90,7 @@ export async function checkDateFeasibility(
             .eq('workspace_id', workspaceId)
             .lte('starts_at', dayEnd)
             .gte('ends_at', dayStart),
-      supabase
-        .from('deals')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', workspaceId)
-        .is('archived_at', null)
-        .eq('proposed_date', dateStr)
-        .in('status', ['inquiry', 'proposal']),
+      dealsQuery,
     ]);
 
     const confirmedCount = eventsRes.count ?? 0;

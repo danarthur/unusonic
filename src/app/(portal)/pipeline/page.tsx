@@ -1,14 +1,34 @@
 /**
  * Pipeline — salesperson portal.
- * Shows deals owned by the salesperson, grouped by status.
+ * Shows deals owned by the salesperson, grouped by their workspace's default
+ * pipeline stages. Honors `hide_from_portal` (admin-controlled visibility) and
+ * drops `kind='lost'` stages from the main view.
  */
 
 import { notFound } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/server';
 import { resolvePortalProfile } from '@/shared/lib/portal-profiles';
+import { getWorkspacePipelineStages } from '@/app/(dashboard)/(features)/crm/actions/get-workspace-pipeline-stages';
 import { PipelineView } from './pipeline-view';
 
 export const dynamic = 'force-dynamic';
+
+async function loadContactNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  contactIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (contactIds.length === 0) return map;
+  const { data: contacts } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name')
+    .in('id', contactIds);
+  for (const c of contacts ?? []) {
+    map.set(c.id, c.display_name ?? 'Unknown');
+  }
+  return map;
+}
 
 export default async function PipelinePage() {
   const supabase = await createClient();
@@ -48,53 +68,65 @@ export default async function PipelinePage() {
     notFound();
   }
 
-  // Fetch deals owned by this entity
-  const { data: deals } = await supabase
-    .from('deals')
-    .select(`
-      id, title, status, proposed_date, budget_estimated, event_archetype,
-      venue_name, lead_source, won_at, lost_at, created_at,
-      owner_entity_id, organization_id, main_contact_id
-    `)
-    .eq('owner_entity_id', personEntity.id)
-    .is('archived_at', null)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  // Fetch workspace default pipeline + deals in parallel
+  const [pipeline, dealsResult] = await Promise.all([
+    getWorkspacePipelineStages(),
+    supabase
+      .from('deals')
+      .select(`
+        id, title, status, stage_id, proposed_date, budget_estimated, event_archetype,
+        venue_name, lead_source, won_at, lost_at, created_at,
+        owner_entity_id, organization_id, main_contact_id
+      `)
+      .eq('owner_entity_id', personEntity.id)
+      .is('archived_at', null)
+      .order('created_at', { ascending: false })
+      .limit(100),
+  ]);
+
+  const deals = dealsResult.data;
 
   // Fetch client names for deals
-  const orgIds = [...new Set((deals ?? []).map(d => d.organization_id).filter(Boolean))];
-  const clientMap = new Map<string, string>();
+  const contactIds = [
+    ...new Set(
+      (deals ?? []).map((d: { main_contact_id: string | null }) => d.main_contact_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const clientMap = await loadContactNames(supabase, contactIds);
 
-  // Get client entity names from main_contact_id
-  const contactIds = [...new Set((deals ?? []).map((d: any) => d.main_contact_id).filter(Boolean))];
-  if (contactIds.length > 0) {
-    const { data: contacts } = await supabase
-      .schema('directory')
-      .from('entities')
-      .select('id, display_name')
-      .in('id', contactIds);
+  type DealRow = {
+    id: string;
+    title: string | null;
+    status: string;
+    stage_id: string | null;
+    proposed_date: string | null;
+    budget_estimated: number | string | null;
+    event_archetype: string | null;
+    venue_name: string | null;
+    lead_source: string | null;
+    won_at: string | null;
+    lost_at: string | null;
+    created_at: string;
+    main_contact_id: string | null;
+  };
 
-    for (const c of contacts ?? []) {
-      clientMap.set(c.id, c.display_name ?? 'Unknown');
-    }
-  }
-
-  const enrichedDeals = (deals ?? []).map((d: any) => ({
-    id: d.id as string,
-    title: d.title as string | null,
-    status: d.status as string,
-    proposedDate: d.proposed_date as string | null,
-    budgetEstimated: d.budget_estimated ? Number(d.budget_estimated) : null,
-    eventArchetype: d.event_archetype as string | null,
-    venueName: d.venue_name as string | null,
+  const enrichedDeals = ((deals ?? []) as DealRow[]).map((d) => ({
+    id: d.id,
+    title: d.title,
+    status: d.status,
+    stageId: d.stage_id,
+    proposedDate: d.proposed_date,
+    budgetEstimated: d.budget_estimated !== null && d.budget_estimated !== undefined ? Number(d.budget_estimated) : null,
+    eventArchetype: d.event_archetype,
+    venueName: d.venue_name,
     clientName: d.main_contact_id ? clientMap.get(d.main_contact_id) ?? null : null,
-    leadSource: d.lead_source as string | null,
-    wonAt: d.won_at as string | null,
-    lostAt: d.lost_at as string | null,
-    createdAt: d.created_at as string,
+    leadSource: d.lead_source,
+    wonAt: d.won_at,
+    lostAt: d.lost_at,
+    createdAt: d.created_at,
   }));
 
   return (
-    <PipelineView deals={enrichedDeals} />
+    <PipelineView deals={enrichedDeals} stages={pipeline?.stages ?? []} />
   );
 }

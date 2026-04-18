@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, Calendar, MapPin, DollarSign, ChevronDown, Clock, Send, MessageSquare, Check, X as XIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { TrendingUp, Calendar, MapPin, DollarSign, Check } from 'lucide-react';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import type { WorkspacePipelineStage } from '@/app/(dashboard)/(features)/crm/actions/get-workspace-pipeline-stages';
 
 /* ── Types ───────────────────────────────────────────────────────── */
 
@@ -12,6 +12,7 @@ interface Deal {
   id: string;
   title: string | null;
   status: string;
+  stageId: string | null;
   proposedDate: string | null;
   budgetEstimated: number | null;
   eventArchetype: string | null;
@@ -25,38 +26,10 @@ interface Deal {
 
 interface PipelineViewProps {
   deals: Deal[];
+  stages: WorkspacePipelineStage[];
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
-
-const STATUS_ORDER = ['inquiry', 'qualifying', 'proposal_sent', 'negotiating', 'won', 'lost'];
-
-const STATUS_LABELS: Record<string, string> = {
-  inquiry: 'Inquiry',
-  qualifying: 'Qualifying',
-  proposal_sent: 'Proposal sent',
-  negotiating: 'Negotiating',
-  won: 'Won',
-  lost: 'Lost',
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  inquiry: 'bg-[oklch(0.75_0.12_250/0.2)] text-[oklch(0.75_0.12_250)]',
-  qualifying: 'bg-[oklch(0.75_0.15_55/0.2)] text-[oklch(0.75_0.15_55)]',
-  proposal_sent: 'bg-[oklch(0.75_0.12_200/0.2)] text-[oklch(0.75_0.12_200)]',
-  negotiating: 'bg-[oklch(0.75_0.15_55/0.2)] text-[oklch(0.75_0.15_55)]',
-  won: 'bg-[oklch(0.75_0.15_145/0.2)] text-[oklch(0.75_0.15_145)]',
-  lost: 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-tertiary)]',
-};
-
-const STATUS_ICONS: Record<string, typeof Clock> = {
-  inquiry: Clock,
-  qualifying: MessageSquare,
-  proposal_sent: Send,
-  negotiating: MessageSquare,
-  won: Check,
-  lost: XIcon,
-};
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -72,12 +45,56 @@ function formatDate(iso: string | null): string {
   return format(new Date(iso), 'MMM d, yyyy');
 }
 
+/**
+ * Style per stage kind. Working stages share a neutral badge; won stages use
+ * the positive-status style. Lost stages are hidden upstream so no style here.
+ */
+const KIND_STYLES: Record<WorkspacePipelineStage['kind'], string> = {
+  working: 'bg-[oklch(0.75_0.12_250/0.2)] text-[oklch(0.75_0.12_250)]',
+  won: 'bg-[oklch(0.75_0.15_145/0.2)] text-[oklch(0.75_0.15_145)]',
+  lost: 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-tertiary)]',
+};
+
 /* ── Component ───────────────────────────────────────────────────── */
 
-export function PipelineView({ deals }: PipelineViewProps) {
-  const [showClosed, setShowClosed] = useState(false);
+export function PipelineView({ deals, stages }: PipelineViewProps) {
+  // Filter stages to what the portal should render: not hidden, not lost.
+  const visibleStages = stages
+    .filter((s) => !s.hide_from_portal && s.kind !== 'lost')
+    .sort((a, b) => a.sort_order - b.sort_order);
 
-  if (deals.length === 0) {
+  const visibleStageIds = new Set(visibleStages.map((s) => s.id));
+  const stageById = new Map(visibleStages.map((s) => [s.id, s]));
+
+  // Drop deals whose stage_id isn't in the visible list (hidden or lost).
+  const visibleDeals = deals.filter((d) => d.stageId && visibleStageIds.has(d.stageId));
+
+  // Empty state: no default pipeline configured for the workspace.
+  if (stages.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+        <TrendingUp className="size-10 text-[var(--stage-text-tertiary)]" />
+        <p className="text-sm text-[var(--stage-text-secondary)]">
+          Your workspace doesn&apos;t have a pipeline configured yet.
+        </p>
+      </div>
+    );
+  }
+
+  // Empty state: admin has hidden every stage from the portal.
+  if (visibleStages.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+        <TrendingUp className="size-10 text-[var(--stage-text-tertiary)]" />
+        <p className="text-sm text-[var(--stage-text-secondary)]">
+          No pipeline stages are visible in the portal yet. Ask your admin to make stages visible.
+        </p>
+      </div>
+    );
+  }
+
+  // Empty state: user has no deals (or all of them are in hidden/lost stages).
+  if (visibleDeals.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
         <TrendingUp className="size-10 text-[var(--stage-text-tertiary)]" />
@@ -88,23 +105,29 @@ export function PipelineView({ deals }: PipelineViewProps) {
     );
   }
 
-  // Split into active and closed
-  const active = deals.filter(d => !['won', 'lost'].includes(d.status));
-  const closed = deals.filter(d => ['won', 'lost'].includes(d.status));
-
-  // Group active by status
+  // Group visible deals by stage_id.
   const grouped = new Map<string, Deal[]>();
-  for (const deal of active) {
-    const list = grouped.get(deal.status) ?? [];
+  for (const deal of visibleDeals) {
+    if (!deal.stageId) continue;
+    const list = grouped.get(deal.stageId) ?? [];
     list.push(deal);
-    grouped.set(deal.status, list);
+    grouped.set(deal.stageId, list);
   }
 
-  // Summary stats
-  const totalActive = active.length;
-  const totalValue = active.reduce((sum, d) => sum + (d.budgetEstimated ?? 0), 0);
-  const wonCount = closed.filter(d => d.status === 'won').length;
-  const wonValue = closed.filter(d => d.status === 'won').reduce((sum, d) => sum + (d.budgetEstimated ?? 0), 0);
+  // Summary stats.
+  const workingDeals = visibleDeals.filter((d) => {
+    const stage = d.stageId ? stageById.get(d.stageId) : null;
+    return stage?.kind === 'working';
+  });
+  const wonDeals = visibleDeals.filter((d) => {
+    const stage = d.stageId ? stageById.get(d.stageId) : null;
+    return stage?.kind === 'won';
+  });
+
+  const totalActive = workingDeals.length;
+  const totalValue = workingDeals.reduce((sum, d) => sum + (d.budgetEstimated ?? 0), 0);
+  const wonCount = wonDeals.length;
+  const wonValue = wonDeals.reduce((sum, d) => sum + (d.budgetEstimated ?? 0), 0);
 
   return (
     <motion.div
@@ -122,53 +145,26 @@ export function PipelineView({ deals }: PipelineViewProps) {
         <StatCard label="Won value" value={wonValue > 0 ? formatCurrency(wonValue) : '$0'} />
       </div>
 
-      {/* Active deals by status */}
-      {STATUS_ORDER.filter(s => !['won', 'lost'].includes(s)).map(status => {
-        const statusDeals = grouped.get(status);
-        if (!statusDeals || statusDeals.length === 0) return null;
+      {/* One section per visible stage, in sort_order. */}
+      {visibleStages.map((stage) => {
+        const stageDeals = grouped.get(stage.id);
+        if (!stageDeals || stageDeals.length === 0) return null;
         return (
-          <section key={status} className="flex flex-col gap-2">
+          <section key={stage.id} className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)]">
-                {STATUS_LABELS[status] ?? status}
+                {stage.label}
               </h2>
-              <span className="text-xs text-[var(--stage-text-tertiary)]">{statusDeals.length}</span>
+              <span className="text-xs text-[var(--stage-text-tertiary)]">{stageDeals.length}</span>
             </div>
             <div className="flex flex-col gap-2">
-              {statusDeals.map(deal => (
-                <DealCard key={deal.id} deal={deal} />
+              {stageDeals.map((deal) => (
+                <DealCard key={deal.id} deal={deal} stage={stage} />
               ))}
             </div>
           </section>
         );
       })}
-
-      {/* Closed deals (collapsed by default) */}
-      {closed.length > 0 && (
-        <div>
-          <button
-            onClick={() => setShowClosed(!showClosed)}
-            className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors"
-          >
-            <ChevronDown className={`size-3.5 transition-transform ${showClosed ? 'rotate-180' : ''}`} />
-            Closed ({closed.length})
-          </button>
-          <AnimatePresence>
-            {showClosed && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex flex-col gap-2 mt-2 overflow-hidden"
-              >
-                {closed.map(deal => (
-                  <DealCard key={deal.id} deal={deal} />
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
     </motion.div>
   );
 }
@@ -186,7 +182,8 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 /* ── Deal Card ───────────────────────────────────────────────────── */
 
-function DealCard({ deal }: { deal: Deal }) {
+function DealCard({ deal, stage }: { deal: Deal; stage: WorkspacePipelineStage }) {
+  const badgeStyle = KIND_STYLES[stage.kind] ?? KIND_STYLES.working;
   return (
     <div data-surface="elevated" className="flex flex-col gap-2 p-4 rounded-xl border border-[oklch(1_0_0/0.06)] bg-[var(--stage-surface-elevated)]">
       <div className="flex items-start justify-between gap-3">
@@ -198,9 +195,9 @@ function DealCard({ deal }: { deal: Deal }) {
             <p className="text-xs text-[var(--stage-text-tertiary)] mt-0.5">{deal.clientName}</p>
           )}
         </div>
-        <span className={`inline-flex items-center gap-1 stage-badge-text px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[deal.status] ?? STATUS_STYLES.inquiry}`}>
-          {STATUS_ICONS[deal.status] && (() => { const I = STATUS_ICONS[deal.status]; return <I className="size-2.5" />; })()}
-          {STATUS_LABELS[deal.status] ?? deal.status}
+        <span className={`inline-flex items-center gap-1 stage-badge-text px-2 py-0.5 rounded-full shrink-0 ${badgeStyle}`}>
+          {stage.kind === 'won' && <Check className="size-2.5" />}
+          {stage.label}
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--stage-text-tertiary)]">

@@ -5,12 +5,17 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
 import type { DealCrewRow } from '../actions/deal-crew';
+import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 
 type CompletionIndicatorsProps = {
   deal: DealDetail;
   stakeholders: DealStakeholderDisplay[];
   crewRows: DealCrewRow[];
   hasProposal: boolean;
+  /** The deal's current stage. Used to derive the Contract indicator's
+   *  done/detail state post-Phase-3i. When null, the Contract indicator
+   *  falls back to the `kind='won'` path via deal.status === 'won'. */
+  stage: WorkspacePipelineStage | null;
 };
 
 type Indicator = {
@@ -24,7 +29,14 @@ export function CompletionIndicators({
   stakeholders,
   crewRows,
   hasProposal,
+  stage,
 }: CompletionIndicatorsProps) {
+  const stageTags = stage?.tags ?? [];
+  const hasStageTag = (tag: string) => stageTags.includes(tag);
+  const isContractSigned = hasStageTag('contract_signed');
+  const isDepositReceived = hasStageTag('deposit_received') || hasStageTag('ready_for_handoff');
+  const isWon = stage?.kind === 'won' || deal.status === 'won';
+
   const indicators: Indicator[] = [
     {
       label: 'Client',
@@ -47,8 +59,8 @@ export function CompletionIndicators({
     },
     {
       label: 'Contract',
-      done: ['contract_signed', 'deposit_received', 'won'].includes(deal.status),
-      detail: deal.status === 'contract_signed' ? 'Signed' : deal.status === 'deposit_received' ? 'Deposit received' : undefined,
+      done: isContractSigned || isDepositReceived || isWon,
+      detail: isDepositReceived ? 'Deposit received' : isContractSigned ? 'Signed' : undefined,
     },
     {
       label: 'Crew',

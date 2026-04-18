@@ -8,6 +8,7 @@ import { NetworkDetailSheetWithSuspense } from '@/widgets/network-detail';
 import { applyActiveEventsFilter } from '@/shared/lib/event-status/get-active-events-filter';
 import { ProductionGridShell } from './components/production-grid-shell';
 import type { StreamCardItem } from './components/stream-card';
+import { getWorkspacePipelineStages, type WorkspacePipelineStage } from './actions/get-workspace-pipeline-stages';
 import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 /** CRM queue item: deal or event row mapped for Production Grid UI. */
@@ -91,17 +92,23 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
   let currentOrgId: string | null = null;
   let gigs: StreamCardItem[] = [];
   let loadError: string | null = null;
+  let pipelineStages: WorkspacePipelineStage[] = [];
 
   try {
     currentOrgId = await getCurrentOrgId();
     const supabase = await createClient();
     const workspaceId = await getActiveWorkspaceId();
 
+    // Phase 3h: fetch pipeline stages alongside deals so Stream tabs can filter
+    // by stage kind/tags instead of hardcoded status slugs. Non-blocking — if
+    // this fails we fall through to the legacy slug-based filter in stream.tsx.
+    const pipelinePromise = getWorkspacePipelineStages().catch(() => null);
+
     const [dealsRes, eventsRes] = await Promise.all([
     workspaceId
       ? supabase
           .from('deals')
-          .select('id, title, status, proposed_date, organization_id, venue_id, event_archetype, lead_source, owner_entity_id, created_at')
+          .select('id, title, status, stage_id, proposed_date, organization_id, venue_id, event_archetype, lead_source, owner_entity_id, created_at')
           .eq('workspace_id', workspaceId)
           .is('archived_at', null)
           .order('proposed_date', { ascending: true })
@@ -206,6 +213,7 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
         id: dealId,
         title: (d.title as string) ?? null,
         status: (d.status as string) ?? null,
+        stage_id: (d.stage_id as string) ?? null,
         event_date: d.proposed_date ? String(d.proposed_date) : null,
         location: venueId ? (entityNameMap.get(venueId) ?? null) : null,
         client_name: clientId ? (entityNameMap.get(clientId) ?? null) : null,
@@ -277,6 +285,10 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
         }
       }
     }
+
+    // Resolve the pipeline stages alongside gigs — used by Stream tab filters.
+    const pipeline = await pipelinePromise;
+    pipelineStages = pipeline?.stages ?? [];
   } catch (err) {
     // The CRM page wraps its entire data load (currentOrg, deals, events,
     // stakeholders, directory lookups, follow-up queue) in one try/catch. On
@@ -304,6 +316,7 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
       streamMode={streamMode}
       currentOrgId={currentOrgId}
       loadError={loadError}
+      pipelineStages={pipelineStages}
     />
   );
 }

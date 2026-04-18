@@ -18,6 +18,7 @@
 
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { daysSince, type InsightCandidate } from '../insight-evaluators';
+import { OPEN_DEAL_STATUSES } from '@/shared/lib/pipeline-stages/constants';
 
 const STALE_DAYS = 14;
 const MIN_BUDGETS_FOR_MEDIAN = 5;
@@ -54,7 +55,7 @@ export async function evaluateGoneQuietWithValue(
     .from('deals')
     .select('id, title, status, updated_at, proposed_date, organization_id, budget_estimated')
     .eq('workspace_id', workspaceId)
-    .in('status', ['inquiry', 'proposal', 'contract_sent'])
+    .in('status', [...OPEN_DEAL_STATUSES])
     .is('archived_at', null);
 
   if (!deals?.length) return [];

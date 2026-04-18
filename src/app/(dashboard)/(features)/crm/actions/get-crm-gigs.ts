@@ -20,7 +20,7 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
     workspaceId
       ? supabase
           .from('deals')
-          .select('id, title, status, proposed_date, organization_id, venue_id, event_archetype, lead_source, owner_entity_id, created_at, show_health')
+          .select('id, title, status, stage_id, proposed_date, organization_id, venue_id, event_archetype, lead_source, owner_entity_id, created_at, show_health')
           .eq('workspace_id', workspaceId)
           .is('archived_at', null)
           .order('proposed_date', { ascending: true })
@@ -134,6 +134,7 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
       id: dealId,
       title: (d.title as string) ?? null,
       status: (d.status as string) ?? null,
+      stage_id: (d.stage_id as string) ?? null,
       event_date: d.proposed_date ? String(d.proposed_date) : null,
       location: venueId ? (entityNameMap.get(venueId) ?? null) : null,
       client_name: clientId ? (entityNameMap.get(clientId) ?? null) : null,
