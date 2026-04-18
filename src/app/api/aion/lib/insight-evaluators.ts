@@ -11,6 +11,7 @@ import { evaluateQuoteExpiring } from './evaluators/quote-expiring';
 import { evaluateHotLeadMultiView } from './evaluators/hot-lead-multi-view';
 import { evaluateDepositGap } from './evaluators/deposit-gap';
 import { evaluateGoneQuietWithValue } from './evaluators/gone-quiet-with-value';
+import { evaluateStageAdvanceSuggestion } from './evaluators/stage-advance-suggestion';
 import { OPEN_DEAL_STATUSES } from '@/shared/lib/pipeline-stages/constants';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -45,6 +46,8 @@ export async function evaluateAllInsights(workspaceId: string): Promise<InsightC
     evaluateHotLeadMultiView(workspaceId),
     evaluateDepositGap(workspaceId),
     evaluateGoneQuietWithValue(workspaceId),
+    // P0 follow-up engine — tag-gated stage advance suggestions
+    evaluateStageAdvanceSuggestion(workspaceId),
   ]);
 
   return results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));

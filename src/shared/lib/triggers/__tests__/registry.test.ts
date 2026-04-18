@@ -32,11 +32,12 @@ const buildFakePrimitive = (type: string): TriggerPrimitive<{ n: number }> => ({
 
 describe('trigger registry', () => {
   describe('auto-registration on module load', () => {
-    it('populates all 5 catalog primitives', () => {
+    it('populates the catalog primitives (P0: 6 — 5 core + enroll_in_follow_up)', () => {
       const all = listAllPrimitives();
       const types = all.map((p) => p.type).sort();
       expect(types).toEqual([
         'create_task',
+        'enroll_in_follow_up',
         'notify_role',
         'send_deposit_invoice',
         'trigger_handoff',
@@ -44,9 +45,10 @@ describe('trigger registry', () => {
       ]);
     });
 
-    it('splits the catalog into 3 internal + 2 outbound per §7.3', () => {
+    it('splits the catalog into 4 internal + 2 outbound', () => {
       expect(listByTier('internal').map((p) => p.type).sort()).toEqual([
         'create_task',
+        'enroll_in_follow_up',
         'notify_role',
         'update_deal_field',
       ]);

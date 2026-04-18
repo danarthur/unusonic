@@ -122,6 +122,7 @@ export async function GET(req: Request) {
   let queued = 0;
   let removed = 0;
   let skipped = 0;
+  let escalated = 0;
   // Workspace IDs touched by Phase 1 (deal scan) — consumed by Phase 2
   // (insight evaluation) which lives in a sibling try block and would
   // otherwise reference out-of-scope `deals`. Declared at function scope
@@ -510,7 +511,60 @@ export async function GET(req: Request) {
       queued++;
     }
 
-    // 8. Remove queue items for deals no longer qualifying (won/lost)
+    // 7.5 Escalate-in-place for rows that already existed and were NOT
+    //     re-scored this run. Priority climbs by 15% per run (capped at
+    //     priority_ceiling), escalation_count bumps, last_escalated_at
+    //     stamps. Dismiss/snooze resets escalation_count + priority_score.
+    //     See docs/reference/code/follow-up-engine.md and P0 plan §5.
+    const scoredDealIds = new Set(scored.map((s) => s.dealId));
+    // Columns priority_ceiling/escalation_count/last_escalated_at/superseded_at
+    // were added in migration 20260423000000; generated types are stale until
+    // `npm run db:types` runs post-deploy. Route through `any` for these
+    // reads/writes — same pattern the ops.* code uses elsewhere.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stale types
+    const opsDb = db.schema('ops') as any;
+
+    const { data: pendingForEscalation } = await opsDb
+      .from('follow_up_queue')
+      .select('id, deal_id, priority_score, priority_ceiling, escalation_count, reason_type')
+      .eq('status', 'pending')
+      .is('superseded_at', null);
+
+    const nowIso = now.toISOString();
+    for (const row of ((pendingForEscalation ?? []) as unknown) as Array<{
+      id: string;
+      deal_id: string;
+      priority_score: number;
+      priority_ceiling: number;
+      escalation_count: number;
+      reason_type: string;
+    }>) {
+      // Rows we just re-scored above get the fresh score; skip escalation.
+      if (scoredDealIds.has(row.deal_id)) continue;
+      // Thank-you follow-ups fire once and don't climb — they're not a nag.
+      if (row.reason_type === 'thank_you') continue;
+      // Safety cap so a forgotten row doesn't loop forever.
+      if (row.escalation_count >= 100) continue;
+
+      const nextScore = Math.min(row.priority_score * 1.15, row.priority_ceiling);
+      if (nextScore > row.priority_score) {
+        await opsDb
+          .from('follow_up_queue')
+          .update({
+            priority_score: nextScore,
+            escalation_count: row.escalation_count + 1,
+            last_escalated_at: nowIso,
+          })
+          .eq('id', row.id);
+        escalated++;
+      }
+    }
+
+    // 8. Won/lost deals: stamp superseded_at on remaining pending rows
+    //    (record_deal_transition supersedes at transition time; this is a
+    //    belt-and-suspenders sweep for deals won before supersession
+    //    shipped). thank_you enrollments stay — they're the whole point
+    //    of the won stage's on_enter trigger.
     const { data: wonLostDeals } = await supabase
       .from('deals')
       .select('id')
@@ -518,21 +572,30 @@ export async function GET(req: Request) {
 
     if ((wonLostDeals ?? []).length) {
       const wonLostIds = wonLostDeals!.map((d) => d.id);
-      const { data: staleItems } = await db
-        .schema('ops')
+      const { data: staleItems } = await opsDb
         .from('follow_up_queue')
-        .select('id, deal_id, workspace_id')
+        .select('id, deal_id, workspace_id, reason_type')
         .in('deal_id', wonLostIds)
-        .in('status', ['pending', 'snoozed']);
+        .eq('status', 'pending')
+        .is('superseded_at', null)
+        .neq('reason_type', 'thank_you');
 
-      for (const stale of (staleItems ?? []) as { id: string; deal_id: string; workspace_id: string }[]) {
-        await db.schema('ops').from('follow_up_queue').delete().eq('id', stale.id);
+      for (const stale of ((staleItems ?? []) as unknown) as Array<{
+        id: string;
+        deal_id: string;
+        workspace_id: string;
+        reason_type: string;
+      }>) {
+        await opsDb
+          .from('follow_up_queue')
+          .update({ superseded_at: nowIso })
+          .eq('id', stale.id);
         await db.schema('ops').from('follow_up_log').insert({
           workspace_id: stale.workspace_id,
           deal_id: stale.deal_id,
           action_type: 'system_removed',
           channel: 'system',
-          summary: 'Deal status changed — removed from follow-up queue',
+          summary: 'Deal status changed — follow-up superseded',
           queue_item_id: stale.id,
         });
         removed++;
@@ -559,7 +622,7 @@ export async function GET(req: Request) {
     console.error('[cron/follow-up-queue] Insight evaluation error:', err);
   }
 
-  console.log(`[cron/follow-up-queue] Done: queued=${queued}, removed=${removed}, skipped=${skipped}, insights=${insightsGenerated}`);
-  return NextResponse.json({ queued, removed, skipped, insights: insightsGenerated });
+  console.log(`[cron/follow-up-queue] Done: queued=${queued}, removed=${removed}, escalated=${escalated}, skipped=${skipped}, insights=${insightsGenerated}`);
+  return NextResponse.json({ queued, removed, escalated, skipped, insights: insightsGenerated });
 }
 

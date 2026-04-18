@@ -129,6 +129,7 @@ export async function getOwedToday(): Promise<OwedTodayItem[]> {
       .schema('ops').from('follow_up_queue')
       .select('id, deal_id, reason, reason_type, priority_score, suggested_channel, status, snoozed_until')
       .eq('workspace_id', workspaceId).in('status', ['pending', 'snoozed'])
+      .is('superseded_at', null)
       .or(`status.eq.pending,snoozed_until.lte.${nowIso}`)
       .order('priority_score', { ascending: false }).limit(HARD_LIMIT);
 

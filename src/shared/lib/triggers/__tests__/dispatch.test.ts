@@ -35,9 +35,10 @@ function makeRow(overrides: Partial<ClaimedTransitionRow> = {}): ClaimedTransiti
     stage_triggers: [],
     stage_slug: 'inquiry',
     stage_kind: 'working',
+    stage_tags: [],
     dedup_skip: false,
     ...overrides,
-  };
+  } as ClaimedTransitionRow;
 }
 
 /** Build a stub primitive that returns a fixed result. */

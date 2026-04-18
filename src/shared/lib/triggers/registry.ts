@@ -37,9 +37,11 @@ import { sendDepositInvoicePrimitive } from './primitives/send-deposit-invoice';
 import { notifyRolePrimitive } from './primitives/notify-role';
 import { createTaskPrimitive } from './primitives/create-task';
 import { updateDealFieldPrimitive } from './primitives/update-deal-field';
+import { enrollInFollowUpPrimitive } from './primitives/enroll-follow-up';
 
 registerPrimitive(triggerHandoffPrimitive);
 registerPrimitive(sendDepositInvoicePrimitive);
 registerPrimitive(notifyRolePrimitive);
 registerPrimitive(createTaskPrimitive);
 registerPrimitive(updateDealFieldPrimitive);
+registerPrimitive(enrollInFollowUpPrimitive);

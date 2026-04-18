@@ -29,6 +29,7 @@ async function fetchStalledDeals(
     .select('id, deal_id, reason, created_at, context_snapshot')
     .eq('workspace_id', workspaceId)
     .eq('status', 'pending')
+    .is('superseded_at', null)
     .eq('reason_type', 'stall')
     .lt('created_at', fourteenDaysAgo)
     .order('priority_score', { ascending: false })

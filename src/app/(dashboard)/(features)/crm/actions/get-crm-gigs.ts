@@ -17,12 +17,18 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
   const workspaceId = await getActiveWorkspaceId();
 
   const [dealsRes, eventsRes] = await Promise.all([
+    // Use the ops.active_deals view so only working deals + won-with-future-
+    // events surface on the CRM pipeline card. Past-won deals drop into the
+    // /crm/archive surface. The view has security_invoker=true so the
+    // workspace RLS on the underlying tables still applies — we pre-filter
+    // workspace_id for query-plan locality, not as a safety measure.
+    // See supabase/migrations/20260423000000_follow_up_p0_schema.sql §6.
     workspaceId
       ? supabase
-          .from('deals')
+          .schema('ops')
+          .from('active_deals')
           .select('id, title, status, stage_id, proposed_date, organization_id, venue_id, event_archetype, lead_source, owner_entity_id, created_at, show_health')
           .eq('workspace_id', workspaceId)
-          .is('archived_at', null)
           .order('proposed_date', { ascending: true })
       : { data: [] as Record<string, unknown>[] },
     workspaceId
