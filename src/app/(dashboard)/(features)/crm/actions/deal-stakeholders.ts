@@ -339,6 +339,156 @@ export async function addDealStakeholder(
   return { success: true, id: inserted.id };
 }
 
+export type SetPrimaryHostResult = { success: true } | { success: false; error: string };
+
+/**
+ * Promote a host-role stakeholder to primary. Atomic within a single RPC-
+ * style flow: all other hosts on the deal lose `is_primary`, the target
+ * gets it. We also verify the target row's role is actually `host` — can't
+ * make a planner or bill-to "primary host."
+ *
+ * Currently runs as the authenticated client; RLS on ops.deal_stakeholders
+ * gates writes by workspace membership. Two UPDATE statements back-to-back
+ * (not a transaction yet — atomic enough for single-owner workflows where
+ * concurrent primary-toggles are not a real threat).
+ */
+export async function setPrimaryHost(
+  dealId: string,
+  targetStakeholderId: string,
+): Promise<SetPrimaryHostResult> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return { success: false, error: 'No workspace.' };
+
+  const supabase = await createClient();
+
+  const { data: deal } = await supabase
+    .from('deals')
+    .select('id')
+    .eq('id', dealId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (!deal) return { success: false, error: 'Deal not found.' };
+
+  const { data: target } = await supabase
+    .schema('ops').from('deal_stakeholders')
+    .select('id, role')
+    .eq('id', targetStakeholderId)
+    .eq('deal_id', dealId)
+    .maybeSingle();
+  if (!target) return { success: false, error: 'Stakeholder not found on this deal.' };
+  if ((target as { role: string }).role !== 'host') {
+    return { success: false, error: 'Only host-role stakeholders can be marked primary.' };
+  }
+
+  // Demote every host on this deal except the target. No-op if nothing was
+  // primary before.
+  const { error: demoteErr } = await supabase
+    .schema('ops').from('deal_stakeholders')
+    .update({ is_primary: false })
+    .eq('deal_id', dealId)
+    .eq('role', 'host')
+    .neq('id', targetStakeholderId);
+  if (demoteErr) return { success: false, error: demoteErr.message };
+
+  const { error: promoteErr } = await supabase
+    .schema('ops').from('deal_stakeholders')
+    .update({ is_primary: true })
+    .eq('id', targetStakeholderId)
+    .eq('deal_id', dealId);
+  if (promoteErr) return { success: false, error: promoteErr.message };
+
+  return { success: true };
+}
+
+export type SetPocResult =
+  | { success: true; clearedOnly: boolean }
+  | { success: false; error: string };
+
+/**
+ * Shared implementation for the two POC roles. Each of them is a single-row
+ * role on a deal (enforced by a partial unique index on `deal_id WHERE role
+ * = '<role>'`). Deletes any existing row for that role on the deal, then
+ * inserts the new one. Pass `target = null` to clear.
+ */
+async function setPocRole(
+  dealId: string,
+  role: 'day_of_poc' | 'deal_poc',
+  target: { entityId?: string; organizationId?: string } | null,
+): Promise<SetPocResult> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return { success: false, error: 'No workspace.' };
+
+  const supabase = await createClient();
+
+  const { data: deal } = await supabase
+    .from('deals')
+    .select('id')
+    .eq('id', dealId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (!deal) return { success: false, error: 'Deal not found.' };
+
+  const { error: delErr } = await supabase
+    .schema('ops').from('deal_stakeholders')
+    .delete()
+    .eq('deal_id', dealId)
+    .eq('role', role);
+  if (delErr) return { success: false, error: delErr.message };
+
+  if (target === null) return { success: true, clearedOnly: true };
+
+  const { entityId, organizationId } = target;
+  if (!entityId && !organizationId) {
+    return { success: false, error: 'Provide entityId or organizationId when assigning POC.' };
+  }
+
+  const { error: insErr } = await supabase
+    .schema('ops').from('deal_stakeholders')
+    .insert({
+      deal_id: dealId,
+      organization_id: organizationId ?? null,
+      entity_id: entityId ?? null,
+      role,
+      is_primary: false,
+    });
+  if (insErr) {
+    if (insErr.code === '23505') {
+      return { success: false, error: 'This person is already connected to the deal.' };
+    }
+    return { success: false, error: insErr.message };
+  }
+
+  return { success: true, clearedOnly: false };
+}
+
+/**
+ * Assign (or clear) the day-of point of contact on a deal. One row per
+ * deal — the partial unique index `(deal_id) WHERE role = 'day_of_poc'`
+ * enforces it. See also `setDealPoc` for the deal-lifecycle counterpart.
+ */
+export async function setDayOfPoc(
+  dealId: string,
+  target: { entityId?: string; organizationId?: string } | null,
+): Promise<SetPocResult> {
+  return setPocRole(dealId, 'day_of_poc', target);
+}
+
+/**
+ * Assign (or clear) the deal-lifecycle point of contact on a deal. This
+ * is the person you email throughout inquiry → proposal → contract →
+ * deposit. Can be the same person as the day-of POC, a host, the planner,
+ * or someone else entirely. One row per deal.
+ */
+export async function setDealPoc(
+  dealId: string,
+  target: { entityId?: string; organizationId?: string } | null,
+): Promise<SetPocResult> {
+  return setPocRole(dealId, 'deal_poc', target);
+}
+
+/** @deprecated use SetPocResult */
+export type SetDayOfPocResult = SetPocResult;
+
 export type RemoveDealStakeholderResult = { success: true } | { success: false; error: string };
 
 export async function removeDealStakeholder(dealId: string, stakeholderId: string): Promise<RemoveDealStakeholderResult> {

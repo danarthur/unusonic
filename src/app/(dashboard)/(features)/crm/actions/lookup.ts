@@ -192,6 +192,51 @@ export async function createGhostVenueEntity(name: string): Promise<string | nul
 // -----------------------------------------------------------------------------
 // createGhostPlannerEntity: create a ghost planner/agency in directory.entities + PARTNER edge.
 // -----------------------------------------------------------------------------
+/**
+ * Create a ghost person for the day-of point-of-contact slot. POCs are
+ * almost always a named human (bride's sister, day-of coordinator, etc.),
+ * so this writes a `person`-type entity — different from the planner
+ * helper which creates a company. No graph edge is written; POC is an
+ * operational role rather than a persistent partnership.
+ *
+ * Returns the entity id or null on failure.
+ */
+export async function createGhostPocEntity(name: string): Promise<string | null> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  try {
+    const supabase = await createClient();
+    const [first, ...rest] = trimmed.split(/\s+/);
+    const last = rest.join(' ');
+
+    const { data: entity, error } = await supabase
+      .schema('directory')
+      .from('entities')
+      .insert({
+        type: 'person',
+        display_name: trimmed,
+        owner_workspace_id: workspaceId,
+        attributes: {
+          is_ghost: true,
+          first_name: first ?? null,
+          last_name: last || null,
+          email: null,
+          phone: null,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (error || !entity) return null;
+    return (entity as { id: string }).id;
+  } catch {
+    return null;
+  }
+}
+
 export async function createGhostPlannerEntity(name: string): Promise<string | null> {
   const workspaceId = await getActiveWorkspaceId();
   if (!workspaceId) return null;

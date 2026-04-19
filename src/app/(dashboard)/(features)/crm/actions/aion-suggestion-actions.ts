@@ -5,6 +5,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { DismissalReasonSchema, type DismissalReason } from '@/shared/lib/triggers/schema';
+import type { Json } from '@/types/supabase';
 import { updateDealStatus, type DealStatus, type DealStatusOverride } from './update-deal-status';
 
 /**
@@ -151,7 +152,7 @@ export async function rejectStageSuggestion(
   const { error } = await system
     .schema('cortex')
     .from('aion_insights')
-    .update({ status: 'dismissed', context: nextContext })
+    .update({ status: 'dismissed', context: nextContext as Json })
     .eq('id', insightId)
     .eq('workspace_id', workspaceId);
 

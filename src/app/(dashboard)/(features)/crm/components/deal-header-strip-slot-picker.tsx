@@ -15,12 +15,13 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { searchNetworkOrgs, type NetworkSearchOrg } from '@/features/network-data';
 import { searchReferrerEntities } from '../actions/search-referrer';
 
-export type SlotType = 'venue' | 'planner' | 'client';
+export type SlotType = 'venue' | 'planner' | 'client' | 'poc';
 
 const SLOT_META: Record<SlotType, { entityTypeFilter?: string; ghostLabel: string }> = {
   venue: { entityTypeFilter: 'venue', ghostLabel: 'Add as venue' },
   planner: { ghostLabel: 'Add as planner' },
   client: { ghostLabel: 'Add as client' },
+  poc: { ghostLabel: 'Add as point of contact' },
 };
 
 export function EntityIcon({
@@ -75,7 +76,10 @@ export function SlotPicker({
       }
       debounceRef.current = setTimeout(async () => {
         setLoading(true);
-        if (slot === 'planner') {
+        if (slot === 'planner' || slot === 'poc') {
+          // Planner + POC both search the workspace's referrer/team roster.
+          // POC is typically a person already known to the workspace (a host,
+          // the planner, or a day-of coordinator they've worked with before).
           const refs = await searchReferrerEntities(q);
           setResults(
             refs.map(

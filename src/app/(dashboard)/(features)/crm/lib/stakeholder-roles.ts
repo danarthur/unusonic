@@ -5,6 +5,7 @@ export type DealStakeholderRole =
   | 'venue_contact'
   | 'vendor'
   | 'host'
+  | 'deal_poc'
   | 'day_of_poc'
   | 'booker'
   | 'principal'
@@ -16,7 +17,8 @@ const ROLE_LABEL: Record<DealStakeholderRole, string> = {
   venue_contact: 'Venue',
   vendor: 'Vendor',
   host: 'Host',
-  day_of_poc: 'Point of contact',
+  deal_poc: 'Deal contact',
+  day_of_poc: 'Day-of',
   booker: 'Booker',
   principal: 'Principal',
   representative: 'Representative',

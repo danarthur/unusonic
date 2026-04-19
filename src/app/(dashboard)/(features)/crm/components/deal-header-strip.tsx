@@ -25,11 +25,15 @@ import {
   addDealStakeholder,
   getOrgRosterForStakeholder,
   removeDealStakeholder,
+  setPrimaryHost,
+  setDayOfPoc,
+  setDealPoc,
   type DealStakeholderDisplay,
   type OrgRosterContact,
 } from '../actions/deal-stakeholders';
 import {
   createGhostPlannerEntity,
+  createGhostPocEntity,
   createGhostVenueEntity,
   getEntityDisplayName,
 } from '../actions/lookup';
@@ -60,7 +64,7 @@ import {
   OwnerPickerPortal,
 } from './deal-header-strip-scalar-pickers';
 import { ClientContactPickerSheet } from './deal-header-strip-client-sheet';
-import { PeopleStrip } from './people-strip';
+import { PeopleStrip, DealHeaderLegend } from './people-strip';
 import { resolveDealHosts, type DealHost } from '../actions/resolve-deal-hosts';
 
 // =============================================================================
@@ -167,6 +171,7 @@ export function DealHeaderStrip({
   const venueSt = stakeholders.find((s) => s.role === 'venue_contact') ?? null;
   const plannerSt = stakeholders.find((s) => s.role === 'planner') ?? null;
   const dayOfPocSt = stakeholders.find((s) => s.role === 'day_of_poc') ?? null;
+  const dealPocSt = stakeholders.find((s) => s.role === 'deal_poc') ?? null;
   const hasLegacyClient = !billTo && !!client?.organization;
 
   // ── Hosts (P0 client-field redesign) ─────────────────────────────────────
@@ -189,9 +194,33 @@ export function DealHeaderStrip({
     billTo != null
     && primaryHost != null
     && (billTo.entity_id ?? billTo.organization_id) !== primaryHost.entity_id;
+  // People strip renders hosts + secondary (standalone POCs, bill-to). Planner
+  // is explicitly NOT in this list — it has its own dedicated slot below
+  // the hosts strip, so surfacing it here would duplicate the person visually.
+  // When the planner is also the POC (deal or day-of), the badge attaches to
+  // the planner slot chip instead (see {deal}pocIsPlanner below).
+  const pocRefId = dayOfPocSt
+    ? dayOfPocSt.entity_id ?? dayOfPocSt.organization_id ?? null
+    : null;
+  const dealPocRefId = dealPocSt
+    ? dealPocSt.entity_id ?? dealPocSt.organization_id ?? null
+    : null;
+  const plannerRefId = plannerSt
+    ? plannerSt.entity_id ?? plannerSt.organization_id ?? null
+    : null;
+  const pocIsPlanner = !!pocRefId && pocRefId === plannerRefId;
+  const dealPocIsPlanner = !!dealPocRefId && dealPocRefId === plannerRefId;
+  const currentPocEntityId = pocRefId;
+  const currentDealPocEntityId = dealPocRefId;
+
   const peopleStripSecondary = [
-    ...(dayOfPocSt ? [{ role: 'day_of_poc' as const, display: dayOfPocSt }] : []),
-    ...(plannerSt ? [{ role: 'planner' as const, display: plannerSt }] : []),
+    // Surface each POC role in the hosts strip only when it isn't already
+    // visible elsewhere (planner slot). If a POC = planner, the badge moves
+    // to the planner slot so the person isn't drawn twice on the same card.
+    // People-strip's own host-dedupe further collapses POC→host into a badge
+    // on the host chip.
+    ...(dealPocSt && !dealPocIsPlanner ? [{ role: 'deal_poc' as const, display: dealPocSt }] : []),
+    ...(dayOfPocSt && !pocIsPlanner ? [{ role: 'day_of_poc' as const, display: dayOfPocSt }] : []),
     ...(billToIsSeparate && billTo ? [{ role: 'bill_to' as const, display: billTo }] : []),
   ];
 
@@ -326,9 +355,17 @@ export function DealHeaderStrip({
         handleSelectClientOrg(org);
         return;
       }
-      const role = slot === 'venue' ? 'venue_contact' : 'planner';
+      const role =
+        slot === 'venue' ? 'venue_contact' :
+        slot === 'poc'   ? 'day_of_poc' :
+        /* slot === 'planner' */ 'planner';
+      // POC is typically a person, so we pass the id as entity_id when the
+      // picked result is a person. Planner can be a company, so it stays on
+      // organization_id. Venue keeps the legacy organization_id path.
+      const pickedId = org.entity_uuid ?? org.id;
+      const isPerson = slot === 'poc' && org.entity_type === 'person';
       const result = await addDealStakeholder(deal.id, role, {
-        organizationId: org.entity_uuid ?? org.id,
+        ...(isPerson ? { entityId: pickedId } : { organizationId: pickedId }),
         isPrimary: false,
       });
       if (result.success) {
@@ -365,16 +402,23 @@ export function DealHeaderStrip({
         }
         return;
       }
-      const creator = slot === 'venue' ? createGhostVenueEntity : createGhostPlannerEntity;
+      const creator =
+        slot === 'venue'   ? createGhostVenueEntity :
+        slot === 'poc'     ? createGhostPocEntity :
+        /* slot === 'planner' */ createGhostPlannerEntity;
       const entityId = await creator(name);
       if (!entityId) {
         toast.error('Failed to create entity');
         return;
       }
       setActiveSlot(null);
-      const role = slot === 'venue' ? 'venue_contact' : 'planner';
+      const role =
+        slot === 'venue' ? 'venue_contact' :
+        slot === 'poc'   ? 'day_of_poc' :
+        /* slot === 'planner' */ 'planner';
+      // POC ghosts are person-type; planner/venue ghosts are company-type.
       const result = await addDealStakeholder(deal.id, role, {
-        organizationId: entityId,
+        ...(slot === 'poc' ? { entityId } : { organizationId: entityId }),
         isPrimary: false,
       });
       if (result.success) {
@@ -397,6 +441,84 @@ export function DealHeaderStrip({
       toast.error(result.error);
     }
   };
+
+  const handleMakePrimaryHost = useCallback(
+    async (stakeholderId: string) => {
+      // Optimistic update: flip is_primary locally before the server action
+      // commits so the star affordance feels immediate. Revert on failure.
+      const snapshot = hosts;
+      setHosts((prev) =>
+        prev.map((h) => ({ ...h, is_primary: h.stakeholder_id === stakeholderId })),
+      );
+      const result = await setPrimaryHost(deal.id, stakeholderId);
+      if (result.success) {
+        toast.success('Primary host updated.');
+        onStakeholdersChange();
+        router.refresh();
+      } else {
+        setHosts(snapshot);
+        toast.error(result.error);
+      }
+    },
+    [deal.id, hosts, onStakeholdersChange, router],
+  );
+
+  // POC toggles: one shared helper that targets either the day_of_poc or
+  // deal_poc role. When the caller's chip is already the active role, we
+  // clear (pass null). Otherwise we set the role onto the given entity.
+  // The server action replaces any existing row for that role.
+  const runPocToggle = useCallback(
+    async (
+      role: 'day_of' | 'deal',
+      target: {
+        entityId?: string | null;
+        organizationId?: string | null;
+        currentlyActive: boolean;
+      },
+    ) => {
+      const payload = target.currentlyActive
+        ? null
+        : {
+            ...(target.entityId ? { entityId: target.entityId } : {}),
+            ...(target.organizationId ? { organizationId: target.organizationId } : {}),
+          };
+      const result = role === 'day_of'
+        ? await setDayOfPoc(deal.id, payload)
+        : await setDealPoc(deal.id, payload);
+      if (result.success) {
+        const label = role === 'day_of' ? 'Day-of contact' : 'Deal contact';
+        toast.success(target.currentlyActive ? `${label} cleared.` : `${label} updated.`);
+        onStakeholdersChange();
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    },
+    [deal.id, onStakeholdersChange, router],
+  );
+
+  const handleMakePoc = useCallback(
+    (target: { entityId?: string | null; organizationId?: string | null; currentlyPoc: boolean }) =>
+      runPocToggle('day_of', {
+        entityId: target.entityId,
+        organizationId: target.organizationId,
+        currentlyActive: target.currentlyPoc,
+      }),
+    [runPocToggle],
+  );
+
+  const handleMakeDealPoc = useCallback(
+    (target: { entityId?: string | null; organizationId?: string | null; currentlyPoc: boolean }) =>
+      runPocToggle('deal', {
+        entityId: target.entityId,
+        organizationId: target.organizationId,
+        currentlyActive: target.currentlyPoc,
+      }),
+    [runPocToggle],
+  );
+
+  // (currentPocEntityId / currentDealPocEntityId / dealPocIsPlanner are
+  // derived earlier near the other stakeholder slot variables.)
 
   // ── Edit sheets ──────────────────────────────────────────────────────────
   const [sheetDetails, setSheetDetails] = useState<NodeDetail | null>(null);
@@ -456,38 +578,134 @@ export function DealHeaderStrip({
   // Render helpers
   // ============================================================================
 
-  const renderStakeholderChip = (s: DealStakeholderDisplay) => {
-    const entityId = s.organization_id;
-    return (
-      <div className="flex items-center gap-1.5 min-w-0">
+  const renderStakeholderChip = (
+    s: DealStakeholderDisplay,
+    extraBadge?: string,
+    pocActions?: {
+      dayOf?: { isActive: boolean; onToggle: () => void };
+      deal?: { isActive: boolean; onToggle: () => void };
+    },
+    onSwap?: () => void,
+  ) => {
+    // Navigate to the filled-chip's entity or the organization that owns the
+    // stakeholder row. This is what a body-click on the chip triggers —
+    // clicking the chip name goes to that person/org's network detail.
+    const navigateTargetId = s.entity_id ?? s.organization_id ?? null;
+    const goToEntity = (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      if (navigateTargetId) {
+        router.push(`/network?selected=${encodeURIComponent(navigateTargetId)}`);
+      }
+    };
+    const roleToggleButton = (
+      label: string,
+      isActive: boolean,
+      onToggle: () => void,
+      iconPath: React.ReactNode,
+    ) => (
+      <button
+        type="button"
+        onClick={(e) => {
+          // The outer fieldBlock div listens for clicks to open the
+          // SlotPicker. Swallow the event so toggling a role doesn't
+          // also pop the picker.
+          e.stopPropagation();
+          onToggle();
+        }}
+        className={cn(
+          'shrink-0 inline-flex items-center justify-center size-5 rounded-sm',
+          'opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity',
+          'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+          isActive && 'opacity-100 text-[var(--stage-text-primary)]',
+        )}
+        aria-label={label}
+        title={label}
+      >
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={isActive ? 2 : 1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {iconPath}
+        </svg>
+      </button>
+    );
+    // Body of the chip is a button that navigates to the entity when there
+    // IS an entity to navigate to. Falls back to a plain div when not
+    // clickable (missing entity reference).
+    const chipBody = (
+      <>
         <EntityIcon
           entityType={s.entity_type}
           className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0"
         />
         <span className="stage-readout truncate">{s.name}</span>
-        {entityId && (
-          <a
-            href={`/network/entity/${entityId}?kind=external_partner`}
-            onClick={(e) => e.stopPropagation()}
-            className="shrink-0 p-0.5 rounded-sm text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors"
+        {extraBadge && (
+          <span className="text-[length:var(--stage-label-size,11px)] text-[var(--stage-text-tertiary)] uppercase tracking-wide shrink-0">
+            {extraBadge}
+          </span>
+        )}
+      </>
+    );
+    const bodyClasses = 'inline-flex items-center gap-1.5 min-w-0 min-w-0 text-left';
+    return (
+      <div className="group flex items-center gap-1 min-w-0">
+        {navigateTargetId && !readOnly ? (
+          <button
+            type="button"
+            onClick={goToEntity}
+            className={cn(
+              bodyClasses,
+              'rounded-[var(--stage-radius-input,6px)] hover:text-[var(--stage-text-primary)] transition-colors',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+            )}
             title="View in network"
           >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-          </a>
+            {chipBody}
+          </button>
+        ) : (
+          <div className={bodyClasses}>{chipBody}</div>
         )}
+        {pocActions?.deal &&
+          roleToggleButton(
+            pocActions.deal.isActive ? 'Clear deal contact' : 'Make deal contact',
+            pocActions.deal.isActive,
+            pocActions.deal.onToggle,
+            // lucide MessageSquare path
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+          )}
+        {pocActions?.dayOf &&
+          roleToggleButton(
+            pocActions.dayOf.isActive ? 'Clear day-of contact' : 'Make day-of contact',
+            pocActions.dayOf.isActive,
+            pocActions.dayOf.onToggle,
+            // lucide Phone path
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />,
+          )}
+        {onSwap &&
+          roleToggleButton(
+            'Swap',
+            false,
+            onSwap,
+            // lucide Replace (two overlapping rounded squares with an arrow
+            // implied by the offset) — drawn as a simplified swap glyph.
+            <>
+              <path d="M14 4c0-1.1.9-2 2-2" />
+              <path d="M20 2c1.1 0 2 .9 2 2" />
+              <path d="M22 8c0 1.1-.9 2-2 2" />
+              <path d="M16 10c-1.1 0-2-.9-2-2" />
+              <path d="m3 7 3 3 3-3" />
+              <path d="M6 10V5c0-.55.45-1 1-1h6" />
+              <path d="m21 17-3-3-3 3" />
+              <path d="M18 14v5c0 .55-.45 1-1 1h-6" />
+            </>,
+          )}
       </div>
     );
   };
@@ -622,17 +840,61 @@ export function DealHeaderStrip({
 
             <div className="stage-divider" />
 
+            {/* Legend — documents every interactive icon used in the stakeholder
+                chips below. Rendered only when there's at least one active
+                affordance to describe; readOnly surfaces skip it entirely. */}
+            {!readOnly && (
+              <DealHeaderLegend
+                showSwap
+                showPrimary={hosts.length > 1}
+                showDealPoc
+                showDayOfPoc
+              />
+            )}
+
             {/* ── Stakeholder grid: 2×2 ── */}
             <div className="grid grid-cols-2 gap-2">
-              {/* Client */}
+              {/* Client / Hosts — PeopleStrip handles its own chip clicks.
+                  The outer fieldBlock only opens the client SlotPicker when
+                  the slot is empty (no hosts + no legacy client yet), so
+                  clicking a host chip no longer double-fires the picker. */}
               <div className="relative" data-header-picker ref={clientTriggerRef}>
                 <div
-                  className={cn(fieldBlock, 'w-full', !readOnly && fieldBlockInteractive)}
-                  onClick={!readOnly ? () => handleOpenSlot('client', clientTriggerRef) : undefined}
+                  className={cn(
+                    fieldBlock,
+                    'w-full',
+                    !readOnly && hosts.length === 0 && !hasLegacyClient && fieldBlockInteractive,
+                  )}
+                  onClick={
+                    !readOnly && hosts.length === 0 && !hasLegacyClient
+                      ? () => handleOpenSlot('client', clientTriggerRef)
+                      : undefined
+                  }
                 >
                   <p className={fieldLabel}>{hosts.length > 1 ? 'Hosts' : 'Client'}</p>
                   {hosts.length > 0 ? (
-                    <PeopleStrip hosts={hosts} secondary={peopleStripSecondary} readOnly={readOnly} />
+                    <PeopleStrip
+                      hosts={hosts}
+                      secondary={peopleStripSecondary}
+                      readOnly={readOnly}
+                      onMakePrimary={handleMakePrimaryHost}
+                      onMakePoc={(host) =>
+                        handleMakePoc({
+                          entityId: host.entity_type === 'person' ? host.entity_id : null,
+                          organizationId: host.entity_type === 'company' ? host.entity_id : null,
+                          currentlyPoc: currentPocEntityId === host.entity_id,
+                        })
+                      }
+                      currentPocEntityId={currentPocEntityId}
+                      onMakeDealPoc={(host) =>
+                        handleMakeDealPoc({
+                          entityId: host.entity_type === 'person' ? host.entity_id : null,
+                          organizationId: host.entity_type === 'company' ? host.entity_id : null,
+                          currentlyPoc: currentDealPocEntityId === host.entity_id,
+                        })
+                      }
+                      currentDealPocEntityId={currentDealPocEntityId}
+                    />
                   ) : billTo ? (
                     renderStakeholderChip(billTo)
                   ) : hasLegacyClient ? (
@@ -671,12 +933,25 @@ export function DealHeaderStrip({
               {/* Venue */}
               <div className="relative" data-header-picker ref={venueTriggerRef}>
                 <div
-                  className={cn(fieldBlock, 'w-full', !readOnly && fieldBlockInteractive)}
-                  onClick={!readOnly ? () => handleOpenSlot('venue', venueTriggerRef) : undefined}
+                  className={cn(
+                    fieldBlock,
+                    'w-full',
+                    !readOnly && !venueSt && fieldBlockInteractive,
+                  )}
+                  onClick={
+                    !readOnly && !venueSt
+                      ? () => handleOpenSlot('venue', venueTriggerRef)
+                      : undefined
+                  }
                 >
                   <p className={fieldLabel}>Venue</p>
                   {venueSt ? (
-                    renderStakeholderChip(venueSt)
+                    renderStakeholderChip(
+                      venueSt,
+                      undefined,
+                      undefined,
+                      !readOnly ? () => handleOpenSlot('venue', venueTriggerRef) : undefined,
+                    )
                   ) : (
                     <span className={emptyValue}>
                       {!readOnly ? (
@@ -747,12 +1022,48 @@ export function DealHeaderStrip({
               {/* Planner */}
               <div className="relative" data-header-picker ref={plannerTriggerRef}>
                 <div
-                  className={cn(fieldBlock, 'w-full', !readOnly && fieldBlockInteractive)}
-                  onClick={!readOnly ? () => handleOpenSlot('planner', plannerTriggerRef) : undefined}
+                  className={cn(
+                    fieldBlock,
+                    'w-full',
+                    !readOnly && !plannerSt && fieldBlockInteractive,
+                  )}
+                  onClick={
+                    !readOnly && !plannerSt
+                      ? () => handleOpenSlot('planner', plannerTriggerRef)
+                      : undefined
+                  }
                 >
                   <p className={fieldLabel}>Planner</p>
                   {plannerSt ? (
-                    renderStakeholderChip(plannerSt)
+                    renderStakeholderChip(
+                      plannerSt,
+                      // No text badge — the filled icon in the pocActions
+                      // group below communicates which role the planner holds.
+                      undefined,
+                      !readOnly
+                        ? {
+                            deal: {
+                              isActive: dealPocIsPlanner,
+                              onToggle: () =>
+                                handleMakeDealPoc({
+                                  entityId: plannerSt.entity_id,
+                                  organizationId: plannerSt.organization_id,
+                                  currentlyPoc: dealPocIsPlanner,
+                                }),
+                            },
+                            dayOf: {
+                              isActive: pocIsPlanner,
+                              onToggle: () =>
+                                handleMakePoc({
+                                  entityId: plannerSt.entity_id,
+                                  organizationId: plannerSt.organization_id,
+                                  currentlyPoc: pocIsPlanner,
+                                }),
+                            },
+                          }
+                        : undefined,
+                      !readOnly ? () => handleOpenSlot('planner', plannerTriggerRef) : undefined,
+                    )
                   ) : (
                     <span className={emptyValue}>
                       {!readOnly ? (
@@ -780,6 +1091,7 @@ export function DealHeaderStrip({
                   )}
                 </AnimatePresence>
               </div>
+
             </div>
 
             {/* ── Archetype row ── */}

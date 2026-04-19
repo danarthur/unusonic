@@ -11,6 +11,13 @@ import { COUPLE_ATTR } from '@/entities/directory/model/attribute-keys';
 export type DealHost = {
   /** directory.entities.id (always set — both new and legacy paths produce a real entity). */
   entity_id: string;
+  /**
+   * `ops.deal_stakeholders.id` for `host_stakeholder` rows. Null for
+   * synthesized chips (couple_legacy / individual_legacy / company_legacy)
+   * because those don't have a real stakeholder row to point at. Callers
+   * that need to mutate (e.g. setPrimaryHost) must guard on null.
+   */
+  stakeholder_id: string | null;
   /** 'person' or 'company' (synthesized rows from a legacy couple are 'person'). */
   entity_type: 'person' | 'company';
   /** Display name on the chip. */
@@ -100,6 +107,7 @@ export async function resolveDealHosts(dealId: string): Promise<DealHost[]> {
         }
         return {
           entity_id: id,
+          stakeholder_id: r.id,
           entity_type: isCompany ? 'company' : 'person',
           display_name: ent.display_name ?? '',
           email,
@@ -149,6 +157,7 @@ export async function resolveDealHosts(dealId: string): Promise<DealHost[]> {
     if (aName) {
       out.push({
         entity_id: legacyEnt.id,
+        stakeholder_id: null,
         entity_type: 'person',
         display_name: aName,
         email: c[COUPLE_ATTR.partner_a_email] ?? null,
@@ -160,6 +169,7 @@ export async function resolveDealHosts(dealId: string): Promise<DealHost[]> {
     if (bName) {
       out.push({
         entity_id: legacyEnt.id,
+        stakeholder_id: null,
         entity_type: 'person',
         display_name: bName,
         email: c[COUPLE_ATTR.partner_b_email] ?? null,
@@ -172,6 +182,7 @@ export async function resolveDealHosts(dealId: string): Promise<DealHost[]> {
     // Couple row with no partner attrs — fall through to display_name-only chip.
     return [{
       entity_id: legacyEnt.id,
+      stakeholder_id: null,
       entity_type: 'person',
       display_name: legacyEnt.display_name ?? 'Couple',
       email: null,
@@ -185,6 +196,7 @@ export async function resolveDealHosts(dealId: string): Promise<DealHost[]> {
     const a = readEntityAttrs(legacyEnt.attributes, 'individual');
     return [{
       entity_id: legacyEnt.id,
+      stakeholder_id: null,
       entity_type: 'person',
       display_name: legacyEnt.display_name ?? [a.first_name, a.last_name].filter(Boolean).join(' '),
       email: a.email ?? null,
@@ -198,6 +210,7 @@ export async function resolveDealHosts(dealId: string): Promise<DealHost[]> {
     const a = readEntityAttrs(legacyEnt.attributes, 'company');
     return [{
       entity_id: legacyEnt.id,
+      stakeholder_id: null,
       entity_type: 'company',
       display_name: legacyEnt.display_name ?? '',
       email: a.support_email ?? a.billing_email ?? null,
