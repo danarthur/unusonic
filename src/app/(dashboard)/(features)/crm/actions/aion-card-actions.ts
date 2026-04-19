@@ -345,6 +345,60 @@ export async function logAionCardEvent(event: AionCardEvent): Promise<void> {
   }
 }
 
+/**
+ * Cadence-accuracy telemetry (Critic P1-6 §9). Fires as a sibling event
+ * when an act lands on a row whose voice referenced cadence personalization.
+ * Predicted window = owner's typical-days-to-first-followup; actual =
+ * days elapsed from proposal-sent to act. `within_predicted_window` is
+ * calibrated ±20% of predicted (so day 5 with a typical of 4 counts as "within").
+ *
+ * Non-blocking. Failures swallowed to match logAionCardEvent.
+ */
+export async function logAionCardCadenceAccuracy(input: {
+  dealId: string;
+  followUpId: string | null;
+  predictedWindowDays: number;
+  actualDaysElapsed: number;
+  action: 'draft_nudge' | 'act_nudge' | 'dismiss_nudge' | 'snooze_nudge';
+}): Promise<void> {
+  try {
+    const workspaceId = await getActiveWorkspaceId();
+    if (!workspaceId) return;
+
+    const tolerance = 0.2;
+    const min = input.predictedWindowDays * (1 - tolerance);
+    const max = input.predictedWindowDays * (1 + tolerance);
+    const withinPredicted = input.actualDaysElapsed >= min && input.actualDaysElapsed <= max;
+
+    const system = getSystemClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
+    await (system as any)
+      .schema('ops')
+      .from('deal_activity_log')
+      .insert({
+        workspace_id: workspaceId,
+        deal_id: input.dealId,
+        actor_kind: 'user',
+        trigger_type: 'aion_card_cadence_accuracy',
+        action_summary: withinPredicted
+          ? 'Cadence prediction confirmed'
+          : 'Cadence prediction diverged',
+        status: 'success',
+        metadata: {
+          follow_up_id: input.followUpId,
+          action: input.action,
+          predicted_window_days: input.predictedWindowDays,
+          actual_days_elapsed: input.actualDaysElapsed,
+          within_predicted_window: withinPredicted,
+          tolerance,
+        },
+      });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[aion-card] logAionCardCadenceAccuracy failed:', err);
+  }
+}
+
 function buildActionSummary(event: AionCardEvent): string {
   switch (event.action) {
     case 'accept_advance':

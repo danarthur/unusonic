@@ -12,6 +12,8 @@ import { evaluateHotLeadMultiView } from './evaluators/hot-lead-multi-view';
 import { evaluateDepositGap } from './evaluators/deposit-gap';
 import { evaluateGoneQuietWithValue } from './evaluators/gone-quiet-with-value';
 import { evaluateStageAdvanceSuggestion } from './evaluators/stage-advance-suggestion';
+import { evaluateStakeholderCountTrend } from './evaluators/stakeholder-count-trend';
+import { evaluateCalendarCollision } from './evaluators/calendar-collision';
 import { OPEN_DEAL_STATUSES } from '@/shared/lib/pipeline-stages/constants';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -48,6 +50,9 @@ export async function evaluateAllInsights(workspaceId: string): Promise<InsightC
     evaluateGoneQuietWithValue(workspaceId),
     // P0 follow-up engine — tag-gated stage advance suggestions
     evaluateStageAdvanceSuggestion(workspaceId),
+    // Phase 7b Tier 2 — relational + temporal signals
+    evaluateStakeholderCountTrend(workspaceId),
+    evaluateCalendarCollision(workspaceId),
   ]);
 
   return results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));

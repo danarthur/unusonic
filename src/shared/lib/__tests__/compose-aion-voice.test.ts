@@ -31,6 +31,22 @@ function isoDaysAgo(n: number): string {
   return d.toISOString();
 }
 
+/** Shorthand: build a ProposalEngagement with the new Phase 7a fields
+ *  defaulted to null. Keeps test bodies focused on the fields they care about. */
+function proposal(
+  partial: Partial<import('../compose-aion-voice').ProposalEngagement>,
+): import('../compose-aion-voice').ProposalEngagement {
+  return {
+    sentAt: null,
+    viewCount: 0,
+    lastViewedAt: null,
+    recentHotOpens: false,
+    bouncedAt: null,
+    depositPaidAt: null,
+    ...partial,
+  };
+}
+
 function sufficientCadence(typical: number): OwnerCadenceProfile {
   return {
     userId: 'u1',
@@ -111,7 +127,7 @@ describe('composeAionVoice — days-out surfacing', () => {
       variant: 'outbound_only',
       urgency: makeUrgency(60),
       stall: null,
-      proposal: { sentAt: isoDaysAgo(5), viewCount: 0, lastViewedAt: null, recentHotOpens: false },
+      proposal: proposal({ sentAt: isoDaysAgo(5), viewCount: 0, lastViewedAt: null, recentHotOpens: false }),
       client: { firstName: 'Emily' },
       cadence: null,
     };
@@ -127,12 +143,12 @@ describe('composeAionVoice — hot-opens override', () => {
       variant: 'outbound_only',
       urgency: makeUrgency(45),
       stall: null,
-      proposal: {
+      proposal: proposal({
         sentAt: isoDaysAgo(3),
         viewCount: 3,
         lastViewedAt: new Date().toISOString(),
         recentHotOpens: true,
-      },
+      }),
       client: { firstName: 'Emily' },
       cadence: null,
     };
@@ -148,12 +164,12 @@ describe('composeAionVoice — hot-opens override', () => {
       variant: 'outbound_only',
       urgency: makeUrgency(14),
       stall: null,
-      proposal: {
+      proposal: proposal({
         sentAt: isoDaysAgo(2),
         viewCount: 4,
         lastViewedAt: new Date().toISOString(),
         recentHotOpens: true,
-      },
+      }),
       client: { firstName: 'Emily' },
       cadence: null,
     };
@@ -169,7 +185,7 @@ describe('composeAionVoice — cadence personalization (User Advocate binding ru
       variant: 'both',
       urgency: makeUrgency(null),
       stall: null,
-      proposal: { sentAt: isoDaysAgo(9), viewCount: 0, lastViewedAt: null, recentHotOpens: false },
+      proposal: proposal({ sentAt: isoDaysAgo(9), viewCount: 0, lastViewedAt: null, recentHotOpens: false }),
       client: { firstName: 'Emily' },
       cadence: sufficientCadence(4),   // typical 4d, it's been 9d → exceeded
     };
@@ -185,7 +201,7 @@ describe('composeAionVoice — cadence personalization (User Advocate binding ru
       variant: 'both',
       urgency: makeUrgency(null),
       stall: null,
-      proposal: { sentAt: isoDaysAgo(9), viewCount: 0, lastViewedAt: null, recentHotOpens: false },
+      proposal: proposal({ sentAt: isoDaysAgo(9), viewCount: 0, lastViewedAt: null, recentHotOpens: false }),
       client: { firstName: 'Emily' },
       cadence: insufficientCadence(),
     };
@@ -202,7 +218,7 @@ describe('composeAionVoice — cadence personalization (User Advocate binding ru
       variant: 'both',
       urgency: makeUrgency(null),
       stall: null,
-      proposal: { sentAt: isoDaysAgo(2), viewCount: 0, lastViewedAt: null, recentHotOpens: false },
+      proposal: proposal({ sentAt: isoDaysAgo(2), viewCount: 0, lastViewedAt: null, recentHotOpens: false }),
       client: { firstName: 'Emily' },
       cadence: sufficientCadence(5),   // typical 5d, only 2d elapsed → within window
     };
@@ -244,7 +260,7 @@ describe('composeAionVoice — stall fallback', () => {
       variant: 'both',
       urgency: makeUrgency(null),
       stall: { daysInStage: 21, stageLabel: 'Inquiry', stageRottingDays: 7 },
-      proposal: { sentAt: isoDaysAgo(10), viewCount: 0, lastViewedAt: null, recentHotOpens: false },
+      proposal: proposal({ sentAt: isoDaysAgo(10), viewCount: 0, lastViewedAt: null, recentHotOpens: false }),
       client: { firstName: 'Emily' },
       cadence: sufficientCadence(4),
     };
@@ -260,7 +276,7 @@ describe('composeAionVoice — banned phrasing (User Advocate binding rules)', (
       variant: 'both',
       urgency: makeUrgency(25),
       stall: { daysInStage: 15, stageLabel: 'Inquiry', stageRottingDays: 7 },
-      proposal: { sentAt: isoDaysAgo(10), viewCount: 0, lastViewedAt: null, recentHotOpens: false },
+      proposal: proposal({ sentAt: isoDaysAgo(10), viewCount: 0, lastViewedAt: null, recentHotOpens: false }),
       client: { firstName: 'Emily' },
       cadence: sufficientCadence(4),
     };
@@ -287,12 +303,72 @@ describe('composeAionVoice — banned phrasing (User Advocate binding rules)', (
       variant: 'outbound_only',
       urgency: makeUrgency(3),    // urgent
       stall: { daysInStage: 40, stageLabel: 'Inquiry', stageRottingDays: 7 },
-      proposal: { sentAt: isoDaysAgo(15), viewCount: 10, lastViewedAt: new Date().toISOString(), recentHotOpens: true },
+      proposal: proposal({ sentAt: isoDaysAgo(15), viewCount: 10, lastViewedAt: new Date().toISOString(), recentHotOpens: true }),
       client: { firstName: 'Emily' },
       cadence: sufficientCadence(4),
     };
     const result = composeAionVoice(input);
     expect(result.voice).not.toMatch(/!/);
+  });
+});
+
+describe('composeAionVoice — Tier 1 additions (Phase 7a)', () => {
+  it('bounced proposal overrides everything — blocker voice wins', () => {
+    const input: ComposeInput = {
+      variant: 'both',
+      urgency: makeUrgency(12),
+      stall: { daysInStage: 21, stageLabel: 'Inquiry', stageRottingDays: 7 },
+      proposal: proposal({
+        sentAt: isoDaysAgo(3),
+        viewCount: 5,
+        recentHotOpens: true,
+        bouncedAt: isoDaysAgo(2),
+      }),
+      client: { firstName: 'Emily' },
+      cadence: sufficientCadence(4),
+    };
+    const result = composeAionVoice(input);
+    expect(result.voice).toMatch(/Proposal to Emily bounced/);
+    expect(result.voice).toMatch(/address may be wrong/);
+    expect(result.contributingSignals).toEqual(['proposal_bounced']);
+    // Every other signal is explicitly suppressed — a bounce means none of
+    // the standard nudge story applies.
+    expect(result.voice).not.toMatch(/opened the proposal/);
+    expect(result.voice).not.toMatch(/days in Inquiry/);
+    expect(result.voice).not.toMatch(/days out/);
+    expect(result.voice).not.toMatch(/typical check-in/);
+  });
+
+  it('uses generic "your client" when no first name on bounce', () => {
+    const input: ComposeInput = {
+      variant: 'outbound_only',
+      urgency: makeUrgency(null),
+      stall: null,
+      proposal: proposal({ bouncedAt: isoDaysAgo(1) }),
+      client: { firstName: null },
+      cadence: null,
+    };
+    expect(composeAionVoice(input).voice).toMatch(/Proposal to your client bounced/);
+  });
+
+  it('deposit-paid suppresses hot-opens voice (belt-and-suspenders)', () => {
+    const input: ComposeInput = {
+      variant: 'outbound_only',
+      urgency: makeUrgency(45),
+      stall: null,
+      proposal: proposal({
+        sentAt: isoDaysAgo(3),
+        viewCount: 3,
+        lastViewedAt: new Date().toISOString(),
+        recentHotOpens: true,
+        depositPaidAt: isoDaysAgo(0),
+      }),
+      client: { firstName: 'Emily' },
+      cadence: null,
+    };
+    const result = composeAionVoice(input);
+    expect(result.contributingSignals).not.toContain('hot_opens');
+    expect(result.voice).not.toMatch(/opened the proposal/);
   });
 });
 

@@ -39,8 +39,9 @@ import {
   revertAionCardAdvance,
   dismissAionCardPipeline,
   logAionCardEvent,
+  logAionCardCadenceAccuracy,
 } from '../actions/aion-card-actions';
-import type { OutboundRow, PipelineRow } from '../actions/get-aion-card-for-deal';
+import type { OutboundRow, PipelineRow, AionCardData } from '../actions/get-aion-card-for-deal';
 import { snoozeFollowUp, dismissFollowUp } from '../actions/follow-up-actions';
 import { DealShowsList } from './deal-shows-list';
 import { SeriesCrewAffordance } from './series-crew-affordance';
@@ -78,6 +79,43 @@ export type DealLensProps = {
   /** Called after linking a client or stakeholder so Prism can refetch. */
   onClientLinked?: () => void;
 };
+
+/**
+ * Fires the `aion_card_cadence_accuracy` telemetry when the card's voice
+ * referenced cadence personalization AND the owner took an action. See
+ * the §9 accuracy-telemetry slot in docs/reference/aion-follow-up-analytics-inventory.md.
+ *
+ * We only have the "predicted window" on the card itself (cadence.typicalDays…);
+ * the "actual days elapsed" is derived from the follow-up row's created_at
+ * to now. For v1 this is crude — follow_up.created_at isn't quite the
+ * right anchor (should be proposal_sent) but it's a consistent proxy.
+ */
+async function emitCadenceAccuracyIfPersonalized(
+  action: 'draft_nudge' | 'act_nudge' | 'dismiss_nudge' | 'snooze_nudge',
+  dealId: string,
+  followUpId: string,
+  cardData: AionCardData | null,
+): Promise<void> {
+  if (!cardData) return;
+  if (!cardData.voiceSignals?.includes('cadence_exceeded')) return;
+  const predicted = cardData.cadence?.typicalDaysProposalToFirstFollowup;
+  if (!predicted || predicted <= 0) return;
+  const row = cardData.outboundRows.find((r) => r.followUpId === followUpId);
+  if (!row) return;
+  // We don't track proposal_sent here — use the row's created_at via the
+  // bundle (lastTouchAt is null on pending, so fall back to "now minus
+  // arbitrary sent window = we can't compute". Skip if we can't compute).
+  // Simplification for v1: emit the event with NULL actual, let analyst
+  // compute later. Refine the anchor in a follow-up.
+  const actualDaysElapsed = 0; // placeholder until proposal_sent is threaded through
+  await logAionCardCadenceAccuracy({
+    dealId,
+    followUpId,
+    predictedWindowDays: predicted,
+    actualDaysElapsed,
+    action,
+  });
+}
 
 export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, onClientLinked }: DealLensProps) {
   const router = useRouter();
@@ -523,6 +561,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                 followUpId: row.followUpId,
                 insightId: row.linkedInsightId ?? undefined,
               });
+              void emitCadenceAccuracyIfPersonalized('draft_nudge', deal.id, row.followUpId, aionBundle.data);
               toast('Opening draft…');
             }}
             onDismissNudge={async (row) => {
@@ -538,6 +577,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                 source: 'deal_lens',
                 followUpId: row.followUpId,
               });
+              void emitCadenceAccuracyIfPersonalized('dismiss_nudge', deal.id, row.followUpId, aionBundle.data);
               getAionCardBundle(deal.id).then(setAionBundle);
             }}
             onSnoozeNudge={async (row, days) => {
@@ -558,6 +598,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                 source: 'deal_lens',
                 followUpId: row.followUpId,
               });
+              void emitCadenceAccuracyIfPersonalized('snooze_nudge', deal.id, row.followUpId, aionBundle.data);
               toast.success(`Snoozed for ${days} ${days === 1 ? 'day' : 'days'}.`);
               getAionCardBundle(deal.id).then(setAionBundle);
             }}

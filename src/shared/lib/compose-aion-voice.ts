@@ -48,6 +48,10 @@ export type ProposalEngagement = {
   lastViewedAt: string | null;
   /** Whether a recent hot-viewing burst happened (≥2 opens in 48h). */
   recentHotOpens: boolean;
+  /** Set if Resend reported a bounce on the delivery. Blocker voice (Navigator A11). */
+  bouncedAt: string | null;
+  /** Set once deposit lands. Used upstream to filter stale hot-lead insights (Navigator A13). */
+  depositPaidAt: string | null;
 };
 
 export type ClientAddress = {
@@ -62,6 +66,9 @@ export type ComposeInput = {
   proposal: ProposalEngagement | null;
   client: ClientAddress;
   cadence: OwnerCadenceProfile | null;  // null when opt-in is off
+  /** Tier 2 Phase 7b — owner-entered "why" anchor. When present, surfaces
+   *  as a brief lead ("Daughter's wedding. …") that situates the deal. */
+  compellingEvent?: string | null;
 };
 
 export type ComposedVoice = {
@@ -75,6 +82,8 @@ export type ComposedVoice = {
     | 'stall_vs_rotting'
     | 'cadence_exceeded'
     | 'cadence_tooltip'
+    | 'proposal_bounced'
+    | 'compelling_event'
   >;
 };
 
@@ -91,10 +100,28 @@ export function composeAionVoice(input: ComposeInput): ComposedVoice {
   const parts: string[] = [];
   const signals: ComposedVoice['contributingSignals'] = [];
 
+  // 0. Bounced-proposal blocker (Tier 1, Navigator A11). Overrides everything
+  //    else — a data-quality issue isn't a nudge story, it's a block on the
+  //    whole follow-up loop. "No reply from Emily" makes no sense if the
+  //    email never arrived.
+  if (input.proposal?.bouncedAt) {
+    const who = input.client.firstName ?? 'your client';
+    parts.push(`Proposal to ${who} bounced. The email address may be wrong.`);
+    signals.push('proposal_bounced');
+    return { voice: parts.join(' '), contributingSignals: signals };
+  }
+
   // 1. Hot-opens lead — overrides the stall story entirely when present.
   //    User Advocate ranked proposal engagement #3 overall; when client is
   //    hot, the narrative shifts from "you're late" to "they're moving."
-  if (input.proposal?.recentHotOpens && input.proposal.viewCount >= 2) {
+  //    Skip when deposit landed — that's Phase 7a Tier 1 cleanup (Navigator
+  //    A13 is enforced upstream by filtering hot_lead insights, but the voice
+  //    would still fire here based on view_count. Belt-and-suspenders.)
+  if (
+    input.proposal?.recentHotOpens
+    && input.proposal.viewCount >= 2
+    && !input.proposal.depositPaidAt
+  ) {
     const who = input.client.firstName ?? 'the client';
     parts.push(`${who} opened the proposal ${input.proposal.viewCount}× in the last 48 hours.`);
     signals.push('hot_opens');
@@ -141,7 +168,31 @@ export function composeAionVoice(input: ComposeInput): ComposedVoice {
     parts.push(`No reply from ${input.client.firstName}.`);
   }
 
+  // 7. Compelling-event anchor (Tier 2 Phase 7b). When the owner captured
+  //    "the why" and we have any voice to pair it with, prepend the anchor
+  //    as a short lead: "Daughter's wedding. Proposal sent 9 days ago."
+  //    Preserves capitalization/punctuation the owner typed — this is their
+  //    data, surfaced as-is. Skip when voice is otherwise empty (the anchor
+  //    alone is filler, not a nudge).
+  const anchor = normalizeCompellingEvent(input.compellingEvent);
+  if (anchor && parts.length > 0) {
+    parts.unshift(anchor);
+    signals.push('compelling_event');
+  }
+
   return { voice: parts.join(' ').trim(), contributingSignals: signals };
+}
+
+/** Normalize user-entered compelling_event for voice — trim, ensure final
+ *  period, cap at 80 chars (reasonable sentence). Owner punctuation kept
+ *  otherwise. */
+function normalizeCompellingEvent(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const truncated = trimmed.length > 80 ? trimmed.slice(0, 77) + '…' : trimmed;
+  if (/[.!?…]$/.test(truncated)) return truncated;
+  return truncated + '.';
 }
 
 function buildCadenceClause(input: ComposeInput):
