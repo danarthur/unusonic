@@ -19,10 +19,6 @@
     {
       "path": "/api/cron/dispatch-triggers",
       "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/dwell-sla",
-      "schedule": "0 * * * *"
     }
   ]
 }

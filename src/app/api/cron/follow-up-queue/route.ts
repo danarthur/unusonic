@@ -622,7 +622,31 @@ export async function GET(req: Request) {
     console.error('[cron/follow-up-queue] Insight evaluation error:', err);
   }
 
-  console.log(`[cron/follow-up-queue] Done: queued=${queued}, removed=${removed}, escalated=${escalated}, skipped=${skipped}, insights=${insightsGenerated}`);
-  return NextResponse.json({ queued, removed, escalated, skipped, insights: insightsGenerated });
+  // ── Phase 3: Dwell-SLA dispatch ────────────────────────────────────────────
+  // Folded in here instead of its own Vercel cron entry so we stay under the
+  // project's cron-registration limit. The standalone endpoint at
+  // /api/cron/dwell-sla still exists and can be invoked manually when
+  // debugging; this call covers the scheduled path once per day.
+  let slaEvaluated = 0;
+  let slaSuccess = 0;
+  try {
+    const { dispatchDwellSla } = await import('@/shared/lib/triggers/dwell-sla');
+    const slaSummary = await dispatchDwellSla();
+    slaEvaluated = slaSummary.evaluated;
+    slaSuccess = slaSummary.success;
+  } catch (err) {
+    console.error('[cron/follow-up-queue] Dwell-SLA dispatch error:', err);
+  }
+
+  console.log(`[cron/follow-up-queue] Done: queued=${queued}, removed=${removed}, escalated=${escalated}, skipped=${skipped}, insights=${insightsGenerated}, sla_evaluated=${slaEvaluated}, sla_success=${slaSuccess}`);
+  return NextResponse.json({
+    queued,
+    removed,
+    escalated,
+    skipped,
+    insights: insightsGenerated,
+    sla_evaluated: slaEvaluated,
+    sla_success: slaSuccess,
+  });
 }
 
