@@ -109,7 +109,7 @@ export function GuardianSetupReminder({ flagEnabled }: GuardianSetupReminderProp
   return (
     <div
       role="status"
-      className="mx-4 mt-3 lg:mx-6 stage-panel rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.14)] bg-[var(--stage-surface)] p-4 flex items-start gap-4"
+      className="mx-4 mt-3 lg:mx-6 stage-panel p-4 flex items-start gap-4"
     >
       <ShieldCheck
         className="w-5 h-5 text-[var(--stage-accent)] shrink-0 mt-0.5"

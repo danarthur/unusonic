@@ -132,7 +132,7 @@ export function GuardianDeferralWarning({
             // of the typical pattern — we don't call onCancel on scrim click,
             // so this guard is defensive in case a future refactor adds one.
             onClick={(e) => e.stopPropagation()}
-            className="stage-panel relative mx-4 w-full max-w-lg rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.14)] bg-[var(--stage-surface)] p-8"
+            className="stage-panel relative mx-4 w-full max-w-lg p-8"
           >
             <div className="flex items-center gap-3">
               <ShieldAlert
@@ -160,7 +160,7 @@ export function GuardianDeferralWarning({
                 Without guardians, a lost phone or laptop is a permanent lockout. Your
                 workspace, your deals, your people &mdash; gone, with no way back in.
               </p>
-              <p className="text-[var(--stage-text-primary)]/75">
+              <p className="text-[var(--stage-text-primary)]">
                 Crew and employees have a separate safety net: you can reset their
                 sign-in from the members page. You are your own workspace&rsquo;s safety
                 net.

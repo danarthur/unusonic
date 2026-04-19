@@ -180,8 +180,8 @@ export function GuardianSetupStep({ onDecision }: GuardianSetupStepProps) {
       transition={{ duration: 0.25, ease: M3_EASING_ENTER }}
       className="w-full flex flex-col items-stretch gap-6"
     >
-      {/* Panel */}
-      <div className="stage-panel rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface)] p-6">
+      {/* Panel — stage-panel owns radius, border, and surface bg; redeclaring them would bypass density tokens. */}
+      <div className="stage-panel p-6">
         <div className="flex items-center gap-3">
           <ShieldCheck
             className="h-5 w-5 text-[var(--stage-accent)]"
@@ -225,7 +225,7 @@ export function GuardianSetupStep({ onDecision }: GuardianSetupStepProps) {
               );
             })}
           </div>
-          <p className="mt-2 text-xs text-[var(--stage-text-secondary)]/75">
+          <p className="mt-2 text-xs text-[var(--stage-text-secondary)]">
             Any {threshold} of your guardians can help you back in.
           </p>
         </div>
@@ -241,7 +241,7 @@ export function GuardianSetupStep({ onDecision }: GuardianSetupStepProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6, transition: { duration: 0.12, ease: M3_EASING_EXIT } }}
                 transition={STAGE_LIGHT}
-                className="flex items-center gap-3 rounded-xl border border-[var(--stage-border)] bg-[var(--ctx-well)] px-4 py-3"
+                className="flex items-center gap-3 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-4 py-3"
               >
                 <UserRound
                   className="h-4 w-4 text-[var(--stage-text-secondary)]"
@@ -271,7 +271,7 @@ export function GuardianSetupStep({ onDecision }: GuardianSetupStepProps) {
             ))}
           </AnimatePresence>
           {loaded && guardians.length === 0 ? (
-            <p className="text-xs text-[var(--stage-text-secondary)]/60">
+            <p className="text-xs text-[var(--stage-text-secondary)]">
               No guardians yet. Add at least {threshold} to continue.
             </p>
           ) : null}
