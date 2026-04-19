@@ -7,6 +7,8 @@ import { computePaymentStatus, paymentStatusLabel, paymentStatusColor } from '@/
 import { NetworkDetailSheetWithSuspense } from '@/widgets/network-detail';
 import { applyActiveEventsFilter } from '@/shared/lib/event-status/get-active-events-filter';
 import { ProductionGridShell } from './components/production-grid-shell';
+import { getWorkspaceFeatureState } from '@/app/(dashboard)/(features)/aion/actions/consent-actions';
+import { AionFirstVisitPrompt } from '@/app/(dashboard)/(features)/aion/components/AionFirstVisitPrompt';
 import type { StreamCardItem } from './components/stream-card';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from './actions/get-workspace-pipeline-stages';
 import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
@@ -309,14 +311,35 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
       ? selectedId
       : null;
 
+  // First-visit consent prompt: only when admin/owner lands on /crm with the
+  // Aion card beta still OFF and no current-version consent recorded.
+  // Non-blocking — failures fall back to prompt=false.
+  const aionState = await getWorkspaceFeatureState().catch(() => null);
+  const shouldPromptAionConsent = Boolean(
+    aionState
+      && aionState.isAdmin
+      && !aionState.cardFlagEnabled
+      && !aionState.cardConsent.accepted,
+  );
+  const isAionReconsent = Boolean(
+    aionState && aionState.cardConsent.requiresReconsent,
+  );
+
   return (
-    <ProductionGridShell
-      gigs={gigs}
-      selectedId={effectiveSelectedId}
-      streamMode={streamMode}
-      currentOrgId={currentOrgId}
-      loadError={loadError}
-      pipelineStages={pipelineStages}
-    />
+    <>
+      <ProductionGridShell
+        gigs={gigs}
+        selectedId={effectiveSelectedId}
+        streamMode={streamMode}
+        currentOrgId={currentOrgId}
+        loadError={loadError}
+        pipelineStages={pipelineStages}
+      />
+      <AionFirstVisitPrompt
+        shouldPrompt={shouldPromptAionConsent}
+        isReconsent={isAionReconsent}
+        cadencePreviouslyAccepted={aionState?.cadenceConsent.accepted ?? false}
+      />
+    </>
   );
 }

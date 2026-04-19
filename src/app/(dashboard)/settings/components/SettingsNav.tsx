@@ -18,6 +18,7 @@ import {
   Fingerprint,
   Workflow,
 } from 'lucide-react';
+import { Aion as AionIcon } from '@/shared/ui/icons/nav/aion';
 
 type NavItem = { href: string; label: string; icon: typeof Settings };
 
@@ -36,6 +37,12 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
       { href: '/settings/team', label: 'Team', icon: Users },
       { href: '/settings/roles', label: 'Roles', icon: Shield },
       { href: '/settings/roster', label: 'Roster', icon: UserCheck },
+    ],
+  },
+  {
+    label: 'AI',
+    items: [
+      { href: '/settings/aion', label: 'Aion', icon: AionIcon },
     ],
   },
   {

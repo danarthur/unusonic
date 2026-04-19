@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/dispatch-triggers",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/owner-cadence-rollup",
+      "schedule": "10 9 * * *"
     }
   ]
 }

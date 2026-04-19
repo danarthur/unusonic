@@ -10,6 +10,20 @@ import { resolveReasonCopy } from '@/shared/lib/follow-up-copy';
 import type { TriggerPrimitive } from '../types';
 
 /**
+ * reason_types that represent a stall/nudge narrative. When one of these
+ * enrolls, any active cortex.aion_insights row with trigger_type='deal_stale'
+ * for the same deal is resolved — this prevents the Today brief from rendering
+ * the same story ("deal is stalling") twice alongside the unified deal card.
+ * See design doc §11.1 case 2 and P0-4 fix.
+ */
+const STALL_NARRATIVE_REASONS: ReadonlySet<FollowUpReasonType> = new Set([
+  'stall',
+  'nudge_client',
+  'check_in',
+  'gone_quiet',
+]);
+
+/**
  * `enroll_in_follow_up` — writes a row into `ops.follow_up_queue` scoped to
  * the deal's current transition. The primitive is the glue that makes pipeline
  * stage transitions first-class signals for the follow-up engine.
@@ -137,10 +151,51 @@ export const enrollInFollowUpPrimitive: TriggerPrimitive<Config> = {
 
     const system = getSystemClient();
 
+    // Look up an active sales-domain insight for this deal. The FK
+    // linked_insight_id is a historical breadcrumb so the unified deal card
+    // reader can join insight → follow-up. Most-recent wins; NULL is fine.
+    // See design doc §8.3.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stale types
+    const cortexDb = system.schema('cortex') as any;
+    const { data: insightRows } = await cortexDb
+      .from('aion_insights')
+      .select('id, trigger_type')
+      .eq('workspace_id', ctx.workspaceId)
+      .eq('entity_type', 'deal')
+      .eq('entity_id', ctx.dealId)
+      .in('status', ['pending', 'surfaced'])
+      .order('created_at', { ascending: false })
+      .limit(5);
+    const insights = (insightRows ?? []) as Array<{ id: string; trigger_type: string }>;
+
+    // P0-4 fix: if this enrollment represents a stall narrative (stall,
+    // nudge_client, check_in, gone_quiet) AND there's an active deal_stale
+    // insight, resolve the insight now so the Today brief doesn't render
+    // the same story twice alongside the deal-page unified card.
+    const staleInsight = STALL_NARRATIVE_REASONS.has(reasonType)
+      ? insights.find((i) => i.trigger_type === 'deal_stale')
+      : undefined;
+    if (staleInsight) {
+      // resolve_aion_insight(p_trigger_type, p_entity_id) lives in cortex —
+      // matches the existing call sites in src/app/api/aion/dispatch/lib/
+      // resolve-insight.ts and src/app/api/aion/lib/insight-evaluators.ts.
+      await system.schema('cortex').rpc('resolve_aion_insight', {
+        p_trigger_type: 'deal_stale',
+        p_entity_id: ctx.dealId,
+      });
+    }
+
+    // Pick the insight to link on this follow-up row. Prefer a
+    // stage_advance_suggestion (it's the card's primary Pipeline-section
+    // source); otherwise take the most recent non-stale active insight.
+    const linkedInsightId =
+      insights.find((i) => i.trigger_type === 'stage_advance_suggestion')?.id
+      ?? insights.find((i) => i.trigger_type !== 'deal_stale')?.id
+      ?? null;
+
     // New columns (originating_transition_id, primitive_key, hide_from_portal)
-    // arrive with migration 20260423000000; generated Supabase types are stale
-    // until `npm run db:types` runs post-deploy. Cast through `any` for this
-    // insert path — matches how other ops.* writers handle the lag.
+    // arrive with migration 20260423000000; linked_insight_id with 20260425.
+    // Generated Supabase types lag until `npm run db:types` runs post-deploy.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stale types
     const opsDb = system.schema('ops') as any;
 
@@ -158,11 +213,13 @@ export const enrollInFollowUpPrimitive: TriggerPrimitive<Config> = {
         hide_from_portal: hideFromPortal,
         originating_transition_id: ctx.transitionId,
         primitive_key: primitiveKey,
+        linked_insight_id: linkedInsightId,
         context_snapshot: {
           triggered_by_transition_id: ctx.transitionId,
           dwell_days: config.dwell_days ?? null,
           priority_boost: priorityBoost,
           source: 'stage_trigger',
+          superseded_deal_stale: staleInsight?.id ?? null,
         },
       });
 

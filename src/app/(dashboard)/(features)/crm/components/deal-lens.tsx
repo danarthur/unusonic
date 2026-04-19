@@ -32,6 +32,17 @@ import { formatRelTime } from '@/shared/lib/format-currency';
 import { updateDealScalars } from '../actions/update-deal-scalars';
 import { ProductionTeamCard } from './production-team-card';
 import { AionSuggestionRow } from './aion-suggestion-row';
+import { AionDealCard } from './aion-deal-card';
+import { getAionCardBundle, type AionCardBundle } from '../actions/get-aion-card-bundle';
+import {
+  acceptAionCardAdvance,
+  revertAionCardAdvance,
+  dismissAionCardPipeline,
+  logAionCardEvent,
+  logAionCardCadenceAccuracy,
+} from '../actions/aion-card-actions';
+import type { OutboundRow, PipelineRow, AionCardData } from '../actions/get-aion-card-for-deal';
+import { snoozeFollowUp, dismissFollowUp } from '../actions/follow-up-actions';
 import { DealShowsList } from './deal-shows-list';
 import { SeriesCrewAffordance } from './series-crew-affordance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
@@ -69,6 +80,43 @@ export type DealLensProps = {
   onClientLinked?: () => void;
 };
 
+/**
+ * Fires the `aion_card_cadence_accuracy` telemetry when the card's voice
+ * referenced cadence personalization AND the owner took an action. See
+ * the §9 accuracy-telemetry slot in docs/reference/aion-follow-up-analytics-inventory.md.
+ *
+ * We only have the "predicted window" on the card itself (cadence.typicalDays…);
+ * the "actual days elapsed" is derived from the follow-up row's created_at
+ * to now. For v1 this is crude — follow_up.created_at isn't quite the
+ * right anchor (should be proposal_sent) but it's a consistent proxy.
+ */
+async function emitCadenceAccuracyIfPersonalized(
+  action: 'draft_nudge' | 'act_nudge' | 'dismiss_nudge' | 'snooze_nudge',
+  dealId: string,
+  followUpId: string,
+  cardData: AionCardData | null,
+): Promise<void> {
+  if (!cardData) return;
+  if (!cardData.voiceSignals?.includes('cadence_exceeded')) return;
+  const predicted = cardData.cadence?.typicalDaysProposalToFirstFollowup;
+  if (!predicted || predicted <= 0) return;
+  const row = cardData.outboundRows.find((r) => r.followUpId === followUpId);
+  if (!row) return;
+  // We don't track proposal_sent here — use the row's created_at via the
+  // bundle (lastTouchAt is null on pending, so fall back to "now minus
+  // arbitrary sent window = we can't compute". Skip if we can't compute).
+  // Simplification for v1: emit the event with NULL actual, let analyst
+  // compute later. Refine the anchor in a follow-up.
+  const actualDaysElapsed = 0; // placeholder until proposal_sent is threaded through
+  await logAionCardCadenceAccuracy({
+    dealId,
+    followUpId,
+    predictedWindowDays: predicted,
+    actualDaysElapsed,
+    action,
+  });
+}
+
 export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, onClientLinked }: DealLensProps) {
   const router = useRouter();
   const isLocked = !!deal.event_id;
@@ -81,6 +129,12 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
   const [crewRows, setCrewRows] = useState<DealCrewRow[]>([]);
   const [eventDates, setEventDates] = useState<{ loadIn: string | null; loadOut: string | null }>({ loadIn: null, loadOut: null });
   const [queueItem, setQueueItem] = useState<FollowUpQueueItem | null>(null);
+
+  // Fork C: unified Aion deal card — gated by `crm.unified_aion_card` flag.
+  // When `enabled=true`, `<AionDealCard>` replaces the four legacy surfaces
+  // (AionSuggestionRow, FollowUpCard, stall badge, NextActionsCard). When
+  // `enabled=false`, legacy chain renders as before.
+  const [aionBundle, setAionBundle] = useState<AionCardBundle>({ enabled: false, data: null });
 
   // Hard delete state — only relevant when deal has no event_id
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -226,6 +280,13 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
   useEffect(() => {
     if (deal?.id) {
       getFollowUpForDeal(deal.id).then(setQueueItem);
+    }
+  }, [deal?.id]);
+
+  // Fork C bundle — flag check + card data in one round-trip.
+  useEffect(() => {
+    if (deal?.id) {
+      getAionCardBundle(deal.id).then(setAionBundle);
     }
   }, [deal?.id]);
 
@@ -397,7 +458,9 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
         onStakeholdersChange={onClientLinked ?? (() => {})}
       />
 
-      {/* Position 2: Pipeline tracker */}
+      {/* Position 2: Pipeline tracker — only hosts the legacy single-row
+          suggestion when the unified Aion card is off. Flag ON lifts the
+          Aion surface out into its own sibling panel (Position 2a below). */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -411,12 +474,137 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             currentStage={currentStage}
             stages={trackerStages}
           />
-          {/* Aion stage-move suggestion — self-hides when no suggestion. */}
-          <div className="mt-4">
-            <AionSuggestionRow dealId={deal.id} />
-          </div>
+          {!(aionBundle.enabled && aionBundle.data) && (
+            <div className="mt-4">
+              <AionSuggestionRow dealId={deal.id} />
+            </div>
+          )}
         </StagePanel>
       </motion.div>
+
+      {/* Position 2a: Aion card — a panel of its own when the beta is on.
+          Sits between the pipeline tracker and the activity log so its
+          primary read is "what Aion thinks about this deal," distinct from
+          the factual pipeline state above. */}
+      {aionBundle.enabled && aionBundle.data && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={STAGE_MEDIUM}
+        >
+          <AionDealCard
+            data={aionBundle.data}
+            onAcceptAdvance={async (row) => {
+              if (!row.suggestedStageTag) {
+                toast.error('No target stage on this suggestion.');
+                return;
+              }
+              const targetStage = pipelineStages?.find(
+                (s) => Array.isArray(s.tags) && s.tags.includes(row.suggestedStageTag!),
+              );
+              if (!targetStage) {
+                toast.error('Target stage not found in this pipeline.');
+                return;
+              }
+              const result = await acceptAionCardAdvance(
+                deal.id,
+                row.insightId,
+                targetStage.id,
+              );
+              if (!result.success) {
+                toast.error(result.error ?? 'Could not move stage.');
+                getAionCardBundle(deal.id).then(setAionBundle);
+                return;
+              }
+              if (result.transitionId === null) {
+                toast(`Already at ${targetStage.label}.`, { duration: 3000 });
+                getAionCardBundle(deal.id).then(setAionBundle);
+                return;
+              }
+              const priorStageId = result.priorStageId;
+              toast(`Moved to ${targetStage.label}.`, {
+                duration: 10_000,
+                action: priorStageId
+                  ? {
+                      label: 'Undo',
+                      onClick: async () => {
+                        const revertResult = await revertAionCardAdvance(
+                          deal.id,
+                          priorStageId,
+                        );
+                        if (!revertResult.success) {
+                          toast.error(revertResult.error ?? 'Could not undo.');
+                          return;
+                        }
+                        toast.success('Reverted.');
+                        getAionCardBundle(deal.id).then(setAionBundle);
+                      },
+                    }
+                  : undefined,
+              });
+              getAionCardBundle(deal.id).then(setAionBundle);
+            }}
+            onDismissAdvance={async (row) => {
+              const result = await dismissAionCardPipeline(deal.id, row.insightId);
+              if (!result.success) {
+                toast.error(result.error ?? 'Could not dismiss.');
+                return;
+              }
+              getAionCardBundle(deal.id).then(setAionBundle);
+            }}
+            onDraftNudge={async (row) => {
+              await logAionCardEvent({
+                action: 'draft_nudge',
+                dealId: deal.id,
+                cardVariant: aionBundle.data?.variant ?? 'outbound_only',
+                source: 'deal_lens',
+                followUpId: row.followUpId,
+                insightId: row.linkedInsightId ?? undefined,
+              });
+              void emitCadenceAccuracyIfPersonalized('draft_nudge', deal.id, row.followUpId, aionBundle.data);
+              toast('Opening draft…');
+            }}
+            onDismissNudge={async (row) => {
+              const result = await dismissFollowUp(row.followUpId, 'other');
+              if (!result.success) {
+                toast.error(result.error ?? 'Could not dismiss.');
+                return;
+              }
+              await logAionCardEvent({
+                action: 'dismiss_nudge',
+                dealId: deal.id,
+                cardVariant: aionBundle.data?.variant ?? 'outbound_only',
+                source: 'deal_lens',
+                followUpId: row.followUpId,
+              });
+              void emitCadenceAccuracyIfPersonalized('dismiss_nudge', deal.id, row.followUpId, aionBundle.data);
+              getAionCardBundle(deal.id).then(setAionBundle);
+            }}
+            onSnoozeNudge={async (row, days) => {
+              const result = await snoozeFollowUp(row.followUpId, days);
+              if (!result.success) {
+                const msg = 'requireDecision' in result && result.requireDecision
+                  ? result.message
+                  : 'error' in result
+                    ? result.error
+                    : 'Could not snooze.';
+                toast.error(msg ?? 'Could not snooze.');
+                return;
+              }
+              await logAionCardEvent({
+                action: 'snooze_nudge',
+                dealId: deal.id,
+                cardVariant: aionBundle.data?.variant ?? 'outbound_only',
+                source: 'deal_lens',
+                followUpId: row.followUpId,
+              });
+              void emitCadenceAccuracyIfPersonalized('snooze_nudge', deal.id, row.followUpId, aionBundle.data);
+              toast.success(`Snoozed for ${days} ${days === 1 ? 'day' : 'days'}.`);
+              getAionCardBundle(deal.id).then(setAionBundle);
+            }}
+          />
+        </motion.div>
+      )}
 
       {/* Position 2b: Activity log — Phase 3b infra. Phase 3c populates rows. */}
       <motion.div
@@ -437,8 +625,9 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
       {/* Scalar pickers (date, archetype, budget) moved into DealHeaderStrip as portaled dropdowns */}
 
 
-      {/* Follow-up card — replaces inline stall warning with actionable follow-up */}
-      {!isLocked && initialProposal !== undefined && (
+      {/* Follow-up card — flag ON: suppressed (the unified card above carries
+          the Outbound rows). Flag OFF: legacy stall + follow-up affordance. */}
+      {!isLocked && initialProposal !== undefined && !aionBundle.enabled && (
         <FollowUpCard
           deal={deal}
           queueItem={queueItem}
@@ -807,14 +996,17 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             initialProposal={initialProposal}
           />
 
-          {/* Next actions */}
-          <NextActionsCard
-            deal={deal}
-            proposal={initialProposal}
-            stakeholders={stakeholders}
-            crewCount={crewCount}
-            stage={pipelineStages?.find((s) => s.id === deal.stage_id) ?? null}
-          />
+          {/* Next actions — flag ON: suppressed (absorbed by the unified
+              Aion card at the top of Deal Lens). Flag OFF: legacy next-actions. */}
+          {!aionBundle.enabled && (
+            <NextActionsCard
+              deal={deal}
+              proposal={initialProposal}
+              stakeholders={stakeholders}
+              crewCount={crewCount}
+              stage={pipelineStages?.find((s) => s.id === deal.stage_id) ?? null}
+            />
+          )}
         </div>
       </div>
 

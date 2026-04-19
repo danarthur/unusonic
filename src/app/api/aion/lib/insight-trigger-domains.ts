@@ -30,6 +30,10 @@ export const INSIGHT_TRIGGER_DOMAINS: Record<string, Domain> = {
 
   // P0 follow-up engine
   stage_advance_suggestion: 'sales',
+
+  // Phase 7b Tier 2 — relational + temporal
+  stakeholder_count_trend:  'sales',
+  calendar_collision:       'sales',
 };
 
 /** Look up the domain for an insight trigger_type. Unknown → 'meta'. */

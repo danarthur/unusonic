@@ -22,6 +22,7 @@ import { SessionExpiredOverlay } from "@/shared/ui/overlays/SessionExpiredOverla
 import { DensitySync } from "@/shared/ui/layout/DensitySync";
 import { SoundProvider } from "@/shared/ui/providers/SoundProvider";
 import { PasskeyNudgeBanner } from "@/widgets/passkey-nudge-banner/PasskeyNudgeBanner";
+import { AionNoticeHost } from "@/app/(dashboard)/(features)/aion/components/AionNoticeHost";
 
 /** Dashboard uses cookies (Supabase auth) — always render on the server. */
 export const dynamic = 'force-dynamic';
@@ -220,6 +221,7 @@ export default async function DashboardLayout({
           {/* Content: extra bottom padding on mobile for dock + safe area */}
           <main className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden bg-transparent pt-[env(safe-area-inset-top)] pb-[max(env(safe-area-inset-bottom),5rem)] lg:pb-0 lg:pt-0">
             <PasskeyNudgeBanner />
+            <AionNoticeHost />
             <div className="flex-1 min-h-0 min-w-0 overflow-auto flex flex-col">
               {children}
             </div>

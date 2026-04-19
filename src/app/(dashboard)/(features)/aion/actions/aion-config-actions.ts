@@ -52,6 +52,16 @@ export type AionConfig = {
   follow_up_playbook?: AionFollowUpPlaybook;
   onboarding_state?: string;
   kill_switch?: boolean;
+  /**
+   * Fork C, Ext B — owner-cadence learning opt-in. Default false. When true,
+   * `ops.metric_owner_cadence_profile` feeds `src/shared/lib/owner-cadence.ts`
+   * which personalizes the unified Aion deal card's voice + priority.
+   * GDPR Art 22 compliance — must be opt-in, never opt-out.
+   *
+   * Disabling schedules 30-day purge of `cortex.aion_memory` facts with
+   * `scope='semantic' AND fact LIKE 'Owner cadence%'` (Phase 4 cron).
+   */
+  learn_owner_cadence?: boolean;
 };
 
 // =============================================================================
@@ -95,6 +105,58 @@ export async function getAionConfigForWorkspace(workspaceId: string): Promise<Ai
 // =============================================================================
 // Mutations
 // =============================================================================
+
+/**
+ * Fork C, Ext B — toggle the `learn_owner_cadence` opt-in.
+ *
+ * When disabled, the deal-card reader stops personalizing (falls back to
+ * archetype defaults silently). Phase 4 cron soft-deletes existing cadence
+ * memories then hard-purges after 30 days.
+ */
+export async function setLearnOwnerCadence(
+  enabled: boolean,
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const workspaceId = await getActiveWorkspaceId();
+    if (!workspaceId) return { success: false, error: 'No active workspace.' };
+
+    // Validate caller is a workspace member before the service-role write.
+    // Workspace role gating for cadence opt-in itself is unnecessary (a user
+    // opts themselves in), but the authenticated session must still own a
+    // seat here.
+    const supabase = await createClient();
+    const { data: membership } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('workspace_id', workspaceId)
+      .limit(1)
+      .maybeSingle();
+    if (!membership) return { success: false, error: 'Not a workspace member.' };
+
+    const current = await getAionConfig();
+    const updated: AionConfig = { ...current, learn_owner_cadence: enabled };
+
+    // public.workspaces has RLS enabled but no UPDATE policy for authenticated
+    // callers — writes must route through the service-role client.
+    const { getSystemClient } = await import('@/shared/api/supabase/system');
+    const system = getSystemClient();
+    const { error } = await system
+      .from('workspaces')
+      .update({ aion_config: updated })
+      .eq('id', workspaceId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/aion');
+    revalidatePath('/crm');
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to update cadence opt-in.',
+    };
+  }
+}
 
 export async function saveAionVoiceConfig(
   voice: AionVoiceConfig,
