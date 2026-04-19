@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useActionState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, KeyRound, UserPlus, Loader2, Download, ShieldAlert, Trash2, Pencil, Check, X as XIcon, Plus, MessageSquare } from 'lucide-react';
+import { Shield, KeyRound, UserPlus, Loader2, Download, ShieldAlert, Trash2, Pencil, Check, X as XIcon, Plus, MessageSquare, RotateCcw } from 'lucide-react';
 import { registerPasskey } from '@/features/passkey-registration';
 import { inviteGuardian } from '@/features/guardian-invite';
 import { cancelRecovery } from '@/features/sovereign-recovery/api/actions';
@@ -11,6 +11,7 @@ import {
   listPasskeys,
   renamePasskey,
   deletePasskey,
+  adminResetMemberPasskey,
   type PasskeyRow,
 } from '@/features/auth/passkey-management/api/actions';
 import { guessDeviceName } from '@/features/auth/passkey-management/lib/guess-device-name';
@@ -35,6 +36,10 @@ interface SecuritySectionProps {
   smsSigninEnabled?: boolean;
   /** True when the caller holds owner/admin role on `workspaceId`. */
   canToggleSms?: boolean;
+  /** The signed-in user's auth.users.id — used to hide self-reset on team access rows. */
+  currentUserId?: string;
+  /** True when the caller is owner/admin of `workspaceId` and can trigger `adminResetMemberPasskey`. */
+  canResetMembers?: boolean;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -57,6 +62,8 @@ export function SecuritySection({
   workspaceId = null,
   smsSigninEnabled: initialSmsSigninEnabled = false,
   canToggleSms = false,
+  currentUserId,
+  canResetMembers = false,
 }: SecuritySectionProps) {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeyMessage, setPasskeyMessage] = useState<string | null>(null);
@@ -76,6 +83,34 @@ export function SecuritySection({
   const [smsEnabled, setSmsEnabled] = useState(initialSmsSigninEnabled);
   const [smsToggling, setSmsToggling] = useState(false);
   const [smsToggleMessage, setSmsToggleMessage] = useState<string | null>(null);
+
+  // ── Admin reset member sign-in (Phase 1 RPC + Phase 4 passkey-reset email) ──
+  const [resetTarget, setResetTarget] = useState<TeamAccessMember | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+
+  const handleConfirmReset = useCallback(async () => {
+    if (!resetTarget || !workspaceId) return;
+    setResetLoading(true);
+    setResetMessage(null);
+    try {
+      const result = await adminResetMemberPasskey({
+        workspaceId,
+        targetUserId: resetTarget.userId,
+      });
+      if (result.ok) {
+        setResetMessage({
+          kind: 'ok',
+          text: `Sign-in reset. We emailed ${resetTarget.email} a one-time link to register a new passkey.`,
+        });
+        setResetTarget(null);
+      } else {
+        setResetMessage({ kind: 'error', text: result.error });
+      }
+    } finally {
+      setResetLoading(false);
+    }
+  }, [resetTarget, workspaceId]);
 
   const handleToggleSms = useCallback(
     async (next: boolean) => {
@@ -533,6 +568,20 @@ export function SecuritySection({
             Security posture for your workspace. Members at risk may get locked out if they lose their device.
           </p>
 
+          {resetMessage && (
+            <div
+              className={`stage-panel-nested px-4 py-3 mb-4 ${
+                resetMessage.kind === 'ok' ? 'stage-stripe-info' : 'stage-stripe-error'
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-sm text-[var(--stage-text-primary)] leading-relaxed">
+                {resetMessage.text}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             {teamAccess.map((member) => (
               <div
@@ -595,15 +644,112 @@ export function SecuritySection({
                       ? 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]'
                       : 'bg-[var(--color-unusonic-warning)]/15 text-[var(--color-unusonic-warning)]'
                   }`}>
-                    <AlertTriangle className="w-3 h-3" strokeWidth={2} />
+                    <AlertTriangle className="w-3 h-3" strokeWidth={1.5} />
                     {member.risk === 'high' ? 'At risk' : 'Setup needed'}
                   </span>
+                )}
+
+                {/* Reset sign-in — owner/admin only, not for self */}
+                {canResetMembers && workspaceId && member.userId !== currentUserId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetMessage(null);
+                      setResetTarget(member);
+                    }}
+                    className="p-1.5 rounded-lg text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors shrink-0"
+                    aria-label={`Reset sign-in for ${member.fullName ?? member.email}`}
+                    title="Reset sign-in — deletes this member's passkeys and emails them a one-time link"
+                  >
+                    <RotateCcw className="w-4 h-4" strokeWidth={1.5} />
+                  </button>
                 )}
               </div>
             ))}
           </div>
         </motion.section>
       )}
+
+      {/* Confirmation dialog — destructive, two-step */}
+      <AnimatePresence>
+        {resetTarget && (
+          <motion.div
+            key="reset-member-dialog"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[9998] flex items-center justify-center p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-member-heading"
+          >
+            {/* Scrim — click-through cancels only when not loading */}
+            <div
+              className="absolute inset-0 bg-[oklch(0.06_0_0/0.80)]"
+              onClick={() => {
+                if (!resetLoading) setResetTarget(null);
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={STAGE_HEAVY}
+              className="stage-panel relative z-10 w-full max-w-md p-6"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-[oklch(1_0_0_/_0.08)] flex items-center justify-center shrink-0">
+                  <RotateCcw className="w-5 h-5 text-[var(--stage-text-primary)]" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h3
+                    id="reset-member-heading"
+                    className="text-base font-medium text-[var(--stage-text-primary)] mb-1"
+                  >
+                    Reset sign-in for {resetTarget.fullName ?? resetTarget.email}?
+                  </h3>
+                  <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
+                    We&apos;ll delete every passkey registered to this member and email them a one-time link to set up a new one. Their workspace access is not removed.
+                  </p>
+                </div>
+              </div>
+              {resetMessage?.kind === 'error' && (
+                <div className="stage-panel-nested stage-stripe-error px-4 py-3 mb-4">
+                  <p className="text-sm text-[var(--stage-text-primary)] leading-relaxed">
+                    {resetMessage.text}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResetTarget(null)}
+                  disabled={resetLoading}
+                  className="stage-btn stage-btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReset}
+                  disabled={resetLoading}
+                  className="stage-btn stage-btn-primary"
+                >
+                  {resetLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
+                      Resetting…
+                    </span>
+                  ) : (
+                    'Reset sign-in'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

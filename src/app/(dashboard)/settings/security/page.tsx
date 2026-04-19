@@ -71,6 +71,8 @@ export default async function SecuritySettingsPage() {
         workspaceId={workspaceId ?? null}
         smsSigninEnabled={smsSigninEnabled}
         canToggleSms={canToggleSms}
+        currentUserId={user.id}
+        canResetMembers={callerRole === 'owner' || callerRole === 'admin'}
       />
     </div>
   );
