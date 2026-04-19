@@ -410,10 +410,10 @@ function SignInCardV2({
         return;
       }
       // On success, verifySmsOtpAction has already set cookies on this
-      // request. Navigate to the redirect target (or root) — the
-      // middleware will route the authed user correctly.
+      // request. Navigate to the redirect target (or /lobby) — middleware
+      // Rule 4 routes portal and client roles to their correct home.
       window.location.href =
-        redirectTo && redirectTo.startsWith('/') ? redirectTo : '/';
+        redirectTo && redirectTo.startsWith('/') ? redirectTo : '/lobby';
     } finally {
       setSmsSubmitting(false);
     }

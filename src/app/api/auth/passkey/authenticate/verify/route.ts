@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
     const nextPath =
       (body.redirectTo as string)?.trim()?.startsWith('/') === true
         ? (body.redirectTo as string).trim()
-        : '/';
+        : '/lobby';
 
     // Generate a magic link OTP to get a hashed_token, then verify it server-side.
     // This avoids the implicit vs PKCE redirect ambiguity — session is established

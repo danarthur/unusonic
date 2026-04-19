@@ -347,7 +347,7 @@ export async function signInAction(
   } else if (sanitizedNext) {
     redirectPath = sanitizedNext;
   } else {
-    redirectPath = '/';
+    redirectPath = '/lobby';
   }
 
   const trustDevice = formData.get('trustDevice');
@@ -678,7 +678,7 @@ export async function verifyOtpAction(
   }
 
   const sanitized = sanitizeRedirectPath(redirectTo);
-  redirect(sanitized ?? '/');
+  redirect(sanitized ?? '/lobby');
 }
 
 // ────────────────────────────────────────────────────────────────────
