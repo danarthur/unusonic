@@ -41,7 +41,7 @@ function LandingHeader() {
         </nav>
         <div className="flex items-center gap-5">
           <Link
-            href="/login"
+            href="/login?redirect=/lobby"
             className="text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
           >
             Log in
