@@ -20,11 +20,14 @@ export function AuthHashHandler() {
   const handled = useRef(false);
 
   const finishRedirect = useCallback(() => {
+    // Default to /lobby so newly-authed magic-link users land in the app,
+    // not on the marketing page at /. Middleware Rule 4 re-routes portal
+    // and client roles to their correct home from there.
     const redirect =
       new URLSearchParams(window.location.search).get('redirect') ||
       new URLSearchParams(window.location.search).get('next') ||
-      '/';
-    const path = redirect.startsWith('/') ? redirect : '/';
+      '/lobby';
+    const path = redirect.startsWith('/') ? redirect : '/lobby';
     window.location.replace(`${window.location.origin}${path}`);
   }, []);
 
