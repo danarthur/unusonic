@@ -215,7 +215,8 @@ export function SecuritySection({
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="flex items-center gap-3">
             <Shield
-              className={`w-5 h-5 ${hasRecoveryKit ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--stage-text-primary)]/60'}`}
+              className={`w-5 h-5 ${hasRecoveryKit ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--stage-text-secondary)]'}`}
+              strokeWidth={1.5}
               aria-hidden
             />
             <h2 className="text-base font-medium text-[var(--stage-text-primary)]">Recovery kit</h2>
@@ -224,7 +225,7 @@ export function SecuritySection({
             className={`text-xs font-medium px-2.5 py-1 rounded-full ${
               hasRecoveryKit
                 ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--color-unusonic-success)]'
-                : 'bg-[var(--stage-surface)] text-[var(--stage-text-primary)]/80'
+                : 'bg-[var(--ctx-well)] text-[var(--stage-text-secondary)]'
             }`}
           >
             {hasRecoveryKit ? 'Backed up' : 'Not set up'}
@@ -249,9 +250,9 @@ export function SecuritySection({
               a.click();
               URL.revokeObjectURL(url);
             }}
-            className="stage-hover overflow-hidden inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--stage-surface)] text-[var(--stage-text-primary)] border border-[var(--stage-border)] transition-colors"
+            className="stage-btn stage-btn-secondary"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4" strokeWidth={1.5} />
             Export identity (CXF)
           </button>
         </div>
@@ -259,9 +260,9 @@ export function SecuritySection({
 
       {/* Pending recovery */}
       {pendingRecoveryRequest && (
-        <section className="rounded-2xl bg-[var(--stage-surface)] border border-[oklch(1_0_0_/_0.08)] border-l-[3px] border-l-[var(--color-unusonic-warning)] p-6">
+        <section className="stage-panel-nested stage-stripe-warning p-6">
           <div className="flex items-center gap-3 mb-2">
-            <ShieldAlert className="w-5 h-5 text-[var(--color-unusonic-warning)]" />
+            <ShieldAlert className="w-5 h-5 text-[var(--color-unusonic-warning)]" strokeWidth={1.5} />
             <h2 className="text-base font-medium text-[var(--stage-text-primary)]">Recovery in progress</h2>
           </div>
           <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mb-4">
@@ -272,9 +273,9 @@ export function SecuritySection({
             type="button"
             onClick={handleCancelRecovery}
             disabled={cancelLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)] border border-[var(--color-unusonic-warning)]/40 hover:bg-[var(--color-unusonic-warning)]/30 disabled:opacity-45"
+            className="stage-btn stage-btn-secondary"
           >
-            {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> : null}
             Cancel recovery
           </button>
           {cancelMessage && (
@@ -332,10 +333,10 @@ export function SecuritySection({
                         placeholder="Name this device"
                       />
                       <button type="button" onClick={() => handleRename(pk.id)} className="p-1 rounded text-[var(--color-unusonic-success)] hover:bg-[oklch(1_0_0_/_0.08)]" aria-label="Save">
-                        <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                        <Check className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </button>
                       <button type="button" onClick={() => setEditingId(null)} className="p-1 rounded text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.08)]" aria-label="Cancel">
-                        <XIcon className="w-3.5 h-3.5" strokeWidth={2} />
+                        <XIcon className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </button>
                     </>
                   ) : deletingId === pk.id ? (
@@ -381,7 +382,7 @@ export function SecuritySection({
         )}
 
         {passkeysLoaded && passkeys.length === 0 && (
-          <p className="text-sm text-[var(--stage-text-secondary)]/60 mb-4">
+          <p className="text-sm text-[var(--stage-text-secondary)] mb-4">
             No passkeys registered. Add one to sign in without a password.
           </p>
         )}
@@ -401,13 +402,13 @@ export function SecuritySection({
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddPasskey(); if (e.key === 'Escape') setShowAddNameInput(false); }}
               autoFocus
               placeholder="Name this device"
-              className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-[var(--ctx-well)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+              className="stage-input flex-1 min-w-0"
             />
             <button
               type="button"
               onClick={handleAddPasskey}
               disabled={passkeyLoading}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors disabled:opacity-45 shrink-0"
+              className="stage-btn stage-btn-secondary shrink-0"
             >
               {passkeyLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
@@ -431,7 +432,7 @@ export function SecuritySection({
             type="button"
             onClick={handleStartAdd}
             disabled={passkeyLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors disabled:opacity-45"
+            className="stage-btn stage-btn-secondary"
           >
             <Plus className="w-4 h-4" strokeWidth={1.5} />
             Add passkey
@@ -529,15 +530,15 @@ export function SecuritySection({
             name="guardianEmail"
             placeholder="Guardian email"
             required
-            className="w-full px-4 py-2.5 rounded-xl bg-[var(--ctx-well)] border border-[var(--stage-border)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            className="stage-input w-full"
           />
           <button
             type="submit"
             disabled={isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--stage-border-hover)] bg-[var(--stage-surface)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors disabled:opacity-45"
+            className="stage-btn stage-btn-secondary"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> : null}
-            {isPending ? 'Sending...' : 'Invite guardian'}
+            {isPending ? 'Sending…' : 'Invite guardian'}
           </button>
         </form>
         {state && (
