@@ -6,6 +6,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { redirect } from 'next/navigation';
 import { SecuritySection } from './SecuritySection';
 import { getTeamAccessData, type TeamAccessMember } from '@/features/auth/passkey-management/api/team-access';
+import { getAuthFlag } from '@/shared/lib/auth-flags';
 
 export const metadata = {
   title: 'Security | Unusonic',
@@ -41,6 +42,22 @@ export default async function SecuritySettingsPage() {
     teamAccess = await getTeamAccessData(workspaceId);
   }
 
+  // Phase 6 — SMS sign-in opt-in. Only readable if we have a workspace
+  // context for the caller; only editable if they're owner/admin.
+  // Flag-gated here so the entire section is absent when the flag is
+  // OFF (server source of truth).
+  const authV2Sms = getAuthFlag('AUTH_V2_SMS');
+  let smsSigninEnabled = false;
+  if (authV2Sms && workspaceId) {
+    const { data: workspaceRow } = await supabase
+      .from('workspaces')
+      .select('sms_signin_enabled')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    smsSigninEnabled = workspaceRow?.sms_signin_enabled ?? false;
+  }
+  const canToggleSms = callerRole === 'owner' || callerRole === 'admin';
+
   return (
     <div className="flex-1 min-h-0 overflow-auto p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-medium tracking-tight text-[var(--stage-text-primary)] mb-6">
@@ -50,6 +67,10 @@ export default async function SecuritySettingsPage() {
         hasRecoveryKit={hasRecoveryKit}
         pendingRecoveryRequest={pendingRecovery}
         teamAccess={teamAccess}
+        authV2Sms={authV2Sms}
+        workspaceId={workspaceId ?? null}
+        smsSigninEnabled={smsSigninEnabled}
+        canToggleSms={canToggleSms}
       />
     </div>
   );

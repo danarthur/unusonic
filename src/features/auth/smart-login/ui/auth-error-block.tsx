@@ -23,17 +23,18 @@ export function AuthErrorBlock({ error }: { error: string }) {
           type="button"
           onClick={() => setShowTechnical((s) => !s)}
           aria-expanded={showTechnical}
-          className="text-field-label text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors flex items-center justify-center gap-1 mx-auto"
+          className="text-field-label text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors flex items-center justify-center gap-1 mx-auto"
         >
           {showTechnical ? 'Hide technical details' : 'See what went wrong'}
           <ChevronDown
             className="w-3 h-3 transition-transform"
+            strokeWidth={1.5}
             style={{ transform: showTechnical ? 'rotate(180deg)' : undefined }}
           />
         </button>
       )}
       {showToggle && showTechnical && (
-        <p className="text-field-label text-[var(--stage-text-secondary)] font-mono break-all text-left px-2 py-1.5 rounded-lg bg-[oklch(1_0_0_/_0.10)]">
+        <p className="text-field-label text-[var(--stage-text-secondary)] font-mono break-all text-left px-2 py-1.5 rounded-lg bg-[var(--ctx-card)]">
           {display.technical}
         </p>
       )}

@@ -11,7 +11,10 @@ import { unstable_noStore, revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { createClient } from '@/shared/api/supabase/server';
 import type { NetworkGraph, ValidateInvitationResult } from '../model/types';
+import type { Role } from '@/entities/auth/model/types';
 import { COMPANY_ATTR, PERSON_ATTR } from '@/features/network-data/model/attribute-keys';
+import { getSystemClient } from '@/shared/api/supabase/system';
+import { getRoleLabel } from '@/features/team-invite/model/role-presets';
 
 const CURRENT_ORG_COOKIE = 'unusonic_current_org_id';
 
@@ -422,7 +425,66 @@ export async function getNetworkGraph(
 }
 
 /**
- * Validate an invitation token (for the claim page).
+ * Resolve a role slug (`owner` / `admin` / `manager` / `member` / `restricted` /
+ * `employee` / `client`) into the strict `Role` shape used by the claim card.
+ *
+ * Falls back to `'member'` when the slug is unknown or missing so the claim
+ * card never renders "as undefined". `manager` / `restricted` are collapsed
+ * to `member` in the user-facing slug set because `InvitationSummary.role.slug`
+ * is deliberately narrow (owner/admin/member/employee/client). The human label
+ * still carries the precise archetype name via `getRoleLabel`.
+ */
+function resolveRole(input: {
+  type: string;
+  roleSlug: string | null;
+}): Role {
+  const raw = (input.roleSlug ?? '').toLowerCase().trim();
+
+  // Type-driven default for persona flows that don't encode a role on the edge.
+  if (input.type === 'partner_summon') {
+    return { slug: 'owner', label: getRoleLabel('owner') };
+  }
+
+  switch (raw) {
+    case 'owner':
+      return { slug: 'owner', label: getRoleLabel('owner') };
+    case 'admin':
+      return { slug: 'admin', label: getRoleLabel('admin') };
+    case 'manager':
+      // Manager lives in UnusonicRolePresets but the narrow Role union
+      // collapses it onto `member` — label still reads "Manager".
+      return { slug: 'member', label: getRoleLabel('manager') };
+    case 'member':
+      return { slug: 'member', label: getRoleLabel('member') };
+    case 'restricted':
+    case 'observer':
+      return { slug: 'member', label: getRoleLabel('restricted') };
+    case 'employee':
+    case 'dj':
+      return { slug: 'employee', label: 'Team member' };
+    case 'client':
+      return { slug: 'client', label: 'Client' };
+    default:
+      // employee_invite without an explicit role edge → default to Team member.
+      if (input.type === 'employee_invite') {
+        return { slug: 'employee', label: 'Team member' };
+      }
+      return { slug: 'member', label: getRoleLabel('member') };
+  }
+}
+
+/**
+ * Validate an invitation token and resolve the full `InvitationSummary` the
+ * `/claim/[token]` card renders.
+ *
+ * Pre-auth contract: the page runs this server-side on an anon session, so
+ * directory-schema lookups may be gated by RLS. For the fields that must
+ * render (workspace name, inviter name), the payload baked in at invite-send
+ * time is the primary source. We then elevate via the service-role client
+ * (`system`) for the directory resolution — the `InvitationSummary` is only
+ * surfaced behind a tokenized link so elevating reads is safe, and it means
+ * logos and inviter entity IDs appear even when `directory` RLS would
+ * otherwise hide them from the anon caller.
  */
 export async function validateInvitation(
   token: string
@@ -431,7 +493,7 @@ export async function validateInvitation(
   const supabase = await createClient();
   const { data: inv, error } = await supabase
     .from('invitations')
-    .select('id, organization_id, email, status, expires_at, payload')
+    .select('id, organization_id, email, status, expires_at, payload, type, target_org_id, created_by_org_id')
     .eq('token', token.trim())
     .maybeSingle();
   if (error || !inv) return { ok: false, error: 'Invalid or expired invitation.' };
@@ -440,24 +502,159 @@ export async function validateInvitation(
   if (new Date(inv.expires_at) <= new Date())
     return { ok: false, error: 'This invitation has expired.' };
 
-  // Try payload first (works for anon users), then directory lookup (needs auth)
-  const payloadOrgName = (inv.payload as { orgName?: string } | null)?.orgName ?? null;
-  let orgName = payloadOrgName;
-  if (!orgName) {
-    const { data: orgEnt } = await supabase
+  const invRow = inv as {
+    id: string;
+    organization_id: string;
+    target_org_id: string | null;
+    created_by_org_id: string | null;
+    email: string;
+    status: string;
+    expires_at: string;
+    payload: { orgName?: string; inviterName?: string; redirectTo?: string } | null;
+    type: string | null;
+  };
+
+  const payloadOrgName = invRow.payload?.orgName ?? null;
+  const payloadInviterName = invRow.payload?.inviterName ?? null;
+  const inviteType = invRow.type ?? 'employee_invite';
+  const targetOrgId = invRow.target_org_id ?? invRow.organization_id;
+
+  // Resolve workspace + inviter via service role. Tokenized boundary; safe to
+  // elevate — the resolved fields are only surfaced behind the validated
+  // `/claim/[token]` URL, and the RLS for the schemas we touch would hide
+  // them from anon callers otherwise.
+  //
+  // The `as any` casts on `.schema('directory' | 'cortex')` mirror the
+  // project-wide pattern: `src/types/supabase.ts` only has coverage for the
+  // `public` schema today (see CLAUDE.md note on PR 6.5).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- public-only schema types in src/types/supabase.ts require cross-schema escape (see CLAUDE.md PR 6.5)
+  const system = getSystemClient() as any;
+
+  // Workspace resolution: from org entity → owner_workspace_id → workspaces.name/logo_url
+  let workspaceId: string | null = null;
+  let workspaceName = payloadOrgName ?? 'Your workspace';
+  let workspaceLogoUrl: string | null = null;
+  {
+    const { data: orgEnt } = await system
       .schema('directory')
       .from('entities')
-      .select('display_name')
-      .eq('legacy_org_id', inv.organization_id)
+      .select('id, display_name, avatar_url, owner_workspace_id, legacy_org_id')
+      .or(`legacy_org_id.eq.${targetOrgId},id.eq.${targetOrgId}`)
+      .eq('type', 'company')
       .maybeSingle();
-    orgName = orgEnt?.display_name ?? null;
+
+    const orgEntRow = (orgEnt as {
+      id: string;
+      display_name: string | null;
+      avatar_url: string | null;
+      owner_workspace_id: string | null;
+      legacy_org_id: string | null;
+    } | null) ?? null;
+
+    workspaceLogoUrl = orgEntRow?.avatar_url ?? null;
+    workspaceId = orgEntRow?.owner_workspace_id ?? null;
+
+    if (workspaceId) {
+      const { data: ws } = await system
+        .from('workspaces')
+        .select('name')
+        .eq('id', workspaceId)
+        .maybeSingle();
+      const wsName = (ws as { name?: string | null } | null)?.name;
+      if (wsName) workspaceName = wsName;
+    } else if (orgEntRow?.display_name) {
+      workspaceName = orgEntRow.display_name;
+    }
   }
+
+  // Inviter resolution: payload first (always present for employee invites),
+  // then fall back to the created_by_org_id's owner entity display_name.
+  let inviterDisplayName = payloadInviterName ?? 'Your team';
+  let inviterEntityId: string | null = null;
+
+  if (invRow.created_by_org_id) {
+    // Look up the org entity → find its first owner via ROSTER_MEMBER edge.
+    const { data: creatorOrgEnt } = await system
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .or(`legacy_org_id.eq.${invRow.created_by_org_id},id.eq.${invRow.created_by_org_id}`)
+      .eq('type', 'company')
+      .maybeSingle();
+    const creatorOrgId = (creatorOrgEnt as { id: string } | null)?.id ?? null;
+
+    if (creatorOrgId) {
+      const { data: ownerRel } = await system
+        .schema('cortex')
+        .from('relationships')
+        .select('source_entity_id, context_data')
+        .eq('target_entity_id', creatorOrgId)
+        .eq('relationship_type', 'ROSTER_MEMBER')
+        .limit(5);
+
+      const rels = (ownerRel as Array<{ source_entity_id: string; context_data: Record<string, unknown> | null }> | null) ?? [];
+      const rolePriority: Record<string, number> = { owner: 0, admin: 1, manager: 2, member: 3, restricted: 4 };
+      const sorted = [...rels].sort(
+        (a, b) => (rolePriority[((a.context_data ?? {}).role as string) ?? ''] ?? 99)
+          - (rolePriority[((b.context_data ?? {}).role as string) ?? ''] ?? 99)
+      );
+      const top = sorted[0];
+      if (top) {
+        inviterEntityId = top.source_entity_id;
+        if (!payloadInviterName) {
+          const { data: inviterEnt } = await system
+            .schema('directory')
+            .from('entities')
+            .select('display_name')
+            .eq('id', top.source_entity_id)
+            .maybeSingle();
+          const name = (inviterEnt as { display_name?: string | null } | null)?.display_name;
+          if (name) inviterDisplayName = name;
+        }
+      }
+    }
+  }
+
+  // Role resolution: prefer the invitee's ROSTER_MEMBER edge context_data.role
+  // (set by add_ghost_member during invite creation). Fall back to the invite
+  // type when no edge exists yet.
+  let roleSlug: string | null = null;
+  {
+    const { data: ghostPerson } = await system
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .ilike('attributes->>email', invRow.email)
+      .eq('type', 'person')
+      .is('claimed_by_user_id', null)
+      .limit(1);
+    const ghostPersonId = ((ghostPerson as Array<{ id: string }> | null) ?? [])[0]?.id ?? null;
+    if (ghostPersonId) {
+      const { data: rosterEdge } = await system
+        .schema('cortex')
+        .from('relationships')
+        .select('context_data')
+        .eq('source_entity_id', ghostPersonId)
+        .eq('relationship_type', 'ROSTER_MEMBER')
+        .limit(1);
+      const ctx = (((rosterEdge as Array<{ context_data: Record<string, unknown> | null }> | null) ?? [])[0]?.context_data) ?? null;
+      const role = ctx?.role;
+      if (typeof role === 'string') roleSlug = role;
+    }
+  }
+
+  const role = resolveRole({ type: inviteType, roleSlug });
 
   return {
     ok: true,
-    email: inv.email,
-    org_name: orgName ?? 'Organization',
-    organization_id: inv.organization_id,
+    workspaceId: workspaceId ?? '',
+    workspaceName,
+    workspaceLogoUrl,
+    inviterDisplayName,
+    inviterEntityId,
+    role,
+    email: invRow.email,
+    expiresAt: invRow.expires_at,
   };
 }
 

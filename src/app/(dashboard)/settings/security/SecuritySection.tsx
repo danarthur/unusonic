@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useActionState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, KeyRound, UserPlus, Loader2, Download, ShieldAlert, Trash2, Pencil, Check, X as XIcon, Plus } from 'lucide-react';
+import { Shield, KeyRound, UserPlus, Loader2, Download, ShieldAlert, Trash2, Pencil, Check, X as XIcon, Plus, MessageSquare } from 'lucide-react';
 import { registerPasskey } from '@/features/passkey-registration';
 import { inviteGuardian } from '@/features/guardian-invite';
 import { cancelRecovery } from '@/features/sovereign-recovery/api/actions';
@@ -15,6 +15,7 @@ import {
 } from '@/features/auth/passkey-management/api/actions';
 import { guessDeviceName } from '@/features/auth/passkey-management/lib/guess-device-name';
 import type { TeamAccessMember } from '@/features/auth/passkey-management/api/team-access';
+import { toggleSmsSigninEnabled } from '@/features/auth/smart-login/api/sms-actions';
 import { Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
@@ -26,6 +27,14 @@ interface SecuritySectionProps {
   hasRecoveryKit?: boolean;
   pendingRecoveryRequest?: PendingRecovery;
   teamAccess?: TeamAccessMember[] | null;
+  /** Phase 6 — `AUTH_V2_SMS` flag mirror. OFF → hide the Sign-in options section. */
+  authV2Sms?: boolean;
+  /** Current workspace the toggle writes to. `null` disables the control. */
+  workspaceId?: string | null;
+  /** Initial value read server-side. */
+  smsSigninEnabled?: boolean;
+  /** True when the caller holds owner/admin role on `workspaceId`. */
+  canToggleSms?: boolean;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -44,6 +53,10 @@ export function SecuritySection({
   hasRecoveryKit = false,
   pendingRecoveryRequest = null,
   teamAccess,
+  authV2Sms = false,
+  workspaceId = null,
+  smsSigninEnabled: initialSmsSigninEnabled = false,
+  canToggleSms = false,
 }: SecuritySectionProps) {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeyMessage, setPasskeyMessage] = useState<string | null>(null);
@@ -58,6 +71,34 @@ export function SecuritySection({
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
   const [state, formAction, isPending] = useActionState(inviteGuardian, null);
+
+  // ── Phase 6 — SMS opt-in toggle state ───────────────────────────────────
+  const [smsEnabled, setSmsEnabled] = useState(initialSmsSigninEnabled);
+  const [smsToggling, setSmsToggling] = useState(false);
+  const [smsToggleMessage, setSmsToggleMessage] = useState<string | null>(null);
+
+  const handleToggleSms = useCallback(
+    async (next: boolean) => {
+      if (!workspaceId) return;
+      // Optimistic flip; roll back on failure.
+      setSmsEnabled(next);
+      setSmsToggleMessage(null);
+      setSmsToggling(true);
+      try {
+        const result = await toggleSmsSigninEnabled(workspaceId, next);
+        if (!result.ok) {
+          setSmsEnabled(!next);
+          setSmsToggleMessage(result.error);
+        }
+      } catch {
+        setSmsEnabled(!next);
+        setSmsToggleMessage('Could not update setting.');
+      } finally {
+        setSmsToggling(false);
+      }
+    },
+    [workspaceId],
+  );
 
   const refreshPasskeys = useCallback(async () => {
     const rows = await listPasskeys();
@@ -367,6 +408,71 @@ export function SecuritySection({
           </p>
         )}
       </motion.section>
+
+      {/* Phase 6 — Sign-in options (SMS opt-in). Rendered only when the
+          feature flag is ON; gated further to owner/admin editability. */}
+      {authV2Sms && workspaceId ? (
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...sectionSpring, delay: 0.2 }}
+          className="stage-panel p-6"
+          data-testid="security-sms-signin-section"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <MessageSquare className="w-5 h-5 text-[var(--stage-accent)]" strokeWidth={1.5} />
+            <h2 className="text-base font-medium text-[var(--stage-text-primary)]">
+              Sign-in options
+            </h2>
+          </div>
+          <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mb-4">
+            Let members sign in with a 6-digit code sent to their phone. Useful
+            when venue Wi-Fi blocks email delivery. The magic link stays the
+            default; SMS only appears after a member first asks for their
+            email link.
+          </p>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-[var(--ctx-well)] border border-[var(--stage-border)]">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-[var(--stage-text-primary)]">
+                SMS sign-in code
+              </p>
+              <p className="text-xs text-[var(--stage-text-secondary)]">
+                {canToggleSms
+                  ? 'Only workspace owners and admins can change this.'
+                  : 'Contact your workspace owner to change this.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={smsEnabled}
+              aria-label="Enable SMS sign-in code"
+              disabled={!canToggleSms || smsToggling}
+              onClick={() => handleToggleSms(!smsEnabled)}
+              data-testid="security-sms-signin-toggle"
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ${
+                smsEnabled
+                  ? 'bg-[var(--color-unusonic-success)]/40 border-[var(--color-unusonic-success)]/60'
+                  : 'bg-[var(--stage-surface)] border-[var(--stage-border)]'
+              }`}
+            >
+              <span
+                aria-hidden
+                className={`inline-block h-4 w-4 rounded-full bg-[var(--stage-text-primary)] transition-transform ${
+                  smsEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {smsToggleMessage ? (
+            <p className="mt-3 text-sm text-[var(--color-unusonic-error)] leading-relaxed">
+              {smsToggleMessage}
+            </p>
+          ) : null}
+        </motion.section>
+      ) : null}
 
       {/* Safety Net */}
       <motion.section

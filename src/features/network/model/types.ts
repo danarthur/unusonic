@@ -45,6 +45,16 @@ export interface NetworkGraph {
   entities: (NetworkEntity & { organization_names: string[]; skill_tags?: string[]; org_member_id?: string | null })[];
 }
 
+import type { InvitationSummary } from '@/entities/auth/model/types';
+
+/**
+ * Result of `validateInvitation` — the full `InvitationSummary` on success,
+ * or a user-facing error string on failure.
+ *
+ * Shape aligned with Phase 3 of the login redesign
+ * (`docs/reference/login-redesign-implementation-plan.md` §Connector types).
+ * The `/claim/[token]` page is the one caller today.
+ */
 export type ValidateInvitationResult =
-  | { ok: true; email: string; org_name: string; organization_id: string }
+  | ({ ok: true } & InvitationSummary)
   | { ok: false; error: string };

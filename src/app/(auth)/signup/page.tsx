@@ -20,7 +20,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   const redirectTo = redirect || next;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative">
+    <div className="min-h-screen flex items-center justify-center p-6 relative bg-stage-void">
       {/* Spotlight / Cove Light — single light source from top, no colored orbs */}
       <div className="fixed inset-0 z-0 bg-[var(--stage-void)] pointer-events-none" aria-hidden>
         <div className="absolute inset-0 grain-overlay" aria-hidden />

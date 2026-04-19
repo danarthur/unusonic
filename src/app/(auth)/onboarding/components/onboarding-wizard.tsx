@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useTransition, useRef, useCallback, useEffect } from 'react';
+import { useState, useTransition, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Sentry from '@sentry/nextjs';
 import { User, Camera, Loader2, X, Check } from 'lucide-react';
@@ -20,6 +20,7 @@ import { GenesisOrchestrator } from '@/features/onboarding';
 import { AionOnboardingShell } from '@/features/onboarding/ui/aion-onboarding-shell';
 import { OnboardingChatInput } from '@/features/onboarding/ui/onboarding-chat-input';
 import { WebsiteStep } from '@/features/onboarding/ui/website-step';
+import { GuardianSetupStep, type GuardianStepDecision } from '@/features/onboarding/ui/guardian-setup-step';
 import type { ScoutOnboardingPayload } from '@/features/onboarding/ui/website-step';
 import type { UserPersona } from '@/features/onboarding/model/subscription-types';
 import type { LivingLogoStatus } from '@/shared/ui/branding/living-logo';
@@ -39,21 +40,52 @@ interface OnboardingState {
 
 interface OnboardingWizardProps {
   initialState: OnboardingState;
+  /**
+   * When true (Phase 5), a non-skippable guardian setup step is inserted
+   * between the website step and workspace genesis. Resolved on the server
+   * from the `AUTH_V2_GUARDIAN_GATE` flag so we don't need to expose the
+   * flag via NEXT_PUBLIC_*.
+   */
+  guardianGateEnabled?: boolean;
 }
 
-const STEPS = 3;
+type StepId = 'profile' | 'website' | 'guardian' | 'genesis';
 
-export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
+export function OnboardingWizard({
+  initialState,
+  guardianGateEnabled = false,
+}: OnboardingWizardProps) {
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Ordered step list. Guardian gate is a true gate: when the flag is on, the
+  // step exists between website and genesis, and the wizard's state machine
+  // refuses to advance past it without an explicit decision. When the flag is
+  // off, the list collapses to the legacy three-step flow byte-for-byte.
+  const stepIds = useMemo<StepId[]>(
+    () => (guardianGateEnabled ? ['profile', 'website', 'guardian', 'genesis'] : ['profile', 'website', 'genesis']),
+    [guardianGateEnabled],
+  );
+
+  const indexOf = useCallback(
+    (id: StepId) => stepIds.indexOf(id),
+    [stepIds],
+  );
+
+  const [guardianDecided, setGuardianDecided] = useState(false);
+
   const computeInitialStep = () => {
-    if (initialState.profile.fullName && initialState.hasWorkspace) return STEPS - 1;
-    if (initialState.profile.fullName?.trim()) return Math.max(1, Math.min(initialState.profile.onboardingStep, STEPS - 1));
-    return Math.min(initialState.profile.onboardingStep, STEPS - 1);
+    const last = stepIds.length - 1;
+    if (initialState.profile.fullName && initialState.hasWorkspace) return last;
+    const cap = guardianGateEnabled ? Math.min(last - 1, indexOf('guardian')) : last;
+    const websiteIdx = indexOf('website');
+    if (initialState.profile.fullName?.trim()) {
+      return Math.max(websiteIdx, Math.min(initialState.profile.onboardingStep, cap));
+    }
+    return Math.min(initialState.profile.onboardingStep, cap);
   };
 
-  const minStep = initialState.profile.fullName?.trim() ? 1 : 0;
+  const minStep = initialState.profile.fullName?.trim() ? indexOf('website') : 0;
 
   const [currentStep, setCurrentStep] = useState(computeInitialStep);
   const [slideX, setSlideX] = useState(24);
@@ -109,61 +141,101 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
         setError(result.error || 'Could not save profile');
         return;
       }
-      await updateOnboardingStep(1);
+      const next = indexOf('website');
+      await updateOnboardingStep(next);
       setProfileSubmitted(true);
       setTimeout(() => {
         setProfileSubmitted(false);
-        goToStep(1, 0);
+        goToStep(next, currentStep);
       }, 350);
     });
   };
 
-  const handleUseScout = (payload: ScoutOnboardingPayload) => {
+  // After the website step, advance to the next step in the list \u2014 that\u2019s
+  // the guardian gate when Phase 5 is on, otherwise genesis. The wizard
+  // refuses to advance past the guardian gate without a recorded decision
+  // (see `handleGuardianDecision`).
+  const advanceFromWebsite = (payload: ScoutOnboardingPayload | null) => {
     setError(null);
     setScoutPayload(payload);
     const from = currentStep;
+    const nextId: StepId = guardianGateEnabled ? 'guardian' : 'genesis';
+    const next = indexOf(nextId);
     startTransition(async () => {
-      await updateOnboardingStep(2);
-      goToStep(2, from);
+      await updateOnboardingStep(next);
+      goToStep(next, from);
     });
+  };
+
+  const handleUseScout = (payload: ScoutOnboardingPayload) => {
+    advanceFromWebsite(payload);
   };
 
   const handleSkipWebsite = () => {
-    setError(null);
-    setScoutPayload(null);
-    const from = currentStep;
-    startTransition(async () => {
-      await updateOnboardingStep(2);
-      goToStep(2, from);
-    });
+    advanceFromWebsite(null);
   };
 
+  // Guardian gate resolution. Both outcomes advance to genesis; the only
+  // difference is the recorded deferral flag (owned by the server action).
+  // No third exit: the step itself blocks any attempt to move on without a
+  // decision, and the wizard's state machine refuses to increment past the
+  // guardian index until this runs.
+  const handleGuardianDecision = useCallback(
+    (_decision: GuardianStepDecision) => {
+      setGuardianDecided(true);
+      const from = currentStep;
+      const next = indexOf('genesis');
+      startTransition(async () => {
+        await updateOnboardingStep(next);
+        goToStep(next, from);
+      });
+    },
+    [currentStep, indexOf, goToStep],
+  );
+
   const handleBack = () => {
+    // Block rewinding past the guardian gate once a decision has been
+    // recorded. The user can still go forward (genesis) but cannot reopen
+    // the gate they already answered. Back from the guardian step itself
+    // to the website step is always allowed \u2014 no decision yet.
+    const currentId = stepIds[currentStep];
+    if (currentId === 'genesis' && guardianDecided) return;
     if (currentStep > minStep) {
       goToStep(currentStep - 1, currentStep);
       setError(null);
     }
   };
 
-  const onBack = currentStep > minStep ? handleBack : undefined;
+  const canGoBack = (() => {
+    if (currentStep <= minStep) return false;
+    const currentId = stepIds[currentStep];
+    if (currentId === 'genesis' && guardianDecided) return false;
+    return true;
+  })();
+
+  const onBack = canGoBack ? handleBack : undefined;
+
+  const currentId = stepIds[currentStep] ?? 'profile';
+  const prompt =
+    currentId === 'profile'
+      ? 'What should we call you?'
+      : currentId === 'website'
+        ? "Let's build your studio"
+        : currentId === 'guardian'
+          ? 'Set up recovery guardians'
+          : 'Name your workspace';
 
   return (
     <AionOnboardingShell
-      prompt={
-        currentStep === 0
-          ? 'What should we call you?'
-          : currentStep === 1
-            ? "Let's build your studio"
-            : 'Name your workspace'
-      }
-      logoStatus={currentStep === 2 ? genesisLogoStatus : 'idle'}
+      prompt={prompt}
+      logoStatus={currentId === 'genesis' ? genesisLogoStatus : 'idle'}
       stepIndex={currentStep}
-      stepTotal={STEPS}
+      stepTotal={stepIds.length}
       onBack={onBack}
-      contentMaxWidth={currentStep === 1 ? '2xl' : 'lg'}
+      contentMaxWidth={currentId === 'website' ? '2xl' : 'lg'}
       hideStepIndicator
       footer={
-        currentStep === 0 ? (
+        currentId === 'profile' ? (
           <div className="w-full space-y-4">
             <OnboardingChatInput
               value={fullName}
@@ -177,7 +249,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
       }
     >
       <AnimatePresence mode="popLayout" initial={false}>
-        {currentStep === 0 && (
+        {currentId === 'profile' && (
           <motion.div
             key="profile"
             initial={{ opacity: 0, x: slideX }}
@@ -253,7 +325,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
           </motion.div>
         )}
 
-        {currentStep === 1 && (
+        {currentId === 'website' && (
           <motion.div
             key="website"
             initial={{ opacity: 0, x: slideX }}
@@ -265,7 +337,19 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
           </motion.div>
         )}
 
-        {currentStep === 2 && (
+        {currentId === 'guardian' && (
+          <motion.div
+            key="guardian"
+            initial={{ opacity: 0, x: slideX }}
+            animate={{ opacity: 1, x: 0, transition: { duration: 0.28, ease: M3_EASING_ENTER } }}
+            exit={{ opacity: 0, x: -slideX, transition: { duration: 0.18, ease: M3_EASING_EXIT } }}
+            className="w-full"
+          >
+            <GuardianSetupStep onDecision={handleGuardianDecision} />
+          </motion.div>
+        )}
+
+        {currentId === 'genesis' && (
           <motion.div
             key="genesis"
             initial={{ opacity: 0, x: slideX }}

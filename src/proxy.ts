@@ -10,7 +10,7 @@ const DASHBOARD_HOME = '/lobby';
 const PORTAL_HOME = '/schedule';
 const CLIENT_HOME = '/client/home';
 const PORTAL_ROUTES = ['/schedule', '/my-calendar', '/profile', '/pay', '/pipeline', '/proposals', '/setlists', '/riders', '/crew-status'];
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p/', '/claim', '/confirm', '/crew/', '/bridge'];
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p/', '/claim', '/confirm', '/crew/', '/bridge', '/api/auth/passkey/authenticate', '/api/auth/recover/request'];
 // Client portal has its own auth (session cookie or Supabase auth via claimed entity).
 // See docs/reference/client-portal-design.md §14–§17. The proxy does NOT enforce
 // anything on /client/* or /api/client-portal/* — the route group's layout and

@@ -46,26 +46,22 @@ export async function POST(request: NextRequest) {
     const system = getSystemClient();
 
     if (email) {
-      // Identified flow: restrict to this user's passkeys.
-      // GoTrue admin REST supports ?email= for a targeted single-user lookup — avoids the
-      // listUsers full-table scan and the SDK's 1000-user cap. getUserByEmail does not exist
-      // in @supabase/auth-js v2.x so we call the REST endpoint directly.
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-      const adminRes = await fetch(
-        `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}&page=1&per_page=1`,
-        { headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } }
-      );
-      const adminData = adminRes.ok ? await adminRes.json() : null;
-      const user = adminData?.users?.[0] ?? null;
-      if (!user?.id) {
+      // Identified flow: restrict to this user's passkeys. The GoTrue
+      // `?email=` REST param is not a filter (verified 2026-04-19: it ignores
+      // the param and returns the first user in the table), so we use the
+      // project's existing SECURITY DEFINER RPC instead.
+      const { data: userId } = await system.rpc('get_user_id_by_email', {
+        user_email: email,
+      });
+      if (!userId) {
         return NextResponse.json(
           { error: 'Sign in with passkey is not available for this account.' },
           { status: 400 }
         );
       }
 
-      resolvedUserId = user.id;
+      resolvedUserId = userId as string;
+      const user = { id: resolvedUserId };
 
       // Rate limit per user
       const rateResult = await checkPasskeyOptionsRate(user.id);

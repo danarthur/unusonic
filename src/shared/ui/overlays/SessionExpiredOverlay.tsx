@@ -5,39 +5,84 @@
  *
  * Instead of redirecting to /login (which destroys all React state, scroll
  * position, and form inputs), this overlay renders on top of the current page
- * with a backdrop blur. The user taps their passkey to re-authenticate in
- * place. After success, the overlay lifts and the page is exactly as they
- * left it.
+ * with a backdrop scrim. The user taps their Face ID / Touch ID / Windows
+ * Hello to re-authenticate in place. After success, the overlay lifts and
+ * the page is exactly as they left it.
  *
- * Inspired by 1Password's lock screen and Google Docs' "Sign in to save" overlay.
+ * Inspired by 1Password's lock screen and Google Docs' "Sign in to save"
+ * overlay.
+ *
+ * ## Phase 4 changes
+ *
+ * - The 6-digit-OTP fallback is replaced by a magic-link send when
+ *   `AUTH_V2_LOGIN_CARD` is ON. The OTP code path remains in place behind
+ *   the flag for rollback. After the flag ships 100%, the OTP branch gets
+ *   deleted as part of cleanup.
+ * - Primary CTA uses device-aware copy via `getDeviceCopy()`. Never
+ *   "Sign in with passkey".
+ * - Every input and button migrates to `stage-input` / `stage-btn stage-btn-*`
+ *   primitives. The hand-rolled `bg-[oklch(...)]` / `ring-ring/30` patterns
+ *   called out in the 2026-04-18 design audit are gone.
  *
  * @module shared/ui/overlays/SessionExpiredOverlay
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2, Lock, Mail } from 'lucide-react';
+
 import { useAuthStatusStore } from '@/shared/lib/auth/auth-status-store';
 import { reauthenticatePasskey } from '@/shared/lib/auth/reauthenticate-passkey';
-import { sendOtpAction, verifyOtpAction } from '@/features/auth/smart-login/api/actions';
+import {
+  sendMagicLinkAction,
+  sendOtpAction,
+  verifyOtpAction,
+} from '@/features/auth/smart-login/api/actions';
 import { createClient } from '@/shared/api/supabase/client';
 import { getQueryClient } from '@/shared/api/query-client';
 import { STAGE_HEAVY, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { classifyUserAgent } from '@/shared/lib/auth/classify-user-agent';
+import {
+  deviceCapabilityFromUserAgentClass,
+  getDeviceCopy,
+} from '@/shared/lib/auth/device-copy';
 
-export function SessionExpiredOverlay() {
+interface SessionExpiredOverlayProps {
+  /**
+   * Phase 4 flag. OFF → legacy OTP fallback (unchanged); ON → magic-
+   * link fallback. Defaults to OFF so rollout is a flag flip.
+   *
+   * Read server-side in the route that mounts the overlay and passed
+   * in as a prop — never `process.env` in a client component.
+   */
+  authV2LoginCard?: boolean;
+}
+
+type FallbackStep = 'idle' | 'otp-email' | 'otp-code' | 'magic-link-sent';
+
+export function SessionExpiredOverlay({
+  authV2LoginCard = false,
+}: SessionExpiredOverlayProps = {}) {
   const sessionExpired = useAuthStatusStore((s) => s.sessionExpired);
   const setSessionExpired = useAuthStatusStore((s) => s.setSessionExpired);
 
   const router = useRouter();
   const [status, setStatus] = useState<'idle' | 'authenticating' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [fallbackStep, setFallbackStep] = useState<FallbackStep>('idle');
+  const [fallbackEmail, setFallbackEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpError, setOtpError] = useState<string | null>(null);
-  const [isOtpPending, setIsOtpPending] = useState(false);
+  const [isFallbackPending, setIsFallbackPending] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
+
+  // Device-aware copy — decides on first mount so copy stays stable
+  // across subsequent re-renders.
+  const deviceCopy = useMemo(() => {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    return getDeviceCopy(deviceCapabilityFromUserAgentClass(classifyUserAgent(ua)));
+  }, []);
 
   const handleReauth = useCallback(async () => {
     setStatus('authenticating');
@@ -46,68 +91,94 @@ export function SessionExpiredOverlay() {
     const result = await reauthenticatePasskey();
 
     if (result.ok) {
-      // Force the Supabase client to pick up the new cookies
       const supabase = createClient();
       await supabase.auth.refreshSession();
       setStatus('idle');
       setSessionExpired(false);
-      // Re-render server components and refetch all queries with the new session
       router.refresh();
       getQueryClient().invalidateQueries();
     } else {
       setStatus('error');
       setErrorMessage(result.error);
     }
-  }, [setSessionExpired]);
+  }, [router, setSessionExpired]);
 
-  const handleFallback = useCallback(() => {
+  const handleEscapeHatch = useCallback(() => {
+    // The one sanctioned client-side redirect to /login. Per
+    // docs/reference/code/session-management.md §3.
     const returnTo = window.location.pathname + window.location.search;
     window.location.href = `/login?reason=session_expired&redirect=${encodeURIComponent(returnTo)}`;
   }, []);
 
-  const handleSendOtp = useCallback(async () => {
-    if (!otpEmail.trim() || isOtpPending) return;
-    setIsOtpPending(true);
+  // ── Fallback: magic link (new path, flag ON) ───────────────────────
+  const handleSendMagicLink = useCallback(async () => {
+    const trimmed = fallbackEmail.trim().toLowerCase();
+    if (!trimmed || isFallbackPending) return;
+    setIsFallbackPending(true);
     setOtpError(null);
-    const result = await sendOtpAction(otpEmail.trim());
-    setIsOtpPending(false);
+    const result = await sendMagicLinkAction(trimmed);
+    setIsFallbackPending(false);
     if (result.ok) {
-      setOtpSent(true);
+      setFallbackStep('magic-link-sent');
+    } else {
+      setOtpError(result.error);
+    }
+  }, [fallbackEmail, isFallbackPending]);
+
+  // ── Fallback: OTP (legacy path, flag OFF) ──────────────────────────
+  const handleSendOtp = useCallback(async () => {
+    const trimmed = fallbackEmail.trim().toLowerCase();
+    if (!trimmed || isFallbackPending) return;
+    setIsFallbackPending(true);
+    setOtpError(null);
+    const result = await sendOtpAction(trimmed);
+    setIsFallbackPending(false);
+    if (result.ok) {
+      setFallbackStep('otp-code');
       setTimeout(() => otpInputRef.current?.focus(), 100);
     } else {
       setOtpError(result.error);
     }
-  }, [otpEmail, isOtpPending]);
+  }, [fallbackEmail, isFallbackPending]);
 
   const handleVerifyOtp = useCallback(async () => {
-    if (!otpEmail.trim() || !otpCode || isOtpPending) return;
-    setIsOtpPending(true);
+    const trimmed = fallbackEmail.trim().toLowerCase();
+    if (!trimmed || !otpCode || isFallbackPending) return;
+    setIsFallbackPending(true);
     setOtpError(null);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.verifyOtp({
-        email: otpEmail.trim(),
-        token: otpCode,
-        type: 'email',
-      });
-      if (error) {
+      // Server action does the verify; on success it redirects, so we
+      // never actually get here with a success path unless the action
+      // returns cleanly. Using the client supabase here preserves the
+      // overlay-in-place behavior — no navigation.
+      const result = await verifyOtpAction(trimmed, otpCode);
+      if (!('ok' in result) || !result.ok) {
         setOtpError('Invalid or expired code. Try again.');
-        setIsOtpPending(false);
+        setIsFallbackPending(false);
         return;
       }
-      // Success — restore session in-place
-      setIsOtpPending(false);
+      const supabase = createClient();
+      await supabase.auth.refreshSession();
+      setIsFallbackPending(false);
       setSessionExpired(false);
-      setShowOtp(false);
-      setOtpSent(false);
+      setFallbackStep('idle');
       setOtpCode('');
       router.refresh();
       getQueryClient().invalidateQueries();
     } catch {
       setOtpError('Verification failed. Try again.');
-      setIsOtpPending(false);
+      setIsFallbackPending(false);
     }
-  }, [otpEmail, otpCode, isOtpPending, setSessionExpired, router]);
+  }, [fallbackEmail, otpCode, isFallbackPending, setSessionExpired, router]);
+
+  // Overlay state is deliberately not reset on close — a subsequent
+  // expiration will take the same code paths, and any stale field is
+  // cleared by the relevant handler on the next user action (e.g.
+  // `fallbackStep === 'idle'` is the default for a fresh open). Avoids
+  // a setState-in-effect pattern that the repo's lint rules flag.
+  // If users report stale UI after a rapid close→reopen, the cleanest
+  // fix is to key the inner Card with a session-expired counter and
+  // let React remount the subtree.
 
   return (
     <AnimatePresence>
@@ -121,7 +192,10 @@ export function SessionExpiredOverlay() {
           className="fixed inset-0 z-[9999] flex items-center justify-center"
         >
           {/* Scrim */}
-          <div className="absolute inset-0 bg-[oklch(0.06_0_0/0.80)]" />
+          <div
+            className="absolute inset-0 bg-[var(--stage-void)]/80"
+            aria-hidden
+          />
 
           {/* Card */}
           <motion.div
@@ -129,27 +203,15 @@ export function SessionExpiredOverlay() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={STAGE_HEAVY}
-            className="relative z-10 w-full max-w-sm mx-4 rounded-2xl border border-[oklch(1_0_0_/_0.06)] p-8 text-center"
-            style={{ background: 'var(--stage-surface, oklch(0.18 0.004 50))' }}
+            className="stage-panel relative z-10 w-full max-w-sm mx-4 p-[var(--stage-padding)] text-center"
+            data-surface="card"
           >
             {/* Lock icon */}
-            <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-[oklch(1_0_0_/_0.06)]"
-              style={{ background: 'var(--stage-surface-elevated, oklch(0.22 0.004 50))' }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-[var(--stage-text-primary)]"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
+            <div className="stage-panel-nested mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full">
+              <Lock
+                className="h-5 w-5 text-[var(--stage-text-primary)]"
+                strokeWidth={1.5}
+              />
             </div>
 
             <h2
@@ -160,116 +222,185 @@ export function SessionExpiredOverlay() {
             </h2>
 
             <p className="text-[var(--stage-text-secondary)] text-sm leading-relaxed mb-6">
-              Your session timed out. Tap to sign back in — you won&apos;t lose your place.
+              Your session timed out. Sign back in — you won&apos;t lose
+              your place.
             </p>
 
-            {/* Error message */}
             <AnimatePresence mode="wait">
               {status === 'error' && errorMessage && (
-                <motion.p
+                <motion.div
                   key="error"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={STAGE_MEDIUM}
-                  className="text-unusonic-error text-sm mb-4"
+                  className="overflow-hidden mb-4"
                 >
-                  {errorMessage}
-                </motion.p>
+                  <div className="stage-panel-nested stage-stripe-error p-3">
+                    <p className="text-unusonic-error text-sm">{errorMessage}</p>
+                  </div>
+                </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Primary action: passkey re-auth */}
+            {/* Primary: device-aware passkey re-auth. Never "passkey". */}
             <button
               onClick={handleReauth}
               disabled={status === 'authenticating'}
-              className="w-full rounded-xl px-4 py-3 text-sm font-medium tracking-tight transition-colors disabled:opacity-45 stage-btn stage-btn-primary"
+              className="stage-btn stage-btn-primary w-full flex items-center justify-center gap-2"
+              data-testid="session-expired-primary"
             >
               {status === 'authenticating' ? (
-                <span className="inline-flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Verifying...
-                </span>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
+                  {deviceCopy.pendingStatus}
+                </>
               ) : (
-                'Sign in with passkey'
+                deviceCopy.signInPrimaryCta
               )}
             </button>
 
-            {/* OTP fallback — in-place, no state loss */}
+            {/* Fallback region */}
             <AnimatePresence mode="wait">
-              {showOtp ? (
+              {fallbackStep === 'idle' ? (
                 <motion.div
-                  key="otp"
+                  key="fallback-options"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={STAGE_MEDIUM}
+                  className="mt-3 space-y-1.5"
+                >
+                  <button
+                    onClick={() => setFallbackStep('otp-email')}
+                    className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors py-1.5"
+                    data-testid="session-expired-fallback"
+                  >
+                    {authV2LoginCard
+                      ? 'Send magic link to email'
+                      : 'Sign in with email code'}
+                  </button>
+                  <button
+                    onClick={handleEscapeHatch}
+                    className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors py-1"
+                  >
+                    Sign in another way
+                  </button>
+                </motion.div>
+              ) : fallbackStep === 'otp-email' ? (
+                <motion.div
+                  key="otp-email"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={STAGE_MEDIUM}
                   className="mt-4 space-y-3 overflow-hidden"
                 >
-                  {!otpSent ? (
-                    <>
-                      <input
-                        type="email"
-                        value={otpEmail}
-                        onChange={(e) => setOtpEmail(e.target.value)}
-                        placeholder="your@email.com"
-                        autoComplete="email"
-                        disabled={isOtpPending}
-                        className="w-full h-11 px-4 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-45 text-sm transition-colors"
-                      />
-                      {otpError && <p className="text-unusonic-error text-xs">{otpError}</p>}
-                      <button
-                        onClick={handleSendOtp}
-                        disabled={isOtpPending || !otpEmail.trim()}
-                        className="w-full rounded-xl px-4 py-2.5 text-sm font-medium border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors disabled:opacity-45"
-                      >
-                        {isOtpPending ? 'Sending...' : 'Send sign-in code'}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-xs text-[var(--stage-text-secondary)]">
-                        Code sent to {otpEmail}
-                      </p>
-                      <input
-                        ref={otpInputRef}
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        maxLength={6}
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        disabled={isOtpPending}
-                        placeholder="000000"
-                        className="w-full h-11 px-4 rounded-xl bg-[oklch(0.10_0_0_/_0.50)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] text-center text-lg tracking-[0.3em] font-mono placeholder:text-[var(--stage-text-secondary)] placeholder:tracking-normal placeholder:text-sm placeholder:font-sans focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-45 transition-colors"
-                      />
-                      {otpError && <p className="text-unusonic-error text-xs">{otpError}</p>}
-                      <button
-                        onClick={handleVerifyOtp}
-                        disabled={isOtpPending || otpCode.length !== 6}
-                        className="w-full rounded-xl px-4 py-2.5 text-sm font-medium border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors disabled:opacity-45"
-                      >
-                        {isOtpPending ? 'Verifying...' : 'Verify code'}
-                      </button>
-                    </>
+                  <input
+                    type="email"
+                    value={fallbackEmail}
+                    onChange={(e) => setFallbackEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    disabled={isFallbackPending}
+                    className="stage-input"
+                  />
+                  {otpError && (
+                    <div className="stage-panel-nested stage-stripe-error p-3">
+                      <p className="text-unusonic-error text-xs">{otpError}</p>
+                    </div>
                   )}
+                  <button
+                    onClick={authV2LoginCard ? handleSendMagicLink : handleSendOtp}
+                    disabled={isFallbackPending || !fallbackEmail.trim()}
+                    className="stage-btn stage-btn-primary w-full flex items-center justify-center gap-2"
+                  >
+                    {isFallbackPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
+                        Sending…
+                      </>
+                    ) : authV2LoginCard ? (
+                      <>
+                        <Mail className="w-4 h-4" strokeWidth={1.5} />
+                        Send magic link
+                      </>
+                    ) : (
+                      'Send sign-in code'
+                    )}
+                  </button>
+                </motion.div>
+              ) : fallbackStep === 'otp-code' ? (
+                <motion.div
+                  key="otp-code"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={STAGE_MEDIUM}
+                  className="mt-4 space-y-3 overflow-hidden"
+                >
+                  <p className="text-xs text-[var(--stage-text-secondary)]">
+                    Code sent to {fallbackEmail}
+                  </p>
+                  <input
+                    ref={otpInputRef}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    disabled={isFallbackPending}
+                    placeholder="000000"
+                    className="stage-input text-center text-lg tracking-[0.3em] font-mono placeholder:tracking-normal placeholder:text-sm placeholder:font-sans"
+                  />
+                  {otpError && (
+                    <div className="stage-panel-nested stage-stripe-error p-3">
+                      <p className="text-unusonic-error text-xs">{otpError}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={isFallbackPending || otpCode.length !== 6}
+                    className="stage-btn stage-btn-primary w-full flex items-center justify-center gap-2"
+                  >
+                    {isFallbackPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
+                        Verifying…
+                      </>
+                    ) : (
+                      'Verify code'
+                    )}
+                  </button>
                 </motion.div>
               ) : (
-                <motion.div key="fallback-options" className="mt-3 space-y-1.5">
+                <motion.div
+                  key="magic-link-sent"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={STAGE_MEDIUM}
+                  className="mt-4 space-y-2 overflow-hidden"
+                >
+                  <div className="stage-panel-nested px-4 py-3">
+                    <p className="text-sm text-[var(--stage-text-primary)] flex items-center justify-center gap-2">
+                      <Mail className="w-4 h-4" strokeWidth={1.5} />
+                      Check your email
+                    </p>
+                    <p className="text-xs text-[var(--stage-text-secondary)] text-center mt-1">
+                      We sent a link to {fallbackEmail}.
+                    </p>
+                  </div>
                   <button
-                    onClick={() => setShowOtp(true)}
-                    className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors py-1.5"
+                    onClick={() => {
+                      setFallbackStep('otp-email');
+                      setOtpCode('');
+                      setOtpError(null);
+                    }}
+                    className="w-full text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
                   >
-                    Sign in with email code
-                  </button>
-                  <button
-                    onClick={handleFallback}
-                    className="w-full text-sm text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors py-1"
-                  >
-                    Sign in another way
+                    Send again
                   </button>
                 </motion.div>
               )}

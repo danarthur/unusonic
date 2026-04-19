@@ -19,6 +19,19 @@ interface SmartLoginFormProps {
   defaultEmail?: string;
   showInactivityMessage?: boolean;
   showSessionExpiredMessage?: boolean;
+  /**
+   * Phase 4 — when true, render the new state-machine sign-in card.
+   * When false or undefined, render the legacy password-fallback card
+   * unchanged. The flag is resolved server-side in
+   * `src/app/(auth)/login/page.tsx`; this component never reads
+   * `process.env` directly.
+   */
+  authV2LoginCard?: boolean;
+  /**
+   * Phase 6 — mirror of `AUTH_V2_SMS`. Resolved server-side and passed
+   * as a prop so the client bundle never has to decide.
+   */
+  authV2Sms?: boolean;
 }
 
 export function SmartLoginForm({
@@ -27,6 +40,8 @@ export function SmartLoginForm({
   defaultEmail,
   showInactivityMessage = false,
   showSessionExpiredMessage = false,
+  authV2LoginCard = false,
+  authV2Sms = false,
 }: SmartLoginFormProps) {
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [email, setEmail] = useState(defaultEmail ?? '');
@@ -123,6 +138,8 @@ export function SmartLoginForm({
             prefersReducedMotion={prefersReducedMotion}
             onModeSwitch={handleModeSwitch}
             onPasskeyPendingChange={setIsPasskeyPending}
+            authV2LoginCard={authV2LoginCard}
+            authV2Sms={authV2Sms}
           />
         )}
       </motion.div>

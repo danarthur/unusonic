@@ -148,8 +148,12 @@ export function SignUpFlow({
   }, [signupStep, isTransitionName, fullName, email, redirectTo, router, setSignupStep, setSignupTransitionPhase, startTransition]);
 
   const isTransitionWelcome = fromSignIn && signupTransitionPhase === 'welcome';
+  // True first-run (direct /signup visit) gets the warm "Welcome to Unusonic" greeting.
+  // Users who switched from Sign In aren't new — they tapped the wrong thing — so they
+  // get a neutral "Create account" heading instead.
+  const welcomeHeading = fromSignIn ? 'Create account' : 'Welcome to Unusonic';
   const effectivePrompt = isTransitionWelcome
-    ? 'Welcome to Unusonic'
+    ? welcomeHeading
     : isTransitionName
       ? 'What should we call you?'
       : signupPrompts[signupStep];
@@ -192,7 +196,7 @@ export function SignUpFlow({
       >
         <AionOnboardingShell
           prompt={effectivePrompt}
-          welcomeTitle={isTransitionName ? 'Welcome to Unusonic' : undefined}
+          welcomeTitle={isTransitionName ? welcomeHeading : undefined}
           logoStatus={isSignupPending ? 'loading' : logoAcknowledging ? 'loading' : 'idle'}
           logoLayoutId={fromSignIn && !signupExiting ? 'auth-logo' : undefined}
           onWelcomeComplete={() => setSignupTransitionPhase('name')}
@@ -262,11 +266,11 @@ export function SignUpFlow({
                         onClick={handleSignupStepSubmit}
                         disabled={isSignupPending}
                         transition={STAGE_HEAVY}
-                        className="stage-btn stage-btn-primary w-full py-3.5 rounded-full font-medium text-sm transition-colors disabled:opacity-45 disabled:pointer-events-none flex items-center justify-center gap-2"
+                        className="stage-btn stage-btn-primary w-full"
                       >
                         {isSignupPending ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                            <Loader2 className="w-4 h-4 animate-spin shrink-0" strokeWidth={1.5} />
                             Creating passkey…
                           </>
                         ) : (

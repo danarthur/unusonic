@@ -1073,6 +1073,26 @@ export const METRICS: Record<string, MetricDefinition> = {
     notes: 'Security nudge banner, not a pickable card. Registered for completeness.',
   },
 
+  'lobby.guardian_setup_reminder': {
+    id: 'lobby.guardian_setup_reminder',
+    kind: 'widget',
+    widgetKey: 'guardian-setup-reminder',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: [],
+    refreshability: 'manual',
+    // Owner + admin only in practice — the widget itself gates on role — but
+    // the library registry catalog these entries against the presets, so the
+    // intersection holds.
+    roles: ['owner'],
+    title: 'Guardian setup reminder',
+    description: 'Nudge to finish the Phase 5 non-skippable guardian gate when the user deferred or is below the Shamir threshold.',
+    emptyState: {
+      title: '',
+      body: '',
+    },
+    notes: 'Global layout banner rendered from src/app/(dashboard)/layout.tsx. Not a library-pickable card; registered for exhaustiveness.',
+  },
+
   // Dev / design surfaces ---------------------------------------------------
 
   'lobby.design_showcase': {

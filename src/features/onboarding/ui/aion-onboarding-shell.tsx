@@ -129,7 +129,7 @@ export function AionOnboardingShell({
           ) : null}
           {isWelcome && onWelcomeComplete && !skipWelcomeHold ? (
             <motion.h1
-              className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]"
+              className="stage-label"
               initial={{ y: 0, opacity: 1 }}
               animate={{ y: -10, opacity: 1 }}
               transition={{
@@ -141,7 +141,7 @@ export function AionOnboardingShell({
               {prompt}
             </motion.h1>
           ) : isWelcome && skipWelcomeHold ? (
-            <h1 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+            <h1 className="stage-label">
               {prompt}
             </h1>
           ) : (
@@ -156,7 +156,7 @@ export function AionOnboardingShell({
                   ease: M3_EASING_ENTER,
                   filter: { duration: M3_DURATION_S * 0.6, ease: M3_EASING_ENTER },
                 }}
-                className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] gpu-accelerated"
+                className="stage-label gpu-accelerated"
               >
                 {prompt}
               </motion.h1>
@@ -187,7 +187,7 @@ export function AionOnboardingShell({
               <button
                 type="button"
                 onClick={onBack}
-                className="text-xs text-[var(--stage-text-secondary)]/70 hover:text-[var(--stage-text-secondary)] transition-colors"
+                className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
               >
                 {backLabel}
               </button>
@@ -196,7 +196,7 @@ export function AionOnboardingShell({
               <button
                 type="button"
                 onClick={onSignIn}
-                className="text-xs text-[var(--stage-text-secondary)]/70 hover:text-[var(--stage-text-secondary)] transition-colors"
+                className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
               >
                 Sign in
               </button>
@@ -228,7 +228,7 @@ export function AionOnboardingShell({
         <form action={signOutAction} className="pointer-events-auto w-fit">
           <button
             type="submit"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--stage-text-secondary)]/70 hover:text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
           >
             <LogOut className="w-3 h-3" strokeWidth={1.5} />
             <span>Sign out</span>

@@ -14,7 +14,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative z-[999999] flex-1 min-h-screen min-w-0 w-full overflow-y-auto bg-[var(--stage-void)] isolate">
+    <div className="relative z-10 flex-1 min-h-screen min-w-0 w-full overflow-y-auto bg-[var(--stage-void)] isolate">
       <AuthHashHandler />
       {children}
     </div>

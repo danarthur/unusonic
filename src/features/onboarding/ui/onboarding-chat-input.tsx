@@ -58,15 +58,10 @@ export function OnboardingChatInput({
       role="group"
       aria-label={placeholder}
       className={cn(
-        'liquid-glass-input w-full mx-auto h-[68px] cursor-text block'
+        'stage-panel-nested w-full mx-auto h-[68px] cursor-text flex items-center gap-3 pl-5 pr-2 py-2'
       )}
       onClick={() => inputRef.current?.focus()}
     >
-      <div
-        className={cn(
-          'liquid-glass-input-inner flex items-center gap-3 pl-5 pr-2 py-2'
-        )}
-      >
       <div className="flex-1 min-w-0 flex flex-col justify-center h-full min-h-0">
         <input
           ref={inputRef}
@@ -82,7 +77,7 @@ export function OnboardingChatInput({
           data-form-type="other"
           data-1p-ignore
           className={cn(
-            'w-full min-w-0 bg-transparent border-none outline-none text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)]/70 cursor-text caret-[var(--stage-accent)]',
+            'w-full min-w-0 bg-transparent border-none outline-none text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] cursor-text caret-[var(--stage-accent)]',
             'font-sans text-lg h-full min-h-[2rem] py-2 px-2 disabled:opacity-45'
           )}
         />
@@ -106,7 +101,7 @@ export function OnboardingChatInput({
               onClick={handleSubmit}
               aria-busy={isLoading}
               aria-label="Submit"
-              className="p-3 rounded-full bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(1_0_0_/_0.08)] transition-colors flex items-center justify-center"
+              className="p-3 rounded-full bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] hover:bg-[oklch(0.90_0_0)] transition-colors flex items-center justify-center"
             >
               <ArrowUp size={20} strokeWidth={1.5} />
             </motion.button>
@@ -115,7 +110,6 @@ export function OnboardingChatInput({
           )}
         </div>
       )}
-      </div>
     </div>
   );
 }

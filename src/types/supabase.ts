@@ -6037,6 +6037,7 @@ export type Database = {
           sending_from_name: string | null
           signalpay_enabled: boolean | null
           slug: string
+          sms_signin_enabled: boolean
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_tier:
@@ -6078,6 +6079,7 @@ export type Database = {
           sending_from_name?: string | null
           signalpay_enabled?: boolean | null
           slug: string
+          sms_signin_enabled?: boolean
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_tier?:
@@ -6119,6 +6121,7 @@ export type Database = {
           sending_from_name?: string | null
           signalpay_enabled?: boolean | null
           slug?: string
+          sms_signin_enabled?: boolean
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_tier?:
@@ -6126,6 +6129,57 @@ export type Database = {
             | null
           timezone?: string
           trial_ends_at?: string | null
+        }
+        Relationships: []
+      }
+      sms_otp_attempts: {
+        Row: {
+          id: string
+          user_id: string
+          ip_hash: string
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          ip_hash: string
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          ip_hash?: string
+          sent_at?: string
+        }
+        Relationships: []
+      }
+      sms_otp_codes: {
+        Row: {
+          id: string
+          user_id: string
+          code_hash: string
+          attempts: number
+          expires_at: string
+          consumed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          code_hash: string
+          attempts?: number
+          expires_at: string
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          code_hash?: string
+          attempts?: number
+          expires_at?: string
+          consumed_at?: string | null
+          created_at?: string
         }
         Relationships: []
       }
@@ -6585,6 +6639,10 @@ export type Database = {
           p_target_entity_id: string
         }
         Returns: boolean
+      }
+      purge_expired_sms_otp_codes: {
+        Args: Record<string, never>
+        Returns: undefined
       }
       regenerate_invite_code: {
         Args: { p_workspace_id: string }

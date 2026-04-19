@@ -22,6 +22,8 @@ import { SessionExpiredOverlay } from "@/shared/ui/overlays/SessionExpiredOverla
 import { DensitySync } from "@/shared/ui/layout/DensitySync";
 import { SoundProvider } from "@/shared/ui/providers/SoundProvider";
 import { PasskeyNudgeBanner } from "@/widgets/passkey-nudge-banner/PasskeyNudgeBanner";
+import { GuardianSetupReminder } from "@/widgets/guardian-setup-reminder";
+import { getAuthFlag } from "@/shared/lib/auth-flags";
 import { AionNoticeHost } from "@/app/(dashboard)/(features)/aion/components/AionNoticeHost";
 
 /** Dashboard uses cookies (Supabase auth) — always render on the server. */
@@ -130,6 +132,10 @@ export default async function DashboardLayout({
     signalpayEnabled: boolean;
   } | null = null;
   let allWorkspaces: { id: string; name: string; role: string }[] = [];
+  // Resolved server-side so the auth flag never lands in the client bundle.
+  // The reminder widget itself gates on the boolean we pass down.
+  const guardianGateEnabled = getAuthFlag('AUTH_V2_GUARDIAN_GATE');
+  const authV2LoginCard = getAuthFlag('AUTH_V2_LOGIN_CARD');
 
   try {
     const supabase = await createClient();
@@ -198,7 +204,7 @@ export default async function DashboardLayout({
       <PreferencesProvider>
       <SystemHeartProvider>
       <AuthGuard>
-      <SessionExpiredOverlay />
+      <SessionExpiredOverlay authV2LoginCard={authV2LoginCard} />
       <InactivityLogoutProvider>
       <DensitySync />
       <SoundProvider>
@@ -221,6 +227,7 @@ export default async function DashboardLayout({
           {/* Content: extra bottom padding on mobile for dock + safe area */}
           <main className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden bg-transparent pt-[env(safe-area-inset-top)] pb-[max(env(safe-area-inset-bottom),5rem)] lg:pb-0 lg:pt-0">
             <PasskeyNudgeBanner />
+            <GuardianSetupReminder flagEnabled={guardianGateEnabled} />
             <AionNoticeHost />
             <div className="flex-1 min-h-0 min-w-0 overflow-auto flex flex-col">
               {children}

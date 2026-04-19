@@ -15,6 +15,7 @@ import { PreferencesProvider } from '@/shared/ui/providers/PreferencesContext';
 import { PortalProfileProvider } from '@/shared/ui/providers/PortalProfileProvider';
 import { AuthGuard } from '@/shared/ui/providers/AuthGuard';
 import { SessionExpiredOverlay } from '@/shared/ui/overlays/SessionExpiredOverlay';
+import { getAuthFlag } from '@/shared/lib/auth-flags';
 import { InactivityLogoutProvider } from '@/shared/ui/providers/InactivityLogoutProvider';
 import { DensitySync } from '@/shared/ui/layout/DensitySync';
 import { resolvePortalProfile, getDefaultNavItems } from '@/shared/lib/portal-profiles';
@@ -222,7 +223,7 @@ export default async function PortalLayout({
       <PreferencesProvider>
         <PortalProfileProvider value={portalProfileValue}>
           <AuthGuard>
-            <SessionExpiredOverlay />
+            <SessionExpiredOverlay authV2LoginCard={getAuthFlag('AUTH_V2_LOGIN_CARD')} />
             <InactivityLogoutProvider>
               <DensitySync />
               <ReducedMotionProvider>

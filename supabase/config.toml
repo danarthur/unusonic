@@ -402,3 +402,13 @@ entrypoint = "./functions/triage-item/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/triage-item/*.html" ]
+
+# Login Redesign Phase 6 — SMS OTP sender.
+# verify_jwt = false because the function accepts BOTH a direct-user JWT
+# AND a service-role impersonation path (see
+# `supabase/functions/sms-otp-send/index.ts` §1). Manual verification
+# happens in the handler body via `admin.auth.getUser(jwt)`.
+[functions.sms-otp-send]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/sms-otp-send/index.ts"

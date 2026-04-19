@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
+import { getAuthFlag } from '@/shared/lib/auth-flags';
 import { OnboardingWizard } from './components/onboarding-wizard';
 
 export const metadata = {
@@ -107,7 +108,13 @@ async function getOnboardingState() {
 
 export default async function OnboardingPage() {
   const state = await getOnboardingState();
-  
+  // Phase 5 gate is resolved on the server from `AUTH_V2_GUARDIAN_GATE` so
+  // we never leak the flag into the client bundle. Anyone hitting
+  // /onboarding is creating a workspace (invited users are redirected to
+  // /claim/[token] above), so the "owners only" contract from the spec
+  // holds by construction — there is no non-owner path through this page.
+  const guardianGateEnabled = getAuthFlag('AUTH_V2_GUARDIAN_GATE');
+
   return (
     <div className="min-h-screen w-full relative">
       {/* Match login: spotlight + grain — no colored orbs */}
@@ -115,7 +122,7 @@ export default async function OnboardingPage() {
         <div className="absolute inset-0 grain-overlay" aria-hidden />
       </div>
       <div className="relative z-10">
-        <OnboardingWizard initialState={state} />
+        <OnboardingWizard initialState={state} guardianGateEnabled={guardianGateEnabled} />
       </div>
     </div>
   );

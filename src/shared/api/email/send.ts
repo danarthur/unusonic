@@ -27,7 +27,11 @@ export {
   sendRecoveryVetoEmail,
   sendEmployeeInviteEmail,
   sendMagicLinkEmail,
+  sendMagicLinkSignIn,
   sendOtpEmail,
+  sendPasskeyResetEmail,
+  sendGhostClaimEmail,
+  sendUnknownEmailSignupEmail,
 } from './senders/auth';
 
 // Proposal emails (workspace-branded).
