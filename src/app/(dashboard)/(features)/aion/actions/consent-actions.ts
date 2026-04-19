@@ -18,6 +18,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
+import { getSystemClient } from '@/shared/api/supabase/system';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import {
   CONSENT_TERMS,
@@ -173,8 +174,11 @@ export async function acceptAionCardBeta(
     });
   if (consentErr) return { success: false, error: consentErr.message };
 
-  // 2. Flip card flag (merge preserving other flags)
-  const { data: current } = await supabase
+  // 2. Flip card flag. RLS on public.workspaces has no UPDATE policy, so we
+  //    route through the service-role client. Admin/owner role already
+  //    validated above — this is a safe escalation.
+  const system = getSystemClient();
+  const { data: current } = await system
     .from('workspaces')
     .select('feature_flags')
     .eq('id', state.workspaceId)
@@ -182,9 +186,9 @@ export async function acceptAionCardBeta(
   const flags = ((current?.feature_flags ?? {}) as Record<string, unknown>);
   flags[FEATURE_FLAGS.CRM_UNIFIED_AION_CARD] = true;
 
-  const { error: flagErr } = await supabase
+  const { error: flagErr } = await system
     .from('workspaces')
-    .update({ feature_flags: flags })
+    .update({ feature_flags: flags as never })
     .eq('id', state.workspaceId);
   if (flagErr) return { success: false, error: flagErr.message };
 
@@ -203,16 +207,16 @@ export async function acceptAionCardBeta(
       return { success: false, error: cadenceConsentErr.message };
     }
 
-    const { data: wsCfg } = await supabase
+    const { data: wsCfg } = await system
       .from('workspaces')
       .select('aion_config')
       .eq('id', state.workspaceId)
       .maybeSingle();
     const cfg = ((wsCfg?.aion_config ?? {}) as Record<string, unknown>);
     cfg.learn_owner_cadence = true;
-    await supabase
+    await system
       .from('workspaces')
-      .update({ aion_config: cfg })
+      .update({ aion_config: cfg as never })
       .eq('id', state.workspaceId);
   }
 
@@ -234,23 +238,24 @@ export async function disableAionCardBeta(): Promise<BaseResult> {
   }
 
   const supabase = await createClient();
+  const system = getSystemClient();
 
-  // Flip flag off
-  const { data: current } = await supabase
+  // Flip flag off via service role (public.workspaces has no UPDATE RLS policy).
+  const { data: current } = await system
     .from('workspaces')
     .select('feature_flags')
     .eq('id', state.workspaceId)
     .maybeSingle();
   const flags = ((current?.feature_flags ?? {}) as Record<string, unknown>);
   flags[FEATURE_FLAGS.CRM_UNIFIED_AION_CARD] = false;
-  const { error: flagErr } = await supabase
+  const { error: flagErr } = await system
     .from('workspaces')
-    .update({ feature_flags: flags })
+    .update({ feature_flags: flags as never })
     .eq('id', state.workspaceId);
   if (flagErr) return { success: false, error: flagErr.message };
 
   // Also flip cadence off since the card is the only consumer today
-  const { data: wsCfg } = await supabase
+  const { data: wsCfg } = await system
     .from('workspaces')
     .select('aion_config')
     .eq('id', state.workspaceId)
@@ -258,13 +263,14 @@ export async function disableAionCardBeta(): Promise<BaseResult> {
   const cfg = ((wsCfg?.aion_config ?? {}) as Record<string, unknown>);
   if (cfg.learn_owner_cadence === true) {
     cfg.learn_owner_cadence = false;
-    await supabase
+    await system
       .from('workspaces')
-      .update({ aion_config: cfg })
+      .update({ aion_config: cfg as never })
       .eq('id', state.workspaceId);
   }
 
-  // Fan out notice to every member
+  // Fan out notice to every member — RPC runs SECURITY DEFINER so the
+  // authenticated session's admin role is checked inside the function.
   await supabase.schema('cortex').rpc('fanout_ui_notice', {
     p_workspace_id: state.workspaceId,
     p_notice_type: 'aion_card_beta_disabled',

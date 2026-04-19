@@ -120,11 +120,27 @@ export async function setLearnOwnerCadence(
     const workspaceId = await getActiveWorkspaceId();
     if (!workspaceId) return { success: false, error: 'No active workspace.' };
 
+    // Validate caller is a workspace member before the service-role write.
+    // Workspace role gating for cadence opt-in itself is unnecessary (a user
+    // opts themselves in), but the authenticated session must still own a
+    // seat here.
     const supabase = await createClient();
+    const { data: membership } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('workspace_id', workspaceId)
+      .limit(1)
+      .maybeSingle();
+    if (!membership) return { success: false, error: 'Not a workspace member.' };
+
     const current = await getAionConfig();
     const updated: AionConfig = { ...current, learn_owner_cadence: enabled };
 
-    const { error } = await supabase
+    // public.workspaces has RLS enabled but no UPDATE policy for authenticated
+    // callers — writes must route through the service-role client.
+    const { getSystemClient } = await import('@/shared/api/supabase/system');
+    const system = getSystemClient();
+    const { error } = await system
       .from('workspaces')
       .update({ aion_config: updated })
       .eq('id', workspaceId);
