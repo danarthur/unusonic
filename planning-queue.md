@@ -21,10 +21,8 @@ This is the queue the research agent reads. When you have a thought, idea, or qu
 
 ## Active
 
-- [ ] **Seed question — feel free to replace.** Scope Phase A of the Aion agent architecture (section 26 of `docs/reference/follow-up-engine-design.md`). Specifically: given the Brain tab is currently paused and `public.workspaces.aion_config` doesn't exist, what's the minimum path to unblock voice setup + first real draft? Context: the goal is to have Daniel open the Brain tab, write 3 paragraphs about how he talks to clients, and immediately see an Aion-generated follow-up draft that respects that voice.
-
 ---
 
 ## Done
 
-<!-- The research agent will move completed questions here with a PR link. -->
+- [x] 2026-04-19 **Seed question — feel free to replace.** Scope Phase A of the Aion agent architecture (section 26 of `docs/reference/follow-up-engine-design.md`). Specifically: given the Brain tab is currently paused and `public.workspaces.aion_config` doesn't exist, what's the minimum path to unblock voice setup + first real draft? Context: the goal is to have Daniel open the Brain tab, write 3 paragraphs about how he talks to clients, and immediately see an Aion-generated follow-up draft that respects that voice. — see PR
