@@ -132,7 +132,8 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const isPublic = PUBLIC_ROUTES.some(r => pathname.startsWith(r));
+  // `/` is public by exact match — startsWith('/') would match every path.
+  const isPublic = pathname === '/' || PUBLIC_ROUTES.some(r => pathname.startsWith(r));
 
   // ─── RULE 1: No user + protected route → login ───
   if (!userId && !isPublic) {
@@ -182,16 +183,11 @@ export async function proxy(request: NextRequest) {
 
   const resolvedHome = isClientUser ? CLIENT_HOME : isPortalUser ? PORTAL_HOME : DASHBOARD_HOME;
 
-  // ─── RULE 2: Authenticated user at root → onboarding or home ───
-  if (userId && pathname === '/') {
-    if (!hasWorkspace) {
-      return NextResponse.redirect(new URL('/onboarding', request.url));
-    }
-    return NextResponse.redirect(new URL(resolvedHome, request.url));
-  }
-
-  // ─── RULE 3: Authenticated user on public route → redirect home ───
-  const isPassthrough = pathname === '/auth/callback' || pathname.startsWith('/p/') || pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew/') || pathname.startsWith('/bridge');
+  // ─── RULE 2: Authenticated user on public route → redirect home ───
+  // `/` is a passthrough so authed users can still see the marketing landing
+  // page (Notion-style). They enter the app by clicking Sign in, which hits
+  // /login and silently re-auths through this same rule.
+  const isPassthrough = pathname === '/' || pathname === '/auth/callback' || pathname.startsWith('/p/') || pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew/') || pathname.startsWith('/bridge');
   if (userId && isPublic && !isPassthrough) {
     if (!hasWorkspace) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
