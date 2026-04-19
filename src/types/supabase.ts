@@ -759,6 +759,10 @@ export type Database = {
         }
         Returns: string
       }
+      reset_member_passkey: {
+        Args: { p_member_user_id: string; p_workspace_id: string }
+        Returns: Json
+      }
       resolve_aion_insight: {
         Args: { p_entity_id: string; p_trigger_type: string }
         Returns: boolean
@@ -5023,6 +5027,7 @@ export type Database = {
       guardians: {
         Row: {
           created_at: string | null
+          display_name: string | null
           guardian_email: string
           id: string
           owner_id: string
@@ -5030,6 +5035,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          display_name?: string | null
           guardian_email: string
           id?: string
           owner_id: string
@@ -5037,6 +5043,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          display_name?: string | null
           guardian_email?: string
           id?: string
           owner_id?: string
@@ -5307,6 +5314,8 @@ export type Database = {
           avatar_url: string | null
           email: string | null
           full_name: string | null
+          guardian_setup_decision_at: string | null
+          guardian_setup_deferred: boolean
           has_recovery_kit: boolean | null
           ical_token: string | null
           id: string
@@ -5322,6 +5331,8 @@ export type Database = {
           avatar_url?: string | null
           email?: string | null
           full_name?: string | null
+          guardian_setup_decision_at?: string | null
+          guardian_setup_deferred?: boolean
           has_recovery_kit?: boolean | null
           ical_token?: string | null
           id: string
@@ -5337,6 +5348,8 @@ export type Database = {
           avatar_url?: string | null
           email?: string | null
           full_name?: string | null
+          guardian_setup_decision_at?: string | null
+          guardian_setup_deferred?: boolean
           has_recovery_kit?: boolean | null
           ical_token?: string | null
           id?: string
@@ -5762,6 +5775,57 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_otp_attempts: {
+        Row: {
+          id: string
+          ip_hash: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          ip_hash: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          ip_hash?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sms_otp_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscription_events: {
         Row: {
           created_at: string
@@ -6129,57 +6193,6 @@ export type Database = {
             | null
           timezone?: string
           trial_ends_at?: string | null
-        }
-        Relationships: []
-      }
-      sms_otp_attempts: {
-        Row: {
-          id: string
-          user_id: string
-          ip_hash: string
-          sent_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          ip_hash: string
-          sent_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          ip_hash?: string
-          sent_at?: string
-        }
-        Relationships: []
-      }
-      sms_otp_codes: {
-        Row: {
-          id: string
-          user_id: string
-          code_hash: string
-          attempts: number
-          expires_at: string
-          consumed_at: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          code_hash: string
-          attempts?: number
-          expires_at: string
-          consumed_at?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          code_hash?: string
-          attempts?: number
-          expires_at?: string
-          consumed_at?: string | null
-          created_at?: string
         }
         Relationships: []
       }
@@ -6640,10 +6653,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      purge_expired_sms_otp_codes: {
-        Args: Record<string, never>
-        Returns: undefined
-      }
+      purge_expired_sms_otp_codes: { Args: never; Returns: undefined }
       regenerate_invite_code: {
         Args: { p_workspace_id: string }
         Returns: string
