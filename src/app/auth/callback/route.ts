@@ -10,7 +10,11 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/';
+  // Default lands in the dashboard home; middleware Rule 4 re-routes portal
+  // users to /schedule and clients to /client/home from there. Prior behavior
+  // sent users to / and relied on a middleware redirect that was removed when
+  // the landing page started rendering at /.
+  const next = searchParams.get('next') ?? '/lobby';
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
