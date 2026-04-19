@@ -67,10 +67,15 @@ export function FeatureConsentModal({
           : 'Aion card beta turned on.',
       );
       onClose();
-      // Re-render the server components above us (/crm deal-lens) so the
-      // unified card appears immediately — `revalidatePath` alone invalidates
-      // the cache but doesn't force the client-side view to refetch.
-      router.refresh();
+      // A full reload is needed (not router.refresh()) because DealLens
+      // reads the flag via a client-side useEffect on the initial mount,
+      // and router.refresh() preserves client state. Reload re-mounts
+      // everything so the unified card surfaces immediately.
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      } else {
+        router.refresh();
+      }
     });
   };
 
