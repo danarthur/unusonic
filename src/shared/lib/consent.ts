@@ -1,5 +1,5 @@
 /**
- * Feature consent registry + helpers.
+ * Feature consent registry — client-safe.
  *
  * Term versions live here as code-level constants. Bumping a version string
  * invalidates every existing accepted row for that term — the next consent
@@ -9,8 +9,9 @@
  * any version bump. Bumping `version` without changing `body` is forbidden —
  * it would force re-consent for no reason and erode trust.
  *
- * See docs/reference/aion-deal-card-unified-design.md §21 (Shape C consent
- * system).
+ * Server-side helpers (getConsentStatus) live in `./consent-server.ts` so
+ * this file can be safely imported from client components (consent modal,
+ * settings view). See docs/reference/aion-deal-card-unified-design.md §21.
  */
 
 export type ConsentTermKey =
@@ -27,6 +28,14 @@ export type ConsentTerm = {
   acceptingRoles: readonly ('owner' | 'admin')[];
   /** Optional dependent-term the user must have accepted first. */
   requires?: ConsentTermKey;
+};
+
+export type ConsentStatus = {
+  accepted: boolean;
+  acceptedAt: string | null;
+  acceptedVersion: string | null;
+  requiresReconsent: boolean;     // accepted an older version; need to re-accept
+  revokedAt: string | null;
 };
 
 // -----------------------------------------------------------------------------
@@ -67,85 +76,4 @@ export const CONSENT_TERMS: Record<ConsentTermKey, ConsentTerm> = {
 
 export function getTerm(key: ConsentTermKey): ConsentTerm {
   return CONSENT_TERMS[key];
-}
-
-// -----------------------------------------------------------------------------
-// Server-side helpers — import only from server actions / route handlers
-// -----------------------------------------------------------------------------
-
-import 'server-only';
-import { createClient } from '@/shared/api/supabase/server';
-
-export type ConsentStatus = {
-  accepted: boolean;
-  acceptedAt: string | null;
-  acceptedVersion: string | null;
-  requiresReconsent: boolean;     // accepted an older version; need to re-accept
-  revokedAt: string | null;
-};
-
-/**
- * Check a single term's consent status for the current caller in a workspace.
- * Returns `accepted=false` when never accepted, never had a workspace member
- * row, or revoked. When a previous version was accepted but the current
- * version string differs, returns `requiresReconsent=true`.
- */
-export async function getConsentStatus(
-  workspaceId: string,
-  termKey: ConsentTermKey,
-): Promise<ConsentStatus> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return {
-      accepted: false,
-      acceptedAt: null,
-      acceptedVersion: null,
-      requiresReconsent: false,
-      revokedAt: null,
-    };
-  }
-
-  const { data, error } = await supabase
-    .schema('cortex')
-    .from('consent_log')
-    .select('term_version, accepted_at, revoked_at')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .eq('term_key', termKey)
-    .order('accepted_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) {
-    return {
-      accepted: false,
-      acceptedAt: null,
-      acceptedVersion: null,
-      requiresReconsent: false,
-      revokedAt: null,
-    };
-  }
-
-  const row = data as { term_version: string; accepted_at: string; revoked_at: string | null };
-  const current = CONSENT_TERMS[termKey].version;
-
-  if (row.revoked_at) {
-    return {
-      accepted: false,
-      acceptedAt: row.accepted_at,
-      acceptedVersion: row.term_version,
-      requiresReconsent: false,
-      revokedAt: row.revoked_at,
-    };
-  }
-
-  const requiresReconsent = row.term_version !== current;
-  return {
-    accepted: !requiresReconsent,
-    acceptedAt: row.accepted_at,
-    acceptedVersion: row.term_version,
-    requiresReconsent,
-    revokedAt: null,
-  };
 }

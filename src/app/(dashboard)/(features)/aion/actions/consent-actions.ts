@@ -21,10 +21,10 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import {
   CONSENT_TERMS,
-  getConsentStatus,
   type ConsentStatus,
   type ConsentTermKey,
 } from '@/shared/lib/consent';
+import { getConsentStatus } from '@/shared/lib/consent-server';
 import { FEATURE_FLAGS } from '@/shared/lib/feature-flags';
 
 // =============================================================================
