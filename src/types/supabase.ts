@@ -280,6 +280,39 @@ export type Database = {
         }
         Relationships: []
       }
+      consent_log: {
+        Row: {
+          accepted_at: string
+          id: string
+          metadata: Json
+          revoked_at: string | null
+          term_key: string
+          term_version: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          id?: string
+          metadata?: Json
+          revoked_at?: string | null
+          term_key: string
+          term_version: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string
+          id?: string
+          metadata?: Json
+          revoked_at?: string | null
+          term_key?: string
+          term_version?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       entity_working_notes: {
         Row: {
           auto_filled_fields: string[]
@@ -315,6 +348,45 @@ export type Database = {
           preferred_channel?: string | null
           updated_at?: string
           updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      feature_access_requests: {
+        Row: {
+          feature_key: string
+          id: string
+          metadata: Json
+          requested_at: string
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_note: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          feature_key: string
+          id?: string
+          metadata?: Json
+          requested_at?: string
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          feature_key?: string
+          id?: string
+          metadata?: Json
+          requested_at?: string
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          status?: string
           workspace_id?: string
         }
         Relationships: []
@@ -430,6 +502,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ui_notices: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          notice_type: string
+          payload: Json
+          seen_at: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notice_type: string
+          payload?: Json
+          seen_at?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notice_type?: string
+          payload?: Json
+          seen_at?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       portal_aion_insights: {
@@ -514,6 +619,7 @@ export type Database = {
       delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       dismiss_aion_insight: { Args: { p_insight_id: string }; Returns: boolean }
       dismiss_capture: { Args: { p_capture_id: string }; Returns: boolean }
+      dismiss_ui_notice: { Args: { p_notice_id: string }; Returns: boolean }
       due_lobby_pins: {
         Args: { p_limit?: number }
         Returns: {
@@ -525,6 +631,15 @@ export type Database = {
           user_id: string
           workspace_id: string
         }[]
+      }
+      fanout_ui_notice: {
+        Args: {
+          p_expires_at?: string
+          p_notice_type: string
+          p_payload?: Json
+          p_workspace_id: string
+        }
+        Returns: number
       }
       hybrid_search: {
         Args: {
@@ -604,6 +719,15 @@ export type Database = {
         Args: { p_capture_id: string; p_new_entity_id: string }
         Returns: boolean
       }
+      record_consent: {
+        Args: {
+          p_metadata?: Json
+          p_term_key: string
+          p_term_version: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       record_lobby_pin_view: { Args: { p_pin_id: string }; Returns: undefined }
       record_refusal: {
         Args: {
@@ -627,9 +751,29 @@ export type Database = {
         Args: { p_ids: string[]; p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      request_feature_access: {
+        Args: {
+          p_feature_key: string
+          p_metadata?: Json
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       resolve_aion_insight: {
         Args: { p_entity_id: string; p_trigger_type: string }
         Returns: boolean
+      }
+      review_feature_request: {
+        Args: { p_decision: string; p_note?: string; p_request_id: string }
+        Returns: boolean
+      }
+      revoke_consent: {
+        Args: {
+          p_target_user?: string
+          p_term_key: string
+          p_workspace_id: string
+        }
+        Returns: number
       }
       save_aion_memory: {
         Args: {
@@ -6541,6 +6685,7 @@ export type Database = {
         | "booker"
         | "principal"
         | "representative"
+        | "deal_poc"
       employment_status: "internal_employee" | "external_contractor"
       event_lifecycle_status:
         | "lead"
@@ -6781,6 +6926,7 @@ export const Constants = {
         "booker",
         "principal",
         "representative",
+        "deal_poc",
       ],
       employment_status: ["internal_employee", "external_contractor"],
       event_lifecycle_status: [
