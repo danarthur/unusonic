@@ -63,6 +63,10 @@ import {
   type AuthResolution,
 } from '../lib/auth-telemetry';
 import { hashEmailForTelemetry } from '@/shared/lib/auth/hash-email-for-telemetry';
+import {
+  assertSmsOtpSaltConfigured,
+  getSmsOtpSaltFingerprint,
+} from '../lib/sms-salt-fingerprint';
 import { headers } from 'next/headers';
 
 /**
@@ -212,6 +216,23 @@ export async function sendSmsOtpAction(params: {
     return { ok: false, error: NOT_AVAILABLE_ERROR };
   }
 
+  // Loud-fail at invocation time if the salt is missing — better than
+  // silent INVALID_CODE on every verify. Also logs the non-secret
+  // fingerprint so ops can compare against the edge function's value
+  // to detect env drift. See Guardian L-3.
+  try {
+    assertSmsOtpSaltConfigured();
+  } catch (err) {
+    Sentry.logger.error('auth.sms.saltNotConfigured', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { ok: false, error: NOT_AVAILABLE_ERROR };
+  }
+  Sentry.logger.info('auth.sms.saltFingerprint', {
+    sms_otp_salt_fingerprint: getSmsOtpSaltFingerprint(),
+    side: 'next-server',
+  });
+
   const parsed = otpEmailSchema.safeParse({ email: params.email });
   if (!parsed.success) {
     // Malformed input: not a resolvable press. Do NOT emit telemetry.
@@ -232,12 +253,24 @@ export async function sendSmsOtpAction(params: {
 
   // Forward the request IP so the edge function rate-limit bucket is
   // keyed on the real client, not our app server.
+  //
+  // Trust boundary (Guardian M-1): the raw `x-forwarded-for` leftmost
+  // hop is browser-controllable on any runtime that doesn't strip
+  // untrusted client headers. On Vercel, `x-vercel-forwarded-for` is
+  // sealed by the edge and cannot be spoofed — prefer it. `x-real-ip`
+  // is typically set by reverse proxies after stripping client-supplied
+  // headers, so prefer it over bare `x-forwarded-for`. Falling back to
+  // the leftmost `x-forwarded-for` hop is best-effort; the per-user
+  // 5/hr bucket is the real limit, per-IP is defense-in-depth only.
   let ip: string | null = null;
   try {
     const h = await headers();
-    const fwd = h.get('x-forwarded-for');
-    if (fwd) ip = fwd.split(',')[0]?.trim() ?? null;
+    ip = h.get('x-vercel-forwarded-for');
     if (!ip) ip = h.get('x-real-ip');
+    if (!ip) {
+      const fwd = h.get('x-forwarded-for');
+      if (fwd) ip = fwd.split(',')[0]?.trim() ?? null;
+    }
   } catch {
     ip = null;
   }

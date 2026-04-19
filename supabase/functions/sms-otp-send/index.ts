@@ -78,16 +78,53 @@ const TWILIO_FAILED_BODY = JSON.stringify({ ok: false, error: 'twilio_failed' })
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Best-effort first-hop IP extraction. Fallback to '0.0.0.0' only for hashing. */
+/**
+ * Best-effort first-hop IP extraction. Fallback to '0.0.0.0' only for hashing.
+ *
+ * Trust boundary (Guardian M-1, see design §7): the Next.js server action
+ * forwards the caller's client IP via one of three headers. `x-vercel-
+ * forwarded-for` is sealed by Vercel's edge and cannot be spoofed from a
+ * browser — prefer it. `x-real-ip` is typically set by reverse proxies
+ * after stripping untrusted client input. Bare `x-forwarded-for` leftmost
+ * hop is the weakest signal (browser-controllable on runtimes that don't
+ * strip untrusted headers) and is used only as a last resort. Per-user
+ * rate limit remains the real limit; per-IP is defense-in-depth.
+ */
 function readClientIp(req: Request): string {
+  const vercel = req.headers.get('x-vercel-forwarded-for');
+  if (vercel) {
+    const first = vercel.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  const real = req.headers.get('x-real-ip');
+  if (real) return real.trim();
   const fwd = req.headers.get('x-forwarded-for');
   if (fwd) {
     const first = fwd.split(',')[0]?.trim();
     if (first) return first;
   }
-  const real = req.headers.get('x-real-ip');
-  if (real) return real.trim();
   return '0.0.0.0';
+}
+
+/**
+ * Non-secret fingerprint of `SMS_OTP_HASH_SALT` for parity verification
+ * with the Next server. MUST match the prefix + hex length used by
+ * `src/features/auth/smart-login/lib/sms-salt-fingerprint.ts` — if one
+ * changes, the other changes. See Guardian L-3.
+ */
+const SALT_FINGERPRINT_PREFIX = 'unusonic-sms-salt-canary|';
+const SALT_FINGERPRINT_LEN = 16;
+
+async function saltFingerprint(salt: string): Promise<string | null> {
+  if (!salt) return null;
+  const buf = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${SALT_FINGERPRINT_PREFIX}${salt}`),
+  );
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, SALT_FINGERPRINT_LEN);
 }
 
 /**
@@ -184,6 +221,19 @@ Deno.serve(async (req: Request) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Log the salt fingerprint once per invocation so ops can grep both this
+  // handler's logs and the Next server's `auth.sms.saltFingerprint` breadcrumb
+  // and compare. Mismatch → env drift → every verify will return INVALID_CODE.
+  // See Guardian L-3 in docs/audits/login-redesign-build-2026-04-19.md.
+  const saltFp = await saltFingerprint(SMS_OTP_HASH_SALT);
+  console.log(
+    JSON.stringify({
+      event: 'sms_otp_salt_fingerprint',
+      sms_otp_salt_fingerprint: saltFp,
+      side: 'edge-function',
+    }),
+  );
 
   // ── 1. Verify caller JWT. ────────────────────────────────────────────────
   // Two legal callers:

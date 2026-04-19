@@ -1,10 +1,12 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/supabase';
-
 // ⚠️ SECURITY WARNING:
 // This client uses the SERVICE_ROLE_KEY. It bypasses ALL Row Level Security.
 // It should ONLY be used in secure API routes (server-side), never in the browser.
-// We use this to fetch data for the "Mock Session" user since they aren't really logged in.
+// The `server-only` import below enforces this at build time — any client
+// component that imports this module will fail to compile. See Guardian L-6
+// in docs/audits/login-redesign-build-2026-04-19.md.
+import 'server-only';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

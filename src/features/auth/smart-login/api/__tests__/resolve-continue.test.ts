@@ -25,6 +25,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
   const fetchMock = vi.fn();
+  const rpcMock = vi.fn();
   const passkeyCountMock = vi.fn();
   const ghostLookupMock = vi.fn();
   const generateLinkMock = vi.fn();
@@ -36,6 +37,7 @@ const hoisted = vi.hoisted(() => {
   const delayToFloorMock = vi.fn();
   return {
     fetchMock,
+    rpcMock,
     passkeyCountMock,
     ghostLookupMock,
     generateLinkMock,
@@ -84,6 +86,7 @@ vi.mock('@/shared/api/supabase/server', () => ({
 vi.mock('@/shared/api/supabase/system', () => ({
   getSystemClient: vi.fn(() => ({
     auth: { admin: { generateLink: hoisted.generateLinkMock } },
+    rpc: hoisted.rpcMock,
     from: (table: string) => {
       if (table === 'passkeys') {
         return {
@@ -144,6 +147,7 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
 
   hoisted.fetchMock.mockReset();
+  hoisted.rpcMock.mockReset();
   hoisted.passkeyCountMock.mockReset();
   hoisted.ghostLookupMock.mockReset();
   hoisted.generateLinkMock.mockReset();
@@ -157,6 +161,11 @@ beforeEach(() => {
   hoisted.delayToFloorMock.mockReset();
 
   // Default: no user, no ghost. Override per test.
+  // The email → user_id lookup now uses the `get_user_id_by_email` RPC
+  // on the service-role client (post-GoTrue-filter-lie fix). `fetchMock`
+  // is retained only for the passkey-presence probe path (currently
+  // exercised via `passkeyCountMock` instead — kept for future use).
+  hoisted.rpcMock.mockResolvedValue({ data: null, error: null });
   hoisted.fetchMock.mockResolvedValue({
     ok: true,
     json: async () => ({ users: [] }),
@@ -202,10 +211,7 @@ import { resolveContinueAction } from '../actions';
 
 describe('resolveContinueAction — enumeration guard (the three non-passkey branches)', () => {
   it('account-exists (no passkey) → { kind: "magic-link" } + MagicLinkSignInEmail', async () => {
-    hoisted.fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [{ id: 'user-1' }] }),
-    });
+    hoisted.rpcMock.mockResolvedValueOnce({ data: 'user-1', error: null });
     hoisted.passkeyCountMock.mockResolvedValueOnce({ count: 0, error: null });
 
     const result = await resolveContinueAction('match@example.com');
@@ -219,10 +225,7 @@ describe('resolveContinueAction — enumeration guard (the three non-passkey bra
 
   it('ghost-match only → { kind: "magic-link" } + GhostClaimEmail', async () => {
     // No auth user, but a ghost.
-    hoisted.fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [] }),
-    });
+    hoisted.rpcMock.mockResolvedValueOnce({ data: null, error: null });
     hoisted.ghostLookupMock.mockResolvedValueOnce({
       data: { id: 'ghost-1' },
       error: null,
@@ -247,18 +250,12 @@ describe('resolveContinueAction — enumeration guard (the three non-passkey bra
 
   it('all three non-passkey branches produce an identical caller-visible response', async () => {
     // Branch 1: account-exists.
-    hoisted.fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [{ id: 'user-1' }] }),
-    });
+    hoisted.rpcMock.mockResolvedValueOnce({ data: 'user-1', error: null });
     hoisted.passkeyCountMock.mockResolvedValueOnce({ count: 0, error: null });
     const a = await resolveContinueAction('a@example.com');
 
     // Branch 2: ghost-only.
-    hoisted.fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [] }),
-    });
+    hoisted.rpcMock.mockResolvedValueOnce({ data: null, error: null });
     hoisted.ghostLookupMock.mockResolvedValueOnce({
       data: { id: 'ghost-1' },
       error: null,
@@ -278,10 +275,7 @@ describe('resolveContinueAction — enumeration guard (the three non-passkey bra
 
 describe('resolveContinueAction — passkey branch', () => {
   it('passkey on file → { kind: "passkey" }, no email sent', async () => {
-    hoisted.fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [{ id: 'user-with-passkey' }] }),
-    });
+    hoisted.rpcMock.mockResolvedValueOnce({ data: 'user-with-passkey', error: null });
     hoisted.passkeyCountMock.mockResolvedValueOnce({ count: 2, error: null });
 
     const result = await resolveContinueAction('passkey@example.com');
@@ -302,10 +296,7 @@ describe('resolveContinueAction — passkey branch', () => {
 
 describe('resolveContinueAction — dummy compare runs regardless of branch', () => {
   it('dummy compare fires on the passkey branch', async () => {
-    hoisted.fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [{ id: 'user-1' }] }),
-    });
+    hoisted.rpcMock.mockResolvedValueOnce({ data: 'user-1', error: null });
     hoisted.passkeyCountMock.mockResolvedValueOnce({ count: 1, error: null });
     await resolveContinueAction('pk@example.com');
     expect(hoisted.dummyCompareMock).toHaveBeenCalledTimes(1);
@@ -334,17 +325,17 @@ describe('resolveContinueAction — dummy compare runs regardless of branch', ()
 
 describe('resolveContinueAction — always-lookup invariant', () => {
   it('account-exists still probes the ghost table (parallel lookup)', async () => {
-    hoisted.fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [{ id: 'user-1' }] }),
-    });
+    hoisted.rpcMock.mockResolvedValueOnce({ data: 'user-1', error: null });
     hoisted.passkeyCountMock.mockResolvedValueOnce({ count: 0, error: null });
     await resolveContinueAction('both@example.com');
 
     // Ghost lookup is called even though the auth user resolved first.
     expect(hoisted.ghostLookupMock).toHaveBeenCalledTimes(1);
-    // Auth admin REST is called.
-    expect(hoisted.fetchMock).toHaveBeenCalledTimes(1);
+    // Auth user resolution RPC is called.
+    expect(hoisted.rpcMock).toHaveBeenCalledWith(
+      'get_user_id_by_email',
+      expect.objectContaining({ user_email: 'both@example.com' }),
+    );
   });
 });
 

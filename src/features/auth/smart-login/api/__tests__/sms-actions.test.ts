@@ -93,6 +93,7 @@ vi.mock('@/shared/api/supabase/server', () => ({
 vi.mock('@/shared/api/supabase/system', () => ({
   getSystemClient: vi.fn(() => ({
     from: hoisted.systemFromMock,
+    rpc: hoisted.rpcMock,
     auth: {
       admin: {
         generateLink: hoisted.generateLinkMock,
@@ -113,7 +114,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.com';
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://project.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
-  process.env.SMS_OTP_HASH_SALT = 'hash-salt';
+  process.env.SMS_OTP_HASH_SALT = 'hash-salt-long-enough-for-assertion';
   process.env.AUTH_V2_SMS = '1';
 
   adminUsersFetchMock.mockReset();
@@ -130,6 +131,11 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(consoleLogSpy);
 
   // Default happy-path mocks.
+  // The email → user_id lookup now goes through the `get_user_id_by_email`
+  // RPC on the system client (post-GoTrue-filter-lie fix). Tests that want
+  // the "unknown email" path override this per-test with
+  // `rpcMock.mockResolvedValueOnce({ data: null, error: null })`.
+  rpcMock.mockResolvedValue({ data: 'user-1', error: null });
   adminUsersFetchMock.mockResolvedValue(
     new Response(JSON.stringify({ users: [{ id: 'user-1' }] }), { status: 200 }),
   );
@@ -172,9 +178,8 @@ describe('sendSmsOtpAction — enumeration safety', () => {
       expect(malformed.error).toMatch(/not available/i);
     }
 
-    adminUsersFetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ users: [] }), { status: 200 }),
-    );
+    // Unknown email: the get_user_id_by_email RPC returns null.
+    rpcMock.mockResolvedValueOnce({ data: null, error: null });
     const unknown = await sendSmsOtpAction({ email: 'ghost@example.com' });
     expect(unknown.ok).toBe(false);
     if (unknown.ok === false) {
@@ -279,7 +284,7 @@ describe('verifySmsOtpAction — hash compare', () => {
   }
 
   it('accepts a correct code, marks consumed, establishes a session', async () => {
-    const stored = await expectedHash('123456', 'user-1', 'hash-salt');
+    const stored = await expectedHash('123456', 'user-1', 'hash-salt-long-enough-for-assertion');
 
     // Build a chainable stub for `system.from('sms_otp_codes')`.
     const codesBuilder = {
@@ -327,7 +332,7 @@ describe('verifySmsOtpAction — hash compare', () => {
   });
 
   it('rejects a wrong code and never calls generateLink', async () => {
-    const storedForOther = await expectedHash('999999', 'user-1', 'hash-salt');
+    const storedForOther = await expectedHash('999999', 'user-1', 'hash-salt-long-enough-for-assertion');
 
     const codesBuilder = {
       select: vi.fn().mockReturnThis(),
@@ -359,7 +364,7 @@ describe('verifySmsOtpAction — hash compare', () => {
   });
 
   it('rejects after 5 attempts', async () => {
-    const stored = await expectedHash('123456', 'user-1', 'hash-salt');
+    const stored = await expectedHash('123456', 'user-1', 'hash-salt-long-enough-for-assertion');
 
     const codesBuilder = {
       select: vi.fn().mockReturnThis(),
@@ -391,7 +396,7 @@ describe('verifySmsOtpAction — hash compare', () => {
   });
 
   it('rejects when the code has expired', async () => {
-    const stored = await expectedHash('123456', 'user-1', 'hash-salt');
+    const stored = await expectedHash('123456', 'user-1', 'hash-salt-long-enough-for-assertion');
 
     const codesBuilder = {
       select: vi.fn().mockReturnThis(),
