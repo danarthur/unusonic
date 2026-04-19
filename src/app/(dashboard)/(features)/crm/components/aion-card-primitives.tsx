@@ -44,7 +44,7 @@ export function ConfidenceDot({
       aria-label={label ?? `Confidence: ${confidence}`}
       title={label ?? `Confidence: ${confidence}`}
       className={cn(
-        'inline-block size-[6px] rounded-full align-middle shrink-0',
+        'inline-block size-[7px] rounded-full align-middle shrink-0',
         stateClass,
         className,
       )}

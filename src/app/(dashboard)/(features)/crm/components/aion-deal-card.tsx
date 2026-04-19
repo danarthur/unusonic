@@ -195,14 +195,18 @@ function CardHeader({ voice }: { voice: string }) {
 function OutboundRowView({
   row,
   cadenceTooltip,
-  primary,
   onDraft,
   onDismiss,
   onSnooze,
 }: {
   row: OutboundRow;
   cadenceTooltip: string | null;
-  primary: boolean;
+  /**
+   * @deprecated Kept on the parent-mapped prop for API stability but no longer
+   * consumed — the unified card uses `variant="secondary"` for both rows and
+   * leans on the achromatic-accent philosophy (text + icon carry the weight).
+   */
+  primary?: boolean;
   onDraft: () => void;
   onDismiss: () => void;
   onSnooze: (days: number) => void;
@@ -216,8 +220,9 @@ function OutboundRowView({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-2.5 py-1.5',
-        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised,var(--stage-surface))]',
+        'flex items-center justify-between gap-3 rounded-md px-3 py-2',
+        'bg-[var(--ctx-card)]',
+        'shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]',
       )}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -232,11 +237,11 @@ function OutboundRowView({
 
       <div className="flex items-center gap-2 shrink-0">
         <Button
-          variant={primary ? 'default' : 'secondary'}
+          variant="secondary"
           size="sm"
           onClick={onDraft}
         >
-          <MessageSquare />
+          <MessageSquare className="size-3.5" />
           {ctaLabel}
         </Button>
 
@@ -246,17 +251,15 @@ function OutboundRowView({
         />
 
         <div className="relative">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label="More actions"
             onClick={() => setMenuOpen((v) => !v)}
-            className={cn(
-              'inline-flex items-center justify-center size-6 rounded-sm',
-              'text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-raised)]',
-            )}
+            className="text-[var(--stage-text-secondary)]"
           >
-            <X className="size-3 rotate-45" aria-hidden />
-          </button>
+            <X className="size-3.5 rotate-45" aria-hidden />
+          </Button>
           {menuOpen && (
             <OutboundActionMenu
               onDismiss={() => {
@@ -347,12 +350,14 @@ function OutboundActionMenu({
 
 function PipelineRowView({
   row,
-  primary,
   onAccept,
   onDismiss,
 }: {
   row: PipelineRow;
-  primary: boolean;
+  /**
+   * @deprecated See OutboundRowView. Kept for call-site compatibility.
+   */
+  primary?: boolean;
   onAccept: () => void;
   onDismiss: () => void;
 }) {
@@ -363,8 +368,9 @@ function PipelineRowView({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-2.5 py-1.5',
-        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised,var(--stage-surface))]',
+        'flex items-center justify-between gap-3 rounded-md px-3 py-2',
+        'bg-[var(--ctx-card)]',
+        'shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]',
       )}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -379,27 +385,25 @@ function PipelineRowView({
 
       <div className="flex items-center gap-2 shrink-0">
         <Button
-          variant={primary ? 'default' : 'secondary'}
+          variant="secondary"
           size="sm"
           onClick={onAccept}
         >
           {ctaLabel}
-          <ArrowRight />
+          <ArrowRight className="size-3.5" />
         </Button>
 
         <WhyThisTooltip breakdown={row.priorityBreakdown} />
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-sm"
           aria-label="Dismiss suggestion"
           onClick={onDismiss}
-          className={cn(
-            'inline-flex items-center justify-center size-6 rounded-sm',
-            'text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-raised)]',
-          )}
+          className="text-[var(--stage-text-secondary)]"
         >
-          <X className="size-3" aria-hidden />
-        </button>
+          <X className="size-3.5" aria-hidden />
+        </Button>
       </div>
     </div>
   );
@@ -429,7 +433,8 @@ function PipelineCollapsedLine({
       transition={STAGE_MEDIUM}
       className={cn(
         'flex items-center justify-between gap-3 rounded-md px-3 py-2',
-        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)]',
+        'bg-[var(--ctx-card)]',
+        'shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]',
       )}
     >
       <div className="flex items-center gap-2 min-w-0">
