@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { formatRelative } from 'date-fns';
-import { Check, X, Sparkles, ShieldAlert } from 'lucide-react';
+import { Check, X, ShieldAlert } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
+import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { cn } from '@/shared/lib/utils';
 import { CONSENT_TERMS } from '@/shared/lib/consent';
 import { FeatureConsentModal } from '@/app/(dashboard)/(features)/aion/components/FeatureConsentModal';
@@ -34,6 +36,7 @@ export function AionSettingsView({
   state: WorkspaceFeatureState;
   pendingRequests: PendingRequest[];
 }) {
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -52,7 +55,7 @@ export function AionSettingsView({
       }
       toast.success('Aion card beta turned off. Members notified.');
       // A full refresh is the cheapest way to re-hydrate server state.
-      window.location.reload();
+      router.refresh();
     });
   };
 
@@ -64,7 +67,7 @@ export function AionSettingsView({
         return;
       }
       toast.success('Consent revoked.');
-      window.location.reload();
+      router.refresh();
     });
   };
 
@@ -87,8 +90,8 @@ export function AionSettingsView({
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       {/* Header */}
       <header className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Sparkles size={18} />
+        <div className="flex items-center gap-2.5">
+          <AionMark size={24} status="idle" />
           <h1 className="text-2xl tracking-tight">Aion</h1>
         </div>
         <p className="text-sm text-[var(--stage-text-secondary)]">
@@ -254,6 +257,7 @@ function StatusDot({ ok }: { ok: boolean }) {
 }
 
 function PendingRequestRow({ req }: { req: PendingRequest }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const review = (decision: 'approved' | 'denied') => {
@@ -264,7 +268,7 @@ function PendingRequestRow({ req }: { req: PendingRequest }) {
         return;
       }
       toast.success(decision === 'approved' ? 'Approved.' : 'Denied.');
-      window.location.reload();
+      router.refresh();
     });
   };
 

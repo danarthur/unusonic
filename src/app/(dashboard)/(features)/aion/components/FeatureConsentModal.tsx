@@ -15,11 +15,13 @@
  */
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Sparkles, Check, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { StagePanel } from '@/shared/ui/stage-panel';
+import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { CONSENT_TERMS, type ConsentTermKey } from '@/shared/lib/consent';
 import { acceptAionCardBeta } from '../actions/consent-actions';
 
@@ -41,6 +43,7 @@ export function FeatureConsentModal({
   mode,
   cadencePreviouslyAccepted,
 }: FeatureConsentModalProps) {
+  const router = useRouter();
   const [enableCadence, setEnableCadence] = useState(cadencePreviouslyAccepted);
   const [isPending, startTransition] = useTransition();
 
@@ -64,6 +67,10 @@ export function FeatureConsentModal({
           : 'Aion card beta turned on.',
       );
       onClose();
+      // Re-render the server components above us (/crm deal-lens) so the
+      // unified card appears immediately — `revalidatePath` alone invalidates
+      // the cache but doesn't force the client-side view to refetch.
+      router.refresh();
     });
   };
 
@@ -81,8 +88,8 @@ export function FeatureConsentModal({
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Sparkles size={18} className="shrink-0" />
+          <div className="flex items-center gap-2.5">
+            <AionMark size={22} status="idle" className="shrink-0" />
             <h2 id="aion-consent-title" className="text-lg tracking-tight">
               {mode === 'reconsent' ? 'Updated terms' : cardTerm.title}
             </h2>

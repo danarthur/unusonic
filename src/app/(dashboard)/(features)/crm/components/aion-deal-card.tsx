@@ -34,6 +34,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, MessageSquare, X } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
+import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type {
@@ -163,12 +164,15 @@ export function AionDealCard({
 function CardHeader({ voice }: { voice: string }) {
   return (
     <div className="space-y-1.5">
-      <p
-        className="stage-label tracking-wide uppercase"
-        style={{ fontSize: '10px', color: 'var(--stage-text-tertiary,var(--stage-text-secondary))' }}
-      >
-        Aion
-      </p>
+      <div className="flex items-center gap-1.5">
+        <AionMark size={12} status="idle" />
+        <p
+          className="stage-label tracking-wide uppercase"
+          style={{ fontSize: '10px', color: 'var(--stage-text-tertiary,var(--stage-text-secondary))' }}
+        >
+          Aion
+        </p>
+      </div>
       {voice && (
         <p
           className="leading-snug"

@@ -17,8 +17,8 @@ import {
   Paintbrush,
   Fingerprint,
   Workflow,
-  Sparkles,
 } from 'lucide-react';
+import { Aion as AionIcon } from '@/shared/ui/icons/nav/aion';
 
 type NavItem = { href: string; label: string; icon: typeof Settings };
 
@@ -42,7 +42,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'AI',
     items: [
-      { href: '/settings/aion', label: 'Aion', icon: Sparkles },
+      { href: '/settings/aion', label: 'Aion', icon: AionIcon },
     ],
   },
   {
