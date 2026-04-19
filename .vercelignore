@@ -1,0 +1,8 @@
+# Sibling monorepo packages that Vercel shouldn't upload or type-check.
+# apps/companion is the Tauri desktop companion — built separately with
+# its own toolchain. Its TypeScript imports (e.g. @tauri-apps/api/core)
+# aren't in the web app's dependency tree, so leaving apps/ in the Vercel
+# upload causes the Next.js production build to fail with
+#   "Cannot find module '@tauri-apps/api/core'"
+# even though tsconfig.json already excludes the directory.
+apps
