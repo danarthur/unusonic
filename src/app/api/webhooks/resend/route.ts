@@ -1,12 +1,25 @@
 /**
  * Resend Webhook Handler
- * Handles domain.updated, email.delivered, and email.bounced events from Resend.
  *
- * Register this URL in your Resend dashboard:
- * https://resend.com/webhooks → POST to {APP_URL}/api/webhooks/resend
- * Enable events: domain.updated, email.delivered, email.bounced
+ * Handles Resend OUTBOUND delivery events. Inbound parsing lives on a
+ * separate handler at /api/webhooks/postmark — we chose Postmark for
+ * inbound on 2026-04-20 after a three-agent research pass. See
+ * docs/reference/replies-design.md §4.2.
  *
- * Set RESEND_WEBHOOK_SECRET in env for shared-secret verification.
+ * Register this URL in Resend dashboard:
+ *   https://resend.com/webhooks → POST to {APP_URL}/api/webhooks/resend
+ *   Enable events: domain.updated, email.delivered, email.bounced,
+ *                  email.opened, email.clicked
+ *
+ * Event routing:
+ *   • domain.updated  — sync sending_domain_status onto public.workspaces
+ *   • email.delivered — stamp delivered_at on proposal/crew/messages
+ *   • email.bounced   — stamp bounced_at on proposal/crew/messages
+ *   • email.opened    — stamp opened_at on ops.messages
+ *   • email.clicked   — stamp clicked_at on ops.messages
+ *
+ * Secrets: RESEND_WEBHOOK_SECRET is required. Verified via x-resend-secret
+ * header with timingSafeEqual. Never open-access in any environment.
  *
  * @module app/api/webhooks/resend
  */
@@ -27,18 +40,12 @@ type ResendWebhookBody = {
 
 function verifySecret(req: NextRequest): boolean {
   const secret = process.env.RESEND_WEBHOOK_SECRET;
-  // Require RESEND_WEBHOOK_SECRET. Never open-access in any environment.
   if (!secret) return false;
-
-  // Resend delivers webhooks with the signing secret in the x-resend-secret header.
-  // Set RESEND_WEBHOOK_SECRET to the value from Resend dashboard → Webhooks → Signing secret.
   const providedSecret = req.headers.get('x-resend-secret');
   if (!providedSecret) return false;
-
   try {
     return timingSafeEqual(Buffer.from(providedSecret), Buffer.from(secret));
   } catch {
-    // Buffer length mismatch (different lengths) — definitely not equal
     return false;
   }
 }
@@ -61,7 +68,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (body.type === 'domain.updated') {
     const resendDomainId = body.data?.id as string | undefined;
     const status = body.data?.status as string | undefined;
-
     if (resendDomainId && status && VALID_DOMAIN_STATUSES.includes(status)) {
       await supabase
         .from('workspaces')
@@ -72,63 +78,84 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ received: true });
   }
 
-  // ── Email delivery tracking ──
+  // ── Email delivery / tracking status ──
   //
-  // A resend_message_id is unique per send, so it belongs to at most one
-  // upstream record: either a proposal or a crew_comms_log row written by
-  // compileAndSendDaySheet. We try both paths; whichever matches wins.
-  if (body.type === 'email.delivered' || body.type === 'email.bounced') {
+  // A resend email_id is provider-globally unique, so it belongs to at most
+  // one upstream record. Any of the following readers may match:
+  //   • proposals (legacy proposal email tracking)
+  //   • crew_comms_log (day-sheet sends)
+  //   • ops.messages (Replies outbound)
+  if (
+    body.type === 'email.delivered'
+    || body.type === 'email.bounced'
+    || body.type === 'email.opened'
+    || body.type === 'email.clicked'
+  ) {
     const emailId = body.data?.email_id as string | undefined;
     if (!emailId) return NextResponse.json({ received: true });
 
     const now = new Date().toISOString();
-    const isDelivered = body.type === 'email.delivered';
 
-    // Path 1: proposal email tracking (existing behaviour).
-    await supabase
-      .from('proposals')
-      .update(
-        isDelivered
-          ? { email_delivered_at: now }
-          : { email_bounced_at: now },
-      )
-      .eq('resend_message_id', emailId);
-
-    // Path 2: crew day-sheet delivery — append a new log row pointing at the
-    // same deal_crew so the Crew Hub can show delivered/bounced status per
-    // recipient. Append-only so we keep the full history.
+    // ops.messages: uniform stamp by event type. Safe to UPDATE with no WHERE
+    // match — no-op if this email_id doesn't belong to a messages row.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: sourceRow } = await (supabase as any)
-      .schema('ops')
-      .from('crew_comms_log')
-      .select('id, workspace_id, deal_crew_id, event_id, payload')
-      .eq('resend_message_id', emailId)
-      .eq('event_type', 'day_sheet_sent')
-      .maybeSingle();
+    const opsClient: any = (supabase as any).schema('ops');
+    if (body.type === 'email.delivered') {
+      await opsClient.from('messages').update({ delivered_at: now }).eq('provider_message_id', emailId);
+    } else if (body.type === 'email.bounced') {
+      await opsClient.from('messages').update({ bounced_at: now }).eq('provider_message_id', emailId);
+    } else if (body.type === 'email.opened') {
+      await opsClient.from('messages').update({ opened_at: now }).eq('provider_message_id', emailId);
+    } else if (body.type === 'email.clicked') {
+      await opsClient.from('messages').update({ clicked_at: now }).eq('provider_message_id', emailId);
+    }
 
-    if (sourceRow) {
+    // Legacy paths: proposal + crew day-sheet tracking only care about
+    // delivered/bounced. Opens/clicks don't have a target row there.
+    if (body.type === 'email.delivered' || body.type === 'email.bounced') {
+      const isDelivered = body.type === 'email.delivered';
+
+      await supabase
+        .from('proposals')
+        .update(isDelivered ? { email_delivered_at: now } : { email_bounced_at: now })
+        .eq('resend_message_id', emailId);
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
+      const { data: sourceRow } = await (supabase as any)
         .schema('ops')
         .from('crew_comms_log')
-        .insert({
-          workspace_id: sourceRow.workspace_id,
-          deal_crew_id: sourceRow.deal_crew_id,
-          event_id: sourceRow.event_id,
-          resend_message_id: emailId,
-          channel: 'email',
-          event_type: isDelivered ? 'day_sheet_delivered' : 'day_sheet_bounced',
-          occurred_at: now,
-          summary: isDelivered ? 'Day sheet delivered' : 'Day sheet bounced',
-          payload: {
-            source_log_id: sourceRow.id,
-            recipient_email: sourceRow.payload?.recipient_email ?? null,
-          },
-        });
+        .select('id, workspace_id, deal_crew_id, event_id, payload')
+        .eq('resend_message_id', emailId)
+        .eq('event_type', 'day_sheet_sent')
+        .maybeSingle();
+
+      if (sourceRow) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .schema('ops')
+          .from('crew_comms_log')
+          .insert({
+            workspace_id: sourceRow.workspace_id,
+            deal_crew_id: sourceRow.deal_crew_id,
+            event_id: sourceRow.event_id,
+            resend_message_id: emailId,
+            channel: 'email',
+            event_type: isDelivered ? 'day_sheet_delivered' : 'day_sheet_bounced',
+            occurred_at: now,
+            summary: isDelivered ? 'Day sheet delivered' : 'Day sheet bounced',
+            payload: {
+              source_log_id: sourceRow.id,
+              recipient_email: sourceRow.payload?.recipient_email ?? null,
+            },
+          });
+      }
     }
 
     return NextResponse.json({ received: true });
   }
 
+  // Any other event type: ack and move on. Inbound events that might leak
+  // through Resend (in case anyone ever enables them) are intentionally
+  // ignored — Postmark owns inbound.
   return NextResponse.json({ received: true });
 }
