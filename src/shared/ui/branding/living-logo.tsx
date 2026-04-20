@@ -317,10 +317,7 @@ export function LivingLogo({
   const [now, setNow] = useState(0);
 
   useEffect(() => {
-    if (!motionAllowed) {
-      setNow(0);
-      return;
-    }
+    if (!motionAllowed) return;
     let raf = 0;
     const t0 = performance.now();
     const tick = (t: number) => {

@@ -49,27 +49,30 @@ export function LivingLogo({ status = 'idle', size = 'md' }: LivingLogoProps) {
   const stroke = STROKES[status];
   const isAnimating = status === 'loading' || status === 'syncing';
 
-  // Separation drift — at classical vesica sep = R. Loading widens and
-  // narrows on a 5s cycle; syncing on a tighter 2.4s cycle.
-  const [sep, setSep] = useState(R);
+  // Separation: animated states drive `animatedSep` via raf; all other states
+  // derive from status at render time (classical vesica for idle, tight for
+  // success, wide for error). Static derivation avoids setState-in-effect.
+  const [animatedSep, setAnimatedSep] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!isAnimating) {
-      setSep(status === 'success' ? R * 0.2 : status === 'error' ? R * 1.5 : R);
-      return;
-    }
+    if (!isAnimating) return;
     let frame = 0;
     const start = performance.now();
     const duration = status === 'syncing' ? 2400 : 5000;
     const tick = (now: number) => {
       const t = ((now - start) % duration) / duration;
       const wave = Math.sin(t * Math.PI * 2);
-      setSep(R + wave * R * 0.35);
+      setAnimatedSep(R + wave * R * 0.35);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [isAnimating, status]);
+
+  let staticSep = R;
+  if (status === 'success') staticSep = R * 0.2;
+  else if (status === 'error') staticSep = R * 1.5;
+  const sep = isAnimating && animatedSep != null ? animatedSep : staticSep;
 
   const cxL = CX - sep / 2;
   const cxR = CX + sep / 2;
