@@ -1,11 +1,13 @@
 'use client';
 
 /**
- * ProductionCapturesPanel — notes linked to a specific deal or event.
+ * ProductionCapturesPanel — voice/Aion captures linked to a specific deal
+ * or event. Heading defaults to "Captures" to distinguish this stream from
+ * the typed-notes card (DealDiaryCard, backed by ops.deal_notes) that also
+ * mounts on the Deal / Plan lenses.
  *
- * Mounts on the deal detail page and the event detail page. Scoped to ONE
- * production, so each row shows the linked entity (who the note was about)
- * instead of the production (which is the context here).
+ * Scoped to ONE production, so each row shows the linked entity (who the
+ * capture was about) instead of the production (which is the context here).
  *
  * Simpler than CaptureTimelinePanel — no grouping, no per-row menu for
  * mutations in v1. Users edit/reassign/relink from the entity detail page.
@@ -30,7 +32,7 @@ export interface ProductionCapturesPanelProps {
   workspaceId: string;
   kind: 'deal' | 'event';
   productionId: string;
-  /** Optional heading override. Defaults to "Notes". */
+  /** Optional heading override. Defaults to "Captures". */
   heading?: string;
   /**
    * For event pages — include captures from the deal that converted into
@@ -43,7 +45,7 @@ export function ProductionCapturesPanel({
   workspaceId,
   kind,
   productionId,
-  heading = 'Notes',
+  heading = 'Captures',
   predecessorDealId = null,
 }: ProductionCapturesPanelProps) {
   const [visibleCount, setVisibleCount] = React.useState(5);
@@ -94,7 +96,7 @@ export function ProductionCapturesPanel({
 
       {captures.length === 0 ? (
         <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
-          No notes yet. Captures that mention this {kind} will land here.
+          No captures yet. Voice captures that mention this {kind} will land here.
         </p>
       ) : (
         <ul className="space-y-2">

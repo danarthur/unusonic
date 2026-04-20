@@ -32,7 +32,8 @@
  */
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { ArrowRight, MessageSquare, Mic } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
@@ -45,6 +46,7 @@ import type {
   PipelineRow,
   PriorityBreakdown,
 } from '../actions/get-aion-card-for-deal';
+import { actOnFollowUp } from '../actions/follow-up-actions';
 import {
   SectionHeader,
   SignalsList,
@@ -63,7 +65,12 @@ export type AionDealCardProps = {
   context?: AionDealCardContext;
   onAcceptAdvance?: (row: PipelineRow) => void;
   onDismissAdvance?: (row: PipelineRow) => void;
+  /** Fired when the user clicks the Draft CTA — used for telemetry. The card
+   *  opens its own inline composer in parallel. */
   onDraftNudge?: (row: OutboundRow) => void;
+  /** Fired after a nudge is successfully logged via the inline composer, so
+   *  the parent can refresh its Aion bundle (the outbound row goes acted). */
+  onNudgeSubmitted?: () => void;
   onDismissNudge?: (row: OutboundRow) => void;
   onSnoozeNudge?: (row: OutboundRow, days: number) => void;
 };
@@ -117,6 +124,7 @@ export function AionDealCard({
   onAcceptAdvance,
   onDismissAdvance,
   onDraftNudge,
+  onNudgeSubmitted,
   onDismissNudge,
   onSnoozeNudge,
 }: AionDealCardProps) {
@@ -135,6 +143,22 @@ export function AionDealCard({
       },
     ]);
   }, []);
+
+  // Inline composer state — when set, the NudgeComposer renders below the
+  // footer CTAs with the row's suggested channel preselected.
+  const [draftingRow, setDraftingRow] = React.useState<OutboundRow | null>(null);
+  const handleStartDraft = React.useCallback(
+    (row: OutboundRow) => {
+      // Preserve existing telemetry hook so the parent still logs the event.
+      onDraftNudge?.(row);
+      setDraftingRow(row);
+    },
+    [onDraftNudge],
+  );
+  const handleComposerSubmitted = React.useCallback(() => {
+    setDraftingRow(null);
+    onNudgeSubmitted?.();
+  }, [onNudgeSubmitted]);
   // Suppress: all events in the past → card must not render on live deal page
   if (data.suppress && context !== 'archive') return null;
 
@@ -176,13 +200,22 @@ export function AionDealCard({
               <li key={row.followUpId}>
                 <ArchiveOutboundRow
                   row={row}
-                  onDraft={() => onDraftNudge?.(row)}
+                  onDraft={() => handleStartDraft(row)}
                   onDismiss={() => onDismissNudge?.(row)}
                   onSnooze={(days) => onSnoozeNudge?.(row, days)}
                 />
               </li>
             ))}
           </ul>
+          <AnimatePresence>
+            {draftingRow && (
+              <NudgeComposer
+                row={draftingRow}
+                onCancel={() => setDraftingRow(null)}
+                onSubmitted={handleComposerSubmitted}
+              />
+            )}
+          </AnimatePresence>
         </StagePanel>
       </motion.div>
     );
@@ -279,10 +312,24 @@ export function AionDealCard({
               outboundRow={hasOutbound ? outboundRows[0] : null}
               pipelineRow={hasPipeline ? pipelineRows[0] : null}
               onAcceptAdvance={(row) => onAcceptAdvance?.(row)}
-              onDraftNudge={(row) => onDraftNudge?.(row)}
+              onDraftNudge={handleStartDraft}
             />
           </div>
         </div>
+
+        {/* Inline nudge composer — appears when Draft is clicked. Logs the
+            nudge via actOnFollowUp which flips the follow_up_queue item to
+            status=acted and writes a follow_up_log row. No email/SMS sending
+            here yet — phase 2 wires Resend/Twilio. */}
+        <AnimatePresence>
+          {draftingRow && (
+            <NudgeComposer
+              row={draftingRow}
+              onCancel={() => setDraftingRow(null)}
+              onSubmitted={handleComposerSubmitted}
+            />
+          )}
+        </AnimatePresence>
       </StagePanel>
     </motion.div>
   );
@@ -842,6 +889,154 @@ function ActionMenu({
         Dismiss
       </button>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NudgeComposer — inline composer that opens when the user clicks the Draft
+// CTA. Phase 1: logs the nudge as sent manually via actOnFollowUp (writes a
+// follow_up_log row + flips the queue item to 'acted'). Phase 2 will wire
+// email/SMS sending through Resend/Twilio so "Send" actually dispatches.
+// ---------------------------------------------------------------------------
+
+type NudgeChannel = 'email' | 'sms' | 'call';
+
+function resolveInitialChannel(row: OutboundRow): NudgeChannel {
+  const c = (row.suggestedChannel ?? '').toLowerCase();
+  if (c === 'phone' || c === 'call') return 'call';
+  if (c === 'sms' || c === 'text') return 'sms';
+  return 'email';
+}
+
+function NudgeComposer({
+  row,
+  onCancel,
+  onSubmitted,
+}: {
+  row: OutboundRow;
+  onCancel: () => void;
+  onSubmitted: () => void;
+}) {
+  const [channel, setChannel] = React.useState<NudgeChannel>(() => resolveInitialChannel(row));
+  const [message, setMessage] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+  React.useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  const handleSubmit = async () => {
+    if (submitting) return;
+    if (!message.trim()) {
+      toast.error('Add a message or call summary first.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const actionType =
+        channel === 'email' ? 'email_sent' : channel === 'sms' ? 'sms_sent' : 'call_logged';
+      const res = await actOnFollowUp(
+        row.followUpId,
+        actionType,
+        channel === 'call' ? 'call' : channel,
+        undefined,
+        message.trim(),
+      );
+      if (!res.success) {
+        toast.error(res.error ?? 'Could not log nudge.');
+        return;
+      }
+      toast.success(channel === 'call' ? 'Call logged.' : 'Nudge logged.');
+      onSubmitted();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitLabel =
+    channel === 'call' ? 'Log call' : channel === 'sms' ? 'Log text' : 'Log email';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={STAGE_MEDIUM}
+      className="overflow-hidden"
+    >
+      <div
+        className="mt-3 p-3 rounded-lg flex flex-col gap-2"
+        style={{
+          border: '1px solid var(--stage-edge-subtle)',
+          background: 'var(--ctx-well)',
+        }}
+        data-surface="well"
+      >
+        <div className="flex items-center gap-1">
+          {(['email', 'sms', 'call'] as const).map((ch) => (
+            <button
+              key={ch}
+              type="button"
+              onClick={() => setChannel(ch)}
+              disabled={submitting}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs transition-colors',
+                channel === ch
+                  ? 'text-[var(--stage-text-primary)] bg-[oklch(1_0_0_/_0.10)]'
+                  : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
+              )}
+            >
+              {ch === 'email' ? 'Email' : ch === 'sms' ? 'Text' : 'Call'}
+            </button>
+          ))}
+        </div>
+
+        <textarea
+          ref={textareaRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={
+            channel === 'call'
+              ? 'Summary of the call…'
+              : channel === 'sms'
+                ? 'What did you text?'
+                : 'What did you send?'
+          }
+          rows={3}
+          disabled={submitting}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
+          className="w-full bg-transparent text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] resize-none outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-md p-1"
+        />
+
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className="text-[11px]"
+            style={{ color: 'var(--stage-text-tertiary)' }}
+          >
+            Logs as sent manually. Sending via Resend/Twilio comes next.
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={submitting}
+              className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] px-2 py-1 transition-colors"
+            >
+              Cancel
+            </button>
+            <Button size="sm" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? 'Logging…' : submitLabel}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
