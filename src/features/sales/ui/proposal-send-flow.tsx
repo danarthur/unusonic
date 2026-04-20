@@ -41,10 +41,15 @@ export function ProposalSendFlow({
   onSend,
 }: ProposalSendFlowProps) {
   return (
-    <div className="shrink-0 pt-4 mt-2 border-t border-[var(--stage-edge-subtle)] space-y-3">
-      <p className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-        Send to
-      </p>
+    <div className="shrink-0 py-3 space-y-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="stage-label text-[var(--stage-text-secondary)]">
+          Send to
+        </p>
+        {lineItemCount === 0 && clientAttached !== false && (
+          <p className="stage-label text-[var(--stage-text-tertiary)]">Add at least one line item</p>
+        )}
+      </div>
 
       {/* Contact pills */}
       {contacts.length > 0 && (
@@ -119,9 +124,6 @@ export function ProposalSendFlow({
       </button>
       {clientAttached === false && (
         <p className="text-xs text-[var(--color-unusonic-error)]">Attach a client to this deal before sending.</p>
-      )}
-      {clientAttached !== false && lineItemCount === 0 && (
-        <p className="text-xs text-[var(--stage-text-secondary)]">Add at least one line item before sending.</p>
       )}
     </div>
   );

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GripVertical, Plus, Minus, X, FileText, Trash2, PackageOpen } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronRight, Copy, GripVertical, PanelLeft, Plus, Minus, MoreHorizontal, MoveDown, MoveUp, Users, X, FileText, Trash2, PackageOpen } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -28,10 +29,12 @@ import { PackageSelectorPalette } from './package-selector-palette';
 import type { ProposalWithItems, ProposalBuilderLineItem, ProposalLineItemCategory, UnitType } from '../model/types';
 import type { RequiredRole } from '../api/package-types';
 import { CurrencyInput } from '@/shared/ui/currency-input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { cn } from '@/shared/lib/utils';
 import { ProposalLineInspector } from './proposal-line-inspector';
 import { ProposalProductionTeam } from './proposal-production-team';
-import { ProposalSummaryCard } from './proposal-summary-card';
+import { ProposalSummaryStrip } from './proposal-summary-strip';
+import { ProposalCatalogPanel, type ProposalCatalogPanelTab } from './proposal-catalog-panel';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { syncCrewFromProposal, getDealCrewEquipmentNames, getDealCrew, type DealCrewRow } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
 
@@ -45,7 +48,6 @@ import { RiderParserModal } from '@/features/ai/ui/rider-parser-modal';
 
 import { toLineItemInput, mapProposalItemsToLineItems, groupLineItemsByPackageInstance } from './proposal-utils';
 import { ProposalSendFlow } from './proposal-send-flow';
-import { ProposalActionsFooter } from './proposal-actions-footer';
 
 /** Contact with email (from deal stakeholders) for "Send to" picker. */
 export type ProposalContact = { id: string; name: string; email: string };
@@ -196,6 +198,20 @@ export function ProposalBuilder({
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [riderModalOpen, setRiderModalOpen] = useState(false);
+  /** Design Phase A: collapsed package groups (by `rowId`). Expanded by default — owners want to see the bundle contents without clicking. */
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
+  /** Currently open row menu (by `rowId`). Single-open so arrow keys stay sane. */
+  const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
+  /** Receipt toolbar "more actions" menu (Save to catalog, etc.). */
+  const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
+  /** Catalog/Inspector side panel — open by default; user can collapse to icon rail. */
+  const [catalogPanelOpen, setCatalogPanelOpen] = useState(true);
+  const [catalogPanelTab, setCatalogPanelTab] = useState<ProposalCatalogPanelTab>('catalog');
+  /** Production team side sheet — opens on explicit button click. */
+  const [teamSheetOpen, setTeamSheetOpen] = useState(false);
+  /** True after client-mount — gates `createPortal` so the sticky Send bar renders only after hydration. */
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => { setPortalReady(true); }, []);
   /** When true, actual_cost is editable for Rental/Retail (sub-rental or custom order). */
   const [subRentalCostUnlocked, setSubRentalCostUnlocked] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -224,6 +240,17 @@ export function ProposalBuilder({
     window.addEventListener('proposal-builder:open-palette', handler);
     return () => window.removeEventListener('proposal-builder:open-palette', handler);
   }, [readOnly]);
+
+  // Auto-switch the Catalog/Inspector side panel to the Inspector tab whenever
+  // a line item is selected. Also pops the panel open if it was collapsed —
+  // the user explicitly asked to edit, so we show them the editor. User can
+  // manually switch back to Catalog.
+  useEffect(() => {
+    if (selectedLineIndex != null) {
+      setCatalogPanelTab('inspector');
+      setCatalogPanelOpen(true);
+    }
+  }, [selectedLineIndex]);
 
   // Fetch crew equipment names for internal source annotations
   useEffect(() => {
@@ -493,6 +520,85 @@ export function ProposalBuilder({
     },
     [groupedLineItems, sortableGroupIds, lineItems, readOnly, onRowReorder],
   );
+
+  /**
+   * Move a group up or down by one position. Keyboard-accessible (and
+   * WCAG 2.5.7–required) non-drag alternative to the grip handle. Reuses
+   * the same `arrayMove` + `flatMap` reconstruction as `handleReceiptDragEnd`
+   * and emits the same telemetry so dashboards see both paths.
+   */
+  const moveGroup = useCallback(
+    (rowId: string, direction: 'up' | 'down') => {
+      if (readOnly) return;
+      const fromIdx = sortableGroupIds.indexOf(rowId);
+      if (fromIdx === -1) return;
+      const toIdx = direction === 'up' ? fromIdx - 1 : fromIdx + 1;
+      if (toIdx < 0 || toIdx >= sortableGroupIds.length) return;
+      const newGroupOrder = arrayMove(groupedLineItems, fromIdx, toIdx);
+      const nextLineItems = newGroupOrder.flatMap((g) => g.indices.map((i) => lineItems[i]));
+      setLineItems(nextLineItems);
+      onRowReorder?.({
+        from_group_index: fromIdx,
+        to_group_index: toIdx,
+        from_group_id: rowId,
+        to_group_id: sortableGroupIds[toIdx],
+      });
+    },
+    [groupedLineItems, sortableGroupIds, lineItems, readOnly, onRowReorder],
+  );
+
+  /**
+   * Duplicate a group: clone every line item in the group with fresh
+   * `clientUid` / `packageInstanceId` so server-side upsert persists them as
+   * new rows (rather than updating the originals). Inserted immediately
+   * after the source group so the receipt order stays obvious.
+   */
+  const duplicateGroup = useCallback(
+    (rowId: string) => {
+      if (readOnly) return;
+      const groupIdx = groupedLineItems.findIndex((g) => g.rowId === rowId);
+      if (groupIdx === -1) return;
+      const group = groupedLineItems[groupIdx];
+      const newPackageInstanceId = group.packageInstanceId
+        ? typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `dup-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        : null;
+      const cloned: ProposalBuilderLineItem[] = group.indices.map((i) => {
+        const source = lineItems[i];
+        const clientUid =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `dup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        return {
+          ...source,
+          id: undefined, // drop server id so upsert inserts a new row
+          clientUid,
+          packageInstanceId: newPackageInstanceId,
+        };
+      });
+      // Splice the cloned block in right after the source group.
+      const flatBoundaryBefore = groupedLineItems
+        .slice(0, groupIdx + 1)
+        .reduce((acc, g) => acc + g.indices.length, 0);
+      const next = [
+        ...lineItems.slice(0, flatBoundaryBefore),
+        ...cloned,
+        ...lineItems.slice(flatBoundaryBefore),
+      ];
+      setLineItems(next);
+    },
+    [groupedLineItems, lineItems, readOnly],
+  );
+
+  const toggleGroupCollapsed = useCallback((rowId: string) => {
+    setCollapsedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+  }, []);
 
   const removeGroup = useCallback(
     (packageInstanceId: string) => {
@@ -1026,7 +1132,7 @@ export function ProposalBuilder({
   };
 
   const receiptListContent = (
-    <div className="flex-1 overflow-auto min-h-[160px] min-w-0">
+    <div className="flex-1 min-w-0 flex flex-col">
       {lineItems.length > 0 && (
         <div className={receiptHeaderClass}>
           <span className="flex-1">Item</span>
@@ -1056,17 +1162,25 @@ export function ProposalBuilder({
         <SortableContext items={sortableGroupIds} strategy={verticalListSortingStrategy}>
           {/* touch-pan-y keeps the page's vertical scroll working on iPad
               while the grip handle ('touch-none' below) owns drag initiation. */}
-          <ul className="space-y-3 mt-1 pb-1 mx-px touch-pan-y">
+          <ul className="flex-1 space-y-3 mt-1 pb-1 mx-px touch-pan-y flex flex-col">
             {lineItems.length === 0 ? (
               <li
                 className={cn(
-                  'text-sm text-[var(--stage-text-secondary)] py-12 px-6 text-center rounded-[var(--stage-radius-panel)] border-2 border-dashed min-h-[160px] flex flex-col items-center justify-center gap-2 transition-colors duration-150',
+                  'flex-1 text-sm text-[var(--stage-text-secondary)] py-12 px-6 text-center rounded-[var(--stage-radius-panel)] border-2 border-dashed min-h-[320px] flex flex-col items-center justify-center gap-3 transition-colors duration-150',
                   isDragOver
                     ? 'border-[var(--color-unusonic-warning)]/50 bg-[var(--color-unusonic-warning)]/10'
                     : 'border-[var(--stage-border-hover)] bg-[var(--ctx-well)]'
                 )}
               >
-                <span>{emptyDropHint ?? 'Add items from the catalog or create a custom line item.'}</span>
+                <Plus className="w-8 h-8 text-[var(--stage-text-tertiary)] opacity-60" strokeWidth={1.25} aria-hidden />
+                <div className="space-y-1 max-w-xs">
+                  <p className="text-sm text-[var(--stage-text-primary)] font-medium">
+                    No line items yet
+                  </p>
+                  <p className="text-xs text-[var(--stage-text-secondary)] leading-relaxed">
+                    {emptyDropHint ?? 'Press ⌘K or Add from catalog above to start building the proposal.'}
+                  </p>
+                </div>
               </li>
             ) : (
               groupedLineItems.map((group) => {
@@ -1120,17 +1234,23 @@ export function ProposalBuilder({
                         )}
                 {hasHeaderRow ? (
                   <>
-                    {/* Package header row: bold name, editable bundle price, Unpack + Trash (div to avoid li > li) */}
+                    {/* Package header row: chevron + bold name, editable package total, row menu (div to avoid li > li) */}
                     {(() => {
                       const item = lineItems[headerIndex!];
                       const index = headerIndex!;
+                      const isCollapsed = collapsedGroupIds.has(group.rowId);
+                      const childCount = group.indices.length - 1; // minus the header
+                      const groupIdxInList = sortableGroupIds.indexOf(group.rowId);
+                      const canMoveUp = groupIdxInList > 0;
+                      const canMoveDown = groupIdxInList >= 0 && groupIdxInList < sortableGroupIds.length - 1;
                       return (
                         <motion.div
                           layout
                           transition={STAGE_MEDIUM}
                           role="row"
+                          data-surface="elevated"
                           className={cn(
-                            'py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] min-w-0 transition-colors duration-[80ms] ease-out cursor-pointer stage-hover overflow-hidden',
+                            'py-3.5 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] hover:border-[var(--stage-border)] min-w-0 transition-colors duration-[80ms] ease-out cursor-pointer stage-hover overflow-hidden',
                             selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
                           )}
                           onClick={() => {
@@ -1139,56 +1259,136 @@ export function ProposalBuilder({
                           }}
                         >
                         <div className="flex items-center gap-3">
+                          {/* Chevron disclosure — toggle children. Package groups only. */}
+                          <button
+                            type="button"
+                            aria-label={isCollapsed ? `Expand ${item.name || 'package'}` : `Collapse ${item.name || 'package'}`}
+                            aria-expanded={!isCollapsed}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleGroupCollapsed(group.rowId);
+                            }}
+                            className="shrink-0 flex items-center justify-center w-6 h-6 rounded text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                            )}
+                          </button>
+
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm leading-snug">
+                            <p className="font-semibold text-[var(--stage-text-primary)] truncate text-base leading-snug tracking-tight">
                               {item.name || 'Package'}
                             </p>
-                            <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">Bundle price</p>
+                            <p className="stage-label text-[var(--stage-text-secondary)] mt-0.5">
+                              Package total{childCount > 0 ? ` · ${childCount} ${childCount === 1 ? 'item' : 'items'}` : ''}
+                            </p>
                           </div>
                           <div className={qtyStepperClass} onClick={(e) => e.stopPropagation()}>
-                            <span className="text-sm font-medium text-[var(--stage-text-secondary)] py-2">1</span>
+                            <span className="text-sm font-medium text-[var(--stage-text-secondary)] py-2 tabular-nums">1</span>
                           </div>
-                          <div className="w-20 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                          <div className="w-24 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
                             <CurrencyInput
                               value={String(effectiveUnitPrice(item))}
                               onChange={(v) => updateLineItemUnitPrice(index, Number(v) || 0)}
-                              className="text-sm font-medium text-[var(--stage-text-primary)] text-right w-full min-w-0 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-1.5 py-1"
+                              className="text-sm font-semibold text-[var(--stage-text-primary)] text-right w-full min-w-0 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-2 py-1 tabular-nums"
                             />
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUnpack(group.packageInstanceId!);
-                              }}
-                              className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                              title="Unpack to line items: break the package into individual items at their standard catalog price."
-                              aria-label="Unpack to line items"
-                            >
-                              <PackageOpen className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeGroup(group.packageInstanceId!);
-                                if (selectedLineIndex === index) setSelectedLineIndex(null);
-                              }}
-                              className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                              aria-label={`Remove ${item.name || 'package'}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            {/* Unpack: break the package into editable line items */}
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnpack(group.packageInstanceId!);
+                                }}
+                                className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                                title="Break out to line items: splits the package into individual rows at their catalog prices."
+                                aria-label="Break out to line items"
+                              >
+                                <PackageOpen className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Row menu: Move up / Move down / Duplicate / Delete — WCAG 2.5.7 non-drag alternative */}
+                            {!readOnly && (
+                              <Popover
+                                open={openRowMenuId === group.rowId}
+                                onOpenChange={(o) => setOpenRowMenuId(o ? group.rowId : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    aria-label={`Options for ${item.name || 'package'}`}
+                                    className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" sideOffset={4} className="w-48 p-1">
+                                  <button
+                                    type="button"
+                                    disabled={!canMoveUp}
+                                    onClick={() => {
+                                      moveGroup(group.rowId, 'up');
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-35 disabled:pointer-events-none text-left"
+                                  >
+                                    <MoveUp className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Move up
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canMoveDown}
+                                    onClick={() => {
+                                      moveGroup(group.rowId, 'down');
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-35 disabled:pointer-events-none text-left"
+                                  >
+                                    <MoveDown className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Move down
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      duplicateGroup(group.rowId);
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] text-left"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Duplicate
+                                  </button>
+                                  <div className="h-px bg-[var(--stage-edge-subtle)] my-1" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      removeGroup(group.packageInstanceId!);
+                                      if (selectedLineIndex === index) setSelectedLineIndex(null);
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--color-unusonic-error)] rounded hover:bg-[var(--color-unusonic-error)]/10 text-left"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Delete package
+                                  </button>
+                                </PopoverContent>
+                              </Popover>
+                            )}
                           </div>
                         </div>
                         </motion.div>
                       );
                     })()}
-                    {/* Child rows: indented, show "Included" when $0 */}
-                    <ul className="pl-5 ml-1 border-l-2 border-[var(--stage-border)] space-y-3 list-none p-0 m-0">
-                      {childIndices.map((index) => renderReceiptRow(index, true))}
-                    </ul>
+                    {/* Child rows: indented, show "Included" when $0. Hidden when the header is collapsed. */}
+                    {!collapsedGroupIds.has(group.rowId) && (
+                      <ul className="pl-5 ml-1 border-l-2 border-[var(--stage-border)] space-y-3 list-none p-0 m-0">
+                        {childIndices.map((index) => renderReceiptRow(index, true))}
+                      </ul>
+                    )}
                   </>
                 ) : (
                   <>
@@ -1318,57 +1518,210 @@ export function ProposalBuilder({
     },
   } as const : null;
 
+  /** Count of unique crew roles referenced by the line items — used for the Production Team button badge. */
+  const crewRoleCount = useMemo(() => {
+    const seen = new Set<string>();
+    for (const item of lineItems) {
+      const roles = (item.requiredRoles ?? []) as { name?: string }[];
+      for (const r of roles) {
+        if (r?.name) seen.add(r.name.toLowerCase());
+      }
+    }
+    return seen.size;
+  }, [lineItems]);
+
   return (
-    <div className={cn('flex flex-col gap-4', className)} style={{ overflow: 'visible' }}>
-      <div className="grid gap-6 flex-1 w-full grid-cols-1 lg:grid-cols-[1fr_minmax(280px,340px)]">
-        {/* Left: Receipt */}
-        <div className="min-w-0 flex flex-col">
-          <div data-surface="elevated" className="flex flex-col min-h-0 max-h-[calc(100vh-7rem)] overflow-hidden rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
-            <div className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-8">
-              <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-5">
-                Receipt
-              </h2>
-              <div className="min-w-0">
-                {receiptListContent}
+    <div
+      className={cn('flex flex-col gap-4', className)}
+      // pb keeps the last line items above the sticky Send bar (~88px).
+      style={{ overflow: 'visible', paddingBottom: lineItems.length > 0 && !readOnly ? '6rem' : undefined }}
+    >
+      {/* Summary strip — always visible at the top. Design C: this replaces
+          the right-rail summary card. The running total is a "nervous tic"
+          per User Advocate research; keeping it in the eye-path matters. */}
+      {lineItems.length > 0 && (
+        <ProposalSummaryStrip
+          totalRevenue={summaryValues.totalRevenue}
+          estimatedCost={summaryValues.estimatedCost}
+          floorGapCount={summaryValues.floorGapCount}
+          floorGapTotal={summaryValues.floorGapTotal}
+          talentBudget={summaryValues.talentBudget}
+        />
+      )}
+
+      {/* Design C: 2-column [catalog/inspector panel · receipt]. Panel is
+          collapsible via its own toggle. Panel hidden on md- (mobile); on
+          mobile, catalog access is via ⌘K and the receipt toolbar, while
+          the inspector renders as a Sheet (preserved below). */}
+      <div className="flex flex-col md:flex-row gap-6 flex-1 w-full min-h-[calc(100vh-14rem)]">
+        {/* Catalog / Inspector panel — md+ only */}
+        {workspaceId && dealId && (
+          <div className="hidden md:flex">
+            <ProposalCatalogPanel
+              workspaceId={workspaceId}
+              dealId={dealId}
+              proposedDate={proposedDate}
+              open={catalogPanelOpen}
+              onOpenChange={setCatalogPanelOpen}
+              activeTab={catalogPanelTab}
+              onActiveTabChange={setCatalogPanelTab}
+              inspectorAvailable={inspectorProps != null}
+              inspectorContent={inspectorProps ? <ProposalLineInspector {...inspectorProps} /> : null}
+              onProposalRefetch={onProposalRefetch}
+              onItemAdded={(packageId) => onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined)}
+              onAddCustomLineItem={addCustomLineItem}
+              readOnly={readOnly}
+            />
+          </div>
+        )}
+
+        {/* Receipt */}
+        <div className="min-w-0 flex-1 flex flex-col h-full relative">
+          {/* Floating "open panel" affordance — only when the side panel is
+              closed. Mirrors the Aion tab's pattern (ChatInterface.tsx). */}
+          {!catalogPanelOpen && !readOnly && (
+            <button
+              type="button"
+              onClick={() => setCatalogPanelOpen(true)}
+              aria-label="Open catalog panel"
+              className="hidden md:flex absolute top-3 left-3 z-10 p-1.5 rounded-[6px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]"
+            >
+              <PanelLeft size={16} strokeWidth={1.5} />
+            </button>
+          )}
+          <div data-surface="elevated" className="flex-1 flex flex-col rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
+            {/* Receipt toolbar — label + draft status on the left;
+                Production team button + overflow menu on the right.
+                The left-panel already owns "+ Add from catalog" so the
+                toolbar keeps only the peripheral actions. ⌘K still works. */}
+            <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-[var(--stage-edge-subtle)]">
+              <div className="flex items-center gap-3 min-w-0">
+                <h2 className="stage-label text-[var(--stage-text-secondary)]">Proposal</h2>
+                {showDraftSaved && (
+                  <span className="stage-label text-[var(--stage-accent)] animate-in fade-in-0 duration-200" role="status">
+                    Draft saved
+                  </span>
+                )}
+                {saveToCatalogMessage && (
+                  <span className="stage-label text-[var(--stage-text-secondary)] truncate" role="status">
+                    {saveToCatalogMessage}
+                  </span>
+                )}
               </div>
-
-            {/* + Add from Catalog — opens palette */}
-            <div className="shrink-0 pt-4 mt-2 border-t border-[var(--stage-edge-subtle)]">
-              {workspaceId && dealId && (
-                <PackageSelectorPalette
-                  workspaceId={workspaceId}
-                  dealId={dealId}
-                  proposedDate={proposedDate}
-                  open={paletteOpen}
-                  onOpenChange={setPaletteOpen}
-                  onApplied={(packageId) => {
-                    onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined);
-                    onProposalRefetch?.();
-                  }}
-                  onAddCustomLineItem={addCustomLineItem}
-                  trigger={
-                    <button
-                      type="button"
-                      className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[var(--stage-border-hover)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] hover:bg-[var(--ctx-well)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]"
-                    >
-                      <Plus className="w-4 h-4" aria-hidden />
-                      Add from catalog
-                    </button>
-                  }
-                />
-              )}
-
-              {/* Parse rider — opens Aion rider parser modal */}
-              {workspaceId && dealId && (
-                <>
+              {!readOnly && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Production team — opens a side sheet. Only meaningful when there are crew roles. */}
                   <button
                     type="button"
-                    onClick={() => setRiderModalOpen(true)}
-                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 mt-2 rounded-[var(--stage-radius-button)] text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors"
+                    onClick={() => setTeamSheetOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-1.5 text-sm text-[var(--stage-text-primary)] hover:border-[var(--stage-border)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    aria-label="Open production team"
                   >
-                    <FileText size={16} strokeWidth={1.5} />
-                    Parse rider
+                    <Users className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                    Production team
+                    {crewRoleCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] text-[10px] tabular-nums font-medium">
+                        {crewRoleCount}
+                      </span>
+                    )}
                   </button>
+                  {/* On mobile only: + Add and Parse rider still live in the toolbar
+                      because the catalog panel is hidden on md-. md+ relies on the panel. */}
+                  <div className="flex md:hidden items-center gap-1">
+                    {workspaceId && dealId && (
+                      <PackageSelectorPalette
+                        workspaceId={workspaceId}
+                        dealId={dealId}
+                        proposedDate={proposedDate}
+                        open={paletteOpen}
+                        onOpenChange={setPaletteOpen}
+                        onApplied={(packageId) => {
+                          onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined);
+                          onProposalRefetch?.();
+                        }}
+                        onAddCustomLineItem={addCustomLineItem}
+                        trigger={
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-2 rounded-[var(--stage-radius-button)] border border-[var(--stage-border)] bg-[var(--stage-surface-raised)] px-3 py-2 text-sm font-medium text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                          >
+                            <Plus className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                            Add
+                          </button>
+                        }
+                      />
+                    )}
+                    {workspaceId && dealId && (
+                      <button
+                        type="button"
+                        onClick={() => setRiderModalOpen(true)}
+                        className="p-2 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                        aria-label="Parse rider"
+                      >
+                        <FileText className="w-4 h-4" strokeWidth={1.5} />
+                      </button>
+                    )}
+                  </div>
+                  {/* md+ needs access to the palette even though the primary
+                      entry is the catalog panel — ⌘K handler dispatches
+                      `proposal-builder:open-palette` which the palette listens
+                      for. Render the palette host here invisibly so the
+                      shortcut has a mount to attach to. */}
+                  <div className="hidden md:block">
+                    {workspaceId && dealId && (
+                      <PackageSelectorPalette
+                        workspaceId={workspaceId}
+                        dealId={dealId}
+                        proposedDate={proposedDate}
+                        open={paletteOpen}
+                        onOpenChange={setPaletteOpen}
+                        onApplied={(packageId) => {
+                          onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined);
+                          onProposalRefetch?.();
+                        }}
+                        onAddCustomLineItem={addCustomLineItem}
+                        trigger={<span className="sr-only" aria-hidden />}
+                      />
+                    )}
+                  </div>
+                  {/* More actions menu — Save to catalog, Parse rider, Save draft now. */}
+                  <Popover open={toolbarMenuOpen} onOpenChange={setToolbarMenuOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="More receipt actions"
+                        className="p-2 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" sideOffset={4} className="w-56 p-1">
+                      <button
+                        type="button"
+                        disabled={lineItems.length === 0 || saveToCatalogPending}
+                        onClick={() => {
+                          handleSaveToCatalog();
+                          setToolbarMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-35 disabled:pointer-events-none text-left"
+                      >
+                        <BookMarked className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                        {saveToCatalogPending ? 'Saving to catalog…' : 'Save as package'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={lineItems.length === 0 || saving || isPending}
+                        onClick={() => {
+                          handleSaveDraft();
+                          setToolbarMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-35 disabled:pointer-events-none text-left"
+                      >
+                        <FileText className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                        Save draft now
+                      </button>
+                    </PopoverContent>
+                  </Popover>
                   <RiderParserModal
                     open={riderModalOpen}
                     onOpenChange={setRiderModalOpen}
@@ -1376,11 +1729,82 @@ export function ProposalBuilder({
                     workspaceId={workspaceId}
                     onItemsAdded={() => onProposalRefetch?.()}
                   />
-                </>
+                </div>
               )}
             </div>
 
-            {/* Send to client */}
+            {/* Receipt list — flex-1 so the card fills its grid cell vertically
+                and the empty state reads as a real empty state rather than a
+                stub sitting in a half-empty card. */}
+            <div className="flex-1 min-w-0 px-4 sm:px-6 py-5 flex flex-col">
+              {receiptListContent}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile: sheet inspector — the md+ inspector lives inside the
+            catalog panel's Inspector tab, so the Sheet is only for viewports
+            where the panel itself isn't rendered. */}
+        {isMobile && (
+          <Sheet
+            open={selectedLineIndex != null && selectedItem != null}
+            onOpenChange={(open) => { if (!open) setSelectedLineIndex(null); }}
+          >
+            <SheetContent side="right" className="w-[min(340px,85vw)]">
+              <SheetHeader>
+                <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+                  Line item details
+                </span>
+              </SheetHeader>
+              <SheetBody>
+                {inspectorProps && (
+                  <ProposalLineInspector {...inspectorProps} />
+                )}
+              </SheetBody>
+            </SheetContent>
+          </Sheet>
+        )}
+      </div>
+
+      {/* Production team — right-side sheet, opens on explicit button click. */}
+      <Sheet open={teamSheetOpen} onOpenChange={setTeamSheetOpen}>
+        <SheetContent side="right" className="w-[min(460px,95vw)]">
+          <SheetHeader>
+            <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+              Production team
+            </span>
+          </SheetHeader>
+          <SheetBody>
+            <ProposalProductionTeam
+              lineItems={lineItems}
+              sourceOrgId={sourceOrgId}
+              onUpdateRoleAssignment={updateRoleAssignment}
+              onAddRole={addRoleToLineItem}
+              onUpdateTimeStart={updateTimeStart}
+              onUpdateTimeEnd={updateTimeEnd}
+              onUpdateShowTimes={updateShowTimesOnProposal}
+              dealEventStartTime={dealEventStartTime}
+              dealEventEndTime={dealEventEndTime}
+              proposedDate={proposedDate}
+              dealId={dealId}
+              planCrewAdditions={planCrewAdditions}
+            />
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
+
+      {/* Sticky Send bar — fixed to the viewport bottom so the closing action is always
+          one tap away (Option B from the layout redesign). Portaled to document.body so
+          backdrop-filter on Stage Engineering ancestors doesn't clip it (CLAUDE.md rule 10). */}
+      {portalReady && !readOnly && lineItems.length > 0 && createPortal(
+        <div
+          data-surface="raised"
+          // bottom-16 on mobile/iPad-portrait lifts above the global MobileDock
+          // (lg:hidden, ~64px tall). On lg+ it docks to the viewport bottom.
+          className="fixed bottom-16 lg:bottom-0 left-0 right-0 z-30 border-t border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised)]/95 backdrop-blur-md"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="max-w-[2400px] mx-auto px-4 sm:px-6">
             <ProposalSendFlow
               contacts={contacts}
               signingEmail={signingEmail}
@@ -1415,89 +1839,32 @@ export function ProposalBuilder({
               onSigningEmailChange={(v) => { setSelectedSignerContactId(null); setSigningEmail(v); }}
               onSend={() => handleSendSubmit(signingEmail, signingName)}
             />
-
-            {/* Total + actions */}
-            <ProposalActionsFooter
-              total={total}
-              lineItemCount={lineItems.length}
-              saving={saving}
-              isPending={isPending}
-              saveToCatalogPending={saveToCatalogPending}
-              saveToCatalogMessage={saveToCatalogMessage}
-              showDraftSaved={showDraftSaved}
-              sendError={sendError}
-              sendNotice={sendNotice}
-              sentUrl={sentUrl}
-              signingName={signingName}
-              signingEmail={signingEmail}
-              onSaveToCatalog={handleSaveToCatalog}
-              onSaveDraft={handleSaveDraft}
-            />
-
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Sidebar — always visible on desktop, stacks below on mobile */}
-        <div className="min-w-0 flex flex-col gap-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:sticky lg:top-0 lg:self-start">
-          {/* Proposal health summary — always visible */}
-          {lineItems.length > 0 && (
-            <ProposalSummaryCard
-              totalRevenue={summaryValues.totalRevenue}
-              estimatedCost={summaryValues.estimatedCost}
-              floorGapCount={summaryValues.floorGapCount}
-              floorGapTotal={summaryValues.floorGapTotal}
-              talentBudget={summaryValues.talentBudget}
-            />
-          )}
-
-          {/* Financial Inspector — slides in when a line item is selected */}
-          {!isMobile && (
-            <AnimatePresence>
-              {inspectorProps && (
-                <ProposalLineInspector {...inspectorProps} />
-              )}
-            </AnimatePresence>
-          )}
-
-          {/* Production team — always visible when roles exist */}
-          <ProposalProductionTeam
-            lineItems={lineItems}
-            sourceOrgId={sourceOrgId}
-            onUpdateRoleAssignment={updateRoleAssignment}
-            onAddRole={addRoleToLineItem}
-            onUpdateTimeStart={updateTimeStart}
-            onUpdateTimeEnd={updateTimeEnd}
-            onUpdateShowTimes={updateShowTimesOnProposal}
-            dealEventStartTime={dealEventStartTime}
-            dealEventEndTime={dealEventEndTime}
-            proposedDate={proposedDate}
-            dealId={dealId}
-            planCrewAdditions={planCrewAdditions}
-          />
-        </div>
-
-        {/* Mobile: sheet inspector */}
-        {isMobile && (
-          <Sheet
-            open={selectedLineIndex != null && selectedItem != null}
-            onOpenChange={(open) => { if (!open) setSelectedLineIndex(null); }}
-          >
-            <SheetContent side="right" className="w-[min(340px,85vw)]">
-              <SheetHeader>
-                <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
-                  Line item details
-                </span>
-              </SheetHeader>
-              <SheetBody>
-                {inspectorProps && (
-                  <ProposalLineInspector {...inspectorProps} />
+            {/* Send status messages — sit inside the sticky footer so they're visible
+                without scrolling when the proposal is long. */}
+            {(sendError || sendNotice || sentUrl) && (
+              <div className="pb-3 -mt-1">
+                {sendError && (
+                  <p className="text-sm text-[var(--color-unusonic-error)]" role="alert">{sendError}</p>
                 )}
-              </SheetBody>
-            </SheetContent>
-          </Sheet>
-        )}
-      </div>
+                {sendNotice && !sendError && (
+                  <p className="text-sm text-[var(--stage-text-secondary)]" role="status">{sendNotice}</p>
+                )}
+                {sentUrl && (
+                  <a
+                    href={sentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-[var(--stage-accent)] underline hover:text-[var(--stage-text-primary)]"
+                  >
+                    Sent — view proposal link
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

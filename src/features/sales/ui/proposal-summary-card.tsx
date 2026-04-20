@@ -54,19 +54,20 @@ export function ProposalSummaryCard({
       data-surface="elevated"
       className="rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-5 space-y-3"
     >
-      <h3 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+      <h3 className="stage-label text-[var(--stage-text-secondary)]">
         Proposal health
       </h3>
 
-      <div className="space-y-2 text-sm">
-        {/* Revenue */}
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-[var(--stage-text-secondary)]">Revenue</span>
-          <span className="tabular-nums text-[var(--stage-text-primary)] font-medium">
-            ${totalRevenue.toLocaleString()}
-          </span>
-        </div>
+      {/* Grand total anchor — the number owners glance at constantly. Sits
+          above a 2px divider per Stage Engineering's Financial Tables pattern. */}
+      <div className="pb-3 border-b-2 border-[var(--stage-edge-subtle)]">
+        <p className="stage-label text-[var(--stage-text-secondary)] mb-1">Revenue</p>
+        <p className="tabular-nums text-[var(--stage-text-primary)] font-semibold text-2xl leading-none tracking-tight">
+          ${totalRevenue.toLocaleString()}
+        </p>
+      </div>
 
+      <div className="space-y-2 text-sm">
         {/* Estimated cost */}
         {estimatedCost != null && (
           <div className="flex items-center justify-between gap-4">
@@ -79,7 +80,7 @@ export function ProposalSummaryCard({
 
         {/* Margin */}
         {margin != null && marginPercent != null && (
-          <div className="flex items-center justify-between gap-4 pt-1 border-t border-[var(--stage-edge-subtle)]">
+          <div className="flex items-center justify-between gap-4">
             <span className="text-[var(--stage-text-secondary)]">Margin</span>
             <span className={cn('tabular-nums font-medium', marginColor)}>
               ${margin.toLocaleString()} ({Math.round(marginPercent)}%)
@@ -89,7 +90,7 @@ export function ProposalSummaryCard({
 
         {/* Talent budget */}
         {talentBudget != null && (
-          <div className="flex items-center justify-between gap-4 pt-1 border-t border-[var(--stage-edge-subtle)]">
+          <div className="flex items-center justify-between gap-4">
             <span className="text-[var(--stage-text-secondary)]">
               {talentBudget < 0 ? '\u26A0 Over budget' : 'Talent budget'}
             </span>
