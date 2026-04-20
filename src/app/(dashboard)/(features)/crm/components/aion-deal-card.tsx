@@ -1,37 +1,39 @@
 'use client';
 
 /**
- * AionDealCard — the unified Aion voice surface on the deal detail page.
- * Replaces the four legacy surfaces (follow-up card, AionSuggestionRow,
- * computeStallSignal badge, NextActionsCard).
+ * AionDealCard — the Aion briefing surface on the deal detail page.
  *
- * Phase 3 shipping behind feature flag `crm.unified_aion_card`. See design
- * doc §7, §9, §10, §20.
+ * Redesigned 2026-04-19 after 4-agent research (User Advocate, Critic, Field
+ * Expert, Signal Navigator) stress-tested the initial narrative-first design.
+ * Research findings reshaped five core decisions:
  *
- * This component is presentational — receives a pre-composed AionCardData
- * from the consolidated reader. All server action wiring (accept-advance
- * with undo, dismiss, draft, etc.) lands in Phase 4.
+ *   1. Narrative-first lost the information-architecture debate. Every shipped
+ *      B2B AI card (Attio, Linear, Einstein, Granola, Superhuman, HubSpot)
+ *      leads with action + one-line context + evidence on demand. Pure prose
+ *      as the lead is a 2023 pattern that has cooled.
+ *   2. One sentence of voice, not 2-3. Scanability + generation quality beat
+ *      ambitious prose.
+ *   3. Single primary CTA, no "also worth considering" link. Menus of actions
+ *      transfer decision latency back to the user (NBA literature).
+ *   4. Confidence lives in phrasing, not a dot. Drop ConfidenceDot.
+ *   5. Third-person, no "I." No shipped product uses first-person AI
+ *      recommendations; veteran owners react viscerally.
  *
- * Variants (§7.1):
- *   - both            → voice paragraph + Outbound + Pipeline sections
- *   - outbound_only   → voice paragraph + Outbound section only
- *   - pipeline_only   → single-line affordance (no voice paragraph)
- *   - collapsed       → nothing renders (caller hides)
+ * Structure:
+ *   Header       : AionMark + voice paragraph (1 sentence + optional memory cite)
+ *   Primary CTA  : single boxed action — "Draft nudge for X" OR "Move to Y"
+ *   Signals      : evidence list, compact, kind-agnostic for Phase 1
+ *   Why this     : folded disclosure (Attio pattern) — opens priority breakdown
  *
- * Archive context variant: pipelineRows suppressed, no voice header beyond
- * "Outstanding" label.
- *
- * Brand voice — binding rules (design §20.8):
- *   - Sentence case, no exclamation marks
- *   - Deal fact first, pattern as measuring stick
- *   - Possessive framing
- *   - "Move" not "Advance" in CTAs
- *   - "Draft a check-in" / "Draft a nudge" — never "Compose follow-up"
+ * Variants inherited from the prior build:
+ *   - collapsed  → nothing renders
+ *   - pipeline_only → PipelineCollapsedLine (single-line advance affordance)
+ *   - archive context → outstanding-only, no voice
  */
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, MessageSquare, X } from 'lucide-react';
+import { ArrowRight, MessageSquare, Mic } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
@@ -41,11 +43,17 @@ import type {
   AionCardData,
   OutboundRow,
   PipelineRow,
+  PriorityBreakdown,
 } from '../actions/get-aion-card-for-deal';
-import { ConfidenceDot, SectionHeader, WhyThisTooltip } from './aion-card-primitives';
+import {
+  SectionHeader,
+  SignalsList,
+  WhyThisDisclosure,
+  type SignalEntry,
+} from './aion-card-primitives';
 
 // ---------------------------------------------------------------------------
-// Main card
+// Types + public API
 // ---------------------------------------------------------------------------
 
 export type AionDealCardContext = 'deal_lens' | 'archive';
@@ -53,13 +61,55 @@ export type AionDealCardContext = 'deal_lens' | 'archive';
 export type AionDealCardProps = {
   data: AionCardData;
   context?: AionDealCardContext;
-  /** Optional callbacks — Phase 4 wires the real handlers. */
   onAcceptAdvance?: (row: PipelineRow) => void;
   onDismissAdvance?: (row: PipelineRow) => void;
   onDraftNudge?: (row: OutboundRow) => void;
   onDismissNudge?: (row: OutboundRow) => void;
   onSnoozeNudge?: (row: OutboundRow, days: number) => void;
 };
+
+// Discriminator for the primary recommendation. Outbound-first bias matches
+// User Advocate's mental model (relationship work > internal stage move).
+type PrimaryRecommendation =
+  | { kind: 'outbound'; row: OutboundRow }
+  | { kind: 'pipeline'; row: PipelineRow };
+
+// Chat conversation message shape. Backend wiring lands separately.
+export type AionChatMessage = {
+  id: string;
+  role: 'user' | 'aion';
+  content: string;
+  timestamp?: string;
+};
+
+/**
+ * Simple tailwind-style breakpoint hook — mirrors `md:` (768) and `lg:` (1024)
+ * so the living logo can size to viewport without duplicating SVG renders.
+ */
+function useBreakpoint(): 'mobile' | 'tablet' | 'desktop' {
+  const [bp, setBp] = React.useState<'mobile' | 'tablet' | 'desktop'>('desktop');
+  React.useEffect(() => {
+    const mqMd = window.matchMedia('(min-width: 768px)');
+    const mqLg = window.matchMedia('(min-width: 1024px)');
+    const update = () => {
+      if (mqLg.matches) setBp('desktop');
+      else if (mqMd.matches) setBp('tablet');
+      else setBp('mobile');
+    };
+    update();
+    mqMd.addEventListener('change', update);
+    mqLg.addEventListener('change', update);
+    return () => {
+      mqMd.removeEventListener('change', update);
+      mqLg.removeEventListener('change', update);
+    };
+  }, []);
+  return bp;
+}
+
+// ---------------------------------------------------------------------------
+// Main card
+// ---------------------------------------------------------------------------
 
 export function AionDealCard({
   data,
@@ -70,23 +120,37 @@ export function AionDealCard({
   onDismissNudge,
   onSnoozeNudge,
 }: AionDealCardProps) {
+  const bp = useBreakpoint();
+  // Conversation scaffold state — scoped to this deal. Backend wiring replaces
+  // the in-memory list with a persisted thread (likely deal diary entries).
+  const [messages, setMessages] = React.useState<AionChatMessage[]>([]);
+  const handleSendMessage = React.useCallback((content: string) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `msg_${Date.now()}`,
+        role: 'user',
+        content,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+  }, []);
   // Suppress: all events in the past → card must not render on live deal page
   if (data.suppress && context !== 'archive') return null;
 
-  // Archive context hides Pipeline rows entirely (won/lost deals don't advance)
   const pipelineRows = context === 'archive' ? [] : data.pipelineRows;
   const outboundRows = data.outboundRows;
 
   const hasOutbound = outboundRows.length > 0;
   const hasPipeline = pipelineRows.length > 0;
 
-  // Archive + no outbound = nothing to show (P1-2 fix — no "All clear" filler)
+  // Archive + no outbound = nothing to show
   if (context === 'archive' && !hasOutbound) return null;
 
-  // Collapsed variant: card hides entirely (design §7.1)
+  // Collapsed variant
   if (data.variant === 'collapsed' || (!hasOutbound && !hasPipeline)) return null;
 
-  // Pipeline-only collapsed-line variant (design §7.1 middle block)
+  // Pipeline-only (no outbound) → single-line advance affordance, no briefing
   if (data.variant === 'pipeline_only' && hasPipeline && !hasOutbound) {
     return (
       <PipelineCollapsedLine
@@ -97,112 +161,571 @@ export function AionDealCard({
     );
   }
 
+  // Archive context renders the outstanding list without the briefing frame.
+  if (context === 'archive') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={STAGE_MEDIUM}
+      >
+        <StagePanel elevated padding="md" className="space-y-3">
+          <SectionHeader>Outstanding</SectionHeader>
+          <ul className="space-y-1.5">
+            {outboundRows.map((row) => (
+              <li key={row.followUpId}>
+                <ArchiveOutboundRow
+                  row={row}
+                  onDraft={() => onDraftNudge?.(row)}
+                  onDismiss={() => onDismissNudge?.(row)}
+                  onSnooze={(days) => onSnoozeNudge?.(row, days)}
+                />
+              </li>
+            ))}
+          </ul>
+        </StagePanel>
+      </motion.div>
+    );
+  }
+
+  // Live briefing: pick ONE primary recommendation.
+  const primary: PrimaryRecommendation | null = hasOutbound
+    ? { kind: 'outbound', row: outboundRows[0] }
+    : hasPipeline
+      ? { kind: 'pipeline', row: pipelineRows[0] }
+      : null;
+
+  if (!primary) return null;
+
+  const signals = composeSignals({ data, primary });
+  const breakdown =
+    primary.kind === 'outbound'
+      ? primary.row.priorityBreakdown
+      : primary.row.priorityBreakdown;
+  const cadenceTooltip = primary.kind === 'outbound' ? data.cadenceTooltip : null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_MEDIUM}
     >
-      <StagePanel elevated padding="md" className="space-y-3">
-        {context !== 'archive' && <CardHeader voice={data.voice} />}
-        {context === 'archive' && (
-          <SectionHeader>Outstanding</SectionHeader>
+      <StagePanel elevated padding="md">
+        {/* Mobile identity row — logo + label horizontal at the top when
+            the two-column layout collapses on narrow viewports. */}
+        {bp === 'mobile' && (
+          <div className="flex items-center gap-2 mb-3">
+            <AionMark size={40} status="loading" />
+            <span
+              className="stage-label tracking-wide uppercase"
+              style={{
+                fontSize: '11px',
+                color: 'var(--stage-text-tertiary, var(--stage-text-secondary))',
+              }}
+            >
+              Aion
+            </span>
+          </div>
         )}
 
-        {hasOutbound && (
-          <section aria-labelledby="aion-outbound-label" className="space-y-2">
-            {context !== 'archive' && (
-              <div id="aion-outbound-label">
-                <SectionHeader>Outbound</SectionHeader>
+        {/* Briefing region — two-column on md+, single column on mobile. */}
+        <div className="flex flex-col md:flex-row md:items-stretch md:gap-5">
+          {/* Left column — hidden on mobile (identity rendered above) */}
+          {bp !== 'mobile' && (
+            <div className="shrink-0 flex flex-col items-center w-[72px] lg:w-[88px]">
+              <span
+                className="stage-label tracking-wide uppercase"
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--stage-text-tertiary, var(--stage-text-secondary))',
+                }}
+              >
+                Aion
+              </span>
+              <div className="flex-1 flex items-center justify-center">
+                <AionMark size={bp === 'tablet' ? 56 : 72} status="loading" />
               </div>
-            )}
-            <ul className="space-y-1.5">
-              {outboundRows.map((row) => (
-                <li key={row.followUpId}>
-                  <OutboundRowView
-                    row={row}
-                    cadenceTooltip={data.cadenceTooltip}
-                    primary={context !== 'archive'}
-                    onDraft={() => onDraftNudge?.(row)}
-                    onDismiss={() => onDismissNudge?.(row)}
-                    onSnooze={(days) => onSnoozeNudge?.(row, days)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {hasPipeline && (
-          <section aria-labelledby="aion-pipeline-label" className="space-y-2">
-            <div id="aion-pipeline-label">
-              <SectionHeader>Pipeline</SectionHeader>
             </div>
-            <ul className="space-y-1.5">
-              {pipelineRows.map((row) => (
-                <li key={row.insightId}>
-                  <PipelineRowView
-                    row={row}
-                    primary={!hasOutbound}
-                    onAccept={() => onAcceptAdvance?.(row)}
-                    onDismiss={() => onDismissAdvance?.(row)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+          )}
+
+          <div className="flex-1 min-w-0 flex flex-col">
+            <TopBar data={data} />
+
+            <div className="space-y-3 max-w-[640px] mt-3">
+              <VoiceParagraph voice={data.voice} />
+              <SignalsList signals={signals} />
+              <WhyThisDisclosure
+                breakdown={breakdown}
+                cadenceTooltip={cadenceTooltip}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Conversation zone — scaffold only. Renders when messages exist;
+            backend wiring persists the thread (likely to the deal diary). */}
+        <ConversationThread messages={messages} />
+
+        {/* Action footer — input + primary CTAs. Wraps to two rows on mobile;
+            single row on tablet+. */}
+        <div
+          className="mt-3 pt-3 flex flex-col md:flex-row md:items-center gap-2"
+          style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}
+        >
+          <AionChatInput dealId={data.dealId} onSend={handleSendMessage} />
+          <div className="flex items-center justify-end gap-2">
+            <FooterActions
+              primary={primary}
+              outboundRow={hasOutbound ? outboundRows[0] : null}
+              pipelineRow={hasPipeline ? pipelineRows[0] : null}
+              onAcceptAdvance={(row) => onAcceptAdvance?.(row)}
+              onDraftNudge={(row) => onDraftNudge?.(row)}
+            />
+          </div>
+        </div>
       </StagePanel>
     </motion.div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Header + voice paragraph
+// Header — AionMark + voice paragraph
 // ---------------------------------------------------------------------------
 
-function CardHeader({ voice }: { voice: string }) {
+// VoiceParagraph — Aion's narrative, prose-only. Identity lives in the TopBar.
+function VoiceParagraph({ voice }: { voice: string }) {
+  if (!voice) return null;
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5">
-        <AionMark size={12} status="idle" />
-        <p
-          className="stage-label tracking-wide uppercase"
-          style={{ fontSize: '10px', color: 'var(--stage-text-tertiary,var(--stage-text-secondary))' }}
-        >
-          Aion
-        </p>
+    <p
+      className="leading-snug"
+      style={{
+        fontSize: '15px',
+        color: 'var(--stage-text-primary)',
+      }}
+    >
+      {voice}
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot strip — key deal facts above the voice
+// ---------------------------------------------------------------------------
+
+// TopBar — Aion identity on the far left, snapshot chips on the same row.
+// Reads as: [◈ AION] │ STAGE …  │ EVENT …  │ SERIES …
+function TopBar({ data }: { data: AionCardData }) {
+  const chips: Array<{ label: string; value: string }> = [];
+
+  if (data.stall?.stageLabel) {
+    const dwell = data.stall.daysInStage;
+    const rot = data.stall.stageRottingDays;
+    const dwellText = dwell != null
+      ? (rot != null && dwell >= rot ? `${dwell}d · past rot` : `${dwell}d`)
+      : null;
+    chips.push({
+      label: 'Stage',
+      value: dwellText ? `${data.stall.stageLabel} · ${dwellText}` : data.stall.stageLabel,
+    });
+  }
+
+  if (data.urgency.date) {
+    const eventDate = formatShortDate(data.urgency.date);
+    const daysOut = data.urgency.daysOut;
+    chips.push({
+      label: 'Event',
+      value: daysOut != null
+        ? `${eventDate} · ${daysOut}d out`
+        : eventDate,
+    });
+  }
+
+  if (data.urgency.isSeries && data.urgency.totalShows > 0) {
+    chips.push({
+      label: 'Series',
+      value: `${data.urgency.totalShows} show${data.urgency.totalShows === 1 ? '' : 's'}`,
+    });
+  }
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-2.5 gap-y-1"
+      style={{ fontSize: '11px' }}
+    >
+      {chips.map((chip, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && (
+            <span
+              aria-hidden
+              className="select-none"
+              style={{ color: 'var(--stage-edge-subtle)' }}
+            >
+              │
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <span
+              className="stage-label tracking-wide uppercase"
+              style={{ color: 'var(--stage-text-tertiary, var(--stage-text-secondary))' }}
+            >
+              {chip.label}
+            </span>
+            <span style={{ color: 'var(--stage-text-secondary)' }}>{chip.value}</span>
+          </span>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''));
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// ---------------------------------------------------------------------------
+// Conversation thread — renders user/Aion messages as they accumulate.
+// Empty by default; appears above the input footer once messages exist.
+// Scrolls internally at max-h to keep the card's overall height bounded.
+// Backend wiring persists thread state (deal diary) separately.
+// ---------------------------------------------------------------------------
+
+function ConversationThread({ messages }: { messages: AionChatMessage[] }) {
+  const endRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [messages.length]);
+
+  if (messages.length === 0) return null;
+
+  return (
+    <div
+      className="mt-3 pt-3 max-h-[240px] overflow-y-auto space-y-2"
+      style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}
+      data-surface="elevated"
+    >
+      {messages.map((msg) => (
+        <MessageBubble key={msg.id} message={msg} />
+      ))}
+      <div ref={endRef} />
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: AionChatMessage }) {
+  const isUser = message.role === 'user';
+  return (
+    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+      <div
+        className={cn(
+          'max-w-[80%] rounded-md px-3 py-2 leading-snug',
+          isUser
+            ? 'bg-[var(--stage-surface-raised)] shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]'
+            : 'bg-[var(--ctx-card)]',
+        )}
+        style={{
+          fontSize: 'var(--stage-text-body, 13px)',
+          color: isUser
+            ? 'var(--stage-text-primary)'
+            : 'var(--stage-text-secondary)',
+        }}
+      >
+        {!isUser && (
+          <span
+            className="stage-label tracking-wide uppercase block mb-0.5"
+            style={{
+              fontSize: '10px',
+              color: 'var(--stage-text-tertiary, var(--stage-text-secondary))',
+            }}
+          >
+            Aion
+          </span>
+        )}
+        {message.content}
       </div>
-      {voice && (
-        <p
-          className="leading-snug"
-          style={{
-            fontSize: 'var(--stage-text-body, 13px)',
-            color: 'var(--stage-text-secondary)',
-          }}
-        >
-          {voice}
-        </p>
-      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Outbound row
+// Deal-scoped chat input — scaffold only, backend wires separately.
+// Every message implicitly carries this deal's context, so users never
+// re-state the subject. Microphone button reserves the voice-input slot.
 // ---------------------------------------------------------------------------
 
-function OutboundRowView({
-  row,
-  cadenceTooltip,
+function AionChatInput({
+  dealId,
+  onSend,
+}: {
+  dealId: string;
+  onSend?: (content: string) => void;
+}) {
+  const [value, setValue] = React.useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onSend?.(trimmed);
+    // Scaffold: backend wiring lands in a follow-up. Logging intent for now.
+    // eslint-disable-next-line no-console -- scaffold only
+    console.info('[AionChatInput] scoped message', { dealId, message: trimmed });
+    setValue('');
+  };
+
+  const handleMicClick = () => {
+    // Placeholder for voice capture — will wire into the existing voice
+    // pipeline (AionVoice component or Web Speech API) in the backend pass.
+    inputRef.current?.focus();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex-1 min-w-0 flex items-center gap-1.5">
+      <div
+        className={cn(
+          'flex items-center flex-1 min-w-0 rounded-md px-3',
+          'bg-[var(--ctx-well)]',
+          'border border-[var(--stage-edge-subtle)]',
+          'focus-within:border-[var(--stage-accent)]',
+          'focus-within:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)]',
+          'transition-colors',
+        )}
+        style={{ height: 'calc(var(--stage-input-height, 34px) - 6px)' }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Ask Aion about this deal…"
+          className={cn(
+            'flex-1 min-w-0 bg-transparent outline-none',
+            'text-sm text-[var(--stage-text-primary)]',
+            'placeholder:text-[var(--stage-text-tertiary,var(--stage-text-secondary))]',
+          )}
+        />
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Voice input"
+        onClick={handleMicClick}
+        className="text-[var(--stage-text-secondary)] shrink-0"
+      >
+        <Mic className="size-3.5" aria-hidden />
+      </Button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Footer actions — one or two co-equal CTAs
+// ---------------------------------------------------------------------------
+
+function FooterActions({
   primary,
+  outboundRow,
+  pipelineRow,
+  onAcceptAdvance,
+  onDraftNudge,
+}: {
+  primary: PrimaryRecommendation;
+  outboundRow: OutboundRow | null;
+  pipelineRow: PipelineRow | null;
+  onAcceptAdvance: (row: PipelineRow) => void;
+  onDraftNudge: (row: OutboundRow) => void;
+}) {
+  // When both kinds of recommendation exist for this deal, render them as
+  // co-equal peers by intent (NBA research: two actions labeled by intent,
+  // not primary/alternative). Secondary gets variant="secondary" (matte);
+  // the primary action — picked by outbound-first bias — keeps
+  // variant="default" (bright accent).
+  const hasBoth = outboundRow != null && pipelineRow != null;
+
+  if (hasBoth) {
+    // Primary is outbound-first per composer bias. Secondary is the other.
+    const secondaryIsPipeline = primary.kind === 'outbound';
+
+    return (
+      <>
+        {secondaryIsPipeline && pipelineRow ? (
+          <PipelineButton
+            row={pipelineRow}
+            variant="secondary"
+            onClick={() => onAcceptAdvance(pipelineRow)}
+          />
+        ) : outboundRow ? (
+          <OutboundButton
+            row={outboundRow}
+            variant="secondary"
+            onClick={() => onDraftNudge(outboundRow)}
+          />
+        ) : null}
+        <PrimaryCta
+          primary={primary}
+          onAcceptAdvance={onAcceptAdvance}
+          onDraftNudge={onDraftNudge}
+        />
+      </>
+    );
+  }
+
+  return (
+    <PrimaryCta
+      primary={primary}
+      onAcceptAdvance={onAcceptAdvance}
+      onDraftNudge={onDraftNudge}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Button helpers — used by both PrimaryCta and the secondary footer slot
+// ---------------------------------------------------------------------------
+
+function OutboundButton({
+  row,
+  variant,
+  onClick,
+}: {
+  row: OutboundRow;
+  variant: 'default' | 'secondary';
+  onClick: () => void;
+}) {
+  const channel = row.suggestedChannel;
+  const ctaLabel =
+    channel === 'sms' ? 'Draft a text'
+      : channel === 'phone' ? 'Log a call'
+        : 'Draft nudge';
+  return (
+    <Button variant={variant} size="sm" onClick={onClick}>
+      <MessageSquare className="size-3.5" />
+      {ctaLabel}
+    </Button>
+  );
+}
+
+function PipelineButton({
+  row,
+  variant,
+  onClick,
+}: {
+  row: PipelineRow;
+  variant: 'default' | 'secondary';
+  onClick: () => void;
+}) {
+  const stageLabel = humanizeStageTag(row.suggestedStageTag ?? '') || 'next stage';
+  return (
+    <Button variant={variant} size="sm" onClick={onClick}>
+      Move to {stageLabel}
+      <ArrowRight className="size-3.5" />
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Primary CTA — the bright accent action (always variant="default")
+// ---------------------------------------------------------------------------
+
+function PrimaryCta({
+  primary,
+  onAcceptAdvance,
+  onDraftNudge,
+}: {
+  primary: PrimaryRecommendation;
+  onAcceptAdvance: (row: PipelineRow) => void;
+  onDraftNudge: (row: OutboundRow) => void;
+}) {
+  if (primary.kind === 'outbound') {
+    return (
+      <OutboundButton
+        row={primary.row}
+        variant="default"
+        onClick={() => onDraftNudge(primary.row)}
+      />
+    );
+  }
+  return (
+    <PipelineButton
+      row={primary.row}
+      variant="default"
+      onClick={() => onAcceptAdvance(primary.row)}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Collapsed-line variant (Pipeline only, no stall)
+// ---------------------------------------------------------------------------
+
+function PipelineCollapsedLine({
+  row,
+  onAccept,
+  onDismiss,
+}: {
+  row: PipelineRow;
+  onAccept: () => void;
+  onDismiss: () => void;
+}) {
+  const stageLabel = humanizeStageTag(row.suggestedStageTag ?? '') || 'next stage';
+  const ctaLabel = `Move to ${stageLabel}`;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={STAGE_MEDIUM}
+      className={cn(
+        'flex items-center justify-between gap-3 rounded-md px-3 py-2',
+        'bg-[var(--ctx-card)]',
+        'shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]',
+      )}
+    >
+      <span
+        className="truncate"
+        style={{
+          fontSize: 'var(--stage-text-body, 13px)',
+          color: 'var(--stage-text-secondary)',
+        }}
+      >
+        {row.title}
+      </span>
+      <div className="flex items-center gap-2 shrink-0">
+        <Button variant="secondary" size="sm" onClick={onAccept}>
+          {ctaLabel}
+        </Button>
+        <button
+          type="button"
+          aria-label="Not yet"
+          onClick={onDismiss}
+          className="text-xs text-[var(--stage-text-secondary)] hover:underline underline-offset-2 px-2"
+        >
+          Not yet
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Archive context row — compact outbound-only listing
+// ---------------------------------------------------------------------------
+
+function ArchiveOutboundRow({
+  row,
   onDraft,
   onDismiss,
   onSnooze,
 }: {
   row: OutboundRow;
-  cadenceTooltip: string | null;
-  primary: boolean;
   onDraft: () => void;
   onDismiss: () => void;
   onSnooze: (days: number) => void;
@@ -211,62 +734,43 @@ function OutboundRowView({
   const channel = row.suggestedChannel;
   const ctaLabel = channel === 'sms' ? 'Draft a text'
     : channel === 'phone' ? 'Log a call'
-    : 'Draft a check-in';
+      : 'Draft nudge';
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-2.5 py-1.5',
-        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised,var(--stage-surface))]',
+        'flex items-center justify-between gap-3 rounded-md px-3 py-2',
+        'bg-[var(--ctx-card)]',
+        'shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]',
       )}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <ConfidenceDot confidence={row.confidence} />
-        <span
-          className="truncate"
-          style={{ fontSize: 'var(--stage-text-body, 13px)' }}
-        >
-          {row.reasonLabel}
-        </span>
-      </div>
+      <span
+        className="truncate"
+        style={{ fontSize: 'var(--stage-text-body, 13px)' }}
+      >
+        {row.reasonLabel}
+      </span>
 
       <div className="flex items-center gap-2 shrink-0">
-        <Button
-          variant={primary ? 'default' : 'secondary'}
-          size="sm"
-          onClick={onDraft}
-        >
-          <MessageSquare />
+        <Button variant="secondary" size="sm" onClick={onDraft}>
+          <MessageSquare className="size-3.5" />
           {ctaLabel}
         </Button>
 
-        <WhyThisTooltip
-          breakdown={row.priorityBreakdown}
-          cadenceTooltip={cadenceTooltip}
-        />
-
         <div className="relative">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label="More actions"
             onClick={() => setMenuOpen((v) => !v)}
-            className={cn(
-              'inline-flex items-center justify-center size-6 rounded-sm',
-              'text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-raised)]',
-            )}
+            className="text-[var(--stage-text-secondary)]"
           >
-            <X className="size-3 rotate-45" aria-hidden />
-          </button>
+            <span aria-hidden className="text-sm leading-none">⋯</span>
+          </Button>
           {menuOpen && (
-            <OutboundActionMenu
-              onDismiss={() => {
-                setMenuOpen(false);
-                onDismiss();
-              }}
-              onSnooze={(days) => {
-                setMenuOpen(false);
-                onSnooze(days);
-              }}
+            <ActionMenu
+              onDismiss={() => { setMenuOpen(false); onDismiss(); }}
+              onSnooze={(days) => { setMenuOpen(false); onSnooze(days); }}
               onClose={() => setMenuOpen(false)}
             />
           )}
@@ -276,7 +780,7 @@ function OutboundRowView({
   );
 }
 
-function OutboundActionMenu({
+function ActionMenu({
   onDismiss,
   onSnooze,
   onClose,
@@ -342,132 +846,106 @@ function OutboundActionMenu({
 }
 
 // ---------------------------------------------------------------------------
-// Pipeline row
+// Signals composer — derive a short evidence list from available data.
+// Phase 1: uses what today's composer already ships (reason label, lastTouchAt,
+// cadenceTooltip, voice signals). Phase 2 will replace with a richer
+// source-bound signals array produced by the server composer.
 // ---------------------------------------------------------------------------
 
-function PipelineRowView({
-  row,
+function composeSignals({
+  data,
   primary,
-  onAccept,
-  onDismiss,
 }: {
-  row: PipelineRow;
-  primary: boolean;
-  onAccept: () => void;
-  onDismiss: () => void;
-}) {
-  const ctaLabel = row.suggestedStageTag
-    ? `Move to ${humanizeStageTag(row.suggestedStageTag)}`
-    : 'Advance stage';
+  data: AionCardData;
+  primary: PrimaryRecommendation;
+}): SignalEntry[] {
+  const out: SignalEntry[] = [];
 
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-2.5 py-1.5',
-        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised,var(--stage-surface))]',
-      )}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <ConfidenceDot confidence={row.confidence} />
-        <span
-          className="truncate"
-          style={{ fontSize: 'var(--stage-text-body, 13px)' }}
-        >
-          {row.title}
-        </span>
-      </div>
+  // Primary recommendation's own evidence first.
+  if (primary.kind === 'outbound') {
+    if (primary.row.reasonLabel) {
+      out.push({ label: 'Status', value: primary.row.reasonLabel, kind: 'context' });
+    }
+    if (primary.row.lastTouchAt) {
+      const days = daysSince(primary.row.lastTouchAt);
+      if (days != null) {
+        out.push({
+          label: 'No reply since',
+          value: formatRelativeDate(primary.row.lastTouchAt, days),
+          kind: 'timing',
+        });
+      }
+    }
+  } else if (primary.row.title) {
+    out.push({ label: 'Ready for', value: primary.row.title, kind: 'context' });
+  }
 
-      <div className="flex items-center gap-2 shrink-0">
-        <Button
-          variant={primary ? 'default' : 'secondary'}
-          size="sm"
-          onClick={onAccept}
-        >
-          {ctaLabel}
-          <ArrowRight />
-        </Button>
+  // Stall context — "4d in stage (past 7d rot threshold)"
+  if (data.stall?.daysInStage != null) {
+    const dwell = data.stall.daysInStage;
+    const rot = data.stall.stageRottingDays;
+    const value = rot != null && dwell >= rot
+      ? `${dwell}d · past ${rot}d rot threshold`
+      : `${dwell}d`;
+    out.push({ label: 'Stage dwell', value, kind: 'timing' });
+  }
 
-        <WhyThisTooltip breakdown={row.priorityBreakdown} />
+  // Cadence profile — "You typically follow up every 3-5 days"
+  if (data.cadence?.typicalDaysBetweenFollowups != null) {
+    out.push({
+      label: 'Your cadence',
+      value: `every ${data.cadence.typicalDaysBetweenFollowups}d between touches`,
+      kind: 'behavior',
+    });
+  } else if (data.cadenceTooltip) {
+    // Fallback: use the prebuilt tooltip when the numeric profile isn't present.
+    out.push({ label: 'Cadence', value: data.cadenceTooltip, kind: 'behavior' });
+  }
 
-        <button
-          type="button"
-          aria-label="Dismiss suggestion"
-          onClick={onDismiss}
-          className={cn(
-            'inline-flex items-center justify-center size-6 rounded-sm',
-            'text-[var(--stage-text-secondary)] hover:bg-[var(--stage-surface-raised)]',
-          )}
-        >
-          <X className="size-3" aria-hidden />
-        </button>
-      </div>
-    </div>
-  );
+  // Event approach — "38 days out" (only if not already in the snapshot strip
+  // i.e. suppress when we have the full date, since the strip carries it)
+  if (data.urgency.daysOut != null && data.urgency.daysOut <= 14) {
+    // Only surface when imminent — the snapshot strip covers the far-out case.
+    out.push({
+      label: 'Event',
+      value: `${data.urgency.daysOut} day${data.urgency.daysOut === 1 ? '' : 's'} out`,
+      kind: 'timing',
+    });
+  }
+
+  // voiceSignals dedupe — skip slug-shaped entries (they're machine flags,
+  // not display-ready). Only human-case strings get surfaced.
+  for (const sig of data.voiceSignals) {
+    if (/[A-Z]|[ ]/.test(sig) && !out.some((e) => e.value === sig)) {
+      out.push({ label: 'Signal', value: sig, kind: 'context' });
+      if (out.length >= 5) break;
+    }
+  }
+
+  return out.slice(0, 5);
 }
 
-// ---------------------------------------------------------------------------
-// Collapsed-line variant (Pipeline only, no stall)
-// ---------------------------------------------------------------------------
+function daysSince(iso: string): number | null {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const now = Date.now();
+  return Math.max(0, Math.floor((now - then) / (24 * 60 * 60 * 1000)));
+}
 
-function PipelineCollapsedLine({
-  row,
-  onAccept,
-  onDismiss,
-}: {
-  row: PipelineRow;
-  onAccept: () => void;
-  onDismiss: () => void;
-}) {
-  const ctaLabel = row.suggestedStageTag
-    ? `Move to ${humanizeStageTag(row.suggestedStageTag)}`
-    : 'Advance stage';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={STAGE_MEDIUM}
-      className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-3 py-2',
-        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)]',
-      )}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <span aria-hidden className="text-[var(--stage-text-secondary)]">★</span>
-        <span
-          className="truncate"
-          style={{
-            fontSize: 'var(--stage-text-body, 13px)',
-            color: 'var(--stage-text-secondary)',
-          }}
-        >
-          {row.title}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-2 shrink-0">
-        <Button variant="secondary" size="sm" onClick={onAccept}>
-          {ctaLabel}
-        </Button>
-        <button
-          type="button"
-          aria-label="Not yet"
-          onClick={onDismiss}
-          className="text-xs text-[var(--stage-text-secondary)] hover:underline underline-offset-2 px-2"
-        >
-          Not yet
-        </button>
-      </div>
-    </motion.div>
-  );
+function formatRelativeDate(iso: string, days: number): string {
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) {
+    const weekday = new Date(iso).toLocaleDateString('en-US', { weekday: 'long' });
+    return `${weekday} (${days}d ago)`;
+  }
+  return `${days} days ago`;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Map stage tag slug to CTA verb phrase. Matches the existing TAG_COPY
- *  from AionSuggestionRow but uses "Move" not "Advance" per User Advocate. */
 function humanizeStageTag(tag: string): string {
   const map: Record<string, string> = {
     proposal_sent: 'Proposal',
@@ -479,3 +957,7 @@ function humanizeStageTag(tag: string): string {
   };
   return map[tag] ?? tag.replace(/_/g, ' ');
 }
+
+// Silence unused-type warning when PriorityBreakdown import is only used
+// transitively via the row types. Keeps the import graph explicit.
+export type { PriorityBreakdown };

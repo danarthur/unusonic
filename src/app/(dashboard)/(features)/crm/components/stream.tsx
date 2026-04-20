@@ -258,6 +258,7 @@ export function Stream({
           }}
           onOpenDayView={setDayViewDate}
           mode={mode}
+          pipelineStages={pipelineStages}
         />
       </div>
 
@@ -297,6 +298,7 @@ function DateGroupedList({
   onClearFilters,
   onOpenDayView,
   mode,
+  pipelineStages,
 }: {
   items: StreamCardItem[];
   selectedId: string | null;
@@ -306,6 +308,7 @@ function DateGroupedList({
   onClearFilters: () => void;
   onOpenDayView: (date: string) => void;
   mode: string;
+  pipelineStages?: readonly WorkspacePipelineStage[];
 }) {
   // Build date groups: { date: string | null, items: StreamCardItem[] }[]
   // Items are already sorted, so we preserve order and insert headers between date changes.
@@ -383,6 +386,7 @@ function DateGroupedList({
               item={item}
               selected={selectedId === item.id}
               onClick={() => onSelect(item.id)}
+              pipelineStages={pipelineStages}
             />
           ))}
         </li>

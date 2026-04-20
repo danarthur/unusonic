@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { Button } from '@/shared/ui/button';
 import type { DismissalReason } from '@/shared/lib/triggers/schema';
 import {
   acceptStageSuggestion,
@@ -12,14 +15,18 @@ import {
 } from '../actions/aion-suggestion-actions';
 
 /**
- * AionSuggestionRow — surfaces a stage-move suggestion or an insight diagnostic
- * on a deal card. Two sub-rows at most:
+ * AionSuggestionRow — surfaces a stage-move suggestion on a deal card.
  *
- *   • Insight chip: "● {insight title}"  [Draft nudge →] (P1)
- *   • Stage move:  "★ Advance to {tag}?"  [✓ Accept]  [× Reject ▾]
+ * Single-row layout: [✓ Advance to proposal]   [× Reject]
  *
- * Reject opens a popover with 4 enum reasons + "other" (free text).
- * All writes go through server actions.
+ * The row sits below a hairline (mt-2 pt-2 + stage-edge-subtle top border) so
+ * it reads as a natural extension of the host card, not a crushed pill. The
+ * full verb phrase lives on the button itself — no separate header, so the
+ * stage label on the stream card and the button CTA don't duplicate each other.
+ *
+ * Reject swaps the row in place to a vertical stack of dismissal reasons
+ * (popover-style block). "Other" swaps to an inline text input. All writes go
+ * through server actions.
  *
  * This component self-fetches on mount — the parent passes only `dealId`.
  * Per-card fetch is acceptable for ~50-card CRM pipelines; the insight
@@ -38,14 +45,16 @@ const DISMISSAL_OPTIONS: Array<{ value: DismissalReason; label: string }> = [
   { value: 'other', label: 'Other' },
 ];
 
-// Map tags to the verb phrase shown on the Accept button. Unknown tags fall
-// back to a generic label — never leak a raw identifier.
+// CTA copy — the full verb phrase lives on the button itself. No separate
+// header: WhyThisTooltip in the deal-panel variant surfaces the reason on
+// demand, and on the stream card the card's stage chip already carries the
+// "where is this deal" context.
 const TAG_COPY: Record<string, string> = {
-  proposal_sent: 'Advance to Proposal',
-  contract_out: 'Advance to Contract',
-  contract_signed: 'Mark Contract Signed',
-  deposit_received: 'Mark Deposit Received',
-  won: 'Mark Won',
+  proposal_sent: 'Advance to proposal',
+  contract_out: 'Advance to contract',
+  contract_signed: 'Mark contract signed',
+  deposit_received: 'Mark deposit received',
+  won: 'Mark won',
   ready_for_handoff: 'Hand off to production',
 };
 
@@ -56,9 +65,14 @@ function tagLabel(tag: string): string {
 export function AionSuggestionRow({
   dealId,
   className,
+  onVisibilityChange,
 }: {
   dealId: string;
   className?: string;
+  /** Fires when the row's visibility changes — true when a suggestion is
+   *  rendered, false when hidden or empty. Lets the host card suppress
+   *  redundant follow-up signals above this row. */
+  onVisibilityChange?: (visible: boolean) => void;
 }) {
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [hidden, setHidden] = useState(false);
@@ -78,7 +92,16 @@ export function AionSuggestionRow({
     };
   }, [dealId]);
 
-  if (!suggestion || hidden || !suggestion.targetTag) return null;
+  const visible = !!suggestion && !hidden && !!suggestion.targetTag;
+
+  useEffect(() => {
+    onVisibilityChange?.(visible);
+    return () => {
+      onVisibilityChange?.(false);
+    };
+  }, [visible, onVisibilityChange]);
+
+  if (!visible) return null;
 
   const handleAccept = () => {
     if (!suggestion.targetTag) return;
@@ -136,53 +159,57 @@ export function AionSuggestionRow({
 
   return (
     <div
-      className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm',
-        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)]',
-        className,
-      )}
+      className={cn('mt-2 pt-2', className)}
+      style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}
       data-surface="elevated"
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <span aria-hidden className="text-[var(--stage-text-secondary)]">★</span>
-        <span className="truncate">{suggestion.title}</span>
-      </div>
-
-      {!rejectOpen ? (
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={handleAccept}
+      <AnimatePresence mode="wait" initial={false}>
+        {!rejectOpen ? (
+          <motion.div
+            key="actions"
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={STAGE_LIGHT}
+            className="flex items-center gap-1.5"
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isPending}
+              onClick={handleAccept}
+              className="flex-1 min-w-0"
+            >
+              <Check className="size-3.5" />
+              <span className="truncate">
+                {suggestion.targetTag ? tagLabel(suggestion.targetTag) : 'Accept'}
+              </span>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isPending}
+              onClick={() => setRejectOpen(true)}
+              className="text-[var(--stage-text-secondary)]"
+            >
+              <X className="size-3.5" />
+              Reject
+            </Button>
+          </motion.div>
+        ) : rejectReason !== 'other' ? (
+          <motion.div
+            key="reject-options"
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={STAGE_LIGHT}
             className={cn(
-              'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs',
-              'bg-[var(--stage-surface-raised)] hover:bg-[var(--stage-surface-raised-hover,var(--stage-surface-raised))]',
+              'rounded-md p-1 shadow-sm',
+              'bg-[var(--ctx-dropdown,var(--stage-surface-raised))]',
               'border border-[var(--stage-edge-subtle)]',
-              isPending && 'opacity-50',
             )}
           >
-            <Check className="size-3" />
-            {suggestion.targetTag ? tagLabel(suggestion.targetTag) : 'Accept'}
-          </button>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => setRejectOpen(true)}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs',
-              'bg-[var(--stage-surface)] hover:bg-[var(--stage-surface-raised)]',
-              'border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)]',
-              isPending && 'opacity-50',
-            )}
-          >
-            <X className="size-3" />
-            Reject
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-end gap-2 shrink-0 text-xs">
-          {rejectReason !== 'other' ? (
-            <div className="flex flex-wrap gap-1 justify-end">
+            <div className="flex flex-col">
               {DISMISSAL_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
@@ -190,9 +217,9 @@ export function AionSuggestionRow({
                   disabled={isPending}
                   onClick={() => handleReject(opt.value)}
                   className={cn(
-                    'rounded-sm px-2 py-1',
-                    'bg-[var(--stage-surface)] hover:bg-[var(--stage-surface-raised)]',
-                    'border border-[var(--stage-edge-subtle)]',
+                    'text-left rounded-sm px-2 py-1.5 text-xs',
+                    'hover:bg-[var(--ctx-well-hover,var(--stage-surface-raised))]',
+                    'transition-colors',
                     isPending && 'opacity-50',
                   )}
                 >
@@ -203,34 +230,48 @@ export function AionSuggestionRow({
                 type="button"
                 disabled={isPending}
                 onClick={() => setRejectOpen(false)}
-                className="rounded-sm px-2 py-1 text-[var(--stage-text-secondary)] underline-offset-2 hover:underline"
+                className={cn(
+                  'mt-1 text-left rounded-sm px-2 py-1 text-[11px]',
+                  'text-[var(--stage-text-tertiary,var(--stage-text-secondary))]',
+                  'hover:text-[var(--stage-text-secondary)] underline-offset-2 hover:underline',
+                )}
               >
                 Cancel
               </button>
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                autoFocus
-                value={rejectText}
-                onChange={(e) => setRejectText(e.target.value)}
-                placeholder="Why?"
-                className="rounded-sm border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] px-2 py-1 text-xs"
-                maxLength={2000}
-              />
-              <button
-                type="button"
-                disabled={isPending || rejectText.trim().length === 0}
-                onClick={handleRejectOther}
-                className="rounded-sm border border-[var(--stage-edge-subtle)] bg-surface-raised px-2 py-1 text-xs"
-              >
-                Submit
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="reject-other"
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={STAGE_LIGHT}
+            className="flex items-center gap-1.5"
+          >
+            <input
+              type="text"
+              autoFocus
+              value={rejectText}
+              onChange={(e) => setRejectText(e.target.value)}
+              placeholder="Why?"
+              className={cn(
+                'flex-1 min-w-0 rounded-sm px-2 py-1 text-xs',
+                'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]',
+              )}
+              maxLength={2000}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isPending || rejectText.trim().length === 0}
+              onClick={handleRejectOther}
+            >
+              Submit
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

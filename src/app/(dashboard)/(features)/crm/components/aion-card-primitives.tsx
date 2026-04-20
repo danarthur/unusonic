@@ -1,66 +1,36 @@
 'use client';
 
 /**
- * Small presentational primitives for the unified Aion deal card.
+ * Presentational primitives for the Aion deal card.
  *
- *   - <ConfidenceDot>   — three-tier indicator (Attio pattern; design §20.7).
- *                         filled (high), half-fill (medium), outline (low).
- *   - <WhyThisTooltip>  — priority-breakdown reveal; natural language, no
- *                         raw numbers in copy (design §20.6).
- *   - <SectionHeader>   — Outbound / Pipeline labels inside the card.
- *
- * Kept in one file because they're small and always rendered together.
+ * Post-research redesign (2026-04-19):
+ *   - ConfidenceDot removed. Confidence is carried by voice phrasing instead
+ *     ("Send today" = high, "Worth considering" = medium, silence = low).
+ *     Research: Field Expert found no shipped product using dual confidence
+ *     signals (dot + phrasing); Critic flagged the redundancy.
+ *   - WhyThisDisclosure replaces the inline `<details>` tooltip pattern.
+ *     Lives at the card footer, folded by default, expands in place.
+ *   - SectionHeader retained — used sparingly for the Signals block.
+ *   - SignalsList — new primitive rendering the evidence under the primary
+ *     recommendation.
  */
 
 import * as React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type { PriorityBreakdown } from '../actions/get-aion-card-for-deal';
 
 // ---------------------------------------------------------------------------
-// ConfidenceDot
-// ---------------------------------------------------------------------------
-
-type Confidence = 'high' | 'medium' | 'low';
-
-export function ConfidenceDot({
-  confidence,
-  label,
-  className,
-}: {
-  confidence: Confidence;
-  label?: string;
-  className?: string;
-}) {
-  const stateClass =
-    confidence === 'high'
-      ? 'bg-[var(--stage-text-primary)] opacity-90'
-      : confidence === 'medium'
-        ? 'bg-[var(--stage-text-primary)] opacity-50'
-        : 'bg-transparent border border-[var(--stage-text-primary)] opacity-60';
-
-  return (
-    <span
-      role="img"
-      aria-label={label ?? `Confidence: ${confidence}`}
-      title={label ?? `Confidence: ${confidence}`}
-      className={cn(
-        'inline-block size-[6px] rounded-full align-middle shrink-0',
-        stateClass,
-        className,
-      )}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SectionHeader
+// SectionHeader — small uppercase label used for "Signals"
 // ---------------------------------------------------------------------------
 
 export function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
     <h3
       className="stage-label tracking-wide uppercase"
-      style={{ fontSize: '10px', color: 'var(--stage-text-tertiary, var(--stage-text-secondary))' }}
+      style={{ color: 'var(--stage-text-tertiary, var(--stage-text-secondary))' }}
     >
       {children}
     </h3>
@@ -68,18 +38,58 @@ export function SectionHeader({ children }: { children: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// WhyThisTooltip — priority breakdown + optional cadence context
+// SignalsList — evidence list under the primary recommendation.
 // ---------------------------------------------------------------------------
 
-/**
- * Hover/focus content for the "Why this?" affordance. Natural language only,
- * no raw scores — parenthetical percentages for calibration (design §20.6).
- *
- * Renders as a simple `<details>` so it's accessible and doesn't require a
- * popover primitive. Card rows place this at the end of the row. Screen
- * readers announce the summary; keyboard users Tab into the disclosure.
- */
-export function WhyThisTooltip({
+export type SignalEntry = {
+  /** Short noun phrase — what the signal IS (e.g. "Proposal sent") */
+  label: string;
+  /** Value — concrete data point (e.g. "Tuesday", "4 days ago") */
+  value: string;
+  /** Optional kind hint for future visual variance. Not wired yet. */
+  kind?: 'timing' | 'behavior' | 'financial' | 'pattern' | 'context';
+};
+
+export function SignalsList({ signals }: { signals: SignalEntry[] }) {
+  if (signals.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <SectionHeader>Signals</SectionHeader>
+      <ul
+        className="space-y-1"
+        style={{
+          fontSize: 'var(--stage-text-body, 13px)',
+          color: 'var(--stage-text-secondary)',
+        }}
+      >
+        {signals.map((signal, i) => (
+          <li key={i} className="flex gap-2 leading-snug">
+            <span
+              aria-hidden
+              className="shrink-0 select-none"
+              style={{ color: 'var(--stage-text-tertiary)' }}
+            >
+              ·
+            </span>
+            <span className="min-w-0">
+              <span style={{ color: 'var(--stage-text-tertiary)' }}>{signal.label}</span>
+              {' '}
+              <span>{signal.value}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WhyThisDisclosure — footer-level "Why this ▸" pattern.
+// Attio-adjacent: reasoning is always a layer away, never the lead.
+// ---------------------------------------------------------------------------
+
+export function WhyThisDisclosure({
   breakdown,
   cadenceTooltip,
   extraReasons = [],
@@ -90,38 +100,57 @@ export function WhyThisTooltip({
   extraReasons?: string[];
   className?: string;
 }) {
+  const [open, setOpen] = React.useState(false);
   const lines = formatBreakdownLines(breakdown);
   const all = [...lines, ...extraReasons, cadenceTooltip].filter(Boolean) as string[];
   if (all.length === 0) return null;
 
   return (
-    <details
-      className={cn(
-        'group relative inline-block text-xs',
-        'text-[var(--stage-text-tertiary,var(--stage-text-secondary))]',
-        className,
-      )}
-    >
-      <summary
-        className="list-none cursor-help underline decoration-dotted underline-offset-2 outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-edge-subtle)] rounded-sm"
-      >
-        Why this?
-      </summary>
-      <ul
+    <div className={cn('relative', className)}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className={cn(
-          'absolute right-0 top-full mt-1 z-10 w-60 rounded-md p-2',
-          'bg-[var(--stage-surface-raised)] border border-[var(--stage-edge-subtle)]',
-          'shadow-lg space-y-1',
+          'inline-flex items-center gap-1 text-xs rounded-sm',
+          'text-[var(--stage-text-tertiary, var(--stage-text-secondary))]',
+          'hover:text-[var(--stage-text-secondary)] transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
         )}
-        style={{ fontSize: '11px' }}
       >
-        {all.map((line, i) => (
-          <li key={i} className="leading-snug">
-            {line}
-          </li>
-        ))}
-      </ul>
-    </details>
+        Why this
+        <ChevronDown
+          size={11}
+          aria-hidden
+          className={cn('transition-transform', open && 'rotate-180')}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.ul
+            key="why-lines"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={STAGE_LIGHT}
+            className={cn(
+              'mt-1.5 overflow-hidden space-y-1 pl-2',
+              'border-l border-[var(--stage-edge-subtle)]',
+            )}
+            style={{
+              fontSize: '11px',
+              color: 'var(--stage-text-tertiary, var(--stage-text-secondary))',
+            }}
+          >
+            {all.map((line, i) => (
+              <li key={i} className="leading-snug">
+                {line}
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
