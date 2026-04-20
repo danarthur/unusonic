@@ -38,8 +38,15 @@ const COMPLETENESS_LABEL: Record<CrewCompletenessLevel, string | null> = {
 
 /** Core (employee): matte elevated. Partner: standard surface. Preferred (inner_circle): silk star marker. */
 export function NetworkCard({ node, onClick, onTogglePreferred, className, layoutId }: NetworkCardProps) {
-  // Freelancer persons (external_partner + person + inner_circle) render as crew, not partners
-  const isFreelancerPerson = node.kind === 'external_partner' && node.identity.entityType === 'person' && node.gravity === 'inner_circle';
+  // Freelancer persons (external_partner + person + inner_circle) render as
+  // crew, not partners. CLIENT-edge persons (wedding hosts, individual
+  // clients) are NOT freelancers — they must render in the Network/clients
+  // lane even though they're person-type entities.
+  const isFreelancerPerson =
+    node.kind === 'external_partner'
+    && node.identity.entityType === 'person'
+    && node.gravity === 'inner_circle'
+    && node.relationshipType !== 'CLIENT';
   const isCore = node.gravity === 'core' || isFreelancerPerson;
   const isPartner = node.kind === 'external_partner' && !isFreelancerPerson;
   const isPreferred = node.gravity === 'inner_circle';

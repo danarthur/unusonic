@@ -14,17 +14,31 @@ import type { NetworkNode } from '@/entities/network';
 // Helpers: classify nodes into zones using existing kind/gravity/entityType
 // =============================================================================
 
-/** A node belongs to the Crew zone if it is roster (staff/contractor) OR a preferred freelancer person. */
+/** A node belongs to the Crew zone if it is roster (staff/contractor) OR a
+ *  preferred freelancer person. CLIENT-edge persons are wedding hosts /
+ *  individual clients and must NOT land in Crew. */
 function isCrewNode(n: NetworkNode): boolean {
   if (n.kind === 'internal_employee' || n.kind === 'extended_team') return true;
-  // Preferred freelancer person — PARTNER edge with tier=preferred and entity type person
-  if (n.kind === 'external_partner' && n.gravity === 'inner_circle' && n.identity.entityType === 'person') return true;
+  // Preferred freelancer person — PARTNER/VENDOR edge with tier=preferred
+  // and entity type person. CLIENT-edge persons excluded.
+  if (
+    n.kind === 'external_partner'
+    && n.gravity === 'inner_circle'
+    && n.identity.entityType === 'person'
+    && n.relationshipType !== 'CLIENT'
+  ) return true;
   return false;
 }
 
-/** A node belongs to the Inner Circle zone if it is a preferred company/venue (not person). */
+/** A node belongs to the Inner Circle zone if it is a preferred company/venue
+ *  (not person), OR a CLIENT-edge person (couple, host, individual client). */
 function isInnerCircleNode(n: NetworkNode): boolean {
-  return n.kind === 'external_partner' && n.gravity === 'inner_circle' && n.identity.entityType !== 'person';
+  if (n.kind !== 'external_partner' || n.gravity !== 'inner_circle') return false;
+  // Company / venue / couple entities always live here.
+  if (n.identity.entityType !== 'person') return true;
+  // Person entities only if they're on a CLIENT edge; freelancer persons
+  // land in Crew via isCrewNode.
+  return n.relationshipType === 'CLIENT';
 }
 
 /** Everything else is Network. */
