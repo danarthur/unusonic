@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getDeal } from '../../../actions/get-deal';
 import { getDealStakeholders } from '../../../actions/deal-stakeholders';
-import { ProposalBuilderStudioRouter } from '../../../components/proposal-builder-studio-router';
+import { ProposalBuilderLoader } from './proposal-builder-loader';
 import { ProposalBuilderHeader } from './proposal-builder-header';
 import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
@@ -32,7 +32,7 @@ export default async function DealProposalBuilderPage({
       <ProposalBuilderHeader dealId={dealId} deal={deal} />
 
       <main className="relative z-10 flex-1 min-h-0 overflow-auto">
-        <ProposalBuilderStudioRouter
+        <ProposalBuilderLoader
           deal={deal}
           contacts={contacts}
           clientAttached={hasBillTo || !!(deal.organization_id || deal.main_contact_id)}

@@ -2,7 +2,24 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Minus, X, FileText, Trash2, PackageOpen } from 'lucide-react';
+import { GripVertical, Plus, Minus, X, FileText, Trash2, PackageOpen } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Sheet, SheetContent, SheetHeader, SheetBody } from '@/shared/ui/sheet';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { upsertProposal, publishProposal, sendForSignature, deleteProposalItemsByPackageInstanceId, unpackPackageInstance } from '../api/proposal-actions';
@@ -32,6 +49,46 @@ import { ProposalActionsFooter } from './proposal-actions-footer';
 
 /** Contact with email (from deal stakeholders) for "Send to" picker. */
 export type ProposalContact = { id: string; name: string; email: string };
+
+/**
+ * Thin render-prop wrapper around `useSortable` so receipt groups can stay
+ * rendered inline inside `ProposalBuilder` instead of being extracted into
+ * a separate component. Each sortable group receives the sortable props
+ * plus `isDragging` for visual state.
+ */
+type SortableGroupShellChildrenProps = {
+  setNodeRef: (node: HTMLElement | null) => void;
+  style: React.CSSProperties;
+  attributes: React.HTMLAttributes<HTMLElement>;
+  listeners: Record<string, (event: unknown) => void> | undefined;
+  isDragging: boolean;
+};
+
+function SortableGroupShell({
+  id,
+  children,
+}: {
+  id: string;
+  children: (props: SortableGroupShellChildrenProps) => React.ReactNode;
+}) {
+  const { setNodeRef, transform, transition, attributes, listeners, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.55 : 1,
+  };
+  return (
+    <>
+      {children({
+        setNodeRef,
+        style,
+        attributes,
+        listeners: listeners as SortableGroupShellChildrenProps['listeners'],
+        isDragging,
+      })}
+    </>
+  );
+}
 
 export interface ProposalBuilderProps {
   /** Deal id (proposals belong to the deal during Liquid phase). */
@@ -73,6 +130,17 @@ export interface ProposalBuilderProps {
    * type. See `ops.proposal_builder_events`.
    */
   onItemAdded?: (source: 'palette' | 'custom', payload?: Record<string, unknown>) => void;
+  /**
+   * Telemetry hook fired on every successful receipt row reorder (Phase 2).
+   * Writes a `row_reorder` event to `ops.proposal_builder_events`. Indices
+   * are in the sortable-group space, not the proposal_items.sort_order space.
+   */
+  onRowReorder?: (payload: {
+    from_group_index: number;
+    to_group_index: number;
+    from_group_id: string;
+    to_group_id: string;
+  }) => void;
 }
 
 export function ProposalBuilder({
@@ -95,6 +163,7 @@ export function ProposalBuilder({
   clientEntityId,
   className,
   onItemAdded,
+  onRowReorder,
 }: ProposalBuilderProps) {
   const [crewEquipmentNames, setCrewEquipmentNames] = useState<string[]>([]);
   // Rescan fix C6 (2026-04-11): manual Plan-tab crew additions are invisible
@@ -331,9 +400,16 @@ export function ProposalBuilder({
   const total = lineItems.reduce((sum, item) => sum + lineTotal(item), 0);
 
   const addCustomLineItem = useCallback(() => {
+    // Generate a stable client uid so dnd-kit can key the row before it's
+    // been saved (server id arrives after auto-save ~1500ms later).
+    const clientUid =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setLineItems((prev) => [
       ...prev,
       {
+        clientUid,
         name: '',
         description: null,
         quantity: 1,
@@ -354,6 +430,69 @@ export function ProposalBuilder({
     ]);
     onItemAdded?.('custom');
   }, [onItemAdded]);
+
+  // ── Receipt row reorder (Phase 2, @dnd-kit/sortable) ──────────────────────
+
+  /** Sensors: pointer for mouse/touch, keyboard for a11y (arrow-key reorder). */
+  const sortableSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  /**
+   * Group + stable group id for each item group. Memoized so sortable IDs
+   * stay referentially stable across renders that didn't change the line-item
+   * array identity.
+   */
+  const groupedLineItems = useMemo(() => {
+    const groups = groupLineItemsByPackageInstance(lineItems);
+    return groups.map((group) => {
+      const firstItem = lineItems[group.indices[0]];
+      // Prefer the packageInstanceId for bundled packages (shared across rows);
+      // for ungrouped single items use the client uid (set on creation / map)
+      // or the server id. Fallback to a deterministic index string for the
+      // edge case of a custom item that somehow lacks both.
+      const rowId =
+        group.packageInstanceId
+          ? `pkg-${group.packageInstanceId}`
+          : firstItem?.clientUid
+            ? `uid-${firstItem.clientUid}`
+            : firstItem?.id
+              ? `id-${firstItem.id}`
+              : `idx-${group.indices[0]}`;
+      return { ...group, rowId };
+    });
+  }, [lineItems]);
+
+  const sortableGroupIds = useMemo(
+    () => groupedLineItems.map((g) => g.rowId),
+    [groupedLineItems],
+  );
+
+  const handleReceiptDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      if (readOnly) return;
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const fromIdx = sortableGroupIds.indexOf(String(active.id));
+      const toIdx = sortableGroupIds.indexOf(String(over.id));
+      if (fromIdx === -1 || toIdx === -1) return;
+
+      const newGroupOrder = arrayMove(groupedLineItems, fromIdx, toIdx);
+      // Flatten groups back into a single lineItems array in the new order.
+      // Each group's internal index order is preserved (package header stays
+      // above its children).
+      const nextLineItems = newGroupOrder.flatMap((g) => g.indices.map((i) => lineItems[i]));
+      setLineItems(nextLineItems);
+      onRowReorder?.({
+        from_group_index: fromIdx,
+        to_group_index: toIdx,
+        from_group_id: String(active.id),
+        to_group_id: String(over.id),
+      });
+    },
+    [groupedLineItems, sortableGroupIds, lineItems, readOnly, onRowReorder],
+  );
 
   const removeGroup = useCallback(
     (packageInstanceId: string) => {
@@ -896,29 +1035,89 @@ export function ProposalBuilder({
           <span className="w-8 shrink-0" aria-hidden />
         </div>
       )}
-      <ul className="space-y-3 mt-1 pb-1 mx-px">
-        {lineItems.length === 0 ? (
-          <li
-            className={cn(
-              'text-sm text-[var(--stage-text-secondary)] py-12 px-6 text-center rounded-[var(--stage-radius-panel)] border-2 border-dashed min-h-[160px] flex flex-col items-center justify-center gap-2 transition-colors duration-150',
-              isDragOver
-                ? 'border-[var(--color-unusonic-warning)]/50 bg-[var(--color-unusonic-warning)]/10'
-                : 'border-[var(--stage-border-hover)] bg-[var(--ctx-well)]'
-            )}
-          >
-            <span>{emptyDropHint ?? 'Add items from the catalog or create a custom line item.'}</span>
-          </li>
-        ) : (
-          groupLineItemsByPackageInstance(lineItems).map((group) => {
-            const headerIndex = group.indices.find((i) => lineItems[i].isPackageHeader);
-            const childIndices = group.indices.filter((i) => !lineItems[i].isPackageHeader);
-            const hasHeaderRow = headerIndex !== undefined && group.packageInstanceId;
-
-            return (
+      <DndContext
+        sensors={sortableSensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleReceiptDragEnd}
+        accessibility={{
+          // Screen-reader announcements for keyboard drag (Space pickup, Arrow
+          // move, Space drop, Escape cancel). Without this dnd-kit ships with
+          // nothing, leaving SR users no confirmation mid-reorder.
+          announcements: {
+            onDragStart: ({ active }) => `Picked up row ${String(active.id)}. Use arrow keys to move, space to drop, escape to cancel.`,
+            onDragOver: ({ active, over }) =>
+              over ? `Row ${String(active.id)} is over row ${String(over.id)}.` : `Row ${String(active.id)} is no longer over a drop target.`,
+            onDragEnd: ({ active, over }) =>
+              over ? `Row ${String(active.id)} was dropped over row ${String(over.id)}.` : `Row ${String(active.id)} was dropped.`,
+            onDragCancel: ({ active }) => `Reorder of row ${String(active.id)} cancelled.`,
+          },
+        }}
+      >
+        <SortableContext items={sortableGroupIds} strategy={verticalListSortingStrategy}>
+          {/* touch-pan-y keeps the page's vertical scroll working on iPad
+              while the grip handle ('touch-none' below) owns drag initiation. */}
+          <ul className="space-y-3 mt-1 pb-1 mx-px touch-pan-y">
+            {lineItems.length === 0 ? (
               <li
-                key={group.packageInstanceId ?? `ungrouped-${group.indices[0]}`}
-                className="space-y-2 list-none"
+                className={cn(
+                  'text-sm text-[var(--stage-text-secondary)] py-12 px-6 text-center rounded-[var(--stage-radius-panel)] border-2 border-dashed min-h-[160px] flex flex-col items-center justify-center gap-2 transition-colors duration-150',
+                  isDragOver
+                    ? 'border-[var(--color-unusonic-warning)]/50 bg-[var(--color-unusonic-warning)]/10'
+                    : 'border-[var(--stage-border-hover)] bg-[var(--ctx-well)]'
+                )}
               >
+                <span>{emptyDropHint ?? 'Add items from the catalog or create a custom line item.'}</span>
+              </li>
+            ) : (
+              groupedLineItems.map((group) => {
+                const headerIndex = group.indices.find((i) => lineItems[i].isPackageHeader);
+                const childIndices = group.indices.filter((i) => !lineItems[i].isPackageHeader);
+                const hasHeaderRow = headerIndex !== undefined && group.packageInstanceId;
+                const groupLabelForDrag =
+                  (headerIndex !== undefined && lineItems[headerIndex]?.name) ||
+                  group.displayGroupName ||
+                  lineItems[group.indices[0]]?.name ||
+                  (group.indices.length > 1 ? 'grouped items' : 'line item');
+
+                return (
+                  <SortableGroupShell key={group.rowId} id={group.rowId}>
+                    {({ setNodeRef, style, attributes, listeners, isDragging }) => (
+                      <li
+                        ref={setNodeRef}
+                        style={style}
+                        className={cn(
+                          'group/rr relative space-y-2 list-none rounded-[var(--stage-radius-panel)]',
+                          isDragging && 'z-10 ring-1 ring-[var(--stage-accent)]/40',
+                        )}
+                      >
+                        {!readOnly && (
+                          // Drag handle: fades in on hover for pointer users,
+                          // always visible on coarse-pointer (touch) devices
+                          // so iPad at venue walkthroughs finds the reorder
+                          // affordance. `{...attributes} {...listeners}`
+                          // activate the dnd-kit sortable sensors (pointer +
+                          // keyboard) at the handle, never the whole row.
+                          <button
+                            type="button"
+                            aria-label={`Reorder ${groupLabelForDrag}`}
+                            className={cn(
+                              'absolute -left-6 top-3 flex items-center justify-center w-6 h-6',
+                              'rounded text-[var(--stage-text-tertiary)]',
+                              // On coarse-pointer devices (touch): always show
+                              // at ~40% so the grip is discoverable without hover.
+                              // On fine-pointer devices: fade in on hover/focus.
+                              'opacity-0 group-hover/rr:opacity-60 focus-visible:opacity-100',
+                              '[@media(pointer:coarse)]:opacity-40',
+                              'hover:text-[var(--stage-text-primary)] active:cursor-grabbing cursor-grab',
+                              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+                              'touch-none select-none',
+                            )}
+                            {...attributes}
+                            {...listeners}
+                          >
+                            <GripVertical className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                          </button>
+                        )}
                 {hasHeaderRow ? (
                   <>
                     {/* Package header row: bold name, editable bundle price, Unpack + Trash (div to avoid li > li) */}
@@ -1018,11 +1217,15 @@ export function ProposalBuilder({
                     </ul>
                   </>
                 )}
-              </li>
-            );
-          })
-        )}
-      </ul>
+                      </li>
+                    )}
+                  </SortableGroupShell>
+                );
+              })
+            )}
+          </ul>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 

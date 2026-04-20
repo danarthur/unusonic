@@ -81,5 +81,26 @@ export function useProposalBuilderEvents({
     [emit, sessionStartMs],
   );
 
-  return { sessionId, emit, emitAddSuccess };
+  /**
+   * Emits a `row_reorder` event for a single drag-end on the receipt. No
+   * debounce — dragging is a discrete user action, not a passive stream.
+   *
+   * `from_group_index` / `to_group_index` are indices into the GROUP list
+   * (what the user sees as a sortable row), NOT into `proposal_items.sort_order`.
+   * Ungrouped line items occupy their own group, so for flat proposals these
+   * match the line-item index; for proposals with package bundles they don't.
+   */
+  const emitRowReorder = useCallback(
+    (payload: {
+      from_group_index: number;
+      to_group_index: number;
+      from_group_id: string;
+      to_group_id: string;
+    }) => {
+      emit('row_reorder', payload);
+    },
+    [emit],
+  );
+
+  return { sessionId, emit, emitAddSuccess, emitRowReorder };
 }
