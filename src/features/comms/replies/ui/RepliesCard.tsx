@@ -23,6 +23,7 @@ import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { formatRelTime } from '@/shared/lib/format-currency';
 import { getDealReplies, type ReplyThread, type ReplyMessage } from '../api/get-deal-replies';
+import { ReplyComposer } from './ReplyComposer';
 
 export type RepliesCardProps = {
   dealId: string;
@@ -138,6 +139,7 @@ function ReplyThreadGroup({
   onRefresh: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [composing, setComposing] = useState(false);
   const lastMessage = thread.messages[thread.messages.length - 1];
   const hasUrgentInbound = thread.messages.some(
     (m) => m.direction === 'inbound' && m.urgencyKeywordMatch,
@@ -230,28 +232,28 @@ function ReplyThreadGroup({
                 <ReplyMessageRow key={m.id} message={m} />
               ))}
 
-              {!readOnly && (
-                <div className="flex items-center" style={{ gap: 'var(--stage-gap, 6px)' }}>
-                  <button
-                    type="button"
-                    className="stage-btn stage-btn-secondary text-xs"
-                    onClick={() => {
-                      // Composer wiring lands in the next pack. For now this
-                      // is a no-op placeholder so the button appears in the
-                      // layout while the data layer settles.
+              {!readOnly && !composing && (
+                <button
+                  type="button"
+                  className="stage-btn stage-btn-secondary text-xs self-start"
+                  onClick={() => setComposing(true)}
+                >
+                  Reply
+                </button>
+              )}
+
+              <AnimatePresence initial={false}>
+                {!readOnly && composing && (
+                  <ReplyComposer
+                    threadId={thread.id}
+                    onSent={() => {
+                      setComposing(false);
                       onRefresh();
                     }}
-                  >
-                    Reply
-                  </button>
-                  <span
-                    className="stage-label"
-                    style={{ color: 'var(--stage-text-tertiary)' }}
-                  >
-                    Composer wiring coming next
-                  </span>
-                </div>
-              )}
+                    onCancel={() => setComposing(false)}
+                  />
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         )}
