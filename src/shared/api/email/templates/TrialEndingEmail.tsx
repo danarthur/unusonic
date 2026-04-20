@@ -14,6 +14,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandHeader } from '../brand-header';
 
 export interface TrialEndingEmailProps {
   workspaceName: string;
@@ -44,6 +45,7 @@ export function TrialEndingEmail({ workspaceName, trialEndsAt, billingUrl }: Tri
       <Body style={main}>
         <Container style={container}>
           <Section style={section}>
+            <EmailBrandHeader color="#999999" wordmarkColor="#fafafa" marginBottom="20px" />
             <Text style={heading}>Your trial is ending</Text>
             <Text style={body}>
               Please note: the Unusonic trial for <strong>{workspaceName}</strong> ends on {when}.

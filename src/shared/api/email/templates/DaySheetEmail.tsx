@@ -17,6 +17,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandMark } from '../brand-header';
 
 export type DaySheetEmailProps = {
   eventTitle: string;
@@ -211,6 +212,7 @@ export function DaySheetEmail({
 
             {/* Footer */}
             <Text style={footer}>
+              <EmailBrandMark color="#888888" />
               Sent by {workspaceName} via Unusonic
             </Text>
           </Section>

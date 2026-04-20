@@ -16,6 +16,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandMark } from '../brand-header';
 
 export interface OtpEmailProps {
   code: string;
@@ -45,6 +46,7 @@ export function OtpEmail({ code, workspaceName }: OtpEmailProps) {
           </Text>
           <Hr style={hr} />
           <Text style={footer}>
+            <EmailBrandMark color="#666666" />
             Sent by {brand} via Unusonic
           </Text>
         </Container>

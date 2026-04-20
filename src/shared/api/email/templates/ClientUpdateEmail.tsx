@@ -14,6 +14,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandMark } from '../brand-header';
 
 export type ClientUpdateEmailProps = {
   clientName: string;
@@ -115,6 +116,7 @@ export function ClientUpdateEmail({
           </Section>
 
           <Text style={footer}>
+            <EmailBrandMark color="#aaaaaa" />
             Sent via {workspaceName} on Unusonic
           </Text>
         </Container>

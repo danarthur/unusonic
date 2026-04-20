@@ -19,6 +19,7 @@ import * as React from 'react';
 import { formatCurrency, formatEventDate } from '@/shared/lib/format-currency';
 import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
 import { type EmailPalette, DEFAULT_EMAIL_PALETTE } from '@/shared/lib/email-palette';
+import { EmailBrandMark } from '../brand-header';
 
 export interface ProposalLinkEmailProps {
   proposalUrl: string;
@@ -344,7 +345,10 @@ export function ProposalLinkEmail({
               Or copy this link into your browser:{'\n'}
               {proposalUrl}
             </Text>
-            <Text style={platformAttrStyle}>via Unusonic</Text>
+            <Text style={platformAttrStyle}>
+              <EmailBrandMark color={t.textSecondaryHex} />
+              via Unusonic
+            </Text>
           </Section>
         </Container>
       </Body>
