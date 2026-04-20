@@ -316,7 +316,70 @@ async function handleInboundEmail(payload: InboundPayload): Promise<InboundHandl
     return { ok: false, reason: `rpc error: ${error.message}` };
   }
 
+  // 7. Urgent-reply insight dispatch. If the RPC's keyword heuristic flagged
+  //    this message AND the thread is bound to a deal, write an aion_insights
+  //    row so the owner sees it on the Daily Brief immediately and the
+  //    downstream notification pipeline can ping them.
+  await maybeFireUrgentInsight(newMessageId as string, threadRow.workspace_id, threadRow.deal_id, fromAddress, bodyText);
+
   return { ok: true, messageId: newMessageId as string };
+}
+
+/**
+ * Look up the just-inserted message's urgency flag and, if set, upsert a
+ * cortex.aion_insight row with trigger_type='inbound_reply_urgent'. Silent
+ * failure on any error — urgency is an enhancement, the reply itself
+ * already landed on the Deal Lens Replies card.
+ */
+async function maybeFireUrgentInsight(
+  messageId: string,
+  workspaceId: string,
+  dealId: string | null,
+  fromAddress: string,
+  bodyText: string | null,
+): Promise<void> {
+  if (!dealId) return;
+
+  const supabase = getSystemClient();
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: msgRow } = await (supabase as any)
+      .schema('ops')
+      .from('messages')
+      .select('urgency_keyword_match')
+      .eq('id', messageId)
+      .maybeSingle();
+
+    const keyword = (msgRow as { urgency_keyword_match: string | null } | null)?.urgency_keyword_match;
+    if (!keyword) return;
+
+    const preview = (bodyText ?? '').slice(0, 140);
+    const title = `Client reply mentions "${keyword}"`;
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).schema('cortex').rpc('upsert_aion_insight', {
+      p_workspace_id: workspaceId,
+      p_trigger_type: 'inbound_reply_urgent',
+      p_entity_type: 'deal',
+      p_entity_id: dealId,
+      p_title: title,
+      p_context: {
+        keyword,
+        message_id: messageId,
+        from_address: fromAddress,
+        preview,
+        suggestedAction: 'Open the Replies card and respond',
+        href: `/crm?selected=${dealId}`,
+        urgency: 'high',
+      },
+      p_priority: 80,
+      p_expires_at: expiresAt,
+    });
+  } catch (err) {
+    console.error('[resend webhook] urgent insight dispatch failed:', err instanceof Error ? err.message : err);
+  }
 }
 
 // =============================================================================
