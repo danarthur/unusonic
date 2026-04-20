@@ -14,6 +14,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandMark } from '../brand-header';
 
 export type PaymentReminderTone = 'informational' | 'warm' | 'direct' | 'firm' | 'formal';
 
@@ -108,6 +109,7 @@ export function PaymentReminderEmail({
             </Button>
           </Section>
           <Text style={footer}>
+            <EmailBrandMark color="#888888" />
             This is an automated reminder from {workspaceName} via Unusonic.
           </Text>
         </Container>

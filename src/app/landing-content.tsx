@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRef, type ReactNode } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { LivingLogo } from '@/shared/ui/branding/living-logo';
+import { Lockup } from '@/shared/ui/branding/lockup';
+import { Wordmark } from '@/shared/ui/branding/wordmark';
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 
 /**
@@ -25,11 +27,10 @@ function LandingHeader() {
       <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
         <Link
           href="/"
-          className="flex items-center gap-2.5 text-[var(--stage-text-primary)]"
+          className="text-[var(--stage-text-primary)]"
           aria-label="Unusonic home"
         >
-          <LivingLogo status="idle" size="sm" />
-          <span className="text-sm font-medium tracking-[0.12em]">UNUSONIC</span>
+          <Lockup variant="horizontal" size="sm" status="idle" />
         </Link>
         <nav
           className="hidden md:flex items-center gap-8 text-sm text-[var(--stage-text-secondary)]"
@@ -111,7 +112,14 @@ function LandingHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={STAGE_HEAVY}
       >
-        <LivingLogo status="idle" size="xl" className="mb-10 text-[var(--stage-text-primary)]" />
+        <div className="flex flex-col items-center mb-10">
+          <LivingLogo status="idle" size="xl" className="text-[var(--stage-text-primary)]" />
+          <Wordmark
+            brand="unusonic"
+            fontSize={22}
+            className="mt-5 text-[var(--stage-text-primary)]"
+          />
+        </div>
         <h1 className="text-5xl md:text-7xl font-medium tracking-tight text-[var(--stage-text-primary)] mb-6 leading-[1.05]">
           The event operating system.
         </h1>
@@ -901,9 +909,8 @@ function LandingFooter() {
     <footer className="relative py-16 px-6 border-t border-[oklch(1_0_0_/_0.06)]">
       <div className="max-w-6xl mx-auto grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-10">
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2.5 text-[var(--stage-text-primary)]">
-            <LivingLogo status="idle" size="sm" />
-            <span className="text-sm font-medium tracking-[0.12em]">UNUSONIC</span>
+          <div className="text-[var(--stage-text-primary)]">
+            <Lockup variant="horizontal" size="sm" status="idle" />
           </div>
           <p className="text-xs text-[var(--stage-text-secondary)]/70 font-light max-w-xs">
             The event operating system.

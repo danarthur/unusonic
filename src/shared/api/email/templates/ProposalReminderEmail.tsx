@@ -18,6 +18,7 @@ import {
 import * as React from 'react';
 import { formatCurrency, formatEventDate } from '@/shared/lib/format-currency';
 import { type EmailPalette, DEFAULT_EMAIL_PALETTE } from '@/shared/lib/email-palette';
+import { EmailBrandMark } from '../brand-header';
 
 export interface ProposalReminderEmailProps {
   proposalUrl: string;
@@ -156,7 +157,10 @@ export function ProposalReminderEmail({
               letterSpacing: '0.08em',
               textTransform: 'uppercase' as const,
               margin: '16px 0 0',
-            }}>via Unusonic</Text>
+            }}>
+              <EmailBrandMark color={t.textSecondaryHex} />
+              via Unusonic
+            </Text>
           </Section>
         </Container>
       </Body>

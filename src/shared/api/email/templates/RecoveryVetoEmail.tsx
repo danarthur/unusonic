@@ -14,6 +14,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandHeader } from '../brand-header';
 
 export interface RecoveryVetoEmailProps {
   cancelUrl: string;
@@ -27,6 +28,7 @@ export function RecoveryVetoEmail({ cancelUrl }: RecoveryVetoEmailProps) {
       <Body style={main}>
         <Container style={container}>
           <Section style={section}>
+            <EmailBrandHeader color="#999999" wordmarkColor="#fafafa" marginBottom="20px" />
             <Text style={heading}>Recovery started</Text>
             <Text style={body}>
               A recovery process has been started for your Unusonic account. If you didn’t request this,

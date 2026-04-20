@@ -14,6 +14,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandHeader } from '../brand-header';
 
 export interface SummonEmailProps {
   originName: string;
@@ -28,6 +29,7 @@ export function SummonEmail({ originName, claimUrl }: SummonEmailProps) {
       <Body style={main}>
         <Container style={container}>
           <Section style={section}>
+            <EmailBrandHeader color="#999999" wordmarkColor="#fafafa" marginBottom="20px" />
             <Text style={heading}>You have a Project Brief.</Text>
             <Text style={body}>
               {originName} has sent you a Project Brief on Unusonic.

@@ -14,6 +14,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandHeader } from '../brand-header';
 
 export interface GuardianInviteEmailProps {
   ownerDisplayName: string;
@@ -33,6 +34,7 @@ export function GuardianInviteEmail({
       <Body style={main}>
         <Container style={container}>
           <Section style={section}>
+            <EmailBrandHeader color="#999999" wordmarkColor="#fafafa" marginBottom="20px" />
             <Text style={heading}>Safety Net invitation</Text>
             <Text style={body}>
               {ownerDisplayName} has invited you to be a <strong>Safety Net</strong> guardian on

@@ -8,6 +8,8 @@ import { LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { isPortalNavActive, NAV, type PortalNavItem } from '@/shared/lib/portal-profiles';
 import { useSidebarStore } from '@/shared/ui/layout/sidebar-store';
 import { WorkspaceSwitcher, type WorkspaceEntry } from '@/shared/ui/layout/WorkspaceSwitcher';
+import { LivingLogo } from '@/shared/ui/branding/living-logo';
+import { Lockup } from '@/shared/ui/branding/lockup';
 import { cn } from '@/shared/lib/utils';
 
 type SerializableNavItem = Omit<PortalNavItem, 'icon'>;
@@ -54,6 +56,23 @@ export function PortalSidebar({ user, workspaceName, workspaces, activeWorkspace
       style={{ transition: 'width 200ms ease' }}
     >
       <div className="py-4 flex flex-col h-full">
+        {/* Brand block — mirrors the dashboard sidebar */}
+        <div className={cn('shrink-0 mb-1', collapsed ? 'px-1.5' : 'px-3')}>
+          <Link
+            href="/"
+            className={cn(
+              'flex items-center w-full rounded-xl p-2 transition-colors hover:bg-[oklch(1_0_0/0.04)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
+              collapsed ? 'justify-center' : 'gap-2.5'
+            )}
+            aria-label="Unusonic home"
+          >
+            {collapsed
+              ? <LivingLogo size="sm" status="idle" />
+              : <Lockup variant="horizontal" size="sm" status="idle" />
+            }
+          </Link>
+        </div>
+
         {/* Workspace name / switcher */}
         <div className={cn('shrink-0 mb-4', collapsed ? 'px-1.5' : 'px-3')}>
           {workspaces && workspaces.length > 0 ? (
