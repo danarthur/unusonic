@@ -66,6 +66,13 @@ export interface ProposalBuilderProps {
   /** Client entity ID (org or person) — used for customer booking history on line items. */
   clientEntityId?: string | null;
   className?: string;
+  /**
+   * Telemetry hook fired whenever a line item successfully lands on the
+   * receipt. `source` identifies the add path so the proposal-builder studio
+   * can attribute first-add / add-success events to the right variant event
+   * type. See `ops.proposal_builder_events`.
+   */
+  onItemAdded?: (source: 'palette' | 'custom', payload?: Record<string, unknown>) => void;
 }
 
 export function ProposalBuilder({
@@ -87,6 +94,7 @@ export function ProposalBuilder({
   proposedDate,
   clientEntityId,
   className,
+  onItemAdded,
 }: ProposalBuilderProps) {
   const [crewEquipmentNames, setCrewEquipmentNames] = useState<string[]>([]);
   // Rescan fix C6 (2026-04-11): manual Plan-tab crew additions are invisible
@@ -137,6 +145,16 @@ export function ProposalBuilder({
     setLineItems(mapProposalItemsToLineItems(initialProposal, dealEventStartTime, dealEventEndTime));
     setProposalId(initialProposal?.id ?? null);
   }, [initialProposal, dealEventStartTime, dealEventEndTime]);
+
+  // Allow the palette-first studio (and any other external surface) to open
+  // the built-in PackageSelectorPalette via a window custom event. Keeps the
+  // palette state colocated here rather than lifting it to the studio.
+  useEffect(() => {
+    if (readOnly) return;
+    const handler = () => setPaletteOpen(true);
+    window.addEventListener('proposal-builder:open-palette', handler);
+    return () => window.removeEventListener('proposal-builder:open-palette', handler);
+  }, [readOnly]);
 
   // Fetch crew equipment names for internal source annotations
   useEffect(() => {
@@ -334,7 +352,8 @@ export function ProposalBuilder({
         showTimesOnProposal: true,
       },
     ]);
-  }, []);
+    onItemAdded?.('custom');
+  }, [onItemAdded]);
 
   const removeGroup = useCallback(
     (packageInstanceId: string) => {
@@ -1119,7 +1138,10 @@ export function ProposalBuilder({
                   proposedDate={proposedDate}
                   open={paletteOpen}
                   onOpenChange={setPaletteOpen}
-                  onApplied={onProposalRefetch}
+                  onApplied={(packageId) => {
+                    onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined);
+                    onProposalRefetch?.();
+                  }}
                   onAddCustomLineItem={addCustomLineItem}
                   trigger={
                     <button

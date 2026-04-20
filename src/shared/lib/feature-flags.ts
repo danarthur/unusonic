@@ -34,6 +34,18 @@ export const FEATURE_FLAGS = {
    * flag only gates Phase 3 UI for rollback safety.
    */
   CRM_UNIFIED_AION_CARD: 'crm.unified_aion_card',
+  /**
+   * Proposal-builder rebuild (Phase 1). When true, the /crm/deal/{id}/proposal-builder
+   * route renders the legacy drag studio (`proposal-builder-studio-legacy.tsx`);
+   * when false/unset, it renders the new palette-first studio
+   * (`proposal-builder-studio.tsx`). Migration 20260501000000 backfills this to
+   * `true` on every workspace that exists at migration time, so existing users
+   * keep the drag muscle-memory until we flip them. Workspaces created after
+   * migration default to unset → new studio.
+   *
+   * Design doc: docs/reference/proposal-builder-rebuild-design.md
+   */
+  CRM_PROPOSAL_BUILDER_DRAG: 'crm.proposal_builder_drag',
 } as const satisfies Record<string, FeatureFlagKey>;
 
 export type KnownFeatureFlag = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
