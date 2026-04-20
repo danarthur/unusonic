@@ -172,6 +172,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       entityId: edge.source_entity_id,
       kind: isExternal ? 'extended_team' : 'internal_employee',
       gravity: 'core',
+      relationshipType: 'ROSTER_MEMBER',
       roleGroup: jobTitle || null,
       identity: { name, avatarUrl, label: jobTitle || role || 'Member', entityType },
       meta: {
@@ -230,6 +231,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const refCount = referralCountMap.get(edge.target_entity_id) ?? 0;
     const entityType = (partner?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
+    const relType = edge.relationship_type as NetworkNode['relationshipType'];
     // Use COUPLE_ATTR / PERSON_ATTR constants so couple entities never ghost-read a
     // preserved email key from a prior person → couple reclassification.
     const email =
@@ -238,18 +240,33 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         : entityType === 'person'
           ? ((attrs[PERSON_ATTR.email] as string) ?? undefined)
           : undefined;
-    // For person entities in inner circle (freelancers), derive roleGroup from job_title
-    const personJobTitle = entityType === 'person' ? (attrs[PERSON_ATTR.job_title] as string | null) ?? null : null;
+    // Only persons on PARTNER / VENDOR edges act as "freelancers" with a
+    // job-title-based roleGroup. CLIENT-edge persons are wedding hosts or
+    // individual clients and should NOT be grouped with crew.
+    const isClientPerson = entityType === 'person' && relType === 'CLIENT';
+    const personJobTitle =
+      entityType === 'person' && !isClientPerson
+        ? (attrs[PERSON_ATTR.job_title] as string | null) ?? null
+        : null;
+    // Label: clients (couple or individual) label as 'Client'; freelancer
+    // persons fall back to job_title → 'Freelancer'; everyone else uses the
+    // cortex-type label ('Vendor' / 'Venue' / 'Partner').
+    const label = relType === 'CLIENT'
+      ? 'Client'
+      : entityType === 'person'
+        ? (personJobTitle || 'Freelancer')
+        : cortexTypeToLabel(edge.relationship_type);
     return {
       id: edge.id,
       entityId: edge.target_entity_id,
       kind: 'external_partner',
       gravity: 'inner_circle',
+      relationshipType: relType,
       roleGroup: personJobTitle,
       identity: {
         name: partner?.display_name ?? 'Unknown',
         avatarUrl: null,
-        label: entityType === 'person' ? (personJobTitle || 'Freelancer') : cortexTypeToLabel(edge.relationship_type),
+        label,
         entityType,
       },
       meta: {
@@ -292,6 +309,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       entityId: rel.target_entity_id,
       kind: 'external_partner' as const,
       gravity: 'outer_orbit' as const,
+      relationshipType: rel.relationship_type as NetworkNode['relationshipType'],
       identity: {
         name: partnerEnt?.display_name ?? 'Unknown',
         label: typeLabel,

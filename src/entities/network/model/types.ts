@@ -12,6 +12,13 @@ export type NetworkNode = {
   entityId: string;
   kind: 'internal_employee' | 'extended_team' | 'external_partner';
   gravity: 'core' | 'inner_circle' | 'outer_orbit';
+  /**
+   * Raw cortex.relationships.relationship_type for external_partner nodes,
+   * or 'ROSTER_MEMBER' for employees / extended team. Drives the "is this a
+   * client vs. freelancer" classification downstream — a person on a CLIENT
+   * edge is a wedding host or individual client, not a freelancer.
+   */
+  relationshipType?: 'ROSTER_MEMBER' | 'PARTNER' | 'VENDOR' | 'CLIENT' | 'VENUE_PARTNER';
   identity: {
     name: string;
     avatarUrl: string | null;
