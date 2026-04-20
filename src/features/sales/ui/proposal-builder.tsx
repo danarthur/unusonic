@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookMarked, ChevronDown, ChevronRight, Copy, GripVertical, Plus, Minus, MoreHorizontal, MoveDown, MoveUp, Users, X, FileText, Trash2, PackageOpen } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronRight, Copy, GripVertical, PanelLeft, Plus, Minus, MoreHorizontal, MoveDown, MoveUp, Users, X, FileText, Trash2, PackageOpen } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -1576,7 +1576,19 @@ export function ProposalBuilder({
         )}
 
         {/* Receipt */}
-        <div className="min-w-0 flex-1 flex flex-col h-full">
+        <div className="min-w-0 flex-1 flex flex-col h-full relative">
+          {/* Floating "open panel" affordance — only when the side panel is
+              closed. Mirrors the Aion tab's pattern (ChatInterface.tsx). */}
+          {!catalogPanelOpen && !readOnly && (
+            <button
+              type="button"
+              onClick={() => setCatalogPanelOpen(true)}
+              aria-label="Open catalog panel"
+              className="hidden md:flex absolute top-3 left-3 z-10 p-1.5 rounded-[6px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]"
+            >
+              <PanelLeft size={16} strokeWidth={1.5} />
+            </button>
+          )}
           <div data-surface="elevated" className="flex-1 flex flex-col rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
             {/* Receipt toolbar — label + draft status on the left;
                 Production team button + overflow menu on the right.

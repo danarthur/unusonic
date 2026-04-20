@@ -1,26 +1,31 @@
 'use client';
 
 /**
- * ProposalCatalogPanel — collapsible left panel with a Catalog / Inspector tab
- * switcher. Opens the full catalog for browse-and-add (Discoverer persona)
- * while the ⌘K palette stays as the Speed-runner's accelerator. When a line
- * item is selected on the receipt, the parent flips the active tab to
- * Inspector and renders the existing `ProposalLineInspector` inside the
- * Inspector pane so the panel doubles as the detail editor.
+ * ProposalCatalogPanel — collapsible left panel with a Catalog / Inspector
+ * tab switcher, styled after AionSidebar (flat surface, right border, tight
+ * typography, AnimatePresence-based open/close). When closed, the parent
+ * renders a floating `PanelLeft` button to reopen it — identical pattern to
+ * the Aion tab.
  *
- * Add flow: click-to-add. No drag. Click "+" on a package → server deep-copy
- * via `addPackageToProposal` → `onProposalRefetch` fires → receipt updates.
+ * The Catalog tab lets the discoverer browse the full package library with
+ * search, category groupings, and a list/card view toggle. Click-to-add
+ * (no drag, per research). The Inspector tab hosts `ProposalLineInspector`
+ * when a line item is selected on the receipt.
  *
- * Scope (Phase C1):
- *   - Flat list grouped by category (sticky headers, not collapsible yet)
- *   - Simple text search (semantic search still lives in the ⌘K palette)
- *   - Availability dots on rental packages
- *   - Reuses `getPackages`, `addPackageToProposal`, `checkBatchAvailability`
+ * Width: 320px open (richer content than Aion's 260). Mobile: backdrop +
+ * fixed overlay (`lg:relative`) matching AionSidebar's responsive behavior.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { ChevronsLeft, ChevronsRight, Loader2, Plus, Search } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  LayoutGrid,
+  List,
+  Loader2,
+  PanelLeftClose,
+  Plus,
+  Search,
+} from 'lucide-react';
 import {
   getPackages,
   addPackageToProposal,
@@ -30,36 +35,29 @@ import {
   type ItemAvailability,
 } from '../api/catalog-availability';
 import type { Package } from '@/types/supabase';
-import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 export type ProposalCatalogPanelTab = 'catalog' | 'inspector';
+export type ProposalCatalogViewMode = 'list' | 'card';
 
 export interface ProposalCatalogPanelProps {
   workspaceId: string;
   dealId: string;
   proposedDate?: string | null;
-  /** Open = panel takes its full width; closed = collapsed to an icon rail. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Which tab is active: Catalog (browse) or Inspector (edit selected row). */
   activeTab: ProposalCatalogPanelTab;
   onActiveTabChange: (tab: ProposalCatalogPanelTab) => void;
-  /** Rendered inside the Inspector tab body. Parent supplies the actual inspector. */
   inspectorContent: React.ReactNode | null;
-  /** Whether the Inspector tab is available (i.e. a line item is selected). */
   inspectorAvailable: boolean;
-  /** Called after a package is added so the parent can refetch. */
   onProposalRefetch?: () => void;
-  /** Called after a package add so the parent can emit telemetry. */
   onItemAdded?: (packageId?: string) => void;
-  /** Add a blank custom line item and close the catalog panel (optional). */
   onAddCustomLineItem?: () => void;
   readOnly?: boolean;
 }
 
-const PANEL_WIDTH_OPEN = 400;
-const PANEL_WIDTH_CLOSED = 48;
+const PANEL_WIDTH = 320;
 
 export function ProposalCatalogPanel({
   workspaceId,
@@ -81,13 +79,11 @@ export function ProposalCatalogPanel({
   const [search, setSearch] = useState('');
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [availability, setAvailability] = useState<Record<string, ItemAvailability>>({});
+  const [viewMode, setViewMode] = useState<ProposalCatalogViewMode>('list');
 
   useEffect(() => {
     if (!workspaceId || !open) return;
     let cancelled = false;
-    // queueMicrotask desyncs the setState from the effect body so lint
-    // (react-hooks/purity) doesn't flag a cascading-render concern. Matches
-    // the pattern in package-selector-palette.tsx.
     queueMicrotask(() => {
       if (cancelled) return;
       setLoading(true);
@@ -106,7 +102,6 @@ export function ProposalCatalogPanel({
     };
   }, [workspaceId, open]);
 
-  // Availability for rental packages (same pattern as the ⌘K palette).
   useEffect(() => {
     if (!proposedDate || packages.length === 0 || !workspaceId || !open) {
       queueMicrotask(() => setAvailability({}));
@@ -145,7 +140,6 @@ export function ProposalCatalogPanel({
     );
   }, [packages, search]);
 
-  // Group filtered packages by category for sticky-header rendering.
   const grouped = useMemo(() => {
     const byCategory = new Map<string, Package[]>();
     for (const pkg of filteredPackages) {
@@ -157,195 +151,180 @@ export function ProposalCatalogPanel({
   }, [filteredPackages]);
 
   return (
-    <motion.aside
-      animate={{ width: open ? PANEL_WIDTH_OPEN : PANEL_WIDTH_CLOSED }}
-      transition={STAGE_LIGHT}
-      initial={false}
-      data-surface="elevated"
-      className="shrink-0 overflow-hidden flex flex-col rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]"
-      style={{ width: open ? PANEL_WIDTH_OPEN : PANEL_WIDTH_CLOSED }}
-    >
-      {open ? (
+    <AnimatePresence initial={false}>
+      {open && (
         <>
-          {/* Tab bar + collapse button */}
-          <div className="shrink-0 flex items-center justify-between gap-2 px-2 pt-2">
-            <div className="flex items-center gap-1" role="tablist" aria-label="Panel tabs">
-              <TabButton
-                active={activeTab === 'catalog'}
-                onClick={() => onActiveTabChange('catalog')}
-              >
-                Catalog
-              </TabButton>
-              <TabButton
-                active={activeTab === 'inspector'}
-                disabled={!inspectorAvailable}
-                onClick={() => onActiveTabChange('inspector')}
-                title={inspectorAvailable ? undefined : 'Select a line item to edit'}
-              >
-                Inspector
-              </TabButton>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              aria-label="Collapse panel"
-              className="p-1.5 rounded text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-            >
-              <ChevronsLeft className="w-4 h-4" strokeWidth={1.5} aria-hidden />
-            </button>
-          </div>
-
-          {/* Tab body */}
-          {activeTab === 'catalog' ? (
-            <div className="flex-1 min-h-0 flex flex-col">
-              {/* Search */}
-              <div className="shrink-0 px-3 pt-3 pb-2">
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--stage-text-secondary)] pointer-events-none"
-                    strokeWidth={1.5}
-                    aria-hidden
-                  />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search catalog"
-                    className="w-full pl-8 pr-3 py-2 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                    aria-label="Search catalog"
-                  />
-                </div>
-              </div>
-
-              {/* List */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
-                {loading ? (
-                  <div className="flex items-center justify-center gap-2 py-12 text-[var(--stage-text-secondary)] text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} aria-hidden />
-                    Loading catalog…
-                  </div>
-                ) : grouped.length === 0 ? (
-                  <div className="py-12 text-center text-sm text-[var(--stage-text-secondary)]">
-                    {packages.length === 0
-                      ? 'No packages yet. Add master packages in Catalog.'
-                      : 'No packages match your search.'}
-                  </div>
-                ) : (
-                  <ul className="space-y-4">
-                    {grouped.map(([category, items]) => (
-                      <li key={category}>
-                        <div className="sticky top-0 z-[1] -mx-2 px-4 py-1.5 bg-[var(--stage-surface-elevated)]/95 backdrop-blur-sm border-b border-[var(--stage-edge-subtle)]">
-                          <span className="stage-label text-[var(--stage-text-secondary)]">
-                            {formatCategory(category)}
-                          </span>
-                        </div>
-                        <ul className="mt-2 space-y-1">
-                          {items.map((pkg) => {
-                            const avail = pkg.category === 'rental' ? availability[pkg.id] : undefined;
-                            const isApplying = applyingId === pkg.id;
-                            return (
-                              <li key={pkg.id}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAdd(pkg)}
-                                  disabled={readOnly || isApplying}
-                                  className={cn(
-                                    'w-full flex items-start gap-3 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors p-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-                                    isApplying && 'opacity-60 pointer-events-none',
-                                  )}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm">
-                                        {pkg.name}
-                                      </p>
-                                      {avail && (
-                                        <span
-                                          className={cn(
-                                            'inline-block w-2 h-2 rounded-full shrink-0',
-                                            avail.status === 'available'
-                                              ? 'bg-[var(--color-unusonic-success)]'
-                                              : avail.status === 'tight'
-                                                ? 'bg-[var(--color-unusonic-warning)]'
-                                                : 'bg-[var(--color-unusonic-error)]',
-                                          )}
-                                          aria-hidden
-                                          title={
-                                            avail.status === 'available'
-                                              ? `${avail.available} available`
-                                              : avail.status === 'tight'
-                                                ? `${avail.available} of ${avail.stockQuantity} remaining`
-                                                : `Fully booked`
-                                          }
-                                        />
-                                      )}
-                                    </div>
-                                    {pkg.description && (
-                                      <p className="text-xs text-[var(--stage-text-secondary)] truncate mt-0.5">
-                                        {pkg.description}
-                                      </p>
-                                    )}
-                                    <p className="text-sm text-[var(--stage-text-primary)] tabular-nums font-medium mt-1">
-                                      ${Number(pkg.price).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  {isApplying ? (
-                                    <Loader2 className="w-4 h-4 text-[var(--stage-text-secondary)] animate-spin shrink-0 mt-1" strokeWidth={1.5} aria-hidden />
-                                  ) : (
-                                    <Plus className="w-4 h-4 text-[var(--stage-text-secondary)] shrink-0 mt-1" strokeWidth={1.5} aria-hidden />
-                                  )}
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Custom line item — bottom-docked action. */}
-              {onAddCustomLineItem && !readOnly && (
-                <div className="shrink-0 p-3 border-t border-[var(--stage-edge-subtle)]">
-                  <button
-                    type="button"
-                    onClick={onAddCustomLineItem}
-                    className="w-full stage-btn stage-btn-ghost inline-flex items-center justify-center gap-2 border border-dashed border-[oklch(1_0_0_/_0.15)] hover:border-[oklch(1_0_0_/_0.25)]"
-                  >
-                    <Plus className="w-4 h-4" strokeWidth={1.5} aria-hidden />
-                    Create custom line item
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Inspector tab body */
-            <div className="flex-1 min-h-0 overflow-y-auto p-3">
-              {inspectorContent ?? (
-                <div className="py-12 text-center text-sm text-[var(--stage-text-secondary)]">
-                  Select a line item to see its details.
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      ) : (
-        /* Collapsed rail — single expand button */
-        <div className="flex flex-col items-center pt-3">
-          <button
-            type="button"
-            onClick={() => onOpenChange(true)}
-            aria-label="Expand catalog panel"
-            className="p-2 rounded text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+          {/* Mobile backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
+            className="fixed inset-0 z-40 bg-[oklch(0.06_0_0/0.75)] lg:hidden"
+            onClick={() => onOpenChange(false)}
+          />
+          <motion.aside
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: PANEL_WIDTH, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={STAGE_MEDIUM}
+            className="shrink-0 overflow-hidden h-full fixed lg:relative z-50 lg:z-auto"
+            data-surface="surface"
           >
-            <ChevronsRight className="w-4 h-4" strokeWidth={1.5} aria-hidden />
-          </button>
-        </div>
+            <div
+              className="flex flex-col h-full bg-[var(--stage-surface)] border-r border-[var(--stage-edge-subtle)]"
+              style={{ width: PANEL_WIDTH }}
+            >
+              {/* Header: tab switcher + collapse button. Small typography
+                  matching the Aion sidebar. */}
+              <div className="flex items-center justify-between gap-2 px-3 py-2.5 shrink-0 border-b border-[var(--stage-edge-subtle)]">
+                <div className="flex items-center gap-1" role="tablist" aria-label="Panel tabs">
+                  <TabButton
+                    active={activeTab === 'catalog'}
+                    onClick={() => onActiveTabChange('catalog')}
+                  >
+                    Catalog
+                  </TabButton>
+                  <TabButton
+                    active={activeTab === 'inspector'}
+                    disabled={!inspectorAvailable}
+                    onClick={() => onActiveTabChange('inspector')}
+                    title={inspectorAvailable ? undefined : 'Select a line item to edit'}
+                  >
+                    Inspector
+                  </TabButton>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenChange(false)}
+                  aria-label="Close panel"
+                  className="p-1.5 rounded-[6px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]"
+                >
+                  <PanelLeftClose size={15} strokeWidth={1.5} />
+                </button>
+              </div>
+
+              {activeTab === 'catalog' ? (
+                <>
+                  {/* Search + view toggle row */}
+                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 shrink-0">
+                    <div className="relative flex-1">
+                      <Search
+                        size={13}
+                        strokeWidth={1.5}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--stage-text-tertiary)] pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search catalog"
+                        className="w-full bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.06)] rounded-md pl-7 pr-2.5 py-1.5 text-xs text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus-visible:border-[var(--stage-accent)] transition-colors duration-[80ms]"
+                        aria-label="Search catalog"
+                      />
+                    </div>
+                    {/* View mode toggle — list vs card */}
+                    <div
+                      role="group"
+                      aria-label="Catalog view"
+                      className="flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.06)]"
+                    >
+                      <ViewToggleButton
+                        active={viewMode === 'list'}
+                        onClick={() => setViewMode('list')}
+                        icon={<List size={12} strokeWidth={1.5} />}
+                        label="List view"
+                      />
+                      <ViewToggleButton
+                        active={viewMode === 'card'}
+                        onClick={() => setViewMode('card')}
+                        icon={<LayoutGrid size={12} strokeWidth={1.5} />}
+                        label="Card view"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Catalog body */}
+                  <div className="flex-1 overflow-y-auto scrollbar-hide px-2 pb-2">
+                    {loading ? (
+                      <div className="flex items-center justify-center gap-2 py-12 text-[var(--stage-text-tertiary)] text-xs">
+                        <Loader2 size={13} strokeWidth={1.5} className="animate-spin" aria-hidden />
+                        Loading catalog…
+                      </div>
+                    ) : grouped.length === 0 ? (
+                      <p className="px-2 py-8 text-center text-xs text-[var(--stage-text-tertiary)] select-none">
+                        {packages.length === 0
+                          ? 'No packages yet. Add master packages in Catalog.'
+                          : 'No packages match your search.'}
+                      </p>
+                    ) : (
+                      grouped.map(([category, items]) => (
+                        <div key={category} className="mb-3">
+                          <p className="px-2 pt-3 pb-1.5 stage-label font-mono text-[var(--stage-text-tertiary)] select-none">
+                            {formatCategory(category)}
+                          </p>
+                          {viewMode === 'list' ? (
+                            items.map((pkg) => (
+                              <CatalogListItem
+                                key={pkg.id}
+                                pkg={pkg}
+                                avail={pkg.category === 'rental' ? availability[pkg.id] : undefined}
+                                applying={applyingId === pkg.id}
+                                disabled={readOnly}
+                                onAdd={() => handleAdd(pkg)}
+                              />
+                            ))
+                          ) : (
+                            <div className="grid grid-cols-2 gap-1.5 px-1">
+                              {items.map((pkg) => (
+                                <CatalogCardItem
+                                  key={pkg.id}
+                                  pkg={pkg}
+                                  avail={pkg.category === 'rental' ? availability[pkg.id] : undefined}
+                                  applying={applyingId === pkg.id}
+                                  disabled={readOnly}
+                                  onAdd={() => handleAdd(pkg)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {onAddCustomLineItem && !readOnly && (
+                    <div className="shrink-0 p-2 border-t border-[var(--stage-edge-subtle)]">
+                      <button
+                        type="button"
+                        onClick={onAddCustomLineItem}
+                        className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-md border border-dashed border-[oklch(1_0_0_/_0.12)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:border-[oklch(1_0_0_/_0.22)] transition-colors"
+                      >
+                        <Plus size={12} strokeWidth={1.5} aria-hidden />
+                        Create custom line item
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Inspector tab body */
+                <div className="flex-1 overflow-y-auto scrollbar-hide">
+                  {inspectorContent ?? (
+                    <p className="px-3 py-8 text-center text-xs text-[var(--stage-text-tertiary)] select-none">
+                      Select a line item to see its details.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.aside>
+        </>
       )}
-    </motion.aside>
+    </AnimatePresence>
   );
 }
+
+// ---------------------------------------------------------------------------
 
 function TabButton({
   active,
@@ -369,14 +348,184 @@ function TabButton({
       onClick={onClick}
       title={title}
       className={cn(
-        'px-3 py-1.5 text-sm rounded-[var(--stage-radius-button)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+        'px-2.5 py-1 text-xs rounded-[6px] transition-colors duration-[80ms] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
         active
-          ? 'bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)] font-medium'
-          : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)]',
+          ? 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-primary)] font-medium'
+          : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)]',
         disabled && 'opacity-35 pointer-events-none',
       )}
     >
       {children}
+    </button>
+  );
+}
+
+function ViewToggleButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        'p-1 rounded transition-colors duration-[80ms] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+        active
+          ? 'bg-[var(--stage-surface-raised)] text-[var(--stage-text-primary)]'
+          : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
+      )}
+    >
+      {icon}
+    </button>
+  );
+}
+
+function AvailabilityDot({ avail }: { avail: ItemAvailability }) {
+  const title =
+    avail.status === 'available'
+      ? `${avail.available} available`
+      : avail.status === 'tight'
+        ? `${avail.available} of ${avail.stockQuantity} remaining`
+        : 'Fully booked';
+  return (
+    <span
+      className={cn(
+        'inline-block w-1.5 h-1.5 rounded-full shrink-0',
+        avail.status === 'available'
+          ? 'bg-[var(--color-unusonic-success)]'
+          : avail.status === 'tight'
+            ? 'bg-[var(--color-unusonic-warning)]'
+            : 'bg-[var(--color-unusonic-error)]',
+      )}
+      aria-hidden
+      title={title}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// List row (compact)
+
+function CatalogListItem({
+  pkg,
+  avail,
+  applying,
+  disabled,
+  onAdd,
+}: {
+  pkg: Package;
+  avail: ItemAvailability | undefined;
+  applying: boolean;
+  disabled: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      disabled={disabled || applying}
+      className={cn(
+        'group/item relative w-full text-left px-2.5 py-2 rounded-lg transition-colors duration-[80ms]',
+        'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)]',
+        'disabled:opacity-45 disabled:pointer-events-none',
+      )}
+    >
+      <div className="flex items-center gap-1.5">
+        <p className="text-sm truncate leading-snug flex-1">{pkg.name}</p>
+        {avail && <AvailabilityDot avail={avail} />}
+      </div>
+      <div className="flex items-center justify-between gap-2 mt-0.5">
+        <p className="text-label text-[var(--stage-text-tertiary)] tabular-nums">
+          ${Number(pkg.price).toLocaleString()}
+        </p>
+        {applying ? (
+          <Loader2
+            size={11}
+            strokeWidth={1.5}
+            className="animate-spin text-[var(--stage-text-tertiary)]"
+            aria-hidden
+          />
+        ) : (
+          <Plus
+            size={12}
+            strokeWidth={1.5}
+            className="text-[var(--stage-text-tertiary)] opacity-0 group-hover/item:opacity-100 transition-opacity"
+            aria-hidden
+          />
+        )}
+      </div>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Card (richer)
+
+function CatalogCardItem({
+  pkg,
+  avail,
+  applying,
+  disabled,
+  onAdd,
+}: {
+  pkg: Package;
+  avail: ItemAvailability | undefined;
+  applying: boolean;
+  disabled: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      disabled={disabled || applying}
+      className={cn(
+        'group/card text-left rounded-lg border border-[oklch(1_0_0_/_0.06)] bg-[var(--stage-surface-raised)] p-2 transition-colors duration-[80ms]',
+        'hover:border-[oklch(1_0_0_/_0.14)] hover:bg-[oklch(1_0_0_/_0.04)]',
+        'disabled:opacity-45 disabled:pointer-events-none',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+      )}
+    >
+      <div className="flex items-start justify-between gap-1 mb-1.5">
+        <p className="text-xs font-medium text-[var(--stage-text-primary)] line-clamp-2 leading-snug">
+          {pkg.name}
+        </p>
+        {avail && <AvailabilityDot avail={avail} />}
+      </div>
+      {pkg.description && (
+        <p className="text-label text-[var(--stage-text-tertiary)] line-clamp-2 mb-1.5 leading-snug">
+          {pkg.description}
+        </p>
+      )}
+      <div className="flex items-center justify-between gap-1">
+        <p className="text-xs text-[var(--stage-text-secondary)] tabular-nums font-medium">
+          ${Number(pkg.price).toLocaleString()}
+        </p>
+        {applying ? (
+          <Loader2
+            size={11}
+            strokeWidth={1.5}
+            className="animate-spin text-[var(--stage-text-tertiary)]"
+            aria-hidden
+          />
+        ) : (
+          <Plus
+            size={12}
+            strokeWidth={1.5}
+            className="text-[var(--stage-text-tertiary)] group-hover/card:text-[var(--stage-text-primary)] transition-colors"
+            aria-hidden
+          />
+        )}
+      </div>
     </button>
   );
 }
