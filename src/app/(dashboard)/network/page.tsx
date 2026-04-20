@@ -76,10 +76,18 @@ async function NetworkPageInner({ searchParams }: PageProps) {
   }
 
   const hasIdentity = !!(org?.name?.trim());
+  // Crew = employees + extended team + preferred freelancer persons. CLIENT-
+  // edge persons (wedding hosts, individual clients) are NOT crew — they
+  // live in the Network/clients lane.
   const crewNodes = nodes.filter((n) =>
     n.kind === 'internal_employee' ||
     n.kind === 'extended_team' ||
-    (n.kind === 'external_partner' && n.identity.entityType === 'person' && n.gravity === 'inner_circle')
+    (
+      n.kind === 'external_partner'
+      && n.identity.entityType === 'person'
+      && n.gravity === 'inner_circle'
+      && n.relationshipType !== 'CLIENT'
+    )
   );
   const hasTeam = crewNodes.length > 1;
   const brandColor = org?.brand_color ?? null;
