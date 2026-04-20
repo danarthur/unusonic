@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GripVertical, Plus, Minus, X, FileText, Trash2, PackageOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, GripVertical, Plus, Minus, MoreHorizontal, MoveDown, MoveUp, X, FileText, Trash2, PackageOpen } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -28,6 +28,7 @@ import { PackageSelectorPalette } from './package-selector-palette';
 import type { ProposalWithItems, ProposalBuilderLineItem, ProposalLineItemCategory, UnitType } from '../model/types';
 import type { RequiredRole } from '../api/package-types';
 import { CurrencyInput } from '@/shared/ui/currency-input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { cn } from '@/shared/lib/utils';
 import { ProposalLineInspector } from './proposal-line-inspector';
 import { ProposalProductionTeam } from './proposal-production-team';
@@ -196,6 +197,10 @@ export function ProposalBuilder({
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [riderModalOpen, setRiderModalOpen] = useState(false);
+  /** Design Phase A: collapsed package groups (by `rowId`). Expanded by default — owners want to see the bundle contents without clicking. */
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
+  /** Currently open row menu (by `rowId`). Single-open so arrow keys stay sane. */
+  const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
   /** When true, actual_cost is editable for Rental/Retail (sub-rental or custom order). */
   const [subRentalCostUnlocked, setSubRentalCostUnlocked] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -493,6 +498,85 @@ export function ProposalBuilder({
     },
     [groupedLineItems, sortableGroupIds, lineItems, readOnly, onRowReorder],
   );
+
+  /**
+   * Move a group up or down by one position. Keyboard-accessible (and
+   * WCAG 2.5.7–required) non-drag alternative to the grip handle. Reuses
+   * the same `arrayMove` + `flatMap` reconstruction as `handleReceiptDragEnd`
+   * and emits the same telemetry so dashboards see both paths.
+   */
+  const moveGroup = useCallback(
+    (rowId: string, direction: 'up' | 'down') => {
+      if (readOnly) return;
+      const fromIdx = sortableGroupIds.indexOf(rowId);
+      if (fromIdx === -1) return;
+      const toIdx = direction === 'up' ? fromIdx - 1 : fromIdx + 1;
+      if (toIdx < 0 || toIdx >= sortableGroupIds.length) return;
+      const newGroupOrder = arrayMove(groupedLineItems, fromIdx, toIdx);
+      const nextLineItems = newGroupOrder.flatMap((g) => g.indices.map((i) => lineItems[i]));
+      setLineItems(nextLineItems);
+      onRowReorder?.({
+        from_group_index: fromIdx,
+        to_group_index: toIdx,
+        from_group_id: rowId,
+        to_group_id: sortableGroupIds[toIdx],
+      });
+    },
+    [groupedLineItems, sortableGroupIds, lineItems, readOnly, onRowReorder],
+  );
+
+  /**
+   * Duplicate a group: clone every line item in the group with fresh
+   * `clientUid` / `packageInstanceId` so server-side upsert persists them as
+   * new rows (rather than updating the originals). Inserted immediately
+   * after the source group so the receipt order stays obvious.
+   */
+  const duplicateGroup = useCallback(
+    (rowId: string) => {
+      if (readOnly) return;
+      const groupIdx = groupedLineItems.findIndex((g) => g.rowId === rowId);
+      if (groupIdx === -1) return;
+      const group = groupedLineItems[groupIdx];
+      const newPackageInstanceId = group.packageInstanceId
+        ? typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `dup-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        : null;
+      const cloned: ProposalBuilderLineItem[] = group.indices.map((i) => {
+        const source = lineItems[i];
+        const clientUid =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `dup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        return {
+          ...source,
+          id: undefined, // drop server id so upsert inserts a new row
+          clientUid,
+          packageInstanceId: newPackageInstanceId,
+        };
+      });
+      // Splice the cloned block in right after the source group.
+      const flatBoundaryBefore = groupedLineItems
+        .slice(0, groupIdx + 1)
+        .reduce((acc, g) => acc + g.indices.length, 0);
+      const next = [
+        ...lineItems.slice(0, flatBoundaryBefore),
+        ...cloned,
+        ...lineItems.slice(flatBoundaryBefore),
+      ];
+      setLineItems(next);
+    },
+    [groupedLineItems, lineItems, readOnly],
+  );
+
+  const toggleGroupCollapsed = useCallback((rowId: string) => {
+    setCollapsedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+  }, []);
 
   const removeGroup = useCallback(
     (packageInstanceId: string) => {
@@ -1120,17 +1204,23 @@ export function ProposalBuilder({
                         )}
                 {hasHeaderRow ? (
                   <>
-                    {/* Package header row: bold name, editable bundle price, Unpack + Trash (div to avoid li > li) */}
+                    {/* Package header row: chevron + bold name, editable package total, row menu (div to avoid li > li) */}
                     {(() => {
                       const item = lineItems[headerIndex!];
                       const index = headerIndex!;
+                      const isCollapsed = collapsedGroupIds.has(group.rowId);
+                      const childCount = group.indices.length - 1; // minus the header
+                      const groupIdxInList = sortableGroupIds.indexOf(group.rowId);
+                      const canMoveUp = groupIdxInList > 0;
+                      const canMoveDown = groupIdxInList >= 0 && groupIdxInList < sortableGroupIds.length - 1;
                       return (
                         <motion.div
                           layout
                           transition={STAGE_MEDIUM}
                           role="row"
+                          data-surface="elevated"
                           className={cn(
-                            'py-3 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] hover:border-[var(--stage-border)] min-w-0 transition-colors duration-[80ms] ease-out cursor-pointer stage-hover overflow-hidden',
+                            'py-3.5 px-4 rounded-[var(--stage-radius-input)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] hover:border-[var(--stage-border)] min-w-0 transition-colors duration-[80ms] ease-out cursor-pointer stage-hover overflow-hidden',
                             selectedLineIndex === index && 'ring-1 ring-inset ring-[var(--stage-accent)]/40'
                           )}
                           onClick={() => {
@@ -1139,56 +1229,136 @@ export function ProposalBuilder({
                           }}
                         >
                         <div className="flex items-center gap-3">
+                          {/* Chevron disclosure — toggle children. Package groups only. */}
+                          <button
+                            type="button"
+                            aria-label={isCollapsed ? `Expand ${item.name || 'package'}` : `Collapse ${item.name || 'package'}`}
+                            aria-expanded={!isCollapsed}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleGroupCollapsed(group.rowId);
+                            }}
+                            className="shrink-0 flex items-center justify-center w-6 h-6 rounded text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                            )}
+                          </button>
+
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium text-[var(--stage-text-primary)] truncate text-sm leading-snug">
+                            <p className="font-semibold text-[var(--stage-text-primary)] truncate text-base leading-snug tracking-tight">
                               {item.name || 'Package'}
                             </p>
-                            <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">Bundle price</p>
+                            <p className="stage-label text-[var(--stage-text-secondary)] mt-0.5">
+                              Package total{childCount > 0 ? ` · ${childCount} ${childCount === 1 ? 'item' : 'items'}` : ''}
+                            </p>
                           </div>
                           <div className={qtyStepperClass} onClick={(e) => e.stopPropagation()}>
-                            <span className="text-sm font-medium text-[var(--stage-text-secondary)] py-2">1</span>
+                            <span className="text-sm font-medium text-[var(--stage-text-secondary)] py-2 tabular-nums">1</span>
                           </div>
-                          <div className="w-20 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                          <div className="w-24 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
                             <CurrencyInput
                               value={String(effectiveUnitPrice(item))}
                               onChange={(v) => updateLineItemUnitPrice(index, Number(v) || 0)}
-                              className="text-sm font-medium text-[var(--stage-text-primary)] text-right w-full min-w-0 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-1.5 py-1"
+                              className="text-sm font-semibold text-[var(--stage-text-primary)] text-right w-full min-w-0 rounded-[var(--stage-radius-input)] border border-[var(--stage-border)] bg-[var(--ctx-well)] px-2 py-1 tabular-nums"
                             />
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUnpack(group.packageInstanceId!);
-                              }}
-                              className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                              title="Unpack to line items: break the package into individual items at their standard catalog price."
-                              aria-label="Unpack to line items"
-                            >
-                              <PackageOpen className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeGroup(group.packageInstanceId!);
-                                if (selectedLineIndex === index) setSelectedLineIndex(null);
-                              }}
-                              className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                              aria-label={`Remove ${item.name || 'package'}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            {/* Unpack: break the package into editable line items */}
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnpack(group.packageInstanceId!);
+                                }}
+                                className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                                title="Break out to line items: splits the package into individual rows at their catalog prices."
+                                aria-label="Break out to line items"
+                              >
+                                <PackageOpen className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Row menu: Move up / Move down / Duplicate / Delete — WCAG 2.5.7 non-drag alternative */}
+                            {!readOnly && (
+                              <Popover
+                                open={openRowMenuId === group.rowId}
+                                onOpenChange={(o) => setOpenRowMenuId(o ? group.rowId : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    aria-label={`Options for ${item.name || 'package'}`}
+                                    className="p-1.5 rounded-[var(--stage-radius-input)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" sideOffset={4} className="w-48 p-1">
+                                  <button
+                                    type="button"
+                                    disabled={!canMoveUp}
+                                    onClick={() => {
+                                      moveGroup(group.rowId, 'up');
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-35 disabled:pointer-events-none text-left"
+                                  >
+                                    <MoveUp className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Move up
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canMoveDown}
+                                    onClick={() => {
+                                      moveGroup(group.rowId, 'down');
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-35 disabled:pointer-events-none text-left"
+                                  >
+                                    <MoveDown className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Move down
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      duplicateGroup(group.rowId);
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--stage-text-primary)] rounded hover:bg-[oklch(1_0_0_/_0.05)] text-left"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Duplicate
+                                  </button>
+                                  <div className="h-px bg-[var(--stage-edge-subtle)] my-1" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      removeGroup(group.packageInstanceId!);
+                                      if (selectedLineIndex === index) setSelectedLineIndex(null);
+                                      setOpenRowMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-[var(--color-unusonic-error)] rounded hover:bg-[var(--color-unusonic-error)]/10 text-left"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden />
+                                    Delete package
+                                  </button>
+                                </PopoverContent>
+                              </Popover>
+                            )}
                           </div>
                         </div>
                         </motion.div>
                       );
                     })()}
-                    {/* Child rows: indented, show "Included" when $0 */}
-                    <ul className="pl-5 ml-1 border-l-2 border-[var(--stage-border)] space-y-3 list-none p-0 m-0">
-                      {childIndices.map((index) => renderReceiptRow(index, true))}
-                    </ul>
+                    {/* Child rows: indented, show "Included" when $0. Hidden when the header is collapsed. */}
+                    {!collapsedGroupIds.has(group.rowId) && (
+                      <ul className="pl-5 ml-1 border-l-2 border-[var(--stage-border)] space-y-3 list-none p-0 m-0">
+                        {childIndices.map((index) => renderReceiptRow(index, true))}
+                      </ul>
+                    )}
                   </>
                 ) : (
                   <>
