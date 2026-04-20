@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookMarked, ChevronDown, ChevronRight, Copy, GripVertical, Plus, Minus, MoreHorizontal, MoveDown, MoveUp, X, FileText, Trash2, PackageOpen } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronRight, Copy, GripVertical, Plus, Minus, MoreHorizontal, MoveDown, MoveUp, Users, X, FileText, Trash2, PackageOpen } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -33,7 +33,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { cn } from '@/shared/lib/utils';
 import { ProposalLineInspector } from './proposal-line-inspector';
 import { ProposalProductionTeam } from './proposal-production-team';
-import { ProposalSummaryCard } from './proposal-summary-card';
+import { ProposalSummaryStrip } from './proposal-summary-strip';
+import { ProposalCatalogPanel, type ProposalCatalogPanelTab } from './proposal-catalog-panel';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { syncCrewFromProposal, getDealCrewEquipmentNames, getDealCrew, type DealCrewRow } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
 
@@ -203,6 +204,11 @@ export function ProposalBuilder({
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
   /** Receipt toolbar "more actions" menu (Save to catalog, etc.). */
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
+  /** Catalog/Inspector side panel — open by default; user can collapse to icon rail. */
+  const [catalogPanelOpen, setCatalogPanelOpen] = useState(true);
+  const [catalogPanelTab, setCatalogPanelTab] = useState<ProposalCatalogPanelTab>('catalog');
+  /** Production team side sheet — opens on explicit button click. */
+  const [teamSheetOpen, setTeamSheetOpen] = useState(false);
   /** True after client-mount — gates `createPortal` so the sticky Send bar renders only after hydration. */
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => { setPortalReady(true); }, []);
@@ -234,6 +240,17 @@ export function ProposalBuilder({
     window.addEventListener('proposal-builder:open-palette', handler);
     return () => window.removeEventListener('proposal-builder:open-palette', handler);
   }, [readOnly]);
+
+  // Auto-switch the Catalog/Inspector side panel to the Inspector tab whenever
+  // a line item is selected. Also pops the panel open if it was collapsed —
+  // the user explicitly asked to edit, so we show them the editor. User can
+  // manually switch back to Catalog.
+  useEffect(() => {
+    if (selectedLineIndex != null) {
+      setCatalogPanelTab('inspector');
+      setCatalogPanelOpen(true);
+    }
+  }, [selectedLineIndex]);
 
   // Fetch crew equipment names for internal source annotations
   useEffect(() => {
@@ -1501,24 +1518,73 @@ export function ProposalBuilder({
     },
   } as const : null;
 
+  /** Count of unique crew roles referenced by the line items — used for the Production Team button badge. */
+  const crewRoleCount = useMemo(() => {
+    const seen = new Set<string>();
+    for (const item of lineItems) {
+      const roles = (item.requiredRoles ?? []) as { name?: string }[];
+      for (const r of roles) {
+        if (r?.name) seen.add(r.name.toLowerCase());
+      }
+    }
+    return seen.size;
+  }, [lineItems]);
+
   return (
     <div
       className={cn('flex flex-col gap-4', className)}
       // pb keeps the last line items above the sticky Send bar (~88px).
       style={{ overflow: 'visible', paddingBottom: lineItems.length > 0 && !readOnly ? '6rem' : undefined }}
     >
-      {/* Design Phase B: 3-column on xl+ (receipt · summary · production team),
-          2-column on lg (receipt · stacked rail), 1-column on md-. Grid cells
-          stretch to fill main's height so the cards feel substantial even
-          when the proposal is empty. */}
-      <div className="grid gap-6 flex-1 w-full min-h-[calc(100vh-11rem)] grid-cols-1 lg:grid-cols-[1fr_minmax(280px,340px)] xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)_minmax(280px,340px)]">
-        {/* Col 1: Receipt */}
-        <div className="min-w-0 flex flex-col h-full">
+      {/* Summary strip — always visible at the top. Design C: this replaces
+          the right-rail summary card. The running total is a "nervous tic"
+          per User Advocate research; keeping it in the eye-path matters. */}
+      {lineItems.length > 0 && (
+        <ProposalSummaryStrip
+          totalRevenue={summaryValues.totalRevenue}
+          estimatedCost={summaryValues.estimatedCost}
+          floorGapCount={summaryValues.floorGapCount}
+          floorGapTotal={summaryValues.floorGapTotal}
+          talentBudget={summaryValues.talentBudget}
+        />
+      )}
+
+      {/* Design C: 2-column [catalog/inspector panel · receipt]. Panel is
+          collapsible via its own toggle. Panel hidden on md- (mobile); on
+          mobile, catalog access is via ⌘K and the receipt toolbar, while
+          the inspector renders as a Sheet (preserved below). */}
+      <div className="flex flex-col md:flex-row gap-6 flex-1 w-full min-h-[calc(100vh-14rem)]">
+        {/* Catalog / Inspector panel — md+ only */}
+        {workspaceId && dealId && (
+          <div className="hidden md:flex">
+            <ProposalCatalogPanel
+              workspaceId={workspaceId}
+              dealId={dealId}
+              proposedDate={proposedDate}
+              open={catalogPanelOpen}
+              onOpenChange={setCatalogPanelOpen}
+              activeTab={catalogPanelTab}
+              onActiveTabChange={setCatalogPanelTab}
+              inspectorAvailable={inspectorProps != null}
+              inspectorContent={inspectorProps ? <ProposalLineInspector {...inspectorProps} /> : null}
+              onProposalRefetch={onProposalRefetch}
+              onItemAdded={(packageId) => onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined)}
+              onAddCustomLineItem={addCustomLineItem}
+              readOnly={readOnly}
+            />
+          </div>
+        )}
+
+        {/* Receipt */}
+        <div className="min-w-0 flex-1 flex flex-col h-full">
           <div data-surface="elevated" className="flex-1 flex flex-col rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
-            {/* Receipt toolbar — primary + Add, secondary tools, draft status. Always visible. */}
+            {/* Receipt toolbar — label + draft status on the left;
+                Production team button + overflow menu on the right.
+                The left-panel already owns "+ Add from catalog" so the
+                toolbar keeps only the peripheral actions. ⌘K still works. */}
             <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-[var(--stage-edge-subtle)]">
               <div className="flex items-center gap-3 min-w-0">
-                <h2 className="stage-label text-[var(--stage-text-secondary)]">Receipt</h2>
+                <h2 className="stage-label text-[var(--stage-text-secondary)]">Proposal</h2>
                 {showDraftSaved && (
                   <span className="stage-label text-[var(--stage-accent)] animate-in fade-in-0 duration-200" role="status">
                     Draft saved
@@ -1532,45 +1598,81 @@ export function ProposalBuilder({
               </div>
               {!readOnly && (
                 <div className="flex items-center gap-1 shrink-0">
-                  {workspaceId && dealId && (
-                    <PackageSelectorPalette
-                      workspaceId={workspaceId}
-                      dealId={dealId}
-                      proposedDate={proposedDate}
-                      open={paletteOpen}
-                      onOpenChange={setPaletteOpen}
-                      onApplied={(packageId) => {
-                        onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined);
-                        onProposalRefetch?.();
-                      }}
-                      onAddCustomLineItem={addCustomLineItem}
-                      trigger={
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-2 rounded-[var(--stage-radius-button)] border border-[var(--stage-border)] bg-[var(--stage-surface-raised)] px-3 py-2 text-sm font-medium text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                        >
-                          <Plus className="w-4 h-4" strokeWidth={1.5} aria-hidden />
-                          Add from catalog
-                          <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] tabular-nums font-medium text-[var(--stage-text-secondary)] bg-[var(--ctx-well)] rounded border border-[var(--stage-edge-subtle)]">
-                            ⌘K
-                          </kbd>
-                        </button>
-                      }
-                    />
-                  )}
-                  {/* Parse rider — demoted to an icon button. */}
-                  {workspaceId && dealId && (
-                    <button
-                      type="button"
-                      onClick={() => setRiderModalOpen(true)}
-                      className="p-2 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                      aria-label="Parse rider with Aion"
-                      title="Parse a rider PDF or text into line items"
-                    >
-                      <FileText className="w-4 h-4" strokeWidth={1.5} />
-                    </button>
-                  )}
-                  {/* More actions menu — Save to catalog, other power-user ops. */}
+                  {/* Production team — opens a side sheet. Only meaningful when there are crew roles. */}
+                  <button
+                    type="button"
+                    onClick={() => setTeamSheetOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] px-3 py-1.5 text-sm text-[var(--stage-text-primary)] hover:border-[var(--stage-border)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                    aria-label="Open production team"
+                  >
+                    <Users className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                    Production team
+                    {crewRoleCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] text-[10px] tabular-nums font-medium">
+                        {crewRoleCount}
+                      </span>
+                    )}
+                  </button>
+                  {/* On mobile only: + Add and Parse rider still live in the toolbar
+                      because the catalog panel is hidden on md-. md+ relies on the panel. */}
+                  <div className="flex md:hidden items-center gap-1">
+                    {workspaceId && dealId && (
+                      <PackageSelectorPalette
+                        workspaceId={workspaceId}
+                        dealId={dealId}
+                        proposedDate={proposedDate}
+                        open={paletteOpen}
+                        onOpenChange={setPaletteOpen}
+                        onApplied={(packageId) => {
+                          onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined);
+                          onProposalRefetch?.();
+                        }}
+                        onAddCustomLineItem={addCustomLineItem}
+                        trigger={
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-2 rounded-[var(--stage-radius-button)] border border-[var(--stage-border)] bg-[var(--stage-surface-raised)] px-3 py-2 text-sm font-medium text-[var(--stage-text-primary)] hover:border-[var(--stage-border-focus)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                          >
+                            <Plus className="w-4 h-4" strokeWidth={1.5} aria-hidden />
+                            Add
+                          </button>
+                        }
+                      />
+                    )}
+                    {workspaceId && dealId && (
+                      <button
+                        type="button"
+                        onClick={() => setRiderModalOpen(true)}
+                        className="p-2 rounded-[var(--stage-radius-button)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                        aria-label="Parse rider"
+                      >
+                        <FileText className="w-4 h-4" strokeWidth={1.5} />
+                      </button>
+                    )}
+                  </div>
+                  {/* md+ needs access to the palette even though the primary
+                      entry is the catalog panel — ⌘K handler dispatches
+                      `proposal-builder:open-palette` which the palette listens
+                      for. Render the palette host here invisibly so the
+                      shortcut has a mount to attach to. */}
+                  <div className="hidden md:block">
+                    {workspaceId && dealId && (
+                      <PackageSelectorPalette
+                        workspaceId={workspaceId}
+                        dealId={dealId}
+                        proposedDate={proposedDate}
+                        open={paletteOpen}
+                        onOpenChange={setPaletteOpen}
+                        onApplied={(packageId) => {
+                          onItemAdded?.('palette', packageId ? { package_id: packageId } : undefined);
+                          onProposalRefetch?.();
+                        }}
+                        onAddCustomLineItem={addCustomLineItem}
+                        trigger={<span className="sr-only" aria-hidden />}
+                      />
+                    )}
+                  </div>
+                  {/* More actions menu — Save to catalog, Parse rider, Save draft now. */}
                   <Popover open={toolbarMenuOpen} onOpenChange={setToolbarMenuOpen}>
                     <PopoverTrigger asChild>
                       <button
@@ -1628,67 +1730,9 @@ export function ProposalBuilder({
           </div>
         </div>
 
-        {/* Col 2: Summary + Inspector. On xl this is its own column; on lg it stacks below on
-            mobile — sticky-top within the main page scroll. */}
-        <div className="min-w-0 flex flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
-          {lineItems.length > 0 && (
-            <ProposalSummaryCard
-              totalRevenue={summaryValues.totalRevenue}
-              estimatedCost={summaryValues.estimatedCost}
-              floorGapCount={summaryValues.floorGapCount}
-              floorGapTotal={summaryValues.floorGapTotal}
-              talentBudget={summaryValues.talentBudget}
-            />
-          )}
-
-          {/* Financial Inspector — slides in when a line item is selected. */}
-          {!isMobile && (
-            <AnimatePresence>
-              {inspectorProps && (
-                <ProposalLineInspector {...inspectorProps} />
-              )}
-            </AnimatePresence>
-          )}
-
-          {/* On lg-only (2-col mode): production team stacks below Summary/Inspector here so
-              users without the xl viewport still see it. On xl, an identical copy lives in col 3. */}
-          <div className="xl:hidden">
-            <ProposalProductionTeam
-              lineItems={lineItems}
-              sourceOrgId={sourceOrgId}
-              onUpdateRoleAssignment={updateRoleAssignment}
-              onAddRole={addRoleToLineItem}
-              onUpdateTimeStart={updateTimeStart}
-              onUpdateTimeEnd={updateTimeEnd}
-              onUpdateShowTimes={updateShowTimesOnProposal}
-              dealEventStartTime={dealEventStartTime}
-              dealEventEndTime={dealEventEndTime}
-              proposedDate={proposedDate}
-              dealId={dealId}
-              planCrewAdditions={planCrewAdditions}
-            />
-          </div>
-        </div>
-
-        {/* Col 3 (xl+ only): Production Team — its own column so it doesn't fight the Inspector for space. */}
-        <div className="hidden xl:flex min-w-0 flex-col gap-4 xl:sticky xl:top-0 xl:self-start xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
-          <ProposalProductionTeam
-            lineItems={lineItems}
-            sourceOrgId={sourceOrgId}
-            onUpdateRoleAssignment={updateRoleAssignment}
-            onAddRole={addRoleToLineItem}
-            onUpdateTimeStart={updateTimeStart}
-            onUpdateTimeEnd={updateTimeEnd}
-            onUpdateShowTimes={updateShowTimesOnProposal}
-            dealEventStartTime={dealEventStartTime}
-            dealEventEndTime={dealEventEndTime}
-            proposedDate={proposedDate}
-            dealId={dealId}
-            planCrewAdditions={planCrewAdditions}
-          />
-        </div>
-
-        {/* Mobile: sheet inspector */}
+        {/* Mobile: sheet inspector — the md+ inspector lives inside the
+            catalog panel's Inspector tab, so the Sheet is only for viewports
+            where the panel itself isn't rendered. */}
         {isMobile && (
           <Sheet
             open={selectedLineIndex != null && selectedItem != null}
@@ -1709,6 +1753,33 @@ export function ProposalBuilder({
           </Sheet>
         )}
       </div>
+
+      {/* Production team — right-side sheet, opens on explicit button click. */}
+      <Sheet open={teamSheetOpen} onOpenChange={setTeamSheetOpen}>
+        <SheetContent side="right" className="w-[min(460px,95vw)]">
+          <SheetHeader>
+            <span className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)]">
+              Production team
+            </span>
+          </SheetHeader>
+          <SheetBody>
+            <ProposalProductionTeam
+              lineItems={lineItems}
+              sourceOrgId={sourceOrgId}
+              onUpdateRoleAssignment={updateRoleAssignment}
+              onAddRole={addRoleToLineItem}
+              onUpdateTimeStart={updateTimeStart}
+              onUpdateTimeEnd={updateTimeEnd}
+              onUpdateShowTimes={updateShowTimesOnProposal}
+              dealEventStartTime={dealEventStartTime}
+              dealEventEndTime={dealEventEndTime}
+              proposedDate={proposedDate}
+              dealId={dealId}
+              planCrewAdditions={planCrewAdditions}
+            />
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
 
       {/* Sticky Send bar — fixed to the viewport bottom so the closing action is always
           one tap away (Option B from the layout redesign). Portaled to document.body so
