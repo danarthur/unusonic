@@ -108,6 +108,12 @@ export function PersonProductionsPanel({
             />
           ) : null,
         )}
+        {/* Explicit empty-state when both active bands are empty but past exists.
+            Without this the past dropdown reads as "all they've ever done is
+            history" — the truth is nothing's currently booked. */}
+        {byBand.in_play.length === 0 && byBand.booked.length === 0 && byBand.past.length > 0 && (
+          <EmptyActiveRow />
+        )}
         {byBand.past.length > 0 && (
           <CollapsedPastSection
             productions={byBand.past}
@@ -116,6 +122,20 @@ export function PersonProductionsPanel({
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function EmptyActiveRow() {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1.5 px-2 py-1.5 -mx-2 rounded-md',
+        'text-[11px] text-[var(--stage-text-tertiary)]',
+      )}
+    >
+      <CalendarCheck2 className="size-3" strokeWidth={1.5} />
+      <span>No upcoming work scheduled</span>
     </div>
   );
 }

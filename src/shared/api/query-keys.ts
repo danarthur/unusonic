@@ -37,6 +37,8 @@ export const queryKeys = {
       ["entities", wsId, "detail", entityId, "productions"] as const,
     referrals: (wsId: string, entityId: string) =>
       ["entities", wsId, "detail", entityId, "referrals"] as const,
+    relationshipStats: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "relationshipStats"] as const,
     venueSpecs: (wsId: string, entityId: string) =>
       ["entities", wsId, "detail", entityId, "venueSpecs"] as const,
   },
