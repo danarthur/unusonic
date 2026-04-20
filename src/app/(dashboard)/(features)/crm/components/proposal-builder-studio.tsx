@@ -14,7 +14,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Lock, Plus } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
 import { getProposalForDeal, revertProposalToDraft } from '@/features/sales/api/proposal-actions';
 import { useProposalBuilderEvents } from '@/features/sales/lib/use-proposal-builder-events';
@@ -95,14 +95,6 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
     return () => document.removeEventListener('keydown', handler, true);
   }, [events, isLocked]);
 
-  const handleOpenPaletteFromButton = useCallback(() => {
-    if (isLocked) return;
-    window.dispatchEvent(
-      new CustomEvent(PROPOSAL_BUILDER_OPEN_PALETTE_EVENT, { detail: { source: 'button' } }),
-    );
-    events.emit('palette_open', { source: 'button' });
-  }, [events, isLocked]);
-
   return (
     <div className="flex flex-col h-full min-h-0">
       {isLocked && (
@@ -136,31 +128,12 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
         </motion.div>
       )}
 
-      {/* Sticky "+ Add from Catalog" affordance at the top of the studio.
-          Mirrors the button inside ProposalBuilder's receipt footer; both
-          dispatch the same open-palette event so keyboard/mouse/touch all
-          land at the same place. */}
-      {!isLocked && (
-        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 pt-4 pb-1">
-          <p className="stage-label text-[var(--stage-text-secondary)]">
-            Proposal
-          </p>
-          <button
-            type="button"
-            onClick={handleOpenPaletteFromButton}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-[var(--stage-radius-button)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-raised)] text-sm text-[var(--stage-text-primary)] hover:border-[var(--stage-border)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]"
-            aria-keyshortcuts="Meta+K Control+K"
-          >
-            <Plus className="w-4 h-4" strokeWidth={1.5} aria-hidden />
-            Add from catalog
-            <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] tabular-nums font-medium text-[var(--stage-text-secondary)] bg-[var(--ctx-well)] rounded border border-[var(--stage-edge-subtle)]">
-              ⌘K
-            </kbd>
-          </button>
-        </div>
-      )}
-
-      <div className="flex-1 min-h-0 p-4 sm:p-6 pt-2">
+      {/* No studio-level sub-header — the receipt card's own toolbar owns the
+          "+ Add from catalog" button and the section label. Removing the
+          duplicate tightens vertical rhythm and avoids two identical CTAs
+          on the page. handleOpenPaletteFromButton is still used by the ⌘K
+          handler above. */}
+      <div className="flex-1 min-h-0 p-4 sm:p-6">
         {deal.workspace_id && (
           <ProposalBuilder
             dealId={deal.id}

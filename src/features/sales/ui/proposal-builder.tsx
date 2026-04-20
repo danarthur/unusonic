@@ -1115,7 +1115,7 @@ export function ProposalBuilder({
   };
 
   const receiptListContent = (
-    <div className="flex-1 overflow-auto min-h-[160px] min-w-0">
+    <div className="flex-1 min-w-0 flex flex-col">
       {lineItems.length > 0 && (
         <div className={receiptHeaderClass}>
           <span className="flex-1">Item</span>
@@ -1145,17 +1145,25 @@ export function ProposalBuilder({
         <SortableContext items={sortableGroupIds} strategy={verticalListSortingStrategy}>
           {/* touch-pan-y keeps the page's vertical scroll working on iPad
               while the grip handle ('touch-none' below) owns drag initiation. */}
-          <ul className="space-y-3 mt-1 pb-1 mx-px touch-pan-y">
+          <ul className="flex-1 space-y-3 mt-1 pb-1 mx-px touch-pan-y flex flex-col">
             {lineItems.length === 0 ? (
               <li
                 className={cn(
-                  'text-sm text-[var(--stage-text-secondary)] py-12 px-6 text-center rounded-[var(--stage-radius-panel)] border-2 border-dashed min-h-[160px] flex flex-col items-center justify-center gap-2 transition-colors duration-150',
+                  'flex-1 text-sm text-[var(--stage-text-secondary)] py-12 px-6 text-center rounded-[var(--stage-radius-panel)] border-2 border-dashed min-h-[320px] flex flex-col items-center justify-center gap-3 transition-colors duration-150',
                   isDragOver
                     ? 'border-[var(--color-unusonic-warning)]/50 bg-[var(--color-unusonic-warning)]/10'
                     : 'border-[var(--stage-border-hover)] bg-[var(--ctx-well)]'
                 )}
               >
-                <span>{emptyDropHint ?? 'Add items from the catalog or create a custom line item.'}</span>
+                <Plus className="w-8 h-8 text-[var(--stage-text-tertiary)] opacity-60" strokeWidth={1.25} aria-hidden />
+                <div className="space-y-1 max-w-xs">
+                  <p className="text-sm text-[var(--stage-text-primary)] font-medium">
+                    No line items yet
+                  </p>
+                  <p className="text-xs text-[var(--stage-text-secondary)] leading-relaxed">
+                    {emptyDropHint ?? 'Press ⌘K or Add from catalog above to start building the proposal.'}
+                  </p>
+                </div>
               </li>
             ) : (
               groupedLineItems.map((group) => {
@@ -1500,11 +1508,13 @@ export function ProposalBuilder({
       style={{ overflow: 'visible', paddingBottom: lineItems.length > 0 && !readOnly ? '6rem' : undefined }}
     >
       {/* Design Phase B: 3-column on xl+ (receipt · summary · production team),
-          2-column on lg (receipt · stacked rail), 1-column on md-. */}
-      <div className="grid gap-6 flex-1 w-full grid-cols-1 lg:grid-cols-[1fr_minmax(280px,340px)] xl:grid-cols-[1fr_minmax(280px,320px)_minmax(280px,320px)]">
+          2-column on lg (receipt · stacked rail), 1-column on md-. Grid cells
+          stretch to fill main's height so the cards feel substantial even
+          when the proposal is empty. */}
+      <div className="grid gap-6 flex-1 w-full min-h-[calc(100vh-11rem)] grid-cols-1 lg:grid-cols-[1fr_minmax(280px,340px)] xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)_minmax(280px,340px)]">
         {/* Col 1: Receipt */}
-        <div className="min-w-0 flex flex-col">
-          <div data-surface="elevated" className="flex flex-col rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
+        <div className="min-w-0 flex flex-col h-full">
+          <div data-surface="elevated" className="flex-1 flex flex-col rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
             {/* Receipt toolbar — primary + Add, secondary tools, draft status. Always visible. */}
             <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-[var(--stage-edge-subtle)]">
               <div className="flex items-center gap-3 min-w-0">
@@ -1609,8 +1619,10 @@ export function ProposalBuilder({
               )}
             </div>
 
-            {/* Receipt list */}
-            <div className="min-w-0 px-4 sm:px-6 py-5">
+            {/* Receipt list — flex-1 so the card fills its grid cell vertically
+                and the empty state reads as a real empty state rather than a
+                stub sitting in a half-empty card. */}
+            <div className="flex-1 min-w-0 px-4 sm:px-6 py-5 flex flex-col">
               {receiptListContent}
             </div>
           </div>
