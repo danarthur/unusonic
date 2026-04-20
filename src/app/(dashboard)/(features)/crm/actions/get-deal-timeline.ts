@@ -8,8 +8,8 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 // Types
 // =============================================================================
 
-export type DealTimelineSource = 'activity' | 'follow_up';
-export type DealTimelineActorKind = 'user' | 'webhook' | 'system' | 'aion';
+export type DealTimelineSource = 'activity' | 'follow_up' | 'message';
+export type DealTimelineActorKind = 'user' | 'webhook' | 'system' | 'aion' | 'client';
 export type DealTimelineStatus = 'success' | 'failed' | 'pending' | 'undone';
 
 /**

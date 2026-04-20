@@ -1227,6 +1227,7 @@ function DealActivitySection({
 function formatActorLabel(entry: DealTimelineEntry): string {
   if (entry.actorKind === 'user') return entry.actorName ?? 'Teammate';
   if (entry.actorKind === 'aion') return 'Aion';
+  if (entry.actorKind === 'client') return 'Client';
   if (entry.actorKind === 'webhook') return 'Webhook';
   return 'System';
 }
