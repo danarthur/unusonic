@@ -448,8 +448,8 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
           </p>
           <p className="stage-badge-text text-[var(--stage-text-tertiary)] leading-relaxed">
             {isLocked
-              ? 'No crew was assigned on the deal. Add crew here — assignments live on the Plan tab only; they do not flow back to the signed proposal.'
-              : 'Build a proposal with package assignments to get crew suggestions, or add crew directly. Manual additions here won\u2019t appear on the proposal line items.'}
+              ? 'Add crew here. Changes stay on the Plan tab and won\u2019t update the signed proposal.'
+              : 'Add crew directly, or build a proposal with packages to auto-suggest them.'}
           </p>
         </div>
       )}
