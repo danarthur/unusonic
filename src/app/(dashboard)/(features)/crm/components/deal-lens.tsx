@@ -52,6 +52,7 @@ import { getFollowUpForDeal, type FollowUpQueueItem } from '../actions/follow-up
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { getDealTimeline, type DealTimelineEntry } from '../actions/get-deal-timeline';
 import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
+import { RepliesCard } from '@/features/comms/replies/ui/RepliesCard';
 
 
 // Legacy fallback used while the workspace's pipeline is loading (first paint)
@@ -695,6 +696,11 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
           {/* Series-only affordance: apply first show's crew to all shows + persist template */}
           <SeriesCrewAffordance dealId={deal.id} isLocked={isLocked} />
+
+          {/* Replies — client email/SMS threads scoped to this deal.
+              Renders empty until the Phase 1 migrations land in the DB and
+              the Resend inbound webhook starts writing ops.messages rows. */}
+          <RepliesCard dealId={deal.id} readOnly={isLocked} />
 
           {/* Production team */}
           <ProductionTeamCard dealId={deal.id} sourceOrgId={sourceOrgId ?? null} eventDate={deal.proposed_date} workspaceId={deal.workspace_id} isLocked={isLocked} />

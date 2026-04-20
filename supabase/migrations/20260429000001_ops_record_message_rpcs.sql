@@ -17,6 +17,26 @@
 
 
 -- =============================================================================
+-- 0. Extend ops.follow_up_log.action_type CHECK to allow 'reply_received'.
+--
+-- The original constraint (migration 20260330120000) did not anticipate
+-- reply-driven auto-resolution. Extending the allowed set here keeps the
+-- RPC semantically explicit (we log WHY the queue item flipped to acted,
+-- not a shoehorned 'system_queued').
+-- =============================================================================
+
+ALTER TABLE ops.follow_up_log
+  DROP CONSTRAINT IF EXISTS follow_up_log_action_type_check;
+
+ALTER TABLE ops.follow_up_log
+  ADD CONSTRAINT follow_up_log_action_type_check
+  CHECK (action_type IN (
+    'email_sent', 'sms_sent', 'call_logged', 'snoozed', 'dismissed', 'note_added',
+    'system_queued', 'system_removed', 'reply_received'
+  ));
+
+
+-- =============================================================================
 -- 1. ops.resolve_follow_up_on_reply
 --
 -- Called by record_inbound_message when an inbound reply arrives on a deal

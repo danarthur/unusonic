@@ -3454,6 +3454,192 @@ export type Database = {
         }
         Relationships: []
       }
+      message_channel_identities: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          identity_address: string
+          is_private: boolean
+          provider: string
+          provider_credential_ref: string | null
+          revoked_at: string | null
+          user_id: string | null
+          verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          id?: string
+          identity_address: string
+          is_private?: boolean
+          provider: string
+          provider_credential_ref?: string | null
+          revoked_at?: string | null
+          user_id?: string | null
+          verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          identity_address?: string
+          is_private?: boolean
+          provider?: string
+          provider_credential_ref?: string | null
+          revoked_at?: string | null
+          user_id?: string | null
+          verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      message_threads: {
+        Row: {
+          channel: string
+          created_at: string
+          deal_id: string | null
+          dismissed_at: string | null
+          id: string
+          last_message_at: string
+          needs_resolution: boolean
+          primary_entity_id: string | null
+          provider_thread_key: string
+          subject: string | null
+          unread_by_user_ids: string[]
+          workspace_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          deal_id?: string | null
+          dismissed_at?: string | null
+          id?: string
+          last_message_at?: string
+          needs_resolution?: boolean
+          primary_entity_id?: string | null
+          provider_thread_key: string
+          subject?: string | null
+          unread_by_user_ids?: string[]
+          workspace_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          deal_id?: string | null
+          dismissed_at?: string | null
+          id?: string
+          last_message_at?: string
+          needs_resolution?: boolean
+          primary_entity_id?: string | null
+          provider_thread_key?: string
+          subject?: string | null
+          unread_by_user_ids?: string[]
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          ai_classification: string | null
+          ai_summary: string | null
+          attachments: Json
+          body_html: string | null
+          body_text: string | null
+          bounced_at: string | null
+          cc_addresses: string[]
+          channel: string
+          clicked_at: string | null
+          created_at: string
+          delivered_at: string | null
+          direction: string
+          from_address: string
+          from_entity_id: string | null
+          hide_from_portal: boolean
+          id: string
+          in_reply_to: string | null
+          opened_at: string | null
+          provider_message_id: string | null
+          replied_at: string | null
+          sent_by_user_id: string | null
+          thread_id: string
+          to_addresses: string[]
+          urgency_keyword_match: string | null
+          workspace_id: string
+        }
+        Insert: {
+          ai_classification?: string | null
+          ai_summary?: string | null
+          attachments?: Json
+          body_html?: string | null
+          body_text?: string | null
+          bounced_at?: string | null
+          cc_addresses?: string[]
+          channel: string
+          clicked_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          direction: string
+          from_address: string
+          from_entity_id?: string | null
+          hide_from_portal?: boolean
+          id?: string
+          in_reply_to?: string | null
+          opened_at?: string | null
+          provider_message_id?: string | null
+          replied_at?: string | null
+          sent_by_user_id?: string | null
+          thread_id: string
+          to_addresses?: string[]
+          urgency_keyword_match?: string | null
+          workspace_id: string
+        }
+        Update: {
+          ai_classification?: string | null
+          ai_summary?: string | null
+          attachments?: Json
+          body_html?: string | null
+          body_text?: string | null
+          bounced_at?: string | null
+          cc_addresses?: string[]
+          channel?: string
+          clicked_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          direction?: string
+          from_address?: string
+          from_entity_id?: string | null
+          hide_from_portal?: boolean
+          id?: string
+          in_reply_to?: string | null
+          opened_at?: string | null
+          provider_message_id?: string | null
+          replied_at?: string | null
+          sent_by_user_id?: string | null
+          thread_id?: string
+          to_addresses?: string[]
+          urgency_keyword_match?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_in_reply_to_fkey"
+            columns: ["in_reply_to"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "message_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_stages: {
         Row: {
           color_token: string | null
@@ -3994,6 +4180,27 @@ export type Database = {
           },
         ]
       }
+      deal_timeline_v: {
+        Row: {
+          action_summary: string | null
+          action_type: string | null
+          actor_kind: string | null
+          actor_user_id: string | null
+          channel: string | null
+          created_at: string | null
+          deal_id: string | null
+          error_message: string | null
+          id: string | null
+          metadata: Json | null
+          source: string | null
+          status: string | null
+          trigger_type: string | null
+          undo_token: string | null
+          undone_at: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
       entity_crew_schedule: {
         Row: {
           assignee_name: string | null
@@ -4343,12 +4550,33 @@ export type Database = {
         }
         Returns: string
       }
+      record_inbound_message: { Args: { p_payload: Json }; Returns: string }
+      record_outbound_message_draft: {
+        Args: {
+          p_attachments: Json
+          p_body_html: string
+          p_body_text: string
+          p_cc_addresses: string[]
+          p_channel: string
+          p_in_reply_to?: string
+          p_sent_by_user_id: string
+          p_subject: string
+          p_thread_id: string
+          p_to_addresses: string[]
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       rename_workspace_event_archetype: {
         Args: { p_new_label: string; p_slug: string; p_workspace_id: string }
         Returns: undefined
       }
       reorder_pipeline_stages: {
         Args: { p_pipeline_id: string; p_stage_ids: string[] }
+        Returns: undefined
+      }
+      resolve_follow_up_on_reply: {
+        Args: { p_message_id: string; p_queue_item_id: string }
         Returns: undefined
       }
       resolve_stage_by_tag: {
@@ -4361,6 +4589,10 @@ export type Database = {
       }
       seed_default_triggers: {
         Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      stamp_outbound_provider_id: {
+        Args: { p_message_id: string; p_provider_message_id: string }
         Returns: undefined
       }
       unarchive_workspace_event_archetype: {
