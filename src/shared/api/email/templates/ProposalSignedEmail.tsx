@@ -16,6 +16,7 @@ import {
 } from '@react-email/components';
 import * as React from 'react';
 import { formatEventDate } from '@/shared/lib/format-currency';
+import { EmailBrandMark } from '../brand-header';
 
 export interface ProposalSignedEmailProps {
   signerName: string;
@@ -115,7 +116,10 @@ export function ProposalSignedEmail({
             <Text style={footer}>
               Internal notification from Unusonic.
             </Text>
-            <Text style={platformAttr}>via Unusonic</Text>
+            <Text style={platformAttr}>
+              <EmailBrandMark color="#888888" />
+              via Unusonic
+            </Text>
           </Section>
         </Container>
       </Body>

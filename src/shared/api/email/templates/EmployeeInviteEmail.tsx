@@ -14,6 +14,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandHeader } from '../brand-header';
 
 export interface EmployeeInviteEmailProps {
   workspaceName: string;
@@ -41,6 +42,7 @@ export function EmployeeInviteEmail({
       <Body style={main}>
         <Container style={container}>
           <Section style={section}>
+            <EmailBrandHeader color="#999999" wordmarkColor="#fafafa" marginBottom="20px" />
             <Text style={heading}>You're invited.</Text>
             <Text style={body}>
               {whoInvited} has added you to their team on Unusonic

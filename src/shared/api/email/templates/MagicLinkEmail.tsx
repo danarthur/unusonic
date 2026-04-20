@@ -17,6 +17,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandMark } from '../brand-header';
 
 export interface MagicLinkEmailProps {
   signInUrl: string;
@@ -54,6 +55,7 @@ export function MagicLinkEmail({
           </Text>
           <Hr style={hr} />
           <Text style={footer}>
+            <EmailBrandMark color="#666666" />
             Sent by {brand} via Unusonic
           </Text>
         </Container>

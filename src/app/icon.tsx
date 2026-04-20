@@ -1,30 +1,35 @@
 import { ImageResponse } from 'next/og';
 
 /**
- * Phase Mark favicon — two offset pills in white on transparent.
- * Achromatic accent. Matches the LivingLogo idle state geometry.
+ * Phase Mark favicon — Unusonic Vesica.
+ *
+ * Two overlapping circles at classical vesica piscis separation (sep = R),
+ * plus the almond lens seam. Achromatic white — the prism reveal only lives
+ * in the animated LivingLogo, not at favicon scale.
+ *
+ * Geometry matches living-logo.tsx: viewBox 40×40, R = 10.5, sep = R.
  */
 
-// Geometry matches living-logo.tsx constants
-const PILL_W = 14;
-const PILL_H = 6;
-const RX = 3;
-const GAP = 2;
-const OFFSET = 4;
 const CX = 20;
 const CY = 20;
-const HALF = (PILL_W + GAP + PILL_W) / 2;
-const LX = CX - HALF;
-const LY = CY - PILL_H / 2 - OFFSET / 2;
-const RX_POS = CX - HALF + PILL_W + GAP;
-const RY = CY - PILL_H / 2 + OFFSET / 2;
+const R = 10.5;
+const SEP = R; // classical vesica
+const CX_L = CX - SEP / 2;
+const CX_R = CX + SEP / 2;
 
-// White fill — achromatic accent, hex for OG image compatibility
+// Lens path: arcs between the two circle intersections.
+const HALF_H = Math.sqrt(R * R - (SEP / 2) * (SEP / 2));
+const TOP_X = (CX_L + CX_R) / 2;
+const TOP_Y = CY - HALF_H;
+const BOT_Y = CY + HALF_H;
+const LENS_PATH = `M ${TOP_X} ${TOP_Y} A ${R} ${R} 0 0 1 ${TOP_X} ${BOT_Y} A ${R} ${R} 0 0 1 ${TOP_X} ${TOP_Y} Z`;
+
 const FILL = '#FFFFFF';
 
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="32" height="32">
-  <rect x="${LX}" y="${LY}" width="${PILL_W}" height="${PILL_H}" rx="${RX}" fill="${FILL}"/>
-  <rect x="${RX_POS}" y="${RY}" width="${PILL_W}" height="${PILL_H}" rx="${RX}" fill="${FILL}"/>
+  <circle cx="${CX_L}" cy="${CY}" r="${R}" fill="none" stroke="${FILL}" stroke-width="2.2"/>
+  <circle cx="${CX_R}" cy="${CY}" r="${R}" fill="none" stroke="${FILL}" stroke-width="2.2"/>
+  <path d="${LENS_PATH}" fill="none" stroke="${FILL}" stroke-width="2.6" stroke-linecap="round" opacity="0.92"/>
 </svg>`;
 
 export const size = { width: 32, height: 32 };

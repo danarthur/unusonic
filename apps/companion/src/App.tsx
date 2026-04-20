@@ -10,7 +10,7 @@ export function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Header with Living Logo */}
+      {/* Header — Unusonic Phase Mark + wordmark + Bridge sub-brand */}
       <div className="row" style={{
         padding: '12px var(--stage-padding)',
         background: 'var(--stage-surface)',
@@ -18,6 +18,22 @@ export function App() {
         gap: '10px',
       }}>
         <LivingLogo size="sm" status="idle" />
+        <span style={{
+          fontSize: '11px',
+          fontWeight: 500,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--stage-text-primary)',
+        }}>
+          Unusonic
+        </span>
+        <span style={{
+          fontSize: '11px',
+          color: 'var(--stage-text-secondary)',
+          letterSpacing: '0.04em',
+        }}>
+          ·
+        </span>
         <span style={{
           fontSize: '13px',
           fontWeight: 600,

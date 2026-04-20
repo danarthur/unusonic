@@ -41,6 +41,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EmailBrandHeader } from '../brand-header';
 
 export interface GhostClaimEmailProps {
   /** Destination of the tokenized claim link (Supabase action URL). */
@@ -69,7 +70,7 @@ export function GhostClaimEmail({
       <Preview>Your records are waiting on Unusonic</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Text style={brandText}>Unusonic</Text>
+          <EmailBrandHeader color="#888888" wordmarkColor="#cccccc" />
           <Hr style={hr} />
           <Text style={heading}>Claim your records</Text>
           <Text style={paragraph}>
@@ -111,14 +112,6 @@ const container: React.CSSProperties = {
   margin: '0 auto',
   padding: '40px 24px',
   maxWidth: '480px',
-};
-
-const brandText: React.CSSProperties = {
-  color: '#888888',
-  fontSize: '13px',
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase' as const,
-  margin: '0 0 24px 0',
 };
 
 const hr: React.CSSProperties = {
