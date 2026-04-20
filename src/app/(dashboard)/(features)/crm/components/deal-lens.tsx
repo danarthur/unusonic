@@ -48,10 +48,9 @@ import { SeriesCrewAffordance } from './series-crew-affordance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
 import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-milestones';
 import { FollowUpCard } from './follow-up-card';
-import { FollowUpActionLog } from './follow-up-action-log';
 import { getFollowUpForDeal, type FollowUpQueueItem } from '../actions/follow-up-actions';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
-import { getDealActivity, type DealActivityEntry } from '../actions/get-deal-activity';
+import { getDealTimeline, type DealTimelineEntry } from '../actions/get-deal-timeline';
 import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
 
 
@@ -161,14 +160,14 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
     return () => { cancelled = true; };
   }, []);
 
-  // Phase 3b: deal activity log (trigger side effects + manual notes).
-  // null = not yet fetched; [] = fetched, no entries.
-  const [activity, setActivity] = useState<DealActivityEntry[] | null>(null);
+  // Unified timeline (ops.deal_timeline_v — unions deal_activity_log +
+  // follow_up_log). null = not yet fetched; [] = fetched, no entries.
+  const [activity, setActivity] = useState<DealTimelineEntry[] | null>(null);
   const [activityExpanded, setActivityExpanded] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setActivity(null);
-    getDealActivity(deal.id).then((entries) => {
+    getDealTimeline(deal.id).then((entries) => {
       if (!cancelled) setActivity(entries);
     }).catch(() => {
       if (!cancelled) setActivity([]);
@@ -553,6 +552,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
               getAionCardBundle(deal.id).then(setAionBundle);
             }}
             onDraftNudge={async (row) => {
+              // Telemetry only — the card opens its own inline composer.
               await logAionCardEvent({
                 action: 'draft_nudge',
                 dealId: deal.id,
@@ -562,7 +562,10 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
                 insightId: row.linkedInsightId ?? undefined,
               });
               void emitCadenceAccuracyIfPersonalized('draft_nudge', deal.id, row.followUpId, aionBundle.data);
-              toast('Opening draft…');
+            }}
+            onNudgeSubmitted={() => {
+              getAionCardBundle(deal.id).then(setAionBundle);
+              getDealTimeline(deal.id).then(setActivity).catch(() => {});
             }}
             onDismissNudge={async (row) => {
               const result = await dismissFollowUp(row.followUpId, 'other');
@@ -606,14 +609,17 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
         </motion.div>
       )}
 
-      {/* Position 2b: Activity log — Phase 3b infra. Phase 3c populates rows. */}
+      {/* Position 2b: Timeline — unified stream from ops.deal_timeline_v
+          (unions deal_activity_log trigger/system rows with follow_up_log
+          engine rows). Base tables still back the Daily Brief readers and
+          Aion dispatch writers. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={STAGE_MEDIUM}
       >
         <StagePanel elevated className="p-5">
-          <p className="stage-label mb-4">Activity</p>
+          <p className="stage-label mb-4">Timeline</p>
           <DealActivitySection
             entries={activity}
             expanded={activityExpanded}
@@ -704,9 +710,6 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
               productionId={deal.id}
             />
           )}
-
-          {/* Follow-up action log */}
-          <FollowUpActionLog dealId={deal.id} />
 
           {/* Post-handover: contract card + inline proposal receipt */}
           {isLocked && deal.workspace_id && (
@@ -1127,19 +1130,50 @@ function ProposalStatusPill({ status }: { status: string }) {
 }
 
 // =============================================================================
-// DealActivitySection — Phase 3b deal activity log renderer.
-// Read-only: shows trigger side effects written by the Phase 3c dispatcher.
-// Collapses to 10 rows; "Show more" reveals the rest of the fetched slice.
+// DealActivitySection — Deal Lens Timeline renderer.
+// Reads from ops.deal_timeline_v (unions deal_activity_log + follow_up_log).
+// Read-only: activity rows come from the Phase 3c dispatcher, follow-up rows
+// come from the follow-up engine. Collapses to 10 rows; "Show more" reveals
+// the rest of the fetched slice.
 // =============================================================================
 
 const ACTIVITY_COLLAPSED_CAP = 10;
+
+// Maps follow_up_log.action_type → user-facing verb. Mirrors the labels the
+// old FollowUpActionLog used so existing rows read identically here.
+const FOLLOW_UP_ACTION_LABELS: Record<string, string> = {
+  email_sent: 'Sent email',
+  sms_sent: 'Sent text message',
+  call_logged: 'Logged phone call',
+  snoozed: 'Snoozed follow-up',
+  dismissed: 'Marked as handled',
+  note_added: 'Added note',
+  system_queued: 'System flagged for follow-up',
+  system_removed: 'System cleared follow-up',
+};
+
+const CHANNEL_LABELS: Record<string, string> = {
+  phone: 'Phone',
+  call: 'Phone',
+  sms: 'Text',
+  email: 'Email',
+  system: 'System',
+  manual: 'Manual',
+};
+
+function formatTimelineSummary(entry: DealTimelineEntry): string {
+  if (entry.source === 'follow_up' && entry.actionType) {
+    return FOLLOW_UP_ACTION_LABELS[entry.actionType] ?? entry.actionSummary;
+  }
+  return entry.actionSummary;
+}
 
 function DealActivitySection({
   entries,
   expanded,
   onToggleExpanded,
 }: {
-  entries: DealActivityEntry[] | null;
+  entries: DealTimelineEntry[] | null;
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
@@ -1160,7 +1194,7 @@ function DealActivitySection({
         className="text-sm"
         style={{ color: 'var(--stage-text-tertiary)' }}
       >
-        No activity yet
+        Nothing yet
       </p>
     );
   }
@@ -1171,7 +1205,7 @@ function DealActivitySection({
   return (
     <div className="flex flex-col" style={{ gap: 'var(--stage-gap, 6px)' }}>
       {visible.map((entry) => (
-        <DealActivityRow key={entry.id} entry={entry} />
+        <DealActivityRow key={`${entry.source}:${entry.id}`} entry={entry} />
       ))}
       {(hiddenCount > 0 || (expanded && entries.length > ACTIVITY_COLLAPSED_CAP)) && (
         <button
@@ -1190,13 +1224,34 @@ function DealActivitySection({
   );
 }
 
-function DealActivityRow({ entry }: { entry: DealActivityEntry }) {
+function formatActorLabel(entry: DealTimelineEntry): string {
+  if (entry.actorKind === 'user') return entry.actorName ?? 'Teammate';
+  if (entry.actorKind === 'aion') return 'Aion';
+  if (entry.actorKind === 'webhook') return 'Webhook';
+  return 'System';
+}
+
+function formatAbsoluteDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function DealActivityRow({ entry }: { entry: DealTimelineEntry }) {
   const isFailed = entry.status === 'failed';
   const isUndone = entry.status === 'undone';
   const isPending = entry.status === 'pending';
+  const channelLabel = entry.channel ? CHANNEL_LABELS[entry.channel] ?? null : null;
+  const actorLabel = formatActorLabel(entry);
+  const absoluteTime = formatAbsoluteDateTime(entry.createdAt);
   return (
     <div className="flex items-baseline justify-between gap-3 min-w-0">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 flex items-baseline gap-2">
         <p
           className="text-sm tracking-tight leading-tight truncate"
           style={{
@@ -1205,7 +1260,13 @@ function DealActivityRow({ entry }: { entry: DealActivityEntry }) {
             opacity: isUndone ? 0.7 : 1,
           }}
         >
-          {entry.actionSummary}
+          {formatTimelineSummary(entry)}
+          <span
+            className="ml-2 text-xs"
+            style={{ color: 'var(--stage-text-tertiary)' }}
+          >
+            · {actorLabel}
+          </span>
           {isPending && (
             <span
               className="ml-2 text-xs"
@@ -1215,6 +1276,19 @@ function DealActivityRow({ entry }: { entry: DealActivityEntry }) {
             </span>
           )}
         </p>
+        {channelLabel && (
+          <span
+            className="stage-badge-text shrink-0 tabular-nums"
+            style={{
+              color: 'var(--stage-text-tertiary)',
+              background: 'oklch(1 0 0 / 0.06)',
+              borderRadius: 'var(--stage-radius-pill)',
+              padding: '1px 6px',
+            }}
+          >
+            {channelLabel}
+          </span>
+        )}
         {isFailed && entry.errorMessage && (
           <p
             className="text-xs leading-tight mt-0.5 break-words"
@@ -1225,8 +1299,9 @@ function DealActivityRow({ entry }: { entry: DealActivityEntry }) {
         )}
       </div>
       <p
-        className="stage-label shrink-0 tabular-nums"
+        className="stage-label shrink-0 tabular-nums cursor-help"
         style={{ color: 'var(--stage-text-tertiary)' }}
+        title={absoluteTime}
       >
         {formatRelTime(entry.createdAt)}
       </p>
