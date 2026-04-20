@@ -1,22 +1,22 @@
 /**
  * Resend Webhook Handler
  *
- * Handles Resend webhook events. Register in Resend dashboard:
- * https://resend.com/webhooks → POST to {APP_URL}/api/webhooks/resend
+ * Handles Resend OUTBOUND delivery events. Inbound parsing lives on a
+ * separate handler at /api/webhooks/postmark — we chose Postmark for
+ * inbound on 2026-04-20 after a three-agent research pass. See
+ * docs/reference/replies-design.md §4.2.
  *
- * Events handled:
- *   • domain.updated       — sync sending_domain_status onto public.workspaces
- *   • email.delivered      — stamp delivered_at on proposal/crew/messages
- *   • email.bounced        — stamp bounced_at on proposal/crew/messages
- *   • email.opened         — stamp opened_at on messages
- *   • email.clicked        — stamp clicked_at on messages
- *   • inbound (email)      — parse + call ops.record_inbound_message RPC
+ * Register this URL in Resend dashboard:
+ *   https://resend.com/webhooks → POST to {APP_URL}/api/webhooks/resend
+ *   Enable events: domain.updated, email.delivered, email.bounced,
+ *                  email.opened, email.clicked
  *
- * Inbound parsing requires:
- *   - MX record on replies.unusonic.com pointing at Resend's inbound endpoint
- *   - DKIM / SPF / DMARC on replies.unusonic.com
- *   - Per-thread alias `thread-{uuid}@replies.unusonic.com` used as Reply-To
- *     on every outbound message we send (see ops.record_outbound_message_draft)
+ * Event routing:
+ *   • domain.updated  — sync sending_domain_status onto public.workspaces
+ *   • email.delivered — stamp delivered_at on proposal/crew/messages
+ *   • email.bounced   — stamp bounced_at on proposal/crew/messages
+ *   • email.opened    — stamp opened_at on ops.messages
+ *   • email.clicked   — stamp clicked_at on ops.messages
  *
  * Secrets: RESEND_WEBHOOK_SECRET is required. Verified via x-resend-secret
  * header with timingSafeEqual. Never open-access in any environment.
@@ -32,16 +32,6 @@ import { revalidatePath } from 'next/cache';
 export const runtime = 'nodejs';
 
 const VALID_DOMAIN_STATUSES = ['not_started', 'pending', 'verified', 'temporary_failure', 'failure'];
-
-// Resend's inbound-email event name isn't fully pinned in the public docs;
-// accept a couple of plausible spellings so a minor rename on their side
-// doesn't silently drop inbound. Confirm against the current docs during
-// the staging rollout and tighten this list.
-const INBOUND_EVENT_TYPES = new Set(['email.inbound', 'inbound.received', 'email.received']);
-
-// Our Reply-To alias format on outbound. Inbound parsing resolves the thread
-// id from whichever `to` address matches this pattern.
-const THREAD_ALIAS_RE = /^thread-([0-9a-f-]{36})@replies\.unusonic\.com$/i;
 
 type ResendWebhookBody = {
   type: string;
@@ -94,7 +84,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // one upstream record. Any of the following readers may match:
   //   • proposals (legacy proposal email tracking)
   //   • crew_comms_log (day-sheet sends)
-  //   • ops.messages (the new Replies outbound path)
+  //   • ops.messages (Replies outbound)
   if (
     body.type === 'email.delivered'
     || body.type === 'email.bounced'
@@ -164,272 +154,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ received: true });
   }
 
-  // ── Inbound email parse ──
-  //
-  // Resend POSTs a parsed inbound message when our MX on replies.unusonic.com
-  // receives mail. We only accept messages to per-thread aliases
-  // (thread-{uuid}@replies.unusonic.com) — anything else is out of scope for
-  // Phase 1 and returns 200 OK to keep Resend from retrying.
-  if (INBOUND_EVENT_TYPES.has(body.type)) {
-    const handled = await handleInboundEmail(body.data);
-    if (!handled.ok) {
-      // Return 200 OK even on non-matching aliases so Resend stops retrying.
-      // Log server-side so we can spot misconfigured MX or unknown senders.
-      console.warn('[resend webhook] inbound skipped:', handled.reason);
-    }
-    return NextResponse.json({ received: true });
-  }
-
+  // Any other event type: ack and move on. Inbound events that might leak
+  // through Resend (in case anyone ever enables them) are intentionally
+  // ignored — Postmark owns inbound.
   return NextResponse.json({ received: true });
-}
-
-// =============================================================================
-// Inbound parse pipeline
-// =============================================================================
-
-type InboundPayload = Record<string, unknown>;
-
-type InboundHandleResult =
-  | { ok: true; messageId: string }
-  | { ok: false; reason: string };
-
-/**
- * Parse a Resend inbound payload and fan out to record_inbound_message.
- *
- * Resend's inbound payload shape is approximately:
- *   {
- *     "email_id":     string,              // provider-unique message id
- *     "from":         { email, name? },    // or raw string
- *     "to":           Array<{ email, name? }> | string[],
- *     "cc":           Array<{ email, name? }> | string[],
- *     "subject":      string,
- *     "text":         string,              // plain body
- *     "html":         string,              // rich body (optional)
- *     "headers":      { "message-id": string, "in-reply-to"?: string, ... },
- *     "attachments":  Array<{ filename, content_type, size, url? }>
- *   }
- *
- * The exact field names aren't fully pinned in public docs, so we defensively
- * read several plausible spellings. Tighten once confirmed in staging.
- */
-async function handleInboundEmail(payload: InboundPayload): Promise<InboundHandleResult> {
-  const supabase = getSystemClient();
-
-  // 1. Required: provider_message_id + at least one recipient that matches
-  //    our per-thread alias pattern.
-  const providerMessageId = pickString(payload, ['email_id', 'id', 'message_id']);
-  if (!providerMessageId) {
-    return { ok: false, reason: 'missing provider message id' };
-  }
-
-  const toAddresses = extractAddressList(payload.to);
-  const ccAddresses = extractAddressList(payload.cc);
-  const allRecipients = [...toAddresses, ...ccAddresses];
-
-  // 2. Match a recipient against thread-{uuid}@replies.unusonic.com.
-  let threadId: string | null = null;
-  for (const addr of allRecipients) {
-    const match = addr.toLowerCase().match(THREAD_ALIAS_RE);
-    if (match) {
-      threadId = match[1];
-      break;
-    }
-  }
-
-  if (!threadId) {
-    return { ok: false, reason: 'no per-thread alias match in recipients' };
-  }
-
-  // 3. Resolve workspace + existing deal from the thread. The thread exists
-  //    because we generated the alias when we sent the outbound that started
-  //    this conversation.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: threadRow } = await (supabase as any)
-    .schema('ops')
-    .from('message_threads')
-    .select('id, workspace_id, deal_id, provider_thread_key')
-    .eq('id', threadId)
-    .maybeSingle();
-
-  if (!threadRow) {
-    return { ok: false, reason: `thread not found: ${threadId}` };
-  }
-
-  // 4. Build the provider_thread_key. Prefer RFC2822 In-Reply-To / References
-  //    root if the headers carry it. Otherwise fall back to the thread's
-  //    stored key (so all reply events in this conversation stitch together).
-  const headers = (payload.headers ?? {}) as Record<string, unknown>;
-  const inReplyTo = pickString(headers, ['in-reply-to', 'In-Reply-To', 'Message-ID']);
-  const references = pickString(headers, ['references', 'References']);
-  // Normalize: strip `<>`, split at whitespace, take the first non-empty.
-  const threadKeyFromHeaders = (references ?? inReplyTo ?? '').replace(/[<>]/g, '').split(/\s+/)[0] || null;
-  const providerThreadKey = threadKeyFromHeaders ?? threadRow.provider_thread_key;
-
-  // 5. Compose the RPC payload.
-  const fromAddress = extractSingleAddress(payload.from);
-  if (!fromAddress) {
-    return { ok: false, reason: 'missing from address' };
-  }
-
-  const bodyText = pickString(payload, ['text', 'body_text', 'plain']);
-  const bodyHtml = pickString(payload, ['html', 'body_html']);
-  const subject = pickString(payload, ['subject']);
-  const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
-
-  // Phase 1: attachments store metadata-only. Resend provides a url per
-  // attachment; we persist that plus filename/mime/size. Phase 1.5 downloads
-  // the bytes into workspace-scoped storage and stamps storage_path.
-  const attachmentMetadata = attachments
-    .filter((a): a is Record<string, unknown> => typeof a === 'object' && a !== null)
-    .map((a) => ({
-      filename: pickString(a, ['filename', 'name']) ?? 'attachment',
-      mime: pickString(a, ['content_type', 'contentType', 'type']) ?? 'application/octet-stream',
-      size: typeof a.size === 'number' ? a.size : null,
-      content_url: pickString(a, ['url', 'download_url']) ?? null,
-    }));
-
-  const rpcPayload = {
-    workspace_id: threadRow.workspace_id,
-    provider_message_id: providerMessageId,
-    provider_thread_key: providerThreadKey,
-    channel: 'email',
-    subject,
-    from_address: fromAddress,
-    to_addresses: toAddresses,
-    cc_addresses: ccAddresses,
-    body_text: bodyText ?? null,
-    body_html: bodyHtml ?? null,
-    attachments: attachmentMetadata,
-    deal_id: threadRow.deal_id,
-  };
-
-  // 6. Fire the RPC. Errors here are logged and 200'd back to Resend —
-  //    the RPC is idempotent, and persistent retries on our side would
-  //    compound provider retries.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: newMessageId, error } = await (supabase as any)
-    .schema('ops')
-    .rpc('record_inbound_message', { p_payload: rpcPayload });
-
-  if (error) {
-    console.error('[resend webhook] record_inbound_message failed:', error.message);
-    return { ok: false, reason: `rpc error: ${error.message}` };
-  }
-
-  // 7. Urgent-reply insight dispatch. If the RPC's keyword heuristic flagged
-  //    this message AND the thread is bound to a deal, write an aion_insights
-  //    row so the owner sees it on the Daily Brief immediately and the
-  //    downstream notification pipeline can ping them.
-  await maybeFireUrgentInsight(newMessageId as string, threadRow.workspace_id, threadRow.deal_id, fromAddress, bodyText);
-
-  return { ok: true, messageId: newMessageId as string };
-}
-
-/**
- * Look up the just-inserted message's urgency flag and, if set, upsert a
- * cortex.aion_insight row with trigger_type='inbound_reply_urgent'. Silent
- * failure on any error — urgency is an enhancement, the reply itself
- * already landed on the Deal Lens Replies card.
- */
-async function maybeFireUrgentInsight(
-  messageId: string,
-  workspaceId: string,
-  dealId: string | null,
-  fromAddress: string,
-  bodyText: string | null,
-): Promise<void> {
-  if (!dealId) return;
-
-  const supabase = getSystemClient();
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: msgRow } = await (supabase as any)
-      .schema('ops')
-      .from('messages')
-      .select('urgency_keyword_match')
-      .eq('id', messageId)
-      .maybeSingle();
-
-    const keyword = (msgRow as { urgency_keyword_match: string | null } | null)?.urgency_keyword_match;
-    if (!keyword) return;
-
-    const preview = (bodyText ?? '').slice(0, 140);
-    const title = `Client reply mentions "${keyword}"`;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).schema('cortex').rpc('upsert_aion_insight', {
-      p_workspace_id: workspaceId,
-      p_trigger_type: 'inbound_reply_urgent',
-      p_entity_type: 'deal',
-      p_entity_id: dealId,
-      p_title: title,
-      p_context: {
-        keyword,
-        message_id: messageId,
-        from_address: fromAddress,
-        preview,
-        suggestedAction: 'Open the Replies card and respond',
-        href: `/crm?selected=${dealId}`,
-        urgency: 'high',
-      },
-      p_priority: 80,
-      p_expires_at: expiresAt,
-    });
-  } catch (err) {
-    console.error('[resend webhook] urgent insight dispatch failed:', err instanceof Error ? err.message : err);
-  }
-}
-
-// =============================================================================
-// Small helpers — defensive readers for Resend's payload shape
-// =============================================================================
-
-function pickString(obj: Record<string, unknown>, keys: string[]): string | null {
-  for (const k of keys) {
-    const v = obj[k];
-    if (typeof v === 'string' && v.length > 0) return v;
-  }
-  return null;
-}
-
-/**
- * Extract a single email address from a "from" field. Resend may shape it as:
- *   - "name <email@example.com>"
- *   - { email: "email@example.com", name?: "Name" }
- *   - "email@example.com"
- */
-function extractSingleAddress(from: unknown): string | null {
-  if (!from) return null;
-  if (typeof from === 'string') {
-    const m = from.match(/<([^>]+)>/);
-    return (m ? m[1] : from).trim().toLowerCase() || null;
-  }
-  if (typeof from === 'object' && 'email' in from) {
-    const email = (from as { email?: unknown }).email;
-    return typeof email === 'string' ? email.trim().toLowerCase() : null;
-  }
-  return null;
-}
-
-/**
- * Extract an array of email addresses from a "to"/"cc" field. Handles:
- *   - Array<{ email, name? }>
- *   - Array<string> (plain emails or "name <email>" strings)
- *   - string (single "name <email>")
- */
-function extractAddressList(field: unknown): string[] {
-  if (!field) return [];
-  if (typeof field === 'string') {
-    const addr = extractSingleAddress(field);
-    return addr ? [addr] : [];
-  }
-  if (!Array.isArray(field)) return [];
-  const out: string[] = [];
-  for (const entry of field) {
-    const addr = extractSingleAddress(entry);
-    if (addr) out.push(addr);
-  }
-  return out;
 }

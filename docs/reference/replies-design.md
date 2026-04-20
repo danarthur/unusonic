@@ -26,7 +26,9 @@ If any of the three break, the feature is theater. The north star is the 4:47pm-
 
 ### 2.1 In scope for Phase 1 (8 weeks)
 
-Email only. Outbound via Resend (existing infrastructure). Inbound via Resend's inbound parsing webhook pointed at a per-thread alias on `replies.unusonic.com`. Follow-up auto-resolution on inbound. Timeline extension. Urgent-reply detection via keyword heuristics (no Aion classification yet). Inline Replies card on the Deal Lens. Outbound composer (single component, two entry points: Replies card + Aion card). Unresolved triage at `/replies/unresolved`. Privacy model: deal-scoped messages workspace-visible; identity privacy gates cross-deal views only.
+Email only. **Outbound via Resend** (existing infrastructure). **Inbound via Postmark's inbound parsing webhook** pointed at a per-thread alias on `replies.unusonic.com`. Follow-up auto-resolution on inbound. Timeline extension. Urgent-reply detection via keyword heuristics (no Aion classification yet). Inline Replies card on the Deal Lens. Outbound composer (single component, two entry points: Replies card + Aion card). Unresolved triage at `/replies/unresolved`. Privacy model: deal-scoped messages workspace-visible; identity privacy gates cross-deal views only.
+
+**Provider split rationale (revised 2026-04-20 after three-agent stress-test):** the original design committed to Resend for both directions. That commitment was reversed on second look. Resend inbound was pre-GA and the Phase 1 webhook handler had shipped with a three-candidate event-name fallback set — a confession that the vendor's contract wasn't pinned. Silent drops on inbound would misfire follow-up nudges on already-replied deals ("Unusonic is theater" failure). Postmark Inbound has been GA for ~10 years with a frozen payload shape, industry-reference quote-stripped reply parsing (`StrippedTextReply`), and zero SLA ambiguity. The webhook handler is an adapter — `ops.record_inbound_message` takes jsonb — so vendor swap is a file + DNS flip, not a rebuild. Outbound stays on Resend where it's best-in-class.
 
 ### 2.2 Deferred to Phase 1.5 (+6 weeks)
 
@@ -163,7 +165,7 @@ Three new tables in `ops`:
 | `user_id` | `uuid` | FK → `auth.users.id`, nullable for workspace-shared identities |
 | `channel` | `text` CHECK | `email` / `sms` |
 | `identity_address` | `text` NOT NULL | Email or E.164 phone |
-| `provider` | `text` | `resend` / `twilio` / `gmail_oauth` (Phase 2) |
+| `provider` | `text` | `resend` (outbound) / `postmark` (inbound) / `twilio` / `gmail_oauth` (Phase 2) |
 | `provider_credential_ref` | `text` | Secret reference, not the secret |
 | `verified_at` | `timestamptz` | |
 | `is_private` | `boolean` DEFAULT false | See §5.2 privacy model — this gates cross-deal views only, not deal-scoped messages |
@@ -175,7 +177,7 @@ Indexes: `(deal_id, last_message_at DESC)` on threads, `(thread_id, created_at D
 
 All SECURITY DEFINER. All REVOKE EXECUTE FROM PUBLIC, anon at creation (per `feedback_postgres_function_grants.md` — the sev-zero bug class we have already shipped once).
 
-**`ops.record_inbound_message(p_provider_payload jsonb)`** — the inbound ingress. Called by `/api/webhooks/resend/route.ts` (and `/api/webhooks/twilio/route.ts` in Phase 1.5) after signature verification.
+**`ops.record_inbound_message(p_provider_payload jsonb)`** — the inbound ingress. Called by `/api/webhooks/postmark/route.ts` (email) and `/api/webhooks/twilio/route.ts` (SMS, Phase 1.5) after signature verification. Payload shape is vendor-agnostic — each webhook handler normalizes its provider's payload into this shape before calling the RPC, so swapping inbound vendors is a file + DNS change, not an RPC change.
 
 Steps:
 1. Parse payload. Extract `provider_message_id`, `provider_thread_key`, `from`, `to`, `cc`, subject, body.
@@ -204,11 +206,15 @@ Outbound emails set `Reply-To: thread-{thread_id}@replies.unusonic.com`. The ali
 
 Why per-thread, not per-deal: a deal may carry three distinct threads (couple, planner, venue). Per-deal aliases flatten them all into one visual thread and lose sender disambiguation. Per-thread aliases let the Replies card render threads as separate collapsible groups while still binding all of them to the deal.
 
-DNS requirements on `replies.unusonic.com`:
-- SPF hard-pass (no soft-fail)
-- DKIM aligned (Resend manages the signing key)
-- DMARC policy: `quarantine` at launch, `reject` once bounce rate stabilizes <2%
-- Bounce rate monitoring: >2% pauses sends on the domain with a loud settings-page banner
+DNS requirements on `replies.unusonic.com` (Cloudflare):
+
+- **MX** `10 inbound.postmarkapp.com.` — Postmark inbound parsing endpoint
+- **TXT** `"v=spf1 include:spf.mtasv.net ~all"` — Postmark's SPF
+- **TXT** DKIM selector (value from Postmark dashboard after creating the inbound server)
+- **TXT** on `_dmarc.replies.unusonic.com` → `"v=DMARC1; p=quarantine; rua=mailto:dmarc@unusonic.com; aspf=s; adkim=s;"` — quarantine at launch, `reject` once bounce rate stabilizes <2%
+- Bounce rate monitoring: >2% pauses outbound on the domain (outbound still flows through Resend; the domain is receive-only) with a loud settings-page banner
+
+The sending domain (for outbound Resend traffic) remains whatever the workspace has verified in `workspaces.sending_domain` — typically the workspace's own branded domain. `replies.unusonic.com` is receive-only and shared across all workspaces.
 
 ### 4.4 Timeline extension
 
@@ -377,7 +383,7 @@ Ordered by P0 (ship or don't ship) → P1 (feature complete) → P2 (polish, fir
 
 **`/inbox` stub reference audit.** Grep the codebase for internal references to `/inbox` before cutover. Add redirect in middleware. External deep links (if any exist in old emails) 301 forward.
 
-**Resend inbound parse feature.** Confirm Resend's inbound-parse endpoint is available and documented before Phase 1 kickoff. If Resend doesn't offer inbound parsing at the tier we need, fall back to SendGrid Inbound Parse or Postmark Inbound — same architectural shape, different vendor. Does not change any table or RPC design.
+**Inbound vendor choice — resolved 2026-04-20.** The initial design committed to Resend for inbound. A three-agent stress-test (Field Expert, Signal Navigator, Critic) unanimously flipped the call to Postmark. Rationale: Resend inbound was pre-GA, the Phase 1 webhook handler shipped with a three-candidate event-name fallback set (confession that the vendor's contract wasn't pinned), and silent drops would misfire follow-up nudges on already-replied deals. Postmark Inbound is GA with a frozen payload shape, industry-reference quote-stripped reply parsing (`StrippedTextReply`), and no SLA ambiguity. The webhook handler is a thin adapter — swapping vendors would be a file + DNS flip, not a rebuild.
 
 **Beta cohort channel-mix validation.** Before Phase 2+ commits to Gmail OAuth, interview 8 production owners: scroll their sent-proposal thread for the last 10 deals and count the channel of the first substantive reply. If email <40%, rethink Phase 2-4. If ≥70%, green-light. Runs in parallel with Phase 1 build — no schedule impact. Internal number published before Phase 1.5 scope is locked.
 
@@ -386,20 +392,26 @@ Ordered by P0 (ship or don't ship) → P1 (feature complete) → P2 (polish, fir
 ## 10. Reference
 
 **New files (Phase 1):**
-- `src/features/comms/replies/RepliesCard.tsx`
-- `src/features/comms/compose/ReplyComposer.tsx`
-- `src/app/(dashboard)/settings/messaging/page.tsx`
-- `src/app/(dashboard)/replies/unresolved/page.tsx`
-- `supabase/migrations/{ts}_ops_messages_tables.sql`
-- `supabase/migrations/{ts}_ops_record_message_rpcs.sql`
-- `supabase/migrations/{ts}_deal_timeline_v_messages_arm.sql`
-- `supabase/migrations/{ts}_replies_alias_dns.sql` (alias lookup table + workspace alias provisioning RPC)
+- `src/app/api/webhooks/postmark/route.ts` — Postmark inbound parsing handler (Basic Auth, normalizes payload, calls `ops.record_inbound_message`, dispatches urgent-keyword insight)
+- `src/features/comms/replies/ui/RepliesCard.tsx`
+- `src/features/comms/replies/ui/ReplyComposer.tsx`
+- `src/features/comms/replies/api/get-deal-replies.ts`
+- `src/features/comms/replies/api/send-reply.ts`
+- `src/app/(dashboard)/settings/messaging/page.tsx` (Phase 1.5)
+- `src/app/(dashboard)/replies/unresolved/page.tsx` (Phase 1.5)
+- `supabase/migrations/20260429000000_ops_messages_tables.sql`
+- `supabase/migrations/20260429000001_ops_record_message_rpcs.sql`
+- `supabase/migrations/20260429000002_deal_timeline_v_messages_arm.sql`
 
 **Extended files (Phase 1):**
-- `src/app/api/webhooks/resend/route.ts` — add inbound parse, `email.opened`, `email.clicked`
-- `src/app/(dashboard)/inbox/page.tsx` — redirect to `/replies/unresolved`
-- `src/app/(dashboard)/(features)/crm/actions/get-deal-timeline.ts` — add `'message'` to `DealTimelineEntry.source` union; extend `getDealTimeline()` to read the new view columns
-- `src/app/(dashboard)/(features)/crm/components/deal-lens.tsx` — insert the Replies card between Timeline and Production Team
+- `src/app/api/webhooks/resend/route.ts` — extended for `email.opened`, `email.clicked`, and stamping `ops.messages` delivery fields. Inbound parsing stripped 2026-04-20 when Postmark took over inbound.
+- `src/app/(dashboard)/inbox/page.tsx` — redirect to `/replies/unresolved` (Phase 1.5)
+- `src/app/(dashboard)/(features)/crm/actions/get-deal-timeline.ts` — adds `'message'` to `DealTimelineEntry.source` union; extends `getDealTimeline()` to read the new view columns
+- `src/app/(dashboard)/(features)/crm/components/deal-lens.tsx` — inserts the Replies card above Production Team
+
+**Required env vars (Phase 1):**
+- `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET` — outbound + outbound event webhook
+- `POSTMARK_WEBHOOK_USERNAME`, `POSTMARK_WEBHOOK_PASSWORD` — inbound webhook Basic Auth
 
 **Phase 1.5 files (not in Phase 1 scope, listed for sequencing):**
 - `src/app/api/webhooks/twilio/route.ts`
