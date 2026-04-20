@@ -81,6 +81,8 @@ export function mapProposalItemsToLineItems(
     const unitType = (row.unit_type === 'hour' || row.unit_type === 'day' ? row.unit_type : 'flat') as ProposalBuilderLineItem['unitType'];
     const mapped: ProposalBuilderLineItem = {
       id: row.id,
+      // Server id serves as the stable client uid for dnd-kit sortable.
+      clientUid: row.id,
       packageId: row.package_id ?? null,
       originPackageId: row.origin_package_id ?? null,
       packageInstanceId: row.package_instance_id ?? null,

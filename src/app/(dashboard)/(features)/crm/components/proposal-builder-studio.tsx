@@ -1,17 +1,13 @@
 /**
- * Proposal Builder Studio — palette-first (Phase 1 of the rebuild).
+ * Proposal Builder Studio — palette-first.
  *
- * Replaces the cross-pane drag-and-drop studio. The catalog sidebar is gone:
- * adding a line item happens exclusively through PackageSelectorPalette, which
- * is embedded inside `<ProposalBuilder>`. This shell is single-column, renders
- * a persistent "+ Add from Catalog" affordance at the top of the receipt, and
- * wires a ⌘K / ⌃K accelerator for power users.
+ * The catalog sidebar is gone: adding a line item happens exclusively through
+ * PackageSelectorPalette, which is embedded inside `<ProposalBuilder>`. This
+ * shell is single-column, renders a persistent "+ Add from Catalog" affordance
+ * at the top of the receipt, and wires a ⌘K / ⌃K accelerator for power users.
+ * Row reorder lives inside `<ProposalBuilder>` on `@dnd-kit/sortable` (Phase 2).
  *
- * Rendered when `crm.proposal_builder_drag` is false or unset. Workspaces
- * created before migration 20260501000000 default to `true` and render the
- * legacy drag studio (`proposal-builder-studio-legacy.tsx`).
- *
- * Design doc: docs/reference/proposal-builder-rebuild-design.md
+ * Design doc: docs/reference/proposal-builder-rebuild-design.md §3 Phase 2.
  */
 'use client';
 
@@ -182,6 +178,7 @@ export function ProposalBuilderStudio({ deal, contacts = [], clientAttached: cli
             clientEntityId={deal.organization_id ?? deal.main_contact_id ?? null}
             className="w-full min-h-0 flex-1"
             onItemAdded={(source, payload) => events.emitAddSuccess(source, payload)}
+            onRowReorder={events.emitRowReorder}
           />
         )}
       </div>

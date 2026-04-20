@@ -86,6 +86,13 @@ export type UnitType = 'flat' | 'hour' | 'day';
 export interface ProposalBuilderLineItem {
   /** Optional: set when from existing proposal_item */
   id?: string;
+  /**
+   * Stable client-side row id used by the receipt's @dnd-kit sortable. Set at
+   * item-creation time (either from the server id in mapProposalItemsToLineItems
+   * or a generated uuid in addCustomLineItem) so reorder drag works even for
+   * new custom items before their first save.
+   */
+  clientUid?: string;
   packageId?: string | null;
   /** Origin package id (for margin inspector lookup of floor/target cost). */
   originPackageId?: string | null;
