@@ -1,17 +1,20 @@
 import { notFound } from 'next/navigation';
 import { getDeal } from '../../../actions/get-deal';
 import { getDealStakeholders } from '../../../actions/deal-stakeholders';
-import { ArrowLeft } from 'lucide-react';
 import { ProposalBuilderLoader } from './proposal-builder-loader';
 import { ProposalBuilderHeader } from './proposal-builder-header';
+import { ProposalBuilderVisualMock } from '../../../components/proposal-builder-visual-mock';
 import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 export default async function DealProposalBuilderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ v?: string; demo?: string }>;
 }) {
   const { id: dealId } = await params;
+  const { v, demo } = await searchParams;
   const [deal, stakeholders] = await Promise.all([getDeal(dealId), getDealStakeholders(dealId)]);
 
   if (!deal) notFound();
@@ -26,6 +29,23 @@ export default async function DealProposalBuilderPage({
       name: (s.contact_name ?? s.name ?? 'Contact').trim(),
       email: (s.contact_email ?? s.email)!.trim(),
     }));
+
+  // Visual prototype — opt-in via ?v=visual. Renders standalone (owns its
+  // own top bar) so the production builder is untouched. Remove the query
+  // param or set it to any other value to return to the shipped builder.
+  if (v === 'visual') {
+    return (
+      <div className="flex flex-col h-full min-h-[80vh] relative">
+        <AionPageContextSetter type="proposal" entityId={dealId} label={deal.title ?? null} />
+        <ProposalBuilderVisualMock
+          deal={deal}
+          contacts={contacts}
+          clientAttached={hasBillTo || !!(deal.organization_id || deal.main_contact_id)}
+          forceDemo={demo === '1'}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full min-h-[80vh] relative">
