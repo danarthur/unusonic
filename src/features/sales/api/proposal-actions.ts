@@ -1344,6 +1344,14 @@ export type ProposalItemPatch = {
   /** Hours or days for unit_type='hour' / 'day' items. Scales revenue AND
    *  cost (see calculate-proposal-total.ts). No effect on 'flat' items. */
   unit_multiplier?: number | null;
+  /** When true, the client sees a checkbox on this line and can opt in or
+   *  out. Unchecked items are struck through and excluded from the total
+   *  via calculateProposalTotal's `clientSelected` gate. */
+  is_optional?: boolean;
+  /** When false, the row is filtered out of the client-facing proposal by
+   *  get-public-proposal.ts. Still visible + editable to the PM and still
+   *  counted in internal margin/cost math. */
+  is_client_visible?: boolean;
 };
 
 export async function updateProposalItem(
@@ -1357,6 +1365,8 @@ export async function updateProposalItem(
     'internal_notes',
     'actual_cost',
     'unit_multiplier',
+    'is_optional',
+    'is_client_visible',
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowedKeys) {

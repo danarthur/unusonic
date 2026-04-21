@@ -172,6 +172,12 @@ type DemoBlock = {
   /** Cached effective multiplier: unitMultiplier when unitType is hour/day, else 1.
    *  Computed once in the reducer so downstream consumers don't re-derive it. */
   effectiveMultiplier?: number;
+  /** When true, the client sees a checkbox on this line and can decline it.
+   *  Not shown on the scope pill unless isClientVisible is also true. */
+  isOptional?: boolean;
+  /** When false, this line is hidden from the client-facing proposal entirely.
+   *  Still visible + editable in the builder; still counted in margin math. */
+  isClientVisible?: boolean;
 };
 
 const DEMO_BLOCKS: DemoBlock[] = [
@@ -390,6 +396,8 @@ export function ProposalBuilderStudio({
           unitType: rowUnitType,
           unitMultiplier: rowUnitMultiplier,
           effectiveMultiplier: rowMultiplier,
+          isOptional: raw.is_optional === true,
+          isClientVisible: raw.is_client_visible !== false,
           // Bundle header cost = summed child costs (we'll add as children
           // stream in below). Start at 0. A single-item package with no
           // children simply stays at 0 until a child row closes the loop.
@@ -442,6 +450,8 @@ export function ProposalBuilderStudio({
           unitType: rowUnitType,
           unitMultiplier: rowUnitMultiplier,
           effectiveMultiplier: rowMultiplier,
+          isOptional: raw.is_optional === true,
+          isClientVisible: raw.is_client_visible !== false,
           actualCost: rowActualCost,
           costIsComputed: false,
         };
@@ -1628,11 +1638,27 @@ function ProposalBuilderSidebar({
                         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
                           {scopeBlocks.map((b, i) => {
                             const active = selectedBlockIdx === i;
+                            // Non-standard items get a subtle prefix so the PM
+                            // sees at-a-glance which lines are optional or
+                            // internal. Internal wins over optional if both are
+                            // set (internal is the stronger "not what the client
+                            // sees" signal).
+                            const marker = b.isClientVisible === false
+                              ? '◌ '
+                              : b.isOptional === true
+                                ? '+ '
+                                : null;
+                            const markerTitle = b.isClientVisible === false
+                              ? 'Internal only — hidden from client'
+                              : b.isOptional === true
+                                ? 'Optional — client can decline'
+                                : undefined;
                             return (
                               <button
                                 key={b.headerItemId ?? `block-${i}`}
                                 type="button"
                                 onClick={() => onSelectBlock(i)}
+                                title={markerTitle}
                                 className={cn(
                                   'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors whitespace-nowrap',
                                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
@@ -1652,6 +1678,11 @@ function ProposalBuilderSidebar({
                                 }
                                 aria-pressed={active}
                               >
+                                {marker && (
+                                  <span className="text-[var(--stage-text-tertiary)] mr-0.5">
+                                    {marker}
+                                  </span>
+                                )}
                                 {b.title}
                               </button>
                             );
@@ -2508,6 +2539,22 @@ function LineInspector({
     onRefetchProposal();
   }, [block, multiplierValue, onRefetchProposal]);
 
+  const toggleOptional = useCallback(async () => {
+    if (!block?.headerItemId) return;
+    const next = !block.isOptional;
+    const res = await updateProposalItem(block.headerItemId, { is_optional: next });
+    if (!res.success) { toast.error(res.error ?? 'Save failed'); return; }
+    onRefetchProposal();
+  }, [block, onRefetchProposal]);
+
+  const toggleClientVisible = useCallback(async () => {
+    if (!block?.headerItemId) return;
+    const next = block.isClientVisible === false ? true : false;
+    const res = await updateProposalItem(block.headerItemId, { is_client_visible: next });
+    if (!res.success) { toast.error(res.error ?? 'Save failed'); return; }
+    onRefetchProposal();
+  }, [block, onRefetchProposal]);
+
   const handleSwap = useCallback(() => {
     if (!block?.headerItemId) return;
     onSwap({
@@ -2806,6 +2853,51 @@ function LineInspector({
           className="stage-input min-h-[64px] px-3 py-2 rounded-[var(--stage-radius-input)] text-[12px] leading-[1.5] resize-none"
         />
       </label>
+
+      {/* Visibility toggles — small-text row styled like the design-system
+           filter-chip area so they read as meta-controls, not primary fields.
+           Optional = client can decline on the live proposal; Internal-only
+           hides from the client doc entirely. Both columns already exist on
+           proposal_items and are consumed by get-public-proposal + LineItemGrid. */}
+      <div className="flex flex-col gap-1.5">
+        <span className="stage-label text-[var(--stage-text-tertiary)]">Visibility</span>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor={`inspector-optional-${block.headerItemId ?? 'na'}`}
+            className="inline-flex items-center gap-2 text-[12px] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-pointer select-none"
+          >
+            <input
+              id={`inspector-optional-${block.headerItemId ?? 'na'}`}
+              type="checkbox"
+              checked={block.isOptional === true}
+              onChange={toggleOptional}
+              disabled={!block.headerItemId}
+              className="size-3.5 rounded-[3px] border border-[oklch(1_0_0_/_0.18)] bg-[var(--ctx-well)] accent-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            />
+            <span>Optional</span>
+            <span className="text-[11px] text-[var(--stage-text-tertiary)] font-normal">
+              — client can decline on the proposal
+            </span>
+          </label>
+          <label
+            htmlFor={`inspector-client-visible-${block.headerItemId ?? 'na'}`}
+            className="inline-flex items-center gap-2 text-[12px] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-pointer select-none"
+          >
+            <input
+              id={`inspector-client-visible-${block.headerItemId ?? 'na'}`}
+              type="checkbox"
+              checked={block.isClientVisible === false}
+              onChange={toggleClientVisible}
+              disabled={!block.headerItemId}
+              className="size-3.5 rounded-[3px] border border-[oklch(1_0_0_/_0.18)] bg-[var(--ctx-well)] accent-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+            />
+            <span>Internal only</span>
+            <span className="text-[11px] text-[var(--stage-text-tertiary)] font-normal">
+              — hide from client-facing proposal
+            </span>
+          </label>
+        </div>
+      </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1 border-t border-[var(--stage-edge-subtle)]">
