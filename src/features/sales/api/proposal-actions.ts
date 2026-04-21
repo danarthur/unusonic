@@ -1327,3 +1327,105 @@ export async function sendProposalReminder(
 
   return { ok: true };
 }
+
+// =============================================================================
+// updateProposalItem — patch a proposal line item's editable fields.
+// Caller picks which fields to update. Price edits write to `override_price`
+// (not `unit_price`) so the catalog snapshot stays intact and calculateProposal
+// Total keeps using override_price ?? unit_price. Setting override_price to
+// null reverts to the catalog default.
+// =============================================================================
+
+export type ProposalItemPatch = {
+  quantity?: number;
+  override_price?: number | null;
+  internal_notes?: string | null;
+  actual_cost?: number | null;
+};
+
+export async function updateProposalItem(
+  itemId: string,
+  patch: ProposalItemPatch,
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!itemId) return { success: false, error: 'Missing item id' };
+  const allowedKeys: Array<keyof ProposalItemPatch> = [
+    'quantity',
+    'override_price',
+    'internal_notes',
+    'actual_cost',
+  ];
+  const update: Record<string, unknown> = {};
+  for (const key of allowedKeys) {
+    if (key in patch) update[key] = patch[key];
+  }
+  if (Object.keys(update).length === 0) return { success: true };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('proposal_items')
+    .update(update)
+    .eq('id', itemId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+// =============================================================================
+// deleteProposalItem — remove a single line item. For bundle rows, callers
+// should use deleteProposalItemsByPackageInstanceId to cascade the whole
+// bundle; this helper only removes the one row it's pointed at.
+// =============================================================================
+
+export async function deleteProposalItem(
+  itemId: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!itemId) return { success: false, error: 'Missing item id' };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('proposal_items')
+    .delete()
+    .eq('id', itemId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+// =============================================================================
+// updateProposal — patch a proposal's editable top-level fields.
+// Mirrors updateProposalItem: caller picks which keys to change, server
+// enforces the allowlist. Used by the FinancialInspector to edit payment
+// terms and scope notes inline.
+// =============================================================================
+
+export type ProposalPatch = {
+  deposit_percent?: number | null;
+  payment_due_days?: number | null;
+  payment_notes?: string | null;
+  scope_notes?: string | null;
+  deposit_deadline_days?: number | null;
+};
+
+export async function updateProposal(
+  proposalId: string,
+  patch: ProposalPatch,
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!proposalId) return { success: false, error: 'Missing proposal id' };
+  const allowedKeys: Array<keyof ProposalPatch> = [
+    'deposit_percent',
+    'payment_due_days',
+    'payment_notes',
+    'scope_notes',
+    'deposit_deadline_days',
+  ];
+  const update: Record<string, unknown> = {};
+  for (const key of allowedKeys) {
+    if (key in patch) update[key] = patch[key];
+  }
+  if (Object.keys(update).length === 0) return { success: true };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('proposals')
+    .update(update)
+    .eq('id', proposalId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}

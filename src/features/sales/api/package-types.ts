@@ -50,6 +50,11 @@ export interface RequiredRole {
   assignee_name?: string | null;
   /** When true, this specific person was requested by the client and should not be swapped without approval. */
   client_locked?: boolean;
+  /** When true, the proposal cannot be considered "complete" without this slot filled.
+   *  Surfaces as a warning badge on the Send button and an asterisk in crew pills.
+   *  Undefined/false is treated as "not required" — an explicit opt-in so historical
+   *  packages don't retroactively nag. */
+  required?: boolean;
 }
 
 /**

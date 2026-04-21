@@ -11,6 +11,10 @@ import { getSystemClient } from '@/shared/api/supabase/system';
 import { calculateProposalTotal } from '../lib/calculate-proposal-total';
 import type { PublicProposalDTO } from '../model/public-proposal';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import {
+  buildTalentRolePredicate,
+  resolveTalentForItem,
+} from '../lib/resolve-talent-from-deal-crew';
 
 export async function getPublicProposal(token: string): Promise<PublicProposalDTO | null> {
   if (!token?.trim()) return null;
@@ -179,20 +183,60 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
     .eq('proposal_id', proposalId);
   const selectionsMap = new Map((selectionsRows ?? []).map((s) => [s.item_id, s.selected]));
 
+  // Pull live crew assignments for this deal from ops.deal_crew. This is the
+  // single source of truth for "who's booked" — snapshot assignee_name is a
+  // legacy artifact from before deal_crew existed, and is no longer authoritative.
+  const { data: dealCrewRowsRaw } = await crossSchema
+    .schema('ops')
+    .from('deal_crew')
+    .select('catalog_item_id, role_note, entity_id')
+    .eq('deal_id', dealId)
+    .not('entity_id', 'is', null);
+
+  type DealCrewRaw = { catalog_item_id: string | null; role_note: string | null; entity_id: string | null };
+  const dealCrewRows = (dealCrewRowsRaw ?? []) as DealCrewRaw[];
+
+  // Resolve entity display_name + avatar_url for every assigned crew member so
+  // the helper can emit names and the single "featured" avatar in one pass.
+  const crewEntityIds = [...new Set(dealCrewRows.map((r) => r.entity_id).filter(Boolean) as string[])];
+  const entityInfo: Record<string, { name: string | null; avatar_url: string | null }> = {};
+  if (crewEntityIds.length > 0) {
+    const { data: entities } = await crossSchema
+      .schema('directory')
+      .from('entities')
+      .select('id, display_name, avatar_url, attributes')
+      .in('id', crewEntityIds);
+    for (const e of (entities ?? []) as Array<{ id: string; display_name: string | null; avatar_url: string | null; attributes: unknown }>) {
+      const attrs = readEntityAttrs(e.attributes, 'person');
+      const name =
+        [attrs.first_name, attrs.last_name].filter(Boolean).join(' ').trim() || e.display_name;
+      entityInfo[e.id] = { name, avatar_url: e.avatar_url ?? null };
+    }
+  }
+
+  const hydratedDealCrew = dealCrewRows.map((r) => {
+    const info = r.entity_id ? entityInfo[r.entity_id] : undefined;
+    return {
+      catalog_item_id: r.catalog_item_id,
+      role_note: r.role_note,
+      entity_id: r.entity_id,
+      entity_name: info?.name ?? null,
+      avatar_url: info?.avatar_url ?? null,
+    };
+  });
+
+  // Predicate is built from the raw pre-consolidation item list so bundle
+  // ingredients (where crew_meta actually lives) contribute their talent-role
+  // flags. Walking only the consolidated view would miss bundle children.
+  const isTalentRole = buildTalentRolePredicate(itemList);
+
   const allItemsWithImages = itemList.map((item) => {
     const isOptional = item.is_optional ?? false;
     const clientSelected = isOptional
       ? (selectionsMap.has(item.id) ? selectionsMap.get(item.id)! : true)
       : true;
-    // Extract talent names and entity IDs from crew_meta (only booking_type === 'talent' are client-facing)
-    const snapshot = (item as { definition_snapshot?: Record<string, unknown> }).definition_snapshot;
-    const roles = (snapshot?.crew_meta as { required_roles?: Array<{ booking_type?: string; assignee_name?: string | null; entity_id?: string | null }> })?.required_roles;
-    const talentRoles = roles?.filter((r) => r.booking_type === 'talent' && r.assignee_name) ?? [];
-    const talentNames = talentRoles.length > 0 ? talentRoles.map((r) => r.assignee_name!) : null;
-    // Collect talent entity IDs for avatar lookup
-    const talentEntityIds = talentRoles
-      .map((r) => r.entity_id)
-      .filter(Boolean) as string[];
+    const catalogIds = [item.origin_package_id, item.package_id].filter(Boolean) as string[];
+    const talent = resolveTalentForItem(catalogIds, hydratedDealCrew, isTalentRole);
 
     return {
       ...item,
@@ -201,37 +245,11 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
         ?? null,
       isOptional,
       clientSelected,
-      talentNames,
-      talentEntityIds: talentEntityIds.length > 0 ? talentEntityIds : null,
+      talentNames: talent.talentNames,
+      talentEntityIds: talent.talentEntityIds,
+      talentAvatarUrl: talent.talentAvatarUrl,
     };
   });
-
-  // Resolve talent avatars from directory.entities
-  const allTalentEntityIds = [...new Set(
-    allItemsWithImages.flatMap((r) => r.talentEntityIds ?? [])
-  )];
-  const talentAvatars: Record<string, string> = {};
-  if (allTalentEntityIds.length > 0 && crossSchema) {
-    const { data: entities } = await crossSchema
-      .schema('directory')
-      .from('entities')
-      .select('id, avatar_url')
-      .in('id', allTalentEntityIds);
-    for (const e of entities ?? []) {
-      if (e.avatar_url) talentAvatars[e.id] = e.avatar_url as string;
-    }
-  }
-  // Attach talent avatar as a separate field (badge-size, not hero image)
-  for (const item of allItemsWithImages) {
-    if (item.talentEntityIds?.length) {
-      const firstAvatar = item.talentEntityIds
-        .map((id) => talentAvatars[id])
-        .find(Boolean);
-      if (firstAvatar) {
-        (item as unknown as { talentAvatarUrl: string | null }).talentAvatarUrl = firstAvatar;
-      }
-    }
-  }
 
   // Filter out internal-only rows before sending to the client
   const itemsWithImages = allItemsWithImages.filter(

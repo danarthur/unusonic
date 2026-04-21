@@ -64,6 +64,11 @@ export default function CatalogEditPage() {
   const [durationHours, setDurationHours] = useState('');
   const [performanceSetCount, setPerformanceSetCount] = useState('');
   const [staffRole, setStaffRole] = useState('');
+  /** Proposal Builder consumer: when checked, the staff role slot counts
+   *  toward the Send button's "N required roles still open" warning and
+   *  shows an asterisk on required-role chips. Explicit opt-in — undefined
+   *  is treated as not required, so historical packages don't start nagging. */
+  const [requiredRole, setRequiredRole] = useState(false);
   const [stockQuantity, setStockQuantity] = useState('');
   const [bufferPercent, setBufferPercent] = useState('');
   const [isSubRental, setIsSubRental] = useState(false);
@@ -142,6 +147,15 @@ export default function CatalogEditPage() {
           setBufferPercent('');
           setContactInfo('');
         }
+        // Seed the "Required role" checkbox from the matching entry in
+        // required_roles[] — the single staff_role is our one-role editor;
+        // we look up its required flag by name (case-insensitive).
+        const existingRoles = (p.definition as { required_roles?: Array<{ role?: string; required?: boolean }> } | null)?.required_roles ?? [];
+        const staffRoleLower = (meta?.staff_role ?? '').toLowerCase().trim();
+        const matchingRole = staffRoleLower
+          ? existingRoles.find((r) => (r?.role ?? '').toLowerCase().trim() === staffRoleLower)
+          : undefined;
+        setRequiredRole(matchingRole?.required === true);
         const pkgRow = p as PackageWithTags & { stock_quantity?: number; is_sub_rental?: boolean; replacement_cost?: number | null; buffer_days?: number };
         if ((p.category as string) === 'rental') {
           setStockQuantity(pkgRow.stock_quantity != null ? String(pkgRow.stock_quantity) : (meta?.stock_quantity != null ? String(meta.stock_quantity) : ''));
@@ -299,13 +313,44 @@ export default function CatalogEditPage() {
           buffer_percent: category === 'retail_sale' && bufferPercent.trim() ? Number(bufferPercent) || null : null,
           contact_info: isServiceOrTalent && contactInfo.trim() ? contactInfo : null,
         };
+    // Sync the Required checkbox into required_roles[]. For service/talent
+    // packages with a staff_role selected: find the matching entry in the
+    // array and set/clear its `required` flag. If no entry exists yet (common
+    // for packages never touched by required_roles management), create a
+    // minimal one so the flag has somewhere to live. Non-service/talent
+    // categories and packages without a staff_role pass the array through.
+    const existingRequiredRoles = Array.isArray((existingDef as { required_roles?: unknown })?.required_roles)
+      ? (existingDef as { required_roles: Array<Record<string, unknown>> }).required_roles
+      : null;
+    let nextRequiredRoles: Array<Record<string, unknown>> | null = existingRequiredRoles;
+    if (isServiceOrTalent && staffRole.trim()) {
+      const staffRoleLower = staffRole.trim().toLowerCase();
+      const arr = existingRequiredRoles ? [...existingRequiredRoles] : [];
+      const matchIdx = arr.findIndex(
+        (r) => String(r?.role ?? '').toLowerCase().trim() === staffRoleLower,
+      );
+      if (matchIdx >= 0) {
+        arr[matchIdx] = { ...arr[matchIdx], required: requiredRole };
+      } else {
+        // No entry for this role yet — seed a minimal one so the flag persists.
+        // booking_type mirrors the package category (service → labor, talent → talent).
+        arr.push({
+          role: staffRole.trim(),
+          booking_type: category === 'talent' ? 'talent' : 'labor',
+          quantity: 1,
+          required: requiredRole,
+        });
+      }
+      nextRequiredRoles = arr;
+    }
+
     const definition = isBundle
       ? (existingDef as unknown as PackageDefinition) ?? undefined
       : ({
           layout: (existingDef as { layout?: string })?.layout,
           blocks: Array.isArray((existingDef as { blocks?: unknown })?.blocks) ? (existingDef as { blocks: unknown[] }).blocks : [],
           staffing: (existingDef as { staffing?: unknown })?.staffing ?? null,
-          required_roles: (existingDef as { required_roles?: unknown })?.required_roles ?? null,
+          required_roles: nextRequiredRoles,
           ingredient_meta,
           ...(category === 'rental' && alternatives.length > 0 ? { alternatives } : {}),
         } as PackageDefinition);
@@ -765,6 +810,24 @@ export default function CatalogEditPage() {
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
+                  {staffRole.trim() !== '' && (
+                    <label
+                      htmlFor="edit-required-role"
+                      className="mt-2 inline-flex items-center gap-2 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-pointer select-none"
+                    >
+                      <input
+                        id="edit-required-role"
+                        type="checkbox"
+                        checked={requiredRole}
+                        onChange={(e) => setRequiredRole(e.target.checked)}
+                        className="size-3.5 rounded-[3px] border border-[oklch(1_0_0_/_0.18)] bg-[var(--ctx-well)] accent-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      />
+                      <span>Required role</span>
+                      <span className="text-[var(--stage-text-tertiary)] font-normal">
+                        — flags Send when unfilled
+                      </span>
+                    </label>
+                  )}
                 </div>
               </div>
               {(category === 'talent' || durationHours.trim()) && (

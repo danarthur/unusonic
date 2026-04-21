@@ -539,20 +539,33 @@ export async function addManualDealCrew(
     // Check for scheduling conflicts before assigning
     const conflict = await checkCrewConflict(supabase, dealId, entityId, workspaceId);
 
+    // The (deal_id, entity_id) uniqueness is enforced by a PARTIAL unique
+    // index (`WHERE entity_id IS NOT NULL`), which Postgres can't resolve via
+    // `ON CONFLICT (deal_id, entity_id)`. Read-then-write keeps upsert
+    // semantics without tripping that.
+    const { data: existing } = await supabase
+      .schema('ops')
+      .from('deal_crew')
+      .select('id')
+      .eq('deal_id', dealId)
+      .eq('entity_id', entityId)
+      .maybeSingle();
+
+    if (existing) {
+      return { success: true, id: (existing as { id: string }).id, conflict: conflict ?? undefined };
+    }
+
     const { data, error } = await supabase
       .schema('ops')
       .from('deal_crew')
-      .upsert(
-        {
-          deal_id: dealId,
-          workspace_id: workspaceId,
-          entity_id: entityId,
-          role_note: roleNote ?? null,
-          source: 'manual',
-          // Do NOT set confirmed_at — crew must confirm availability
-        },
-        { onConflict: 'deal_id,entity_id' }
-      )
+      .insert({
+        deal_id: dealId,
+        workspace_id: workspaceId,
+        entity_id: entityId,
+        role_note: roleNote ?? null,
+        source: 'manual',
+        // Do NOT set confirmed_at — crew must confirm availability
+      })
       .select('id')
       .single();
 
@@ -1112,6 +1125,162 @@ export async function searchCrewMembers(
   }
 
   return [...teamResults.slice(0, 10), ...networkResults];
+  });
+}
+
+// =============================================================================
+// listDealRoster — the workspace's core crew roster for an assignment picker.
+// Returns every active ROSTER_MEMBER person (the people the workspace books).
+// Intentionally does NOT include PARTNER/VENDOR/CLIENT edges — that's the
+// broader Network graph and is not a pool of people we book as crew.
+// =============================================================================
+
+export async function listDealRoster(dealId: string): Promise<CrewSearchResult[]> {
+  return instrument('listDealRoster', async () => {
+  const parsed = z.string().uuid().safeParse(dealId);
+  if (!parsed.success) return [];
+
+  const activeWsRaw = await getActiveWorkspaceId();
+  if (!activeWsRaw) return [];
+
+  const supabase = await createClient();
+
+  const { data: dealRow } = await supabase
+    .from('deals')
+    .select('workspace_id')
+    .eq('id', dealId)
+    .maybeSingle();
+
+  const workspaceId = (dealRow as { workspace_id?: string } | null)?.workspace_id;
+  if (!workspaceId || workspaceId !== activeWsRaw) return [];
+
+  // Resolve the workspace's HQ company entity. legacy_org_id ≠ workspace_id
+  // for workspaces created after the org→workspace split, so we can't use the
+  // legacy_org_id shortcut. Instead: find a workspace member's entity, follow
+  // their MEMBER/ROSTER_MEMBER edge to the HQ. Fall back to any company entity
+  // owned by the workspace if no edge exists.
+  const { data: wsMemberRows0 } = await supabase
+    .from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', workspaceId);
+  const memberUserIds = (wsMemberRows0 ?? []).map((m) => m.user_id).filter(Boolean) as string[];
+
+  let orgEntId: string | null = null;
+  if (memberUserIds.length > 0) {
+    const { data: memberEntities } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .in('claimed_by_user_id', memberUserIds);
+    const memberEntityIds = (memberEntities ?? []).map((e) => e.id);
+    if (memberEntityIds.length > 0) {
+      const { data: hqEdges } = await supabase
+        .schema('cortex')
+        .from('relationships')
+        .select('target_entity_id')
+        .in('source_entity_id', memberEntityIds)
+        .in('relationship_type', ['MEMBER', 'ROSTER_MEMBER']);
+      if (hqEdges?.length) {
+        // If members belong to multiple orgs, prefer one owned by this workspace.
+        const targetIds = [...new Set(hqEdges.map((r) => r.target_entity_id))];
+        const { data: ownedHq } = await supabase
+          .schema('directory')
+          .from('entities')
+          .select('id')
+          .in('id', targetIds)
+          .eq('owner_workspace_id', workspaceId)
+          .limit(1)
+          .maybeSingle();
+        orgEntId = (ownedHq as { id: string } | null)?.id ?? targetIds[0];
+      }
+    }
+  }
+  if (!orgEntId) {
+    const { data: fallback } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id')
+      .eq('owner_workspace_id', workspaceId)
+      .eq('type', 'company')
+      .limit(1)
+      .maybeSingle();
+    orgEntId = (fallback as { id: string } | null)?.id ?? null;
+  }
+  if (!orgEntId) return [];
+  const orgEnt = { id: orgEntId };
+
+  const { data: rosterRels } = await supabase
+    .schema('cortex')
+    .from('relationships')
+    .select('source_entity_id, context_data')
+    .eq('target_entity_id', orgEnt.id)
+    .eq('relationship_type', 'ROSTER_MEMBER');
+
+  const activeRosterRels = (rosterRels ?? []).filter(
+    (r) => !(r.context_data as Record<string, unknown>)?.deleted_at,
+  );
+  const rosterEntityIds = activeRosterRels.map((r) => r.source_entity_id);
+  const rosterCtxById = new Map(
+    activeRosterRels.map((r) => [r.source_entity_id, r.context_data as Record<string, unknown>]),
+  );
+
+  let teamResults: CrewSearchResult[] = [];
+  if (rosterEntityIds.length > 0) {
+    const [rosterEntResult, crewSkillsResult, crewEquipmentResult] = await Promise.all([
+      supabase
+        .schema('directory')
+        .from('entities')
+        .select('id, display_name, avatar_url, attributes, claimed_by_user_id')
+        .in('id', rosterEntityIds),
+      supabase
+        .schema('ops')
+        .from('crew_skills')
+        .select('entity_id, skill_tag')
+        .in('entity_id', rosterEntityIds)
+        .eq('workspace_id', workspaceId),
+      supabase
+        .schema('ops')
+        .from('crew_equipment')
+        .select('entity_id, name')
+        .in('entity_id', rosterEntityIds)
+        .eq('workspace_id', workspaceId),
+    ]);
+
+    const skillsByEntityId = new Map<string, string[]>();
+    for (const row of crewSkillsResult.data ?? []) {
+      const list = skillsByEntityId.get(row.entity_id) ?? [];
+      list.push(row.skill_tag);
+      skillsByEntityId.set(row.entity_id, list);
+    }
+    const equipmentByEntityId = new Map<string, string[]>();
+    for (const row of crewEquipmentResult.data ?? []) {
+      const list = equipmentByEntityId.get(row.entity_id) ?? [];
+      list.push(row.name);
+      equipmentByEntityId.set(row.entity_id, list);
+    }
+
+    teamResults = (rosterEntResult.data ?? []).map((e) => {
+      const attrs = readEntityAttrs(e.attributes, 'person');
+      const ctx = rosterCtxById.get(e.id) ?? {};
+      const name =
+        [attrs.first_name, attrs.last_name].filter(Boolean).join(' ').trim() ||
+        e.display_name;
+      return {
+        entity_id: e.id,
+        name,
+        job_title: attrs.job_title ?? (ctx.job_title as string | null) ?? null,
+        avatar_url: e.avatar_url ?? null,
+        is_ghost: e.claimed_by_user_id == null,
+        employment_status:
+          (ctx.employment_status as 'internal_employee' | 'external_contractor' | null) ?? null,
+        skills: skillsByEntityId.get(e.id) ?? [],
+        equipment: equipmentByEntityId.get(e.id) ?? [],
+        _section: 'team' as const,
+      };
+    });
+  }
+
+  return teamResults;
   });
 }
 
