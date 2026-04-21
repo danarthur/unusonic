@@ -14,6 +14,8 @@ const VALID_PRESETS = new Set<string>([
 export async function getPortalTheme(): Promise<{
   preset: PortalThemePreset;
   config: PortalThemeConfig;
+  name: string | null;
+  logoUrl: string | null;
 } | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -30,7 +32,7 @@ export async function getPortalTheme(): Promise<{
 
   const { data: workspace } = await supabase
     .from('workspaces')
-    .select('portal_theme_preset, portal_theme_config')
+    .select('name, logo_url, portal_theme_preset, portal_theme_config')
     .eq('id', membership.workspace_id)
     .single();
 
@@ -39,6 +41,8 @@ export async function getPortalTheme(): Promise<{
   return {
     preset: (workspace.portal_theme_preset ?? 'paper') as PortalThemePreset,
     config: (workspace.portal_theme_config ?? {}) as PortalThemeConfig,
+    name: workspace.name ?? null,
+    logoUrl: workspace.logo_url ?? null,
   };
 }
 

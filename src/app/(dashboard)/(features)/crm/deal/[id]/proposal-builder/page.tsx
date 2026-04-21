@@ -30,6 +30,23 @@ export default async function DealProposalBuilderPage({
       email: (s.contact_email ?? s.email)!.trim(),
     }));
 
+  // Derive client + venue for the builder's WYSIWYG document render.
+  const billToSt = stakeholders.find((s) => s.role === 'bill_to') ?? null;
+  const venueSt = stakeholders.find((s) => s.role === 'venue_contact') ?? null;
+  const clientName = billToSt
+    ? (billToSt.organization_name ?? billToSt.contact_name ?? billToSt.name)
+    : null;
+  const venue = venueSt
+    ? {
+        name: venueSt.organization_name ?? venueSt.name,
+        address: venueSt.address
+          ? [venueSt.address.street, venueSt.address.city, venueSt.address.state]
+              .filter(Boolean)
+              .join(', ') || null
+          : null,
+      }
+    : null;
+
   // Visual prototype — opt-in via ?v=visual. Renders standalone (owns its
   // own top bar) so the production builder is untouched. Remove the query
   // param or set it to any other value to return to the shipped builder.
@@ -42,6 +59,8 @@ export default async function DealProposalBuilderPage({
           contacts={contacts}
           clientAttached={hasBillTo || !!(deal.organization_id || deal.main_contact_id)}
           forceDemo={demo === '1'}
+          clientName={clientName}
+          venue={venue}
         />
       </div>
     );

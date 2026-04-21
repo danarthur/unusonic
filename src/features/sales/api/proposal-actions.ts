@@ -415,7 +415,11 @@ export interface AddPackageToProposalResult {
 
 export async function addPackageToProposal(
   dealId: string,
-  packageId: string
+  packageId: string,
+  /** When provided, insert new rows immediately AFTER this sort_order. Existing
+   *  rows with sort_order > insertAfterSortOrder are shifted down by the number
+   *  of rows being inserted. When null/undefined, rows are appended to the end. */
+  insertAfterSortOrder?: number | null
 ): Promise<AddPackageToProposalResult> {
   const supabase = await createClient();
   const workspaceId = await resolveWorkspaceIdFromDeal(supabase, dealId);
@@ -453,16 +457,39 @@ export async function addPackageToProposal(
 
   if (existing?.id) {
     proposalId = existing.id;
-    const { data: maxRow } = await supabase
-      .from('proposal_items')
-      .select('sort_order')
-      .eq('proposal_id', proposalId)
-      .order('sort_order', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    nextSortOrder = (maxRow && typeof (maxRow as { sort_order: number }).sort_order === 'number'
-      ? (maxRow as { sort_order: number }).sort_order + 1
-      : 0);
+    if (insertAfterSortOrder != null) {
+      // Insert in the middle: shift all rows with sort_order > insertAfterSortOrder
+      // down by the number of rows we're about to add, then insert at the gap.
+      const rowsCount = expanded.length === 1 ? 1 : 1 + expanded.length;
+      const { data: toShift } = await supabase
+        .from('proposal_items')
+        .select('id, sort_order')
+        .eq('proposal_id', proposalId)
+        .gt('sort_order', insertAfterSortOrder)
+        .order('sort_order', { ascending: false });
+      if (toShift && toShift.length > 0) {
+        // Update in reverse order so temporary collisions can't violate any future
+        // UNIQUE(proposal_id, sort_order) constraint (none today, but future-proof).
+        for (const row of toShift as { id: string; sort_order: number }[]) {
+          await supabase
+            .from('proposal_items')
+            .update({ sort_order: row.sort_order + rowsCount })
+            .eq('id', row.id);
+        }
+      }
+      nextSortOrder = insertAfterSortOrder + 1;
+    } else {
+      const { data: maxRow } = await supabase
+        .from('proposal_items')
+        .select('sort_order')
+        .eq('proposal_id', proposalId)
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      nextSortOrder = (maxRow && typeof (maxRow as { sort_order: number }).sort_order === 'number'
+        ? (maxRow as { sort_order: number }).sort_order + 1
+        : 0);
+    }
   } else {
     const publicToken = crypto.randomUUID();
     const { data: inserted, error: insertError } = await supabase

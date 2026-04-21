@@ -18,23 +18,43 @@ import {
   ChevronDown,
   Copy,
   FileText,
-  GripVertical,
-  MoreHorizontal,
   PanelLeft,
   PanelLeftClose,
-  Pencil,
   Plus,
   Search,
   Send,
   Users,
 } from 'lucide-react';
-import { getProposalForDeal } from '@/features/sales/api/proposal-actions';
+import { toast } from 'sonner';
+import {
+  getProposalForDeal,
+  addPackageToProposal,
+} from '@/features/sales/api/proposal-actions';
+import {
+  getCatalogPackagesWithTags,
+  type PackageWithTags,
+  type PackageTag,
+} from '@/features/sales/api/package-actions';
+import {
+  getWorkspaceTags,
+  type WorkspaceTag,
+} from '@/features/sales/api/workspace-tag-actions';
+import { semanticSearchCatalog } from '@/features/sales/api/catalog-embeddings';
 import { getPortalTheme } from '@/app/(dashboard)/settings/portal/actions';
 import {
   resolvePortalCssVars,
+  resolvePortalTheme,
   type PortalThemePreset,
   type PortalThemeConfig,
 } from '@/shared/lib/portal-theme';
+import { ProposalHero } from '@/features/sales/ui/public/ProposalHero';
+import { LineItemGrid } from '@/features/sales/ui/public/LineItemGrid';
+import { ProposalSummaryBlock } from '@/features/sales/ui/public/ProposalSummaryBlock';
+import { SectionTrim } from '@/features/sales/ui/public/SectionTrim';
+import type {
+  PublicProposalDTO,
+  PublicProposalItem,
+} from '@/features/sales/model/public-proposal';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -53,6 +73,10 @@ export type ProposalBuilderVisualMockProps = {
   /** When true, always render the populated document with demo scope blocks,
    *  even if the deal has no real proposal items yet. Enabled via ?demo=1. */
   forceDemo?: boolean;
+  /** Resolved client name from the bill_to stakeholder (page-level). */
+  clientName?: string | null;
+  /** Resolved venue from the venue_contact stakeholder (page-level). */
+  venue?: { name: string; address: string | null } | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -67,6 +91,9 @@ type DemoBlock = {
   summary: string;
   subtotal: number;
   lines: DemoLine[];
+  /** Highest sort_order among this block's proposal_items. Used to position
+   *  new items inserted "below" this block. undefined for demo data. */
+  maxSortOrder?: number;
 };
 
 const DEMO_BLOCKS: DemoBlock[] = [
@@ -114,6 +141,8 @@ const DEMO_TOTAL = DEMO_SUBTOTAL + DEMO_TAX;
 export function ProposalBuilderVisualMock({
   deal,
   forceDemo = false,
+  clientName = null,
+  venue = null,
 }: ProposalBuilderVisualMockProps) {
   const [proposal, setProposal] = useState<ProposalWithItems | null>(null);
 
@@ -123,12 +152,14 @@ export function ProposalBuilderVisualMock({
     return stored === null ? true : stored === '1';
   });
 
-  // Workspace portal theme — the same preset + config the client sees on the
-  // sent proposal. Applied to the DOCUMENT area only; sidebar + top bar keep
-  // Unusonic's Stage Engineering tokens (they're builder chrome, not content).
+  // The document area is true WYSIWYG of the client view: it paints in the
+  // workspace's portal theme so what the PM sees is what the client gets.
+  // Sidebar + top bar stay Stage Engineering — they're builder chrome.
   const [portalTheme, setPortalTheme] = useState<{
     preset: PortalThemePreset;
     config: PortalThemeConfig;
+    name: string | null;
+    logoUrl: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -178,10 +209,14 @@ export function ProposalBuilderVisualMock({
     [sidebarOpen],
   );
 
-  useEffect(() => {
+  const refetchProposal = useCallback(() => {
     if (forceDemo) return;
     getProposalForDeal(deal.id).then(setProposal);
   }, [deal.id, forceDemo]);
+
+  useEffect(() => {
+    refetchProposal();
+  }, [refetchProposal]);
 
   // When forceDemo is on, render the populated document with demo blocks
   // regardless of real proposal state. Lets us see both states without
@@ -199,6 +234,7 @@ export function ProposalBuilderVisualMock({
       const qty = Number((item as any).quantity ?? 1);
       const unitPrice = Number((item as any).unit_price ?? (item as any).override_price ?? 0);
       const amount = qty * unitPrice;
+      const sortOrder = Number((item as any).sort_order ?? 0);
       const isHeader =
         (item as any).is_package_header === true ||
         (item as any).isPackageHeader === true;
@@ -209,10 +245,17 @@ export function ProposalBuilderVisualMock({
           summary: (item as any).description ?? '',
           subtotal: amount,
           lines: [],
+          maxSortOrder: sortOrder,
         };
       } else {
         if (!current) {
-          current = { title: 'A la carte', summary: '', subtotal: 0, lines: [] };
+          current = {
+            title: 'A la carte',
+            summary: '',
+            subtotal: 0,
+            lines: [],
+            maxSortOrder: sortOrder,
+          };
         }
         current.subtotal += amount;
         current.lines.push({
@@ -220,6 +263,9 @@ export function ProposalBuilderVisualMock({
           qty: qty !== 1 ? `${qty} × $${unitPrice.toLocaleString()}` : undefined,
           amount: amount || 'included',
         });
+        if (sortOrder > (current.maxSortOrder ?? -1)) {
+          current.maxSortOrder = sortOrder;
+        }
       }
     }
     if (current) blocks.push(current);
@@ -257,10 +303,20 @@ export function ProposalBuilderVisualMock({
         onToggle={toggleSidebar}
         scopeBlocks={scopeBlocks}
         selectedBlockIdx={selectedBlockIdx}
+        onSelectBlock={handleSelectBlock}
         subtotal={subtotal}
         tax={tax}
         total={total}
         taxRate={taxRate}
+        workspaceId={deal.workspace_id ?? null}
+        dealId={deal.id}
+        forceDemo={forceDemo}
+        insertAfterSortOrder={
+          selectedBlockIdx != null
+            ? scopeBlocks[selectedBlockIdx]?.maxSortOrder ?? null
+            : null
+        }
+        onItemAdded={refetchProposal}
       />
 
       <div className="flex flex-col flex-1 min-w-0 relative">
@@ -277,7 +333,7 @@ export function ProposalBuilderVisualMock({
         <main
           className="flex-1 min-h-0 overflow-auto"
           style={
-            portalTheme
+            portalTheme && hasRealItems
               ? ({
                   ...portalCssVars,
                   backgroundColor: 'var(--portal-bg)',
@@ -287,11 +343,6 @@ export function ProposalBuilderVisualMock({
               : undefined
           }
         >
-          {portalTheme && (
-            <ThemeBanner
-              presetLabel={presetLabelFor(portalTheme.preset)}
-            />
-          )}
           {!hasRealItems ? (
             <EmptyStateHero dealId={deal.id} />
           ) : (
@@ -309,6 +360,10 @@ export function ProposalBuilderVisualMock({
               selectedBlockIdx={selectedBlockIdx}
               onSelectBlock={handleSelectBlock}
               themed={portalTheme !== null}
+              proposal={proposal}
+              portalTheme={portalTheme}
+              clientName={clientName}
+              venue={venue}
             />
           )}
         </main>
@@ -419,8 +474,8 @@ type DocumentBodyProps = {
   /** Called when a scope row is clicked. Toggles selection. */
   onSelectBlock?: (idx: number) => void;
   /** When true, remap internal --stage-* tokens to --portal-* so the document
-   *  paints in the workspace's client-facing theme. Top bar + sidebar stay
-   *  Unusonic-themed since they're builder chrome. */
+   *  paints in the workspace's client-facing theme — true WYSIWYG of what the
+   *  client sees. Top bar + sidebar stay Unusonic-themed (builder chrome). */
   themed?: boolean;
 };
 
@@ -444,6 +499,135 @@ const THEMED_TOKEN_OVERRIDES: React.CSSProperties = {
   fontFamily: 'var(--portal-font-body)',
 };
 
+/**
+ * Consolidate multi-row bundles into a single displayable row.
+ *
+ * `addPackageToProposal` writes a bundle as a header row (is_package_header=true,
+ * carrying the bundle price) followed by child rows (at unit_price=0). Rendering
+ * all of those as separate cards creates noise and zero-priced children.
+ *
+ * This adapter keeps the header, rolls the children's names into the header's
+ * description as an "Includes: …" list, and drops the children from the array.
+ * A la carte items (no package_instance_id) and single-item packages pass through
+ * unchanged. Sort order is preserved.
+ */
+function consolidateBundleRows(
+  items: ProposalWithItems['items'],
+): ProposalWithItems['items'] {
+  type AnyItem = (typeof items)[number] & {
+    package_instance_id?: string | null;
+    is_package_header?: boolean | null;
+    sort_order?: number | null;
+    name?: string | null;
+    description?: string | null;
+  };
+  const byInstance = new Map<string, AnyItem[]>();
+  const standalone: AnyItem[] = [];
+
+  for (const raw of items as AnyItem[]) {
+    const instanceId = raw.package_instance_id ?? null;
+    if (instanceId) {
+      if (!byInstance.has(instanceId)) byInstance.set(instanceId, []);
+      byInstance.get(instanceId)!.push(raw);
+    } else {
+      standalone.push(raw);
+    }
+  }
+
+  const result: AnyItem[] = [];
+
+  for (const group of byInstance.values()) {
+    const header = group.find((i) => i.is_package_header === true);
+    if (!header) {
+      // No header (single-item package) — pass through all rows in the group.
+      result.push(...group);
+      continue;
+    }
+    const children = group.filter((i) => i.is_package_header !== true);
+    const inclusions = children
+      .map((c) => c.name ?? '')
+      .filter(Boolean)
+      .join(' · ');
+    const originalDesc = header.description ?? '';
+    const nextDesc = inclusions
+      ? (originalDesc
+          ? `${originalDesc}\nIncludes: ${inclusions}`
+          : `Includes: ${inclusions}`)
+      : originalDesc;
+    result.push({
+      ...header,
+      description: nextDesc,
+      // Clear display_group_name so the section header doesn't duplicate the
+      // bundle title (now carried by the header row's own name).
+      display_group_name: null,
+    } as AnyItem);
+  }
+
+  for (const item of standalone) {
+    result.push({
+      ...item,
+      display_group_name: null,
+    } as AnyItem);
+  }
+
+  result.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  return result as ProposalWithItems['items'];
+}
+
+function buildPublicProposalDTO(
+  deal: DealDetail,
+  proposal: ProposalWithItems,
+  workspaceMeta: {
+    name?: string;
+    logoUrl?: string | null;
+    portalThemePreset?: string | null;
+    portalThemeConfig?: Record<string, unknown> | null;
+  },
+  total: number,
+  clientName: string | null,
+  venue: { name: string; address: string | null } | null,
+): PublicProposalDTO {
+  const startsAt = deal.proposed_date
+    ? new Date(`${deal.proposed_date}T00:00:00`).toISOString()
+    : null;
+
+  const displayItems = consolidateBundleRows(proposal.items ?? []);
+
+  return {
+    proposal: proposal as PublicProposalDTO['proposal'],
+    event: {
+      id: (deal as { event_id?: string | null }).event_id ?? deal.id,
+      title: deal.title ?? 'Untitled production',
+      clientName,
+      startsAt,
+      endsAt: null,
+      hasEventTimes: !!deal.event_start_time,
+      eventStartTime: deal.event_start_time ?? null,
+      eventEndTime: deal.event_end_time ?? null,
+    },
+    workspace: {
+      id: deal.workspace_id ?? '',
+      name: workspaceMeta.name ?? 'Your production company',
+      logoUrl: workspaceMeta.logoUrl ?? null,
+      portalThemePreset: workspaceMeta.portalThemePreset ?? null,
+      portalThemeConfig: workspaceMeta.portalThemeConfig ?? null,
+    },
+    items: displayItems.map((item) => ({
+      ...item,
+      isOptional: false,
+      clientSelected: true,
+      packageImageUrl: null,
+      talentAvatarUrl: null,
+      talentNames: null,
+      talentEntityIds: null,
+    })) as unknown as PublicProposalItem[],
+    total,
+    venue,
+    embedSrc: null,
+    signedPdfDownloadUrl: null,
+  };
+}
+
 function DocumentBody({
   deal,
   scopeBlocks,
@@ -458,178 +642,137 @@ function DocumentBody({
   selectedBlockIdx,
   onSelectBlock,
   themed = false,
-}: DocumentBodyProps) {
+  proposal,
+  portalTheme,
+  clientName,
+  venue,
+}: DocumentBodyProps & {
+  proposal: ProposalWithItems | null;
+  portalTheme:
+    | {
+        preset: PortalThemePreset;
+        config: PortalThemeConfig;
+        name: string | null;
+        logoUrl: string | null;
+      }
+    | null;
+  clientName: string | null;
+  venue: { name: string; address: string | null } | null;
+}) {
+  // True WYSIWYG: render the actual public proposal components composed the
+  // same way the client sees them. Builder-only chrome (sign panel, deposit
+  // step, "It's a Date" celebratory state) is replaced with a builder notice.
+  if (!proposal) return null;
+
+  const dto = buildPublicProposalDTO(
+    deal,
+    proposal,
+    {
+      name: portalTheme?.name ?? undefined,
+      logoUrl: portalTheme?.logoUrl ?? null,
+      portalThemePreset: portalTheme?.preset ?? null,
+      portalThemeConfig: (portalTheme?.config ?? null) as Record<string, unknown> | null,
+    },
+    total,
+    clientName,
+    venue,
+  );
+
+  // Pull preset-driven layout decisions (item layout, section trim, accent band).
+  const tokens = portalTheme
+    ? resolvePortalTheme(portalTheme.preset, portalTheme.config).tokens
+    : null;
+  const itemLayout = (tokens?.itemLayout as 'card' | 'row' | 'minimal') ?? 'card';
+  const sectionTrim = (tokens?.sectionTrim as 'none' | 'wave' | 'angle' | 'dots' | 'straight') ?? 'none';
+  const accentBand = (tokens?.accentBand as 'none' | 'top' | 'bottom') ?? 'none';
+  const sectionBgAlternate = tokens?.sectionBgAlternate === 'true';
+
   return (
     <div
-      className="mx-auto w-full max-w-[760px] px-5 sm:px-8 py-10 sm:py-14 flex flex-col gap-10"
-      style={themed ? THEMED_TOKEN_OVERRIDES : undefined}
+      className="flex flex-col w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16"
+      style={{
+        maxWidth: 'var(--portal-content-max-width, 56rem)',
+        ...(themed ? THEMED_TOKEN_OVERRIDES : {}),
+      }}
     >
-      {/* Block: Header identity (client, date, venue, owner) */}
-      <section className="flex flex-col gap-4">
-        <BlockLabel label="Prepared for" editable={editable} />
-        <div className="flex flex-col gap-1.5">
-          <h2 className="text-[28px] sm:text-[32px] font-medium tracking-tight text-[var(--stage-text-primary)] leading-[1.1]">
-            {dealTitle}
-          </h2>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 stage-readout text-[var(--stage-text-secondary)]">
-            {dateLabel && <span className="tabular-nums whitespace-nowrap">{dateLabel}</span>}
-            {dateLabel && timeLabel && <Dot />}
-            {timeLabel && <span className="tabular-nums whitespace-nowrap">{timeLabel}</span>}
-            {(dateLabel || timeLabel) && <Dot />}
-            <span>At a venue to be confirmed</span>
-            <Dot />
-            <span>Prepared by your team</span>
-          </div>
-        </div>
+      <ProposalHero data={dto} className="mb-8 sm:mb-10" accentBand={accentBand} />
+
+      <ProposalSummaryBlock
+        eventTitle={dto.event.title}
+        startsAt={dto.event.startsAt}
+        endsAt={dto.event.endsAt}
+        hasEventTimes={dto.event.hasEventTimes}
+        venue={dto.venue}
+        total={dto.total}
+        depositPercent={(dto.proposal as { deposit_percent?: number | null }).deposit_percent ?? null}
+        paymentDueDays={(dto.proposal as { payment_due_days?: number | null }).payment_due_days ?? null}
+        paymentNotes={(dto.proposal as { payment_notes?: string | null }).payment_notes ?? null}
+        scopeNotes={(dto.proposal as { scope_notes?: string | null }).scope_notes ?? null}
+        className="mb-8"
+      />
+
+      <SectionTrim variant={sectionTrim} className="my-6 sm:my-8" />
+
+      <section className="flex-1">
+        <h2
+          className="mb-4"
+          style={{
+            color: 'var(--portal-text-secondary)',
+            fontSize: 'var(--portal-label-size)',
+            fontWeight: 'var(--portal-label-weight)' as React.CSSProperties['fontWeight'],
+            letterSpacing: 'var(--portal-label-tracking)',
+            textTransform: 'var(--portal-label-transform)' as React.CSSProperties['textTransform'],
+          }}
+        >
+          Scope
+        </h2>
+        <LineItemGrid
+          items={dto.items}
+          style={{ gap: 'var(--portal-gap)' } as React.CSSProperties}
+          disabled
+          eventStartTime={dto.event.eventStartTime ?? null}
+          eventEndTime={dto.event.eventEndTime ?? null}
+          layout={itemLayout}
+          sectionBgAlternate={sectionBgAlternate}
+          sectionTrim={sectionTrim}
+        />
       </section>
 
-      <HairlineRule />
+      {/* Builder-context placeholder where the client will sign on the live
+          proposal. Not the actual DocuSeal panel — that's only present when the
+          proposal is sent. */}
+      <BuilderSignPlaceholder />
 
-      {/* Block: Voice — the PM's sentence */}
-      <section className="flex flex-col gap-3">
-        <BlockLabel label="Overview" editable={editable} />
-        <p className="text-[17px] leading-[1.65] text-[var(--stage-text-primary)] tracking-[-0.005em]">
-          We've put together the production package you and I walked through. The audio rig is sized
-          for the room with headroom for a DJ set. Lighting is designed to pick up the brand colors
-          without drawing focus from the stage. Our crew will load in the day before so the room is
-          ready when your team arrives.
-        </p>
-        {editable && (
-          <button
-            type="button"
-            className="stage-btn stage-btn-ghost inline-flex items-center gap-2 self-start -ml-2 h-8"
-          >
-            <AionMark size={16} status="idle" />
-            Rewrite with Aion
-          </button>
-        )}
-      </section>
-
-      <HairlineRule />
-
-      {/* Block: Scope — the line items */}
-      <section className="flex flex-col gap-5">
-        <BlockLabel label="What's included" editable={editable} />
-        <div className="flex flex-col">
-          {scopeBlocks.map((block, i) => (
-            <ScopeRow
-              key={`${block.title}-${i}`}
-              block={block}
-              editable={editable}
-              selected={editable && selectedBlockIdx === i}
-              onClick={onSelectBlock ? () => onSelectBlock(i) : undefined}
-            />
-          ))}
-        </div>
-
-        {/* Totals — restrained typography, no filled row backgrounds */}
-        <div className="mt-2 pt-5 border-t border-[var(--stage-edge-subtle)]">
-          <div className="flex flex-col gap-1.5">
-            <TotalRow label="Subtotal" amount={subtotal} />
-            {tax > 0 && (
-              <TotalRow
-                label={`Sales tax${taxRate ? ` (${(taxRate * 100).toFixed(2).replace(/\.?0+$/, '')}%)` : ''}`}
-                amount={tax}
-              />
-            )}
-          </div>
-          <div className="mt-4 pt-4 border-t border-[var(--stage-edge-subtle)] flex items-baseline justify-between">
-            <span className="stage-label text-[var(--stage-text-primary)] normal-case tracking-normal text-[13px] font-medium">
-              Total
-            </span>
-            <span className="text-[28px] sm:text-[32px] font-medium tabular-nums tracking-tight text-[var(--stage-text-primary)] leading-none">
-              {formatMoney(total)}
-            </span>
-          </div>
-        </div>
-
-        {editable && (
-          <button
-            type="button"
-            className="stage-btn stage-btn-secondary inline-flex items-center gap-2 self-start h-9 mt-2"
-          >
-            <Plus size={14} strokeWidth={1.75} />
-            Add from catalog
-            <span className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal ml-1">
-              ⌘K
-            </span>
-          </button>
-        )}
-      </section>
-
-      <HairlineRule />
-
-      {/* Block: Terms */}
-      <section className="flex flex-col gap-3">
-        <BlockLabel label="Terms" editable={editable} />
-        <p className="text-[15px] leading-[1.65] text-[var(--stage-text-primary)]">
-          A <strong className="font-medium tabular-nums">{formatMoney(Math.round(total * 0.5))}</strong> deposit
-          holds the date. Balance of{' '}
-          <strong className="font-medium tabular-nums">{formatMoney(total - Math.round(total * 0.5))}</strong>{' '}
-          is due fourteen days before the show.
-        </p>
-        <p className="text-[13px] leading-[1.6] text-[var(--stage-text-secondary)]">
-          Includes standard production insurance and a two-hour post-show strike window. Overtime
-          billed at 1.5× after ten hours. This proposal is valid for thirty days.
-        </p>
-      </section>
-
-      <HairlineRule />
-
-      {/* Block: Accept */}
-      <section className="flex flex-col gap-5">
-        <BlockLabel label="Accept" editable={editable} />
-        <StagePanel className="p-6 flex flex-col gap-5">
-          <div className="flex items-baseline justify-between">
-            <div className="flex flex-col gap-1">
-              <span className="stage-label text-[var(--stage-text-tertiary)]">To accept</span>
-              <p className="stage-readout text-[var(--stage-text-primary)]">
-                Sign below and we'll send a deposit invoice within the hour.
-              </p>
-            </div>
-            <span className="text-[22px] font-medium tabular-nums tracking-tight text-[var(--stage-text-primary)]">
-              {formatMoney(total)}
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <span className="stage-label text-[var(--stage-text-tertiary)]">Signature</span>
-            <div className="h-12 rounded-[var(--stage-radius-input)] border-b border-[var(--stage-edge-subtle)] bg-transparent" />
-          </div>
-
-          <button
-            type="button"
-            className={cn(
-              'stage-btn stage-btn-primary inline-flex items-center justify-center gap-2 h-11 self-start px-6',
-              editable && 'opacity-70 pointer-events-none',
-            )}
-            style={
-              themed
-                ? { color: 'var(--portal-accent-text)' }
-                : undefined
-            }
-          >
-            Accept and sign
-            <ArrowRight size={15} strokeWidth={1.75} />
-          </button>
-          {editable && (
-            <p className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal">
-              This is how the client accepts — the button is live on the sent proposal.
-            </p>
-          )}
-        </StagePanel>
-      </section>
-
-      {/* Footer — real presence signals */}
-      <footer className="flex flex-col gap-1 pt-6 border-t border-[var(--stage-edge-subtle)]">
-        <p className="stage-readout text-[var(--stage-text-primary)]">Your production company</p>
-        <p className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal">
-          Nashville, TN · Licensed & insured · Reply to the proposer directly
-        </p>
-      </footer>
+      <p
+        className="text-center text-xs mt-12 pb-4 tracking-[0.08em] uppercase"
+        style={{ color: 'var(--portal-text-secondary)', opacity: 0.5 }}
+      >
+        Powered by Unusonic
+      </p>
     </div>
   );
 }
+
+function BuilderSignPlaceholder() {
+  return (
+    <div
+      className="mt-8 p-5 rounded-[var(--portal-radius)] text-sm text-center"
+      style={{
+        backgroundColor: 'var(--portal-surface)',
+        border: 'var(--portal-border-width) dashed var(--portal-border)',
+        color: 'var(--portal-text-secondary)',
+      }}
+    >
+      <p style={{ color: 'var(--portal-text)', fontWeight: 500, marginBottom: '0.25rem' }}>
+        Sign block
+      </p>
+      <p style={{ fontSize: '12px' }}>
+        Visible to the client when this proposal is sent. They sign here to accept.
+      </p>
+    </div>
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 // Empty-state hero — four doors (Aion headline + three secondary)
@@ -726,180 +869,9 @@ function EmptyStateHero({ dealId }: { dealId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Theme banner — small pill above the document showing which portal theme is
-// currently applied. Clicks through to workspace settings so the PM can change
-// how the client sees the sent proposal.
-// ---------------------------------------------------------------------------
-
-function ThemeBanner({ presetLabel }: { presetLabel: string }) {
-  return (
-    <div className="mx-auto w-full max-w-[760px] px-5 sm:px-8 pt-5 sm:pt-7 flex items-center justify-between gap-3">
-      <span
-        className="inline-flex items-center gap-1.5 text-[11px] tracking-[0.08em] uppercase"
-        style={{
-          color: 'color-mix(in oklch, var(--portal-text-secondary) 75%, transparent)',
-        }}
-      >
-        <span
-          className="size-1.5 rounded-full"
-          style={{ backgroundColor: 'var(--portal-accent)' }}
-          aria-hidden
-        />
-        Client sees · {presetLabel}
-      </span>
-      <Link
-        href="/settings/portal"
-        className="text-[11px] tracking-[0.02em] hover:underline"
-        style={{ color: 'var(--portal-text-secondary)' }}
-      >
-        Change theme
-      </Link>
-    </div>
-  );
-}
-
-const PRESET_LABELS: Record<string, string> = {
-  paper: 'Paper',
-  clean: 'Clean',
-  blackout: 'Blackout',
-  editorial: 'Editorial',
-  civic: 'Civic',
-  linen: 'Linen',
-  poster: 'Poster',
-  terminal: 'Terminal',
-  marquee: 'Marquee',
-  broadcast: 'Broadcast',
-  gallery: 'Gallery',
-  custom: 'Custom',
-};
-
-function presetLabelFor(preset: string): string {
-  return PRESET_LABELS[preset] ?? preset;
-}
-
-// ---------------------------------------------------------------------------
 // Atoms
 // ---------------------------------------------------------------------------
 
-function BlockLabel({ label, editable }: { label: string; editable: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <p className="stage-label text-[var(--stage-text-tertiary)]">{label}</p>
-      {editable && (
-        <button
-          type="button"
-          className="opacity-0 hover:opacity-100 focus:opacity-100 text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] transition-opacity p-1 -mr-1 rounded-[var(--stage-radius-input)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:opacity-100"
-          aria-label={`Edit ${label.toLowerCase()}`}
-        >
-          <Pencil size={12} strokeWidth={1.75} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function ScopeRow({
-  block,
-  editable,
-  selected = false,
-  onClick,
-}: {
-  block: DemoBlock;
-  editable: boolean;
-  selected?: boolean;
-  onClick?: () => void;
-}) {
-  const Wrapper = onClick ? 'button' : 'div';
-  const wrapperProps = onClick
-    ? ({ type: 'button' as const, onClick, 'aria-pressed': selected })
-    : {};
-  return (
-    <Wrapper
-      {...(wrapperProps as {})}
-      className={cn(
-        'group relative w-full text-left py-4 border-b border-[var(--stage-edge-subtle)] last:border-b-0 first:pt-0 transition-colors',
-        editable && 'cursor-pointer hover:bg-[oklch(1_0_0_/_0.015)] -mx-3 px-3 rounded-[var(--stage-radius-input)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset',
-        selected && 'bg-[oklch(1_0_0_/_0.025)]',
-      )}
-    >
-      {/* Accent left-stripe for the selected row (inspector target). */}
-      {selected && (
-        <span
-          className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-[var(--stage-accent)]"
-          aria-hidden
-        />
-      )}
-
-      <div className="flex items-baseline justify-between gap-6">
-        <div className="flex-1 min-w-0 flex items-baseline gap-2">
-          {/* Drag grip — reveals on hover, persistent when selected. */}
-          {editable && (
-            <button
-              type="button"
-              className={cn(
-                'shrink-0 -ml-5 p-0.5 rounded text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] transition-opacity',
-                selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-              )}
-              aria-label="Reorder"
-            >
-              <GripVertical size={14} strokeWidth={1.75} />
-            </button>
-          )}
-          <div className="flex-1 min-w-0 flex flex-col gap-1">
-            <span className="stage-readout text-[var(--stage-text-primary)] font-medium">
-              {block.title}
-            </span>
-            {block.summary && (
-              <span className="text-[13px] leading-[1.55] text-[var(--stage-text-secondary)]">
-                {block.summary}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-baseline gap-2 shrink-0">
-          <span className="stage-readout tabular-nums text-[var(--stage-text-primary)] whitespace-nowrap">
-            {formatMoney(block.subtotal)}
-          </span>
-          {editable && (
-            <button
-              type="button"
-              className={cn(
-                '-mr-2 p-1 rounded text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] transition-opacity',
-                selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-              )}
-              aria-label="More actions"
-            >
-              <MoreHorizontal size={14} strokeWidth={1.75} />
-            </button>
-          )}
-        </div>
-      </div>
-      {block.lines.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-1.5 pl-0">
-          {block.lines.map((line, i) => (
-            <li
-              key={`${line.label}-${i}`}
-              className="flex items-baseline justify-between gap-6 text-[13px]"
-            >
-              <span className="flex-1 min-w-0 flex items-baseline gap-2 text-[var(--stage-text-secondary)]">
-                <span className="text-[var(--stage-text-tertiary)]">—</span>
-                <span className="truncate">{line.label}</span>
-                {line.qty && (
-                  <span className="text-[var(--stage-text-tertiary)] tabular-nums whitespace-nowrap">
-                    · {line.qty}
-                  </span>
-                )}
-              </span>
-              <span className="tabular-nums whitespace-nowrap text-[var(--stage-text-secondary)]">
-                {line.amount === 'included' ? 'included' : formatMoney(line.amount)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Wrapper>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // ProposalBuilderSidebar — docked sidebar attached to the main app nav, like
@@ -915,19 +887,31 @@ function ProposalBuilderSidebar({
   onToggle,
   scopeBlocks,
   selectedBlockIdx,
+  onSelectBlock,
   subtotal,
   tax,
   total,
   taxRate,
+  workspaceId,
+  dealId,
+  forceDemo,
+  insertAfterSortOrder,
+  onItemAdded,
 }: {
   isOpen: boolean;
   onToggle: () => void;
   scopeBlocks: DemoBlock[];
   selectedBlockIdx: number | null;
+  onSelectBlock: (idx: number) => void;
   subtotal: number;
   tax: number;
   total: number;
   taxRate: number;
+  workspaceId: string | null;
+  dealId: string;
+  forceDemo: boolean;
+  insertAfterSortOrder: number | null;
+  onItemAdded: () => void;
 }) {
   const [tab, setTab] = useState<RailTab>('catalog');
 
@@ -1005,7 +989,15 @@ function ProposalBuilderSidebar({
 
               {/* Body — tab contents */}
               <div className="flex-1 min-h-0 overflow-hidden">
-                {tab === 'catalog' && <CatalogPicker />}
+                {tab === 'catalog' && (
+                  <CatalogPicker
+                    workspaceId={workspaceId}
+                    dealId={dealId}
+                    forceDemo={forceDemo}
+                    insertAfterSortOrder={insertAfterSortOrder}
+                    onItemAdded={onItemAdded}
+                  />
+                )}
                 {tab === 'inspector' && (
                   <div className="h-full overflow-y-auto p-3">
                     {selectedBlock ? (
@@ -1017,6 +1009,7 @@ function ProposalBuilderSidebar({
                         tax={tax}
                         total={total}
                         taxRate={taxRate}
+                        onSelectBlock={onSelectBlock}
                       />
                     )}
                   </div>
@@ -1059,117 +1052,148 @@ function RailTabButton({
 }
 
 // ---------------------------------------------------------------------------
-// Catalog picker — search + category accordions + click-to-add
+// Catalog picker — real data: workspace packages, workspace tags, semantic
+// search, click-to-add. Packages group by category enum; tag chips filter
+// orthogonally (AND logic). Shift-click stages items for batch add.
 // ---------------------------------------------------------------------------
 
-type CatalogItem = {
-  id: string;
-  name: string;
-  summary?: string;
-  price: number;
-  unit?: 'flat' | 'day' | 'hour';
+/** Color token → OKLCH pill tints for tag chips. Mirrors smart-tag-input.tsx. */
+const TAG_PILL_STYLES: Record<string, { bg: string; border: string; dot: string }> = {
+  'blue-400':     { bg: 'oklch(0.35 0.08 250 / 0.35)', border: 'oklch(0.55 0.12 250 / 0.5)', dot: 'oklch(0.65 0.15 250)' },
+  'emerald-400':  { bg: 'oklch(0.35 0.08 145 / 0.35)', border: 'oklch(0.55 0.12 145 / 0.5)', dot: 'oklch(0.65 0.15 145)' },
+  'amber-400':    { bg: 'oklch(0.35 0.08 70  / 0.35)', border: 'oklch(0.55 0.12 70  / 0.5)', dot: 'oklch(0.75 0.15 70)' },
+  'rose-400':     { bg: 'oklch(0.35 0.08 350 / 0.35)', border: 'oklch(0.55 0.12 350 / 0.5)', dot: 'oklch(0.65 0.18 350)' },
+  'violet-400':   { bg: 'oklch(0.35 0.08 290 / 0.35)', border: 'oklch(0.55 0.12 290 / 0.5)', dot: 'oklch(0.65 0.15 290)' },
+  'teal-400':     { bg: 'oklch(0.35 0.08 180 / 0.35)', border: 'oklch(0.55 0.12 180 / 0.5)', dot: 'oklch(0.65 0.12 180)' },
+  'orange-400':   { bg: 'oklch(0.35 0.08 45  / 0.35)', border: 'oklch(0.55 0.12 45  / 0.5)', dot: 'oklch(0.7 0.15 45)' },
+  'fuchsia-400':  { bg: 'oklch(0.35 0.08 320 / 0.35)', border: 'oklch(0.55 0.12 320 / 0.5)', dot: 'oklch(0.65 0.18 320)' },
+  'slate-400':    { bg: 'oklch(0.35 0.02 250 / 0.3)',  border: 'oklch(0.5 0.02 250 / 0.45)', dot: 'oklch(0.6 0.02 250)' },
 };
 
-type CatalogCategory = {
-  id: string;
-  label: string;
-  items: CatalogItem[];
-};
+function tagPill(color: string) {
+  return TAG_PILL_STYLES[color] ?? TAG_PILL_STYLES['slate-400'];
+}
 
-const CATALOG_DEMO: CatalogCategory[] = [
-  {
-    id: 'audio',
-    label: 'Audio',
-    items: [
-      { id: 'audio-kara', name: 'L-Acoustics Kara line array', summary: 'Stereo hang, amps, rigging, 24-box ceiling', price: 6800 },
-      { id: 'audio-sd12', name: 'DiGiCo SD12 console', summary: 'FOH or monitor, with Waves SoundGrid', price: 1400 },
-      { id: 'audio-ma3', name: 'MA3 onPC wing', summary: 'Console + stagebox, recorded show file', price: 1200 },
-      { id: 'audio-wireless', name: 'Wireless rack — 8ch', summary: 'Shure Axient digital, RF coordination', price: 1600 },
-      { id: 'audio-monitor', name: 'Monitor world', summary: 'IEM + wedge package, monitor position', price: 2200 },
-      { id: 'audio-smaart', name: 'Smaart measurement kit', summary: 'System tuning by an A1 on-site', price: 400 },
-    ],
-  },
-  {
-    id: 'lighting',
-    label: 'Lighting',
-    items: [
-      { id: 'lx-base', name: 'Base lighting kit', summary: 'Trussing, 12 PARs, console, 1-op', price: 3200 },
-      { id: 'lx-moving', name: 'Moving-head rig', summary: '16 Martin MAC Aura XB, haze, programmer', price: 7400 },
-      { id: 'lx-full', name: 'Full stage lighting', summary: 'Moving + static wash + FX, LD + programmer', price: 11200 },
-      { id: 'lx-haze', name: 'Haze + atmospherics', summary: 'MDG ATMe + 2× Le Maitre low-fog', price: 900 },
-      { id: 'lx-followspot', name: 'Follow spot package', summary: 'Lycian 1271 + operator, comms', price: 1400 },
-    ],
-  },
-  {
-    id: 'video',
-    label: 'Video / LED',
-    items: [
-      { id: 'vid-16x9', name: '16×9 LED wall — ROE BP2v2', summary: '12ft × 7ft, processor, spare modules', price: 5800 },
-      { id: 'vid-cams', name: 'Tri-camera switcher', summary: '3× Blackmagic, TriCaster, 2 ops', price: 4200 },
-      { id: 'vid-playback', name: 'Playback server', summary: 'QLab Pro with redundancy', price: 700 },
-      { id: 'vid-confidence', name: 'Confidence monitors', summary: '2× 32" on-stage, wedge stand', price: 450 },
-    ],
-  },
-  {
-    id: 'crew',
-    label: 'Crew',
-    items: [
-      { id: 'crew-a1', name: 'FOH engineer (A1)', summary: 'Day rate, 10-hour day, OT after', price: 1200, unit: 'day' },
-      { id: 'crew-a2', name: 'Monitor engineer (A2)', summary: 'Day rate, 10-hour day, OT after', price: 1000, unit: 'day' },
-      { id: 'crew-ld', name: 'Lighting designer + programmer', summary: 'Pre-pro day + show day', price: 1400, unit: 'day' },
-      { id: 'crew-stagehand', name: 'Stagehand', summary: 'Load-in, strike, show call', price: 320, unit: 'day' },
-      { id: 'crew-vid-op', name: 'Video operator', summary: 'Switcher, playback, or LED', price: 900, unit: 'day' },
-    ],
-  },
-  {
-    id: 'transport',
-    label: 'Transport',
-    items: [
-      { id: 'tx-sprinter', name: 'Sprinter van — local', summary: 'Crew cab, 14ft box, driver', price: 420 },
-      { id: 'tx-box', name: 'Box truck — 26ft', summary: 'Lift gate, driver, regional', price: 780 },
-      { id: 'tx-cartage', name: 'Cartage — backline', summary: 'Local runner, one-way', price: 240 },
-    ],
-  },
-  {
-    id: 'fees',
-    label: 'Fees & passthroughs',
-    items: [
-      { id: 'fee-per-diem', name: 'Per diem — crew', summary: '$75 / crew / day, non-taxable', price: 75, unit: 'day' },
-      { id: 'fee-travel', name: 'Travel & lodging', summary: 'Passthrough, receipts', price: 0 },
-      { id: 'fee-insurance', name: 'Rider insurance rider', summary: 'Additional insured certificate', price: 250 },
-    ],
-  },
+/** Category display order + labels for the accordion. */
+const CATEGORY_ORDER: { id: string; label: string }[] = [
+  { id: 'package',     label: 'Packages' },
+  { id: 'service',     label: 'Services' },
+  { id: 'rental',      label: 'Rentals' },
+  { id: 'talent',      label: 'Talent' },
+  { id: 'retail_sale', label: 'Retail' },
+  { id: 'fee',         label: 'Fees' },
 ];
 
-function CatalogPicker() {
+function CatalogPicker({
+  workspaceId,
+  dealId,
+  forceDemo,
+  insertAfterSortOrder,
+  onItemAdded,
+}: {
+  workspaceId: string | null;
+  dealId: string;
+  forceDemo: boolean;
+  insertAfterSortOrder: number | null;
+  onItemAdded: () => void;
+}) {
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['lighting']));
+  const [packages, setPackages] = useState<PackageWithTags[]>([]);
+  const [allTags, setAllTags] = useState<WorkspaceTag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(['package']));
+  const [semanticIds, setSemanticIds] = useState<string[] | null>(null);
+  const [semanticLoading, setSemanticLoading] = useState(false);
+  const [stagedIds, setStagedIds] = useState<Set<string>>(new Set());
+  const [adding, setAdding] = useState<Set<string>>(new Set());
+  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
 
+  // ── Initial load — catalog + tags in parallel ────────────────────────────
+  useEffect(() => {
+    if (!workspaceId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      getCatalogPackagesWithTags(workspaceId),
+      getWorkspaceTags(workspaceId),
+    ]).then(([pkgsResult, tagsResult]) => {
+      if (cancelled) return;
+      setPackages((pkgsResult.packages ?? []).filter((p) => (p as any).is_active !== false && (p as any).is_draft !== true));
+      setAllTags(tagsResult.tags ?? []);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
+  // ── Semantic search — debounced, only when query is non-empty ────────────
   const isSearching = query.trim().length > 0;
+  useEffect(() => {
+    if (!isSearching || !workspaceId) {
+      setSemanticIds(null);
+      setSemanticLoading(false);
+      return;
+    }
+    setSemanticLoading(true);
+    const handle = setTimeout(async () => {
+      const results = await semanticSearchCatalog(workspaceId, query.trim(), 30);
+      setSemanticIds(results.map((r) => r.packageId));
+      setSemanticLoading(false);
+    }, 220);
+    return () => { clearTimeout(handle); };
+  }, [query, isSearching, workspaceId]);
 
+  // ── Filtered + grouped packages ──────────────────────────────────────────
   const filtered = useMemo(() => {
-    if (!isSearching) return CATALOG_DEMO;
-    const q = query.toLowerCase();
-    return CATALOG_DEMO
-      .map((cat) => ({
-        ...cat,
-        items: cat.items.filter(
-          (i) =>
-            i.name.toLowerCase().includes(q) ||
-            (i.summary ?? '').toLowerCase().includes(q) ||
-            cat.label.toLowerCase().includes(q),
-        ),
-      }))
-      .filter((cat) => cat.items.length > 0);
-  }, [query, isSearching]);
+    let list = packages;
+
+    // Tag filter — AND logic across selected tags.
+    if (selectedTagIds.size > 0) {
+      list = list.filter((p) => {
+        const pkgTagIds = new Set((p.tags ?? []).map((t) => t.id));
+        for (const id of selectedTagIds) if (!pkgTagIds.has(id)) return false;
+        return true;
+      });
+    }
+
+    // Search: semantic ids (reordered by similarity) OR plain filter fallback.
+    if (isSearching) {
+      if (semanticIds !== null) {
+        const idSet = new Set(semanticIds);
+        list = list.filter((p) => idSet.has(p.id));
+        list.sort((a, b) => semanticIds.indexOf(a.id) - semanticIds.indexOf(b.id));
+      } else {
+        const q = query.trim().toLowerCase();
+        list = list.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            (p.description ?? '').toLowerCase().includes(q),
+        );
+      }
+    }
+
+    // Group by category (preserving semantic ordering within each group).
+    const groups = new Map<string, PackageWithTags[]>();
+    for (const pkg of list) {
+      const cat = pkg.category ?? 'package';
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat)!.push(pkg);
+    }
+    return CATEGORY_ORDER
+      .map(({ id, label }) => ({ id, label, items: groups.get(id) ?? [] }))
+      .filter((g) => g.items.length > 0);
+  }, [packages, selectedTagIds, isSearching, semanticIds, query]);
 
   const totalMatches = useMemo(
     () => filtered.reduce((n, c) => n + c.items.length, 0),
     [filtered],
   );
 
-  const toggle = (id: string) => {
-    setExpanded((prev) => {
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const toggleCategory = (id: string) => {
+    setExpandedCats((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -1177,10 +1201,84 @@ function CatalogPicker() {
     });
   };
 
+  const toggleTag = (tagId: string) => {
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
+      return next;
+    });
+  };
+
+  const addPackage = useCallback(
+    async (pkg: PackageWithTags) => {
+      if (forceDemo) {
+        toast.info('Demo view — open without ?demo=1 to add real items.');
+        return;
+      }
+      setAdding((prev) => new Set(prev).add(pkg.id));
+      const result = await addPackageToProposal(dealId, pkg.id, insertAfterSortOrder ?? undefined);
+      setAdding((prev) => {
+        const next = new Set(prev);
+        next.delete(pkg.id);
+        return next;
+      });
+      if (result.success) {
+        setRecentlyAdded(pkg.id);
+        window.setTimeout(() => setRecentlyAdded((current) => (current === pkg.id ? null : current)), 800);
+        toast.success(`Added ${pkg.name}`);
+        onItemAdded();
+      } else {
+        toast.error(result.error ?? 'Could not add to proposal.');
+      }
+    },
+    [dealId, forceDemo, insertAfterSortOrder, onItemAdded],
+  );
+
+  const commitStaged = useCallback(async () => {
+    if (forceDemo) {
+      toast.info('Demo view — open without ?demo=1 to add real items.');
+      return;
+    }
+    const ids = Array.from(stagedIds);
+    const stagedPkgs = packages.filter((p) => ids.includes(p.id));
+    setStagedIds(new Set());
+    // Sequential — server positions each relative to the previous insert.
+    let cursor = insertAfterSortOrder;
+    for (const pkg of stagedPkgs) {
+      const result = await addPackageToProposal(dealId, pkg.id, cursor ?? undefined);
+      if (!result.success) {
+        toast.error(`${pkg.name}: ${result.error ?? 'failed'}`);
+        continue;
+      }
+      // Next item lands after this one — approximate step (header+children).
+      if (cursor != null) cursor += 10;
+    }
+    toast.success(`Added ${stagedPkgs.length} item${stagedPkgs.length === 1 ? '' : 's'}`);
+    onItemAdded();
+  }, [stagedIds, packages, insertAfterSortOrder, dealId, forceDemo, onItemAdded]);
+
+  const onRowClick = useCallback(
+    (pkg: PackageWithTags, withShift: boolean) => {
+      if (withShift) {
+        setStagedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(pkg.id)) next.delete(pkg.id);
+          else next.add(pkg.id);
+          return next;
+        });
+      } else {
+        addPackage(pkg);
+      }
+    },
+    [addPackage],
+  );
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="h-full min-h-0 flex flex-col">
-      {/* Sticky search header — the sidebar already labels itself */}
-      <div className="shrink-0 px-3 pb-3 flex items-center gap-2">
+      {/* Search + match count */}
+      <div className="shrink-0 px-3 pb-2 flex items-center gap-2">
         <label className="relative flex items-center flex-1 min-w-0">
           <Search
             size={13}
@@ -1193,34 +1291,85 @@ function CatalogPicker() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search catalog…"
-            className="stage-input w-full h-8 pl-8 pr-3 text-[13px]"
+            className="stage-input w-full h-8 text-[13px]"
+            style={{ paddingLeft: '30px', paddingRight: '12px' }}
             aria-label="Search catalog"
           />
         </label>
         {isSearching && (
-          <span className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal tabular-nums shrink-0">
-            {totalMatches}
+          <span className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal tabular-nums shrink-0 min-w-[22px] text-right">
+            {semanticLoading ? '…' : totalMatches}
           </span>
         )}
       </div>
 
-      {/* Category accordions — scrollable */}
+      {/* Tag filter chip row — horizontal scroll */}
+      <div className="shrink-0 px-3 pb-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+          {allTags.map((tag) => {
+            const isActive = selectedTagIds.has(tag.id);
+            const pill = tagPill(tag.color);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => toggleTag(tag.id)}
+                className={cn(
+                  'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors whitespace-nowrap flex items-center gap-1',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+                )}
+                style={
+                  isActive
+                    ? { backgroundColor: pill.bg, borderColor: pill.border, color: 'var(--stage-text-primary)' }
+                    : {
+                        backgroundColor: 'transparent',
+                        borderColor: 'oklch(1 0 0 / 0.08)',
+                        color: 'var(--stage-text-secondary)',
+                      }
+                }
+                aria-pressed={isActive}
+              >
+                <span
+                  className="size-1.5 rounded-full"
+                  style={{ backgroundColor: pill.dot }}
+                  aria-hidden
+                />
+                {tag.label}
+              </button>
+            );
+          })}
+
+          {selectedTagIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedTagIds(new Set())}
+              className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)] transition-colors"
+              aria-label="Clear tag filters"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Results — categories */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-        {filtered.length === 0 ? (
-          <div className="px-4 py-10 flex flex-col items-center gap-1 text-center">
-            <p className="stage-readout text-[var(--stage-text-secondary)]">No matches</p>
-            <p className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal">
-              Try another search or clear to browse.
-            </p>
-          </div>
+        {loading ? (
+          <CatalogSkeleton />
+        ) : filtered.length === 0 ? (
+          <CatalogEmpty
+            workspaceId={workspaceId}
+            hasPackages={packages.length > 0}
+            isFiltered={isSearching || selectedTagIds.size > 0}
+          />
         ) : (
           filtered.map((cat) => {
-            const isOpen = isSearching || expanded.has(cat.id);
+            const isOpen = isSearching || expandedCats.has(cat.id);
             return (
               <section key={cat.id} className="border-b border-[var(--stage-edge-subtle)] last:border-b-0">
                 <button
                   type="button"
-                  onClick={() => !isSearching && toggle(cat.id)}
+                  onClick={() => !isSearching && toggleCategory(cat.id)}
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-[oklch(1_0_0_/_0.02)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset"
                 >
                   <ChevronDown
@@ -1241,9 +1390,16 @@ function CatalogPicker() {
                 </button>
                 {isOpen && (
                   <ul className="flex flex-col pb-1 list-none">
-                    {cat.items.map((item) => (
-                      <li key={item.id}>
-                        <CatalogItemRow item={item} />
+                    {cat.items.map((pkg) => (
+                      <li key={pkg.id}>
+                        <CatalogItemRow
+                          pkg={pkg}
+                          onClick={(withShift) => onRowClick(pkg, withShift)}
+                          isStaged={stagedIds.has(pkg.id)}
+                          isAdding={adding.has(pkg.id)}
+                          wasRecentlyAdded={recentlyAdded === pkg.id}
+                          isBundle={pkg.category === 'package'}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -1253,41 +1409,204 @@ function CatalogPicker() {
           })
         )}
       </div>
+
+      {/* Staged-batch footer bar — appears when ≥1 item staged via shift-click */}
+      {stagedIds.size > 0 && (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-t border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]">
+          <span className="flex-1 text-[12px] text-[var(--stage-text-primary)] font-medium">
+            {stagedIds.size} item{stagedIds.size === 1 ? '' : 's'} staged
+          </span>
+          <button
+            type="button"
+            onClick={() => setStagedIds(new Set())}
+            className="stage-btn stage-btn-ghost inline-flex items-center h-7 text-[12px] px-2"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={commitStaged}
+            className="stage-btn stage-btn-primary inline-flex items-center gap-1.5 h-7 text-[12px] px-3"
+          >
+            Add {stagedIds.size}
+          </button>
+        </div>
+      )}
+
+      {/* Manage-tags footnote */}
+      {allTags.length > 0 && (
+        <div className="shrink-0 px-3 py-2 border-t border-[var(--stage-edge-subtle)]">
+          <Link
+            href="/catalog"
+            className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal hover:text-[var(--stage-text-primary)] transition-colors"
+          >
+            Manage tags in Catalog →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
 
-function CatalogItemRow({ item }: { item: CatalogItem }) {
+function CatalogItemRow({
+  pkg,
+  onClick,
+  isStaged,
+  isAdding,
+  wasRecentlyAdded,
+  isBundle,
+}: {
+  pkg: PackageWithTags;
+  onClick: (withShift: boolean) => void;
+  isStaged: boolean;
+  isAdding: boolean;
+  wasRecentlyAdded: boolean;
+  isBundle: boolean;
+}) {
+  const unit = (pkg as PackageWithTags & { unit_type?: string }).unit_type ?? 'flat';
+  const priceLabel = Number(pkg.price) > 0 ? `$${Number(pkg.price).toLocaleString()}` : '—';
+  const unitSuffix = unit === 'hour' ? ' / hr' : unit === 'day' ? ' / day' : '';
   return (
     <button
       type="button"
-      className="group w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-[oklch(1_0_0_/_0.025)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset"
+      onClick={(e) => onClick(e.shiftKey)}
+      disabled={isAdding}
+      className={cn(
+        'group w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset',
+        isStaged
+          ? 'bg-[var(--stage-accent-muted)]'
+          : wasRecentlyAdded
+          ? 'bg-[oklch(0.75_0.18_145_/_0.08)]'
+          : 'hover:bg-[oklch(1_0_0_/_0.025)]',
+        isAdding && 'opacity-60 cursor-wait',
+      )}
     >
-      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span className="text-[13px] text-[var(--stage-text-primary)] font-medium truncate">
-          {item.name}
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <span className="text-[13px] text-[var(--stage-text-primary)] font-medium truncate flex items-center gap-1.5">
+          {isBundle && (
+            <span
+              className="shrink-0 stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal px-1 py-px rounded-sm border border-[var(--stage-edge-subtle)] text-[9px] uppercase"
+              style={{ lineHeight: 1 }}
+            >
+              Bundle
+            </span>
+          )}
+          <span className="truncate">{pkg.name}</span>
         </span>
-        {item.summary && (
+        {pkg.description && (
           <span className="text-[12px] leading-[1.45] text-[var(--stage-text-tertiary)] line-clamp-2">
-            {item.summary}
+            {pkg.description}
           </span>
+        )}
+        {pkg.tags && pkg.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+            {pkg.tags.slice(0, 3).map((tag) => {
+              const pill = tagPill(tag.color);
+              return (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] border"
+                  style={{ backgroundColor: pill.bg, borderColor: pill.border, color: 'var(--stage-text-secondary)' }}
+                >
+                  <span className="size-1 rounded-full" style={{ backgroundColor: pill.dot }} aria-hidden />
+                  {tag.label}
+                </span>
+              );
+            })}
+            {pkg.tags.length > 3 && (
+              <span className="text-[10px] text-[var(--stage-text-tertiary)]">
+                +{pkg.tags.length - 3}
+              </span>
+            )}
+          </div>
         )}
       </div>
       <div className="shrink-0 flex flex-col items-end gap-1">
         <span className="text-[12px] tabular-nums text-[var(--stage-text-secondary)] whitespace-nowrap">
-          {item.price > 0 ? `$${item.price.toLocaleString()}` : 'per receipt'}
-          {item.unit && item.unit !== 'flat' && (
-            <span className="text-[var(--stage-text-tertiary)]"> / {item.unit}</span>
+          {priceLabel}
+          {unitSuffix && (
+            <span className="text-[var(--stage-text-tertiary)]">{unitSuffix}</span>
           )}
         </span>
         <span
-          className="size-5 inline-flex items-center justify-center rounded-full bg-[var(--stage-surface-raised)] border border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] group-hover:bg-[var(--stage-accent-muted)] transition-colors"
+          className={cn(
+            'size-5 inline-flex items-center justify-center rounded-full border transition-colors',
+            isStaged
+              ? 'bg-[var(--stage-accent)] border-transparent text-[oklch(0.10_0_0)]'
+              : wasRecentlyAdded
+              ? 'bg-[var(--color-unusonic-success)] border-transparent text-[oklch(0.10_0_0)]'
+              : 'bg-[var(--stage-surface-raised)] border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] group-hover:bg-[var(--stage-accent-muted)]',
+          )}
           aria-hidden
         >
-          <Plus size={11} strokeWidth={2} />
+          {isAdding ? (
+            <AionMark size={14} status="loading" />
+          ) : wasRecentlyAdded ? (
+            '✓'
+          ) : isStaged ? (
+            '✓'
+          ) : (
+            <Plus size={11} strokeWidth={2} />
+          )}
         </span>
       </div>
     </button>
+  );
+}
+
+function CatalogSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 px-4 py-4">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="flex items-start gap-3 py-2">
+          <div className="flex-1 flex flex-col gap-1.5">
+            <div className="h-3 rounded bg-[var(--ctx-well)] stage-skeleton" style={{ width: `${60 + (i % 3) * 10}%` }} />
+            <div className="h-2.5 rounded bg-[var(--ctx-well)] stage-skeleton" style={{ width: `${40 + (i % 2) * 15}%` }} />
+          </div>
+          <div className="h-4 w-10 rounded bg-[var(--ctx-well)] stage-skeleton" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CatalogEmpty({
+  workspaceId,
+  hasPackages,
+  isFiltered,
+}: {
+  workspaceId: string | null;
+  hasPackages: boolean;
+  isFiltered: boolean;
+}) {
+  if (!workspaceId) {
+    return (
+      <div className="px-4 py-10 flex flex-col items-center gap-1 text-center">
+        <p className="stage-readout text-[var(--stage-text-secondary)]">Workspace unavailable</p>
+      </div>
+    );
+  }
+  if (isFiltered && hasPackages) {
+    return (
+      <div className="px-4 py-10 flex flex-col items-center gap-1 text-center">
+        <p className="stage-readout text-[var(--stage-text-secondary)]">No matches</p>
+        <p className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal">
+          Try a different search or clear your tag filters.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="px-4 py-10 flex flex-col items-center gap-2 text-center">
+      <p className="stage-readout text-[var(--stage-text-secondary)]">No catalog items yet</p>
+      <Link
+        href="/catalog"
+        className="stage-label text-[var(--stage-accent)] normal-case tracking-normal hover:underline"
+      >
+        Add items in Catalog →
+      </Link>
+    </div>
   );
 }
 
@@ -1471,12 +1790,14 @@ function FinancialInspector({
   tax,
   total,
   taxRate,
+  onSelectBlock,
 }: {
   scopeBlocks: DemoBlock[];
   subtotal: number;
   tax: number;
   total: number;
   taxRate: number;
+  onSelectBlock?: (idx: number) => void;
 }) {
   // Demo: same 38% cost assumption as LineInspector.
   const totalCost = Math.round(subtotal * 0.38);
@@ -1541,38 +1862,52 @@ function FinancialInspector({
         </div>
       </div>
 
-      {/* Per-package rows */}
+      {/* Per-package rows — clickable to drill into the line inspector */}
       <div className="flex flex-col gap-2">
-        <span className="stage-label text-[var(--stage-text-tertiary)]">By package</span>
+        <div className="flex items-baseline justify-between">
+          <span className="stage-label text-[var(--stage-text-tertiary)]">By package</span>
+          <span className="stage-label text-[var(--stage-text-tertiary)] normal-case tracking-normal">
+            Click to inspect
+          </span>
+        </div>
         <ul className="flex flex-col list-none p-0">
           {scopeBlocks.map((block, i) => {
             const bCost = Math.round(block.subtotal * 0.38);
             const bMarginPct = block.subtotal > 0 ? (block.subtotal - bCost) / block.subtotal : 0;
             return (
-              <li
-                key={`${block.title}-${i}`}
-                className="flex items-center justify-between py-1.5 text-[12px] border-b border-[var(--stage-edge-subtle)] last:border-b-0"
-              >
-                <span className="flex-1 min-w-0 truncate text-[var(--stage-text-primary)]">
-                  {block.title}
-                </span>
-                <span className="shrink-0 flex items-baseline gap-3 tabular-nums">
-                  <span className="text-[var(--stage-text-secondary)]">
-                    {formatMoney(block.subtotal)}
+              <li key={`${block.title}-${i}`}>
+                <button
+                  type="button"
+                  onClick={onSelectBlock ? () => onSelectBlock(i) : undefined}
+                  disabled={!onSelectBlock}
+                  className={cn(
+                    'w-full flex items-center justify-between py-1.5 px-2 -mx-2 rounded-[var(--stage-radius-input)] text-[12px] border-b border-[var(--stage-edge-subtle)] last:border-b-0 text-left transition-colors',
+                    onSelectBlock
+                      ? 'hover:bg-[oklch(1_0_0_/_0.03)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
+                      : '',
+                  )}
+                >
+                  <span className="flex-1 min-w-0 truncate text-[var(--stage-text-primary)]">
+                    {block.title}
                   </span>
-                  <span
-                    className={cn(
-                      'text-[11px] w-9 text-right',
-                      bMarginPct >= 0.5
-                        ? 'text-[var(--color-unusonic-success)]'
-                        : bMarginPct >= 0.3
-                        ? 'text-[var(--color-unusonic-warning)]'
-                        : 'text-[var(--color-unusonic-error)]',
-                    )}
-                  >
-                    {Math.round(bMarginPct * 100)}%
+                  <span className="shrink-0 flex items-baseline gap-3 tabular-nums">
+                    <span className="text-[var(--stage-text-secondary)]">
+                      {formatMoney(block.subtotal)}
+                    </span>
+                    <span
+                      className={cn(
+                        'text-[11px] w-9 text-right',
+                        bMarginPct >= 0.5
+                          ? 'text-[var(--color-unusonic-success)]'
+                          : bMarginPct >= 0.3
+                          ? 'text-[var(--color-unusonic-warning)]'
+                          : 'text-[var(--color-unusonic-error)]',
+                      )}
+                    >
+                      {Math.round(bMarginPct * 100)}%
+                    </span>
                   </span>
-                </span>
+                </button>
               </li>
             );
           })}
@@ -1688,7 +2023,8 @@ function TeamPicker({ selectedBlock }: { selectedBlock: DemoBlock | undefined })
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search team…"
-            className="stage-input w-full h-8 pl-8 pr-3 text-[13px]"
+            className="stage-input w-full h-8 text-[13px]"
+            style={{ paddingLeft: '30px', paddingRight: '12px' }}
             aria-label="Search team"
           />
         </label>
@@ -1797,14 +2133,6 @@ function TotalRow({ label, amount }: { label: string; amount: number }) {
       </span>
     </div>
   );
-}
-
-function HairlineRule() {
-  return <div className="h-px bg-[var(--stage-edge-subtle)]" aria-hidden />;
-}
-
-function Dot() {
-  return <span className="text-[var(--stage-text-tertiary)] select-none">·</span>;
 }
 
 function StatusDot({ status }: { status: string }) {
