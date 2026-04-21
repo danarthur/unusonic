@@ -162,6 +162,16 @@ type DemoBlock = {
   /** Catalog category of the header row's package, e.g. 'package' / 'rental' / 'service'.
    *  Drives the small category pill in the inspector header. */
   category?: string | null;
+  /** Catalog unit type — 'flat' / 'hour' / 'day'. Read-only here (catalog-level
+   *  concept; changing it mid-proposal would reshape the math contract). */
+  unitType?: string | null;
+  /** For 'hour' / 'day' items: how many hours/days this line represents. Editable
+   *  per proposal — a service with a catalog default of 8 hours can be bumped to
+   *  10 for a long night. Scales both revenue and cost. */
+  unitMultiplier?: number | null;
+  /** Cached effective multiplier: unitMultiplier when unitType is hour/day, else 1.
+   *  Computed once in the reducer so downstream consumers don't re-derive it. */
+  effectiveMultiplier?: number;
 };
 
 const DEMO_BLOCKS: DemoBlock[] = [
@@ -340,7 +350,14 @@ export function ProposalBuilderStudio({
       const baseUnitPrice = Number(raw.unit_price ?? 0);
       const overridePrice = raw.override_price != null ? Number(raw.override_price) : null;
       const effectiveUnitPrice = overridePrice ?? baseUnitPrice;
-      const amount = qty * effectiveUnitPrice;
+      const rowUnitType = (raw.unit_type as string | null | undefined) ?? null;
+      const rowUnitMultiplier = raw.unit_multiplier != null ? Number(raw.unit_multiplier) : null;
+      // Symmetric with LineItemGrid + calculateProposalTotal: multiplier only
+      // applies for hour/day items, else 1.
+      const rowMultiplier = (rowUnitType === 'hour' || rowUnitType === 'day')
+        ? (rowUnitMultiplier != null && rowUnitMultiplier > 0 ? rowUnitMultiplier : 1)
+        : 1;
+      const amount = qty * effectiveUnitPrice * rowMultiplier;
       const rowActualCost = raw.actual_cost != null ? Number(raw.actual_cost) : null;
       const sortOrder = Number(raw.sort_order ?? 0);
       const isHeader = raw.is_package_header === true || raw.isPackageHeader === true;
@@ -370,6 +387,9 @@ export function ProposalBuilderStudio({
           unitPrice: baseUnitPrice,
           internalNotes: (raw.internal_notes as string | null | undefined) ?? null,
           category,
+          unitType: rowUnitType,
+          unitMultiplier: rowUnitMultiplier,
+          effectiveMultiplier: rowMultiplier,
           // Bundle header cost = summed child costs (we'll add as children
           // stream in below). Start at 0. A single-item package with no
           // children simply stays at 0 until a child row closes the loop.
@@ -390,11 +410,12 @@ export function ProposalBuilderStudio({
         if (childCatalogId && current.childCatalogItemIds) {
           current.childCatalogItemIds.push(childCatalogId);
         }
-        // Sum children's cost into the bundle header's displayed cost.
-        // Matches get-event-ledger's "exclude bundle header, sum children"
-        // rule so PM view + Event ROI dashboard agree on the math.
+        // Sum children's cost into the bundle header's displayed cost,
+        // including each child's own multiplier. Matches get-event-ledger's
+        // "exclude bundle header, sum children" rule so PM view + Event ROI
+        // dashboard agree on the math.
         if (rowActualCost != null) {
-          current.actualCost = (current.actualCost ?? 0) + rowActualCost * qty;
+          current.actualCost = (current.actualCost ?? 0) + rowActualCost * qty * rowMultiplier;
         }
       } else {
         // Standalone a-la-carte row — its own block so Price/Qty/Notes edit cleanly.
@@ -418,6 +439,9 @@ export function ProposalBuilderStudio({
           unitPrice: baseUnitPrice,
           internalNotes: (raw.internal_notes as string | null | undefined) ?? null,
           category,
+          unitType: rowUnitType,
+          unitMultiplier: rowUnitMultiplier,
+          effectiveMultiplier: rowMultiplier,
           actualCost: rowActualCost,
           costIsComputed: false,
         };
@@ -2352,7 +2376,10 @@ function LineInspector({
   const [costValue, setCostValue] = useState(
     block?.actualCost != null ? String(block.actualCost) : '',
   );
-  const [savingField, setSavingField] = useState<'price' | 'qty' | 'note' | 'cost' | null>(null);
+  const [multiplierValue, setMultiplierValue] = useState(
+    block?.unitMultiplier != null ? String(block.unitMultiplier) : '',
+  );
+  const [savingField, setSavingField] = useState<'price' | 'qty' | 'note' | 'cost' | 'multiplier' | null>(null);
 
   // Reset local state when the selected item changes (by id, not title —
   // two items can share the same name).
@@ -2361,6 +2388,7 @@ function LineInspector({
     setQtyValue(String(block?.quantity ?? 1));
     setNote(block?.internalNotes ?? '');
     setCostValue(block?.actualCost != null ? String(block.actualCost) : '');
+    setMultiplierValue(block?.unitMultiplier != null ? String(block.unitMultiplier) : '');
   }, [block?.headerItemId]);
 
   // Crew rows tied to this block. deal_crew is the source of truth — every
@@ -2460,6 +2488,26 @@ function LineInspector({
     onRefetchProposal();
   }, [block, costValue, onRefetchProposal]);
 
+  const saveMultiplier = useCallback(async () => {
+    // Only meaningful for hourly/daily items. unit_type itself is catalog-level
+    // and not editable here — switching a service from flat to hourly would
+    // reshape the math contract for the line.
+    if (!block?.headerItemId) return;
+    if (block.unitType !== 'hour' && block.unitType !== 'day') return;
+    const trimmed = multiplierValue.trim();
+    const parsed = trimmed === '' ? null : Number(trimmed);
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed <= 0)) {
+      setMultiplierValue(block.unitMultiplier != null ? String(block.unitMultiplier) : '');
+      return;
+    }
+    if (parsed === (block.unitMultiplier ?? null)) return;
+    setSavingField('multiplier');
+    const res = await updateProposalItem(block.headerItemId, { unit_multiplier: parsed });
+    setSavingField(null);
+    if (!res.success) { toast.error(res.error ?? 'Save failed'); return; }
+    onRefetchProposal();
+  }, [block, multiplierValue, onRefetchProposal]);
+
   const handleSwap = useCallback(() => {
     if (!block?.headerItemId) return;
     onSwap({
@@ -2501,13 +2549,22 @@ function LineInspector({
   }, [block, proposalId, onClearSelection, onRefetchProposal, onRefetchCrew]);
 
   if (!block) return null;
-  // Live preview of row total — reflects the local (unsaved) price/qty so the
-  // PM sees the effect before blur commits it.
+  // Live preview of row total — reflects the local (unsaved) price/qty/hours
+  // so the PM sees the effect before blur commits it. For flat items the
+  // multiplier is 1; for hour/day items it scales both revenue and cost
+  // (symmetric with LineItemGrid on the document side).
   const parsedPrice = Number(priceValue);
   const parsedQty = Number(qtyValue);
+  const parsedMultiplier = Number(multiplierValue);
   const livePrice = Number.isFinite(parsedPrice) ? parsedPrice : effectiveUnitPrice;
   const liveQty = Number.isInteger(parsedQty) && parsedQty > 0 ? parsedQty : (block.quantity ?? 1);
-  const liveTotal = livePrice * liveQty;
+  const isHourOrDay = block.unitType === 'hour' || block.unitType === 'day';
+  const liveMultiplier = isHourOrDay
+    ? (Number.isFinite(parsedMultiplier) && parsedMultiplier > 0
+        ? parsedMultiplier
+        : (block.unitMultiplier != null && block.unitMultiplier > 0 ? block.unitMultiplier : 1))
+    : 1;
+  const liveTotal = livePrice * liveQty * liveMultiplier;
 
   const categoryLabel = (() => {
     switch (block.category) {
@@ -2604,11 +2661,43 @@ function LineInspector({
         </label>
       </div>
 
+      {/* Hours or Days — only for items whose catalog unit_type is hour/day.
+           Scales revenue AND cost. Saved to proposal_items.unit_multiplier. */}
+      {isHourOrDay && (
+        <label className="flex flex-col gap-1.5">
+          <span className="stage-label text-[var(--stage-text-tertiary)]">
+            {block.unitType === 'hour' ? 'Hours' : 'Days'}
+          </span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={multiplierValue}
+            onChange={(e) => setMultiplierValue(e.target.value.replace(/[^\d.]/g, ''))}
+            onBlur={saveMultiplier}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            }}
+            disabled={!block.headerItemId}
+            placeholder={block.unitType === 'hour' ? 'Hours per line' : 'Days per line'}
+            className="stage-input h-9 px-3 text-[13px] tabular-nums text-[var(--stage-text-primary)]"
+            aria-label={block.unitType === 'hour' ? 'Hours' : 'Days'}
+            title={`${block.unitType === 'hour' ? 'Hours' : 'Days'} per line — catalog default can be overridden for this proposal`}
+          />
+        </label>
+      )}
+
       {/* Row total + margin — live preview of price × qty vs. cost × qty.
            Margin band thresholds match the catalog edit page and the
            FinancialInspector for consistency. */}
       {(() => {
-        const liveCost = block.actualCost != null ? block.actualCost * liveQty : null;
+        // For a-la-carte rows: actualCost is per-unit, so scale by qty × multiplier.
+        // For bundle headers: actualCost is already the summed total for 1 bundle
+        // instance (children's multipliers already rolled up in the reducer),
+        // so we only scale by liveQty. Bundle headers never have hour/day
+        // unit_type themselves, so liveMultiplier is 1 for them anyway.
+        const liveCost = block.actualCost != null
+          ? (block.costIsComputed ? block.actualCost * liveQty : block.actualCost * liveQty * liveMultiplier)
+          : null;
         const rowMargin = liveCost != null ? liveTotal - liveCost : null;
         const rowMarginPct = liveCost != null && liveTotal > 0 ? rowMargin! / liveTotal : null;
         const marginColor = rowMarginPct == null

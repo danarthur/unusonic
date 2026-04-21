@@ -1341,6 +1341,9 @@ export type ProposalItemPatch = {
   override_price?: number | null;
   internal_notes?: string | null;
   actual_cost?: number | null;
+  /** Hours or days for unit_type='hour' / 'day' items. Scales revenue AND
+   *  cost (see calculate-proposal-total.ts). No effect on 'flat' items. */
+  unit_multiplier?: number | null;
 };
 
 export async function updateProposalItem(
@@ -1353,6 +1356,7 @@ export async function updateProposalItem(
     'override_price',
     'internal_notes',
     'actual_cost',
+    'unit_multiplier',
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowedKeys) {
