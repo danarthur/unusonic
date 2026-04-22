@@ -22,6 +22,409 @@ import { getRevenueTrend } from '@/widgets/dashboard/api/get-revenue-trend';
 import { searchMemory, type SourceType } from '../../lib/embeddings';
 import type { AionToolContext } from './types';
 
+// ---------------------------------------------------------------------------
+// Pure helpers — extracted from `lookup_historical_deals` so they can be
+// unit-tested without mocking the supabase chain. See §3.1 of the Phase 2
+// plan for the scoring rubric and payload caps.
+// ---------------------------------------------------------------------------
+
+export type HistoricalDealCandidate = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  proposed_date: string | null;
+  event_archetype: string | null;
+  venue_id: string | null;
+  organization_id: string | null;
+  event_id: string | null;
+  won_at: string | null;
+  lost_at: string | null;
+  created_at: string;
+};
+
+export type HistoricalDealSourceContext = {
+  event_archetype: string | null;
+  venue_id: string | null;
+  proposed_date: string | null;
+  guest_count_expected: number | null;
+};
+
+/**
+ * Score a candidate deal against a source deal using four structural factors:
+ * event archetype, venue, month-of-year (±1 month, circular), headcount (±25%).
+ * Each factor contributes 1 point — max score 4. Headcount is only scored when
+ * both source and candidate have an event-linked headcount.
+ */
+export function scoreStructuralSimilarity(
+  source: HistoricalDealSourceContext,
+  candidate: HistoricalDealCandidate,
+  candidateGuestCount: number | null,
+): number {
+  let score = 0;
+  if (source.event_archetype && candidate.event_archetype && source.event_archetype === candidate.event_archetype) {
+    score += 1;
+  }
+  if (source.venue_id && candidate.venue_id && source.venue_id === candidate.venue_id) {
+    score += 1;
+  }
+  if (source.proposed_date && candidate.proposed_date) {
+    const sm = new Date(source.proposed_date).getUTCMonth();
+    const cm = new Date(candidate.proposed_date).getUTCMonth();
+    const diff = Math.min(Math.abs(sm - cm), 12 - Math.abs(sm - cm));
+    if (diff <= 1) score += 1;
+  }
+  if (source.guest_count_expected != null && candidateGuestCount != null && source.guest_count_expected > 0) {
+    const delta = Math.abs(candidateGuestCount - source.guest_count_expected) / source.guest_count_expected;
+    if (delta <= 0.25) score += 1;
+  }
+  return score;
+}
+
+/**
+ * Cap a string to `n` characters, adding a trailing ellipsis when truncated.
+ * Returns null when the input is null/empty to preserve field-absence semantics.
+ */
+export function capString(s: string | null, n: number): string | null {
+  if (s == null) return null;
+  if (s.length <= n) return s;
+  return s.slice(0, n - 1) + '…';
+}
+
+/**
+ * Extract meaningful search tokens from a free-text query. Drops stop words
+ * and very short tokens, caps at 4, and returns an array of lowercase tokens
+ * usable for building an AND-chain of ILIKE patterns.
+ *
+ * Why: literal ILIKE fails on "Ally Emily" against title "Ally & Emily Wedding"
+ * because the `&` is between the tokens. Token-AND matching fires three
+ * independent `ILIKE '%token%'` constraints which `chainEq(title)` combines
+ * as AND — so any token arrangement matches.
+ */
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'for', 'of', 'in', 'on', 'at', 'by', 'to', 'from', 'with',
+  'and', 'or', 'but', 'is', 'was', 'are', 'were', 'be', 'been', 'being',
+  'what', 'which', 'who', 'whom', 'whose', 'where', 'when', 'why', 'how',
+  'did', 'do', 'does', 'done', 'doing', 'has', 'have', 'had', 'having',
+  'we', 'us', 'our', 'ours', 'you', 'your', 'yours', 'i', 'me', 'my', 'mine',
+  'they', 'them', 'their', 'theirs', 'this', 'that', 'these', 'those',
+  'much', 'many', 'some', 'any', 'all', 'each', 'every',
+  'quote', 'quoted', 'charge', 'charged', 'pay', 'paid', 'cost', 'costs',
+  'price', 'pricing', 'priced', 'total',
+]);
+
+export function extractSearchTokens(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/[\s,.!?]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !STOP_WORDS.has(t))
+    .slice(0, 4); // cap so a run-on sentence doesn't AND to zero
+}
+
+/** Escape `%` and `_` in a token so it's a literal ILIKE match. */
+export function toIlikePattern(token: string): string {
+  return `%${token.replace(/[%_]/g, '\\$&')}%`;
+}
+
+// ---------------------------------------------------------------------------
+// lookup_historical_deals helpers — private to this module.
+// Each helper covers one phase of the tool's flow so the main `execute`
+// stays under the repo's cognitive-complexity ceiling.
+// ---------------------------------------------------------------------------
+
+type AuthedClient = Awaited<ReturnType<typeof createClient>>;
+
+type DealRow = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  proposed_date: string | null;
+  event_archetype: string | null;
+  venue_id: string | null;
+  organization_id: string | null;
+  /** Nullable — weddings often have an individual contact (Ally / Emily)
+   *  rather than a company. Used by the union-query client filter. */
+  main_contact_id: string | null;
+  event_id: string | null;
+  won_at: string | null;
+  lost_at: string | null;
+  created_at: string;
+};
+
+type CandidateFilters = {
+  limit: number;
+  hasSimilarity: boolean;
+  excludeDealId?: string;
+  /** Directory entity ids matched from either explicit id or fuzzy name query.
+   *  Used to filter deals by organization_id OR main_contact_id. */
+  clientEntityIds: string[];
+  /** Raw fuzzy query — applied as a deal-title ILIKE fallback so wedding-style
+   *  deals (title on the DEAL, not the client entity) still surface. */
+  clientNameQuery?: string;
+  filters?: {
+    date_range?: [string, string];
+    status?: 'won' | 'lost' | 'any';
+    min_value?: number;
+    max_value?: number;
+    venue_entity_id?: string;
+  };
+};
+
+/**
+ * Resolve directory entity ids that match the caller's intent. Returns the
+ * explicit id as a singleton, fuzzy-matched ids for a name query, or an empty
+ * array when no entity matches (which is NOT a dead end — the caller falls
+ * back to a deal-title ILIKE so wedding-style deals still surface).
+ *
+ * Post-"Ally & Emily" fix (Sprint 3 polish): an empty list no longer
+ * short-circuits to an empty result — the candidate fetch will still try the
+ * deal-title match before giving up.
+ */
+async function resolveClientEntityIds(
+  supabase: AuthedClient,
+  workspaceId: string,
+  clientEntityId: string | undefined,
+  clientNameQuery: string | undefined,
+): Promise<string[]> {
+  if (clientEntityId) return [clientEntityId];
+  if (!clientNameQuery) return [];
+
+  const tokens = extractSearchTokens(clientNameQuery);
+  if (tokens.length === 0) return [];
+
+  // Chain .ilike() per token so all tokens must appear SOMEWHERE in the
+  // display name. Avoids the "Ally Emily" ≠ "Ally & Emily" literal failure.
+  let q = supabase
+    .schema('directory')
+    .from('entities')
+    .select('id')
+    .eq('owner_workspace_id', workspaceId)
+    .in('type', ['organization', 'client', 'company', 'person'])
+    .limit(20);
+  for (const token of tokens) {
+    q = q.ilike('display_name', toIlikePattern(token));
+  }
+  const { data } = await q;
+  return ((data ?? []) as { id: string }[]).map((e) => e.id);
+}
+
+/**
+ * Pull the four structural fields of the source deal used to score candidates.
+ * Source must be in the caller's workspace — `.eq('workspace_id', ...)` is the
+ * cross-workspace probe defence (Critic §Risk 2).
+ */
+async function fetchSimilarityContext(
+  supabase: AuthedClient,
+  workspaceId: string,
+  sourceDealId: string,
+): Promise<HistoricalDealSourceContext | null> {
+  const { data: srcDeal } = await supabase
+    .from('deals')
+    .select('event_archetype, venue_id, proposed_date, event_id')
+    .eq('id', sourceDealId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (!srcDeal) return null;
+  const src = srcDeal as { event_archetype: string | null; venue_id: string | null; proposed_date: string | null; event_id: string | null };
+
+  let guestCount: number | null = null;
+  if (src.event_id) {
+    const { data: ev } = await (supabase as unknown as { schema: (s: string) => { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { guest_count_expected: number | null; guest_count_actual: number | null } | null }> } } } } })
+      .schema('ops')
+      .from('events')
+      .select('guest_count_expected, guest_count_actual')
+      .eq('id', src.event_id)
+      .maybeSingle();
+    if (ev) guestCount = ev.guest_count_actual ?? ev.guest_count_expected ?? null;
+  }
+
+  return {
+    event_archetype: src.event_archetype,
+    venue_id: src.venue_id,
+    proposed_date: src.proposed_date,
+    guest_count_expected: guestCount,
+  };
+}
+
+async function fetchCandidateDeals(
+  supabase: AuthedClient,
+  workspaceId: string,
+  spec: CandidateFilters,
+): Promise<DealRow[] | null> {
+  const SELECT = 'id, title, status, proposed_date, event_archetype, venue_id, organization_id, main_contact_id, event_id, won_at, lost_at, created_at';
+  const perQueryLimit = spec.hasSimilarity ? 40 : Math.min(spec.limit + 5, 20);
+
+  // Re-usable base filter applier. Every union branch must carry the same
+  // workspace scope + shared filters — this prevents accidentally dropping
+  // e.g. `status='won'` on the title-match branch.
+  // `any` here matches the repo-wide pattern for building Supabase chains;
+  // the Supabase types are too recursive for a clean generic signature.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyBase = (q: any) => {
+    let acc = q
+      .eq('workspace_id', workspaceId)
+      .is('archived_at', null)
+      .order('proposed_date', { ascending: false })
+      .limit(perQueryLimit);
+    if (spec.excludeDealId) acc = acc.neq('id', spec.excludeDealId);
+    const f = spec.filters;
+    if (f?.status && f.status !== 'any') acc = acc.eq('status', f.status);
+    if (f?.date_range) acc = acc.gte('proposed_date', f.date_range[0]).lte('proposed_date', f.date_range[1]);
+    if (f?.venue_entity_id) acc = acc.eq('venue_id', f.venue_entity_id);
+    return acc;
+  };
+
+  const hasIds = spec.clientEntityIds.length > 0;
+  const hasQuery = !!spec.clientNameQuery?.trim();
+
+  // No client filter at all → return recent deals in the workspace. Similarity
+  // re-ranks them downstream when `similar_to_deal_id` is set.
+  if (!hasIds && !hasQuery) {
+    const { data, error } = await applyBase(supabase.from('deals').select(SELECT));
+    if (error) return null;
+    return (data ?? []) as DealRow[];
+  }
+
+  // Union: run up to 3 queries in parallel and dedupe by id. This is the
+  // "Ally & Emily" fix — a wedding deal with an individual client won't
+  // surface via `organization_id`, but the title match catches it. PostgREST
+  // `.or()` with ILIKE is fragile for values containing commas / parens, so
+  // we split the union server-side instead.
+  const queries: Array<Promise<{ data: DealRow[] | null; error: unknown }>> = [];
+
+  if (hasIds) {
+    queries.push(
+      applyBase(supabase.from('deals').select(SELECT))
+        .in('organization_id', spec.clientEntityIds),
+    );
+    queries.push(
+      applyBase(supabase.from('deals').select(SELECT))
+        .in('main_contact_id', spec.clientEntityIds),
+    );
+  }
+  if (hasQuery) {
+    // Token-AND title match: "Ally Emily" → ILIKE %Ally% AND ILIKE %Emily%
+    // catches the title "Ally & Emily Wedding" even though the raw query
+    // string misses the `&`.
+    const tokens = extractSearchTokens(spec.clientNameQuery!);
+    if (tokens.length > 0) {
+      let titleQ = applyBase(supabase.from('deals').select(SELECT));
+      for (const token of tokens) {
+        titleQ = titleQ.ilike('title', toIlikePattern(token));
+      }
+      queries.push(titleQ);
+    }
+  }
+
+  const results = await Promise.all(queries);
+
+  // Dedupe by id, keep newest-first ordering by proposed_date.
+  const seen = new Map<string, DealRow>();
+  for (const r of results) {
+    if (r.error) continue;
+    for (const row of (r.data ?? []) as DealRow[]) {
+      if (!seen.has(row.id)) seen.set(row.id, row);
+    }
+  }
+  return [...seen.values()].sort((a, b) =>
+    (b.proposed_date ?? '').localeCompare(a.proposed_date ?? ''),
+  );
+}
+
+/**
+ * Batch-load headcount for a set of event ids. Uses `guest_count_actual` when
+ * available (post-show truth), else `guest_count_expected`.
+ */
+async function fetchGuestCounts(supabase: AuthedClient, eventIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (eventIds.length === 0) return out;
+  const { data } = await (supabase as unknown as { schema: (s: string) => { from: (t: string) => { select: (c: string) => { in: (k: string, v: string[]) => Promise<{ data: { id: string; guest_count_expected: number | null; guest_count_actual: number | null }[] | null }> } } } })
+    .schema('ops')
+    .from('events')
+    .select('id, guest_count_expected, guest_count_actual')
+    .in('id', eventIds);
+  for (const ev of data ?? []) {
+    const hc = ev.guest_count_actual ?? ev.guest_count_expected;
+    if (hc != null) out.set(ev.id, hc);
+  }
+  return out;
+}
+
+/**
+ * Compute final_accepted_total + headline line-item per deal. Prefers an
+ * accepted proposal; falls back to the max-total non-draft proposal. Uses the
+ * same formula the app uses elsewhere: `(override_price ?? unit_price) * quantity`.
+ */
+async function computeDealTotals(
+  supabase: AuthedClient,
+  dealIds: string[],
+): Promise<Map<string, { total: number; headline: string | null }>> {
+  const out = new Map<string, { total: number; headline: string | null }>();
+  if (dealIds.length === 0) return out;
+
+  const { data: proposals } = await supabase
+    .from('proposals')
+    .select('id, deal_id, status, accepted_at')
+    .in('deal_id', dealIds)
+    .neq('status', 'draft');
+  const proposalRows = (proposals ?? []) as { id: string; deal_id: string; status: string; accepted_at: string | null }[];
+  if (proposalRows.length === 0) return out;
+
+  const { data: items } = await supabase
+    .from('proposal_items')
+    .select('proposal_id, name, quantity, unit_price, override_price')
+    .in('proposal_id', proposalRows.map((p) => p.id))
+    .eq('is_client_visible', true);
+
+  const totalsByProposal = new Map<string, number>();
+  const topLineByProposal = new Map<string, { name: string; amount: number }>();
+  for (const it of (items ?? []) as { proposal_id: string; name: string | null; quantity: number; unit_price: number | null; override_price: number | null }[]) {
+    const price = (it.override_price ?? it.unit_price) ?? 0;
+    const line = price * (it.quantity ?? 1);
+    totalsByProposal.set(it.proposal_id, (totalsByProposal.get(it.proposal_id) ?? 0) + line);
+    if (it.name) {
+      const current = topLineByProposal.get(it.proposal_id);
+      if (!current || line > current.amount) {
+        topLineByProposal.set(it.proposal_id, { name: it.name, amount: line });
+      }
+    }
+  }
+
+  const byDeal = new Map<string, { id: string; total: number; accepted: boolean }>();
+  for (const p of proposalRows) {
+    const total = totalsByProposal.get(p.id) ?? 0;
+    const accepted = Boolean(p.accepted_at);
+    const prev = byDeal.get(p.deal_id);
+    if (!prev || (accepted && !prev.accepted) || (accepted === prev.accepted && total > prev.total)) {
+      byDeal.set(p.deal_id, { id: p.id, total, accepted });
+    }
+  }
+  for (const [dealId, pick] of byDeal) {
+    out.set(dealId, { total: pick.total, headline: topLineByProposal.get(pick.id)?.name ?? null });
+  }
+  return out;
+}
+
+async function fetchClientNames(
+  supabase: AuthedClient,
+  workspaceId: string,
+  orgIds: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const unique = [...new Set(orgIds)];
+  if (unique.length === 0) return out;
+  const { data } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name')
+    .in('id', unique)
+    .eq('owner_workspace_id', workspaceId);
+  for (const e of (data ?? []) as { id: string; display_name: string | null }[]) {
+    if (e.display_name) out.set(e.id, e.display_name);
+  }
+  return out;
+}
+
 export function createKnowledgeTools(ctx: AionToolContext) {
   const { workspaceId, pageContext } = ctx;
 
@@ -459,6 +862,207 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     },
   });
 
+  // ---- Cross-deal lookup (Phase 2, Sprint 1) ----
+  //
+  // Answers the Henderson question: "what did we charge client X last June for
+  // an event like this?" Phase 1's structured-context block only sees the
+  // current deal, so cross-deal pricing references required RAG or trawling
+  // the UI. `lookup_historical_deals` is the structured-first answer.
+  //
+  // Plan: docs/reference/aion-deal-chat-phase2-plan.md §3.1.
+  //
+  // Workspace isolation discipline (Critic §Risk 2): the query filters by
+  // `workspace_id = ctx.workspaceId` at the SQL layer. RLS would also clamp
+  // this, but Critic flagged that `directory.entities` is cross-workspace
+  // visible via PARTNER edges — so a fuzzy `client_name_query` match could
+  // surface a same-named entity from another workspace unless we filter deals
+  // by workspace_id explicitly. Belt-and-suspenders is cheap here.
+  const lookup_historical_deals = tool({
+    description:
+      'Search deals and return pricing. The primary deal-search tool — use for ' +
+      'ANY question about deal pricing, totals, or past client work. ' +
+      'Handles: "how much did we charge for X", "what did we quote for Y", ' +
+      '"what did Henderson pay last June", "find similar deals". ' +
+      'Searches by deal title, client entity, contact person, or structural ' +
+      'similarity — all at once. Works for weddings (title-based), corporate ' +
+      'deals (client entity), and anything in between. ' +
+      'Returns per-deal payloads with title, client name, accepted total, ' +
+      'close date, status, and a headline of the largest line item. ' +
+      'Pass client_name_query with whatever the user said verbatim — the tool ' +
+      "strips to the essentials. Don't pre-filter by status unless the user " +
+      "explicitly asked for won/lost; a 'working' deal is still a valid pricing reference.",
+    inputSchema: z.object({
+      client_entity_id: z.string().optional().describe('Exact directory entity id for the client'),
+      client_name_query: z.string().optional().describe('Fuzzy match on directory.entities.display_name'),
+      similar_to_deal_id: z.string().optional().describe('Structural similarity to the given deal (event archetype, venue, month-of-year, headcount ±25%)'),
+      filters: z.object({
+        date_range: z.tuple([z.string(), z.string()]).optional().describe('[start, end] in YYYY-MM-DD'),
+        status: z.enum(['won', 'lost', 'any']).optional().describe('Deal status filter. Default: any'),
+        min_value: z.number().optional().describe('Minimum accepted total in cents'),
+        max_value: z.number().optional().describe('Maximum accepted total in cents'),
+        venue_entity_id: z.string().optional().describe('Scope to a specific venue'),
+      }).optional(),
+      limit: z.number().int().min(1).max(10).optional().describe('Max results. Default 5, cap 10.'),
+    }),
+    execute: async (params) => {
+      const supabase = await createClient();
+      const limit = Math.min(params.limit ?? 5, 10);
+
+      const clientEntityIds = await resolveClientEntityIds(
+        supabase,
+        workspaceId,
+        params.client_entity_id,
+        params.client_name_query,
+      );
+
+      const source = params.similar_to_deal_id
+        ? await fetchSimilarityContext(supabase, workspaceId, params.similar_to_deal_id)
+        : null;
+
+      // No short-circuit on empty entity list — the deal-title fallback
+      // inside fetchCandidateDeals catches wedding-style deals where the
+      // title carries the client names.
+      const rows = await fetchCandidateDeals(supabase, workspaceId, {
+        limit,
+        hasSimilarity: !!source,
+        excludeDealId: params.similar_to_deal_id,
+        clientEntityIds,
+        clientNameQuery: params.client_name_query,
+        filters: params.filters,
+      });
+      if (rows == null) return { deals: [], truncated: false, error: 'Deal lookup failed.' };
+      if (rows.length === 0) return { deals: [], truncated: false };
+
+      const guestByEventId = source
+        ? await fetchGuestCounts(supabase, rows.map((r) => r.event_id).filter((x): x is string => Boolean(x)))
+        : new Map<string, number>();
+
+      const scored = rows.map((r) => ({
+        row: r,
+        score: source ? scoreStructuralSimilarity(source, r, r.event_id ? guestByEventId.get(r.event_id) ?? null : null) : 0,
+      }));
+      const ranked = source
+        ? scored.filter((s) => s.score > 0).sort((a, b) =>
+            b.score - a.score || (b.row.proposed_date ?? '').localeCompare(a.row.proposed_date ?? ''),
+          )
+        : scored;
+
+      const totalCandidates = ranked.length;
+      const sliced = ranked.slice(0, limit);
+      const candidateDealIds = sliced.map((s) => s.row.id);
+
+      // Resolve client names via both organization_id AND main_contact_id
+      // in one name-map fetch. Wedding deals typically store the client on
+      // main_contact_id (individual person), so organization-only resolution
+      // left client_name=null on ~half of deals.
+      const nameEntityIds: string[] = [];
+      for (const s of sliced) {
+        if (s.row.organization_id) nameEntityIds.push(s.row.organization_id);
+        if (s.row.main_contact_id) nameEntityIds.push(s.row.main_contact_id);
+      }
+      const [dealTotals, clientNameMap] = await Promise.all([
+        computeDealTotals(supabase, candidateDealIds),
+        fetchClientNames(supabase, workspaceId, nameEntityIds),
+      ]);
+
+      const deals = sliced.map(({ row }) => {
+        const moneyInfo = dealTotals.get(row.id);
+        // Prefer organization name (company / couple's surname entity) over
+        // individual contact name when both exist.
+        const clientName =
+          (row.organization_id && clientNameMap.get(row.organization_id)) ||
+          (row.main_contact_id && clientNameMap.get(row.main_contact_id)) ||
+          null;
+        return {
+          deal_id: row.id,
+          title: capString(row.title, 60),
+          client_name: clientName,
+          final_accepted_total: moneyInfo?.total ?? null,
+          close_date: row.won_at ?? row.lost_at ?? null,
+          proposed_date: row.proposed_date,
+          status: row.status,
+          event_archetype: row.event_archetype,
+          headline: capString(moneyInfo?.headline ?? null, 80),
+        };
+      });
+
+      // Phase 2 launch telemetry — single structured line grepable from logs.
+      // Tracks usage pattern + tool-chain cost without adding a new metric
+      // store. `similar_mode` lets us see whether owners lean on fuzzy names
+      // or "deals like this one" — informs whether RAG (Phase 3) is worth
+      // the embedding-pipeline investment.
+      console.log(
+        `[aion.lookup_historical_deals] workspace=${workspaceId} returned=${deals.length} candidates=${totalCandidates} truncated=${totalCandidates > limit} similar_mode=${source ? 'structural' : 'name_or_filter'}`,
+      );
+
+      return { deals, truncated: totalCandidates > limit };
+    },
+  });
+
+  // ---- Catalog lookup (Phase 2, Sprint 1, Week 2) ----
+  //
+  // Wraps the `public.aion_lookup_catalog` SECURITY DEFINER RPC (migration
+  // 20260513000000). The RPC is authenticated-only with an explicit
+  // workspace-member check and is REVOKEd from anon/PUBLIC per the
+  // feedback_postgres_function_grants discipline.
+  //
+  // Why an RPC (and not a direct `.from('packages')` call)?
+  //   1. Forward-compat: when catalog moves to its own schema (CLAUDE.md rule
+  //      7 — `catalog` not PostgREST-exposed), the tool surface stays.
+  //   2. Defensive discipline: SECURITY DEFINER + workspace-member check
+  //      still prevents cross-workspace reads even if RLS were ever relaxed.
+  //
+  // Plan: docs/reference/aion-deal-chat-phase2-plan.md §3.1.2.
+  const lookup_catalog = tool({
+    description:
+      'Search the workspace catalog (packages + items) by name or description. ' +
+      'Returns default price, category, a one-line description, and the catalog id. ' +
+      'Use when the user asks "what do we charge for X", "do we sell Y", or pricing-reference questions. ' +
+      'Does NOT do semantic search — plain fuzzy name/description match. For semantic pricing intent, combine with lookup_historical_deals.',
+    inputSchema: z.object({
+      query: z.string().describe('Term to search for. Empty string returns recent active entries.'),
+      kind: z.enum(['package', 'item', 'any']).optional().describe("Filter by type. 'package' = container, 'item' = individual service/rental/etc. Default: any."),
+      limit: z.number().int().min(1).max(8).optional().describe('Max results. Default 5, cap 8.'),
+    }),
+    execute: async (params) => {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc('aion_lookup_catalog', {
+        p_workspace_id: workspaceId,
+        p_query: params.query ?? '',
+        p_kind: params.kind ?? 'any',
+        p_limit: params.limit ?? 5,
+      });
+      if (error) {
+        // Don't echo the raw database error back to the model — it can contain
+        // schema hints. Give a clean boundary message; Sonnet handles it.
+        return { results: [], error: 'Catalog lookup failed.' };
+      }
+      type Row = {
+        id: string;
+        name: string;
+        category: string;
+        price: number | null;
+        description: string | null;
+        kind: 'package' | 'item';
+      };
+      const rows = (data ?? []) as Row[];
+      const results = rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        kind: r.kind,
+        category: r.category,
+        price: r.price,
+        description: capString(r.description, 140),
+      }));
+      // Phase 2 launch telemetry. Same shape as lookup_historical_deals so
+      // both tools can be grepped side-by-side for tool-chain analysis.
+      console.log(
+        `[aion.lookup_catalog] workspace=${workspaceId} returned=${results.length} kind=${params.kind ?? 'any'} had_query=${!!params.query?.trim()}`,
+      );
+      return { results, count: results.length };
+    },
+  });
+
   return {
     search_entities, get_entity_details,
     get_deal_details, get_deal_crew, get_proposal_details,
@@ -467,5 +1071,6 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     get_pipeline_summary, get_revenue_summary, get_revenue_trend, get_client_concentration, get_client_insights,
     search_workspace_knowledge, get_proactive_insights, dismiss_insight,
     get_run_of_show, get_event_financials,
+    lookup_historical_deals, lookup_catalog,
   };
 }

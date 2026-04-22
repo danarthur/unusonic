@@ -1,11 +1,27 @@
 'use client';
 
 import { memo, useState, useCallback, useMemo, type ReactNode } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import hljs from 'highlight.js/lib/core';
 import { Copy, Check } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { CitationPill } from './CitationPill';
+import type { CitationKind } from '../actions/resolve-citation';
+
+/**
+ * react-markdown v10 sanitizes all link URLs through `urlTransform`, and the
+ * default sanitizer rejects any scheme it doesn't recognize — including our
+ * custom `citation:` scheme. That caused every citation link to fall through
+ * to the plain-<a> fallback with a stripped href. This wrapper preserves
+ * citation URLs verbatim and delegates everything else to the default
+ * sanitizer so http/mailto/etc. still get their safety filter.
+ */
+const CITATION_URL_PREFIX = /^citation:/i;
+function citationSafeUrlTransform(url: string): string {
+  if (CITATION_URL_PREFIX.test(url)) return url;
+  return defaultUrlTransform(url);
+}
 
 // Register common languages (tree-shakeable)
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -97,10 +113,19 @@ function CodeBlock({ children, className }: { children: ReactNode; className?: s
 // ---------------------------------------------------------------------------
 
 export const AionMarkdown = memo(function AionMarkdown({ content }: { content: string }) {
+  // Pre-process inline citation tags into custom-scheme markdown links.
+  // The `a` component override below intercepts `citation:` hrefs and renders
+  // a <CitationPill> instead of a normal anchor. Doing this as a string
+  // substitution (rather than a remark plugin) keeps the transformation
+  // dependency-free and survives streaming partial content — once a tag is
+  // complete, it renders; until then the raw text stays visible as-is.
+  const processed = useMemo(() => replaceCitationTags(content), [content]);
+
   return (
     <div className="aion-prose">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        urlTransform={citationSafeUrlTransform}
         components={{
           pre({ children }) {
             return <pre>{children}</pre>;
@@ -113,6 +138,16 @@ export const AionMarkdown = memo(function AionMarkdown({ content }: { content: s
             return <code className={className} {...props}>{children}</code>;
           },
           a({ href, children, ...props }) {
+            const citation = parseCitationHref(href);
+            if (citation) {
+              return (
+                <CitationPill
+                  kind={citation.kind}
+                  id={citation.id}
+                  fallbackLabel={extractText(children)}
+                />
+              );
+            }
             return (
               <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
                 {children}
@@ -121,7 +156,7 @@ export const AionMarkdown = memo(function AionMarkdown({ content }: { content: s
           },
         }}
       >
-        {content}
+        {processed}
       </ReactMarkdown>
     </div>
   );
@@ -134,6 +169,39 @@ export const AionMarkdown = memo(function AionMarkdown({ content }: { content: s
 function isBlockCode(props: Record<string, unknown>): boolean {
   const node = props.node as { position?: { start?: { line?: number } } } | undefined;
   return !!node;
+}
+
+// ---------------------------------------------------------------------------
+// Citation tag helpers
+// ---------------------------------------------------------------------------
+
+const CITATION_REGEX = /<citation\s+kind="(deal|entity|catalog)"\s+id="([0-9a-f-]{36})">([^<]{1,80})<\/citation>/gi;
+const CITATION_HREF_REGEX = /^citation:(deal|entity|catalog):([0-9a-f-]{36})$/i;
+const MD_LABEL_ESCAPE = /([\[\]\\])/g;
+
+/**
+ * Replace `<citation kind="..." id="...">Label</citation>` blocks with
+ * `[Label](citation:<kind>:<id>)`. Bad matches pass through untouched — a
+ * partial mid-stream chunk may look like `<citation kind="deal" id="...` and
+ * we leave that visible until the close tag arrives.
+ */
+export function replaceCitationTags(input: string): string {
+  return input.replace(CITATION_REGEX, (_full, kind: string, id: string, label: string) => {
+    // Escape any characters that would otherwise break the markdown link
+    // label. Labels come from Sonnet — assume they can contain brackets.
+    const safeLabel = label.replace(MD_LABEL_ESCAPE, '\\$1');
+    return `[${safeLabel}](citation:${kind.toLowerCase()}:${id.toLowerCase()})`;
+  });
+}
+
+/**
+ * Parse a citation href back into {kind, id}. Returns null for normal anchors.
+ */
+export function parseCitationHref(href: string | undefined): { kind: CitationKind; id: string } | null {
+  if (!href) return null;
+  const m = href.match(CITATION_HREF_REGEX);
+  if (!m) return null;
+  return { kind: m[1].toLowerCase() as CitationKind, id: m[2].toLowerCase() };
 }
 
 function extractText(node: ReactNode): string {

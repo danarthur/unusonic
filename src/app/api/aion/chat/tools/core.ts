@@ -613,24 +613,17 @@ export function createCoreTools(ctx: AionToolContext) {
     },
   });
 
-  const search_deals = tool({
-    description: 'Search for deals by name, client, or status.',
-    inputSchema: z.object({
-      query: z.string().describe('Search term — deal title, client name, or event type'),
-      status: z.string().optional().describe('Filter by status: inquiry, proposal, contract_sent, won, lost'),
-    }),
-    execute: async (params) => {
-      const supabase = await createClient();
-      const pattern = `%${params.query}%`;
-      let q = supabase.from('deals')
-        .select('id, title, status, proposed_date, event_archetype, budget_estimated')
-        .eq('workspace_id', workspaceId).ilike('title', pattern).is('archived_at', null)
-        .order('created_at', { ascending: false }).limit(5);
-      if (params.status) q = q.eq('status', params.status);
-      const { data } = await q;
-      return { deals: (data ?? []) as Array<{ id: string; title: string | null; status: string; proposed_date: string | null; event_archetype: string | null; budget_estimated: number | null }>, count: data?.length ?? 0 };
-    },
-  });
+  // NOTE: Removed 2026-04-22 — `search_deals` was a narrower, older tool
+  // that only matched `deals.title` and so silently returned nothing for
+  // wedding-style deals where the couple's names live on the client entity.
+  // It also shadowed `lookup_historical_deals` (knowledge.ts) in Sonnet's
+  // tool pick because its description was simpler; owners asking "how much
+  // did we charge for the Ally & Emily wedding" got an unhelpful miss.
+  //
+  // `lookup_historical_deals` (knowledge.ts) is the unified replacement — it
+  // unions organization_id + main_contact_id + title match and also returns
+  // proposal totals (which search_deals didn't). If you need a cheap "is this
+  // deal in the workspace" check, use get_deal_details with a dealId.
 
   return {
     save_voice_config,
@@ -644,6 +637,5 @@ export function createCoreTools(ctx: AionToolContext) {
     dismiss_follow_up: dismiss_follow_up_tool,
     snooze_follow_up,
     get_current_config,
-    search_deals,
   };
 }
