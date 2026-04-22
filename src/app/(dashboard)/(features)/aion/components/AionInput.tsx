@@ -185,10 +185,15 @@ export const AionInput: React.FC<AionInputProps> = (props) => {
           autoComplete="off"
         />
 
-        {/* Right module: voice + send */}
+        {/* Right module: voice (mobile only) + send.
+            Phase 2 Sprint 3 §3.3: voice input ships on mobile only. Desktop
+            mic was cut — Salesforce Einstein Voice was retired in 2020 for
+            the reason owners don't talk at a laptop. `md:hidden` hides it
+            at ≥768px; the send button is the sole composer action on desktop. */}
         {showVoice && !isLoading && (
           <div className={cn(
             'shrink-0 transition-[width,opacity] duration-[120ms] overflow-hidden',
+            'md:hidden',  // mobile-only mount
             hasContent ? 'w-0 opacity-0' : 'w-[34px] opacity-100',
           )}>
             <AionVoice />
