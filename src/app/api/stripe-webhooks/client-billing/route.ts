@@ -246,6 +246,33 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
         stripeEventId: paymentIntent.id,
       });
     }
+
+    // Phase 2 Sprint 2: resolve any money_event proactive line anchored to
+    // this proposal (deposit_overdue). Silent failure — the pill auto-expires
+    // in 72h regardless.
+    try {
+      const { data: dealRow } = await supabase
+        .from('deals')
+        .select('workspace_id')
+        .eq('id', existing.deal_id ?? '')
+        .maybeSingle();
+      const wsId = (dealRow as { workspace_id: string } | null)?.workspace_id;
+      if (wsId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex not in generated types for system client
+        await (supabase as any)
+          .schema('cortex')
+          .rpc('resolve_aion_proactive_lines_by_artifact', {
+            p_workspace_id: wsId,
+            p_artifact_kind: 'proposal',
+            p_artifact_id: proposal_id,
+          });
+      }
+    } catch (resolveErr) {
+      Sentry.logger.warn('stripe.clientBilling.proactiveResolveSkipped', {
+        proposalId: proposal_id,
+        error: (resolveErr as Error).message,
+      });
+    }
   }
 
   return json({ received: true });

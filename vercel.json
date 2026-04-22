@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/owner-cadence-rollup",
       "schedule": "10 9 * * *"
+    },
+    {
+      "path": "/api/cron/aion-proactive",
+      "schedule": "0 * * * *"
     }
   ]
 }

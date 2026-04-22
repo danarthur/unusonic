@@ -264,6 +264,31 @@ async function handleInboundEmail(payload: PostmarkInboundPayload): Promise<Inbo
     bodyText,
   );
 
+  // 9. Phase 2 Sprint 2: resolve dead_silence and proposal_engagement proactive
+  //    lines for this deal. Silence is broken (deal got a reply); both pills
+  //    are now stale. money_event lines are intentionally left alone — a
+  //    client reply saying "I'll pay tomorrow" isn't an actual payment.
+  if (threadRow.deal_id) {
+    for (const signalType of ['dead_silence', 'proposal_engagement'] as const) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .schema('cortex')
+          .rpc('resolve_aion_proactive_lines_by_deal', {
+            p_workspace_id: threadRow.workspace_id,
+            p_deal_id: threadRow.deal_id,
+            p_signal_type: signalType,
+          });
+      } catch (resolveErr) {
+        console.warn(
+          '[postmark webhook] resolve_aion_proactive_lines_by_deal skipped:',
+          signalType,
+          (resolveErr as Error).message,
+        );
+      }
+    }
+  }
+
   return { ok: true, messageId: newMessageId as string };
 }
 

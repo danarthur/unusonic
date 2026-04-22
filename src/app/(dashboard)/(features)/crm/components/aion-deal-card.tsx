@@ -32,14 +32,17 @@
  */
 
 import * as React from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowRight, MessageSquare, Mic } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp, ExternalLink, MessageSquare, Mic, Plus, Sparkles } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
+import { useSession, type Message as SessionMessage } from '@/shared/ui/providers/SessionContext';
+import { useRequiredWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import type {
   AionCardData,
   OutboundRow,
@@ -53,6 +56,9 @@ import {
   WhyThisDisclosure,
   type SignalEntry,
 } from './aion-card-primitives';
+import { ProactiveLineContainer } from './proactive-line-pill';
+import type { ProactiveLine } from '../actions/proactive-line-actions';
+import { AionMarkdown } from '@/app/(dashboard)/(features)/aion/components/AionMarkdown';
 
 // ---------------------------------------------------------------------------
 // Types + public API
@@ -63,6 +69,10 @@ export type AionDealCardContext = 'deal_lens' | 'archive';
 export type AionDealCardProps = {
   data: AionCardData;
   context?: AionDealCardContext;
+  /** Display title stored on the scope-linked session at create time so the
+   *  Aion-tab sidebar can label the thread meaningfully before the live
+   *  header fetch resolves. Optional — falls back to "Deal" in the header. */
+  dealTitle?: string | null;
   onAcceptAdvance?: (row: PipelineRow) => void;
   onDismissAdvance?: (row: PipelineRow) => void;
   /** Fired when the user clicks the Draft CTA — used for telemetry. The card
@@ -81,13 +91,11 @@ type PrimaryRecommendation =
   | { kind: 'outbound'; row: OutboundRow }
   | { kind: 'pipeline'; row: PipelineRow };
 
-// Chat conversation message shape. Backend wiring lands separately.
-export type AionChatMessage = {
-  id: string;
-  role: 'user' | 'aion';
-  content: string;
-  timestamp?: string;
-};
+// Chat conversation message shape — uses SessionContext's Message type so the
+// card renders the same thread rows the Aion tab does. Role can be 'user' |
+// 'assistant' | 'system'; the card's MessageBubble treats anything non-'user'
+// as Aion-authored (visually identical to the legacy 'aion' literal).
+export type AionChatMessage = SessionMessage;
 
 /**
  * Simple tailwind-style breakpoint hook — mirrors `md:` (768) and `lg:` (1024)
@@ -121,6 +129,7 @@ function useBreakpoint(): 'mobile' | 'tablet' | 'desktop' {
 export function AionDealCard({
   data,
   context = 'deal_lens',
+  dealTitle,
   onAcceptAdvance,
   onDismissAdvance,
   onDraftNudge,
@@ -129,20 +138,136 @@ export function AionDealCard({
   onSnoozeNudge,
 }: AionDealCardProps) {
   const bp = useBreakpoint();
-  // Conversation scaffold state — scoped to this deal. Backend wiring replaces
-  // the in-memory list with a persisted thread (likely deal diary entries).
-  const [messages, setMessages] = React.useState<AionChatMessage[]>([]);
-  const handleSendMessage = React.useCallback((content: string) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `msg_${Date.now()}`,
-        role: 'user',
-        content,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
-  }, []);
+  // Wire the card's chat surface to the unified session store
+  // (cortex.aion_sessions scope='deal'). Messages rendered here are the same
+  // rows that show up under the Aion-tab sidebar's "Deals" section — two
+  // views into one thread. See docs/reference/aion-deal-chat-design.md §2.
+  const workspaceId = useRequiredWorkspace();
+  const {
+    messages: sessionMessages,
+    sessions: allSessions,
+    currentSessionId,
+    openScopedSession,
+    createNewScopedChat,
+    sendChatMessage,
+  } = useSession();
+  const [dealSessionId, setDealSessionId] = React.useState<string | null>(null);
+
+  // Resume or create the deal-scoped session whenever the dealId changes.
+  // openScopedSession is idempotent (cortex.resume_or_create_aion_session
+  // returns the existing row when one is present), so remounting is cheap.
+  // It also sets the session as current — the scope header picks that up.
+  //
+  // We pass the deal title so the sidebar's grouping label ("Alex &
+  // Christine's Wedding") resolves immediately from the optimistic client
+  // state. generate-title (see generate-title.ts) now treats a session
+  // title that exactly matches the scope entity's title as a placeholder
+  // and regenerates from conversation content after the first assistant
+  // turn — so threads still get content-based titles while the group
+  // header stays correct.
+  React.useEffect(() => {
+    let cancelled = false;
+    openScopedSession({
+      workspaceId,
+      scopeType: 'deal',
+      scopeEntityId: data.dealId,
+      title: dealTitle ?? null,
+    }).then((id) => {
+      if (!cancelled && id) setDealSessionId(id);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data.dealId, workspaceId, dealTitle, openScopedSession]);
+
+  // Only show thread messages once the async session open resolves AND the
+  // current session matches — guards against flashing a prior session's
+  // messages during the brief mount-to-resolve window.
+  const messages: AionChatMessage[] =
+    dealSessionId && currentSessionId === dealSessionId ? sessionMessages : [];
+
+  const handleSendMessage = React.useCallback(
+    (content: string) => {
+      // Fire-and-forget — sendChatMessage handles streaming + persistence via
+      // SessionContext. The user message and assistant reply both appear in
+      // the thread via the shared session state.
+      sendChatMessage({ text: content, workspaceId }).catch((err) => {
+        console.error('[AionDealCard] sendChatMessage failed:', err);
+        toast.error('Aion could not send that message. Try again.');
+      });
+    },
+    [sendChatMessage, workspaceId],
+  );
+
+  // Spin up a fresh thread under the same deal scope. The new session becomes
+  // current; the old one stays under Productions in the sidebar.
+  // Title carries the deal name for sidebar grouping; generate-title will
+  // replace it with a content-based title after the first assistant turn
+  // (the title-matches-scope-entity guard allows replacement).
+  const handleNewChatInScope = React.useCallback(async () => {
+    const id = await createNewScopedChat({
+      workspaceId,
+      scopeType: 'deal',
+      scopeEntityId: data.dealId,
+      title: dealTitle ?? null,
+    });
+    if (id) setDealSessionId(id);
+  }, [createNewScopedChat, workspaceId, data.dealId, dealTitle]);
+
+  // Thread-title for the header bar above the scroll region. Until the title
+  // generator fires (after first assistant turn), this falls back to "New
+  // conversation" — matches ChatGPT's pre-title placeholder.
+  const activeSessionMeta = React.useMemo(
+    () => allSessions.find((s) => s.id === dealSessionId) ?? null,
+    [allSessions, dealSessionId],
+  );
+  const threadTitle = activeSessionMeta?.title?.trim() || 'New conversation';
+
+  // Collapsed state is persisted per-deal so each production remembers its
+  // own open/closed preference. When the user minimizes chat on Ally &
+  // Emily, they expect to find Aion closed there but still open on Corporate
+  // Gala. Key is scoped by dealId; only runs client-side.
+  const collapseStorageKey = `unusonic.aion_chat_collapsed.${data.dealId}`;
+  const [isChatCollapsed, setIsChatCollapsed] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(collapseStorageKey) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const toggleChatCollapsed = React.useCallback(() => {
+    setIsChatCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(collapseStorageKey, String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, [collapseStorageKey]);
+
+  // Proactive-line "Ask Aion" handler. Click on the pill headline posts the
+  // insight as a user message into the deal-scoped thread so Aion can riff on
+  // it. Plan §3.2.4: "Click expands the thread with the insight auto-posted
+  // as a system message to kick off a conversation about it."
+  // We send as a user turn (not system) — feels more conversational and
+  // reuses the existing sendChatMessage path.
+  const handleAskAboutProactiveLine = React.useCallback(
+    (line: ProactiveLine) => {
+      if (isChatCollapsed) {
+        setIsChatCollapsed(false);
+        try {
+          window.localStorage.setItem(collapseStorageKey, 'false');
+        } catch {
+          /* ignore */
+        }
+      }
+      handleSendMessage(line.headline);
+    },
+    [isChatCollapsed, collapseStorageKey, handleSendMessage],
+  );
 
   // Inline composer state — when set, the NudgeComposer renders below the
   // footer CTAs with the row's suggested channel preselected.
@@ -285,6 +410,10 @@ export function AionDealCard({
             <TopBar data={data} />
 
             <div className="space-y-3 max-w-[640px] mt-3">
+              <ProactiveLineContainer
+                dealId={data.dealId}
+                onAsk={handleAskAboutProactiveLine}
+              />
               <VoiceParagraph voice={data.voice} />
               <SignalsList signals={signals} />
               <WhyThisDisclosure
@@ -295,17 +424,66 @@ export function AionDealCard({
           </div>
         </div>
 
-        {/* Conversation zone — scaffold only. Renders when messages exist;
-            backend wiring persists the thread (likely to the deal diary). */}
-        <ConversationThread messages={messages} />
+        {/* Conversation zone — renders when messages exist AND chat is not
+            collapsed. Header bar shows the thread title (auto-generated
+            after first assistant turn) plus controls for spawning a fresh
+            thread in this deal scope and for opening the current thread in
+            the full /aion view. */}
+        {!isChatCollapsed && (
+          <ConversationThread
+            messages={messages}
+            threadTitle={threadTitle}
+            sessionId={dealSessionId}
+            onNewChat={handleNewChatInScope}
+            onCollapse={toggleChatCollapsed}
+          />
+        )}
 
-        {/* Action footer — input + primary CTAs. Wraps to two rows on mobile;
-            single row on tablet+. */}
+        {/* Collapsed-chat row — a single-line "Open chat" pill that replaces
+            the input + thread. Clicking it restores the full chat. Primary
+            CTAs in FooterActions below stay visible either way. */}
+        {isChatCollapsed ? (
+          <div
+            className="mt-3 pt-3 flex items-center justify-between gap-2"
+            style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}
+          >
+            <button
+              type="button"
+              onClick={toggleChatCollapsed}
+              className={cn(
+                'flex-1 flex items-center justify-between gap-2 rounded-md px-3 py-1.5',
+                'bg-[var(--ctx-well)] border border-[var(--stage-edge-subtle)]',
+                'text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)]',
+                'hover:border-[var(--stage-accent)] transition-colors duration-[80ms]',
+              )}
+              aria-label="Open Aion chat"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <AionMark size={14} status="ambient" />
+                <span className="truncate">
+                  {messages.length > 0
+                    ? `Aion chat · ${messages.length} message${messages.length === 1 ? '' : 's'}`
+                    : 'Ask Aion'}
+                </span>
+              </span>
+              <ChevronUp size={12} strokeWidth={1.5} aria-hidden />
+            </button>
+            <div className="flex items-center justify-end gap-2 shrink-0">
+              <FooterActions
+                primary={primary}
+                outboundRow={hasOutbound ? outboundRows[0] : null}
+                pipelineRow={hasPipeline ? pipelineRows[0] : null}
+                onAcceptAdvance={(row) => onAcceptAdvance?.(row)}
+                onDraftNudge={handleStartDraft}
+              />
+            </div>
+          </div>
+        ) : (
         <div
           className="mt-3 pt-3 flex flex-col md:flex-row md:items-center gap-2"
           style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}
         >
-          <AionChatInput dealId={data.dealId} onSend={handleSendMessage} />
+          <AionChatInput onSend={handleSendMessage} />
           <div className="flex items-center justify-end gap-2">
             <FooterActions
               primary={primary}
@@ -316,6 +494,7 @@ export function AionDealCard({
             />
           </div>
         </div>
+        )}
 
         {/* Inline nudge composer — appears when Draft is clicked. Logs the
             nudge via actOnFollowUp which flips the follow_up_queue item to
@@ -440,7 +619,24 @@ function formatShortDate(iso: string): string {
 // Backend wiring persists thread state (deal diary) separately.
 // ---------------------------------------------------------------------------
 
-function ConversationThread({ messages }: { messages: AionChatMessage[] }) {
+function ConversationThread({
+  messages,
+  threadTitle,
+  sessionId,
+  onNewChat,
+  onCollapse,
+}: {
+  messages: AionChatMessage[];
+  threadTitle: string;
+  /** Current session id — powers the "Open in Aion" deep-link. NULL during
+   *  the brief mount window before openScopedSession resolves. */
+  sessionId: string | null;
+  /** Spawn a fresh thread in this deal scope (same production, new topic). */
+  onNewChat: () => void;
+  /** Collapse the chat region (thread + input). Parent persists the state
+   *  per-deal so each production remembers its preference. */
+  onCollapse: () => void;
+}) {
   const endRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -451,24 +647,98 @@ function ConversationThread({ messages }: { messages: AionChatMessage[] }) {
 
   if (messages.length === 0) return null;
 
+  // Deep-link into /aion with this session pre-selected. AionPageClient reads
+  // the `session` query param and hands it to selectSession on mount.
+  const openInAionHref = sessionId
+    ? `/aion?session=${encodeURIComponent(sessionId)}`
+    : '/aion';
+
   return (
     <div
-      className="mt-3 pt-3 max-h-[240px] overflow-y-auto space-y-2"
+      className="mt-3 pt-3 flex flex-col"
       style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}
-      data-surface="elevated"
     >
-      {messages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
-      ))}
-      <div ref={endRef} />
+      {/* Thread header — title + controls. Card compression fix per
+          docs/reference/aion-deal-chat-design.md §3 (sticky header above a
+          fixed-height scroll region keeps the card from becoming a monolith
+          as the thread grows). */}
+      <div className="flex items-center gap-1.5 pb-2">
+        <p
+          className="text-xs truncate flex-1 leading-none"
+          style={{ color: 'var(--stage-text-secondary)' }}
+          title={threadTitle}
+        >
+          {threadTitle}
+        </p>
+        <button
+          type="button"
+          onClick={onNewChat}
+          className={cn(
+            'shrink-0 p-1 rounded-[4px]',
+            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
+            'hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]',
+          )}
+          aria-label="New chat about this production"
+          title="New chat about this production"
+        >
+          <Plus size={13} strokeWidth={1.5} />
+        </button>
+        <Link
+          href={openInAionHref}
+          className={cn(
+            'shrink-0 p-1 rounded-[4px]',
+            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
+            'hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]',
+          )}
+          aria-label="Open in Aion"
+          title="Open in Aion"
+        >
+          <ExternalLink size={13} strokeWidth={1.5} />
+        </Link>
+        <button
+          type="button"
+          onClick={onCollapse}
+          className={cn(
+            'shrink-0 p-1 rounded-[4px]',
+            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
+            'hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]',
+          )}
+          aria-label="Minimize chat"
+          title="Minimize chat"
+        >
+          <ChevronDown size={13} strokeWidth={1.5} />
+        </button>
+      </div>
+
+      {/* Fixed-height scroll region — 320px matches Field Expert spec. Keeps
+          the briefing + signals always visible even as the conversation
+          grows. The "Open in Aion" link is the escape valve for longer
+          reviews of history. */}
+      <div
+        className="h-[320px] overflow-y-auto space-y-2 pr-1"
+        data-surface="elevated"
+      >
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
+        <div ref={endRef} />
+      </div>
     </div>
   );
 }
 
 function MessageBubble({ message }: { message: AionChatMessage }) {
   const isUser = message.role === 'user';
+  // Assistant messages lead with the AionMark living logo as the avatar —
+  // identity signature for every Aion turn. User turns render right-aligned
+  // without an avatar (the user is implicit).
   return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+    <div className={cn('flex items-start gap-2', isUser ? 'justify-end' : 'justify-start')}>
+      {!isUser && (
+        <div className="shrink-0 mt-0.5">
+          <AionMark size={22} status="ambient" />
+        </div>
+      )}
       <div
         className={cn(
           'max-w-[80%] rounded-md px-3 py-2 leading-snug',
@@ -483,18 +753,22 @@ function MessageBubble({ message }: { message: AionChatMessage }) {
             : 'var(--stage-text-secondary)',
         }}
       >
-        {!isUser && (
-          <span
-            className="stage-label tracking-wide uppercase block mb-0.5"
-            style={{
-              fontSize: '10px',
-              color: 'var(--stage-text-tertiary, var(--stage-text-secondary))',
-            }}
+        {/* Assistant text is run through AionMarkdown so inline <citation>
+            tags render as clickable CitationPills (Phase 2 §3.1.3). User
+            text is left plain — no markdown on human-authored input. */}
+        {!isUser && (message as { preamble?: string }).preamble?.trim() && (
+          <div
+            className="mb-1.5 flex items-start gap-1 text-[0.72rem] italic leading-snug"
+            style={{ color: 'var(--stage-text-tertiary)' }}
+            aria-label="Aion's reasoning"
           >
-            Aion
-          </span>
+            <Sparkles size={9} strokeWidth={1.5} className="shrink-0 mt-[3px] opacity-60" aria-hidden />
+            <span className="whitespace-pre-wrap">
+              {(message as { preamble?: string }).preamble!.trim()}
+            </span>
+          </div>
         )}
-        {message.content}
+        {isUser ? message.content : <AionMarkdown content={message.content} />}
       </div>
     </div>
   );
@@ -507,10 +781,8 @@ function MessageBubble({ message }: { message: AionChatMessage }) {
 // ---------------------------------------------------------------------------
 
 function AionChatInput({
-  dealId,
   onSend,
 }: {
-  dealId: string;
   onSend?: (content: string) => void;
 }) {
   const [value, setValue] = React.useState('');
@@ -521,9 +793,6 @@ function AionChatInput({
     const trimmed = value.trim();
     if (!trimmed) return;
     onSend?.(trimmed);
-    // Scaffold: backend wiring lands in a follow-up. Logging intent for now.
-    // eslint-disable-next-line no-console -- scaffold only
-    console.info('[AionChatInput] scoped message', { dealId, message: trimmed });
     setValue('');
   };
 
