@@ -92,6 +92,12 @@ export function SortControl({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, right: 0 });
+  // SSR guard — createPortal(..., document.body) crashes during server render
+  // since `document` is browser-only. Defer portal render until hydration.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const currentLabel = SORT_OPTIONS.find((o) => o.field === sort.field)?.label ?? 'Sort';
 
@@ -135,7 +141,7 @@ export function SortControl({
         <DirIcon size={10} />
       </button>
 
-      {createPortal(
+      {mounted && createPortal(
         <AnimatePresence>
           {open && (
             <motion.div

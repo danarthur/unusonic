@@ -5,11 +5,13 @@
  * React/framer-motion. Phase 3h (docs/reference/custom-pipelines-design.md §9.6).
  *
  * Tab semantics:
- *   Inquiry : deals in kind='working' stages tagged initial_contact OR
- *             proposal_sent. Past-dated inquiries drop out.
+ *   Inquiry : deals in kind='working' stages tagged initial_contact,
+ *             proposal_sent, OR contract_out (contract out for signature is
+ *             still courting work, not yet a locked-in show). Past-dated
+ *             inquiries drop out.
  *   Active  : events (non-archived, non-cancelled, future) + deals in
- *             kind='won' OR in working stages past proposal_sent (i.e. tagged
- *             contract_out / contract_signed / deposit_received / etc.). Won
+ *             kind='won' OR in working stages from contract_signed onward
+ *             (i.e. tagged contract_signed / deposit_received / etc.). Won
  *             deals with past dates slide into Past, not Active.
  *   Past    : cancelled events / past-dated events / deals kind='lost' /
  *             won deals past their date / any past-dated working deal.
@@ -29,9 +31,18 @@ import { readEventStatusFromLifecycle } from '@/shared/lib/event-status/read-eve
 
 export type StreamMode = 'inquiry' | 'active' | 'past';
 
-/** Tags that define the Inquiry bucket. Every working stage NOT tagged with
- *  one of these falls into Active. */
-const INQUIRY_TAGS = ['initial_contact', 'proposal_sent'] as const;
+/** Tags that define the Inquiry bucket. A stage with ANY inquiry tag AND NO
+ *  active-working tag belongs to Inquiry. `contract_out` (proposal out for
+ *  signature, awaiting client) is Inquiry — the deal is not yet locked in.
+ *  Active begins at `contract_signed`. */
+const INQUIRY_TAGS = ['initial_contact', 'proposal_sent', 'contract_out'] as const;
+
+/** Tags that define the Active working-stage set. When a workspace merges
+ *  multiple semantic stages into one (e.g. a single "Paperwork" stage tagged
+ *  contract_out + contract_signed + deposit_received), the active-forward tag
+ *  wins precedence so the merged stage still lands in Active rather than
+ *  Inquiry. */
+const ACTIVE_WORKING_TAGS = ['contract_signed', 'deposit_received', 'ready_for_handoff'] as const;
 
 /** Legacy fallback slug sets — used only when stage lookup fails.
  *  Phase 3i collapsed every working-stage legacy slug to the single 'working'
@@ -62,8 +73,13 @@ export function buildStageLookup(stages: readonly WorkspacePipelineStage[]): Sta
 
   for (const s of stages) {
     byId.set(s.id, { kind: s.kind, tags: s.tags });
+    const hasActiveTag = ACTIVE_WORKING_TAGS.some((t) => s.tags.includes(t));
     const hasInquiryTag = INQUIRY_TAGS.some((t) => s.tags.includes(t));
-    if (hasInquiryTag) {
+    if (hasActiveTag) {
+      // Active-forward precedence: merged stages that include contract_signed
+      // or later land in Active regardless of also carrying an inquiry tag.
+      if (s.kind === 'working') activeWorkingStageIds.add(s.id);
+    } else if (hasInquiryTag) {
       inquiryStageIds.add(s.id);
     } else if (s.kind === 'working') {
       activeWorkingStageIds.add(s.id);

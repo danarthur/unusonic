@@ -77,6 +77,20 @@ export type StreamCardItem = {
   series_archetype?: string | null;
 };
 
+// Follow-up reason types that warrant the warning-yellow attention tint.
+// Routine nudges (proposal_sent reminders, generic check-ins, thank-yous) stay
+// in the neutral secondary color so yellow keeps its meaning as "something is
+// actually wrong" rather than "a follow-up exists."
+const WARNING_REASON_TYPES = new Set([
+  'stall',
+  'gone_quiet',
+  'proposal_bounced',
+  'proposal_unseen',
+  'date_hold_pressure',
+  'no_owner',
+  'deadline_proximity',
+]);
+
 // Fallback when a deal's stage_id can't be resolved against the workspace's
 // current pipelineStages (legacy rows, seed data, missing relation).
 const KIND_LABELS: Record<string, string> = {
@@ -266,10 +280,15 @@ export function StreamCard({
   const hasAnyAction = canArchive || canMarkLost || canReopen || canReschedule || canCancel;
 
   const stageLabel = resolveStageLabel(item, pipelineStages);
+  // Follow-up attention line: only surface on active working deals. Won/lost
+  // deals are out of the sales flow — any pending queue row left on them is
+  // stale (see cron cleanup sweep in follow-up-queue/route.ts for the root fix).
   const showAttentionLine =
     item.followUpStatus === 'pending' &&
     !!item.followUpReason &&
-    !aionSuggestionVisible;
+    !aionSuggestionVisible &&
+    item.status !== 'won' &&
+    item.status !== 'lost';
 
   return (
     <motion.div
@@ -460,11 +479,18 @@ export function StreamCard({
 
           {/* Follow-up reason — replaces the 1.5px attention dot with the
               actual reason text so the user can scan what's wrong without
-              opening the card. */}
+              opening the card. Warning-yellow tint is reserved for reason
+              types that represent real trouble (stall, bounced, gone quiet,
+              conflict, unowned, deadline, unseen); routine nudges render in
+              the neutral secondary color so yellow keeps its signal value. */}
           {showAttentionLine && (
             <div
               className="mt-2 flex items-start gap-1.5 stage-badge-text leading-snug"
-              style={{ color: 'var(--color-unusonic-warning)' }}
+              style={{
+                color: WARNING_REASON_TYPES.has(item.followUpReasonType ?? '')
+                  ? 'var(--color-unusonic-warning)'
+                  : 'var(--stage-text-secondary)',
+              }}
             >
               <AlertCircle size={11} className="shrink-0 mt-px" aria-hidden />
               <span className="truncate">{item.followUpReason}</span>

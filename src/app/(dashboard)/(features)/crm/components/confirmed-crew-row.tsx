@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, CheckCheck, Clock, StickyNote, ChevronDown, ChevronRight, DollarSign, Wrench } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { formatTime12h } from '@/shared/lib/parse-time';
@@ -98,25 +99,48 @@ export function ConfirmedCrewRow({
     const currentIdx = PAYMENT_ORDER.indexOf(paymentStatus);
     const nextIdx = currentIdx + 1 >= PAYMENT_ORDER.length ? 0 : currentIdx + 1;
     const next = PAYMENT_ORDER[nextIdx];
+    // Capture previous state BEFORE the optimistic setter so we can roll back
+    // if the RPC rejects the write. Without this, the pill lies.
+    const prev = paymentStatus;
     setPaymentStatus(next);
-    await updateCrewDispatch(row.id, {
+    const result = await updateCrewDispatch(row.id, {
       payment_status: next,
       payment_date: next === 'paid' ? new Date().toISOString() : null,
     });
+    if (!result.success) {
+      setPaymentStatus(prev);
+      toast.error(result.error);
+    }
   };
 
   const toggleGear = async () => {
     const next = !bringsOwnGear;
+    const prev = bringsOwnGear;
+    const prevGearExpanded = gearExpanded;
     setBringsOwnGear(next);
     if (!next) {
       setGearExpanded(false);
     }
-    await updateCrewDispatch(row.id, { brings_own_gear: next });
+    const result = await updateCrewDispatch(row.id, { brings_own_gear: next });
+    if (!result.success) {
+      setBringsOwnGear(prev);
+      // Restore the expander too — we only collapsed it because we thought
+      // the write would succeed.
+      setGearExpanded(prevGearExpanded);
+      toast.error(result.error);
+    }
   };
 
   const saveGearNotes = async () => {
     const trimmed = gearNotes.trim() || null;
-    await updateCrewDispatch(row.id, { gear_notes: trimmed });
+    // onBlur save — no separate optimistic setter to revert (the textarea is
+    // the state), but still surface the error so the owner knows the note
+    // didn't persist. Local state stays as-typed; the server is the one that
+    // rejected it.
+    const result = await updateCrewDispatch(row.id, { gear_notes: trimmed });
+    if (!result.success) {
+      toast.error(result.error);
+    }
   };
 
   const cycleDispatch = async () => {
@@ -124,8 +148,13 @@ export function ConfirmedCrewRow({
     const currentIdx = dispatchStatus ? DISPATCH_ORDER.indexOf(dispatchStatus) : -1;
     const nextIdx = currentIdx + 1 >= DISPATCH_ORDER.length ? 0 : currentIdx + 1;
     const next = DISPATCH_ORDER[nextIdx];
+    const prev = dispatchStatus;
     setDispatchStatus(next);
-    await updateCrewDispatch(row.id, { dispatch_status: next });
+    const result = await updateCrewDispatch(row.id, { dispatch_status: next });
+    if (!result.success) {
+      setDispatchStatus(prev);
+      toast.error(result.error);
+    }
   };
 
   // Kit compliance: prefer the batch-prefetched result when the parent supplied

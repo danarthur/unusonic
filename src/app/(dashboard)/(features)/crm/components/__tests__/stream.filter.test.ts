@@ -145,14 +145,14 @@ describe('filterByMode — stock workspace regression', () => {
 
   const all = Object.values(d);
 
-  it('Inquiry tab: future-dated inquiry + proposal deals only', () => {
+  it('Inquiry tab: future-dated inquiry + proposal + contract_sent deals', () => {
     const got = filterByMode(all, 'inquiry', STOCK_STAGES, NOW_ISO).map((i) => i.id).sort();
-    expect(got).toEqual(['d-inq', 'd-prop'].sort());
+    expect(got).toEqual(['d-cs', 'd-inq', 'd-prop'].sort());
   });
 
-  it('Active tab: future events + future contract_sent/signed/deposit/won deals', () => {
+  it('Active tab: future events + future contract_signed/deposit/won deals', () => {
     const got = filterByMode(all, 'active', STOCK_STAGES, NOW_ISO).map((i) => i.id).sort();
-    expect(got).toEqual(['d-cs', 'd-csi', 'd-dep', 'd-won-f', 'e-f'].sort());
+    expect(got).toEqual(['d-csi', 'd-dep', 'd-won-f', 'e-f'].sort());
   });
 
   it('Past tab: past events + cancelled events + lost + won-past + past-dated pre-handover deals', () => {
@@ -198,7 +198,7 @@ describe('filterByMode — custom-renamed pipeline', () => {
     expect(got.map((i) => i.id)).toEqual(['d-custom-pitch']);
   });
 
-  it('Active tab: deal on custom "paperwork" stage (contract_out tag, NOT inquiry tags) appears', () => {
+  it('Active tab: deal on merged "paperwork" stage (contract_out + contract_signed + deposit) appears via active-forward precedence', () => {
     const deal = dealItem({
       id: 'd-custom-paperwork',
       status: 'paperwork',
@@ -207,6 +207,28 @@ describe('filterByMode — custom-renamed pipeline', () => {
     });
     const got = filterByMode([deal], 'active', CUSTOM_STAGES, NOW_ISO);
     expect(got.map((i) => i.id)).toEqual(['d-custom-paperwork']);
+  });
+
+  it('Inquiry tab: deal on contract_out-only stage stays in Inquiry (awaiting signature)', () => {
+    const CONTRACT_OUT_ONLY_STAGES: WorkspacePipelineStage[] = [
+      {
+        id: 'custom-contract-out', slug: 'sent_for_signing', label: 'Sent for signing', kind: 'working',
+        sort_order: 1, requires_confirmation: false, opens_handoff_wizard: false,
+        hide_from_portal: false, tags: ['contract_out'], color_token: null, triggers: [],
+      },
+    ];
+    const deal = dealItem({
+      id: 'd-contract-out-only',
+      status: 'sent_for_signing',
+      stage_id: 'custom-contract-out',
+      event_date: FUTURE_DATE,
+    });
+    expect(
+      filterByMode([deal], 'inquiry', CONTRACT_OUT_ONLY_STAGES, NOW_ISO).map((i) => i.id),
+    ).toEqual(['d-contract-out-only']);
+    expect(
+      filterByMode([deal], 'active', CONTRACT_OUT_ONLY_STAGES, NOW_ISO).map((i) => i.id),
+    ).toEqual([]);
   });
 
   it('Past tab: deal on custom "passed" stage (lost kind) appears', () => {

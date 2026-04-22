@@ -494,6 +494,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
         >
           <AionDealCard
             data={aionBundle.data}
+            dealTitle={deal.title}
             onAcceptAdvance={async (row) => {
               if (!row.suggestedStageTag) {
                 toast.error('No target stage on this suggestion.');

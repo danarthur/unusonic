@@ -371,6 +371,14 @@ function FilterChip({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  // Portal guard — createPortal(..., document.body) blows up during SSR since
+  // `document` is browser-only. Gate the portal render on a post-mount flag
+  // so the server output is an empty dropdown (it's closed by default
+  // anyway) and the client fills it in after hydration.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const DROPDOWN_MAX_HEIGHT = 280;
 
@@ -467,7 +475,7 @@ function FilterChip({
         )}
       </button>
 
-      {createPortal(
+      {mounted && createPortal(
         <AnimatePresence>
           {isOpen && (
             <motion.div
