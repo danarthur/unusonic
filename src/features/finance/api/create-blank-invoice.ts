@@ -87,7 +87,10 @@ export async function createBlankInvoice(
     .from('invoices')
     .insert({
       workspace_id: input.workspaceId,
-      invoice_kind: 'standard',
+      // invoice_kind CHECK is ('deposit' | 'progress' | 'final' | 'standalone' | 'credit_note').
+      // "standard" was the legacy label and violates the constraint — use 'standalone'
+      // for the blank-invoice path (no proposal parent).
+      invoice_kind: 'standalone',
       status: 'draft',
       bill_to_entity_id: input.billToEntityId,
       billing_email: input.billingEmail ?? null,

@@ -175,28 +175,42 @@ export async function sendInvoice(
   // ── 5a. Persist snapshots + numbering, but keep status='draft' until PDF
   //       and email both succeed. This makes the "sent" flip atomic — clients
   //       never receive a "sent" invoice with a 404 PDF or no email delivery.
+  //       The .eq('status', 'draft') guard + count check gives us server-side
+  //       idempotency: a concurrent double-click either stages here or bails
+  //       cleanly, rather than both runs allocating a second invoice number.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: stageErr } = await (system as any)
+  const { error: stageErr, count: stageCount } = await (system as any)
     .schema('finance')
     .from('invoices')
-    .update({
-      invoice_number: invoiceNumber,
-      subtotal_amount: subtotal,
-      discount_amount: 0,
-      tax_amount: taxAmount,
-      tax_rate_snapshot: taxRate,
-      total_amount: totalAmount,
-      issue_date: issueDate,
-      due_date: dueDate,
-      issued_at: nowIso,
-      bill_to_snapshot: billToSnapshot,
-      from_snapshot: fromSnapshot,
-      pdf_version: newPdfVersion,
-    })
-    .eq('id', invoiceId);
+    .update(
+      {
+        invoice_number: invoiceNumber,
+        subtotal_amount: subtotal,
+        discount_amount: 0,
+        tax_amount: taxAmount,
+        tax_rate_snapshot: taxRate,
+        total_amount: totalAmount,
+        issue_date: issueDate,
+        due_date: dueDate,
+        issued_at: nowIso,
+        bill_to_snapshot: billToSnapshot,
+        from_snapshot: fromSnapshot,
+        pdf_version: newPdfVersion,
+      },
+      { count: 'exact' },
+    )
+    .eq('id', invoiceId)
+    .eq('status', 'draft');
 
   if (stageErr) {
     return { success: false, invoiceNumber: null, error: stageErr.message };
+  }
+  if (!stageCount) {
+    return {
+      success: false,
+      invoiceNumber: null,
+      error: 'Invoice is no longer in draft — it may have already been sent.',
+    };
   }
 
   // ── 6. Generate PDF + upload (must succeed; otherwise invoice stays draft) ──

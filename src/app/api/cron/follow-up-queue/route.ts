@@ -240,6 +240,29 @@ export async function GET(req: Request) {
         .in('id', (snoozedExpired as { id: string }[]).map((s) => s.id));
     }
 
+    // 4b. Sweep pending/snoozed queue rows for deals that are no longer open
+    // (won, lost, or archived). This cron only evaluates working deals via
+    // OPEN_DEAL_STATUSES, so without this sweep, rows go stale the moment a
+    // deal transitions out — e.g. a won deal keeps showing "proposal sent,
+    // nudge the client" on its card forever. Only pending/snoozed statuses
+    // are swept; acted/dismissed rows are preserved for audit history.
+    const openDealIdSet = new Set(dealIds);
+    const { data: activeRows } = await db
+      .schema('ops')
+      .from('follow_up_queue')
+      .select('id, deal_id')
+      .in('status', ['pending', 'snoozed']);
+    const staleIds = ((activeRows ?? []) as { id: string; deal_id: string }[])
+      .filter((r) => !openDealIdSet.has(r.deal_id))
+      .map((r) => r.id);
+    if (staleIds.length > 0) {
+      await db
+        .schema('ops')
+        .from('follow_up_queue')
+        .delete()
+        .in('id', staleIds);
+    }
+
     // 5. Batch-fetch existing queue items (after snooze expiry)
     const { data: existingQueue } = await db
       .schema('ops')

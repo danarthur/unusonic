@@ -2,7 +2,10 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import { getPrimitive } from '@/shared/lib/triggers';
+// Write-path validation needs the full primitive (configSchema). Import from
+// the server-only registry, not the barrel — the barrel returns metadata only
+// to keep the client bundle free of the service-role Supabase client.
+import { getPrimitive } from '@/shared/lib/triggers/registry';
 import type { TriggerEntry } from '@/shared/lib/triggers/normalize';
 import { revalidatePath } from 'next/cache';
 

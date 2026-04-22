@@ -29,8 +29,8 @@ import {
   updatePipelineStageTriggers,
   type TriggerEntry,
 } from '@/features/pipeline-settings/api/actions';
-import { listAllPrimitives, getPrimitive } from '@/shared/lib/triggers';
-import type { TriggerPrimitive, TriggerTier } from '@/shared/lib/triggers';
+import { listAllPrimitives, getPrimitive } from '@/shared/lib/triggers/metadata';
+import type { PrimitiveMetadata, TriggerTier } from '@/shared/lib/triggers/metadata';
 import { cn } from '@/shared/lib/utils';
 
 type EditorStage = {
@@ -968,7 +968,7 @@ function TriggerConfigForm({
   onCancel,
   disabled,
 }: {
-  primitive: TriggerPrimitive<unknown>;
+  primitive: PrimitiveMetadata;
   initialConfig: Record<string, unknown>;
   onSave: (entry: TriggerEntry) => void;
   onCancel: () => void;

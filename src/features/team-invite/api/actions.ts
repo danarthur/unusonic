@@ -535,7 +535,6 @@ export async function acceptEmployeeInvite(
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
-  console.log('[acceptEmployeeInvite] auth check:', { userId: user?.id, email: user?.email, error: authError?.message });
   if (authError || !user?.email) {
     return { ok: false, error: 'You must be signed in to accept this invite.' };
   }
@@ -573,7 +572,9 @@ export async function acceptEmployeeInvite(
     .eq('type', 'person')
     .or(`claimed_by_user_id.is.null,claimed_by_user_id.eq.${user.id}`)
     .limit(1) as { data: { id: string; owner_workspace_id: string | null; claimed_by_user_id: string | null }[] | null; error: unknown };
-  console.log('[acceptEmployeeInvite] personRows:', personRows, 'err:', personErr);
+  if (process.env.NODE_ENV === 'development' && personErr) {
+    console.error('[acceptEmployeeInvite] personRows lookup error:', personErr);
+  }
   const personEntity = personRows?.[0] ?? null;
   if (!personEntity) {
     return { ok: false, error: 'No matching team member found for this email.' };
@@ -612,7 +613,7 @@ export async function acceptEmployeeInvite(
         .from('relationships')
         .select('context_data')
         .eq('target_entity_id', personEntity.id)
-        .eq('type', 'ROSTER_MEMBER')
+        .eq('relationship_type', 'ROSTER_MEMBER')
         .limit(1)
         .maybeSingle() as { data: { context_data: Record<string, unknown> | null } | null };
       const edgeRoleId = rosterEdge?.context_data?.role_id as string | undefined;
@@ -643,7 +644,6 @@ export async function acceptEmployeeInvite(
         if (sysRole) roleId = sysRole.id;
       }
 
-      console.log('[acceptEmployeeInvite] inserting workspace_members:', { workspaceId, userId: user.id, roleId });
       const { error: insertErr } = await system.from('workspace_members').insert({
         workspace_id: workspaceId,
         user_id: user.id,

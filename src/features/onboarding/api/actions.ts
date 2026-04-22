@@ -495,11 +495,11 @@ export async function claimOrganization(
   }
 
   // Mark org as claimed in directory.entities
-  const attrs = (orgDirEnt.attributes as Record<string, unknown>) ?? {};
+  const ghostAttrs = (orgDirEnt.attributes as Record<string, unknown>) ?? {};
   const { error: orgUpdateErr } = await supabase
     .schema('directory')
     .from('entities')
-    .update({ attributes: { ...attrs, is_claimed: true } })
+    .update({ attributes: { ...ghostAttrs, is_claimed: true } })
     .eq('id', orgDirEnt.id);
   if (orgUpdateErr) {
     return { ok: false, error: orgUpdateErr.message ?? 'Failed to claim organization.' };
@@ -513,7 +513,7 @@ export async function claimOrganization(
     .eq('id', ghostPersonEnt.id);
   if (personUpdateErr) {
     await supabase.schema('directory').from('entities')
-      .update({ attributes: { ...attrs, is_claimed: false } })
+      .update({ attributes: { ...ghostAttrs, is_claimed: false } })
       .eq('id', orgDirEnt.id);
     return { ok: false, error: personUpdateErr.message ?? 'Failed to link your account.' };
   }
