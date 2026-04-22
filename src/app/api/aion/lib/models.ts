@@ -16,14 +16,60 @@
  *   - When uncertain, route UP not down (tool-calling failures are worse than cost)
  */
 
-import { anthropic } from '@ai-sdk/anthropic';
+import { createAnthropic } from '@ai-sdk/anthropic';
+
+/**
+ * Resolve the Anthropic API key in a way that survives the Claude Desktop
+ * install poisoning process.env with `ANTHROPIC_API_KEY=` (empty string) and
+ * `ANTHROPIC_BASE_URL=https://api.anthropic.com` (missing /v1). Next.js loads
+ * .env.local into process.env but does NOT override variables that are
+ * already set (even to empty string), so we parse .env.local directly when
+ * the shell-provided value is empty.
+ */
+function resolveAnthropicApiKey(): string | undefined {
+  const fromEnv = process.env.ANTHROPIC_API_KEY;
+  if (fromEnv && fromEnv.trim().length > 0) return fromEnv;
+  try {
+    // Only runs if shell env poisoned the var. Next dev + node runtime only —
+    // edge runtime would need a different approach, but chat route runs on
+    // nodejs per `export const runtime = 'nodejs'` in route.ts.
+    const { readFileSync } = require('node:fs');
+    const { resolve } = require('node:path');
+    const raw = readFileSync(resolve(process.cwd(), '.env.local'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const m = /^ANTHROPIC_API_KEY\s*=\s*(.+)$/.exec(line);
+      if (m) return m[1].trim().replace(/^['"]|['"]$/g, '');
+    }
+  } catch {
+    /* fall through */
+  }
+  return undefined;
+}
+
+/**
+ * Explicit baseURL + apiKey guard against a stray shell env poisoning from
+ * the Claude Desktop install (observed 2026-04-21):
+ *   ANTHROPIC_BASE_URL=https://api.anthropic.com  (no /v1 → 404 on every call)
+ *   ANTHROPIC_API_KEY=                            (empty → "x-api-key header is required")
+ * The SDK's auto-loader picks those up first and never falls through to
+ * .env.local. Pinning both values here isolates the app from the shell env.
+ */
+const anthropic = createAnthropic({
+  baseURL: 'https://api.anthropic.com/v1',
+  apiKey: resolveAnthropicApiKey(),
+});
 
 // ── Model IDs ────────────────────────────────────────────────────────────────
 
+// TEMPORARY (2026-04-21): Anthropic API key for this workspace has access to
+// Haiku 4.5 but returns 404 on Sonnet 4.5 / Opus 4.5 / Sonnet 4.6 / Opus 4.7.
+// Routing all tiers through Haiku until org-level model access is sorted.
+// Flip `standard` back to 'claude-sonnet-4-5' and `heavy` to 'claude-opus-4-5'
+// (or 4-6 aliases) once the dashboard confirms access.
 export const MODELS = {
   fast: 'claude-haiku-4-5-20251001',
-  standard: 'claude-sonnet-4-20250514',
-  heavy: 'claude-opus-4-20250514',
+  standard: 'claude-haiku-4-5-20251001',
+  heavy: 'claude-haiku-4-5-20251001',
 } as const;
 
 export type ModelTier = keyof typeof MODELS;
