@@ -116,6 +116,7 @@ export type Database = {
       aion_messages: {
         Row: {
           content: string
+          context_fingerprint: string | null
           created_at: string
           expires_at: string | null
           id: string
@@ -125,6 +126,7 @@ export type Database = {
         }
         Insert: {
           content?: string
+          context_fingerprint?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -134,6 +136,7 @@ export type Database = {
         }
         Update: {
           content?: string
+          context_fingerprint?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -144,6 +147,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "aion_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "aion_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aion_proactive_lines: {
+        Row: {
+          artifact_ref: Json
+          created_at: string
+          created_date_local: string
+          deal_id: string
+          dismissed_at: string | null
+          dismissed_by: string | null
+          expires_at: string
+          headline: string
+          id: string
+          payload: Json
+          resolved_at: string | null
+          session_id: string | null
+          signal_type: string
+          workspace_id: string
+        }
+        Insert: {
+          artifact_ref: Json
+          created_at?: string
+          created_date_local: string
+          deal_id: string
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          expires_at?: string
+          headline: string
+          id?: string
+          payload?: Json
+          resolved_at?: string | null
+          session_id?: string | null
+          signal_type: string
+          workspace_id: string
+        }
+        Update: {
+          artifact_ref?: Json
+          created_at?: string
+          created_date_local?: string
+          deal_id?: string
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          expires_at?: string
+          headline?: string
+          id?: string
+          payload?: Json
+          resolved_at?: string | null
+          session_id?: string | null
+          signal_type?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aion_proactive_lines_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "aion_sessions"
@@ -183,37 +245,61 @@ export type Database = {
       }
       aion_sessions: {
         Row: {
+          archived_at: string | null
           conversation_summary: string | null
           created_at: string
           feedback: Json | null
           id: string
+          is_pinned: boolean
+          last_message_at: string
+          pinned: boolean
+          pinned_at: string | null
           preview: string | null
+          scope_entity_id: string | null
+          scope_type: string
           summarized_up_to: string | null
           title: string | null
+          title_locked: boolean
           updated_at: string
           user_id: string
           workspace_id: string
         }
         Insert: {
+          archived_at?: string | null
           conversation_summary?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
+          is_pinned?: boolean
+          last_message_at?: string
+          pinned?: boolean
+          pinned_at?: string | null
           preview?: string | null
+          scope_entity_id?: string | null
+          scope_type: string
           summarized_up_to?: string | null
           title?: string | null
+          title_locked?: boolean
           updated_at?: string
           user_id: string
           workspace_id: string
         }
         Update: {
+          archived_at?: string | null
           conversation_summary?: string | null
           created_at?: string
           feedback?: Json | null
           id?: string
+          is_pinned?: boolean
+          last_message_at?: string
+          pinned?: boolean
+          pinned_at?: string | null
           preview?: string | null
+          scope_entity_id?: string | null
+          scope_type?: string
           summarized_up_to?: string | null
           title?: string | null
+          title_locked?: boolean
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -598,11 +684,24 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      archive_aion_session: {
+        Args: { p_session_id: string }
+        Returns: undefined
+      }
       create_aion_session: {
         Args: {
           p_id?: string
           p_preview?: string
           p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      create_new_aion_session_for_scope: {
+        Args: {
+          p_scope_entity_id?: string
+          p_scope_type: string
+          p_title?: string
           p_workspace_id: string
         }
         Returns: string
@@ -618,6 +717,10 @@ export type Database = {
       }
       delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       dismiss_aion_insight: { Args: { p_insight_id: string }; Returns: boolean }
+      dismiss_aion_proactive_line: {
+        Args: { p_line_id: string }
+        Returns: boolean
+      }
       dismiss_capture: { Args: { p_capture_id: string }; Returns: boolean }
       dismiss_ui_notice: { Args: { p_notice_id: string }; Returns: boolean }
       due_lobby_pins: {
@@ -632,6 +735,17 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      emit_aion_proactive_line: {
+        Args: {
+          p_artifact_ref: Json
+          p_deal_id: string
+          p_headline: string
+          p_payload?: Json
+          p_signal_type: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       fanout_ui_notice: {
         Args: {
           p_expires_at?: string
@@ -640,6 +754,20 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: number
+      }
+      get_proactive_line_dismiss_rates: {
+        Args: {
+          p_min_sample?: number
+          p_window_days?: number
+          p_workspace_id: string
+        }
+        Returns: {
+          above_threshold: boolean
+          dismiss_rate: number
+          signal_type: string
+          total_dismissed: number
+          total_emitted: number
+        }[]
       }
       hybrid_search: {
         Args: {
@@ -715,6 +843,7 @@ export type Database = {
           source_type: string
         }[]
       }
+      pin_aion_session: { Args: { p_session_id: string }; Returns: undefined }
       reassign_capture: {
         Args: { p_capture_id: string; p_new_entity_id: string }
         Returns: boolean
@@ -767,6 +896,34 @@ export type Database = {
         Args: { p_entity_id: string; p_trigger_type: string }
         Returns: boolean
       }
+      resolve_aion_proactive_lines_by_artifact: {
+        Args: {
+          p_artifact_id: string
+          p_artifact_kind: string
+          p_workspace_id: string
+        }
+        Returns: number
+      }
+      resolve_aion_proactive_lines_by_deal: {
+        Args: {
+          p_deal_id: string
+          p_signal_type?: string
+          p_workspace_id: string
+        }
+        Returns: number
+      }
+      resume_or_create_aion_session: {
+        Args: {
+          p_scope_entity_id?: string
+          p_scope_type: string
+          p_title?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          is_new: boolean
+          session_id: string
+        }[]
+      }
       review_feature_request: {
         Args: { p_decision: string; p_note?: string; p_request_id: string }
         Returns: boolean
@@ -810,6 +967,15 @@ export type Database = {
         }
         Returns: string
       }
+      set_aion_session_title: {
+        Args: { p_lock?: boolean; p_session_id: string; p_title: string }
+        Returns: undefined
+      }
+      unarchive_aion_session: {
+        Args: { p_session_id: string }
+        Returns: undefined
+      }
+      unpin_aion_session: { Args: { p_session_id: string }; Returns: undefined }
       update_aion_session_summary: {
         Args: {
           p_session_id: string
@@ -3795,6 +3961,42 @@ export type Database = {
         }
         Relationships: []
       }
+      proposal_builder_events: {
+        Row: {
+          created_at: string
+          deal_id: string
+          id: string
+          payload: Json
+          session_id: string
+          type: string
+          user_id: string | null
+          variant: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          deal_id: string
+          id?: string
+          payload?: Json
+          session_id: string
+          type: string
+          user_id?: string | null
+          variant: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          deal_id?: string
+          id?: string
+          payload?: Json
+          session_id?: string
+          type?: string
+          user_id?: string | null
+          variant?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       workspace_call_time_rules: {
         Row: {
           action_type: string
@@ -4567,6 +4769,17 @@ export type Database = {
         }
         Returns: string
       }
+      record_proposal_builder_event: {
+        Args: {
+          p_deal_id: string
+          p_payload?: Json
+          p_session_id: string
+          p_type: string
+          p_variant: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       rename_workspace_event_archetype: {
         Args: { p_new_label: string; p_slug: string; p_workspace_id: string }
         Returns: undefined
@@ -5133,6 +5346,7 @@ export type Database = {
       }
       deals: {
         Row: {
+          aion_proactive_enabled: boolean
           archived_at: string | null
           budget_estimated: number | null
           compelling_event: string | null
@@ -5171,6 +5385,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          aion_proactive_enabled?: boolean
           archived_at?: string | null
           budget_estimated?: number | null
           compelling_event?: string | null
@@ -5209,6 +5424,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          aion_proactive_enabled?: boolean
           archived_at?: string | null
           budget_estimated?: number | null
           compelling_event?: string | null
@@ -6518,6 +6734,23 @@ export type Database = {
           p_person_entity_id: string
         }
         Returns: string
+      }
+      aion_lookup_catalog: {
+        Args: {
+          p_kind?: string
+          p_limit?: number
+          p_query: string
+          p_workspace_id: string
+        }
+        Returns: {
+          category: string
+          description: string
+          id: string
+          kind: string
+          name: string
+          price: number
+          rank: number
+        }[]
       }
       bulk_approve_pending_equipment: {
         Args: { p_workspace_id: string }

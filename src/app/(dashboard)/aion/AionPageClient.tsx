@@ -36,12 +36,40 @@ function PinOpenDispatcher({ workspaceId }: { workspaceId: string }) {
   return null;
 }
 
+/**
+ * Session deep-link handler. Handles `/aion?session=<uuid>` (used by the
+ * "Open in Aion" button on the deal-card thread header). Reads the param
+ * once on mount, calls selectSession, and strips the param from the URL so
+ * a reload doesn't force-reselect.
+ */
+function SessionDeepLinker() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const { selectSession } = useSession();
+  const handledFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    const sessionId = params.get('session');
+    if (!sessionId) return;
+    if (handledFor.current === sessionId) return;
+    handledFor.current = sessionId;
+
+    selectSession(sessionId);
+
+    // Clean the URL so a browser reload doesn't force-reselect.
+    router.replace('/aion');
+  }, [params, selectSession, router]);
+
+  return null;
+}
+
 export function AionPageClient() {
   const workspaceId = useRequiredWorkspace();
 
   return (
     <div className="flex flex-col h-full" data-surface="void">
       <PinOpenDispatcher workspaceId={workspaceId} />
+      <SessionDeepLinker />
       <ChatInterface viewState="chat" workspaceId={workspaceId} />
     </div>
   );
