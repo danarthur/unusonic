@@ -8,6 +8,12 @@ import {
   getSessionMessages,
   createSession,
   saveMessage,
+  resumeOrCreateSession,
+  archiveSession as archiveSessionAction,
+  createNewScopedSession as createNewScopedSessionAction,
+  pinSession as pinSessionAction,
+  unpinSession as unpinSessionAction,
+  continueSessionInNewChat as continueSessionInNewChatAction,
   type DbSessionMeta,
 } from '@/app/(dashboard)/(features)/aion/actions/aion-session-actions';
 
@@ -21,6 +27,14 @@ export type Message = {
   structured?: AionMessageContent[];
   isError?: boolean;
   modelTier?: 'fast' | 'standard' | 'heavy';
+  /**
+   * Optional "thinking" preamble — text the model emits BEFORE calling its
+   * first tool ("I'll search for that wedding deal"). Populated via the
+   * server's `preamble:` stream channel, frozen on `preamble-end:`. The
+   * renderer shows it as a muted collapsible header above `content`.
+   * Absent on turns where no tool was called (the whole response is content).
+   */
+  preamble?: string;
 };
 
 export type SessionMeta = {
@@ -28,6 +42,31 @@ export type SessionMeta = {
   createdAt: number;
   updatedAt: number;
   preview: string;
+  /** Last-message timestamp (ms epoch). Drives sidebar sort within a scope
+   *  group. Bumped by save_aion_message alongside updated_at. */
+  lastMessageAt: number;
+  /** Thread title — auto-generated after the first assistant turn (3–6
+   *  words, Title Case) OR set by the user. Starts as the scope entity
+   *  name (e.g. deal title) until the title generator lands. */
+  title: string | null;
+  /** Session scope — drives sidebar grouping. */
+  scopeType: 'general' | 'deal' | 'event';
+  /** Scope subject id. NULL for general. */
+  scopeEntityId: string | null;
+  /** Display title of the scope entity (e.g. "Ally & Emily Wedding").
+   *  Server enrichment — joined live from public.deals on every list fetch
+   *  so a rename propagates immediately. NULL for general sessions. */
+  scopeEntityTitle: string | null;
+  /** True when the user has renamed — the title generator will never
+   *  overwrite. */
+  titleLocked: boolean;
+  /** Multi-thread pin: max 3 per scope bucket. Pinned threads float to the
+   *  top within each deal group. */
+  isPinned: boolean;
+  pinnedAt: number | null;
+  /** Legacy boolean pin column from 20260512000100. Kept for backward
+   *  compat with pre-multi-thread UI; new sort order uses `isPinned`. */
+  pinned: boolean;
 };
 
 interface SessionContextType {
@@ -49,8 +88,39 @@ interface SessionContextType {
   setWorkspaceId: (id: string) => void;
   addMessage: (role: 'user' | 'assistant', content: string, structured?: AionMessageContent[]) => void;
   startNewChat: () => void;
+  /** Open (resume if exists, else create) a scope-linked session. Used by
+   *  the deal card to attach chat to a specific deal, and by future event
+   *  surfaces. Returns the resolved session id, which is also set as the
+   *  current session. */
+  openScopedSession: (args: {
+    workspaceId: string;
+    scopeType: 'deal' | 'event';
+    scopeEntityId: string;
+    title?: string | null;
+  }) => Promise<string | null>;
+  /** Create a NEW scope-linked session — always creates, never resumes. Used
+   *  by the "+ New chat" button in the sidebar + scope header to spawn a
+   *  fresh thread under the same production. */
+  createNewScopedChat: (args: {
+    workspaceId: string;
+    scopeType: 'deal' | 'event';
+    scopeEntityId: string;
+    title?: string | null;
+  }) => Promise<string | null>;
   selectSession: (sessionId: string) => void;
+  /** Hard-delete — permanent removal. Existing Trash2 affordance in the sidebar. */
   removeSession: (sessionId: string) => void;
+  /** Soft-delete — stamps archived_at, preserves history, drops from sidebar. */
+  archiveSession: (sessionId: string) => Promise<void>;
+  /** Pin a session (max 3 per scope). Surfaces pin failures via a toast so
+   *  the caller doesn't need to inspect the promise resolve value. */
+  pinSession: (sessionId: string) => Promise<void>;
+  /** Unpin a session. */
+  unpinSession: (sessionId: string) => Promise<void>;
+  /** Spawn a fresh thread in the source session's scope, titled
+   *  "Continuing: <source title>". Field Expert's merge-escape-valve.
+   *  Returns the new session id (also selected as current) or null on error. */
+  continueSessionInNewChat: (sourceSessionId: string) => Promise<string | null>;
   /** Edit a past user message and resend from that point */
   editAndResend: (msgId: string, newContent: string, workspaceId: string) => void;
   /** Retry the last failed assistant message */
@@ -67,12 +137,44 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 const MAX_CACHED_SESSIONS = 5;
 
+/**
+ * Factory for optimistic general-chat SessionMeta rows inserted before the
+ * server authoritative row arrives. Used across the new-chat, resume, and
+ * legacy-hydrate paths so the SessionMeta shape stays in one place.
+ */
+function buildGeneralSessionMeta(id: string, now: number, preview = ''): SessionMeta {
+  return {
+    id,
+    createdAt: now,
+    updatedAt: now,
+    lastMessageAt: now,
+    preview,
+    title: null,
+    scopeType: 'general',
+    scopeEntityId: null,
+    scopeEntityTitle: null,
+    titleLocked: false,
+    isPinned: false,
+    pinnedAt: null,
+    pinned: false,
+  };
+}
+
 function dbSessionToMeta(db: DbSessionMeta): SessionMeta {
   return {
     id: db.id,
     createdAt: new Date(db.created_at).getTime(),
     updatedAt: new Date(db.updated_at).getTime(),
+    lastMessageAt: new Date(db.last_message_at).getTime(),
     preview: db.preview ?? '',
+    title: db.title,
+    scopeType: db.scope_type,
+    scopeEntityId: db.scope_entity_id,
+    scopeEntityTitle: db.scope_entity_title,
+    titleLocked: db.title_locked,
+    isPinned: db.is_pinned,
+    pinnedAt: db.pinned_at ? new Date(db.pinned_at).getTime() : null,
+    pinned: db.pinned,
   };
 }
 
@@ -209,7 +311,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setSessions(prev => {
           if (prev.some(s => s.id === sessionId)) return prev;
           const now = Date.now();
-          return [...prev, { id: sessionId, createdAt: now, updatedAt: now, preview: '' }];
+          return [...prev, buildGeneralSessionMeta(sessionId, now)];
         });
         return;
       }
@@ -233,7 +335,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSessions(prev => {
       if (prev.some(s => s.id === sessionId)) return prev;
       const now = Date.now();
-      return [...prev, { id: sessionId, createdAt: now, updatedAt: now, preview: '' }];
+      return [...prev, buildGeneralSessionMeta(sessionId, now)];
     });
   }, [sessionId, storage, isHydrated]);
 
@@ -264,7 +366,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const now = Date.now();
         const existing = prevSessions.find(session => session.id === sessionId);
         if (!existing) {
-          return [...prevSessions, { id: sessionId, createdAt: now, updatedAt: now, preview: role === 'user' ? preview : '' }];
+          return [...prevSessions, buildGeneralSessionMeta(sessionId, now, role === 'user' ? preview : '')];
         }
         return prevSessions.map(session => {
           if (session.id !== sessionId) return session;
@@ -294,6 +396,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, [sessionId, storage]);
 
+  const updateMessagePreamble = useCallback((msgId: string, preamble: string) => {
+    setMessages(prev => {
+      const next = prev.map(m => m.id === msgId ? { ...m, preamble } : m);
+      if (typeof window !== 'undefined') {
+        try { window.localStorage.setItem(storage.messagesKey(sessionId), JSON.stringify(next)); } catch {}
+      }
+      return next;
+    });
+  }, [sessionId, storage]);
+
   const finalizeMessage = useCallback((msgId: string, content: string, structured?: AionMessageContent[], isError?: boolean) => {
     setMessages(prev => {
       const next = prev.map(m => m.id === msgId ? { ...m, content, ...(structured ? { structured } : {}), ...(isError ? { isError } : {}) } : m);
@@ -313,7 +425,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSessionId(newSessionId);
     setMessages([]);
     const now = Date.now();
-    setSessions(prev => [...prev, { id: newSessionId, createdAt: now, updatedAt: now, preview: '' }]);
+    setSessions(prev => [...prev, buildGeneralSessionMeta(newSessionId, now)]);
 
     // Fire-and-forget: create in DB
     if (providerWorkspaceId) {
@@ -329,6 +441,224 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSessionId(targetSessionId);
   };
 
+  /**
+   * Resume-or-create a scope-linked session. Routed through the
+   * cortex.resume_or_create_aion_session RPC so a user's existing deal-scoped
+   * session is reused rather than duplicated. Returns the resolved id (also
+   * set as the current session so ChatInterface picks it up).
+   *
+   * General-scope chats should continue to use startNewChat — that path
+   * generates a client-side UUID and avoids the server round-trip.
+   */
+  const openScopedSession = useCallback(async ({
+    workspaceId,
+    scopeType,
+    scopeEntityId,
+    title,
+  }: {
+    workspaceId: string;
+    scopeType: 'deal' | 'event';
+    scopeEntityId: string;
+    title?: string | null;
+  }): Promise<string | null> => {
+    const result = await resumeOrCreateSession(workspaceId, scopeType, scopeEntityId, title ?? null);
+    if (!result.success) {
+      console.error('[SessionContext] resumeOrCreateSession failed:', result.error);
+      return null;
+    }
+    const resolvedId = result.sessionId;
+
+    // Select the session (lazy-load of messages happens via the existing
+    // effect that keys on sessionId).
+    window.localStorage.setItem(storage.currentSessionKey, resolvedId);
+    setSessionId(resolvedId);
+
+    // Inject into local sessions if not already present. We create a minimal
+    // SessionMeta with the known scope fields — the sidebar will re-hydrate
+    // with the authoritative row (including any stored title/preview) on the
+    // next getSessionList refetch.
+    setSessions(prev => {
+      if (prev.some(s => s.id === resolvedId)) return prev;
+      const now = Date.now();
+      return [...prev, {
+        id: resolvedId,
+        createdAt: now,
+        updatedAt: now,
+        lastMessageAt: now,
+        preview: '',
+        title: title ?? null,
+        scopeType,
+        scopeEntityId,
+        // Optimistic: use the caller-provided title as the scope entity
+        // title so the sidebar group header renders correctly before the
+        // next getSessionList refetch (the caller passes the live deal
+        // title from deal-lens). Server-side enrichment will overwrite on
+        // the next full hydrate if the deal is renamed.
+        scopeEntityTitle: title ?? null,
+        titleLocked: false,
+        isPinned: false,
+        pinnedAt: null,
+        pinned: false,
+      }];
+    });
+    return resolvedId;
+  }, [storage]);
+
+  /**
+   * Create a FRESH scope-linked session — never resumes. Paired with
+   * openScopedSession: that one is for deal-card mount (resume-most-recent),
+   * this one is for the "+ New chat" button in the sidebar or scope header
+   * (explicit new thread about the same production).
+   *
+   * Matches ChatGPT / Claude Projects where a project holds many chats,
+   * each with its own topic and synopsis title.
+   */
+  const createNewScopedChat = useCallback(async ({
+    workspaceId,
+    scopeType,
+    scopeEntityId,
+    title,
+  }: {
+    workspaceId: string;
+    scopeType: 'deal' | 'event';
+    scopeEntityId: string;
+    title?: string | null;
+  }): Promise<string | null> => {
+    const result = await createNewScopedSessionAction(workspaceId, scopeType, scopeEntityId, title ?? null);
+    if (!result.success) {
+      console.error('[SessionContext] createNewScopedSession failed:', result.error);
+      return null;
+    }
+    const newId = result.sessionId;
+    window.localStorage.setItem(storage.currentSessionKey, newId);
+    setSessionId(newId);
+    setMessages([]);
+    setSessions(prev => {
+      if (prev.some(s => s.id === newId)) return prev;
+      const now = Date.now();
+      return [...prev, {
+        id: newId,
+        createdAt: now,
+        updatedAt: now,
+        lastMessageAt: now,
+        preview: '',
+        // Thread title starts null for brand-new sessions — the title
+        // generator will populate after the first assistant turn.
+        title: null,
+        scopeType,
+        scopeEntityId,
+        // Optimistic: caller-provided title becomes the scope entity title
+        // (deal title) for sidebar grouping. See openScopedSession for the
+        // same pattern + rationale.
+        scopeEntityTitle: title ?? null,
+        titleLocked: false,
+        isPinned: false,
+        pinnedAt: null,
+        pinned: false,
+      }];
+    });
+    return newId;
+  }, [storage]);
+
+  const pinSession = useCallback(async (targetSessionId: string) => {
+    const result = await pinSessionAction(targetSessionId);
+    if (!result.success) {
+      if (result.atCap) {
+        // Dynamic import to avoid a hard dep on sonner in the provider.
+        const { toast } = await import('sonner');
+        toast.error('Pin cap reached — unpin an existing thread (max 3 per production).');
+      } else {
+        console.error('[SessionContext] pinSession failed:', result.error);
+      }
+      return;
+    }
+    // Optimistic: flip the local pin flag so the sidebar reflows without a
+    // full session-list refetch. Server authoritative on next hydrate.
+    setSessions(prev =>
+      prev.map(s => s.id === targetSessionId
+        ? { ...s, isPinned: true, pinnedAt: Date.now() }
+        : s,
+      ),
+    );
+  }, []);
+
+  const unpinSession = useCallback(async (targetSessionId: string) => {
+    const result = await unpinSessionAction(targetSessionId);
+    if (!result.success) {
+      console.error('[SessionContext] unpinSession failed:', result.error);
+      return;
+    }
+    setSessions(prev =>
+      prev.map(s => s.id === targetSessionId
+        ? { ...s, isPinned: false, pinnedAt: null }
+        : s,
+      ),
+    );
+  }, []);
+
+  const continueSessionInNewChat = useCallback(async (sourceSessionId: string): Promise<string | null> => {
+    const result = await continueSessionInNewChatAction(sourceSessionId);
+    if (!result.success) {
+      console.error('[SessionContext] continueSessionInNewChat failed:', result.error);
+      return null;
+    }
+    const newId = result.sessionId;
+
+    // Seed local sessions with an optimistic row for the new thread. Carry
+    // the source's scope entity title so the sidebar groups it correctly
+    // before the next getSessionList refetch.
+    const source = sessions.find(s => s.id === sourceSessionId) ?? null;
+    window.localStorage.setItem(storage.currentSessionKey, newId);
+    setSessionId(newId);
+    setMessages([]);
+    setSessions(prev => {
+      if (prev.some(s => s.id === newId)) return prev;
+      const now = Date.now();
+      return [...prev, {
+        id: newId,
+        createdAt: now,
+        updatedAt: now,
+        lastMessageAt: now,
+        preview: '',
+        title: source?.title ? `Continuing: ${source.title}` : 'Continuing thread',
+        scopeType: source?.scopeType ?? 'deal',
+        scopeEntityId: source?.scopeEntityId ?? null,
+        scopeEntityTitle: source?.scopeEntityTitle ?? null,
+        titleLocked: false,
+        isPinned: false,
+        pinnedAt: null,
+        pinned: false,
+      }];
+    });
+    return newId;
+  }, [sessions, storage]);
+
+  const archiveSession = useCallback(async (targetSessionId: string) => {
+    const result = await archiveSessionAction(targetSessionId);
+    if (!result.success) {
+      console.error('[SessionContext] archiveSession failed:', result.error);
+      return;
+    }
+
+    // Drop from the local sessions array so the sidebar updates immediately
+    // (the getSessionList query already filters archived_at IS NULL).
+    setSessions(prev => prev.filter(s => s.id !== targetSessionId));
+
+    // Leave localStorage messages in place — archival is reversible, unlike
+    // removeSession's permanent deletion.
+
+    // If archiving the active session, fall back to a new general chat so
+    // the user isn't staring at a ghost thread.
+    if (targetSessionId === sessionId) {
+      const newId = `chat-${crypto.randomUUID()}`;
+      window.localStorage.setItem(storage.currentSessionKey, newId);
+      setSessionId(newId);
+      setMessages([]);
+      const now = Date.now();
+      setSessions(prev => [...prev, buildGeneralSessionMeta(newId, now)]);
+    }
+  }, [sessionId, storage]);
+
   const removeSession = useCallback((targetSessionId: string) => {
     setSessions(prev => prev.filter(s => s.id !== targetSessionId));
     // Clean up localStorage messages for this session
@@ -340,7 +670,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSessionId(newId);
       setMessages([]);
       const now = Date.now();
-      setSessions(prev => [...prev, { id: newId, createdAt: now, updatedAt: now, preview: '' }]);
+      setSessions(prev => [...prev, buildGeneralSessionMeta(newId, now)]);
     }
     // Fire-and-forget DB deletion
     import('@/app/(dashboard)/(features)/aion/actions/aion-session-actions')
@@ -414,9 +744,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         type ? { type, entityId, label, secondaryId, secondaryType } : undefined;
 
       abortRef.current = new AbortController();
+      // Matches route.ts export `maxDuration = 30`. Long LLM streams on Opus
+      // with multiple tool-calls (e.g. lookup_thread → draft_followup) can
+      // run 10-20s legitimately, and dev-mode webpack cold-compiles the
+      // route at ~14s first-hit — the old 15s budget timed out on both.
       timeoutId = setTimeout(() => {
         abortRef.current?.abort('timeout');
-      }, 15_000);
+      }, 30_000);
       const response = await fetch('/api/aion/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -439,6 +773,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = '';
+        let preambleAccum = '';
+        let preambleFrozen = false;
         let buffer = '';
 
         while (true) {
@@ -455,6 +791,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               accumulated += line.slice(5);
               setActiveToolLabel(null);
               updateMessageContent(msgId, accumulated);
+            } else if (line.startsWith('preamble:')) {
+              // Pre-tool commentary ("I'll search for that wedding deal").
+              // Renders as a muted "thinking" header above the answer so
+              // it doesn't mash into the main content.
+              preambleAccum += line.slice('preamble:'.length);
+              updateMessagePreamble(msgId, preambleAccum);
+            } else if (line === 'preamble-end:') {
+              // First tool-call fired — preamble is frozen. Any further
+              // text goes to main content, not preamble.
+              preambleFrozen = true;
             } else if (line.startsWith('thinking:')) {
               // Extended thinking deltas — show as thinking indicator
               setActiveToolLabel('reasoning');
@@ -468,8 +814,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               try {
                 const payload = JSON.parse(line.slice(11));
                 const blocks: AionMessageContent[] = payload.blocks ?? [];
+                // If no tool ever fired, "preamble" is actually the whole
+                // answer — promote it to main content so the user sees a
+                // response instead of an empty answer with preamble-only.
+                if (!preambleFrozen && !accumulated && preambleAccum) {
+                  accumulated = preambleAccum;
+                  updateMessagePreamble(msgId, '');
+                }
                 finalizeMessage(msgId, accumulated || 'I processed that.', blocks.length > 0 ? blocks : undefined);
               } catch {
+                if (!preambleFrozen && !accumulated && preambleAccum) {
+                  accumulated = preambleAccum;
+                  updateMessagePreamble(msgId, '');
+                }
                 finalizeMessage(msgId, accumulated || 'I processed that.');
               }
             } else if (line.startsWith('error:')) {
@@ -666,8 +1023,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setViewState,
       addMessage,
       startNewChat,
+      openScopedSession,
+      createNewScopedChat,
       selectSession,
       removeSession,
+      archiveSession,
+      pinSession,
+      unpinSession,
+      continueSessionInNewChat,
       editAndResend,
       retryLastMessage,
       cancelStreaming,

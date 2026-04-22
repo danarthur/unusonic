@@ -228,7 +228,26 @@ export async function POST(req: Request) {
   // 7. Build system prompt with workspace context + user identity
   const wsSnapshot = await getWorkspaceSnapshot(workspaceId);
   const userMemories = await getUserMemories(workspaceId, user.id);
-  const systemPrompt = buildSystemPrompt(aionConfig, onboardingState, workspaceName, wsSnapshot, userName, userRole ?? 'viewer', userMemories, pageContext);
+
+  // 7b. Resolve session scope server-side and build a live record-context
+  // block for deal-scoped sessions. Industry-standard pattern (Attio,
+  // HubSpot, Linear, Salesforce, Pylon): scope lives on the session row,
+  // record facts are re-fetched every turn — no caching across messages.
+  // See docs/reference/aion-deal-chat-design.md §7.4.
+  //
+  // pageContext stays as a fallback for legacy sessions without scope, and
+  // as the signal source for entity-type pages where no session has been
+  // created yet (lobby, dashboards).
+  let scopePrefix = '';
+  if (body.sessionId) {
+    const { resolveSessionScope, buildScopePrefix } = await import('../lib/scope-context');
+    const scope = await resolveSessionScope(body.sessionId);
+    if (scope) {
+      scopePrefix = await buildScopePrefix(scope);
+    }
+  }
+
+  const systemPrompt = scopePrefix + buildSystemPrompt(aionConfig, onboardingState, workspaceName, wsSnapshot, userName, userRole ?? 'viewer', userMemories, pageContext);
 
   // 8. Build the message history (with rolling summarization for long conversations)
   const allMessages = messages.map((m) => ({
@@ -363,6 +382,21 @@ export async function POST(req: Request) {
           // Emit model tier so client can display it
           controller.enqueue(encoder.encode(`model:${modelTier}\n`));
 
+          // Text-delta routing: Sonnet's typical tool-call flow emits
+          // preamble ("I'll search for that wedding deal") → tool-call →
+          // tool-result → answer. We route the preamble text to a separate
+          // `preamble:` stream channel so the client can render it as a
+          // collapsible "thinking" header above the main answer instead of
+          // mashing both into one run-on paragraph. Post-tool text goes to
+          // the normal `text:` channel.
+          //
+          // If the model calls multiple tools in a turn ("I'll check X →
+          // [tool] → Now I'll check Y → [tool] → Here's what I found"),
+          // each pre-tool chunk adds to the preamble. The final post-tool
+          // segment is the answer.
+          let toolSeen = false;
+          const preambleText: string[] = [];
+
           // Stream text deltas + tool call events via fullStream
           for await (const part of result.fullStream) {
             if (part.type === 'reasoning-delta') {
@@ -370,15 +404,43 @@ export async function POST(req: Request) {
               controller.enqueue(encoder.encode(`thinking:${(part as any).text ?? ''}\n`));
             } else if (part.type === 'text-delta') {
               const delta = (part as any).text ?? (part as any).delta ?? '';
-              collectedText.push(delta);
-              controller.enqueue(encoder.encode(`text:${delta}\n`));
+              if (!toolSeen) {
+                // Pre-tool text → preamble channel. Keep an accumulator so
+                // we know the preamble content for the final structured
+                // response assembly even if no tools end up being called.
+                preambleText.push(delta);
+                controller.enqueue(encoder.encode(`preamble:${delta}\n`));
+              } else {
+                collectedText.push(delta);
+                controller.enqueue(encoder.encode(`text:${delta}\n`));
+              }
             } else if (part.type === 'tool-call') {
+              // First tool seen flips the routing: further text is the
+              // post-tool answer, not preamble.
+              if (!toolSeen) {
+                // If we accumulated preamble but no answer text came yet,
+                // signal the boundary so the client freezes the preamble
+                // box and prepares for the answer.
+                controller.enqueue(encoder.encode(`preamble-end:\n`));
+              }
+              toolSeen = true;
               toolsCalled.push(part.toolName);
               const label = part.toolName.replace(/_/g, ' ');
               controller.enqueue(encoder.encode(`tool:${label}\n`));
             } else if (part.type === 'tool-result') {
               collectedToolResults.push({ toolName: (part as any).toolName, output: (part as any).output });
             }
+          }
+
+          // Edge case: model emitted only preamble text and never finalized
+          // with a post-tool answer. Demote the preamble to main content so
+          // the UI isn't left with an empty answer block. This also covers
+          // plain conversational turns that don't call tools at all — those
+          // never see `preamble-end:` and have empty collectedText, so we
+          // promote the preamble to main text.
+          if (!toolSeen && preambleText.length > 0 && collectedText.length === 0) {
+            const joined = preambleText.join('');
+            collectedText.push(joined);
           }
 
           await recordAionAction(workspaceId);
@@ -396,6 +458,7 @@ export async function POST(req: Request) {
 
           // Build structured response from collected stream data
           const finalText = collectedText.join('');
+
           const structuredResponse = buildResponseFromResult(
             { text: finalText, steps: [{ toolResults: collectedToolResults }] },
             configUpdates,
@@ -406,6 +469,25 @@ export async function POST(req: Request) {
           controller.enqueue(encoder.encode(
             `structured:${JSON.stringify({ blocks, configUpdates: structuredResponse.configUpdates })}\n`
           ));
+
+          // Fire-and-forget title generation — runs after the stream closes
+          // so it never delays the response. The generator reads the session's
+          // current title and silently bails if one is already set OR if the
+          // user has locked it mid-generation. Only triggers when we have
+          // both a user message and a meaningful assistant reply.
+          if (body.sessionId && finalText.trim().length > 0) {
+            const lastUser = messages.filter((m) => m.role === 'user').pop()?.content ?? '';
+            if (lastUser.trim().length > 0) {
+              const sessionId = body.sessionId;
+              void import('../lib/generate-title').then(({ generateSessionTitle }) =>
+                generateSessionTitle({
+                  sessionId,
+                  userMessage: lastUser,
+                  assistantReply: finalText,
+                }),
+              );
+            }
+          }
 
           // Log routing outcome
           logOutcome({ toolsCalled, success: true, durationMs: 0 });
@@ -652,6 +734,19 @@ function buildSystemPrompt(config: AionConfig, onboardingState: OnboardingState,
     '- For schedule questions, use get_entity_schedule or get_calendar_events',
     '- For financial questions, use get_entity_financial_summary or get_proposal_details',
     '- For reports and dashboards: use get_revenue_summary (financial scorecard), get_pipeline_summary (deal pipeline chart), get_revenue_trend (6-month revenue line chart), get_client_concentration (revenue by client donut chart), get_client_insights (client scorecard). These render as visual data cards with charts — use them when users ask for summaries, scorecards, reports, metrics, or dashboards.',
+    '- For cross-deal pricing references ("what did we charge X last June", "what did past rooftops go for", "find similar deals"): use lookup_historical_deals. Pass client_name_query for fuzzy client lookup, similar_to_deal_id for structural matches (archetype + venue + month + headcount), or filters.date_range / filters.status for time-and-outcome scoping. When the tool returns truncated: true, acknowledge the result-count limit without speculating about hidden records.',
+    '- For catalog pricing ("what do we charge for X", "do we sell Y", "list our rooftop packages"): use lookup_catalog. Returns name, category, default price, description, and the catalog id. Plain fuzzy search — combine with lookup_historical_deals when the user wants both default pricing AND what clients actually paid.',
+    '',
+    '=== INLINE RECORD CITATIONS ===',
+    'When you reference a deal, client/entity, or catalog package that you retrieved via a tool in this turn, emit the name as an inline citation tag instead of plain text. The client-side renders these as clickable pills with hover cards.',
+    'Format: <citation kind="KIND" id="UUID">Display Name</citation>',
+    'Allowed kinds: "deal" (from lookup_historical_deals), "entity" (a client / person / company / venue id), "catalog" (from lookup_catalog).',
+    'Rules:',
+    '- Only cite ids you retrieved from a tool in this conversation. Never fabricate an id.',
+    '- Cite each record once per response — further references use the bare name.',
+    '- Keep the display name under 60 characters.',
+    '- Do NOT wrap numbers, dates, or prices in citation tags.',
+    'Example: "The closest reference is <citation kind="deal" id="238cabce-1234-4abc-9def-000000000001">Henderson Holiday Party</citation> — same venue, 75 guests, $12,400 total."',
     '',
     '=== REGISTRY METRICS (call_metric) ===',
     'When the user asks for a single scalar business metric that maps to a registry ID, call `call_metric` with the metric_id and (if required) args. Do NOT compose multiple read tools into a ScoreCard when one registry metric covers the ask — call_metric renders a first-class analytics_result card with comparison, sparkline, pills, and provenance.',
@@ -846,16 +941,23 @@ async function buildGreeting(state: OnboardingState, userName: string | null, wo
         const queue = await getFollowUpQueue();
         if (queue.length > 0) {
           const topItem = queue[0];
-          const topTitle = (topItem.context_snapshot as any)?.deal_title ?? 'a deal';
-          const topReason = topItem.reason;
+          const rawTitle = (topItem.context_snapshot as Record<string, unknown> | null)?.deal_title;
+          const topTitle = typeof rawTitle === 'string' && rawTitle.trim().length > 0
+            ? rawTitle.trim()
+            : null;
+          // Reason sometimes ends with a trailing period — strip it so the
+          // template doesn't render "reason.." which looks like a typo.
+          const topReason = (topItem.reason ?? '').replace(/\s*\.\s*$/, '').trim();
+          const topReasonLower = topReason.toLowerCase();
+          const subject = topTitle ?? 'one deal';
           const greetingText = queue.length === 1
-            ? `Hey${name}. You have 1 deal that needs follow-up. ${topTitle} — ${topReason.toLowerCase()}. Want me to draft something?`
-            : `Hey${name}. You have ${queue.length} deals that need follow-up. ${topTitle} — ${topReason.toLowerCase()}. Want me to draft something?`;
+            ? `Hey${name}. You have 1 deal that needs follow-up${topTitle ? ` — ${topTitle}` : ''}${topReasonLower ? `: ${topReasonLower}` : ''}. Want me to draft something?`
+            : `Hey${name}. You have ${queue.length} deals that need follow-up${topTitle ? `. Top priority: ${topTitle}` : ''}${topReasonLower ? ` — ${topReasonLower}` : ''}. Want me to draft something?`;
           responseMessages.push({ type: 'text', text: greetingText });
           responseMessages.push({ type: 'suggestions', text: '', chips: [
-            { label: 'Draft it', value: `Draft a follow-up for ${topTitle}.` },
+            { label: 'Draft it', value: `Draft a follow-up for ${subject}.` },
             ...(queue.length > 1 ? [{ label: `Show me all ${queue.length}`, value: 'What needs attention today?' }] : []),
-            { label: 'I already handled it', value: `I already handled ${topTitle}.` },
+            { label: 'I already handled it', value: `I already handled ${subject}.` },
           ]});
         } else {
           responseMessages.push({ type: 'text', text: `Hey${name}. All caught up. I'm here if you need me.` });
@@ -865,115 +967,26 @@ async function buildGreeting(state: OnboardingState, userName: string | null, wo
         responseMessages.push({ type: 'text', text: `Hey${name}. What can I help with?` });
       }
 
-      // Insights are now surfaced on the lobby brief card with direct actions.
-      // Keep a brief reference here so Aion acknowledges them without duplicating.
+      // Discipline rule (2026-04-22): the greeting ships ONE text block + ONE
+      // chip block. Insights, edit-pattern observations, and page-context
+      // addendums used to each post their own follow-up message at open time,
+      // stacking up to four Aion turns before the user even typed. Those now
+      // require an explicit prompt ("what's on my brief", "what patterns
+      // have you noticed"). We still mark the insights as surfaced for
+      // telemetry so the lobby brief card updates, but we don't render the
+      // acknowledgement here.
       try {
         const { getPendingInsights, markInsightsSurfaced } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
         const insights = await getPendingInsights(workspaceId ?? '', 5);
         if (insights.length > 0) {
-          const urgentCount = insights.filter((i) => i.urgency === 'critical' || i.urgency === 'high').length;
-          const msg = urgentCount > 0
-            ? `I surfaced ${insights.length} item${insights.length === 1 ? '' : 's'} on your brief — ${urgentCount} need${urgentCount === 1 ? 's' : ''} attention. Anything you want to dig into?`
-            : `I surfaced ${insights.length} item${insights.length === 1 ? '' : 's'} on your brief. Anything you want to dig into?`;
-          responseMessages.push({ type: 'text', text: msg });
-          responseMessages.push({
-            type: 'suggestions',
-            text: '',
-            chips: [
-              { label: 'Tell me more', value: 'Tell me more about the items on my brief' },
-              { label: 'Dismiss all', value: 'Dismiss all current insights' },
-            ],
-          });
-
-          // Fire-and-forget: mark insights as surfaced
-          const insightIds = insights.map((i: any) => i.id);
+          const insightIds = insights.map((i: { id: string }) => i.id);
           markInsightsSurfaced(insightIds).catch(() => {});
         }
       } catch { /* insights not available yet — fine */ }
 
-      const observation = await detectEditPatterns();
-      if (observation) {
-        responseMessages.push({ type: 'text', text: observation.text });
-        responseMessages.push({ type: 'suggestions', text: '', chips: observation.chips });
-      }
-
-      // Page-context-aware greeting addition
-      if (pageContext?.type === 'deal' && pageContext.entityId && workspaceId) {
-        try {
-          const { getFollowUpForDeal } = await import('@/app/(dashboard)/(features)/crm/actions/follow-up-actions');
-          const queueItem = await getFollowUpForDeal(pageContext.entityId);
-          if (queueItem) {
-            const dealLabel = pageContext.label ?? 'this deal';
-            responseMessages.push({
-              type: 'text' as const,
-              text: `I see you're looking at ${dealLabel}. It's in the follow-up queue — ${queueItem.reason?.toLowerCase() ?? 'needs attention'}. Want me to draft something?`,
-            });
-            responseMessages.push({ type: 'suggestions', text: '', chips: [
-              { label: 'Draft a follow-up', value: `Draft a follow-up for this deal` },
-              { label: 'Show details', value: `Tell me about this deal` },
-            ]});
-          }
-        } catch {
-          // Non-blocking
-        }
-      } else if (pageContext?.type === 'entity' && pageContext.label) {
-        responseMessages.push({
-          type: 'text' as const,
-          text: `Looking at ${pageContext.label}. Ask me anything about them — deals, history, or draft a message.`,
-        });
-      }
-
       return { messages: responseMessages };
     }
   }
-}
-
-// =============================================================================
-// Teaching moments — detect patterns from recent edit tracking
-// =============================================================================
-
-type EditObservation = { text: string; chips: SuggestionChip[] };
-
-async function detectEditPatterns(): Promise<EditObservation | null> {
-  try {
-    const supabase = await createClient();
-    const db = supabase;
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await db.schema('ops').from('follow_up_log')
-      .select('draft_original, content, edit_classification, edit_distance')
-      .not('draft_original', 'is', null).not('edit_classification', 'is', null)
-      .gte('created_at', since).order('created_at', { ascending: false }).limit(20);
-
-    if (error || !data || data.length < 3) return null;
-
-    const entries = data as Array<{ draft_original: string; content: string | null; edit_classification: string; edit_distance: number }>;
-    const counts = { approved_unchanged: 0, light_edit: 0, heavy_edit: 0 };
-    for (const e of entries) { if (e.edit_classification in counts) counts[e.edit_classification as keyof typeof counts]++; }
-
-    const total = entries.length;
-    if (counts.approved_unchanged / total > 0.6 && total >= 5) return null;
-
-    if (counts.heavy_edit / total > 0.5 && total >= 4) {
-      return { text: `I noticed you've been making significant edits to my last ${total} drafts. Want to update my voice settings so I get closer to your style?`, chips: [
-        { label: 'Yes, let me adjust', value: 'Let me update how you write.' },
-        { label: 'No, they were one-offs', value: 'Those were special cases, keep going as you are.' },
-      ]};
-    }
-
-    const edited = entries.filter((e) => e.content && e.draft_original);
-    if (edited.length >= 3) {
-      let shorter = 0, longer = 0;
-      for (const e of edited) {
-        if (e.content!.length < e.draft_original.length * 0.8) shorter++;
-        if (e.content!.length > e.draft_original.length * 1.2) longer++;
-      }
-      if (shorter >= Math.ceil(edited.length * 0.6))
-        return { text: `I noticed you've been shortening my drafts on the last ${shorter} messages. Should I keep them shorter going forward?`, chips: [{ label: 'Yes, shorter', value: 'Yes, keep drafts shorter going forward.' }, { label: 'No, those were one-offs', value: 'Those were one-offs, keep the current length.' }] };
-      if (longer >= Math.ceil(edited.length * 0.6))
-        return { text: `I noticed you've been adding more detail to my drafts recently. Should I write longer, more detailed messages?`, chips: [{ label: 'Yes, more detail', value: 'Yes, write longer and more detailed messages.' }, { label: 'No, those were one-offs', value: 'Those were one-offs, keep the current length.' }] };
-    }
-    return null;
-  } catch { return null; }
 }
 
 // =============================================================================

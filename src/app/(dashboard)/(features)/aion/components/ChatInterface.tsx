@@ -13,6 +13,7 @@ import type { DraftEditedData } from './DraftPreviewCard';
 import { AionThinkingSteps } from './AionThinkingSteps';
 import { AionMarkdown } from './AionMarkdown';
 import { AionSidebar } from './AionSidebar';
+import { ChatScopeHeader } from './ChatScopeHeader';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { usePageContextStore } from '@/shared/lib/page-context-store';
 
@@ -74,7 +75,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
   const {
     messages, isLoading, addMessage, startNewChat, setWorkspaceId,
     sendChatMessage, sendMessage, sessions, currentSessionId, selectSession,
-    removeSession, editAndResend, retryLastMessage, cancelStreaming, streamingMessageId, activeToolLabel,
+    removeSession, createNewScopedChat,
+    pinSession, unpinSession, archiveSession, continueSessionInNewChat,
+    editAndResend, retryLastMessage, cancelStreaming, streamingMessageId, activeToolLabel,
     modelMode, setModelMode,
   } = useSession();
   const [input, setInput] = useState('');
@@ -166,10 +169,31 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Init greeting
+  // Init greeting — fires at most ONCE per session per tab.
+  //
+  // Prior bug (2026-04-22): every time ChatInterface remounted (e.g. after
+  // navigating to a citation pill's destination and returning to /aion),
+  // `initFetched` reset to false and a fresh greeting was posted — even when
+  // the session already had history. In one session owners saw the "You have
+  // N deals..." greeting stack 3+ times.
+  //
+  // Dedup strategy: sessionStorage key per (session|default). Once greeted,
+  // we don't greet that session again in this tab. Clears naturally on tab
+  // close — a new tab on the same session gets one fresh greeting, which is
+  // correct.
   useEffect(() => {
     if (!workspaceId || messages.length > 0 || initFetched.current) return;
+    const greetedKey = `unusonic.aion_greeted.${currentSessionId || 'default'}`;
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem(greetedKey) === '1') {
+      // Already greeted this session in this tab — skip. Don't reset
+      // initFetched so the effect doesn't keep re-checking.
+      initFetched.current = true;
+      return;
+    }
     initFetched.current = true;
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(greetedKey, '1');
+    }
     setInitError(false);
     fetch('/api/aion/chat', {
       method: 'POST',
@@ -188,15 +212,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
         addMessage('assistant', textContent || 'Hey, I’m Aion.', data.messages);
       })
       .catch(() => { setInitError(true); });
-  }, [workspaceId, messages.length, addMessage]);
+  }, [workspaceId, messages.length, addMessage, currentSessionId]);
 
   const handleNewChat = useCallback(() => {
     startNewChat();
     initFetched.current = false;
+    // Clear the greeting dedup so the brand-new chat gets its welcome.
+    // Only the default-key entry needs clearing — new sessions get new keys.
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem('unusonic.aion_greeted.default');
+    }
   }, [startNewChat]);
 
   const handleSelectSession = useCallback(
-    (id: string) => { selectSession(id); initFetched.current = false; },
+    // Do NOT reset initFetched here. Pre-multi-thread, resetting was harmless
+    // because sessions were roughly 1:1 with users. With per-deal multi-
+    // thread sessions, every sidebar click was re-firing the init greeting
+    // AND racing the DB message load (the load effect briefly sets
+    // messages=[]), so the init effect saw length=0 and stacked another
+    // greeting on every switch. initFetched only needs to reset on explicit
+    // new-chat creation, which handleNewChat handles.
+    (id: string) => selectSession(id),
     [selectSession],
   );
 
@@ -258,6 +294,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
         onSelect={handleSelectSession}
         onNewChat={handleNewChat}
         onDelete={removeSession}
+        onNewScopedChat={({ scopeType, scopeEntityId }) => {
+          if (!workspaceId) return;
+          // Only deal scope is wired today; event is Phase 2+ per the RPC.
+          if (scopeType !== 'deal') return;
+          void createNewScopedChat({ workspaceId, scopeType, scopeEntityId });
+        }}
+        onPin={(id) => void pinSession(id)}
+        onUnpin={(id) => void unpinSession(id)}
+        onArchive={(id) => void archiveSession(id)}
+        onContinueInNewChat={(id) => void continueSessionInNewChat(id)}
         isOpen={sidebarOpen}
         onToggle={toggleSidebar}
       />
@@ -278,6 +324,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
               </button>
             </div>
           )}
+
+          {/* Sticky scope header — renders when the current session is scope-linked
+              (e.g. a specific deal). General chats render nothing here. */}
+          {(() => {
+            const current = sessions.find((s) => s.id === currentSessionId);
+            return current ? <ChatScopeHeader session={current} /> : null;
+          })()}
 
           {/* Empty state */}
           {isEmpty && viewState !== 'overview' && (
@@ -454,6 +507,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
                                 )
                               ) : (
                                 <>
+                                  {/* Thinking preamble — the model's "I'll search for..."
+                                      chatter that precedes a tool call. Rendered as a
+                                      muted italic header above the answer so it doesn't
+                                      compete with main content. Absent on plain turns. */}
+                                  {msg.preamble && msg.preamble.trim().length > 0 && (
+                                    <div
+                                      className="mb-2 flex items-start gap-1.5 pl-0.5 text-[0.78rem] italic text-[var(--stage-text-tertiary)] leading-snug"
+                                      aria-label="Aion's reasoning"
+                                    >
+                                      <Sparkles size={11} strokeWidth={1.5} className="shrink-0 mt-[3px] opacity-70" aria-hidden />
+                                      <span className="whitespace-pre-wrap">{msg.preamble.trim()}</span>
+                                    </div>
+                                  )}
                                   {msg.content ? (
                                     <>
                                       <AionMarkdown content={msg.content} />
