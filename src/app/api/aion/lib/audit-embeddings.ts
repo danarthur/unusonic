@@ -80,7 +80,7 @@ export async function auditWorkspaceContentFill(workspaceId: string): Promise<Fi
   const memoryByType = new Map<AuditedSource, number>(memoryCounts);
 
   // Source-table expected-min counts. Parallel so the audit stays snappy.
-  const [notesRes, followRes, proposalsRes, catalogRes] = await Promise.all([
+  const [notesRes, followRes, proposalsRes, catalogRes, messagesRes, activitySummary] = await Promise.all([
     supabase
       .schema('ops')
       .from('deal_notes')
@@ -100,19 +100,42 @@ export async function auditWorkspaceContentFill(workspaceId: string): Promise<Fi
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .eq('is_active', true),
+    // Only messages with body_text are embeddable, so that's the right
+    // denominator. Null-body messages skip the embed path.
+    supabase
+      .schema('ops')
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .not('body_text', 'is', null),
+    // Activity-chunk expected-min is the count of distinct (deal, YYYYMM)
+    // pairs. PostgREST can't aggregate that directly — fetch ids +
+    // created_at for deals in the workspace and compute client-side.
+    supabase
+      .schema('ops')
+      .from('deal_activity_log')
+      .select('deal_id, created_at')
+      .eq('workspace_id', workspaceId),
   ]);
+
+  type ActivityRow = { deal_id: string; created_at: string };
+  const activityChunkKeys = new Set<string>();
+  for (const r of ((activitySummary.data ?? []) as unknown) as ActivityRow[]) {
+    const month = r.created_at.slice(0, 7); // YYYY-MM
+    activityChunkKeys.add(`${r.deal_id}::${month}`);
+  }
 
   const expectedByType = new Map<AuditedSource, number | null>([
     ['deal_note', notesRes.count ?? 0],
     ['follow_up', followRes.count ?? 0],
     ['proposal', proposalsRes.count ?? 0],
     ['catalog', catalogRes.count ?? 0],
+    ['message', messagesRes.count ?? 0],
+    ['activity_log', activityChunkKeys.size],
     // No expected_min yet — see module comment.
     ['event_note', null],
     ['capture', null],
-    ['message', null],
     ['narrative', null],
-    ['activity_log', null],
   ]);
 
   const rows: FillAuditRow[] = AUDITED_SOURCE_TYPES.map((sourceType) => {

@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/aion-memory-drain",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/aion-activity-embed",
+      "schedule": "0 3 * * *"
     }
   ]
 }

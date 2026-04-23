@@ -10,6 +10,12 @@ import {
   auditWorkspaceContentFill,
   type FillAuditResult,
 } from '@/app/api/aion/lib/audit-embeddings';
+import {
+  estimateAiSummaryBackfillCost,
+  runAiSummaryBackfill,
+  type AiSummaryCostEstimate,
+  type AiSummaryBackfillResult,
+} from '@/app/api/aion/lib/ai-summary-backfill';
 
 export type MemoryBackfillResult =
   | { success: true; workspaceId: string; result: BackfillResult }
@@ -17,6 +23,14 @@ export type MemoryBackfillResult =
 
 export type MemoryAuditResult =
   | { success: true; audit: FillAuditResult }
+  | { success: false; error: string };
+
+export type AiSummaryCostResult =
+  | { success: true; estimate: AiSummaryCostEstimate }
+  | { success: false; error: string };
+
+export type AiSummaryRunResult =
+  | { success: true; result: AiSummaryBackfillResult }
   | { success: false; error: string };
 
 async function resolveAdminWorkspaceOrFail(): Promise<
@@ -59,4 +73,28 @@ export async function runMemoryAudit(): Promise<MemoryAuditResult> {
 
   const audit = await auditWorkspaceContentFill(gate.workspaceId);
   return { success: true, audit };
+}
+
+/**
+ * Pre-flight cost estimate for ai_summary backfill. Read-only — counts
+ * eligible messages, samples body length, returns projected USD.
+ */
+export async function estimateAiSummaryCost(): Promise<AiSummaryCostResult> {
+  const gate = await resolveAdminWorkspaceOrFail();
+  if (!gate.ok) return { success: false, error: gate.error };
+
+  const estimate = await estimateAiSummaryBackfillCost(gate.workspaceId);
+  return { success: true, estimate };
+}
+
+/**
+ * Run ai_summary backfill (Haiku one-shot per message, writes ops.messages.ai_summary).
+ * Bounded by `cap` to stay under Vercel's 300s function limit for large workspaces.
+ */
+export async function runAiSummary(cap?: number): Promise<AiSummaryRunResult> {
+  const gate = await resolveAdminWorkspaceOrFail();
+  if (!gate.ok) return { success: false, error: gate.error };
+
+  const result = await runAiSummaryBackfill(gate.workspaceId, { cap });
+  return { success: true, result };
 }
