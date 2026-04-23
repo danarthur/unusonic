@@ -48,6 +48,11 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Generated types — not subject to size limits.
     "src/types/supabase.ts",
+    // Agent-session worktrees (gitignored, but eslint flat config doesn't
+    // read .gitignore). Each worktree is a full codebase copy, so without
+    // this ignore every violation reports 10-20× depending on how many
+    // sessions have run. See docs/reference/code/coding-protocol.md.
+    ".claude/**",
   ]),
 
   // ─── Entity attribute access guardrail ──────────────────────────────────────
