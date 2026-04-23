@@ -20,6 +20,7 @@ import { getFinancialPulse } from '@/widgets/dashboard/api/get-financial-pulse';
 import { getClientConcentration } from '@/widgets/dashboard/api/get-client-concentration';
 import { getRevenueTrend } from '@/widgets/dashboard/api/get-revenue-trend';
 import { searchMemory, type SourceType } from '../../lib/embeddings';
+import { wrapUntrusted } from '../../lib/wrap-untrusted';
 import type { AionToolContext } from './types';
 
 // ---------------------------------------------------------------------------
@@ -229,7 +230,7 @@ async function fetchSimilarityContext(
 
   let guestCount: number | null = null;
   if (src.event_id) {
-    const { data: ev } = await (supabase as unknown as { schema: (s: string) => { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { guest_count_expected: number | null; guest_count_actual: number | null } | null }> } } } } })
+    const { data: ev } = await supabase
       .schema('ops')
       .from('events')
       .select('guest_count_expected, guest_count_actual')
@@ -338,7 +339,7 @@ async function fetchCandidateDeals(
 async function fetchGuestCounts(supabase: AuthedClient, eventIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (eventIds.length === 0) return out;
-  const { data } = await (supabase as unknown as { schema: (s: string) => { from: (t: string) => { select: (c: string) => { in: (k: string, v: string[]) => Promise<{ data: { id: string; guest_count_expected: number | null; guest_count_actual: number | null }[] | null }> } } } })
+  const { data } = await supabase
     .schema('ops')
     .from('events')
     .select('id, guest_count_expected, guest_count_actual')
@@ -1074,6 +1075,134 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     },
   });
 
+  // ---- Message lookup (Phase 3, Sprint 1, Week 1 — D4 pull-back) ----
+  //
+  // Deterministic read over ops.messages. Ships BEFORE the RAG path
+  // (lookup_client_messages, Week 2) so "what's the latest from Sarah"
+  // works on reply data the moment the ingestion hook lands.
+  //
+  // Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.2 D4.
+  //
+  // Scoping discipline (C5 fix):
+  //   1. Workspace RLS on ops.messages filters rows the caller can't see.
+  //   2. When `deal_id` is provided, verify it's in the caller's workspace
+  //      via deals.workspace_id (belt + RLS).
+  //   3. When `entity_id` is provided, verify it's in the caller's workspace
+  //      via directory.entities.owner_workspace_id.
+  //   4. When only `entity_id` is provided, default to the caller's current
+  //      page-context deal (narrow scope). Passing `deal_id: null`
+  //      explicitly is the widen-to-all-deals signal.
+  //   5. When both are provided they're AND'd — intersection, not union.
+  //
+  // Injection safety (B4): body_text is wrapped via wrapUntrusted() before
+  // leaving the handler. Every caller downstream (model context assembly,
+  // CitationPill rendering) therefore sees `<untrusted>...</untrusted>`
+  // delimiters instead of raw client text.
+  //
+  // ops.messages row shape: see migration 20260429000000.
+  const get_latest_messages = tool({
+    description:
+      'Fetch the most recent messages (emails, SMS, call notes) on a deal ' +
+      'or with a specific client contact. Deterministic — use this for ' +
+      '"what did Sarah say last", "show me the last 3 emails on this deal", ' +
+      '"any reply from Henderson today". Returns verbatim body excerpts ' +
+      'with sender, channel, direction, and timestamp. ' +
+      'For semantic queries ("what did Sarah say about dinner timing") use ' +
+      'lookup_client_messages (RAG) instead. ' +
+      'Scope defaults to the current deal in view when the user has a deal ' +
+      'page context; pass deal_id explicitly to switch, or deal_id=null ' +
+      'with entity_id to widen to all deals with that person.',
+    inputSchema: z.object({
+      deal_id: z.string().nullable().optional().describe(
+        'Deal UUID to fetch messages for. Defaults to the current deal in view ' +
+        'if present. Pass null explicitly (with entity_id set) to widen ' +
+        'across all deals for that entity.',
+      ),
+      entity_id: z.string().optional().describe(
+        'Directory entity UUID (person or org) to filter by. Matches either ' +
+        'the message sender OR the thread\'s primary entity.',
+      ),
+      direction: z.enum(['inbound', 'outbound', 'any']).optional().describe(
+        'Filter by message direction. Default: any.',
+      ),
+      limit: z.number().int().min(1).max(10).optional().describe(
+        'Max results. Default 5, cap 10.',
+      ),
+    }),
+    execute: async (params) => {
+      const supabase = await createClient();
+      const limit = Math.min(params.limit ?? 5, 10);
+
+      // Resolve deal scope — explicit null = widen; undefined = fall back to
+      // page context; value = use it. Zod preserves the undefined-vs-null
+      // distinction because both are allowed and the object key's presence
+      // is what carries the widen intent.
+      const dealSpecifiedNull =
+        Object.prototype.hasOwnProperty.call(params, 'deal_id') && params.deal_id === null;
+      const dealId =
+        params.deal_id ??
+        (dealSpecifiedNull ? null : resolveDealId(undefined));
+
+      // C5 validation — if caller supplied a deal_id value, verify it's
+      // inside the caller's workspace before querying messages.
+      if (dealId) {
+        const { data: dealRow } = await supabase
+          .from('deals')
+          .select('id')
+          .eq('id', dealId)
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+        if (!dealRow) return { messages: [], error: 'Deal not in workspace.' };
+      }
+
+      // C5 validation — same for entity_id.
+      if (params.entity_id) {
+        const { data: entRow } = await supabase
+          .schema('directory')
+          .from('entities')
+          .select('id')
+          .eq('id', params.entity_id)
+          .eq('owner_workspace_id', workspaceId)
+          .maybeSingle();
+        if (!entRow) return { messages: [], error: 'Entity not in workspace.' };
+      }
+
+      // Core query — ops.messages joined to the thread for deal_id + subject.
+      // Workspace filter + RLS both fire; the redundant .eq is belt + suspenders.
+      let q = buildLatestMessagesBaseQuery(supabase, workspaceId, limit);
+
+      if (dealId) {
+        q = q.eq('thread.deal_id', dealId);
+      }
+      if (params.entity_id) {
+        // Sender-entity match is the common "what did Sarah say" path, but
+        // thread.primary_entity_id catches outbound-only messages from the
+        // workspace where from_entity_id is NULL (owner address, not in
+        // directory). Supabase chains don't support `or()` across a joined
+        // table cleanly, so we run two queries and merge.
+        const altQ = buildLatestMessagesBaseQuery(supabase, workspaceId, limit)
+          .eq('thread.primary_entity_id', params.entity_id);
+        const senderQ = q.eq('from_entity_id', params.entity_id);
+        const [senderRes, altRes] = await Promise.all([senderQ, altQ]);
+        const merged = new Map<string, MessageRow>();
+        for (const r of ((senderRes.data ?? []) as unknown as MessageRow[])) merged.set(r.id, r);
+        for (const r of ((altRes.data ?? []) as unknown as MessageRow[])) merged.set(r.id, r);
+        const rows = [...merged.values()]
+          .sort((a, b) => b.created_at.localeCompare(a.created_at))
+          .slice(0, limit);
+        return renderMessages(rows, params.direction ?? 'any');
+      }
+
+      if (params.direction && params.direction !== 'any') {
+        q = q.eq('direction', params.direction);
+      }
+
+      const { data, error } = await q;
+      if (error) return { messages: [], error: 'Message lookup failed.' };
+      return renderMessages((data ?? []) as MessageRow[], params.direction ?? 'any');
+    },
+  });
+
   return {
     search_entities, get_entity_details,
     get_deal_details, get_deal_crew, get_proposal_details,
@@ -1083,5 +1212,99 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     search_workspace_knowledge, get_proactive_insights, dismiss_insight,
     get_run_of_show, get_event_financials,
     lookup_historical_deals, lookup_catalog,
+    get_latest_messages,
   };
+}
+
+// ---------------------------------------------------------------------------
+// get_latest_messages helpers — extracted so the execute handler stays under
+// the repo's cognitive-complexity ceiling.
+// ---------------------------------------------------------------------------
+
+/**
+ * Base Supabase chain for ops.messages lookups with the shared join + filters.
+ * Returned as `any` because Supabase's relational-select generic types are
+ * deeply recursive and don't survive being passed through a function boundary
+ * without blowing the TS inference budget. This is the same pattern used by
+ * the `applyBase` helper in `lookup_historical_deals`. All returned chains
+ * are narrowed to MessageRow[] before the data leaves the handler.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildLatestMessagesBaseQuery(supabase: AuthedClient, workspaceId: string, limit: number): any {
+  return supabase
+    .schema('ops')
+    .from('messages')
+    .select(
+      'id, thread_id, direction, channel, from_address, from_entity_id, body_text, ai_summary, created_at, ' +
+      'thread:message_threads!inner(deal_id, subject, primary_entity_id)',
+    )
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+}
+
+export type MessageRow = {
+  id: string;
+  thread_id: string;
+  direction: 'inbound' | 'outbound';
+  channel: 'email' | 'sms' | 'call_note';
+  from_address: string;
+  from_entity_id: string | null;
+  body_text: string | null;
+  ai_summary: string | null;
+  created_at: string;
+  thread: {
+    deal_id: string | null;
+    subject: string | null;
+    primary_entity_id: string | null;
+  } | null;
+};
+
+/** Hard cap so a single handler can't leak tens of kilobytes into the model context. */
+export const MESSAGE_EXCERPT_CAP = 400;
+
+/**
+ * Cut `text` to `limit` chars on a sentence boundary where possible, falling
+ * back to word boundary, falling back to a hard cut with ellipsis (C4 full-
+ * sentence-boundary discipline).
+ */
+export function sentenceBoundaryCut(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const window = text.slice(0, limit);
+  const punctMatch = window.match(/^[\s\S]*[.!?](?=\s|$)/);
+  if (punctMatch && punctMatch[0].length >= limit * 0.5) {
+    return punctMatch[0].trim() + '…';
+  }
+  const lastSpace = window.lastIndexOf(' ');
+  if (lastSpace > limit * 0.5) return window.slice(0, lastSpace).trim() + '…';
+  return window.trim() + '…';
+}
+
+export function renderMessages(rows: MessageRow[], direction: 'inbound' | 'outbound' | 'any') {
+  const filtered = direction === 'any'
+    ? rows
+    : rows.filter((r) => r.direction === direction);
+
+  const messages = filtered.map((r) => {
+    const body = r.body_text ?? '';
+    const excerpt = sentenceBoundaryCut(body, MESSAGE_EXCERPT_CAP);
+    // B4 injection safety — body text is client-authored and flows into the
+    // model's context window. Wrap before it leaves the handler.
+    const bodyWrapped = excerpt ? wrapUntrusted(excerpt) : '';
+    return {
+      id: r.id,
+      threadId: r.thread_id,
+      dealId: r.thread?.deal_id ?? null,
+      direction: r.direction,
+      channel: r.channel,
+      fromAddress: r.from_address,
+      fromEntityId: r.from_entity_id,
+      subject: r.thread?.subject ?? null,
+      bodyExcerpt: bodyWrapped,
+      truncated: body.length > excerpt.length,
+      aiSummary: r.ai_summary, // structured, safe — owner-generated
+      sentAt: r.created_at,
+    };
+  });
+  return { messages, count: messages.length };
 }

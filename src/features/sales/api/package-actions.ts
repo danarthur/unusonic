@@ -8,6 +8,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import type { Package } from '@/types/supabase';
 import { generateAndUpsertEmbedding } from './catalog-embeddings';
+import { observeUpsert } from '@/app/api/aion/lib/embeddings';
 
 // NOTE: do NOT re-export `Package` from this 'use server' file.
 // Next 16's server-action bundler produces a value-level re-export for
@@ -287,8 +288,12 @@ export async function createPackage(
   }
   const tagsMap = await fetchTagsForPackages(supabase, [pkg.id]);
 
-  // Fire-and-forget embedding generation — don't block the user
-  generateAndUpsertEmbedding(workspaceId, pkg.id).catch(() => {});
+  // Fire-and-forget embedding generation — don't block the user.
+  // observeUpsert logs/Sentries the returned UpsertOutcome on failure.
+  observeUpsert(
+    generateAndUpsertEmbedding(workspaceId, pkg.id),
+    { sourceType: 'catalog', sourceId: pkg.id },
+  );
 
   return { package: { ...pkg, tags: tagsMap.get(pkg.id) ?? [] } as PackageWithTags };
 }
@@ -368,9 +373,12 @@ export async function updatePackage(
   const pkg = data as Package;
   const tagsMap = await fetchTagsForPackages(supabase, [pkg.id]);
 
-  // Fire-and-forget embedding update
+  // Fire-and-forget embedding update with UpsertOutcome observation.
   if (pkg.workspace_id) {
-    generateAndUpsertEmbedding(pkg.workspace_id, pkg.id).catch(() => {});
+    observeUpsert(
+      generateAndUpsertEmbedding(pkg.workspace_id, pkg.id),
+      { sourceType: 'catalog', sourceId: pkg.id },
+    );
   }
 
   return { package: { ...pkg, tags: tagsMap.get(pkg.id) ?? [] } as PackageWithTags };

@@ -18,7 +18,7 @@ import { getPublicProposal } from './get-public-proposal';
 import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../model/types';
 import { resolveRequiredRoles, type RequiredRole, type PackageDefinition } from './package-types';
-import { upsertEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
+import { upsertEmbedding, observeUpsert, buildContextHeader } from '@/app/api/aion/lib/embeddings';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 
 /** Base URL for public links (proposal, claim, etc.). Prefer NEXT_PUBLIC_APP_URL; on Vercel fall back to VERCEL_URL so links in emails are always absolute. */
@@ -815,18 +815,13 @@ export async function upsertProposal(
       .join('\n');
     const { data: dealRow } = await supabase.from('deals').select('title').eq('id', dealId).maybeSingle();
     const header = buildContextHeader('proposal', { dealTitle: (dealRow as any)?.title });
-    upsertEmbedding(workspaceId, 'proposal', proposalId, proposalText, header).catch((err: unknown) => {
-      Sentry.captureMessage('upsertProposal: embedding failed', {
-        level: 'warning',
-        extra: {
-          workspaceId,
-          proposalId,
-          dealId,
-          error: err instanceof Error ? err.message : String(err),
-        },
-        tags: { area: 'sales.embeddings' },
-      });
-    });
+    // Sprint 0 removed the throw semantics from upsertEmbedding — the old
+    // .catch() never fires now. observeUpsert inspects the returned
+    // UpsertOutcome and logs/Sentries failures (S0-1 fix).
+    observeUpsert(
+      upsertEmbedding(workspaceId, 'proposal', proposalId, proposalText, header),
+      { sourceType: 'proposal', sourceId: proposalId },
+    );
   }
 
   return { proposalId, total };

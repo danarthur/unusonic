@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/shared/api/supabase/server';
+import { deleteCatalogEmbeddings } from './catalog-embeddings';
 
 export interface DeleteCheckResult {
   /** Always true — items can always be deleted. */
@@ -84,7 +85,7 @@ export async function permanentlyDeletePackages(
 
   // 3. Clean up related data
   await supabase.from('package_tags').delete().in('package_id', packageIds);
-  await supabase.from('catalog_embeddings').delete().in('package_id', packageIds);
+  await deleteCatalogEmbeddings(packageIds);
 
   // 4. Clean up assignees via RPC (catalog schema not PostgREST-exposed)
   for (const id of packageIds) {

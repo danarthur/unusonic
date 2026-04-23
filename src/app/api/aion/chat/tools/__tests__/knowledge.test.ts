@@ -16,8 +16,12 @@ import {
   capString,
   extractSearchTokens,
   toIlikePattern,
+  sentenceBoundaryCut,
+  renderMessages,
+  MESSAGE_EXCERPT_CAP,
   type HistoricalDealCandidate,
   type HistoricalDealSourceContext,
+  type MessageRow,
 } from '../knowledge';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -249,5 +253,100 @@ describe('capString', () => {
   it('truncates with trailing ellipsis when over cap', () => {
     expect(capString('this string is too long', 10)).toBe('this stri…');
     expect(capString('this string is too long', 10)).toHaveLength(10);
+  });
+});
+
+// =============================================================================
+// Phase 3 Sprint 1 Week 1 — get_latest_messages helpers
+// =============================================================================
+
+describe('sentenceBoundaryCut', () => {
+  it('returns text unchanged when within limit', () => {
+    expect(sentenceBoundaryCut('short enough', 20)).toBe('short enough');
+  });
+
+  it('cuts at sentence boundary when one falls above the 50% mark', () => {
+    const text = 'Yes, dinner at seven works. But can we push to eight? I will confirm tomorrow.';
+    const out = sentenceBoundaryCut(text, 50);
+    // "Yes, dinner at seven works." ends with a period well past the 50% mark.
+    expect(out.endsWith('works.…')).toBe(true);
+  });
+
+  it('falls back to word boundary when no sentence end falls above 50%', () => {
+    const text = 'one two three four five six seven eight nine ten eleven';
+    const out = sentenceBoundaryCut(text, 20);
+    expect(out.endsWith('…')).toBe(true);
+    expect(out).not.toContain(' o'); // ellipsis follows a full word
+  });
+
+  it('falls back to hard cut when there is no word boundary past the half-way point', () => {
+    const out = sentenceBoundaryCut('loremipsumverylongwordnospaces', 10);
+    expect(out).toHaveLength(11); // 10 chars + ellipsis
+    expect(out.endsWith('…')).toBe(true);
+  });
+
+  it('refuses the sentence boundary if it falls below the 50% mark', () => {
+    // "Hi." at the very start is a valid sentence end but only 3/40 chars —
+    // accepting it would lose almost everything.
+    const text = 'Hi. Then a much longer follow-up sentence that goes on.';
+    const out = sentenceBoundaryCut(text, 40);
+    expect(out.startsWith('Hi. ')).toBe(true);
+    expect(out.length).toBeGreaterThan(20);
+  });
+});
+
+describe('renderMessages', () => {
+  function row(partial: Partial<MessageRow> = {}): MessageRow {
+    return {
+      id: 'msg-1',
+      thread_id: 'th-1',
+      direction: 'inbound',
+      channel: 'email',
+      from_address: 'sarah@example.com',
+      from_entity_id: 'ent-sarah',
+      body_text: 'Can we move dinner to 8pm?',
+      ai_summary: null,
+      created_at: '2026-04-22T17:00:00Z',
+      thread: {
+        deal_id: 'deal-123',
+        subject: 'Re: Cipriani Wedding',
+        primary_entity_id: 'ent-sarah',
+      },
+      ...partial,
+    };
+  }
+
+  it('wraps body excerpts in <untrusted> delimiters (B4 injection safety)', () => {
+    const { messages } = renderMessages([row()], 'any');
+    expect(messages[0].bodyExcerpt).toBe('<untrusted>Can we move dinner to 8pm?</untrusted>');
+  });
+
+  it('leaves empty body excerpts as empty strings (not empty <untrusted>)', () => {
+    const { messages } = renderMessages([row({ body_text: '' })], 'any');
+    expect(messages[0].bodyExcerpt).toBe('');
+  });
+
+  it('sets truncated=true when body was longer than the excerpt cap', () => {
+    const long = 'word '.repeat(MESSAGE_EXCERPT_CAP);
+    const { messages } = renderMessages([row({ body_text: long })], 'any');
+    expect(messages[0].truncated).toBe(true);
+  });
+
+  it('filters by direction when direction !== any', () => {
+    const rows = [row({ id: 'a', direction: 'inbound' }), row({ id: 'b', direction: 'outbound' })];
+    expect(renderMessages(rows, 'inbound').messages).toHaveLength(1);
+    expect(renderMessages(rows, 'outbound').messages.map((m) => m.id)).toEqual(['b']);
+  });
+
+  it('carries deal_id + subject from the joined thread', () => {
+    const { messages } = renderMessages([row()], 'any');
+    expect(messages[0].dealId).toBe('deal-123');
+    expect(messages[0].subject).toBe('Re: Cipriani Wedding');
+  });
+
+  it('passes ai_summary through unwrapped (owner-generated, not untrusted)', () => {
+    const { messages } = renderMessages([row({ ai_summary: 'Sarah wants to push dinner' })], 'any');
+    expect(messages[0].aiSummary).toBe('Sarah wants to push dinner');
+    expect(messages[0].aiSummary).not.toContain('<untrusted>');
   });
 });

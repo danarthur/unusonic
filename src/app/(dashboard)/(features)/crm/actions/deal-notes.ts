@@ -4,7 +4,7 @@ import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { revalidatePath } from 'next/cache';
-import { upsertEmbedding, deleteEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
+import { upsertEmbedding, deleteEmbedding, observeUpsert, buildContextHeader } from '@/app/api/aion/lib/embeddings';
 
 // =============================================================================
 // Types
@@ -156,11 +156,15 @@ export async function addDealNote(
 
   if (error) return { success: false, error: error.message };
 
-  // Fire-and-forget: embed the note for Aion RAG
+  // Fire-and-forget: embed the note for Aion RAG. observeUpsert handles
+  // failure logging (Sprint 0 removed the throw semantics — .catch() was dead).
   const noteId = (data as { id: string }).id;
   const { data: dealRow } = await supabase.from('deals').select('title').eq('id', dealId).maybeSingle();
   const header = buildContextHeader('deal_note', { dealTitle: (dealRow as any)?.title });
-  upsertEmbedding(workspaceId, 'deal_note', noteId, content.trim(), header).catch(console.error);
+  observeUpsert(
+    upsertEmbedding(workspaceId, 'deal_note', noteId, content.trim(), header),
+    { sourceType: 'deal_note', sourceId: noteId },
+  );
 
   revalidatePath('/crm');
   return { success: true, id: noteId };
@@ -314,8 +318,12 @@ export async function editDealNote(
   const { error } = await query;
   if (error) return { success: false, error: error.message };
 
-  // Fire-and-forget: re-embed the updated note
-  upsertEmbedding(workspaceId, 'deal_note', noteId, content.trim()).catch(console.error);
+  // Fire-and-forget: re-embed the updated note. observeUpsert handles
+  // failure logging.
+  observeUpsert(
+    upsertEmbedding(workspaceId, 'deal_note', noteId, content.trim()),
+    { sourceType: 'deal_note', sourceId: noteId },
+  );
 
   return { success: true };
 }

@@ -1,11 +1,11 @@
 /**
  * Backfill embeddings for existing workspace content.
  *
- * Collects deal notes, follow-up logs, and proposals into one flat list and
- * sends them through {@link upsertEmbeddingBatch}, which batches up to 96
- * items per Voyage call. Catalog packages still run through the legacy
- * single-call path in `features/sales/api/catalog-embeddings` and write to
- * their own table.
+ * Collects deal notes, follow-up logs, proposals, and catalog packages into
+ * one flat list and sends them through {@link upsertEmbeddingBatch}, which
+ * batches up to 96 items per Voyage call. All four source types land in
+ * cortex.memory after the Phase 3 Sprint 1 catalog consolidation (migration
+ * 20260517000200).
  */
 
 'use server';
@@ -133,9 +133,68 @@ export async function backfillWorkspaceContentEmbeddings(
   });
   result.proposals.attempted = proposalItems.length;
 
-  // ── Single batched run across all three source types ────────────────────
+  // ── Collect catalog packages ───────────────────────────────────────────
 
-  const all: EmbedItem[] = [...noteItems, ...logItems, ...proposalItems];
+  const { data: pkgs } = await supabase
+    .from('packages')
+    .select('id, name, description, category')
+    .eq('workspace_id', workspaceId)
+    .eq('is_active', true);
+
+  const pkgRows = (pkgs ?? []) as Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    category: string;
+  }>;
+
+  const { data: tagRows } = pkgRows.length > 0
+    ? await supabase
+        .from('package_tags')
+        .select('package_id, workspace_tags(label)')
+        .in('package_id', pkgRows.map((p) => p.id))
+    : { data: null };
+
+  type PackageTagRow = {
+    package_id: string;
+    workspace_tags: { label: string } | { label: string }[] | null;
+  };
+
+  const typedTagRows = (tagRows ?? []) as PackageTagRow[];
+
+  const catalogItems: EmbedItem[] = pkgRows.map((pkg) => {
+    const tags = typedTagRows
+      .filter((r) => r.package_id === pkg.id)
+      .map((r) => {
+        const wt = r.workspace_tags;
+        if (Array.isArray(wt)) return wt[0]?.label;
+        return wt?.label;
+      })
+      .filter(Boolean) as string[];
+
+    const bodyParts = [
+      pkg.name,
+      pkg.description ?? '',
+      `Category: ${pkg.category.replace(/_/g, ' ')}`,
+      ...tags,
+    ];
+
+    return {
+      workspaceId,
+      sourceType: 'catalog' as SourceType,
+      sourceId: pkg.id,
+      contentText: bodyParts.filter(Boolean).join(' ').trim(),
+      contextHeader: buildContextHeader('catalog', {
+        packageName: pkg.name,
+        packageCategory: pkg.category,
+      }),
+    };
+  });
+  result.catalogPackages.attempted = catalogItems.length;
+
+  // ── Single batched run across all four source types ────────────────────
+
+  const all: EmbedItem[] = [...noteItems, ...logItems, ...proposalItems, ...catalogItems];
   const outcomes = await upsertEmbeddingBatch(all);
 
   const tallyFor = (source: SourceType): BackfillSourceTally => {
@@ -143,6 +202,7 @@ export async function backfillWorkspaceContentEmbeddings(
       case 'deal_note': return result.dealNotes;
       case 'follow_up': return result.followUpLogs;
       case 'proposal': return result.proposals;
+      case 'catalog': return result.catalogPackages;
       default: throw new Error(`unexpected source ${source}`);
     }
   };
@@ -152,19 +212,6 @@ export async function backfillWorkspaceContentEmbeddings(
     const outcome = outcomes[i];
     const tally = tallyFor(item.sourceType);
     applyOutcome(tally, outcome, item, recordFailure);
-  }
-
-  // ── Catalog packages (legacy path, separate store) ─────────────────────
-
-  try {
-    const { backfillWorkspaceEmbeddings } = await import('@/features/sales/api/catalog-embeddings');
-    const catalogResult = await backfillWorkspaceEmbeddings(workspaceId);
-    result.catalogPackages.attempted = catalogResult.processed + catalogResult.errors;
-    result.catalogPackages.inserted = catalogResult.processed;
-    result.catalogPackages.failed = catalogResult.errors;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    recordFailure({ sourceType: 'catalog', sourceId: 'backfill', stage: 'rpc', message });
   }
 
   return result;

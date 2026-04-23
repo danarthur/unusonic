@@ -7,7 +7,7 @@ import { addDays } from 'date-fns';
 import { getDeal } from './get-deal';
 import { getDealClientContext } from './get-deal-client';
 import { getProposalForDeal } from '@/features/sales/api/proposal-actions';
-import { upsertEmbedding, buildContextHeader } from '@/app/api/aion/lib/embeddings';
+import { upsertEmbedding, observeUpsert, buildContextHeader } from '@/app/api/aion/lib/embeddings';
 import { DismissalReasonSchema, type DismissalReason } from '@/shared/lib/triggers/schema';
 
 // =============================================================================
@@ -436,8 +436,12 @@ export async function logFollowUpAction(
 
     if (!deal) return { success: false, error: 'Not authorised' };
 
-    // Insert log entry
-    const { error: logErr } = await db
+    // Insert log entry — .select('id') so we can thread the real UUID into
+    // the fire-and-forget embedding upsert below (pre-Sprint-1, this used a
+    // synthesized `${dealId}-${Date.now()}` string that the cortex RPC's
+    // uuid-typed source_id parameter rejected, making every live follow-up
+    // embed fail silently).
+    const { data: logged, error: logErr } = await db
       .schema('ops')
       .from('follow_up_log')
       .insert({
@@ -453,9 +457,11 @@ export async function logFollowUpAction(
           edit_classification: editTracking.editClassification,
           edit_distance: editTracking.editDistance,
         } : {}),
-      });
+      })
+      .select('id')
+      .single();
 
-    if (logErr) return { success: false, error: logErr.message };
+    if (logErr || !logged) return { success: false, error: logErr?.message ?? 'Follow-up log insert failed.' };
 
     // If a pending or snoozed queue item exists for this deal, mark it as acted
     const { data: pendingItem } = await db
@@ -475,14 +481,18 @@ export async function logFollowUpAction(
         .eq('id', (pendingItem as { id: string }).id);
     }
 
-    // Fire-and-forget: embed the follow-up content for Aion RAG
+    // Fire-and-forget: embed the follow-up content for Aion RAG.
+    // observeUpsert logs/Sentries the returned UpsertOutcome on failure
+    // (Sprint 0 removed the throw semantics — .catch() was dead code).
     const textToEmbed = content || summary;
     if (textToEmbed) {
       const { data: dealRow } = await supabase.from('deals').select('title').eq('id', dealId).maybeSingle();
       const header = buildContextHeader('follow_up', { dealTitle: (dealRow as any)?.title, channel });
-      // Use deal_id + timestamp as a pseudo source_id since follow_up_log rows don't have a returned id
-      const sourceId = `${dealId}-${Date.now()}`;
-      upsertEmbedding(workspaceId, 'follow_up', sourceId, textToEmbed, header).catch(console.error);
+      const logId = (logged as { id: string }).id;
+      observeUpsert(
+        upsertEmbedding(workspaceId, 'follow_up', logId, textToEmbed, header),
+        { sourceType: 'follow_up', sourceId: logId },
+      );
     }
 
     revalidatePath('/crm');

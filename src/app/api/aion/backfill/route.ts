@@ -51,6 +51,6 @@ export async function POST(req: Request) {
       proposals: result.proposals,
       catalogPackages: result.catalogPackages,
     },
-    errors: result.errors,
+    firstFailures: result.firstFailures,
   });
 }

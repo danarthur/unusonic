@@ -24,7 +24,8 @@ export type SourceType =
   | 'capture'
   | 'message'
   | 'narrative'
-  | 'activity_log';
+  | 'activity_log'
+  | 'catalog';
 
 export type ContextHeaderInput = {
   dealTitle?: string | null;
@@ -35,6 +36,8 @@ export type ContextHeaderInput = {
   channel?: string | null;
   direction?: 'inbound' | 'outbound' | null;
   monthLabel?: string | null;
+  packageName?: string | null;
+  packageCategory?: string | null;
 };
 
 // ── Embedding generation ─────────────────────────────────────────────────────
@@ -119,6 +122,11 @@ export function buildContextHeader(
       parts.push('This is a deal activity summary');
       if (input.dealTitle) parts.push(`for "${input.dealTitle}"`);
       if (input.monthLabel) parts.push(`covering ${input.monthLabel}`);
+      break;
+    case 'catalog':
+      parts.push('This is a catalog package');
+      if (input.packageName) parts.push(`named "${input.packageName}"`);
+      if (input.packageCategory) parts.push(`in category ${input.packageCategory}`);
       break;
   }
 
@@ -268,6 +276,55 @@ export async function upsertEmbedding(
     metadata,
   }]);
   return outcome;
+}
+
+// ── Observability ────────────────────────────────────────────────────────────
+
+/**
+ * Attach failure-logging to a fire-and-forget upsert. Sprint 0 removed the
+ * throw semantics from {@link upsertEmbedding}, so the old
+ * `.catch(console.error)` pattern silently swallows every failure. This
+ * helper inspects the returned {@link UpsertOutcome} and logs to console +
+ * Sentry when the embed or RPC step failed.
+ *
+ * Why a helper: every live-write call site wants the same observation
+ * discipline, and the alternatives (a) manually `.then(...)` at each site,
+ * or (b) making `upsertEmbedding` throw again both proved worse — (a) is
+ * copy-paste drift, (b) loses the per-item outcome shape that batched
+ * ingestion needs.
+ */
+export function observeUpsert(
+  p: Promise<UpsertOutcome>,
+  ref: { sourceType: SourceType; sourceId: string },
+): void {
+  void p.then(async (outcome) => {
+    if (outcome.status !== 'failed') return;
+    console.error(
+      `[aion/embeddings] upsert failed for ${ref.sourceType}/${ref.sourceId} @ ${outcome.stage}:`,
+      outcome.message,
+    );
+    try {
+      const Sentry = await import('@sentry/nextjs');
+      Sentry.captureMessage(
+        `upsertEmbedding failed: ${ref.sourceType}/${ref.sourceId}`,
+        {
+          level: 'warning',
+          tags: {
+            module: 'aion',
+            action: 'upsertEmbedding',
+            source_type: ref.sourceType,
+            stage: outcome.stage,
+          },
+          extra: { sourceId: ref.sourceId, message: outcome.message },
+        },
+      );
+    } catch {
+      // Sentry optional — console.error above is sufficient locally.
+    }
+  }).catch((err) => {
+    // Defence in depth — upsertEmbedding contract says it never rejects.
+    console.error('[aion/embeddings] observeUpsert saw unexpected rejection:', err);
+  });
 }
 
 // ── Delete embedding ─────────────────────────────────────────────────────────
