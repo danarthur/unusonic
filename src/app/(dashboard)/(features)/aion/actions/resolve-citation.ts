@@ -20,7 +20,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 
-export type CitationKind = 'deal' | 'entity' | 'catalog';
+export type CitationKind = 'deal' | 'entity' | 'catalog' | 'message';
 
 export type CitationResolution = {
   kind: CitationKind;
@@ -142,6 +142,85 @@ async function resolveEntity(id: string): Promise<CitationResolution | null> {
   };
 }
 
+type MessageRow = {
+  id: string;
+  channel: string | null;
+  direction: string | null;
+  from_address: string | null;
+  body_text: string | null;
+  ai_summary: string | null;
+  created_at: string;
+  thread: { deal_id: string | null; subject: string | null } | null;
+};
+
+/**
+ * First-sentence cut for the paraphrase fallback when ai_summary is null.
+ * Caps at ~100 chars on a sentence boundary; falls back to word-boundary at
+ * 50% or hard-cut. Matches the discipline of sentenceBoundaryCut in the
+ * knowledge tools but kept inline because resolve-citation can't import
+ * from the chat tools package (FSD layering).
+ */
+function firstSentenceParaphrase(text: string | null, limit = 100): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length <= limit) return trimmed;
+  const window = trimmed.slice(0, limit);
+  const punct = window.match(/^[\s\S]*[.!?](?=\s|$)/);
+  if (punct && punct[0].length >= limit * 0.5) return punct[0].trim();
+  const lastSpace = window.lastIndexOf(' ');
+  if (lastSpace > limit * 0.5) return window.slice(0, lastSpace).trim() + '…';
+  return window.trim() + '…';
+}
+
+async function resolveMessage(id: string): Promise<CitationResolution | null> {
+  const supabase = await createClient();
+  const workspaceIds = await getMembershipWorkspaceIds(supabase);
+  if (workspaceIds.length === 0) return null;
+
+  const { data } = await supabase
+    .schema('ops')
+    .from('messages')
+    .select(
+      'id, channel, direction, from_address, body_text, ai_summary, created_at, ' +
+      'thread:message_threads!inner(deal_id, subject)',
+    )
+    .eq('id', id)
+    .in('workspace_id', workspaceIds)
+    .maybeSingle();
+
+  if (!data) return null;
+  const row = (data as unknown) as MessageRow;
+
+  const subjectOrSender = row.thread?.subject || row.from_address || 'Message';
+  const label = row.direction === 'outbound'
+    ? `Sent ${formatDateShort(row.created_at)}`
+    : `From ${row.from_address ?? 'unknown'} · ${formatDateShort(row.created_at)}`;
+
+  // Prefer the Haiku-generated ai_summary paraphrase (populated at ingest
+  // time once Week 3 backfill runs); fall back to a cut of body_text while
+  // ai_summary is NULL on historical rows.
+  const paraphrase = row.ai_summary?.trim() || firstSentenceParaphrase(row.body_text);
+
+  const dealId = row.thread?.deal_id ?? null;
+  const href = dealId ? `/crm/deal/${dealId}/replies?message=${row.id}` : null;
+
+  return {
+    kind: 'message',
+    id: row.id,
+    label,
+    snippet: paraphrase ? `“${subjectOrSender}” — ${paraphrase}` : subjectOrSender,
+    href,
+  };
+}
+
+function formatDateShort(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
 async function resolveCatalog(id: string): Promise<CitationResolution | null> {
   const supabase = await createClient();
   const workspaceIds = await getMembershipWorkspaceIds(supabase);
@@ -186,5 +265,6 @@ export async function resolveCitation(
   if (kind === 'deal') return resolveDeal(id);
   if (kind === 'entity') return resolveEntity(id);
   if (kind === 'catalog') return resolveCatalog(id);
+  if (kind === 'message') return resolveMessage(id);
   return null;
 }

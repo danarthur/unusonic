@@ -327,6 +327,68 @@ export function observeUpsert(
   });
 }
 
+// ── Queue enqueue (Week 2 ingestion) ────────────────────────────────────────
+
+/**
+ * Enqueue a row for eventual embedding via the 2-minute drain cron. Called
+ * from the webhook paths (Postmark inbound, send-reply outbound) where we
+ * don't want to block the 200 OK on Voyage latency.
+ *
+ * Header enrichment happens in the drain cron (joins deal + sender entity)
+ * so the webhook call is a single RPC round-trip with no extra queries.
+ *
+ * Fire-and-forget at call sites: if the enqueue itself fails, we log it
+ * but don't fail the webhook — an un-embedded message still lives in
+ * ops.messages, so the deterministic `get_latest_messages` tool still
+ * finds it; only the semantic `lookup_client_messages` path is impaired.
+ *
+ * Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.2 B2.
+ */
+export async function enqueueMessageEmbedding(args: {
+  workspaceId: string;
+  messageId: string;
+  bodyText: string;
+  channel: 'email' | 'sms' | 'call_note';
+  direction: 'inbound' | 'outbound';
+  providerMessageId?: string | null;
+}): Promise<void> {
+  if (!args.bodyText?.trim()) return;
+
+  try {
+    const { getSystemClient } = await import('@/shared/api/supabase/system');
+    const system = getSystemClient();
+    // RPC not yet in generated types until migration 20260518000100 is applied;
+    // matches the repo pattern for cross-schema RPC calls whose types lag the code.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (system as any)
+      .schema('cortex')
+      .rpc('enqueue_memory_pending', {
+        p_workspace_id: args.workspaceId,
+        p_source_type: 'message',
+        p_source_id: args.messageId,
+        p_content_text: args.bodyText,
+        p_content_header: null,
+        p_entity_ids: [],
+        p_metadata: {
+          channel: args.channel,
+          direction: args.direction,
+          provider_message_id: args.providerMessageId ?? null,
+        },
+      });
+    if (error) {
+      console.error(
+        `[aion/enqueue-message] enqueue failed for ${args.messageId}:`,
+        error.message,
+      );
+    }
+  } catch (err) {
+    console.error(
+      `[aion/enqueue-message] enqueue threw for ${args.messageId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 // ── Delete embedding ─────────────────────────────────────────────────────────
 
 /**

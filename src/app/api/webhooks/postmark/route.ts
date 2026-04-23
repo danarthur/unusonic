@@ -33,6 +33,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { enqueueMessageEmbedding } from '@/app/api/aion/lib/embeddings';
 
 export const runtime = 'nodejs';
 
@@ -250,6 +251,21 @@ async function handleInboundEmail(payload: PostmarkInboundPayload): Promise<Inbo
     console.error('[postmark webhook] record_inbound_message failed:', error.message);
     return { ok: false, reason: `rpc error: ${error.message}` };
   }
+
+  // 7b. Enqueue for Aion embedding. Fire-and-forget inside the helper —
+  //     logs on failure but does not bubble up, so a Voyage/queue hiccup
+  //     doesn't retry the webhook (the client would double-deliver the
+  //     email on retry). The deterministic get_latest_messages tool still
+  //     finds the message via ops.messages even if this enqueue fails;
+  //     only the semantic lookup_client_messages path is impaired.
+  await enqueueMessageEmbedding({
+    workspaceId: threadRow.workspace_id,
+    messageId: newMessageId as string,
+    bodyText: bodyText ?? '',
+    channel: 'email',
+    direction: 'inbound',
+    providerMessageId,
+  });
 
   // 8. Urgent-keyword insight dispatch. Same logic as the Resend webhook
   //    used to carry — now lives here because Postmark is the inbound

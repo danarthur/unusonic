@@ -617,6 +617,111 @@ const noLegacyBrand = {
   },
 };
 
+// ── require-wrap-untrusted ───────────────────────────────────────────────────
+//
+// Phase 3 Sprint 1 Week 2 — B4 injection safety enforcement. Any file that
+// reads client-authored content (email bodies, note text, message excerpts)
+// and threads it into a template literal MUST also import `wrapUntrusted`
+// from `@/app/api/aion/lib/wrap-untrusted` — making the injection-safety
+// discipline explicit at the file level.
+//
+// Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.2 B4.
+//
+// Forbidden identifier names in template literal expressions:
+//   body_text, body_excerpt, note_text, activity_text, ai_classification
+// (ai_summary is owner-generated from Haiku and considered safe.)
+//
+// This is a heuristic rule — a false positive gets silenced with a standard
+// eslint-disable comment. The goal is to fail loudly when a new file starts
+// concatenating untrusted text without reaching for the wrapper.
+
+const UNTRUSTED_FIELD_NAMES = new Set([
+  "body_text",
+  "body_excerpt",
+  "note_text",
+  "activity_text",
+  "ai_classification",
+]);
+
+/**
+ * Recursively check if an expression references any of the forbidden field
+ * names via Identifier or MemberExpression property.
+ */
+function referencesUntrustedField(expr) {
+  if (!expr) return false;
+  if (expr.type === "Identifier") {
+    return UNTRUSTED_FIELD_NAMES.has(expr.name);
+  }
+  if (expr.type === "MemberExpression") {
+    if (expr.property?.type === "Identifier" && UNTRUSTED_FIELD_NAMES.has(expr.property.name)) {
+      return true;
+    }
+    return referencesUntrustedField(expr.object);
+  }
+  if (expr.type === "LogicalExpression" || expr.type === "BinaryExpression") {
+    return referencesUntrustedField(expr.left) || referencesUntrustedField(expr.right);
+  }
+  if (expr.type === "ConditionalExpression") {
+    return (
+      referencesUntrustedField(expr.test) ||
+      referencesUntrustedField(expr.consequent) ||
+      referencesUntrustedField(expr.alternate)
+    );
+  }
+  if (expr.type === "CallExpression") {
+    return expr.arguments.some(referencesUntrustedField);
+  }
+  return false;
+}
+
+const requireWrapUntrusted = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Require import of wrapUntrusted when interpolating untrusted client fields in template literals.",
+    },
+    schema: [],
+    messages: {
+      missingImport:
+        "Template literal interpolates client-authored field ({{field}}) — this file must `import { wrapUntrusted } from '@/app/api/aion/lib/wrap-untrusted'` and apply it before the value enters the model context. Silence with eslint-disable when the value is only going to storage or the DB.",
+    },
+  },
+  create(context) {
+    let hasWrapUntrustedImport = false;
+    const pending = [];
+
+    return {
+      ImportDeclaration(node) {
+        const src = node.source?.value;
+        if (typeof src === "string" && src.includes("wrap-untrusted")) {
+          hasWrapUntrustedImport = true;
+        }
+      },
+      TemplateLiteral(node) {
+        for (const expr of node.expressions) {
+          if (referencesUntrustedField(expr)) {
+            let fieldName = "untrusted field";
+            // Best-effort name extraction for the error message.
+            if (expr.type === "Identifier") fieldName = expr.name;
+            else if (expr.type === "MemberExpression" && expr.property?.type === "Identifier") {
+              fieldName = expr.property.name;
+            }
+            pending.push({ node: expr, field: fieldName });
+          }
+        }
+      },
+      "Program:exit"() {
+        if (hasWrapUntrustedImport) return;
+        for (const { node, field } of pending) {
+          context.report({ node, messageId: "missingImport", data: { field } });
+        }
+      },
+    };
+  },
+};
+
+
 // ── Plugin export ────────────────────────────────────────────────────────────
 
 const plugin = {
@@ -635,6 +740,8 @@ const plugin = {
     "no-legacy-css-vars": noLegacyCssVars,
     "no-raw-colors": noRawColors,
     "no-legacy-brand": noLegacyBrand,
+    // Phase 3 Sprint 1 injection-safety enforcement
+    "require-wrap-untrusted": requireWrapUntrusted,
   },
 };
 

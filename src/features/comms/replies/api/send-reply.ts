@@ -19,6 +19,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { getWorkspaceFrom } from '@/shared/api/email/send';
 import { getResend } from '@/shared/api/email/core';
+import { enqueueMessageEmbedding } from '@/app/api/aion/lib/embeddings';
 
 const inputSchema = z.object({
   threadId: z.string().uuid(),
@@ -159,6 +160,17 @@ export async function sendReply(input: {
       // the caller. The reconciliation job (Phase 1.5) can fix orphans.
       console.error('[send-reply] stamp failed but send succeeded:', stampErr.message);
     }
+
+    // Phase 3 Sprint 1: enqueue for Aion semantic embedding. Fire-and-forget
+    // inside the helper — a queue hiccup shouldn't fail a sent email.
+    await enqueueMessageEmbedding({
+      workspaceId,
+      messageId: messageId as string,
+      bodyText: parsed.data.bodyText,
+      channel: 'email',
+      direction: 'outbound',
+      providerMessageId: sendResult.id,
+    });
 
     return { success: true, messageId: messageId as string };
   } catch (err) {

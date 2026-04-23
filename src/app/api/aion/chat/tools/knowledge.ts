@@ -1203,6 +1203,152 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     },
   });
 
+  // ---- Semantic message search (Phase 3, Sprint 1, Week 2) ----
+  //
+  // Wraps cortex.match_memory with source_type='message' for questions where
+  // the caller wants to find messages by what was SAID, not when or by whom.
+  // "What did Sarah say about dinner timing" / "any mention of wireless
+  // upgrade pricing" / "did Becca ever agree to the 9pm cut".
+  //
+  // Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.2 (lookup_client_messages).
+  //
+  // Relationship to get_latest_messages:
+  //   • get_latest_messages — deterministic, ORDER BY date — "show me the last 3"
+  //   • lookup_client_messages — vector search — "what was said about X"
+  //   Sonnet / Haiku pick by intent; tool descriptions disambiguate.
+  //
+  // Scoping + safety (same discipline as get_latest_messages, C5 + B4):
+  //   • deal_id / entity_id validated against caller's workspace.
+  //   • When only entity_id provided, defaults to page-context deal (narrow);
+  //     deal_id=null explicit widens.
+  //   • body_excerpt cut on sentence boundary (C4), wrapped in <untrusted>.
+  //   • Truncated-at-budget flag fires when the retrieval-budget cap trips.
+  const lookup_client_messages = tool({
+    description:
+      'Semantic search over client message history (emails, SMS, call notes). ' +
+      'Use for questions about what was discussed: "what did Sarah say about ' +
+      'dinner timing", "any mention of the wireless upgrade", "did the client ' +
+      'agree to the 9pm cut". ' +
+      'Returns ranked body excerpts with sender, date, channel, and a ' +
+      'message-id citation reference. Excerpts are cut on sentence boundaries ' +
+      'and wrapped in <untrusted> delimiters — quote verbatim inside quotation ' +
+      'marks, do not paraphrase. ' +
+      'For chronological "latest N messages" queries, use get_latest_messages ' +
+      'instead — it is deterministic and cheaper.',
+    inputSchema: z.object({
+      query: z.string().min(1).describe(
+        'What to search for — natural language, include names and topics.',
+      ),
+      deal_id: z.string().nullable().optional().describe(
+        'Deal UUID to scope to. Defaults to the current deal in view. Pass ' +
+        'null (with entity_id set) to widen across all deals for the entity.',
+      ),
+      entity_id: z.string().optional().describe(
+        'Directory entity UUID (person or org) to scope to. Matches messages ' +
+        'from that sender or with that entity as thread primary.',
+      ),
+      channel: z.enum(['email', 'sms', 'any']).optional().describe(
+        'Filter by message channel. Default: any.',
+      ),
+      limit: z.number().int().min(1).max(10).optional().describe(
+        'Max matches. Default 5, cap 10.',
+      ),
+    }),
+    execute: async (params) => {
+      const supabase = await createClient();
+      const limit = Math.min(params.limit ?? 5, 10);
+
+      // Same explicit-null vs fall-back-to-context discipline as
+      // get_latest_messages. Entity-only asks default to the current deal.
+      const dealSpecifiedNull =
+        Object.prototype.hasOwnProperty.call(params, 'deal_id') && params.deal_id === null;
+      const dealId =
+        params.deal_id ??
+        (dealSpecifiedNull ? null : resolveDealId(undefined));
+
+      if (dealId) {
+        const { data: dealRow } = await supabase
+          .from('deals')
+          .select('id')
+          .eq('id', dealId)
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+        if (!dealRow) return { matches: [], truncated_at_budget: false, error: 'Deal not in workspace.' };
+      }
+      if (params.entity_id) {
+        const { data: entRow } = await supabase
+          .schema('directory')
+          .from('entities')
+          .select('id')
+          .eq('id', params.entity_id)
+          .eq('owner_workspace_id', workspaceId)
+          .maybeSingle();
+        if (!entRow) return { matches: [], truncated_at_budget: false, error: 'Entity not in workspace.' };
+      }
+
+      // Vector search. cortex.match_memory filters by workspace_id via RLS
+      // (SECURITY INVOKER) and by source_type + entity_ids at the SQL level.
+      const results = await searchMemory(workspaceId, params.query, {
+        sourceTypes: ['message'],
+        entityIds: params.entity_id ? [params.entity_id] : undefined,
+        limit,
+        threshold: 0.3,
+      });
+
+      if (results.length === 0) {
+        return { matches: [], truncated_at_budget: false };
+      }
+
+      // Client-side filter on channel + deal_id. The vector search returns
+      // by similarity — doing this post-filter keeps the ranked order intact.
+      // If the filter drops us below `limit`, the caller knows there's no
+      // additional budget spent on a second search.
+      const messageIds = results.map((r) => r.sourceId);
+      const { data: msgs } = await supabase
+        .schema('ops')
+        .from('messages')
+        .select(
+          'id, thread_id, direction, channel, from_address, from_entity_id, ai_summary, created_at, ' +
+          'thread:message_threads!inner(deal_id, subject, primary_entity_id)',
+        )
+        .in('id', messageIds);
+      const msgById = new Map<string, MessageRow>();
+      for (const m of ((msgs ?? []) as unknown as MessageRow[])) msgById.set(m.id, m);
+
+      let truncatedAtBudget = false;
+      const matches = [];
+      for (const r of results) {
+        const msg = msgById.get(r.sourceId);
+        if (!msg) continue;
+        if (dealId && msg.thread?.deal_id !== dealId) continue;
+        if (params.channel && params.channel !== 'any' && msg.channel !== params.channel) continue;
+
+        const excerpt = sentenceBoundaryCut(r.content, MESSAGE_EXCERPT_CAP);
+        if (r.content.length > excerpt.length) truncatedAtBudget = true;
+
+        matches.push({
+          messageId: msg.id,
+          dealId: msg.thread?.deal_id ?? null,
+          direction: msg.direction,
+          channel: msg.channel,
+          fromAddress: msg.from_address,
+          fromEntityId: msg.from_entity_id,
+          subject: msg.thread?.subject ?? null,
+          bodyExcerpt: wrapUntrusted(excerpt + ' … (see full message)'),
+          aiSummary: msg.ai_summary,
+          sentAt: msg.created_at,
+          similarity: Math.round(r.similarity * 100) / 100,
+        });
+      }
+
+      console.log(
+        `[aion.lookup_client_messages] workspace=${workspaceId} query_chars=${params.query.length} returned=${matches.length}`,
+      );
+
+      return { matches, truncated_at_budget: truncatedAtBudget };
+    },
+  });
+
   return {
     search_entities, get_entity_details,
     get_deal_details, get_deal_crew, get_proposal_details,
@@ -1213,6 +1359,7 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     get_run_of_show, get_event_financials,
     lookup_historical_deals, lookup_catalog,
     get_latest_messages,
+    lookup_client_messages,
   };
 }
 

@@ -116,6 +116,23 @@ const eslintConfig = defineConfig([
     },
   },
 
+  // ─── Phase 3 — Untrusted-field interpolation guard (B4) ─────────────────────
+  // Any file that interpolates body_text / body_excerpt / note_text /
+  // activity_text / ai_classification into a template literal MUST also
+  // import wrapUntrusted from the Aion lib. Scoped to server-side code that
+  // can plausibly feed the model context — client components don't need it.
+  {
+    files: [
+      "src/app/api/**/*.ts",
+      "src/features/**/api/**/*.ts",
+      "src/app/**/actions/**/*.ts",
+    ],
+    plugins: { "stage-engineering": stageEngineering },
+    rules: {
+      "stage-engineering/require-wrap-untrusted": "error",
+    },
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Protocol v2 — SECURITY BOUNDARIES (error from Day 0)
   // ═══════════════════════════════════════════════════════════════════════════

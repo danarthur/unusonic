@@ -23,7 +23,7 @@
 import { useRouter } from 'next/navigation';
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Briefcase, Package, User, ArrowUpRight } from 'lucide-react';
+import { Briefcase, Package, User, Mail, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import {
   resolveCitation,
@@ -47,12 +47,14 @@ const KIND_ICON: Record<CitationKind, typeof Briefcase> = {
   deal: Briefcase,
   entity: User,
   catalog: Package,
+  message: Mail,
 };
 
 const KIND_LABEL: Record<CitationKind, string> = {
   deal: 'Deal',
   entity: 'Contact',
   catalog: 'Catalog',
+  message: 'Message',
 };
 
 /**
@@ -66,6 +68,11 @@ const KIND_HREF: Record<CitationKind, (id: string) => string> = {
   deal: (id) => `/crm?selected=${id}`,
   entity: (id) => `/network/${id}`,
   catalog: (id) => `/settings/catalog?open=${id}`,
+  // Message fallback href — resolveCitation upgrades this to the full
+  // /crm/deal/<id>/replies?message=<id> path once it returns the deal_id.
+  // The raw /messages route does not exist today; in that gap the pill is
+  // still a visual pill with a hover card, just not click-navigable.
+  message: () => '#',
 };
 
 // Pill component is memo'd because chat streams can re-render the parent
