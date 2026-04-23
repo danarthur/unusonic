@@ -90,13 +90,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
   const initFetched = useRef(false);
   const [initError, setInitError] = useState(false);
 
-  // Sidebar state
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    if (stored !== null) return stored === 'true';
-    return window.innerWidth >= 1024;
-  });
+  // Sidebar state — always start `true` so SSR and first client render match.
+  // A post-mount effect then reconciles with localStorage or viewport width.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+      if (stored !== null) {
+        setSidebarOpen(stored === 'true');
+      } else if (window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      }
+    } catch {
+      // localStorage can throw in private mode — keep the default.
+    }
+  }, []);
 
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((prev) => {

@@ -8,7 +8,7 @@
  * Writes to cortex.memory via SECURITY DEFINER RPCs.
  */
 
-import { embed } from 'ai';
+import { embed, embedMany } from 'ai';
 import { createVoyage } from 'voyage-ai-provider';
 import type { Json } from '@/types/supabase';
 
@@ -16,7 +16,15 @@ const voyage = createVoyage({ apiKey: process.env.VOYAGE_API_KEY! });
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type SourceType = 'deal_note' | 'follow_up' | 'proposal' | 'event_note' | 'capture';
+export type SourceType =
+  | 'deal_note'
+  | 'follow_up'
+  | 'proposal'
+  | 'event_note'
+  | 'capture'
+  | 'message'
+  | 'narrative'
+  | 'activity_log';
 
 export type ContextHeaderInput = {
   dealTitle?: string | null;
@@ -25,6 +33,8 @@ export type ContextHeaderInput = {
   entityName?: string | null;
   date?: string | null;
   channel?: string | null;
+  direction?: 'inbound' | 'outbound' | null;
+  monthLabel?: string | null;
 };
 
 // ── Embedding generation ─────────────────────────────────────────────────────
@@ -87,6 +97,29 @@ export function buildContextHeader(
       parts.push('This is a voice/text capture');
       if (input.entityName) parts.push(`about ${input.entityName}`);
       break;
+    case 'message': {
+      const dir = input.direction === 'outbound' ? 'outbound' : 'inbound';
+      parts.push(`This is an ${dir} ${input.channel ?? 'email'} message`);
+      if (input.dealTitle) parts.push(`for "${input.dealTitle}"`);
+      if (input.clientName) {
+        parts.push(
+          input.direction === 'outbound'
+            ? `to ${input.clientName}`
+            : `from ${input.clientName}`,
+        );
+      }
+      break;
+    }
+    case 'narrative':
+      parts.push('This is the deal narrative');
+      if (input.dealTitle) parts.push(`for "${input.dealTitle}"`);
+      if (input.clientName) parts.push(`with client ${input.clientName}`);
+      break;
+    case 'activity_log':
+      parts.push('This is a deal activity summary');
+      if (input.dealTitle) parts.push(`for "${input.dealTitle}"`);
+      if (input.monthLabel) parts.push(`covering ${input.monthLabel}`);
+      break;
   }
 
   if (input.date) parts.push(`from ${input.date}`);
@@ -96,11 +129,125 @@ export function buildContextHeader(
 
 // ── Upsert embedding ─────────────────────────────────────────────────────────
 
+export type UpsertOutcome =
+  | { status: 'inserted' }
+  | { status: 'skipped'; reason: 'empty_content' }
+  | { status: 'failed'; stage: 'embed' | 'rpc'; message: string };
+
+export type EmbedItem = {
+  workspaceId: string;
+  sourceType: SourceType;
+  sourceId: string;
+  contentText: string;
+  contextHeader?: string | null;
+  entityIds?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+// Voyage's documented per-request cap is 128 inputs; keep a margin.
+const EMBED_BATCH_SIZE = 96;
+
 /**
- * Generate an embedding for content and upsert it into cortex.memory.
- * Fire-and-forget safe — logs errors but does not throw.
+ * Batch-embed and upsert many items in one flow.
  *
- * Uses the system client (SECURITY DEFINER RPC) to bypass RLS for writes.
+ *  1. Empty-content items are skipped (no API call).
+ *  2. Remaining items are embedded in chunks of 96 via `embedMany` — one
+ *     Voyage round-trip per chunk instead of one per item, which dodges
+ *     rate-limit churn on large backfills.
+ *  3. Each embedded item is upserted via the SECURITY DEFINER RPC.
+ *
+ * Returns a per-input outcome array in the same order as the input.
+ */
+export async function upsertEmbeddingBatch(items: EmbedItem[]): Promise<UpsertOutcome[]> {
+  const outcomes: (UpsertOutcome | null)[] = new Array(items.length).fill(null);
+
+  const activeIndexes: number[] = [];
+  const activeTexts: string[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item.contentText.trim()) {
+      outcomes[i] = { status: 'skipped', reason: 'empty_content' };
+      continue;
+    }
+    activeIndexes.push(i);
+    activeTexts.push(
+      item.contextHeader ? `${item.contextHeader}\n\n${item.contentText}` : item.contentText,
+    );
+  }
+
+  const embeddings: (number[] | null)[] = new Array(activeIndexes.length).fill(null);
+
+  for (let offset = 0; offset < activeTexts.length; offset += EMBED_BATCH_SIZE) {
+    const chunkValues = activeTexts.slice(offset, offset + EMBED_BATCH_SIZE);
+    try {
+      const { embeddings: chunkEmbeddings } = await embedMany({
+        model: voyage.textEmbeddingModel('voyage-3'),
+        values: chunkValues,
+      });
+      for (let j = 0; j < chunkEmbeddings.length; j++) {
+        embeddings[offset + j] = chunkEmbeddings[j];
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[aion/embeddings] embedMany chunk failed (offset ${offset}, size ${chunkValues.length}):`,
+        message,
+      );
+      for (let j = 0; j < chunkValues.length; j++) {
+        outcomes[activeIndexes[offset + j]] = { status: 'failed', stage: 'embed', message };
+      }
+    }
+  }
+
+  const { getSystemClient } = await import('@/shared/api/supabase/system');
+  const system = getSystemClient();
+
+  for (let i = 0; i < activeIndexes.length; i++) {
+    const originalIdx = activeIndexes[i];
+    if (outcomes[originalIdx] !== null) continue;
+
+    const item = items[originalIdx];
+    const embedding = embeddings[i];
+    if (!embedding) {
+      outcomes[originalIdx] = { status: 'failed', stage: 'embed', message: 'Embedding missing after chunk' };
+      continue;
+    }
+
+    const embeddingStr = `[${embedding.join(',')}]`;
+    try {
+      const { error } = await system.schema('cortex').rpc('upsert_memory_embedding', {
+        p_workspace_id: item.workspaceId,
+        p_source_type: item.sourceType,
+        p_source_id: item.sourceId,
+        p_content_text: item.contentText,
+        p_content_header: item.contextHeader ?? undefined,
+        p_embedding: embeddingStr,
+        p_entity_ids: item.entityIds ?? [],
+        p_metadata: (item.metadata ?? {}) as Json,
+      });
+      if (error) {
+        console.error(
+          `[aion/embeddings] RPC failed for ${item.sourceType}/${item.sourceId}:`,
+          error.message,
+        );
+        outcomes[originalIdx] = { status: 'failed', stage: 'rpc', message: error.message };
+      } else {
+        outcomes[originalIdx] = { status: 'inserted' };
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[aion/embeddings] RPC threw for ${item.sourceType}/${item.sourceId}:`, message);
+      outcomes[originalIdx] = { status: 'failed', stage: 'rpc', message };
+    }
+  }
+
+  return outcomes as UpsertOutcome[];
+}
+
+/**
+ * Single-item wrapper around {@link upsertEmbeddingBatch}. Kept for the
+ * fire-and-forget live-write paths (deal notes, follow-up logs, proposals)
+ * where the trigger is one record at a time.
  */
 export async function upsertEmbedding(
   workspaceId: string,
@@ -110,33 +257,17 @@ export async function upsertEmbedding(
   contextHeader?: string | null,
   entityIds?: string[],
   metadata?: Record<string, unknown>,
-): Promise<void> {
-  // Skip empty content
-  if (!contentText.trim()) return;
-
-  try {
-    const embedding = await embedContent(contentText, contextHeader);
-    const embeddingStr = `[${embedding.join(',')}]`;
-
-    const { getSystemClient } = await import('@/shared/api/supabase/system');
-    const system = getSystemClient();
-
-    await system.schema('cortex').rpc('upsert_memory_embedding', {
-      p_workspace_id: workspaceId,
-      p_source_type: sourceType,
-      p_source_id: sourceId,
-      p_content_text: contentText,
-      // RPC signature expects `undefined` not `null` for optional params
-      p_content_header: contextHeader ?? undefined,
-      p_embedding: embeddingStr,
-      p_entity_ids: entityIds ?? [],
-      // Cast through Json: the typed signature narrows to `Json` but metadata
-      // is typed as `Record<string, unknown>` in upstream callers
-      p_metadata: (metadata ?? {}) as Json,
-    });
-  } catch (err) {
-    console.error(`[aion/embeddings] Failed to upsert embedding for ${sourceType}/${sourceId}:`, err);
-  }
+): Promise<UpsertOutcome> {
+  const [outcome] = await upsertEmbeddingBatch([{
+    workspaceId,
+    sourceType,
+    sourceId,
+    contentText,
+    contextHeader,
+    entityIds,
+    metadata,
+  }]);
+  return outcome;
 }
 
 // ── Delete embedding ─────────────────────────────────────────────────────────

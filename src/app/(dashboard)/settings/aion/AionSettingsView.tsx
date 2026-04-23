@@ -12,6 +12,7 @@ import { cn } from '@/shared/lib/utils';
 import { CONSENT_TERMS } from '@/shared/lib/consent';
 import { FeatureConsentModal } from '@/app/(dashboard)/(features)/aion/components/FeatureConsentModal';
 import { CadenceLearningToggle } from '@/app/(dashboard)/(features)/aion/components/CadenceLearningToggle';
+import { MemoryBackfillSection } from './MemoryBackfillSection';
 import type { WorkspaceFeatureState } from '@/app/(dashboard)/(features)/aion/actions/consent-actions';
 import {
   disableAionCardBeta,
@@ -228,6 +229,9 @@ export function AionSettingsView({
           </ul>
         </StagePanel>
       )}
+
+      {/* Memory backfill (admin only) */}
+      {isAdmin && <MemoryBackfillSection />}
 
       {/* Footer — term version */}
       <p className="text-xs text-[var(--stage-text-tertiary,var(--stage-text-secondary))]">

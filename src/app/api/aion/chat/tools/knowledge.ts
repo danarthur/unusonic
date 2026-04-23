@@ -691,12 +691,23 @@ export function createKnowledgeTools(ctx: AionToolContext) {
 
   const search_workspace_knowledge = tool({
     description:
-      'Search the workspace knowledge base for deal notes, follow-up history, proposal content, and event notes. ' +
-      'Call this when the user asks about past discussions, agreements, quotes, pricing history, or anything not available through structured data tools. ' +
+      'Search the workspace knowledge base for deal notes, follow-up history, proposal content, event notes, client messages (emails/texts), deal narratives, and historical activity summaries. ' +
+      'Call this when the user asks about past discussions, agreements, quotes, pricing history, what a client said before, or anything not available through structured data tools. ' +
       'You can call this multiple times with different queries to find more relevant information.',
     inputSchema: z.object({
       query: z.string().describe('What to search for — be specific with names, dates, and topics'),
-      sourceTypes: z.array(z.enum(['deal_note', 'follow_up', 'proposal', 'event_note'])).optional()
+      sourceTypes: z.array(
+        z.enum([
+          'deal_note',
+          'follow_up',
+          'proposal',
+          'event_note',
+          'capture',
+          'message',
+          'narrative',
+          'activity_log',
+        ]),
+      ).optional()
         .describe('Filter by content type. Omit to search all types.'),
       entityIds: z.array(z.string()).optional()
         .describe('Scope to specific entity IDs (people, companies, venues). Omit to search all.'),
