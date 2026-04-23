@@ -34,7 +34,10 @@
  * date prefix stay plain (code-generated, safe).
  */
 
-'use server';
+// Server-side helper — `server-only` blocks accidental client imports, but
+// unlike `'use server'` doesn't force every export to be an async server
+// action (buildChunkContent is a sync pure function).
+import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { wrapUntrusted } from './wrap-untrusted';
