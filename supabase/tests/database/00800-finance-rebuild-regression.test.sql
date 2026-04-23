@@ -26,7 +26,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE OR REPLACE FUNCTION test_create_user_in_workspace(p_user_id uuid, p_workspace_id uuid, p_role text DEFAULT 'owner') RETURNS void AS $$
 BEGIN
   INSERT INTO public.workspaces (id, name, slug)
-  VALUES (p_workspace_id, 'Test WS ' || p_workspace_id::text, 'test-' || left(p_workspace_id::text, 8))
+  VALUES (p_workspace_id, 'Test WS ' || p_workspace_id::text, 'test-' || p_workspace_id::text)
   ON CONFLICT (id) DO NOTHING;
   INSERT INTO auth.users (id, instance_id, email, encrypted_password, aud, role, created_at, updated_at, confirmation_token)
   VALUES (p_user_id, '00000000-0000-0000-0000-000000000000', p_user_id::text || '@test.local', crypt('password', gen_salt('bf')), 'authenticated', 'authenticated', now(), now(), '')

@@ -15,7 +15,7 @@ CREATE OR REPLACE FUNCTION test_create_user_in_workspace(
 BEGIN
   -- Ensure the workspace exists
   INSERT INTO public.workspaces (id, name, slug)
-  VALUES (p_workspace_id, 'Test Workspace ' || p_workspace_id::text, 'test-' || left(p_workspace_id::text, 8))
+  VALUES (p_workspace_id, 'Test Workspace ' || p_workspace_id::text, 'test-' || p_workspace_id::text)
   ON CONFLICT (id) DO NOTHING;
 
   -- Insert auth.users entry

@@ -57,7 +57,7 @@ BEGIN
   VALUES (
     p_workspace_id,
     'WS ' || p_workspace_id::text,
-    'ws-' || left(p_workspace_id::text, 8)
+    'ws-' || p_workspace_id::text
   )
   ON CONFLICT (id) DO NOTHING;
 END; $$ LANGUAGE plpgsql;
