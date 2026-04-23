@@ -1052,6 +1052,17 @@ export type Database = {
         Args: { p_lock?: boolean; p_session_id: string; p_title: string }
         Returns: undefined
       }
+      substrate_counts: {
+        Args: { p_window_days?: number; p_workspace_id: string }
+        Returns: {
+          catalog_items: number
+          deals: number
+          entities: number
+          memory_chunks: number
+          messages_in_window: number
+          notes: number
+        }[]
+      }
       unarchive_aion_session: {
         Args: { p_session_id: string }
         Returns: undefined
@@ -2349,6 +2360,54 @@ export type Database = {
   }
   ops: {
     Tables: {
+      aion_write_log: {
+        Row: {
+          artifact_ref: Json
+          confirmed_at: string | null
+          created_at: string
+          deal_id: string | null
+          drafted_at: string
+          executed_at: string | null
+          id: string
+          input_params: Json
+          result: Json | null
+          session_id: string | null
+          tool_name: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          artifact_ref?: Json
+          confirmed_at?: string | null
+          created_at?: string
+          deal_id?: string | null
+          drafted_at?: string
+          executed_at?: string | null
+          id?: string
+          input_params?: Json
+          result?: Json | null
+          session_id?: string | null
+          tool_name: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          artifact_ref?: Json
+          confirmed_at?: string | null
+          created_at?: string
+          deal_id?: string | null
+          drafted_at?: string
+          executed_at?: string | null
+          id?: string
+          input_params?: Json
+          result?: Json | null
+          session_id?: string | null
+          tool_name?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       assignments: {
         Row: {
           agreed_rate: number | null
@@ -7013,6 +7072,7 @@ export type Database = {
         Returns: string
       }
       current_entity_id: { Args: never; Returns: string }
+      deal_in_workspace: { Args: { p_deal_id: string }; Returns: boolean }
       generate_bridge_pairing_code: {
         Args: { p_person_entity_id: string; p_user_id: string }
         Returns: string

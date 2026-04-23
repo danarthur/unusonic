@@ -15,6 +15,8 @@ import { updateDealStatus } from '@/app/(dashboard)/(features)/crm/actions/updat
 import { updateDealScalars } from '@/app/(dashboard)/(features)/crm/actions/update-deal-scalars';
 import { getCrewDecisionData } from '@/app/(dashboard)/(features)/crm/actions/get-crew-decision-data';
 import { logFollowUpAction } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
+import { envelope } from '../../lib/retrieval-envelope';
+import { getSubstrateCounts } from '../../lib/substrate-counts';
 import { WRITE_DENIED, type AionToolContext } from './types';
 
 export function createActionTools(ctx: AionToolContext) {
@@ -102,16 +104,28 @@ export function createActionTools(ctx: AionToolContext) {
     }),
     execute: async (params) => {
       const deal = await getDeal(params.dealId);
-      if (!deal) return { error: 'Deal not found' };
-      if (!deal.proposed_date) return { error: 'Deal has no proposed date — set a date first' };
+      if (!deal) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'deal_not_found' });
+      }
+      if (!deal.proposed_date) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'deal_not_found', hint: 'Deal has no proposed date — set a date first.' });
+      }
 
       const supabase = await createClient();
       const { data: orgEntity } = await supabase.schema('directory').from('entities')
         .select('id').eq('owner_workspace_id', workspaceId).in('type', ['organization', 'company']).limit(1).maybeSingle();
-      if (!orgEntity) return { error: 'No organization found' };
+      if (!orgEntity) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'entity_not_found', hint: 'No organization found in workspace.' });
+      }
 
       const candidates = await searchCrewMembers((orgEntity as any).id, params.role ?? '', params.role);
-      if (candidates.length === 0) return { crew: [], message: 'No crew members found matching that role.' };
+      if (candidates.length === 0) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'no_crew_with_equipment' });
+      }
 
       const entityIds = candidates.slice(0, 10).map((c) => c.entity_id);
       const decisions = await getCrewDecisionData(entityIds, deal.proposed_date, params.role ?? null, workspaceId);
@@ -124,13 +138,15 @@ export function createActionTools(ctx: AionToolContext) {
       });
 
       const nameMap = new Map(candidates.map((c) => [c.entity_id, c.name]));
-      return {
-        crew: sorted.slice(0, 8).map((d) => ({
-          entityId: d.entityId, name: nameMap.get(d.entityId) ?? 'Unknown',
-          availability: d.availability, conflictEvent: d.conflictEventName,
-          skillMatch: d.skillMatchScore, pastShows: d.pastShowCount, lastShow: d.lastShowDate, dayRate: d.dayRate,
-        })),
-      };
+      const rows = sorted.slice(0, 8).map((d) => ({
+        entityId: d.entityId, name: nameMap.get(d.entityId) ?? 'Unknown',
+        availability: d.availability, conflictEvent: d.conflictEventName,
+        skillMatch: d.skillMatchScore, pastShows: d.pastShowCount, lastShow: d.lastShowDate, dayRate: d.dayRate,
+      }));
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(rows, searched, {
+        reason: rows.length === 0 ? 'no_crew_with_equipment' : 'has_data',
+      });
     },
   });
 
@@ -181,10 +197,11 @@ export function createActionTools(ctx: AionToolContext) {
     execute: async () => {
       const result = await getCatalogPackagesWithTags(workspaceId);
       const packages = result.packages ?? [];
-      return {
-        packages: packages.slice(0, 15).map((p: any) => ({ id: p.id, name: p.name, category: p.category, price: p.price, tags: p.tags?.map((t: any) => t.name) ?? [] })),
-        total: packages.length,
-      };
+      const rows = packages.slice(0, 15).map((p: any) => ({ id: p.id, name: p.name, category: p.category, price: p.price, tags: p.tags?.map((t: any) => t.name) ?? [] }));
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(rows, searched, {
+        reason: rows.length === 0 ? 'no_matching_catalog' : 'has_data',
+      });
     },
   });
 

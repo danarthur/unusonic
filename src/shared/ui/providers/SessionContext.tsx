@@ -751,9 +751,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       timeoutId = setTimeout(() => {
         abortRef.current?.abort('timeout');
       }, 30_000);
+      // Phase 3 §3.4 B3 — mobile-surface header. Tells the server this
+      // client is running on a mobile viewport (Tailwind md: breakpoint).
+      // Server gate also checks the User-Agent; both must pass before
+      // voice-intent tools (send_reply etc.) are surfaced. See
+      // src/app/api/aion/lib/surface-detection.ts.
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches) {
+        headers['x-aion-surface'] = 'mobile';
+      }
+
       const response = await fetch('/api/aion/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ messages: history, workspaceId, sessionId, pageContext, modelMode }),
         signal: abortRef.current.signal,
       });

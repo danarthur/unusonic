@@ -8,6 +8,9 @@ import { getModel } from '../../lib/models';
 import { z } from 'zod';
 import { createClient } from '@/shared/api/supabase/server';
 import { searchMemory } from '../../lib/embeddings';
+import { envelope } from '../../lib/retrieval-envelope';
+import { getSubstrateCounts } from '../../lib/substrate-counts';
+import { getToneAnchor } from '../../lib/tone-anchoring';
 import {
   getAionConfigForWorkspace,
   updateAionConfigForWorkspace,
@@ -305,7 +308,10 @@ export function createCoreTools(ctx: AionToolContext) {
         reason: item.reason,
         priority: item.priority_score,
       }));
-      return { items, count: queue.length };
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(items, searched, {
+        reason: items.length === 0 ? 'no_follow_up_queue' : 'has_data',
+      });
     },
   });
 
@@ -403,15 +409,32 @@ export function createCoreTools(ctx: AionToolContext) {
 
       const draftPrompt = buildDraftPrompt(dealContext, channel, config.voice ?? null, memoryContext, config.learned?.vocabulary, draftingRules);
 
+      // §3.4 U3 tone anchoring — prepend the user's observed sent-style.
+      // dealContext.entityIds is ordered [organization_id, main_contact_id,
+      // venue_id] (filtered to non-null); the first non-null id is the
+      // recipient to probe. If that id has <3 outbound samples, getToneAnchor
+      // falls back to workspace-wide, then to a default-voice preamble that
+      // flags the absence honestly.
+      const toneRecipient = dealContext.entityIds[0] ?? null;
+      const toneAnchor = await getToneAnchor(workspaceId, toneRecipient);
+      const systemPrompt = `${toneAnchor.preamble}\n\n---\n\n${draftPrompt}`;
+
       const { text: draftText } = await generateText({
         model: getModel('fast'),
-        system: draftPrompt,
+        system: systemPrompt,
         prompt: `Write a ${channel === 'sms' ? 'text message' : 'short email'} follow-up for this deal. Reason: ${dealContext.followUp.reason}`,
         maxOutputTokens: 200,
         temperature: 0.6,
       });
 
-      return { draft: draftText.trim(), dealId: targetDealId, dealTitle: dealContext.deal.title ?? 'Untitled deal', channel };
+      return {
+        draft: draftText.trim(),
+        dealId: targetDealId,
+        dealTitle: dealContext.deal.title ?? 'Untitled deal',
+        channel,
+        toneTier: toneAnchor.tier,
+        toneSamples: toneAnchor.samples,
+      };
     },
   });
 
@@ -609,7 +632,11 @@ export function createCoreTools(ctx: AionToolContext) {
         }
       } catch { /* cortex.aion_memory may not exist yet */ }
 
-      return { voice: config.voice, learned: config.learned, rules };
+      const searched = await getSubstrateCounts(workspaceId);
+      const hasConfig = Boolean(config.voice?.description) || rules.length > 0;
+      return envelope({ voice: config.voice, learned: config.learned, rules }, searched, {
+        reason: hasConfig ? 'has_data' : 'no_config_yet',
+      });
     },
   });
 

@@ -133,6 +133,27 @@ const eslintConfig = defineConfig([
     },
   },
 
+  // ─── Phase 3 Sprint 2 — Confirm-gate discipline for Aion §3.5 write tools ──
+  // Scope is DELIBERATELY narrow: the three new write tools and their
+  // confirmation actions. Pre-existing Aion handlers (action tools, dispatch
+  // backend) have their own UX-level confirmation discipline via [Confirm]
+  // [Cancel] chips on the tool description and are out of §3.5 scope.
+  //
+  // When a fourth write tool ships (Phase 4 calendar, mass-send, etc.), add
+  // its file to this glob. The rule fails closed: missing import = block.
+  //
+  // Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.5 C3 rail.
+  {
+    files: [
+      "src/app/api/aion/chat/tools/writes.ts",
+      "src/app/(dashboard)/(features)/aion/actions/write-confirmations.ts",
+    ],
+    plugins: { "stage-engineering": stageEngineering },
+    rules: {
+      "stage-engineering/require-confirmed-before-dispatch": "error",
+    },
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Protocol v2 — SECURITY BOUNDARIES (error from Day 0)
   // ═══════════════════════════════════════════════════════════════════════════

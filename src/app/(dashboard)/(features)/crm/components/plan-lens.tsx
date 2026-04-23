@@ -9,6 +9,7 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { DispatchSummary } from './dispatch-summary';
 import { CrewDetailRail } from './crew-detail-rail';
 import { DealHeaderStrip } from './deal-header-strip';
+import { EventBriefButton } from './event-brief-button';
 import { DealDiaryCard } from './deal-diary-card';
 import { CompletionIndicators } from './completion-indicators';
 import { HandoffConfirmStrip } from './handoff-confirm-strip';
@@ -345,21 +346,30 @@ export function PlanLens({
 
   // Shared header strip — editable on Plan (with confirmation for post-handoff changes)
   const headerStrip = deal ? (
-    <DealHeaderStrip
-      title={localTitle}
-      proposedDate={deal.proposed_date}
-      eventArchetype={deal.event_archetype ?? null}
-      saving={scalarsSaving}
-      onTitleChange={handleTitleChange}
-      onSaveScalar={(patch) => {
-        handleSaveScalar(patch as Parameters<typeof updateDealScalars>[1]);
-      }}
-      deal={deal}
-      stakeholders={stakeholders}
-      client={client}
-      sourceOrgId={sourceOrgId ?? null}
-      onStakeholdersChange={onStakeholdersChange ?? (() => {})}
-    />
+    <div className="flex flex-col gap-2">
+      <DealHeaderStrip
+        title={localTitle}
+        proposedDate={deal.proposed_date}
+        eventArchetype={deal.event_archetype ?? null}
+        saving={scalarsSaving}
+        onTitleChange={handleTitleChange}
+        onSaveScalar={(patch) => {
+          handleSaveScalar(patch as Parameters<typeof updateDealScalars>[1]);
+        }}
+        deal={deal}
+        stakeholders={stakeholders}
+        client={client}
+        sourceOrgId={sourceOrgId ?? null}
+        onStakeholdersChange={onStakeholdersChange ?? (() => {})}
+      />
+      {/* §3.9 Brief me — only post-handoff (event exists). Mobile-primary;
+          renders on desktop too as a secondary affordance. */}
+      {isPostHandoff && eventId && (
+        <div className="flex justify-end">
+          <EventBriefButton eventId={eventId} />
+        </div>
+      )}
+    </div>
   ) : null;
 
   let content: React.ReactNode;

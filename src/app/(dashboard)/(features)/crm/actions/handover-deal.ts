@@ -15,6 +15,7 @@ import { COUPLE_ATTR } from '@/entities/directory/model/attribute-keys';
 import { publishDomainEvent } from '@/shared/lib/domain-events/publish-domain-event';
 import { resolveStageByKind } from '@/shared/lib/pipeline-stages/resolve-stage';
 import { SeriesRuleSchema, expandSeriesRule, type SeriesRule } from '@/shared/lib/series-rule';
+import { seedHandoffNarrative } from './seed-handoff-narrative';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -560,6 +561,18 @@ export async function handoverDeal(
       warnings.push('Contract record creation failed — you may need to recreate it manually on the Plan tab.');
     }
   }
+
+  // Phase 3 §3.5 — seed the deal narrative with handoff facts. Fire-and-forget
+  // via service role; a failure here doesn't roll back the handoff. The
+  // DealNarrativeStrip on the event page reads cortex.memory on next render.
+  seedHandoffNarrative({ dealId, workspaceId, eventId }).catch((err) => {
+    Sentry.logger.warn('crm.handoverDeal.seedNarrativeFailed', {
+      dealId,
+      eventId,
+      workspaceId,
+      message: err instanceof Error ? err.message : 'unknown',
+    });
+  });
 
   revalidatePath('/crm');
   revalidatePath('/');

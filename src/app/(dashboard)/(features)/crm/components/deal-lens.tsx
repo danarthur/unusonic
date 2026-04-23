@@ -19,6 +19,7 @@ import type { DealClientContext } from '../actions/get-deal-client';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
 import { DealDetailsCard } from './deal-details-card';
 import { DealHeaderStrip } from './deal-header-strip';
+import { DealNarrativeStrip } from './deal-narrative-strip';
 import { deleteDeal } from '../actions/delete-deal';
 import { sendProposalReminder } from '@/features/sales/api/proposal-actions';
 import { updateDealStatus } from '../actions/update-deal-status';
@@ -457,6 +458,10 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
         sourceOrgId={sourceOrgId}
         onStakeholdersChange={onClientLinked ?? (() => {})}
       />
+
+      {/* Phase 3 §3.5 — Aion-authored deal narrative. Renders nothing until
+          handoff seeds one or the user confirms an update_narrative draft. */}
+      <DealNarrativeStrip dealId={deal.id} />
 
       {/* Position 2: Pipeline tracker — only hosts the legacy single-row
           suggestion when the unified Aion card is off. Flag ON lifts the

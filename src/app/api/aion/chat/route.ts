@@ -40,7 +40,9 @@ import { createEntityTools } from './tools/entity';
 import { createProductionTools } from './tools/production';
 import { createAnalyticsTools, invokeCallMetric } from './tools/analytics';
 import { createRefusalTools } from './tools/refusal';
+import { createWriteTools } from './tools/writes';
 import type { AionToolContext } from './tools/types';
+import { isMobileSurface, stripVoiceIntentTools } from '../lib/surface-detection';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -75,6 +77,7 @@ function buildToolsForIntent(
   toolCtx: AionToolContext,
   canWrite: boolean,
   pageType: string | null,
+  isMobile: boolean = false,
 ): Record<string, any> {
   // Always include core (voice config, memory, follow-ups, drafts) + knowledge (read-only lookups)
   const core = createCoreTools(toolCtx);
@@ -84,43 +87,54 @@ function buildToolsForIntent(
   // is the fallback path when the user asks for an out-of-registry metric.
   const refusal = createRefusalTools(toolCtx);
 
+  let tools: Record<string, any>;
   switch (intent) {
     // Lightweight intents — core + knowledge only (no write/entity/production tools)
     case 'greeting':
     case 'rejection':
     case 'conversational':
-      return { ...core, ...knowledge };
+      tools = { ...core, ...knowledge };
+      break;
 
     // Simple lookup can ask for a scalar metric (revenue, AR, sync health)
     case 'simple_lookup':
-      return { ...core, ...knowledge, ...analytics, ...refusal };
+      tools = { ...core, ...knowledge, ...analytics, ...refusal };
+      break;
 
-    // Draft requests — core has draft_follow_up + regenerate_draft, knowledge for context
+    // Draft requests — core has draft_follow_up + regenerate_draft; §3.5 write
+    // tools (send_reply, schedule_followup, update_narrative) are also here
+    // because drafting is cheap by design. The voice-intent gate downstream
+    // strips send_reply on desktop.
     case 'draft_request':
-      return { ...core, ...knowledge };
+      tools = { ...core, ...knowledge, ...createWriteTools(toolCtx) };
+      break;
 
     // Config/teaching — core only (save_voice_config, save_memory, save_follow_up_rule)
     case 'config':
-      return { ...core };
+      tools = { ...core };
+      break;
 
     // Write actions — need action + entity tools, plus knowledge for context lookups
     case 'write_action':
     case 'confirmation': {
       const actions = createActionTools(toolCtx);
       const entity = createEntityTools(toolCtx);
+      const writes = createWriteTools(toolCtx);
       // Include production tools when on a deal/event page
       if (pageType === 'deal' || pageType === 'event') {
         const production = createProductionTools(toolCtx);
-        return { ...core, ...knowledge, ...actions, ...entity, ...production };
+        tools = { ...core, ...knowledge, ...actions, ...entity, ...production, ...writes };
+      } else {
+        tools = { ...core, ...knowledge, ...actions, ...entity, ...writes };
       }
-      return { ...core, ...knowledge, ...actions, ...entity };
+      break;
     }
 
     // Multi-step, analysis, strategic — full tool set (+ call_metric for analysis)
     case 'multi_step':
     case 'analysis':
     case 'strategic':
-      return {
+      tools = {
         ...core,
         ...knowledge,
         ...analytics,
@@ -128,11 +142,23 @@ function buildToolsForIntent(
         ...createActionTools(toolCtx),
         ...createEntityTools(toolCtx),
         ...createProductionTools(toolCtx),
+        ...createWriteTools(toolCtx),
       };
+      break;
 
     default:
-      return { ...core, ...knowledge };
+      tools = { ...core, ...knowledge };
   }
+
+  // Phase 3 §3.4 B3 — voice-intent tools (send_reply, future voice-only writes)
+  // are stripped unless the request is verified mobile (header + UA). Even if
+  // an intent classifier would include them, a desktop POST never surfaces
+  // them. See src/app/api/aion/lib/surface-detection.ts.
+  if (!isMobile) {
+    stripVoiceIntentTools(tools);
+  }
+
+  return tools;
 }
 
 // =============================================================================
@@ -169,6 +195,15 @@ export async function POST(req: Request) {
   }
 
   const { messages, workspaceId, pageContext, modelMode } = body;
+
+  // Normalize sessionId — general-scope chats use client-minted `chat-<uuid>`
+  // pseudo-IDs (SessionContext.startNewChat). Those are never valid DB UUIDs,
+  // so scope resolution + auto-title RPCs would throw. Treat them as null
+  // server-side; scoped sessions (deal/event) use `resume_or_create_aion_session`
+  // which returns real UUIDs and reaches this check unchanged.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const normalizedSessionId =
+    body.sessionId && UUID_RE.test(body.sessionId) ? body.sessionId : undefined;
 
   // 3. Tier gate
   const gate = await canExecuteAionAction(workspaceId, 'active');
@@ -239,9 +274,9 @@ export async function POST(req: Request) {
   // as the signal source for entity-type pages where no session has been
   // created yet (lobby, dashboards).
   let scopePrefix = '';
-  if (body.sessionId) {
+  if (normalizedSessionId) {
     const { resolveSessionScope, buildScopePrefix } = await import('../lib/scope-context');
-    const scope = await resolveSessionScope(body.sessionId);
+    const scope = await resolveSessionScope(normalizedSessionId);
     if (scope) {
       scopePrefix = await buildScopePrefix(scope);
     }
@@ -256,13 +291,13 @@ export async function POST(req: Request) {
   }));
   // Load existing session summary for continuity
   let existingSummary: string | null = null;
-  if (body.sessionId) {
+  if (normalizedSessionId) {
     try {
       const { data: session } = await supabase
         .schema('cortex')
         .from('aion_sessions')
         .select('conversation_summary')
-        .eq('id', body.sessionId)
+        .eq('id', normalizedSessionId)
         .maybeSingle();
       existingSummary = session?.conversation_summary ?? null;
     } catch {}
@@ -271,8 +306,8 @@ export async function POST(req: Request) {
   const { summary, recentMessages, didSummarize } = await prepareConversationHistory(allMessages, existingSummary);
 
   // Persist summary after summarization (fire-and-forget)
-  if (didSummarize && summary && body.sessionId) {
-    const sessionId = body.sessionId; // capture for the async closure (TS can't narrow across closure boundaries)
+  if (didSummarize && summary && normalizedSessionId) {
+    const sessionId = normalizedSessionId; // capture for the async closure (TS can't narrow across closure boundaries)
     (async () => {
       try {
         const { getSystemClient } = await import('@/shared/api/supabase/system');
@@ -314,8 +349,12 @@ export async function POST(req: Request) {
   const recentContext = messages.slice(-4).map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
   const intent = classifyIntent(lastUserMessage.trim(), recentContext);
 
-  // 10a. Build only the tool sets needed for this intent (saves ~3k tokens on simple queries)
-  const toolSets = buildToolsForIntent(intent, toolCtx, canWrite, pageContext?.type ?? null);
+  // 10a. Build only the tool sets needed for this intent (saves ~3k tokens on simple queries).
+  // §3.4 B3: voice-intent tools (send_reply, future voice-only writes) are
+  // stripped unless the request is a verified mobile POST (header + UA both
+  // match). Desktop transcript POST can never surface them.
+  const isMobile = isMobileSurface(req);
+  const toolSets = buildToolsForIntent(intent, toolCtx, canWrite, pageContext?.type ?? null, isMobile);
 
   const routerInput: RouterInput = {
     message: lastUserMessage,
@@ -475,10 +514,10 @@ export async function POST(req: Request) {
           // current title and silently bails if one is already set OR if the
           // user has locked it mid-generation. Only triggers when we have
           // both a user message and a meaningful assistant reply.
-          if (body.sessionId && finalText.trim().length > 0) {
+          if (normalizedSessionId && finalText.trim().length > 0) {
             const lastUser = messages.filter((m) => m.role === 'user').pop()?.content ?? '';
             if (lastUser.trim().length > 0) {
-              const sessionId = body.sessionId;
+              const sessionId = normalizedSessionId;
               void import('../lib/generate-title').then(({ generateSessionTitle }) =>
                 generateSessionTitle({
                   sessionId,
@@ -736,6 +775,34 @@ function buildSystemPrompt(config: AionConfig, onboardingState: OnboardingState,
     '- For reports and dashboards: use get_revenue_summary (financial scorecard), get_pipeline_summary (deal pipeline chart), get_revenue_trend (6-month revenue line chart), get_client_concentration (revenue by client donut chart), get_client_insights (client scorecard). These render as visual data cards with charts — use them when users ask for summaries, scorecards, reports, metrics, or dashboards.',
     '- For cross-deal pricing references ("what did we charge X last June", "what did past rooftops go for", "find similar deals"): use lookup_historical_deals. Pass client_name_query for fuzzy client lookup, similar_to_deal_id for structural matches (archetype + venue + month + headcount), or filters.date_range / filters.status for time-and-outcome scoping. When the tool returns truncated: true, acknowledge the result-count limit without speculating about hidden records.',
     '- For catalog pricing ("what do we charge for X", "do we sell Y", "list our rooftop packages"): use lookup_catalog. Returns name, category, default price, description, and the catalog id. Plain fuzzy search — combine with lookup_historical_deals when the user wants both default pricing AND what clients actually paid.',
+    '',
+    '=== RETRIEVAL ENVELOPE (every read tool) ===',
+    'Every retrieval tool returns: { result, reason, searched, hint?, adjacent? }.',
+    '- `result` is the data: an array, a single object, null, or a scalar. Read it directly.',
+    '- `searched` is the substrate universe the query ran against (workspace-scoped): { deals, entities, messages_in_window, notes, catalog_items, memory_chunks }. NOT the number of matches — the inventory.',
+    '- `reason` is why: "has_data" when result is populated, or a specific empty-state code (no_matching_deals, no_messages_from_entity, deal_not_found, workspace_empty, etc.).',
+    '- `hint` is an optional one-liner from the tool (e.g. "Showing top 5 of 42 matches").',
+    '- `adjacent` lists reach-across suggestions: related substrate you might offer ({kind, id, label}).',
+    '',
+    'EMPTY-STATE DISCIPLINE (non-negotiable):',
+    'When `result` is empty or null, the FIRST sentence of your reply must name the substrate you actually looked at — using `searched`. Never say "I don\'t have any matching X" as if you searched exhaustively without saying how much there was. The substrate speaks first; the answer follows.',
+    '',
+    'Examples:',
+    '- searched={deals:3, messages_in_window:47, notes:12, ...}, reason="no_matching_deals" for "Henderson" →',
+    '  "I looked at your 3 deals, 47 messages, and 12 notes — nothing mentions Henderson. Is this someone you\'ve worked with, or a new lead?"',
+    '- searched={deals:0, messages_in_window:0, ...}, reason="workspace_empty" →',
+    '  "Nothing to search yet — no deals, no messages, no notes on file. Connect your inbox or add your first deal to get started."',
+    '- searched={messages_in_window:0, ...}, reason="no_activity_in_window" for "what did Sarah say" →',
+    '  "No messages in the last 90 days. Your inbox connection may be fresh — I\'ll have more as messages come in."',
+    '- searched={deals:47, messages_in_window:1842, ...}, reason="no_closed_deals_yet" for "average deal size" →',
+    '  "You have 47 deals in the pipeline but none closed yet — pattern stats activate after 5-10 closed deals. Want me to show the active ones instead?"',
+    '- reason="entity_not_found" → "I don\'t see that entity in your workspace." (bounded ask — entity-level miss; don\'t dump the full substrate inventory for a lookup miss)',
+    '',
+    'Rules:',
+    '- Mention only the substrate counts that matter for the question. A pricing question touches deals + catalog; a communication question touches messages + notes. Don\'t recite the full inventory every time.',
+    '- When `adjacent` is present, offer the reach-across: "There\'s a thread from sarah.patel@gmail — want me to start a deal from it?"',
+    '- Sentence case, no exclamation marks, production vocabulary. Don\'t editorialize the emptiness (no "Unfortunately...", no "Great question!").',
+    '- Filled results: answer the question. You don\'t need to announce `searched` counts when result is populated — the inline <citation> tags carry the per-item trust.',
     '',
     '=== INLINE RECORD CITATIONS ===',
     'When you reference a deal, client/entity, or catalog package that you retrieved via a tool in this turn, emit the name as an inline citation tag instead of plain text. The client-side renders these as clickable pills with hover cards.',

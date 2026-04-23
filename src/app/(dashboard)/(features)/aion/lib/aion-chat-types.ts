@@ -179,6 +179,10 @@ export type AionMessageContent =
   | { type: 'scorecard'; text: string; title: string; metrics: ScorecardMetric[] }
   | { type: 'chart'; text: string; title: string; chartType: 'bar' | 'line' | 'area' | 'donut'; data: ChartDataPoint[]; valuePrefix?: string; valueSuffix?: string }
   | { type: 'data_table'; text: string; title: string; columns: DataTableColumn[]; rows: Record<string, string | number>[] }
+  // Phase 3 §3.5 — Aion write tool preview cards (diff-confirm-execute).
+  | { type: 'reply_preview'; text: string; draftId: string; threadId: string; subject: string; to: string | null; bodyText: string }
+  | { type: 'followup_preview'; text: string; draftId: string; dealId: string; scheduledFor: string; channel: 'email' | 'sms'; draftBody: string | null; remindOwnerFirst: boolean }
+  | { type: 'narrative_preview'; text: string; draftId: string; dealId: string; previousNarrative: string | null; newNarrative: string }
   | AnalyticsResult
   | Refusal;
 

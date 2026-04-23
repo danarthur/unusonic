@@ -4,6 +4,9 @@ import React from 'react';
 import { useSession } from '@/shared/ui/providers/SessionContext';
 import type { AionMessageContent } from '../lib/aion-chat-types';
 import { DraftPreviewCard, type DraftEditedData } from './DraftPreviewCard';
+import { ReplyPreviewCard } from './ReplyPreviewCard';
+import { FollowupPreviewCard } from './FollowupPreviewCard';
+import { NarrativePreviewCard } from './NarrativePreviewCard';
 import { QueuePreviewCard } from './QueuePreviewCard';
 import { LearnedSummaryCard } from './LearnedSummaryCard';
 import { ScorecardCard } from './ScorecardCard';
@@ -120,6 +123,39 @@ export function AionMessageRenderer({ contents, workspaceId, onDraftEdited }: Ai
                 key={idx}
                 refusal={block}
                 onSuggestionTap={handleRefusalSuggestion}
+              />
+            );
+          // Phase 3 §3.5 — write-tool preview cards (diff-confirm-execute).
+          case 'reply_preview':
+            return (
+              <ReplyPreviewCard
+                key={idx}
+                draftId={block.draftId}
+                threadId={block.threadId}
+                subject={block.subject}
+                to={block.to}
+                bodyText={block.bodyText}
+              />
+            );
+          case 'followup_preview':
+            return (
+              <FollowupPreviewCard
+                key={idx}
+                draftId={block.draftId}
+                dealId={block.dealId}
+                scheduledFor={block.scheduledFor}
+                channel={block.channel}
+                draftBody={block.draftBody}
+                remindOwnerFirst={block.remindOwnerFirst}
+              />
+            );
+          case 'narrative_preview':
+            return (
+              <NarrativePreviewCard
+                key={idx}
+                draftId={block.draftId}
+                previousNarrative={block.previousNarrative}
+                newNarrative={block.newNarrative}
               />
             );
           // text and suggestions are handled by ChatInterface

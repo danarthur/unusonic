@@ -21,6 +21,8 @@ import { getClientConcentration } from '@/widgets/dashboard/api/get-client-conce
 import { getRevenueTrend } from '@/widgets/dashboard/api/get-revenue-trend';
 import { searchMemory, type SourceType } from '../../lib/embeddings';
 import { wrapUntrusted } from '../../lib/wrap-untrusted';
+import { envelope } from '../../lib/retrieval-envelope';
+import { getSubstrateCounts } from '../../lib/substrate-counts';
 import type { AionToolContext } from './types';
 
 // ---------------------------------------------------------------------------
@@ -462,7 +464,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         const ctxType = e.type === 'organization' || e.type === 'client' || e.type === 'company' ? 'company' : e.type;
         return { id: e.id, type: e.type, name: e.display_name, ...toIONContext(e.attributes, ctxType) };
       });
-      return { entities: results, count: results.length };
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(results, searched, {
+        reason: results.length === 0 ? 'no_matching_entities' : 'has_data',
+      });
     },
   });
 
@@ -471,12 +476,18 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({ entityId: z.string().optional().describe('The entity ID. Omit to use the current page context.') }),
     execute: async (params) => {
       const entityId = resolveEntityId(params.entityId);
-      if (!entityId) return { error: 'No entity ID provided and no entity in view.' };
+      if (!entityId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
+      }
       const supabase = await createClient();
       const { data: entity } = await supabase.schema('directory').from('entities')
         .select('id, type, display_name, attributes, avatar_url, claimed_by_user_id')
         .eq('id', entityId).eq('owner_workspace_id', workspaceId).maybeSingle();
-      if (!entity) return { error: 'Entity not found' };
+      if (!entity) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'entity_not_found' });
+      }
 
       const entityType = (entity as any).type;
       const ctxType = entityType === 'organization' || entityType === 'client' || entityType === 'company' ? 'company' : entityType;
@@ -503,12 +514,13 @@ export function createKnowledgeTools(ctx: AionToolContext) {
 
       const deals = await getEntityDeals(entityId);
       const invoices = await getEntityFinancialSummary(entityId);
+      const searched = await getSubstrateCounts(workspaceId);
 
-      return {
+      return envelope({
         id: (entity as any).id, name: (entity as any).display_name, type: entityType,
         isGhost: !(entity as any).claimed_by_user_id, attributes: attrs,
         relationships, deals: deals.slice(0, 5), openInvoices: invoices,
-      };
+      }, searched);
     },
   });
 
@@ -519,20 +531,27 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({ dealId: z.string().optional().describe('The deal ID. Omit to use the current page context.') }),
     execute: async (params) => {
       const dealId = resolveDealId(params.dealId);
-      if (!dealId) return { error: 'No deal ID provided and no deal in view.' };
+      if (!dealId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'deal_not_found', hint: 'No deal ID provided and no deal in view.' });
+      }
       const deal = await getDeal(dealId);
-      if (!deal) return { error: 'Deal not found' };
+      if (!deal) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'deal_not_found' });
+      }
       const client = await getDealClientContext(dealId);
       const proposal = await getProposalForDeal(dealId);
       const crew = await getDealCrew(dealId);
+      const searched = await getSubstrateCounts(workspaceId);
 
-      return {
+      return envelope({
         deal: { id: deal.id, title: deal.title, status: deal.status, eventDate: deal.proposed_date, eventType: deal.event_archetype, budget: deal.budget_estimated, notes: deal.notes, showHealth: deal.show_health },
         client: client ? { name: client.organization.name, contactName: client.mainContact ? `${client.mainContact.first_name} ${client.mainContact.last_name}` : null, email: client.mainContact?.email ?? client.organization.support_email, phone: client.mainContact?.phone } : null,
         proposal: proposal ? { status: proposal.status, total: proposal.items?.reduce((sum: number, i: any) => sum + (i.total ?? 0), 0) ?? 0, itemCount: proposal.items?.length ?? 0, viewCount: proposal.view_count, lastViewed: proposal.last_viewed_at } : null,
         crew: crew.slice(0, 10).map((c) => ({ name: c.entity_name, role: c.role_note, confirmed: !!c.confirmed_at, dispatchStatus: c.dispatch_status })),
         crewTotal: crew.length,
-      };
+      }, searched);
     },
   });
 
@@ -541,12 +560,16 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({ dealId: z.string().optional().describe('The deal ID. Omit to use the current page context.') }),
     execute: async (params) => {
       const dealId = resolveDealId(params.dealId);
-      if (!dealId) return { error: 'No deal ID provided and no deal in view.' };
+      if (!dealId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'deal_not_found', hint: 'No deal ID provided and no deal in view.' });
+      }
       const crew = await getDealCrew(dealId);
-      return {
-        crew: crew.slice(0, 15).map((c) => ({ entityId: c.entity_id, name: c.entity_name, role: c.role_note, department: c.department, confirmed: !!c.confirmed_at, dispatchStatus: c.dispatch_status, callTime: c.call_time, dayRate: c.day_rate })),
-        total: crew.length,
-      };
+      const searched = await getSubstrateCounts(workspaceId);
+      const rows = crew.slice(0, 15).map((c) => ({ entityId: c.entity_id, name: c.entity_name, role: c.role_note, department: c.department, confirmed: !!c.confirmed_at, dispatchStatus: c.dispatch_status, callTime: c.call_time, dayRate: c.day_rate }));
+      return envelope(rows, searched, {
+        reason: rows.length === 0 ? 'no_crew_on_deal' : 'has_data',
+      });
     },
   });
 
@@ -555,15 +578,22 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({ dealId: z.string().optional().describe('The deal ID. Omit to use the current page context.') }),
     execute: async (params) => {
       const dealId = resolveDealId(params.dealId);
-      if (!dealId) return { error: 'No deal ID provided and no deal in view.' };
+      if (!dealId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'deal_not_found', hint: 'No deal ID provided and no deal in view.' });
+      }
       const proposal = await getProposalForDeal(dealId);
-      if (!proposal) return { error: 'No proposal found for this deal' };
-      return {
+      if (!proposal) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'no_proposal_on_deal' });
+      }
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope({
         id: proposal.id, status: proposal.status,
         total: proposal.items?.reduce((sum: number, i: any) => sum + (i.total ?? 0), 0) ?? 0,
         viewCount: proposal.view_count, lastViewed: proposal.last_viewed_at, acceptedAt: proposal.accepted_at,
         items: (proposal.items ?? []).slice(0, 15).map((i: any) => ({ name: i.name ?? i.label, quantity: i.quantity, unitPrice: i.unit_price, total: i.total, category: i.category })),
-      };
+      }, searched);
     },
   });
 
@@ -575,7 +605,11 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       entityId: z.string().describe('The crew member entity ID'),
       date: z.string().describe('The date to check in YYYY-MM-DD format'),
     }),
-    execute: async (params) => checkCrewAvailability(params.entityId, params.date),
+    execute: async (params) => {
+      const availability = await checkCrewAvailability(params.entityId, params.date);
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(availability, searched);
+    },
   });
 
   const get_entity_schedule = tool({
@@ -583,12 +617,16 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({ entityId: z.string().optional().describe('The crew member entity ID. Omit to use the current page context.') }),
     execute: async (params) => {
       const entityId = resolveEntityId(params.entityId);
-      if (!entityId) return { error: 'No entity ID provided and no entity in view.' };
+      if (!entityId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
+      }
       const schedule = await getEntityCrewSchedule(entityId);
-      return {
-        upcoming: schedule.slice(0, 10).map((e) => ({ eventTitle: e.event_title, role: e.role, status: e.status, startsAt: e.starts_at, endsAt: e.ends_at, venueName: e.venue_name, dealId: e.deal_id })),
-        total: schedule.length,
-      };
+      const searched = await getSubstrateCounts(workspaceId);
+      const upcoming = schedule.slice(0, 10).map((e) => ({ eventTitle: e.event_title, role: e.role, status: e.status, startsAt: e.starts_at, endsAt: e.ends_at, venueName: e.venue_name, dealId: e.deal_id }));
+      return envelope(upcoming, searched, {
+        reason: upcoming.length === 0 ? 'no_upcoming_shows' : 'has_data',
+      });
     },
   });
 
@@ -600,10 +638,11 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     }),
     execute: async (params) => {
       const events = await getCalendarEvents({ start: params.start, end: params.end, workspaceId });
-      return {
-        events: events.slice(0, 15).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, status: e.status, location: e.location, clientName: e.clientName })),
-        total: events.length,
-      };
+      const searched = await getSubstrateCounts(workspaceId);
+      const rows = events.slice(0, 15).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, status: e.status, location: e.location, clientName: e.clientName }));
+      return envelope(rows, searched, {
+        reason: rows.length === 0 ? 'no_activity_in_window' : 'has_data',
+      });
     },
   });
 
@@ -612,12 +651,19 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({ entityId: z.string().optional().describe('The entity ID. Omit to use the current page context.') }),
     execute: async (params) => {
       const entityId = resolveEntityId(params.entityId);
-      if (!entityId) return { error: 'No entity ID provided and no entity in view.' };
+      if (!entityId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
+      }
       const [invoices, deals] = await Promise.all([getEntityFinancialSummary(entityId), getEntityDeals(entityId)]);
-      return {
+      const searched = await getSubstrateCounts(workspaceId);
+      const hasData = invoices.length > 0 || deals.length > 0;
+      return envelope({
         openInvoices: invoices, totalOutstanding: invoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0),
         deals: deals.slice(0, 10).map((d) => ({ id: d.id, eventType: d.event_archetype, status: d.status, date: d.proposed_date, budget: d.budget_estimated })),
-      };
+      }, searched, {
+        reason: !hasData ? 'no_open_invoices' : 'has_data',
+      });
     },
   });
 
@@ -634,7 +680,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           if (stage.deals?.length > 10) stage.deals = stage.deals.slice(0, 10);
         }
       }
-      return pipeline;
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(pipeline, searched, {
+        reason: searched.deals === 0 ? 'no_closed_deals_yet' : 'has_data',
+      });
     },
   });
 
@@ -643,7 +692,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({}),
     execute: async () => {
       const data = await getFinancialPulse();
-      return { revenueThisMonth: data.revenueThisMonth, revenueLastMonth: data.revenueLastMonth, revenueDelta: data.revenueDelta, outstandingTotal: data.outstandingTotal, outstandingCount: data.outstandingCount, overdueTotal: data.overdueTotal, overdueCount: data.overdueCount };
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope({ revenueThisMonth: data.revenueThisMonth, revenueLastMonth: data.revenueLastMonth, revenueDelta: data.revenueDelta, outstandingTotal: data.outstandingTotal, outstandingCount: data.outstandingCount, overdueTotal: data.overdueTotal, overdueCount: data.overdueCount }, searched, {
+        reason: searched.deals === 0 ? 'no_closed_deals_yet' : 'has_data',
+      });
     },
   });
 
@@ -654,7 +706,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       const data = await getClientConcentration();
       // Cap to top 8 clients to keep token budget reasonable
       if (data.clients?.length > 8) data.clients = data.clients.slice(0, 8);
-      return data;
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(data, searched, {
+        reason: (data.clients?.length ?? 0) === 0 ? 'no_closed_deals_yet' : 'has_data',
+      });
     },
   });
 
@@ -663,7 +718,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({}),
     execute: async () => {
       const data = await getRevenueTrend();
-      return { months: data.months };
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope({ months: data.months }, searched, {
+        reason: searched.deals === 0 ? 'no_closed_deals_yet' : 'has_data',
+      });
     },
   });
 
@@ -672,19 +730,25 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     inputSchema: z.object({ entityId: z.string().optional().describe('The client entity ID. Omit to use the current page context.') }),
     execute: async (params) => {
       const entityId = resolveEntityId(params.entityId);
-      if (!entityId) return { error: 'No entity ID provided and no entity in view.' };
+      if (!entityId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
+      }
       const [deals, invoices] = await Promise.all([getEntityDeals(entityId), getEntityFinancialSummary(entityId)]);
       const wonDeals = deals.filter((d) => d.status === 'won');
       const totalBudget = deals.reduce((sum, d) => sum + (d.budget_estimated ?? 0), 0);
       const outstandingBalance = invoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
-      return {
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope({
         totalDeals: deals.length, wonDeals: wonDeals.length,
         winRate: deals.length > 0 ? Math.round((wonDeals.length / deals.length) * 100) : 0,
         avgDealSize: deals.length > 0 ? Math.round(totalBudget / deals.length) : 0,
         outstandingBalance, openInvoiceCount: invoices.length,
         preferredEventTypes: [...new Set(deals.map((d) => d.event_archetype).filter(Boolean))],
         recentDeals: deals.slice(0, 5),
-      };
+      }, searched, {
+        reason: deals.length === 0 ? 'no_deals_for_client' : 'has_data',
+      });
     },
   });
 
@@ -725,19 +789,16 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         threshold: 0.3,
       });
 
-      if (results.length === 0) {
-        return { results: [], message: 'No relevant knowledge found for this query.' };
-      }
-
-      return {
-        results: results.map((r) => ({
-          content: r.content.slice(0, 800), // token budget guard
-          source: r.sourceType,
-          similarity: Math.round(r.similarity * 100) / 100,
-          metadata: r.metadata,
-        })),
-        count: results.length,
-      };
+      const searched = await getSubstrateCounts(workspaceId);
+      const rows = results.map((r) => ({
+        content: r.content.slice(0, 800), // token budget guard
+        source: r.sourceType,
+        similarity: Math.round(r.similarity * 100) / 100,
+        metadata: r.metadata,
+      }));
+      return envelope(rows, searched, {
+        reason: rows.length === 0 ? 'no_matching_knowledge' : 'has_data',
+      });
     },
   });
 
@@ -752,26 +813,23 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     execute: async () => {
       const { getPendingInsights } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
       const insights = await getPendingInsights(workspaceId, 10);
+      const searched = await getSubstrateCounts(workspaceId);
 
-      if (insights.length === 0) {
-        return { insights: [], message: 'Nothing urgent right now. All clear.' };
-      }
-
-      return {
-        insights: insights.map((i) => ({
-          id: i.id,
-          type: i.triggerType,
-          title: i.title,
-          priority: i.priority,
-          urgency: i.urgency,
-          suggestedAction: i.suggestedAction,
-          href: i.href,
-          entityType: i.entityType,
-          entityId: i.entityId,
-          context: i.context,
-        })),
-        count: insights.length,
-      };
+      const rows = insights.map((i) => ({
+        id: i.id,
+        type: i.triggerType,
+        title: i.title,
+        priority: i.priority,
+        urgency: i.urgency,
+        suggestedAction: i.suggestedAction,
+        href: i.href,
+        entityType: i.entityType,
+        entityId: i.entityId,
+        context: i.context,
+      }));
+      return envelope(rows, searched, {
+        reason: rows.length === 0 ? 'no_proactive_lines' : 'has_data',
+      });
     },
   });
 
@@ -808,12 +866,17 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           eventId = deal?.event_id ?? undefined;
         }
       }
-      if (!eventId) return { error: 'No event context. Specify an eventId or dealId.' };
+      if (!eventId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'event_not_found', hint: 'No event context. Specify an eventId or dealId.' });
+      }
 
       const { fetchSections, fetchCues } = await import('@/features/run-of-show/api/ros');
       const [sections, cues] = await Promise.all([fetchSections(eventId), fetchCues(eventId)]);
+      const searched = await getSubstrateCounts(workspaceId);
 
-      return {
+      const hasData = sections.length > 0 || cues.length > 0;
+      return envelope({
         sections: sections.map((s) => ({
           id: s.id, title: s.title, startTime: s.start_time, color: s.color, notes: s.notes,
         })),
@@ -824,7 +887,9 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         })),
         sectionCount: sections.length,
         cueCount: cues.length,
-      };
+      }, searched, {
+        reason: hasData ? 'has_data' : 'no_ros_for_event',
+      });
     },
   });
 
@@ -848,13 +913,20 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           eventId = deal?.event_id ?? undefined;
         }
       }
-      if (!eventId) return { error: 'No event context. Specify an eventId or dealId.' };
+      if (!eventId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'event_not_found', hint: 'No event context. Specify an eventId or dealId.' });
+      }
 
       const { getEventLedger } = await import('@/features/finance/api/get-event-ledger');
       const ledger = await getEventLedger(eventId);
-      if (!ledger) return { error: 'No financial data found for this event.' };
+      if (!ledger) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(null, searched, { reason: 'no_financials_for_event' });
+      }
 
-      return {
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope({
         totalRevenue: ledger.fmt.totalRevenue,
         totalCost: ledger.fmt.totalCost,
         margin: ledger.fmt.margin,
@@ -870,7 +942,7 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         transactions: ledger.transactions.slice(0, 10).map((t) => ({
           type: t.type, label: t.label, amount: t.amount, inbound: t.inbound, status: t.status,
         })),
-      };
+      }, searched);
     },
   });
 
@@ -942,8 +1014,16 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         clientNameQuery: params.client_name_query,
         filters: params.filters,
       });
-      if (rows == null) return { deals: [], truncated: false, error: 'Deal lookup failed.' };
-      if (rows.length === 0) return { deals: [], truncated: false };
+      if (rows == null) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'no_matching_deals', hint: 'Deal lookup failed.' });
+      }
+      if (rows.length === 0) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, {
+          reason: searched.deals === 0 ? 'no_closed_deals_yet' : 'no_matching_deals',
+        });
+      }
 
       const guestByEventId = source
         ? await fetchGuestCounts(supabase, rows.map((r) => r.event_id).filter((x): x is string => Boolean(x)))
@@ -1007,7 +1087,11 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         `[aion.lookup_historical_deals] workspace=${workspaceId} returned=${deals.length} candidates=${totalCandidates} truncated=${totalCandidates > limit} similar_mode=${source ? 'structural' : 'name_or_filter'}`,
       );
 
-      return { deals, truncated: totalCandidates > limit };
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(deals, searched, {
+        reason: deals.length === 0 ? 'no_matching_deals' : 'has_data',
+        hint: totalCandidates > limit ? `Showing top ${limit} of ${totalCandidates} matches.` : undefined,
+      });
     },
   });
 
@@ -1047,7 +1131,8 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       if (error) {
         // Don't echo the raw database error back to the model — it can contain
         // schema hints. Give a clean boundary message; Sonnet handles it.
-        return { results: [], error: 'Catalog lookup failed.' };
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'no_matching_catalog', hint: 'Catalog lookup failed.' });
       }
       type Row = {
         id: string;
@@ -1071,7 +1156,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       console.log(
         `[aion.lookup_catalog] workspace=${workspaceId} returned=${results.length} kind=${params.kind ?? 'any'} had_query=${!!params.query?.trim()}`,
       );
-      return { results, count: results.length };
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(results, searched, {
+        reason: results.length === 0 ? 'no_matching_catalog' : 'has_data',
+      });
     },
   });
 
@@ -1152,7 +1240,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           .eq('id', dealId)
           .eq('workspace_id', workspaceId)
           .maybeSingle();
-        if (!dealRow) return { messages: [], error: 'Deal not in workspace.' };
+        if (!dealRow) {
+          const searched = await getSubstrateCounts(workspaceId);
+          return envelope([], searched, { reason: 'deal_not_found', hint: 'Deal not in workspace.' });
+        }
       }
 
       // C5 validation — same for entity_id.
@@ -1164,7 +1255,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           .eq('id', params.entity_id)
           .eq('owner_workspace_id', workspaceId)
           .maybeSingle();
-        if (!entRow) return { messages: [], error: 'Entity not in workspace.' };
+        if (!entRow) {
+          const searched = await getSubstrateCounts(workspaceId);
+          return envelope([], searched, { reason: 'entity_not_found', hint: 'Entity not in workspace.' });
+        }
       }
 
       // Core query — ops.messages joined to the thread for deal_id + subject.
@@ -1190,7 +1284,11 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         const rows = [...merged.values()]
           .sort((a, b) => b.created_at.localeCompare(a.created_at))
           .slice(0, limit);
-        return renderMessages(rows, params.direction ?? 'any');
+        const { messages } = renderMessages(rows, params.direction ?? 'any');
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope(messages, searched, {
+          reason: messages.length === 0 ? 'no_messages_from_entity' : 'has_data',
+        });
       }
 
       if (params.direction && params.direction !== 'any') {
@@ -1198,8 +1296,15 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       }
 
       const { data, error } = await q;
-      if (error) return { messages: [], error: 'Message lookup failed.' };
-      return renderMessages((data ?? []) as MessageRow[], params.direction ?? 'any');
+      if (error) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'no_activity_in_window', hint: 'Message lookup failed.' });
+      }
+      const { messages } = renderMessages((data ?? []) as MessageRow[], params.direction ?? 'any');
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(messages, searched, {
+        reason: messages.length === 0 ? 'no_activity_in_window' : 'has_data',
+      });
     },
   });
 
@@ -1273,7 +1378,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           .eq('id', dealId)
           .eq('workspace_id', workspaceId)
           .maybeSingle();
-        if (!dealRow) return { matches: [], truncated_at_budget: false, error: 'Deal not in workspace.' };
+        if (!dealRow) {
+          const searched = await getSubstrateCounts(workspaceId);
+          return envelope([], searched, { reason: 'deal_not_found', hint: 'Deal not in workspace.' });
+        }
       }
       if (params.entity_id) {
         const { data: entRow } = await supabase
@@ -1283,7 +1391,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           .eq('id', params.entity_id)
           .eq('owner_workspace_id', workspaceId)
           .maybeSingle();
-        if (!entRow) return { matches: [], truncated_at_budget: false, error: 'Entity not in workspace.' };
+        if (!entRow) {
+          const searched = await getSubstrateCounts(workspaceId);
+          return envelope([], searched, { reason: 'entity_not_found', hint: 'Entity not in workspace.' });
+        }
       }
 
       // Vector search. cortex.match_memory filters by workspace_id via RLS
@@ -1296,7 +1407,10 @@ export function createKnowledgeTools(ctx: AionToolContext) {
       });
 
       if (results.length === 0) {
-        return { matches: [], truncated_at_budget: false };
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, {
+          reason: searched.messages_in_window === 0 ? 'no_activity_in_window' : 'no_matching_knowledge',
+        });
       }
 
       // Client-side filter on channel + deal_id. The vector search returns
@@ -1345,7 +1459,11 @@ export function createKnowledgeTools(ctx: AionToolContext) {
         `[aion.lookup_client_messages] workspace=${workspaceId} query_chars=${params.query.length} returned=${matches.length}`,
       );
 
-      return { matches, truncated_at_budget: truncatedAtBudget };
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(matches, searched, {
+        reason: matches.length === 0 ? 'no_matching_knowledge' : 'has_data',
+        hint: truncatedAtBudget ? 'Excerpts truncated at budget; quote verbatim inside quotes.' : undefined,
+      });
     },
   });
 

@@ -722,6 +722,110 @@ const requireWrapUntrusted = {
 };
 
 
+// ── require-confirmed-before-dispatch ────────────────────────────────────────
+//
+// Phase 3 Sprint 2 §3.5 C3 rail. Any Aion write handler that dispatches to
+// Resend (outbound email), Twilio (outbound SMS), or the Replies sendReply
+// server action MUST go through the requireConfirmed() gate — the aion_write_log
+// audit row's `confirmed_at` must be stamped and the row re-read before the
+// irreversible side-effect happens. Blocks replay, user-mismatch, and
+// unconfirmed-dispatch bugs.
+//
+// This is a file-level heuristic: if a dispatch call is present in the file
+// AND the file does not import requireConfirmed, fail. A false positive (e.g.
+// a well-audited handler that calls a wrapper which itself calls
+// requireConfirmed) can be silenced with a standard eslint-disable.
+//
+// Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.5 C3 rail.
+
+const DISPATCH_CALL_PATTERNS = [
+  // resend.emails.send(...)
+  { object: "emails", method: "send" },
+  // twilio.messages.create(...)
+  { object: "messages", method: "create" },
+];
+
+const DISPATCH_IMPORT_NAMES = new Set([
+  // Replies-feature sendReply — the canonical outbound-email path.
+  "sendReply",
+]);
+
+const requireConfirmedBeforeDispatch = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Aion write dispatchers must import requireConfirmed before calling Resend / Twilio / sendReply.",
+    },
+    schema: [],
+    messages: {
+      missingGate:
+        "This file dispatches to an outbound channel ({{call}}) but does not import `requireConfirmed` from '@/app/api/aion/lib/require-confirmed'. Every Aion write handler must call requireConfirmed(draftId, userId) before the side-effect — see docs/reference/aion-deal-chat-phase3-plan.md §3.5 C3. Silence with eslint-disable when this file is called from another file that has already gated.",
+    },
+  },
+  create(context) {
+    let hasRequireConfirmedImport = false;
+    let hasDispatchImport = false;
+    const dispatchCalls = [];
+
+    const isDispatchMember = (callee) => {
+      if (callee?.type !== "MemberExpression") return null;
+      const propName = callee.property?.name;
+      // Drill to the nearest Identifier on the object side.
+      let obj = callee.object;
+      while (obj?.type === "MemberExpression") obj = obj.object;
+      const objName = obj?.type === "Identifier" ? obj.name : null;
+      for (const p of DISPATCH_CALL_PATTERNS) {
+        if (propName === p.method && objName === p.object) return `${p.object}.${p.method}`;
+        // Chained forms: resend.emails.send — check inner.property.name too.
+        if (callee.object?.type === "MemberExpression") {
+          const innerProp = callee.object.property?.name;
+          if (propName === p.method && innerProp === p.object) return `${innerProp}.${p.method}`;
+        }
+      }
+      return null;
+    };
+
+    return {
+      ImportDeclaration(node) {
+        const src = node.source?.value;
+        if (typeof src === "string" && src.includes("require-confirmed")) {
+          hasRequireConfirmedImport = true;
+        }
+        if (typeof src === "string") {
+          for (const spec of node.specifiers) {
+            if (spec.type === "ImportSpecifier" && DISPATCH_IMPORT_NAMES.has(spec.imported?.name)) {
+              hasDispatchImport = true;
+            }
+          }
+        }
+      },
+      CallExpression(node) {
+        const member = isDispatchMember(node.callee);
+        if (member) {
+          dispatchCalls.push({ node, call: member });
+          return;
+        }
+        // sendReply(...)
+        if (node.callee?.type === "Identifier" && DISPATCH_IMPORT_NAMES.has(node.callee.name)) {
+          dispatchCalls.push({ node, call: node.callee.name });
+        }
+      },
+      "Program:exit"() {
+        if (dispatchCalls.length === 0) return;
+        if (hasRequireConfirmedImport) return;
+        // sendReply may be imported without any dispatch call — only report if
+        // the file imports AND calls it (which dispatchCalls already reflects).
+        void hasDispatchImport;
+        for (const { node, call } of dispatchCalls) {
+          context.report({ node, messageId: "missingGate", data: { call } });
+        }
+      },
+    };
+  },
+};
+
+
 // ── Plugin export ────────────────────────────────────────────────────────────
 
 const plugin = {
@@ -742,6 +846,8 @@ const plugin = {
     "no-legacy-brand": noLegacyBrand,
     // Phase 3 Sprint 1 injection-safety enforcement
     "require-wrap-untrusted": requireWrapUntrusted,
+    // Phase 3 Sprint 2 §3.5 C3 rail — confirm gate before dispatch
+    "require-confirmed-before-dispatch": requireConfirmedBeforeDispatch,
   },
 };
 

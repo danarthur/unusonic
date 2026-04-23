@@ -10,6 +10,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { createClient } from '@/shared/api/supabase/server';
 import { getDeal } from '@/app/(dashboard)/(features)/crm/actions/get-deal';
+import { envelope } from '../../lib/retrieval-envelope';
+import { getSubstrateCounts } from '../../lib/substrate-counts';
 import { WRITE_DENIED, type AionToolContext } from './types';
 
 // ── Event ID resolver ─────────────────────────────────────────────────────────
@@ -168,16 +170,17 @@ export function createProductionTools(ctx: AionToolContext) {
     execute: async () => {
       const { fetchRosTemplates } = await import('@/features/run-of-show/api/ros');
       const templates = await fetchRosTemplates();
-      return {
-        templates: templates.map((t) => ({
-          id: t.id,
-          name: t.name,
-          description: t.description,
-          cueCount: t.cues.length,
-          sectionCount: t.sections?.length ?? 0,
-        })),
-        count: templates.length,
-      };
+      const rows = templates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        cueCount: t.cues.length,
+        sectionCount: t.sections?.length ?? 0,
+      }));
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(rows, searched, {
+        reason: rows.length === 0 ? 'no_templates' : 'has_data',
+      });
     },
   });
 
@@ -400,9 +403,13 @@ export function createProductionTools(ctx: AionToolContext) {
         .eq('verification_status', 'approved')
         .ilike('name', `%${params.equipment_query}%`);
 
-      if (error) return { error: error.message };
+      if (error) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'no_crew_with_equipment', hint: error.message });
+      }
       if (!matches || matches.length === 0) {
-        return { result: `No crew members found with equipment matching "${params.equipment_query}".` };
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'no_crew_with_equipment' });
       }
 
       // Resolve entity names
@@ -421,20 +428,80 @@ export function createProductionTools(ctx: AionToolContext) {
         nameMap.set(e.id, fullName || e.display_name || 'Unknown');
       }
 
-      const lines = (matches as { entity_id: string; name: string; category: string }[]).map((m) => {
-        const personName = nameMap.get(m.entity_id) ?? 'Unknown';
-        return `${personName} — ${m.name} [${m.category}] (verified)`;
-      });
+      const rows = (matches as { entity_id: string; name: string; category: string }[]).map((m) => ({
+        entityId: m.entity_id,
+        entityName: nameMap.get(m.entity_id) ?? 'Unknown',
+        equipmentName: m.name,
+        category: m.category,
+      }));
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(rows, searched);
+    },
+  });
 
-      return {
-        result: `Found ${matches.length} crew member${matches.length === 1 ? '' : 's'} with matching equipment:\n${lines.join('\n')}`,
-        matches: (matches as { entity_id: string; name: string; category: string }[]).map((m) => ({
-          entityId: m.entity_id,
-          entityName: nameMap.get(m.entity_id) ?? 'Unknown',
-          equipmentName: m.name,
-          category: m.category,
-        })),
-      };
+  // ===========================================================================
+  // Group F: Daily brief on demand (Phase 3 §3.9)
+  //
+  // Chat-callable complement to the lobby Daily Brief and the event-page
+  // Brief-me overlay. Shares the same insight engine (cortex.aion_insights via
+  // getPendingInsights) but buckets the results by trigger_type so the model
+  // can render a four-column DailyBriefCard without doing its own
+  // classification.
+  // ===========================================================================
+
+  const daily_brief_on_demand = tool({
+    description:
+      'Get today\'s actionable snapshot — pending follow-up nudges, unpaid deposits, stale proposals, upcoming shows. Call this when the user asks "what\'s going on today", "catch me up", "morning rundown". Read-only, no side effects.',
+    inputSchema: z.object({
+      limit: z.number().int().min(5).max(25).optional().describe('Max total items across all buckets. Default 15, cap 25.'),
+    }),
+    execute: async (params) => {
+      const { getPendingInsights } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
+      const cap = Math.min(params.limit ?? 15, 25);
+      const insights = await getPendingInsights(workspaceId, cap);
+
+      const pendingNudges: Array<{ id: string; title: string; urgency: string; href: string | null }> = [];
+      const unpaidDeposits: Array<{ id: string; title: string; urgency: string; href: string | null }> = [];
+      const staleProposals: Array<{ id: string; title: string; urgency: string; href: string | null }> = [];
+      const upcomingShows: Array<{ id: string; title: string; urgency: string; href: string | null }> = [];
+
+      for (const insight of insights) {
+        const item = {
+          id: insight.id,
+          title: insight.title,
+          urgency: insight.urgency,
+          href: insight.href,
+        };
+        switch (insight.triggerType) {
+          case 'gone_quiet_with_value':
+          case 'stage_advance_suggestion':
+          case 'stakeholder_count_trend':
+            pendingNudges.push(item);
+            break;
+          case 'deposit_gap':
+            unpaidDeposits.push(item);
+            break;
+          case 'quote_expiring':
+          case 'hot_lead_multi_view':
+            staleProposals.push(item);
+            break;
+          case 'calendar_collision':
+            upcomingShows.push(item);
+            break;
+          default:
+            pendingNudges.push(item);
+        }
+      }
+
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope({
+        pending_nudges:   pendingNudges,
+        unpaid_deposits:  unpaidDeposits,
+        stale_proposals:  staleProposals,
+        upcoming_shows:   upcomingShows,
+      }, searched, {
+        reason: insights.length === 0 ? 'no_proactive_lines' : 'has_data',
+      });
     },
   });
 
@@ -450,5 +517,6 @@ export function createProductionTools(ctx: AionToolContext) {
     record_payment,
     log_expense,
     search_crew_by_equipment,
+    daily_brief_on_demand,
   };
 }
