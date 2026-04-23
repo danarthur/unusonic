@@ -6,6 +6,7 @@ import { useSession } from '@/shared/ui/providers/SessionContext';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
 import { AionInput } from '@/app/(dashboard)/(features)/aion/components/AionInput';
+import { AionLandingStarters } from './AionLandingStarters';
 import type { AionChatResponse, SuggestionChip, AionModelMode } from '@/app/(dashboard)/(features)/aion/lib/aion-chat-types';
 import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { AionMessageRenderer } from './AionMessageRenderer';
@@ -21,11 +22,9 @@ import { usePageContextStore } from '@/shared/lib/page-context-store';
 // Constants
 // ---------------------------------------------------------------------------
 
-const EMPTY_CHIPS = [
-  { label: 'Draft a follow-up', value: 'Help me draft a follow-up message' },
-  { label: 'Review my queue', value: 'Show my follow-up queue' },
-  { label: 'Prep for a call', value: 'Help me prepare for my next call' },
-];
+// Landing-pane starters are now rendered via <AionLandingStarters /> below —
+// inventory-first full-width CTAs replaced the generic chip row on 2026-04-23
+// per the greeting-identity design doc §3.4. See AionLandingStarters.tsx.
 
 const SIDEBAR_STORAGE_KEY = 'unusonic.aion_sidebar_open';
 
@@ -385,23 +384,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
                   workspaceId={workspaceId}
                 />
               </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={STAGE_LIGHT}
-                className="flex flex-wrap gap-2 mt-5 max-w-2xl justify-center"
-              >
-                {EMPTY_CHIPS.map((chip) => (
-                  <button
-                    key={chip.label}
-                    type="button"
-                    onClick={() => handleChipTap(chip.value)}
-                    className="stage-btn stage-btn-secondary shrink-0 px-3.5 py-1.5 text-xs font-medium rounded-full transition-colors duration-[80ms]"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </motion.div>
+              <AionLandingStarters onStart={handleChipTap} />
+
             </div>
           )}
 

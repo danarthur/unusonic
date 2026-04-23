@@ -43,6 +43,9 @@ import { createRefusalTools } from './tools/refusal';
 import { createWriteTools } from './tools/writes';
 import type { AionToolContext } from './tools/types';
 import { isMobileSurface, stripVoiceIntentTools } from '../lib/surface-detection';
+import { pickGreeting } from '../lib/greeting-catalog';
+import { resolveWorkspaceStateLine } from '../lib/workspace-state-line';
+import { resolveGreetingChips } from '../lib/greeting-chips';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -967,20 +970,40 @@ async function buildGreeting(state: OnboardingState, userName: string | null, wo
       };
 
     case 'configured': {
+      // ═══════════════════════════════════════════════════════════════════
+      // Configured workspaces run in PULL-MODE (design doc 2026-04-23).
+      //
+      // Cold-open no longer pushes a follow-up-queue nudge. The drumbeat
+      // lives on ambient surfaces — lobby Today's Brief card, Sales
+      // Dashboard cards, deal-card pinned proactive lines. All three are
+      // live. See docs/reference/aion-greeting-identity-design.md.
+      //
+      // Greeting shape:
+      //   1. Rotating warm line (Claude-style, time-of-day + weekday)
+      //   2. Optional ambient state line (gated on ≥1 active deal, zero-
+      //      content facts only)
+      //   3. Contextual chip row (capability-teaching, never urgency)
+      //
+      // Teaching moments (edit-pattern detection, config learning) are a
+      // separate axis and fire AFTER turns, not at greeting.
+      //
+      // markInsightsSurfaced() telemetry still fires here — pending
+      // Sprint 3 migration to Brief-widget onMount (hazard §5.1).
+      // ═══════════════════════════════════════════════════════════════════
       const responseMessages: AionMessageContent[] = [];
+      const firstName = userName?.split(' ')[0] ?? null;
 
-      // Page-aware greeting: when user opens Aion from a specific page
+      // Page-aware warm greeting: when the user opens Aion ON a specific
+      // record, use its title and capability chips for that record.
       if (pageContext?.type === 'deal' && pageContext.entityId) {
         try {
           const deal = await import('@/app/(dashboard)/(features)/crm/actions/get-deal').then(m => m.getDeal(pageContext.entityId!));
           if (deal) {
             const dealTitle = deal.title || 'this deal';
-            responseMessages.push({ type: 'text', text: `Hey${name}. You're on ${dealTitle}. What do you need?` });
-            responseMessages.push({ type: 'suggestions', text: '', chips: [
-              { label: 'Draft a follow-up', value: `Draft a follow-up for this deal.` },
-              { label: 'Show me the crew', value: 'Who is on the crew for this deal?' },
-              { label: 'Deal summary', value: 'Give me a summary of this deal.' },
-            ]});
+            responseMessages.push({ type: 'text', text: `Hey${name}. You're on ${dealTitle}.` });
+            responseMessages.push({ type: 'suggestions', text: '', chips: resolveGreetingChips({ pageContext }) });
+            logGreetingTelemetry('configured_pull_mode', 'deal', responseMessages.length);
+            fireSurfacedTelemetry(workspaceId);
             return { messages: responseMessages };
           }
         } catch { /* fall through to default greeting */ }
@@ -993,67 +1016,81 @@ async function buildGreeting(state: OnboardingState, userName: string | null, wo
             .select('display_name, type').eq('id', pageContext.entityId).maybeSingle();
           if (entity) {
             const entityName = (entity as any).display_name;
-            responseMessages.push({ type: 'text', text: `Hey${name}. You're looking at ${entityName}. How can I help?` });
-            responseMessages.push({ type: 'suggestions', text: '', chips: [
-              { label: 'Contact info', value: `What's the contact info for ${entityName}?` },
-              { label: 'Deal history', value: `Show me the deal history for ${entityName}.` },
-              { label: 'Financial summary', value: `What's the financial summary for ${entityName}?` },
-            ]});
+            responseMessages.push({ type: 'text', text: `Hey${name}. You're looking at ${entityName}.` });
+            responseMessages.push({ type: 'suggestions', text: '', chips: resolveGreetingChips({ pageContext }) });
+            logGreetingTelemetry('configured_pull_mode', 'entity', responseMessages.length);
+            fireSurfacedTelemetry(workspaceId);
             return { messages: responseMessages };
           }
         } catch { /* fall through to default greeting */ }
       }
 
-      try {
-        const queue = await getFollowUpQueue();
-        if (queue.length > 0) {
-          const topItem = queue[0];
-          const rawTitle = (topItem.context_snapshot as Record<string, unknown> | null)?.deal_title;
-          const topTitle = typeof rawTitle === 'string' && rawTitle.trim().length > 0
-            ? rawTitle.trim()
-            : null;
-          // Reason sometimes ends with a trailing period — strip it so the
-          // template doesn't render "reason.." which looks like a typo.
-          const topReason = (topItem.reason ?? '').replace(/\s*\.\s*$/, '').trim();
-          const topReasonLower = topReason.toLowerCase();
-          const subject = topTitle ?? 'one deal';
-          const greetingText = queue.length === 1
-            ? `Hey${name}. You have 1 deal that needs follow-up${topTitle ? ` — ${topTitle}` : ''}${topReasonLower ? `: ${topReasonLower}` : ''}. Want me to draft something?`
-            : `Hey${name}. You have ${queue.length} deals that need follow-up${topTitle ? `. Top priority: ${topTitle}` : ''}${topReasonLower ? ` — ${topReasonLower}` : ''}. Want me to draft something?`;
-          responseMessages.push({ type: 'text', text: greetingText });
-          responseMessages.push({ type: 'suggestions', text: '', chips: [
-            { label: 'Draft it', value: `Draft a follow-up for ${subject}.` },
-            ...(queue.length > 1 ? [{ label: `Show me all ${queue.length}`, value: 'What needs attention today?' }] : []),
-            { label: 'I already handled it', value: `I already handled ${subject}.` },
-          ]});
-        } else {
-          responseMessages.push({ type: 'text', text: `Hey${name}. All caught up. I'm here if you need me.` });
-          responseMessages.push({ type: 'suggestions', text: '', chips: [{ label: 'What have you learned', value: 'What have you learned about how I work?' }] });
-        }
-      } catch {
-        responseMessages.push({ type: 'text', text: `Hey${name}. What can I help with?` });
+      if (pageContext?.type === 'event' && pageContext.entityId) {
+        responseMessages.push({ type: 'text', text: `Hey${name}. You're on this show.` });
+        responseMessages.push({ type: 'suggestions', text: '', chips: resolveGreetingChips({ pageContext }) });
+        logGreetingTelemetry('configured_pull_mode', 'event', responseMessages.length);
+        fireSurfacedTelemetry(workspaceId);
+        return { messages: responseMessages };
       }
 
-      // Discipline rule (2026-04-22): the greeting ships ONE text block + ONE
-      // chip block. Insights, edit-pattern observations, and page-context
-      // addendums used to each post their own follow-up message at open time,
-      // stacking up to four Aion turns before the user even typed. Those now
-      // require an explicit prompt ("what's on my brief", "what patterns
-      // have you noticed"). We still mark the insights as surfaced for
-      // telemetry so the lobby brief card updates, but we don't render the
-      // acknowledgement here.
-      try {
-        const { getPendingInsights, markInsightsSurfaced } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
-        const insights = await getPendingInsights(workspaceId ?? '', 5);
-        if (insights.length > 0) {
-          const insightIds = insights.map((i: { id: string }) => i.id);
-          markInsightsSurfaced(insightIds).catch(() => {});
-        }
-      } catch { /* insights not available yet — fine */ }
+      // No pageContext — the pull-mode greeting. Warm line + optional
+      // state line + contextual chips.
+      const warmGreeting = pickGreeting({
+        firstName,
+        workspaceId: workspaceId ?? 'anon',
+      });
+      responseMessages.push({ type: 'text', text: warmGreeting });
 
+      // State line — gated on ≥1 active deal per Q1 resolution. Zero-content
+      // facts only. Renders as a SEPARATE text block, not concatenated.
+      if (workspaceId) {
+        try {
+          const stateLine = await resolveWorkspaceStateLine(workspaceId);
+          if (stateLine) {
+            responseMessages.push({ type: 'text', text: stateLine.text });
+          }
+        } catch { /* non-blocking — pull-mode greeting works without it */ }
+      }
+
+      // Chip row — no pageContext branch. `isNewWorkspace` hint from
+      // workspace snapshot (resolved earlier in the route; wire from
+      // buildGreeting's caller by checking activeDealCount in the snapshot).
+      // Here we pass undefined and let the resolver default to established
+      // workspace chips, which are correct for every case except a true
+      // day-0 workspace that hasn't made it to `configured` yet — those
+      // still hit the no_voice/no_example branches.
+      responseMessages.push({ type: 'suggestions', text: '', chips: resolveGreetingChips({ pageContext }) });
+
+      logGreetingTelemetry('configured_pull_mode', pageContext?.type ?? 'lobby', responseMessages.length);
+      fireSurfacedTelemetry(workspaceId);
       return { messages: responseMessages };
     }
   }
+}
+
+/**
+ * Fire-and-forget insight-surfaced telemetry. Keeps the lobby Today's Brief
+ * widget's dedup path fed even though we no longer LIST insights in the
+ * greeting (design doc §5.1). When Sprint 3 Wk 11 audit confirms the Brief
+ * widget's onMount path is load-bearing on its own, this call can retire.
+ */
+function fireSurfacedTelemetry(workspaceId: string | undefined): void {
+  if (!workspaceId) return;
+  (async () => {
+    try {
+      const { getPendingInsights, markInsightsSurfaced } = await import('@/app/(dashboard)/(features)/aion/actions/aion-insight-actions');
+      const insights = await getPendingInsights(workspaceId, 5);
+      if (insights.length > 0) {
+        const insightIds = insights.map((i: { id: string }) => i.id);
+        markInsightsSurfaced(insightIds).catch(() => {});
+      }
+    } catch { /* insights not available yet — fine */ }
+  })();
+}
+
+function logGreetingTelemetry(mode: string, surface: string, blocks: number): void {
+  // Grepable log line. Migrates to ops.aion_events when Sprint 3 Wk 11 lands.
+  console.log(`[aion.greeting] mode=${mode} surface=${surface} blocks=${blocks}`);
 }
 
 // =============================================================================
