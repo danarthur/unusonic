@@ -5,14 +5,23 @@ import { toast } from 'sonner';
 import { Database } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
-import { runMemoryBackfill, type MemoryBackfillResult } from './memory-backfill-action';
+import {
+  runMemoryBackfill,
+  runMemoryAudit,
+  type MemoryBackfillResult,
+  type MemoryAuditResult,
+} from './memory-backfill-action';
 import type { BackfillResult, BackfillSourceTally } from '@/app/api/aion/lib/backfill-embeddings';
+import type { FillAuditResult, FillAuditRow } from '@/app/api/aion/lib/audit-embeddings';
 
 type SuccessResult = Extract<MemoryBackfillResult, { success: true }>;
+type SuccessAudit = Extract<MemoryAuditResult, { success: true }>;
 
 export function MemoryBackfillSection() {
   const [isPending, startTransition] = useTransition();
+  const [isAuditing, startAuditTransition] = useTransition();
   const [last, setLast] = useState<SuccessResult | null>(null);
+  const [audit, setAudit] = useState<SuccessAudit | null>(null);
 
   const handleClick = () => {
     startTransition(async () => {
@@ -28,6 +37,25 @@ export function MemoryBackfillSection() {
         toast.success(`Backfill complete: ${total} rows embedded, no failures.`);
       } else {
         toast.warning(`Backfill done: ${total} embedded, ${failed} failed — see detail below.`);
+      }
+    });
+  };
+
+  const handleAuditClick = () => {
+    startAuditTransition(async () => {
+      const res = await runMemoryAudit();
+      if (!res.success) {
+        toast.error(res.error);
+        return;
+      }
+      setAudit(res);
+      const under80 = res.audit.rows.filter(
+        (r) => r.fillRatio !== null && r.fillRatio < 0.8,
+      );
+      if (under80.length === 0) {
+        toast.success('Audit: all audited source types at ≥80% fill.');
+      } else {
+        toast.warning(`Audit: ${under80.length} source type(s) below 80% fill.`);
       }
     });
   };
@@ -51,10 +79,21 @@ export function MemoryBackfillSection() {
           </div>
 
           {last && <BackfillReadout result={last.result} />}
+          {audit && <AuditReadout result={audit.audit} />}
 
-          <Button size="sm" onClick={handleClick} disabled={isPending}>
-            {isPending ? 'Running backfill…' : 'Run backfill'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleClick} disabled={isPending}>
+              {isPending ? 'Running backfill…' : 'Run backfill'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAuditClick}
+              disabled={isAuditing}
+            >
+              {isAuditing ? 'Checking…' : 'Check fill rates'}
+            </Button>
+          </div>
         </div>
       </div>
     </StagePanel>
@@ -104,4 +143,44 @@ function sumInserted(r: BackfillResult): number {
 
 function sumFailed(r: BackfillResult): number {
   return r.dealNotes.failed + r.followUpLogs.failed + r.proposals.failed + r.catalogPackages.failed;
+}
+
+function AuditReadout({ result }: { result: FillAuditResult }) {
+  return (
+    <div className="space-y-2 rounded-md border border-[var(--stage-border)] bg-[var(--ctx-well)] p-2.5 text-xs">
+      <div className="flex items-center justify-between pb-1.5 border-b border-[var(--stage-border)]">
+        <span className="text-[var(--stage-text-secondary)]">Fill rate audit</span>
+        <span className="font-mono text-[10px] text-[var(--stage-text-tertiary)]">
+          {new Date(result.auditedAt).toLocaleTimeString()}
+        </span>
+      </div>
+      {result.rows.map((row) => (
+        <AuditRow key={row.sourceType} row={row} />
+      ))}
+    </div>
+  );
+}
+
+function AuditRow({ row }: { row: FillAuditRow }) {
+  const noBaseline = row.expectedMin === null;
+  const belowTarget = row.fillRatio !== null && row.fillRatio < 0.8;
+  const label = row.sourceType.replace(/_/g, ' ');
+  return (
+    <div className={`flex items-center justify-between ${noBaseline ? 'opacity-60' : ''}`}>
+      <span className="text-[var(--stage-text-secondary)]">{label}</span>
+      <span className="font-mono text-[var(--stage-text-tertiary)]">
+        {row.rowCount}
+        {row.expectedMin !== null ? ` / ${row.expectedMin}` : ' / —'}
+        {row.fillRatio !== null && (
+          <span
+            style={belowTarget ? { color: 'var(--color-unusonic-error)' } : undefined}
+            className={belowTarget ? '' : 'text-[var(--stage-text-secondary)]'}
+          >
+            {' · '}
+            {Math.round(row.fillRatio * 100)}%
+          </span>
+        )}
+      </span>
+    </div>
+  );
 }
