@@ -381,27 +381,22 @@ s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
 
+# Scaffolded but not yet implemented. `ingest-email` is the Postmark inbound
+# webhook for the Replies initiative (see memory: project_replies_initiative).
+# `triage-item` origin is unclear; likely older scaffolding. Both are disabled
+# so `supabase start` doesn't try to load missing import maps. Re-enable and
+# scaffold when the features are implemented.
 [functions.ingest-email]
-enabled = true
+enabled = false
 verify_jwt = true
 import_map = "./functions/ingest-email/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/ingest-email/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/ingest-email/*.html" ]
 
 [functions.triage-item]
-enabled = true
+enabled = false
 verify_jwt = true
 import_map = "./functions/triage-item/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/triage-item/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/triage-item/*.html" ]
 
 # Login Redesign Phase 6 — SMS OTP sender.
 # verify_jwt = false because the function accepts BOTH a direct-user JWT
