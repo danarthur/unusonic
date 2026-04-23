@@ -357,17 +357,14 @@ export async function enqueueMessageEmbedding(args: {
   try {
     const { getSystemClient } = await import('@/shared/api/supabase/system');
     const system = getSystemClient();
-    // RPC not yet in generated types until migration 20260518000100 is applied;
-    // matches the repo pattern for cross-schema RPC calls whose types lag the code.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (system as any)
+    const { error } = await system
       .schema('cortex')
       .rpc('enqueue_memory_pending', {
         p_workspace_id: args.workspaceId,
         p_source_type: 'message',
         p_source_id: args.messageId,
         p_content_text: args.bodyText,
-        p_content_header: null,
+        p_content_header: undefined,
         p_entity_ids: [],
         p_metadata: {
           channel: args.channel,

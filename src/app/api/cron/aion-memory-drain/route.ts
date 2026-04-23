@@ -62,9 +62,7 @@ export async function GET(req: Request) {
 
   // 1. Claim batch of due rows. attempts is bumped up front in the RPC so
   //    a crash mid-handler still counts the attempt.
-  //    RPCs not yet in generated types until migration 20260518000100 is applied.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: claimed, error: claimErr } = await (supabase as any)
+  const { data: claimed, error: claimErr } = await supabase
     .schema('cortex')
     .rpc('claim_memory_pending_batch', { p_limit: CLAIM_LIMIT });
 
@@ -88,8 +86,7 @@ export async function GET(req: Request) {
   // 4. Report result back to the queue.
   let successes = 0;
   let failures = 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cortex = (supabase as any).schema('cortex');
+  const cortex = supabase.schema('cortex');
   await Promise.all(
     outcomes.map((outcome, i) => {
       const row = rows[i];
@@ -99,7 +96,7 @@ export async function GET(req: Request) {
         return cortex.rpc('mark_memory_pending_result', {
           p_id: row.id,
           p_status: 'success',
-          p_error: null,
+          p_error: undefined,
         });
       }
       failures++;

@@ -485,6 +485,7 @@ export type Database = {
           embedding: string
           entity_ids: string[] | null
           id: string
+          last_rebuilt_at: string | null
           metadata: Json | null
           source_id: string
           source_type: string
@@ -498,6 +499,7 @@ export type Database = {
           embedding: string
           entity_ids?: string[] | null
           id?: string
+          last_rebuilt_at?: string | null
           metadata?: Json | null
           source_id: string
           source_type: string
@@ -511,10 +513,59 @@ export type Database = {
           embedding?: string
           entity_ids?: string[] | null
           id?: string
+          last_rebuilt_at?: string | null
           metadata?: Json | null
           source_id?: string
           source_type?: string
           updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      memory_pending: {
+        Row: {
+          attempts: number
+          content_header: string | null
+          content_text: string
+          enqueued_at: string
+          entity_ids: string[]
+          id: string
+          last_attempted_at: string | null
+          last_error: string | null
+          metadata: Json
+          next_attempt_after: string
+          source_id: string
+          source_type: string
+          workspace_id: string
+        }
+        Insert: {
+          attempts?: number
+          content_header?: string | null
+          content_text: string
+          enqueued_at?: string
+          entity_ids?: string[]
+          id?: string
+          last_attempted_at?: string | null
+          last_error?: string | null
+          metadata?: Json
+          next_attempt_after?: string
+          source_id: string
+          source_type: string
+          workspace_id: string
+        }
+        Update: {
+          attempts?: number
+          content_header?: string | null
+          content_text?: string
+          enqueued_at?: string
+          entity_ids?: string[]
+          id?: string
+          last_attempted_at?: string | null
+          last_error?: string | null
+          metadata?: Json
+          next_attempt_after?: string
+          source_id?: string
+          source_type?: string
           workspace_id?: string
         }
         Relationships: []
@@ -688,6 +739,20 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: undefined
       }
+      claim_memory_pending_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          content_header: string
+          content_text: string
+          entity_ids: string[]
+          id: string
+          metadata: Json
+          source_id: string
+          source_type: string
+          workspace_id: string
+        }[]
+      }
       create_aion_session: {
         Args: {
           p_id?: string
@@ -742,6 +807,18 @@ export type Database = {
           p_headline: string
           p_payload?: Json
           p_signal_type: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      enqueue_memory_pending: {
+        Args: {
+          p_content_header?: string
+          p_content_text: string
+          p_entity_ids?: string[]
+          p_metadata?: Json
+          p_source_id: string
+          p_source_type: string
           p_workspace_id: string
         }
         Returns: string
@@ -822,6 +899,10 @@ export type Database = {
       }
       mark_lobby_pin_failure: {
         Args: { p_error_at?: string; p_error_message: string; p_pin_id: string }
+        Returns: undefined
+      }
+      mark_memory_pending_result: {
+        Args: { p_error?: string; p_id: string; p_status: string }
         Returns: undefined
       }
       match_memory: {
@@ -5042,48 +5123,6 @@ export type Database = {
             columns: ["device_token_id"]
             isOneToOne: false
             referencedRelation: "bridge_device_tokens"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      catalog_embeddings: {
-        Row: {
-          content_text: string
-          embedding: string
-          id: string
-          package_id: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          content_text: string
-          embedding: string
-          id?: string
-          package_id: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          content_text?: string
-          embedding?: string
-          id?: string
-          package_id?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "catalog_embeddings_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "catalog_embeddings_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
