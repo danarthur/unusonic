@@ -1,8 +1,27 @@
 # Supabase Migration Audit
 
-**Last synced:** 2026-04-02 (Session 17 — subscription tier migration to 3-tier per-seat model, Stripe billing, seat/show enforcement)
-**DB total:** ~101 applied migrations (estimate — new columns and grants applied via MCP)
-**Local files:** 66
+**Last synced:** 2026-04-23 (baseline capture — full prod schema dumped into
+`20260101000000_baseline_schema.sql`; 222 historical migrations moved to
+`pre-baseline/`).
+
+**DB total (prod):** baseline + any post-baseline migrations (initially zero).
+**Pre-baseline history:** `pre-baseline/` folder — 222 files. Do not replay.
+**Out-of-band applies (pre-baseline):** `archive/` folder — 17 files that
+were applied via MCP/SQL editor before migration discipline. Do not replay.
+
+The baseline captures the full cumulative effect of everything in
+`pre-baseline/` + `archive/` + any DB-only applies listed below. CI replays
+only the baseline plus any new migrations authored after 2026-04-23.
+
+See `pre-baseline/README.md` for why this cut happened. See the baseline
+file's header for how to re-capture if a future cut is needed.
+
+---
+
+## Historical timeline (through 2026-04-02)
+
+Everything below is informational — the migrations themselves are in
+`pre-baseline/` or `archive/`, and their effect is captured in the baseline.
 
 ---
 

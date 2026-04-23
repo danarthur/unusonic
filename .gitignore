@@ -63,3 +63,7 @@ docs/
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Supabase CLI local state + raw schema dumps (captured baselines live in migrations/)
+supabase/.temp/
+supabase/schemas/
