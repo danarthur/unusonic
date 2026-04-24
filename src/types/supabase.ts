@@ -924,6 +924,14 @@ export type Database = {
           source_type: string
         }[]
       }
+      migrate_session_scope: {
+        Args: {
+          p_new_scope_entity_id: string
+          p_new_scope_type: string
+          p_session_id: string
+        }
+        Returns: string
+      }
       pin_aion_session: { Args: { p_session_id: string }; Returns: undefined }
       reassign_capture: {
         Args: { p_capture_id: string; p_new_entity_id: string }
