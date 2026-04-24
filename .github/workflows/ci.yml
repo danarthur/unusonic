@@ -24,8 +24,11 @@ jobs:
 
       - run: npm ci
 
-      - name: Lint
+      - name: Lint (errors hard-fail)
         run: npm run lint
+
+      - name: Lint baseline ratchet (warnings can't exceed snapshot)
+        run: npm run lint:baseline:check
 
       - name: Typecheck
         run: npx tsc --noEmit
