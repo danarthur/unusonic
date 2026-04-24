@@ -16,6 +16,7 @@ import { publishDomainEvent } from '@/shared/lib/domain-events/publish-domain-ev
 import { resolveStageByKind } from '@/shared/lib/pipeline-stages/resolve-stage';
 import { SeriesRuleSchema, expandSeriesRule, type SeriesRule } from '@/shared/lib/series-rule';
 import { seedHandoffNarrative } from './seed-handoff-narrative';
+import { migrateCallerDealSessionToEvent } from './migrate-deal-session-to-event';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -513,6 +514,13 @@ export async function handoverDeal(
     return { success: false, error: updateErr.message };
   }
 
+  // Phase 3 §3.6 — migrate the caller's active Aion deal-scoped session to
+  // the new event's scope. R6: handoff must never be gated on Aion, so all
+  // failures log to Sentry and swallow. Non-blocking on purpose (race-safe:
+  // if the user is mid-stream, the stream finishes on the deal prefix and
+  // the next turn reads the fresh event-scoped session row).
+  await migrateCallerDealSessionToEvent(supabase, dealId, eventId, workspaceId);
+
   // Create contract from accepted proposal (client signed during Liquid phase; event didn't exist yet)
   const { data: acceptedProposal } = await supabase
     .from('proposals')
@@ -662,3 +670,5 @@ async function seedDjClientInfo(
     throw new Error(`patch_event_ros_data failed: ${rpcError.message}`);
   }
 }
+
+

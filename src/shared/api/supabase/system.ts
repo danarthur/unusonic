@@ -2,15 +2,14 @@
 // This client uses the SERVICE_ROLE_KEY. It bypasses ALL Row Level Security.
 // It should ONLY be used in secure API routes (server-side), never in the browser.
 //
-// TODO(guardian-l6): re-add `import 'server-only'` once the triggers module
-// is split. Today, `src/shared/lib/triggers/registry.ts` eagerly imports
-// every primitive at module load (including `enroll-follow-up.ts`, which
-// imports this file). Any client that imports `@/shared/lib/triggers` —
-// `pipeline-editor.tsx` and `prism.tsx` today — transitively pulls this
-// module into its bundle. Adding `server-only` here makes that a hard
-// build error. The fix is to split trigger metadata (client-safe) from
-// `run()` functions (server-only), or to lazy-load the primitives. See
-// docs/audits/login-redesign-build-2026-04-19.md Guardian L-6.
+// The `import 'server-only'` guard makes any accidental client import a hard
+// build error — previously blocked by the triggers registry's eager primitive
+// load (Guardian L-6, docs/audits/login-redesign-build-2026-04-19.md). That
+// split landed in `src/shared/lib/triggers/registry-server.ts` + `./metadata.ts`
+// (Phase 3 §3.12 A3 / project_triggers_module_leak memory): client imports
+// now go through the client-safe barrel, the server runtime is isolated.
+import 'server-only';
+
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
