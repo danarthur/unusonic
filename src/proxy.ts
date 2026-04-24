@@ -10,7 +10,32 @@ const DASHBOARD_HOME = '/lobby';
 const PORTAL_HOME = '/schedule';
 const CLIENT_HOME = '/client/home';
 const PORTAL_ROUTES = ['/schedule', '/my-calendar', '/profile', '/pay', '/pipeline', '/proposals', '/setlists', '/riders', '/crew-status'];
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth/callback', '/p/', '/claim', '/confirm', '/crew/', '/bridge', '/api/auth/passkey/authenticate', '/api/auth/recover/request'];
+
+// External-service webhook routes. Each handler self-authenticates via
+// signature verification (Stripe, Resend, DocuSeal) or HTTP Basic Auth
+// (Postmark). The proxy must NOT gate these on user sessions — external
+// services have no session cookie, so gating them here 307-redirects
+// every webhook call to /login (root cause of the silent-webhook-failure
+// incident on 2026-04-24; see docs/audits/).
+//
+// SECURITY CONTRACT: every path listed here MUST have a self-auth check
+// as the first statement in its POST handler. Removing that check while
+// the path is in WEBHOOK_ROUTES is a privilege-escalation bug. Audited
+// 2026-04-24 — all five handlers return 401/400 on missing/bad auth.
+//
+// See src/__tests__/proxy.test.ts for the regression gate.
+export const WEBHOOK_ROUTES = [
+  '/api/webhooks/',        // postmark (Basic Auth), resend (x-resend-secret)
+  '/api/stripe-webhooks/', // stripe signature verification (constructEvent)
+  '/api/docuseal-webhook', // docuseal shared secret (x-docuseal-secret)
+];
+
+export const PUBLIC_ROUTES = [
+  '/login', '/signup', '/forgot-password', '/auth/callback',
+  '/p/', '/claim', '/confirm', '/crew/', '/bridge',
+  '/api/auth/passkey/authenticate', '/api/auth/recover/request',
+  ...WEBHOOK_ROUTES,
+];
 // Client portal has its own auth (session cookie or Supabase auth via claimed entity).
 // See docs/reference/client-portal-design.md §14–§17. The proxy does NOT enforce
 // anything on /client/* or /api/client-portal/* — the route group's layout and
