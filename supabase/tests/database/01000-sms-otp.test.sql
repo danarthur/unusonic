@@ -119,41 +119,26 @@ SELECT results_eq(
   'authenticated user cannot SELECT another user''s sms_otp_attempts row'
 );
 
--- 8. Authenticated user CANNOT SELECT any sms_otp_codes row (RLS + no GRANT).
---    Wrapped in a DO block because the SELECT itself raises when permissions are
---    missing; we assert the permission-denied exception, not an empty row set.
-DO $$
-DECLARE
-  v_count int := -1;
-BEGIN
-  BEGIN
-    SELECT count(*) INTO v_count FROM public.sms_otp_codes;
-  EXCEPTION WHEN insufficient_privilege THEN
-    v_count := -1;
-  END;
-  PERFORM ok(
-    v_count = -1 OR v_count = 0,
-    'authenticated user cannot SELECT sms_otp_codes rows'
-  );
-END $$;
+-- 8. Authenticated user CANNOT SELECT any sms_otp_codes row (no grant).
+-- pgTAP's ok() inside a DO block doesn't register with the plan counter, so
+-- asserting via throws_ok — permission denied is the prod behavior.
+SELECT throws_ok(
+  $$SELECT count(*) FROM public.sms_otp_codes$$,
+  '42501',
+  'permission denied for table sms_otp_codes',
+  'authenticated user cannot SELECT sms_otp_codes rows'
+);
 
--- 9. Anon CANNOT SELECT sms_otp_attempts either (no anon SELECT policy).
+-- 9. Anon CANNOT see any sms_otp_attempts rows (no anon SELECT policy —
+-- RLS filter returns zero rows rather than denying the SELECT, since anon
+-- has the grant but no matching policy).
 SELECT test_reset_role();
 SET ROLE anon;
-DO $$
-DECLARE
-  v_count int := -1;
-BEGIN
-  BEGIN
-    SELECT count(*) INTO v_count FROM public.sms_otp_attempts;
-  EXCEPTION WHEN insufficient_privilege THEN
-    v_count := -1;
-  END;
-  PERFORM ok(
-    v_count = -1 OR v_count = 0,
-    'anon cannot SELECT sms_otp_attempts rows'
-  );
-END $$;
+SELECT results_eq(
+  $$SELECT count(*)::int FROM public.sms_otp_attempts$$,
+  ARRAY[0],
+  'anon sees zero sms_otp_attempts rows (no anon SELECT policy)'
+);
 
 SELECT test_reset_role();
 

@@ -250,13 +250,17 @@ SELECT ok(
 );
 
 -- ==========================================================================
--- Test 10: Cross-workspace payment isolation
+-- Test 10: finance.payments direct SELECT is denied (RPC-only access)
 -- ==========================================================================
+-- Same posture as finance.invoices / stripe_webhook_events: authenticated has
+-- no grant on finance.payments. Cross-workspace isolation is enforced inside
+-- the SECURITY DEFINER RPCs that wrap payment reads.
 SELECT test_authenticate_as('f2222222-2222-4222-a222-222222222222'::uuid);
-SELECT ok(
-  (SELECT count(*) FROM finance.payments
-   WHERE invoice_id = 'f4000000-0000-4000-a000-000000000004'::uuid) = 0,
-  'User B cannot see payments from User A workspace'
+SELECT throws_ok(
+  $$SELECT count(*) FROM finance.payments WHERE invoice_id = 'f4000000-0000-4000-a000-000000000004'::uuid$$,
+  '42501',
+  'permission denied for table payments',
+  'Authenticated user cannot read finance.payments directly (RPC-only access)'
 );
 SELECT test_reset_role();
 
