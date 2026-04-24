@@ -164,6 +164,9 @@ describe('createRefusalTools — record_refusal execute', () => {
 
     expect(rpcSpy).toHaveBeenCalledTimes(1);
     const [, args] = rpcSpy.mock.calls[0];
-    expect(args.p_attempted_metric_id).toBeNull();
+    // RPC signature types p_attempted_metric_id as string | undefined; the
+    // code coerces null → undefined at the call site so TS accepts the call.
+    // Semantically equivalent at runtime for this optional arg.
+    expect(args.p_attempted_metric_id).toBeUndefined();
   });
 });

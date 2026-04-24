@@ -91,19 +91,20 @@ describe('LibraryDrawer', () => {
     );
     // "Today" is the title for lobby.today_schedule — should be absent.
     expect(screen.queryByText('Today')).toBeNull();
-    // But week strip should still be there.
-    expect(screen.getByText('This week')).toBeTruthy();
+    // Week strip(s) should still be there — three registry entries share the
+    // "This week" title (schedule-strip, this-week-tally, another week card).
+    expect(screen.getAllByText('This week').length).toBeGreaterThan(0);
   });
 
   it('narrows the list when the search box is used', () => {
     render(<LibraryDrawer {...baseProps} />);
-    expect(screen.getByText('This week')).toBeTruthy();
+    expect(screen.getAllByText('This week').length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText('Search cards'), {
       target: { value: 'velocity' },
     });
     // Pipeline velocity matches by title.
     expect(screen.getByText('Pipeline velocity')).toBeTruthy();
-    // Schedule cards no longer match.
+    // "This week" cards no longer match the velocity search term.
     expect(screen.queryByText('This week')).toBeNull();
   });
 

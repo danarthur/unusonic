@@ -15,30 +15,332 @@ exports[`<ClaimView /> — snapshot > renders the default unauthed Face ID varia
         class="relative inline-flex items-center justify-center shrink-0"
         data-living-logo="true"
         role="img"
-        style="width: 40px; height: 40px;"
+        style="width: 40px; height: 40px; overflow: visible;"
       >
         <svg
-          aria-hidden="true"
           class="block"
           height="40"
-          style="transform-origin: 20px 20px;"
+          overflow="visible"
+          style="overflow: visible;"
           viewBox="0 0 40 40"
           width="40"
         >
-          <rect
-            fill="var(--stage-accent, oklch(1 0 0))"
-            height="6"
-            rx="3"
-            width="14"
-            x="5"
-          />
-          <rect
-            fill="var(--stage-accent, oklch(1 0 0))"
-            height="6"
-            rx="3"
-            width="14"
-            x="21"
-          />
+          <defs>
+            <lineargradient
+              gradientUnits="userSpaceOnUse"
+              id="vesica-prism-idle-_r_9_"
+              x1="0"
+              x2="40"
+              y1="20"
+              y2="20"
+            >
+              <stop
+                offset="0"
+                stop-color="oklch(0.78 0.22 20)"
+              />
+              <stop
+                offset="0.17"
+                stop-color="oklch(0.82 0.22 60)"
+              />
+              <stop
+                offset="0.33"
+                stop-color="oklch(0.88 0.22 100)"
+              />
+              <stop
+                offset="0.5"
+                stop-color="oklch(0.78 0.22 150)"
+              />
+              <stop
+                offset="0.67"
+                stop-color="oklch(0.72 0.22 220)"
+              />
+              <stop
+                offset="0.83"
+                stop-color="oklch(0.68 0.22 280)"
+              />
+              <stop
+                offset="1"
+                stop-color="oklch(0.72 0.22 340)"
+              />
+            </lineargradient>
+            <lineargradient
+              gradientUnits="userSpaceOnUse"
+              id="vesica-prism-thinking-_r_9_"
+              x1="0"
+              x2="40"
+              y1="20"
+              y2="20"
+            >
+              <stop
+                offset="0"
+                stop-color="oklch(0.75 0.24 260)"
+              />
+              <stop
+                offset="0.17"
+                stop-color="oklch(0.70 0.25 220)"
+              />
+              <stop
+                offset="0.33"
+                stop-color="oklch(0.76 0.22 195)"
+              />
+              <stop
+                offset="0.5"
+                stop-color="oklch(0.80 0.20 175)"
+              />
+              <stop
+                offset="0.67"
+                stop-color="oklch(0.72 0.24 250)"
+              />
+              <stop
+                offset="0.83"
+                stop-color="oklch(0.65 0.26 285)"
+              />
+              <stop
+                offset="1"
+                stop-color="oklch(0.70 0.24 310)"
+              />
+            </lineargradient>
+            <lineargradient
+              gradientUnits="userSpaceOnUse"
+              id="vesica-prism-success-_r_9_"
+              x1="0"
+              x2="40"
+              y1="20"
+              y2="20"
+            >
+              <stop
+                offset="0"
+                stop-color="oklch(0.88 0.22 120)"
+              />
+              <stop
+                offset="0.17"
+                stop-color="oklch(0.82 0.26 140)"
+              />
+              <stop
+                offset="0.33"
+                stop-color="oklch(0.78 0.24 155)"
+              />
+              <stop
+                offset="0.5"
+                stop-color="oklch(0.82 0.22 175)"
+              />
+              <stop
+                offset="0.67"
+                stop-color="oklch(0.85 0.24 145)"
+              />
+              <stop
+                offset="0.83"
+                stop-color="oklch(0.80 0.26 130)"
+              />
+              <stop
+                offset="1"
+                stop-color="oklch(0.88 0.22 120)"
+              />
+            </lineargradient>
+            <lineargradient
+              gradientUnits="userSpaceOnUse"
+              id="vesica-prism-error-_r_9_"
+              x1="0"
+              x2="40"
+              y1="20"
+              y2="20"
+            >
+              <stop
+                offset="0"
+                stop-color="oklch(0.68 0.26 25)"
+              />
+              <stop
+                offset="0.17"
+                stop-color="oklch(0.74 0.22 40)"
+              />
+              <stop
+                offset="0.33"
+                stop-color="oklch(0.80 0.20 60)"
+              />
+              <stop
+                offset="0.5"
+                stop-color="oklch(0.72 0.24 50)"
+              />
+              <stop
+                offset="0.67"
+                stop-color="oklch(0.65 0.27 20)"
+              />
+              <stop
+                offset="0.83"
+                stop-color="oklch(0.70 0.26 10)"
+              />
+              <stop
+                offset="1"
+                stop-color="oklch(0.68 0.26 25)"
+              />
+            </lineargradient>
+            <lineargradient
+              gradientUnits="userSpaceOnUse"
+              id="vesica-prism-ambient-_r_9_"
+              x1="0"
+              x2="40"
+              y1="20"
+              y2="20"
+            >
+              <stop
+                offset="0"
+                stop-color="oklch(0.78 0.04 20)"
+              />
+              <stop
+                offset="0.33"
+                stop-color="oklch(0.82 0.04 120)"
+              />
+              <stop
+                offset="0.67"
+                stop-color="oklch(0.78 0.04 220)"
+              />
+              <stop
+                offset="1"
+                stop-color="oklch(0.80 0.04 320)"
+              />
+            </lineargradient>
+            <filter
+              height="180%"
+              id="vesica-bloom-_r_9_"
+              width="180%"
+              x="-40%"
+              y="-40%"
+            >
+              <fegaussianblur
+                stdDeviation="0.7"
+              />
+            </filter>
+          </defs>
+          <g
+            style="transform-origin: 20px 20px; transform: rotate(0deg) scale(1);"
+          >
+            <g>
+              <circle
+                cx="14.855"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="url(#vesica-prism-idle-_r_9_)"
+                stroke-linecap="round"
+                stroke-width="5.5"
+                style="mix-blend-mode: plus-lighter; filter: blur(3.2px); opacity: 0.7;"
+              />
+              <circle
+                cx="14.855"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="url(#vesica-prism-idle-_r_9_)"
+                stroke-linecap="round"
+                stroke-width="2.2"
+                style="mix-blend-mode: plus-lighter;"
+              />
+              <circle
+                cx="14.855"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="oklch(0.82 0.2 30)"
+                stroke-linecap="round"
+                stroke-width="1.2100000000000002"
+                style="opacity: 0.38; mix-blend-mode: plus-lighter; transform-origin: 14.855px 20px; transform: scale(1.020952380952381); filter: blur(0.35px);"
+              />
+              <circle
+                cx="14.855"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="oklch(0.72 0.24 260)"
+                stroke-linecap="round"
+                stroke-width="1.2100000000000002"
+                style="opacity: 0.38; mix-blend-mode: plus-lighter; transform-origin: 14.855px 20px; transform: scale(0.979047619047619); filter: blur(0.35px);"
+              />
+              <circle
+                cx="14.855"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="oklch(0.98 0.005 0)"
+                stroke-linecap="round"
+                stroke-width="2.64"
+                style="opacity: 0.58;"
+              />
+            </g>
+            <g>
+              <circle
+                cx="25.145"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="url(#vesica-prism-idle-_r_9_)"
+                stroke-linecap="round"
+                stroke-width="5.5"
+                style="mix-blend-mode: plus-lighter; filter: blur(3.2px); opacity: 0.7;"
+              />
+              <circle
+                cx="25.145"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="url(#vesica-prism-idle-_r_9_)"
+                stroke-linecap="round"
+                stroke-width="2.2"
+                style="mix-blend-mode: plus-lighter;"
+              />
+              <circle
+                cx="25.145"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="oklch(0.82 0.2 30)"
+                stroke-linecap="round"
+                stroke-width="1.2100000000000002"
+                style="opacity: 0.38; mix-blend-mode: plus-lighter; transform-origin: 25.145px 20px; transform: scale(1.020952380952381); filter: blur(0.35px);"
+              />
+              <circle
+                cx="25.145"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="oklch(0.72 0.24 260)"
+                stroke-linecap="round"
+                stroke-width="1.2100000000000002"
+                style="opacity: 0.38; mix-blend-mode: plus-lighter; transform-origin: 25.145px 20px; transform: scale(0.979047619047619); filter: blur(0.35px);"
+              />
+              <circle
+                cx="25.145"
+                cy="20"
+                fill="none"
+                r="10.5"
+                stroke="oklch(0.98 0.005 0)"
+                stroke-linecap="round"
+                stroke-width="2.64"
+                style="opacity: 0.58;"
+              />
+            </g>
+            <path
+              d="M 20 10.846914454677046 A 10.5 10.5 0 0 1 20 29.153085545322952 A 10.5 10.5 0 0 1 20 10.846914454677046 Z"
+              fill="oklch(0.98 0.005 0)"
+              opacity="0.24"
+            />
+            <path
+              d="M 20 10.846914454677046 A 10.5 10.5 0 0 1 20 29.153085545322952 A 10.5 10.5 0 0 1 20 10.846914454677046 Z"
+              fill="none"
+              opacity="0.92"
+              stroke="oklch(0.98 0.005 0)"
+              stroke-linecap="round"
+              stroke-width="2.6"
+            />
+            <path
+              d="M 20 10.846914454677046 A 10.5 10.5 0 0 1 20 29.153085545322952 A 10.5 10.5 0 0 1 20 10.846914454677046 Z"
+              fill="none"
+              filter="url(#vesica-bloom-_r_9_)"
+              opacity="0.9"
+              stroke="url(#vesica-prism-idle-_r_9_)"
+              stroke-width="2.21"
+              style="mix-blend-mode: plus-lighter;"
+            />
+          </g>
         </svg>
       </div>
     </div>

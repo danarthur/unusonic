@@ -102,8 +102,10 @@ describe('registry sanity', () => {
 // ─── Library manifest coverage (Phase 2.1) ──────────────────────────────────
 
 /** Widget folders excluded from library coverage. `__tests__` holds the
- * cross-widget empty-states pattern README added in Phase 2.5, not a widget. */
-const WIDGET_EXCLUDES = new Set(['dashboard', 'shared', '__tests__']);
+ * cross-widget empty-states pattern README added in Phase 2.5, not a widget.
+ * `lobby-capture` is a capture-specific widget that renders inside the lobby
+ * shell — not a metric-library card. */
+const WIDGET_EXCLUDES = new Set(['dashboard', 'shared', '__tests__', 'lobby-capture']);
 
 function listWidgetFolders(): string[] {
   const widgetsDir = join(process.cwd(), 'src', 'widgets');
