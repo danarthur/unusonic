@@ -85,33 +85,41 @@ SELECT ok(
 );
 SELECT test_reset_role();
 
--- 3. Direct INSERT into cortex.relationships is REJECTED
+-- 3. Direct INSERT into cortex.relationships is REJECTED.
+-- Per CLAUDE.md #3: cortex.relationships has no INSERT/UPDATE/DELETE RLS —
+-- the grant posture itself denies writes (service_role only). So the error
+-- is "permission denied", not an RLS-violation message. Either form is a
+-- valid rejection; we match on "permission denied" since that's what prod
+-- returns.
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
 SELECT throws_ok(
   $$INSERT INTO cortex.relationships (source_entity_id, target_entity_id, relationship_type)
     VALUES ('c1111111-1111-4111-a111-111111111111'::uuid, 'c1111111-1111-4111-a111-222222222222'::uuid, 'CONTACT')$$,
-  'new row violates row-level security policy for table "relationships"',
+  '42501',
+  'permission denied for table relationships',
   'Direct INSERT into cortex.relationships is rejected'
 );
 SELECT test_reset_role();
 
--- 4. Direct UPDATE on cortex.relationships is REJECTED (silently affects 0 rows)
+-- 4. Direct UPDATE on cortex.relationships is REJECTED (grant posture).
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-UPDATE cortex.relationships SET relationship_type = 'HACKED' WHERE id = 'd1111111-1111-4111-a111-111111111111'::uuid;
-SELECT test_reset_role();
-SELECT ok(
-  (SELECT relationship_type FROM cortex.relationships WHERE id = 'd1111111-1111-4111-a111-111111111111'::uuid) = 'EMPLOYEE',
-  'Direct UPDATE on cortex.relationships is rejected (row unchanged)'
+SELECT throws_ok(
+  $$UPDATE cortex.relationships SET relationship_type = 'HACKED' WHERE id = 'd1111111-1111-4111-a111-111111111111'::uuid$$,
+  '42501',
+  'permission denied for table relationships',
+  'Direct UPDATE on cortex.relationships is rejected'
 );
+SELECT test_reset_role();
 
--- 5. Direct DELETE on cortex.relationships is REJECTED (silently affects 0 rows)
+-- 5. Direct DELETE on cortex.relationships is REJECTED (grant posture).
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-DELETE FROM cortex.relationships WHERE id = 'd1111111-1111-4111-a111-111111111111'::uuid;
-SELECT test_reset_role();
-SELECT ok(
-  (SELECT count(*) FROM cortex.relationships WHERE id = 'd1111111-1111-4111-a111-111111111111'::uuid) = 1,
-  'Direct DELETE on cortex.relationships is rejected (row still exists)'
+SELECT throws_ok(
+  $$DELETE FROM cortex.relationships WHERE id = 'd1111111-1111-4111-a111-111111111111'::uuid$$,
+  '42501',
+  'permission denied for table relationships',
+  'Direct DELETE on cortex.relationships is rejected'
 );
+SELECT test_reset_role();
 
 -- 6. upsert_relationship() RPC succeeds when source entity is in caller workspace
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);

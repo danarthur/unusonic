@@ -77,7 +77,8 @@ INSERT INTO public.client_portal_tokens (id, entity_id, token_hash, source_kind,
 VALUES (
   '11111111-1111-4111-a111-111111111111'::uuid,
   'c1111111-1111-4111-a111-111111111111'::uuid,
-  'hash_a_' || gen_random_uuid()::text,
+  -- token_hash must be exactly 64 chars (sha256 hex); build one deterministically
+  encode(digest('hash_a_' || gen_random_uuid()::text, 'sha256'), 'hex'),
   'proposal',
   now() + interval '30 days'
 );
@@ -100,7 +101,7 @@ INSERT INTO public.client_portal_tokens (id, entity_id, token_hash, source_kind,
 VALUES (
   '22222222-2222-4222-a222-222222222222'::uuid,
   'c2222222-2222-4222-a222-222222222222'::uuid,
-  'hash_b_' || gen_random_uuid()::text,
+  encode(digest('hash_b_' || gen_random_uuid()::text, 'sha256'), 'hex'),
   'proposal',
   now() + interval '30 days'
 );

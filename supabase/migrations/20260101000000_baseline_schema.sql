@@ -25535,6 +25535,47 @@ GRANT ALL ON TABLE public.workspaces TO service_role;
 
 
 --
+-- ============================================================================
+-- Post-baseline grants hardening
+-- ============================================================================
+-- pg_dump captures the net grant state — GRANT statements only. REVOKEs that
+-- removed default-acl-inherited privileges in pre-baseline migrations don't
+-- replay because the current ACL doesn't show them. On a fresh Supabase DB,
+-- default ACLs (from Supabase's platform init) re-grant broadly, so we must
+-- explicitly tighten sensitive tables here.
+--
+-- Sources:
+--   - sms_otp: supabase/migrations/pre-baseline/20260427000000_sms_signin_enabled.sql
+--   - client-portal RPCs: pre-baseline/20260410160000_revoke_anon_exec_client_portal_rpcs.sql
+--   - broad security-definer REVOKE: pre-baseline/20260410170000_revoke_anon_exec_broader_security_definer.sql
+-- ============================================================================
+
+-- SMS OTP tables (sensitive credential-handling).
+REVOKE ALL ON TABLE public.sms_otp_codes FROM PUBLIC, anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.sms_otp_attempts FROM PUBLIC, anon, authenticated;
+
+-- SMS OTP purge function — cron-only, service role only.
+REVOKE ALL ON FUNCTION public.purge_expired_sms_otp_codes() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.purge_expired_sms_otp_codes() TO service_role;
+
+-- Stripe webhook events — webhook-only, no user read path.
+REVOKE ALL ON TABLE finance.stripe_webhook_events FROM PUBLIC, anon, authenticated;
+
+-- cortex.relationships — SELECT only for authenticated (CLAUDE.md #3 write-protection).
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE cortex.relationships FROM PUBLIC, anon, authenticated;
+
+-- Client Portal song RPCs — service_role only (no anon/authenticated path).
+-- Pre-baseline migration: 20260410204754_client_portal_songs_client_rpcs.sql
+REVOKE EXECUTE ON FUNCTION public.client_songs_add_request(uuid, uuid, text, text, text, text, text, text, text, text, text, integer, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.client_songs_update_request(uuid, uuid, uuid, text, text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.client_songs_delete_request(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+-- Ops songs promote RPC — authenticated staff path (not anon).
+-- Pre-baseline migration: 20260410205821_ops_songs_dj_rpcs.sql
+REVOKE EXECUTE ON FUNCTION public.ops_songs_promote_client_request(uuid, uuid, text, uuid) FROM PUBLIC, anon;
+
+
+--
 -- PostgreSQL database dump complete
 --
 

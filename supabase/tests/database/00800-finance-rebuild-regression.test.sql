@@ -225,13 +225,18 @@ SELECT ok(
 -- ==========================================================================
 -- Test 8: stripe_webhook_events — authenticated cannot SELECT
 -- ==========================================================================
--- Insert a test event as superuser
+-- authenticated has no grant on finance.stripe_webhook_events; the SELECT
+-- fails at the grant check rather than returning 0 rows via RLS. Either
+-- outcome satisfies the security requirement; we match on the stricter
+-- "permission denied" response prod actually returns.
 INSERT INTO finance.stripe_webhook_events (stripe_event_id, source, event_type, payload)
 VALUES ('evt_test_123', 'client_billing', 'checkout.session.completed', '{}');
 
 SELECT test_authenticate_as('f1111111-1111-4111-a111-111111111111'::uuid);
-SELECT ok(
-  (SELECT count(*) FROM finance.stripe_webhook_events) = 0,
+SELECT throws_ok(
+  $$SELECT count(*) FROM finance.stripe_webhook_events$$,
+  '42501',
+  'permission denied for table stripe_webhook_events',
   'Authenticated user cannot read stripe_webhook_events'
 );
 SELECT test_reset_role();
