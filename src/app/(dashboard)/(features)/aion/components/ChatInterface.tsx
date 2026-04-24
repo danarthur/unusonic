@@ -68,9 +68,14 @@ interface ChatInterfaceProps {
   viewState?: 'overview' | 'chat';
   onInteraction?: () => void;
   workspaceId?: string;
+  /** Density of the ChatScopeHeader that mounts above the thread.
+   *  `full` (default) renders the 4-field event/deal row.
+   *  `lite` renders a minimal title strip — used when the surface already
+   *  carries DealHeaderStrip (CRM Prism surfaces that embed a chat). */
+  scopeHeaderVariant?: 'full' | 'lite';
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspaceId }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspaceId, scopeHeaderVariant = 'full' }) => {
   const {
     messages, isLoading, addMessage, startNewChat, setWorkspaceId,
     sendChatMessage, sendMessage, sessions, currentSessionId, selectSession,
@@ -334,10 +339,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
           )}
 
           {/* Sticky scope header — renders when the current session is scope-linked
-              (e.g. a specific deal). General chats render nothing here. */}
+              (e.g. a specific deal or event). General chats render nothing here.
+              Variant propagates from the caller: lite skips the field row when
+              the surrounding surface already carries event context. */}
           {(() => {
             const current = sessions.find((s) => s.id === currentSessionId);
-            return current ? <ChatScopeHeader session={current} /> : null;
+            return current ? (
+              <ChatScopeHeader session={current} variant={scopeHeaderVariant} />
+            ) : null;
           })()}
 
           {/* Empty state */}

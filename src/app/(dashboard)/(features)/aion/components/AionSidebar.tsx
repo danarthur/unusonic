@@ -57,6 +57,15 @@ type ProductionGroup = {
   sessions: SessionMeta[];
 };
 
+type EventGroup = {
+  scopeEntityId: string;
+  /** Deal-title provenance — the thread started life on this deal's chat. */
+  title: string;
+  /** ISO starts_at of the underlying event (ops.events.starts_at). */
+  eventDate: string | null;
+  sessions: SessionMeta[];
+};
+
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 1).trimEnd() + '…';
@@ -107,6 +116,7 @@ function dbSessionMetaToSessionMeta(db: DbSessionMeta): SessionMeta {
     scopeType: db.scope_type,
     scopeEntityId: db.scope_entity_id,
     scopeEntityTitle: db.scope_entity_title,
+    scopeEntityEventDate: db.scope_entity_event_date,
     titleLocked: db.title_locked,
     isPinned: db.is_pinned,
     pinnedAt: db.pinned_at ? new Date(db.pinned_at).getTime() : null,
@@ -199,7 +209,7 @@ export function AionSidebar({
     toast.success('Restored.');
   }, []);
 
-  const { productions, general } = useMemo(() => {
+  const { productions, events, general } = useMemo(() => {
     const query = search.toLowerCase().trim();
 
     // Filter: keep sessions with ANY signal so fresh threads show up before
@@ -210,6 +220,7 @@ export function AionSidebar({
         || (s.preview && s.preview.trim().length > 0)
         || s.isPinned
         || s.scopeType === 'deal'
+        || s.scopeType === 'event'
       ))
       .filter((s) => {
         if (!query) return true;
@@ -218,8 +229,9 @@ export function AionSidebar({
       })
       .slice(0, SESSION_LIMIT);
 
-    // Group deal-scoped sessions by scope_entity_id.
+    // Group deal- and event-scoped sessions by scope_entity_id.
     const dealBuckets = new Map<string, { title: string; sessions: SessionMeta[] }>();
+    const eventBuckets = new Map<string, { title: string; sessions: SessionMeta[]; eventDate: string | null }>();
     const generalSessions: SessionMeta[] = [];
 
     for (const s of visible) {
@@ -232,6 +244,19 @@ export function AionSidebar({
         if (s.scopeEntityTitle) bucket.title = s.scopeEntityTitle;
         bucket.sessions.push(s);
         dealBuckets.set(s.scopeEntityId, bucket);
+      } else if (s.scopeType === 'event' && s.scopeEntityId) {
+        // Event-scoped sessions group under the deal-title header ("deal-title
+        // → event-date" subtitle on each row). See
+        // aion-event-scope-header-design.md §4.1 for the provenance pattern.
+        const bucket = eventBuckets.get(s.scopeEntityId) ?? {
+          title: s.scopeEntityTitle ?? 'Untitled event',
+          sessions: [],
+          eventDate: s.scopeEntityEventDate,
+        };
+        if (s.scopeEntityTitle) bucket.title = s.scopeEntityTitle;
+        if (s.scopeEntityEventDate) bucket.eventDate = s.scopeEntityEventDate;
+        bucket.sessions.push(s);
+        eventBuckets.set(s.scopeEntityId, bucket);
       } else {
         generalSessions.push(s);
       }
@@ -245,9 +270,18 @@ export function AionSidebar({
       }))
       .sort((a, b) => mostRecentWithin(b.sessions) - mostRecentWithin(a.sessions));
 
+    const events: EventGroup[] = Array.from(eventBuckets.entries())
+      .map(([scopeEntityId, { title, sessions: ss, eventDate }]) => ({
+        scopeEntityId,
+        title,
+        eventDate,
+        sessions: [...ss].sort(sortWithinScope),
+      }))
+      .sort((a, b) => mostRecentWithin(b.sessions) - mostRecentWithin(a.sessions));
+
     const general = [...generalSessions].sort(sortWithinScope);
 
-    return { productions, general };
+    return { productions, events, general };
   }, [sessions, search]);
 
   const toggleDealCollapse = (scopeEntityId: string) => {
@@ -259,7 +293,7 @@ export function AionSidebar({
     });
   };
 
-  const isEmpty = productions.length === 0 && general.length === 0;
+  const isEmpty = productions.length === 0 && events.length === 0 && general.length === 0;
 
   return (
     <AnimatePresence initial={false}>
@@ -347,6 +381,34 @@ export function AionSidebar({
                             onSelect={onSelect}
                             onDelete={onDelete}
                             onNewScopedChat={onNewScopedChat}
+                            onPin={onPin}
+                            onUnpin={onUnpin}
+                            onArchive={onArchive}
+                            onContinueInNewChat={onContinueInNewChat}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Events — Phase 3 §3.6. Sits between Productions and
+                        General per the plan. Each row's subtitle is
+                        "deal-title → event-date"; the thread title is the
+                        chat's own title. */}
+                    {events.length > 0 && (
+                      <div className="mb-3">
+                        <p className="px-2 pt-3 pb-1.5 stage-label font-mono text-[var(--stage-text-tertiary)] select-none flex items-center gap-1">
+                          <Briefcase size={10} strokeWidth={1.5} aria-hidden />
+                          Events
+                        </p>
+                        {events.map((group) => (
+                          <EventGroupRow
+                            key={group.scopeEntityId}
+                            group={group}
+                            currentSessionId={currentSessionId}
+                            collapsed={collapsedDeals.has(group.scopeEntityId)}
+                            onToggleCollapse={() => toggleDealCollapse(group.scopeEntityId)}
+                            onSelect={onSelect}
+                            onDelete={onDelete}
                             onPin={onPin}
                             onUnpin={onUnpin}
                             onArchive={onArchive}
@@ -507,6 +569,107 @@ function ProductionGroupRow({
             <Plus size={12} strokeWidth={1.5} />
           </button>
         )}
+      </div>
+
+      {/* Nested thread rows */}
+      {!collapsed && (
+        <div className="ml-1 pl-2 border-l border-[oklch(1_0_0_/_0.05)]">
+          {group.sessions.map((session) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              isActive={session.id === currentSessionId}
+              onSelect={onSelect}
+              onDelete={onDelete}
+              onPin={onPin}
+              onUnpin={onUnpin}
+              onArchive={onArchive}
+              onContinueInNewChat={onContinueInNewChat}
+              indented
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Event group — same collapsible pattern as ProductionGroupRow, but the
+// header renders the subtitle "deal-title → event-date" per
+// aion-event-scope-header-design.md §4.1. No + New chat in the header —
+// post-handoff threads are created by the handover flow, not manually.
+// ---------------------------------------------------------------------------
+
+function formatEventDateShort(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(d);
+}
+
+function EventGroupRow({
+  group,
+  currentSessionId,
+  collapsed,
+  onToggleCollapse,
+  onSelect,
+  onDelete,
+  onPin,
+  onUnpin,
+  onArchive,
+  onContinueInNewChat,
+}: {
+  group: EventGroup;
+  currentSessionId: string;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  onPin?: (id: string) => void;
+  onUnpin?: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onContinueInNewChat?: (id: string) => void;
+}) {
+  const containsActive = group.sessions.some((s) => s.id === currentSessionId);
+  const subtitle = formatEventDateShort(group.eventDate);
+
+  return (
+    <div className="mb-0.5 group/event">
+      {/* Event header row — deal-title → event-date. No + button; event threads
+          come from handover. */}
+      <div
+        className={cn(
+          'flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer select-none',
+          'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.03)]',
+          'transition-colors duration-[80ms]',
+          containsActive && 'text-[var(--stage-text-primary)]',
+        )}
+        onClick={onToggleCollapse}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleCollapse();
+          }
+        }}
+      >
+        <span className="shrink-0 text-[var(--stage-text-tertiary)]">
+          {collapsed ? <ChevronRight size={12} strokeWidth={1.5} /> : <ChevronDown size={12} strokeWidth={1.5} />}
+        </span>
+        <span className="flex-1 min-w-0 leading-tight">
+          <span className="text-sm truncate block">{truncate(group.title, MAX_TITLE_CHARS)}</span>
+          {subtitle && (
+            <span className="text-[10px] text-[var(--stage-text-tertiary)] tracking-wide truncate block">
+              → {subtitle}
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Nested thread rows */}

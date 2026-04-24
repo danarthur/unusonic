@@ -55,8 +55,14 @@ export type SessionMeta = {
   scopeEntityId: string | null;
   /** Display title of the scope entity (e.g. "Ally & Emily Wedding").
    *  Server enrichment — joined live from public.deals on every list fetch
-   *  so a rename propagates immediately. NULL for general sessions. */
+   *  so a rename propagates immediately. NULL for general sessions. For
+   *  event-scoped sessions this carries the deal-title provenance ("the
+   *  thread started as this deal's chat"), matching the sidebar-subtitle
+   *  "deal-title → event-date" shape in aion-event-scope-header-design.md §4.1. */
   scopeEntityTitle: string | null;
+  /** For event-scoped sessions: ISO date of the event's starts_at, used for
+   *  the sidebar subtitle formatted side. NULL for deal/general. */
+  scopeEntityEventDate: string | null;
   /** True when the user has renamed — the title generator will never
    *  overwrite. */
   titleLocked: boolean;
@@ -153,6 +159,7 @@ function buildGeneralSessionMeta(id: string, now: number, preview = ''): Session
     scopeType: 'general',
     scopeEntityId: null,
     scopeEntityTitle: null,
+    scopeEntityEventDate: null,
     titleLocked: false,
     isPinned: false,
     pinnedAt: null,
@@ -171,6 +178,7 @@ function dbSessionToMeta(db: DbSessionMeta): SessionMeta {
     scopeType: db.scope_type,
     scopeEntityId: db.scope_entity_id,
     scopeEntityTitle: db.scope_entity_title,
+    scopeEntityEventDate: db.scope_entity_event_date,
     titleLocked: db.title_locked,
     isPinned: db.is_pinned,
     pinnedAt: db.pinned_at ? new Date(db.pinned_at).getTime() : null,
@@ -495,6 +503,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // title from deal-lens). Server-side enrichment will overwrite on
         // the next full hydrate if the deal is renamed.
         scopeEntityTitle: title ?? null,
+        scopeEntityEventDate: null,
         titleLocked: false,
         isPinned: false,
         pinnedAt: null,
@@ -551,6 +560,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // (deal title) for sidebar grouping. See openScopedSession for the
         // same pattern + rationale.
         scopeEntityTitle: title ?? null,
+        scopeEntityEventDate: null,
         titleLocked: false,
         isPinned: false,
         pinnedAt: null,
@@ -624,6 +634,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         scopeType: source?.scopeType ?? 'deal',
         scopeEntityId: source?.scopeEntityId ?? null,
         scopeEntityTitle: source?.scopeEntityTitle ?? null,
+        scopeEntityEventDate: source?.scopeEntityEventDate ?? null,
         titleLocked: false,
         isPinned: false,
         pinnedAt: null,

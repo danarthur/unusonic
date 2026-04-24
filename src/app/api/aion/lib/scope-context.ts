@@ -24,6 +24,7 @@ import {
   getDealContextForAion,
   type FollowUpQueueItem,
 } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
+import { buildEventScopePrefix } from './build-event-scope-prefix';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -185,7 +186,14 @@ export async function buildScopePrefix(scope: SessionScope | null): Promise<stri
   if (scope.scope_type === 'deal') {
     return buildDealScopePrefix(entityId);
   }
-  // Phase 2+: scope_type='event' wires when ops.events gets a context builder.
+  if (scope.scope_type === 'event') {
+    // Phase 3 §3.6 — event scope now supported. buildEventScopePrefix returns
+    // { prompt, ui, contextFingerprint }; the chat route only needs the prompt
+    // slice. ChatScopeHeader (the event-variant UI) imports the full payload
+    // directly via its own server action.
+    const payload = await buildEventScopePrefix(entityId);
+    return payload.prompt;
+  }
   return '';
 }
 

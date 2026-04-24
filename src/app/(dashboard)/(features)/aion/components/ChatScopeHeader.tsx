@@ -29,12 +29,24 @@ import {
   getDealHeaderForScope,
   type DealHeaderForScope,
 } from '@/app/(dashboard)/(features)/crm/actions/get-deal-header-for-scope';
+import {
+  getEventHeaderForScope,
+  type EventHeaderForScope,
+} from '@/app/(dashboard)/(features)/crm/actions/get-event-header-for-scope';
+
+/** Header density.
+ *  - `full`: sticky 4-field event row (default on /aion)
+ *  - `lite`: title strip + fingerprint pill only, no field row (used inside
+ *    AionDealCard on CRM Prism where DealHeaderStrip already owns the surface)
+ */
+export type ScopeHeaderVariant = 'full' | 'lite';
 
 type Props = {
   session: SessionMeta;
+  variant?: ScopeHeaderVariant;
 };
 
-export function ChatScopeHeader({ session }: Props) {
+export function ChatScopeHeader({ session, variant = 'full' }: Props) {
   // General-scope sessions get no header — the chat surface is already the
   // entire point of the page.
   if (session.scopeType === 'general') return null;
@@ -44,7 +56,10 @@ export function ChatScopeHeader({ session }: Props) {
     return <DealScopeHeader session={session} />;
   }
 
-  // Phase 2+: scopeType='event' lands when the events surface wires in.
+  if (session.scopeType === 'event') {
+    return <EventScopeHeader session={session} variant={variant} />;
+  }
+
   return null;
 }
 
@@ -125,6 +140,188 @@ function DealScopeHeader({ session }: Props) {
         <ExternalLink size={11} strokeWidth={1.5} aria-hidden />
       </Link>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Event scope header — Phase 3 §3.6 + D4 convergence design doc.
+// ---------------------------------------------------------------------------
+//
+// Fields laid out per bucket — see docs/reference/aion-event-scope-header-design.md §1.1
+//
+//   upcoming  (>48h out):  [CLIENT] • [DATE]            • [VENUE] • [deposit state]
+//   this_week (≤48h):      [CLIENT] • [DATE-relative]   • [VENUE] • [call time]
+//   today:                  [CLIENT] • [call time bold]  • [VENUE] • [day-state chip]
+//   recent    (≤7d post):  [CLIENT] • [DATE]            • [VENUE] • [money state]
+//
+// Anchor fields (CLIENT + VENUE) never drop. Field 2 (date / call) and
+// field 4 (swing slot) rotate with the bucket. See the design doc §3 for
+// why CLIENT and VENUE are the stable anchors.
+
+function EventScopeHeader({
+  session,
+  variant,
+}: Props & { variant: ScopeHeaderVariant }) {
+  const eventId = session.scopeEntityId as string;
+  const [header, setHeader] = useState<EventHeaderForScope | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getEventHeaderForScope(eventId).then((result) => {
+      if (!cancelled) setHeader(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  // Lite variant — CRM Prism surfaces. DealHeaderStrip already owns the
+  // surface above; all we contribute is the fingerprint freshness pill so
+  // the owner can see whether the record has moved since the last turn.
+  if (variant === 'lite') {
+    if (!header) return null;
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-2 px-4 py-1.5',
+          'text-xs text-[var(--stage-text-tertiary)]',
+        )}
+        data-surface="surface"
+      >
+        <FreshnessPill fingerprint={header.contextFingerprint} />
+      </div>
+    );
+  }
+
+  const title = session.title ?? 'Event';
+  const ui = header?.ui ?? null;
+  const url = header?.url ?? `/events/g/${encodeURIComponent(eventId)}`;
+
+  return (
+    <div
+      className={cn(
+        'sticky top-0 z-20 flex items-center gap-3 px-4 py-2',
+        'bg-[var(--stage-surface)] border-b border-[var(--stage-edge-subtle)]',
+        'text-sm',
+      )}
+      data-surface="surface"
+    >
+      {/* Scope badge */}
+      <span
+        className={cn(
+          'stage-label font-mono text-[10px] tracking-wider uppercase shrink-0',
+          'text-[var(--stage-text-tertiary)]',
+        )}
+      >
+        EVENT
+      </span>
+
+      {/* Field row — stable layout with placeholder dots before data lands. */}
+      {ui ? (
+        <EventFieldRow ui={ui} />
+      ) : (
+        <span className="text-[var(--stage-text-primary)] truncate leading-none">
+          {title}
+        </span>
+      )}
+
+      {/* Freshness pill — lives next to the Open link once data lands. */}
+      {header && (
+        <FreshnessPill
+          fingerprint={header.contextFingerprint}
+          className="ml-auto"
+        />
+      )}
+
+      <Link
+        href={url}
+        className={cn(
+          !header && 'ml-auto',
+          'shrink-0 flex items-center gap-1 text-xs',
+          'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
+          'transition-colors duration-[80ms]',
+        )}
+        aria-label="Open event"
+      >
+        Open
+        <ExternalLink size={11} strokeWidth={1.5} aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
+function EventFieldRow({ ui }: { ui: EventHeaderForScope['ui'] }) {
+  // Slot order mirrors the design doc table in §1.1. `today` bucket bolds
+  // slot 2 because that's the call time and what Marco is scanning for.
+  const slot2Bold = ui.bucket === 'today';
+  const slots = [
+    ui.client || null,
+    ui.secondarySlot || null,
+    ui.venue || null,
+    ui.swingSlot || null,
+  ].filter((s): s is string => Boolean(s && s.trim()));
+
+  if (slots.length === 0) {
+    return (
+      <span className="text-[var(--stage-text-secondary)] truncate leading-none">
+        —
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 min-w-0 leading-none">
+      {slots.map((slot, i) => {
+        const isDot = i > 0;
+        const emphasize = slot2Bold && i === 1;
+        return (
+          <span key={i} className="flex items-center gap-2 min-w-0">
+            {isDot && (
+              <span className="text-[var(--stage-text-tertiary)] select-none" aria-hidden>
+                •
+              </span>
+            )}
+            <span
+              className={cn(
+                'truncate',
+                emphasize
+                  ? 'text-[var(--stage-text-primary)] font-medium'
+                  : 'text-[var(--stage-text-primary)]',
+              )}
+            >
+              {slot}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// Small text chip — "live" when hash is stable, "updated" when we later
+// invalidate the cached fingerprint (post-handoff, post-ingest, etc.). Tap
+// rehydrates scope — for now that's a no-op visual; Phase 4 wires a real
+// revalidate. No dots or pulses (Phase 3 kickoff rail).
+function FreshnessPill({
+  fingerprint,
+  className,
+}: {
+  fingerprint: string;
+  className?: string;
+}) {
+  if (!fingerprint) return null;
+  return (
+    <span
+      className={cn(
+        'shrink-0 text-[10px] font-mono text-[var(--stage-text-tertiary)]',
+        'tracking-wider uppercase',
+        className,
+      )}
+      aria-label="Context freshness"
+      title={`Context fingerprint: ${fingerprint}`}
+    >
+      LIVE
+    </span>
   );
 }
 

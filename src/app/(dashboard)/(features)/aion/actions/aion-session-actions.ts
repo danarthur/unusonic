@@ -29,6 +29,10 @@ export type DbSessionMeta = {
    *  the sidebar group header never goes stale after a deal rename.
    *  Column added 20260512000300 (multi-thread pivot). */
   scope_entity_title: string | null;
+  /** For event-scoped sessions: the ISO start date of the underlying event.
+   *  Drives the sidebar subtitle shape "deal-title → event-date" per
+   *  aion-event-scope-header-design.md §4.1. Null for deal/general. */
+  scope_entity_event_date: string | null;
   /** True pin with a 3-per-scope cap. Shown before unpinned within each group. */
   is_pinned: boolean;
   pinned_at: string | null;
@@ -79,7 +83,7 @@ export async function getSessionList(
     .limit(80);
 
   if (error) return { success: false, error: error.message };
-  const rawSessions = (data ?? []) as Array<Omit<DbSessionMeta, 'scope_entity_title'>>;
+  const rawSessions = (data ?? []) as Array<Omit<DbSessionMeta, 'scope_entity_title' | 'scope_entity_event_date'>>;
 
   // Enrich deal-scoped sessions with the live deal title so the sidebar
   // group header stays fresh after renames. One batch query, zero N+1.
@@ -103,13 +107,86 @@ export async function getSessionList(
     }
   }
 
-  const sessions: DbSessionMeta[] = rawSessions.map((s) => ({
-    ...s,
-    scope_entity_title:
-      s.scope_type === 'deal' && s.scope_entity_id
-        ? dealTitleById.get(s.scope_entity_id) ?? null
-        : null,
-  }));
+  // Enrich event-scoped sessions with (deal-title, event-starts_at) via
+  // ops.events join. Deal-title carries the provenance (matches what the
+  // session started as before handoff); event-date is the live schedule.
+  // Together they form the sidebar subtitle per
+  // aion-event-scope-header-design.md §4.1.
+  const eventIds = Array.from(
+    new Set(
+      rawSessions
+        .filter((s) => s.scope_type === 'event' && s.scope_entity_id)
+        .map((s) => s.scope_entity_id as string),
+    ),
+  );
+
+  const eventEnrichmentById = new Map<
+    string,
+    { dealTitle: string | null; startsAt: string | null }
+  >();
+  if (eventIds.length > 0) {
+    const { data: eventRows } = await supabase
+      .schema('ops')
+      .from('events')
+      .select('id, starts_at, deal_id')
+      .in('id', eventIds)
+      .eq('workspace_id', workspaceId);
+    const typedEventRows = (eventRows ?? []) as Array<{
+      id: string;
+      starts_at: string | null;
+      deal_id: string | null;
+    }>;
+
+    // Second hop: fetch deal titles for any deal_ids referenced by these events
+    // that weren't already fetched by the deal-scope branch above.
+    const extraDealIds = typedEventRows
+      .map((e) => e.deal_id)
+      .filter((id): id is string => id != null)
+      .filter((id) => !dealTitleById.has(id));
+    if (extraDealIds.length > 0) {
+      const { data: extraDealRows } = await supabase
+        .from('deals')
+        .select('id, title')
+        .in('id', extraDealIds)
+        .eq('workspace_id', workspaceId);
+      for (const d of (extraDealRows ?? []) as Array<{ id: string; title: string | null }>) {
+        dealTitleById.set(d.id, d.title);
+      }
+    }
+
+    for (const e of typedEventRows) {
+      eventEnrichmentById.set(e.id, {
+        dealTitle: e.deal_id ? (dealTitleById.get(e.deal_id) ?? null) : null,
+        startsAt: e.starts_at,
+      });
+    }
+  }
+
+  const sessions: DbSessionMeta[] = rawSessions.map((s) => {
+    if (s.scope_type === 'deal' && s.scope_entity_id) {
+      return {
+        ...s,
+        scope_entity_title: dealTitleById.get(s.scope_entity_id) ?? null,
+        scope_entity_event_date: null,
+      };
+    }
+    if (s.scope_type === 'event' && s.scope_entity_id) {
+      const enrich = eventEnrichmentById.get(s.scope_entity_id);
+      return {
+        ...s,
+        // Title carries the deal provenance ("Ally & Emily Wedding" even
+        // though the thread is now event-scoped). Null fallback means the
+        // sidebar falls back to the session title.
+        scope_entity_title: enrich?.dealTitle ?? null,
+        scope_entity_event_date: enrich?.startsAt ?? null,
+      };
+    }
+    return {
+      ...s,
+      scope_entity_title: null,
+      scope_entity_event_date: null,
+    };
+  });
 
   return { success: true, sessions };
 }
@@ -412,7 +489,7 @@ export async function getArchivedSessionList(
     .limit(80);
 
   if (error) return { success: false, error: error.message };
-  const rawSessions = (data ?? []) as Array<Omit<DbSessionMeta, 'scope_entity_title'>>;
+  const rawSessions = (data ?? []) as Array<Omit<DbSessionMeta, 'scope_entity_title' | 'scope_entity_event_date'>>;
 
   const dealIds = Array.from(
     new Set(
@@ -440,6 +517,9 @@ export async function getArchivedSessionList(
       s.scope_type === 'deal' && s.scope_entity_id
         ? dealTitleById.get(s.scope_entity_id) ?? null
         : null,
+    // Archived list doesn't carry the event-date enrichment — archived
+    // threads don't render in the live Events sidebar section.
+    scope_entity_event_date: null,
   }));
 
   return { success: true, sessions };
