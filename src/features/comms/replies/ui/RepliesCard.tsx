@@ -272,6 +272,11 @@ function ReplyMessageRow({ message }: { message: ReplyMessage }) {
     ? message.fromEntityName ?? message.fromAddress
     : message.sentByName ?? 'You';
 
+  // Auto-replies (OOO, bounces, bulk mail) are still shown — Marcus explicitly
+  // wants visibility so he doesn't re-email — but visually muted to keep the
+  // deal feed clean. Notifications skip these upstream via is_auto_reply.
+  const isAutoReply = message.isAutoReply;
+
   return (
     <div
       className="flex flex-col"
@@ -280,7 +285,12 @@ function ReplyMessageRow({ message }: { message: ReplyMessage }) {
         padding: 'var(--stage-gap-wide, 12px)',
         borderRadius: 'var(--stage-radius-nested, 8px)',
         background: isInbound ? 'var(--ctx-well)' : 'oklch(1 0 0 / 0.02)',
-        borderLeft: isInbound ? '2px solid var(--color-unusonic-info)' : '2px solid transparent',
+        borderLeft: isAutoReply
+          ? '2px solid transparent'
+          : isInbound
+            ? '2px solid var(--color-unusonic-info)'
+            : '2px solid transparent',
+        opacity: isAutoReply ? 0.62 : 1,
       }}
       data-surface={isInbound ? 'well' : undefined}
     >
@@ -289,16 +299,21 @@ function ReplyMessageRow({ message }: { message: ReplyMessage }) {
           <span
             className="stage-badge-text tracking-wide uppercase shrink-0"
             style={{
-              color: isInbound
-                ? 'var(--color-unusonic-info)'
-                : 'var(--stage-text-tertiary)',
+              color: isAutoReply
+                ? 'var(--stage-text-tertiary)'
+                : isInbound
+                  ? 'var(--color-unusonic-info)'
+                  : 'var(--stage-text-tertiary)',
             }}
           >
-            {isInbound ? 'Client' : 'You'}
+            {isAutoReply ? 'Auto-reply' : isInbound ? 'Client' : 'You'}
           </span>
           <span
             className="text-sm tracking-tight truncate"
-            style={{ color: 'var(--stage-text-primary)' }}
+            style={{
+              color: 'var(--stage-text-primary)',
+              fontStyle: isAutoReply ? 'italic' : 'normal',
+            }}
           >
             {senderLabel}
           </span>
@@ -306,7 +321,11 @@ function ReplyMessageRow({ message }: { message: ReplyMessage }) {
         <span
           className="stage-label shrink-0 tabular-nums"
           style={{ color: 'var(--stage-text-tertiary)' }}
-          title={new Date(message.createdAt).toLocaleString()}
+          title={
+            isAutoReply && message.autoReplyReason
+              ? `Auto-reply (${message.autoReplyReason}) · ${new Date(message.createdAt).toLocaleString()}`
+              : new Date(message.createdAt).toLocaleString()
+          }
         >
           {formatRelTime(message.createdAt)}
         </span>
@@ -314,7 +333,10 @@ function ReplyMessageRow({ message }: { message: ReplyMessage }) {
 
       {message.bodyText && (
         <p
-          className="text-sm leading-relaxed whitespace-pre-wrap break-words"
+          className={cn(
+            'text-sm leading-relaxed whitespace-pre-wrap break-words',
+            isAutoReply && 'italic',
+          )}
           style={{ color: 'var(--stage-text-primary)' }}
         >
           {message.bodyText}

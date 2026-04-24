@@ -29,6 +29,12 @@ export type ReplyMessage = {
   }>;
   urgencyKeywordMatch: string | null;
   aiClassification: string | null;
+  /** RFC 3834 + heuristic classification. True = OOO, bounce, bulk mail.
+   *  UI mutes the message and skips notifications when true. */
+  isAutoReply: boolean;
+  /** Machine-readable reason (e.g. 'auto-submitted:auto-replied',
+   *  'from-local:mailer-daemon'). Null when isAutoReply is false. */
+  autoReplyReason: string | null;
   createdAt: string;
   deliveredAt: string | null;
   openedAt: string | null;
@@ -103,6 +109,8 @@ export async function getDealReplies(dealId: string): Promise<ReplyThread[]> {
       attachments: ReplyMessage['attachments'];
       urgency_keyword_match: string | null;
       ai_classification: string | null;
+      is_auto_reply: boolean | null;
+      auto_reply_reason: string | null;
       delivered_at: string | null;
       opened_at: string | null;
       bounced_at: string | null;
@@ -112,7 +120,7 @@ export async function getDealReplies(dealId: string): Promise<ReplyThread[]> {
     const { data: messagesData, error: messagesErr } = await opsClient
       .from('messages')
       .select(
-        'id, thread_id, direction, channel, from_address, from_entity_id, sent_by_user_id, body_text, body_html, attachments, urgency_keyword_match, ai_classification, delivered_at, opened_at, bounced_at, created_at',
+        'id, thread_id, direction, channel, from_address, from_entity_id, sent_by_user_id, body_text, body_html, attachments, urgency_keyword_match, ai_classification, is_auto_reply, auto_reply_reason, delivered_at, opened_at, bounced_at, created_at',
       )
       .in('thread_id', threadIds)
       .order('created_at', { ascending: true });
@@ -168,6 +176,8 @@ export async function getDealReplies(dealId: string): Promise<ReplyThread[]> {
         attachments: Array.isArray(m.attachments) ? m.attachments : [],
         urgencyKeywordMatch: m.urgency_keyword_match,
         aiClassification: m.ai_classification,
+        isAutoReply: Boolean(m.is_auto_reply),
+        autoReplyReason: m.auto_reply_reason ?? null,
         createdAt: m.created_at,
         deliveredAt: m.delivered_at,
         openedAt: m.opened_at,
