@@ -32,6 +32,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
+import { toPlainText } from '@react-email/render';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { enqueueMessageEmbedding } from '@/app/api/aion/lib/embeddings';
 
@@ -58,7 +59,7 @@ type PostmarkAttachment = {
   ContentID?: string;
 };
 
-type PostmarkInboundPayload = {
+export type PostmarkInboundPayload = {
   MessageID?: string;
   MessageStream?: string;
   From?: string;
@@ -80,6 +81,36 @@ type PostmarkInboundPayload = {
   Headers?: PostmarkHeader[];
   Attachments?: PostmarkAttachment[];
 };
+
+/**
+ * Selects the best plain-text body for an inbound Postmark payload.
+ *
+ * Cascade, in order of quality:
+ *   1. StrippedTextReply — Postmark's quote-stripped reply. Best for
+ *      in-card preview and Aion classification (sees only the new message).
+ *   2. TextBody — full plain-text body from the sender. Includes quoted
+ *      history but at least has signal.
+ *   3. toPlainText(HtmlBody) — derived fallback for HTML-only emails.
+ *      Gmail's default compose sends multipart with an HTML part and a
+ *      WHITESPACE-ONLY plain-text part, and Postmark faithfully passes
+ *      through that empty-looking TextBody (and an empty StrippedTextReply).
+ *      Without this branch, body_text would be "" and the Replies card
+ *      renders nothing — because `{message.bodyText && ...}` sees the
+ *      empty string as falsy. Discovered 2026-04-24 during Test C.
+ *
+ * Uses `||` not `??` so empty strings cascade (nullish coalescing would
+ * stop at ""). Trim each stage so whitespace-only bodies also fall
+ * through — some mail clients emit " \r\n" for the text part.
+ *
+ * Exported for unit testing; do not call outside the handler module.
+ */
+export function selectInboundBodyText(payload: PostmarkInboundPayload): string | null {
+  return (
+    payload.StrippedTextReply?.trim() ||
+    payload.TextBody?.trim() ||
+    (payload.HtmlBody ? toPlainText(payload.HtmlBody).trim() || null : null)
+  );
+}
 
 function verifyBasicAuth(req: NextRequest): boolean {
   const username = process.env.POSTMARK_WEBHOOK_USERNAME;
@@ -203,15 +234,8 @@ async function handleInboundEmail(payload: PostmarkInboundPayload): Promise<Inbo
     return { ok: false, reason: 'missing from address' };
   }
 
-  // 5. Body. Prefer StrippedTextReply for the in-card preview and Aion
-  //    classification; keep the full TextBody for audit / RAG. We store
-  //    only the stripped form in body_text to keep rows light, and the
-  //    full body in body_html for provenance.
-  //
-  //    Design call: Phase 1 stores StrippedTextReply → body_text. This
-  //    matches what the Replies card shows and what Aion classifies on.
-  //    If we later need full quoted history, re-download from Postmark.
-  const bodyText = payload.StrippedTextReply ?? payload.TextBody ?? null;
+  // 5. Body — see selectInboundBodyText() below for the cascade contract.
+  const bodyText = selectInboundBodyText(payload);
   const bodyHtml = payload.HtmlBody ?? null;
 
   // 6. Attachments — Postmark inlines base64 Content in the webhook. We
