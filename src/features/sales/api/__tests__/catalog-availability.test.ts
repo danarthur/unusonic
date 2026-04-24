@@ -167,7 +167,7 @@ describe('checkBatchAvailability', () => {
   it('returns empty when no rental packages found', async () => {
     const batchBuilder = createQueryBuilder();
     mockClient.from.mockReturnValue(batchBuilder as any);
-    batchBuilder.then.mockImplementation((resolve: Function) =>
+    batchBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -178,7 +178,7 @@ describe('checkBatchAvailability', () => {
   it('returns availability per package with correct status', async () => {
     const batchBuilder = createQueryBuilder();
     mockClient.from.mockReturnValue(batchBuilder as any);
-    batchBuilder.then.mockImplementation((resolve: Function) =>
+    batchBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [
           { id: 'pkg-a', stock_quantity: 10, category: 'rental' },

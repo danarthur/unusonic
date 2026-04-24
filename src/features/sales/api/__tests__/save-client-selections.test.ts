@@ -81,7 +81,7 @@ describe('saveClientSelections', () => {
     });
 
     const ownedBuilder = createQueryBuilder();
-    ownedBuilder.then.mockImplementation((resolve: Function) =>
+    ownedBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }), // No items match
     );
 
@@ -120,17 +120,17 @@ describe('saveClientSelections', () => {
         });
       } else if (callCount === 2) {
         // Owned items check
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [{ id: itemId }], error: null }),
         );
       } else if (callCount === 3) {
         // Upsert selections
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: null, error: null }),
         );
       } else if (callCount === 4) {
         // Fetch items for total recomputation
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [
               { id: itemId, unit_price: 100, override_price: null, quantity: 2, unit_multiplier: 1, is_optional: true, is_client_visible: true },
@@ -140,7 +140,7 @@ describe('saveClientSelections', () => {
         );
       } else if (callCount === 5) {
         // Fetch selections
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [{ item_id: itemId, selected: true }],
             error: null,

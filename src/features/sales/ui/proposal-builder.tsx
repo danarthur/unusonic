@@ -695,6 +695,52 @@ export function ProposalBuilder({
     }
   }, [selectedLineIndex, lineItems, onProposalRefetch]);
 
+  // ── Proposal summary card values ──────────────────────────────────────────
+  // Hoisted ABOVE the readOnly early-return so hook order is stable.
+  const summaryValues = useMemo(() => {
+    const totalRevenue = lineItems.reduce((sum, item) => sum + lineTotal(item), 0);
+    let hasCost = false;
+    let costSum = 0;
+    let floorGapCount = 0;
+    let floorGapTotal = 0;
+    let floorSum = 0;
+    let hasFloor = false;
+    for (const item of lineItems) {
+      // Skip bundle children for cost — the header row carries the total bundle cost.
+      const isBundleChild = !item.isPackageHeader && item.packageInstanceId != null;
+      if (item.actualCost != null && !isBundleChild) {
+        hasCost = true;
+        costSum += item.actualCost * item.quantity * unitMultiplier(item);
+      }
+      // Floor comparison at LINE TOTAL level, not per-unit.
+      // floorPrice in the snapshot is the flat total floor for this line item.
+      // Compare the actual line total against the floor — regardless of billing mode.
+      const itemLineTotal = lineTotal(item);
+      const fp = item.floorPrice;
+      if (fp != null && itemLineTotal < fp) {
+        floorGapCount += 1;
+        floorGapTotal += fp - itemLineTotal;
+      }
+      // Talent budget: floor price is already a total (not per-unit)
+      if (!isBundleChild) {
+        const floorVal = fp ?? (item.actualCost != null ? item.actualCost * item.quantity * unitMultiplier(item) : null);
+        if (floorVal != null) {
+          hasFloor = true;
+          floorSum += floorVal;
+        }
+      }
+    }
+    // talentBudget = revenue minus floor sum; only show when at least one item has a floor or cost
+    const talentBudget = hasFloor ? Math.round(totalRevenue - floorSum) : null;
+    return {
+      totalRevenue,
+      estimatedCost: hasCost ? costSum : null,
+      floorGapCount,
+      floorGapTotal,
+      talentBudget,
+    };
+  }, [lineItems]);
+
   if (readOnly) {
     return (
       <div className={cn('flex flex-col gap-4', className)}>
@@ -1006,51 +1052,6 @@ export function ProposalBuilder({
       </ul>
     </div>
   );
-
-  // ── Proposal summary card values ──────────────────────────────────────────
-  const summaryValues = useMemo(() => {
-    const totalRevenue = lineItems.reduce((sum, item) => sum + lineTotal(item), 0);
-    let hasCost = false;
-    let costSum = 0;
-    let floorGapCount = 0;
-    let floorGapTotal = 0;
-    let floorSum = 0;
-    let hasFloor = false;
-    for (const item of lineItems) {
-      // Skip bundle children for cost — the header row carries the total bundle cost.
-      const isBundleChild = !item.isPackageHeader && item.packageInstanceId != null;
-      if (item.actualCost != null && !isBundleChild) {
-        hasCost = true;
-        costSum += item.actualCost * item.quantity * unitMultiplier(item);
-      }
-      // Floor comparison at LINE TOTAL level, not per-unit.
-      // floorPrice in the snapshot is the flat total floor for this line item.
-      // Compare the actual line total against the floor — regardless of billing mode.
-      const itemLineTotal = lineTotal(item);
-      const fp = item.floorPrice;
-      if (fp != null && itemLineTotal < fp) {
-        floorGapCount += 1;
-        floorGapTotal += fp - itemLineTotal;
-      }
-      // Talent budget: floor price is already a total (not per-unit)
-      if (!isBundleChild) {
-        const floorVal = fp ?? (item.actualCost != null ? item.actualCost * item.quantity * unitMultiplier(item) : null);
-        if (floorVal != null) {
-          hasFloor = true;
-          floorSum += floorVal;
-        }
-      }
-    }
-    // talentBudget = revenue minus floor sum; only show when at least one item has a floor or cost
-    const talentBudget = hasFloor ? Math.round(totalRevenue - floorSum) : null;
-    return {
-      totalRevenue,
-      estimatedCost: hasCost ? costSum : null,
-      floorGapCount,
-      floorGapTotal,
-      talentBudget,
-    };
-  }, [lineItems]);
 
   const selectedItem = selectedLineIndex != null ? lineItems[selectedLineIndex] ?? null : null;
   const inspectorCategory: ProposalLineItemCategory | null = selectedItem?.category ?? null;

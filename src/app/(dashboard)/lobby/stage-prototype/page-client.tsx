@@ -39,7 +39,7 @@ const LABELS: Record<string, Record<DensityTier, string>> = {
   call_time:      { spacious: 'Call time',             balanced: 'Call time',       dense: 'CT' },
 };
 
-function useLabel(key: string, density: DensityTier): string {
+function getLabel(key: string, density: DensityTier): string {
   return LABELS[key]?.[density] ?? key;
 }
 
@@ -184,7 +184,7 @@ function PulseStrip() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function PipelinePanel({ density }: { density: DensityTier }) {
-  const l = (key: string) => useLabel(key, density);
+  const l = (key: string) => getLabel(key, density);
   const totalPipeline = MOCK_PIPELINE.reduce((s, d) => s + d.value, 0);
   const signedValue = MOCK_PIPELINE.filter(d => d.status === 'signed').reduce((s, d) => s + d.value, 0);
 
@@ -225,7 +225,7 @@ function PipelinePanel({ density }: { density: DensityTier }) {
 }
 
 function UpcomingShowsPanel({ density }: { density: DensityTier }) {
-  const l = (key: string) => useLabel(key, density);
+  const l = (key: string) => getLabel(key, density);
 
   return (
     <StagePanel padding="lg" className="h-full flex flex-col">
@@ -277,7 +277,7 @@ function UpcomingShowsPanel({ density }: { density: DensityTier }) {
 }
 
 function ActionStreamPanel({ density }: { density: DensityTier }) {
-  const l = (key: string) => useLabel(key, density);
+  const l = (key: string) => getLabel(key, density);
 
   return (
     <StagePanel padding="lg" className="h-full flex flex-col">
@@ -307,7 +307,7 @@ function ActionStreamPanel({ density }: { density: DensityTier }) {
 }
 
 function FinancialPanel({ density }: { density: DensityTier }) {
-  const l = (key: string) => useLabel(key, density);
+  const l = (key: string) => getLabel(key, density);
 
   return (
     <StagePanel padding="lg" className="h-full flex flex-col">
@@ -339,7 +339,7 @@ function FinancialPanel({ density }: { density: DensityTier }) {
 }
 
 function CashPositionPanel({ density }: { density: DensityTier }) {
-  const l = (key: string) => useLabel(key, density);
+  const l = (key: string) => getLabel(key, density);
 
   return (
     <StagePanel padding="lg" className="h-full flex flex-col justify-between">
@@ -354,7 +354,7 @@ function CashPositionPanel({ density }: { density: DensityTier }) {
 }
 
 function InputPreviewPanel({ density }: { density: DensityTier }) {
-  const l = (key: string) => useLabel(key, density);
+  const l = (key: string) => getLabel(key, density);
 
   return (
     <StagePanel padding="lg" className="h-full flex flex-col">

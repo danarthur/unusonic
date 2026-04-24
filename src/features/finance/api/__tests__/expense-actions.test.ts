@@ -164,7 +164,7 @@ describe('deleteExpense', () => {
   });
 
   it('returns error when delete fails', async () => {
-    opsBuilder.then.mockImplementation((resolve: Function) =>
+    opsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: null, error: { message: 'not found' } }),
     );
 

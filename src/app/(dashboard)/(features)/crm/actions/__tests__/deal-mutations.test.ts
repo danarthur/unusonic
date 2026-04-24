@@ -171,7 +171,7 @@ describe('updateDealStatus', () => {
   });
 
   it('returns error on update failure', async () => {
-    mutationBuilder.then.mockImplementation((resolve: Function) =>
+    mutationBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: null, error: { message: 'DB error' } }),
     );
     const r = await updateDealStatus('deal-1', 'proposal');
@@ -263,7 +263,7 @@ describe('deleteDeal', () => {
   });
 
   it('returns error on delete failure', async () => {
-    mutationBuilder.then.mockImplementation((resolve: Function) =>
+    mutationBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: null, error: { message: 'FK constraint' } }),
     );
     const r = await deleteDeal('deal-1');

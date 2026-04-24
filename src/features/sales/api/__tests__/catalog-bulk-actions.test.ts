@@ -52,7 +52,7 @@ describe('bulkArchivePackages', () => {
 
   it('returns error on failure', async () => {
     const b = createQueryBuilder();
-    b.then.mockImplementation((resolve: Function) =>
+    b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: null, error: { message: 'DB error' } }),
     );
     mockClient.from.mockReturnValue(b as any);
@@ -89,7 +89,7 @@ describe('bulkAdjustPrice', () => {
 
   it('applies percentage increase and rounds to cents', async () => {
     const fetchBuilder = createQueryBuilder();
-    fetchBuilder.then.mockImplementation((resolve: Function) =>
+    fetchBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [{ id: 'pkg-1', price: 100 }],
         error: null,
@@ -109,7 +109,7 @@ describe('bulkAdjustPrice', () => {
 
   it('applies percentage decrease and floors at 0', async () => {
     const fetchBuilder = createQueryBuilder();
-    fetchBuilder.then.mockImplementation((resolve: Function) =>
+    fetchBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [{ id: 'pkg-1', price: 5 }],
         error: null,
@@ -129,7 +129,7 @@ describe('bulkAdjustPrice', () => {
 
   it('returns error when fetch fails', async () => {
     const fetchBuilder = createQueryBuilder();
-    fetchBuilder.then.mockImplementation((resolve: Function) =>
+    fetchBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: null, error: { message: 'fetch error' } }),
     );
     mockClient.from.mockReturnValue(fetchBuilder as any);

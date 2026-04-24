@@ -130,7 +130,7 @@ describe('swapProposalLineItem', () => {
       data: { id: 'pkg-1', name: 'X', price: 100, target_cost: null, floor_price: null, is_taxable: true, category: 'fee', definition: null },
       error: null,
     });
-    updateBuilder.then.mockImplementation((resolve: Function) =>
+    updateBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: null, error: { message: 'update failed' } }),
     );
 

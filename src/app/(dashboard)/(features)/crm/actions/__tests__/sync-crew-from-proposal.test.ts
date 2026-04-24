@@ -99,8 +99,8 @@ describe('syncCrewFromProposalToEvent', () => {
   it('delegates to syncCrewFromProposal and reports 0 added (with diagnostic) when no rows were created', async () => {
     eventBuilder.maybeSingle.mockResolvedValue({ data: { id: 'evt-1' }, error: null });
     dealBuilder.maybeSingle.mockResolvedValue({ data: { id: 'deal-1' }, error: null });
-    crewBeforeBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 2, error: null }));
-    crewAfterBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 2, error: null }));
+    crewBeforeBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) => resolve({ count: 2, error: null }));
+    crewAfterBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) => resolve({ count: 2, error: null }));
     vi.mocked(getCrewRolesFromProposalDiagnostic).mockResolvedValue({ step: 'ok', rolesFound: ['DJ'] });
 
     const result = await syncCrewFromProposalToEvent('evt-1');
@@ -111,8 +111,8 @@ describe('syncCrewFromProposalToEvent', () => {
   it('reports the number of newly added deal_crew rows', async () => {
     eventBuilder.maybeSingle.mockResolvedValue({ data: { id: 'evt-1' }, error: null });
     dealBuilder.maybeSingle.mockResolvedValue({ data: { id: 'deal-1' }, error: null });
-    crewBeforeBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 1, error: null }));
-    crewAfterBuilder.then.mockImplementation((resolve: Function) => resolve({ count: 4, error: null }));
+    crewBeforeBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) => resolve({ count: 1, error: null }));
+    crewAfterBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) => resolve({ count: 4, error: null }));
 
     const result = await syncCrewFromProposalToEvent('evt-1');
     expect(syncCrewFromProposal).toHaveBeenCalledWith('deal-1');

@@ -63,7 +63,7 @@ describe('createPackage', () => {
     // from('packages').insert → first call
     // from('package_tags') → second call (tags fetch)
     const tagsBuilder = createQueryBuilder();
-    tagsBuilder.then.mockImplementation((resolve: Function) =>
+    tagsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -114,7 +114,7 @@ describe('createPackage', () => {
 
     const tagsInsertBuilder = createQueryBuilder();
     const tagsFetchBuilder = createQueryBuilder();
-    tagsFetchBuilder.then.mockImplementation((resolve: Function) =>
+    tagsFetchBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -153,7 +153,7 @@ describe('updatePackage', () => {
     const updateBuilder = createQueryBuilder();
     updateBuilder.single.mockResolvedValue({ data: { ...basePkg, name: 'Renamed' }, error: null });
     const tagsBuilder = createQueryBuilder();
-    tagsBuilder.then.mockImplementation((resolve: Function) =>
+    tagsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -175,7 +175,7 @@ describe('updatePackage', () => {
     const fetchBuilder = createQueryBuilder();
     fetchBuilder.single.mockResolvedValue({ data: basePkg, error: null });
     const tagsBuilder = createQueryBuilder();
-    tagsBuilder.then.mockImplementation((resolve: Function) =>
+    tagsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -199,7 +199,7 @@ describe('updatePackage', () => {
     const fetchBuilder = createQueryBuilder();
     fetchBuilder.single.mockResolvedValue({ data: basePkg, error: null });
     const tagsBuilder = createQueryBuilder();
-    tagsBuilder.then.mockImplementation((resolve: Function) =>
+    tagsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 

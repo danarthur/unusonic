@@ -66,7 +66,7 @@ function createQueryBuilder() {
 
   // Make the builder itself thenable so `await supabase.from('x').select()`
   // resolves without calling `.single()`.
-  builder.then = vi.fn().mockImplementation((resolve: Function) =>
+  builder.then = vi.fn().mockImplementation((resolve: (...args: unknown[]) => unknown) =>
     resolve(defaultResponse),
   );
 

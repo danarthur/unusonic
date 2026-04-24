@@ -79,14 +79,24 @@ export async function recordAionAction(workspaceId: string): Promise<void> {
   const system = getSystemClient();
 
   // Atomic increment via RPC.
-  // NOTE: `increment_aion_actions` RPC and `aion_actions_used` column are created
-  // by the Phase 1 migration. Until types are regenerated after that migration,
-  // we cast through `unknown` to avoid TS errors against the current schema.
-  const { error } = await (system.rpc as Function)('increment_aion_actions', {
+  // NOTE: `increment_aion_actions` RPC + `aion_actions_used` column predate
+  // the current types regen and aren't present in src/types/supabase.ts.
+  // Cast through typed adapters to keep call-site ergonomics while
+  // documenting the runtime assumption.
+  type RpcResult = { error: { message: string } | null };
+  type UpdateChain = {
+    eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>;
+  };
+
+  const rpcFn = system.rpc as unknown as (
+    name: string,
+    args: Record<string, unknown>,
+  ) => Promise<RpcResult>;
+  const { error } = await rpcFn('increment_aion_actions', {
     p_workspace_id: workspaceId,
   });
 
-  // Fallback: if the RPC doesn't exist yet, do a manual read-increment-write
+  // Fallback: if the RPC doesn't exist yet, do a manual read-increment-write.
   if (error) {
     const { data } = await system
       .from('workspaces')
@@ -95,13 +105,13 @@ export async function recordAionAction(workspaceId: string): Promise<void> {
       .single();
 
     if (data) {
-      // Read current value via raw query workaround until column exists in types
       const raw = data as unknown as Record<string, unknown>;
       const current = (raw.aion_actions_used as number) ?? 0;
 
-      await (system.from('workspaces').update as Function)(
-        { aion_actions_used: current + 1 },
-      ).eq('id', workspaceId);
+      const updateFn = system.from('workspaces').update as unknown as (
+        values: Record<string, unknown>,
+      ) => UpdateChain;
+      await updateFn({ aion_actions_used: current + 1 }).eq('id', workspaceId);
     }
   }
 }

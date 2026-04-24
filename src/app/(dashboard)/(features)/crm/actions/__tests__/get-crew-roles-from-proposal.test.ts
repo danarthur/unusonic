@@ -33,7 +33,7 @@ beforeEach(() => {
   // Default: all from() calls return empty builders
   mockClient.from.mockImplementation(() => {
     const b = createQueryBuilder();
-    b.then.mockImplementation((resolve: Function) => resolve({ data: [], error: null }));
+    b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) => resolve({ data: [], error: null }));
     b.maybeSingle.mockResolvedValue({ data: null, error: null });
     return b as any;
   });
@@ -59,12 +59,12 @@ describe('getCrewRolesFromProposalForDeal', () => {
       const b = createQueryBuilder();
       if (callNum <= 2) {
         // Proposal queries (accepted/sent, then any)
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [{ id: 'prop-1' }], error: null }),
         );
       } else if (callNum === 3) {
         // proposal_items
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [{ package_id: 'pkg-1', origin_package_id: null }],
             error: null,
@@ -72,7 +72,7 @@ describe('getCrewRolesFromProposalForDeal', () => {
         );
       } else if (callNum === 4) {
         // packages
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [
               {
@@ -85,7 +85,7 @@ describe('getCrewRolesFromProposalForDeal', () => {
           }),
         );
       } else {
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [], error: null }),
         );
       }
@@ -102,12 +102,12 @@ describe('getCrewRolesFromProposalForDeal', () => {
       callNum++;
       const b = createQueryBuilder();
       if (callNum <= 2) {
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [{ id: 'prop-1' }], error: null }),
         );
       } else if (callNum === 3) {
         // proposal_items pointing to a bundle
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [{ package_id: 'bundle-1', origin_package_id: null }],
             error: null,
@@ -115,7 +115,7 @@ describe('getCrewRolesFromProposalForDeal', () => {
         );
       } else if (callNum === 4) {
         // Top-level packages — the bundle
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [
               {
@@ -133,7 +133,7 @@ describe('getCrewRolesFromProposalForDeal', () => {
         );
       } else if (callNum === 5) {
         // Ingredient packages
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [
               {
@@ -146,7 +146,7 @@ describe('getCrewRolesFromProposalForDeal', () => {
           }),
         );
       } else {
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [], error: null }),
         );
       }
@@ -163,11 +163,11 @@ describe('getCrewRolesFromProposalForDeal', () => {
       callNum++;
       const b = createQueryBuilder();
       if (callNum <= 2) {
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [{ id: 'prop-1' }], error: null }),
         );
       } else if (callNum === 3) {
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [
               { package_id: 'pkg-1', origin_package_id: null },
@@ -177,7 +177,7 @@ describe('getCrewRolesFromProposalForDeal', () => {
           }),
         );
       } else if (callNum === 4) {
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({
             data: [
               { id: 'pkg-1', category: 'service', definition: { ingredient_meta: { staff_role: 'DJ' } } },
@@ -187,7 +187,7 @@ describe('getCrewRolesFromProposalForDeal', () => {
           }),
         );
       } else {
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [], error: null }),
         );
       }
@@ -221,12 +221,12 @@ describe('getCrewRolesFromProposalDiagnostic', () => {
       const b = createQueryBuilder();
       if (callNum <= 2) {
         // Proposal queries
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [{ id: 'prop-1', status: 'sent' }], error: null }),
         );
       } else {
         // Items query → empty
-        b.then.mockImplementation((resolve: Function) =>
+        b.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
           resolve({ data: [], error: null }),
         );
       }

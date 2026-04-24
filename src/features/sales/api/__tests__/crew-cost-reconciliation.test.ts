@@ -58,10 +58,10 @@ describe('getCrewCostReconciliation', () => {
 
   it('returns zero totals when no crew data on either side', async () => {
     proposalBuilder.maybeSingle.mockResolvedValue({ data: { id: 'prop-1' }, error: null });
-    itemsBuilder.then.mockImplementation((resolve: Function) =>
+    itemsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
-    crewBuilder.then.mockImplementation((resolve: Function) =>
+    crewBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -76,7 +76,7 @@ describe('getCrewCostReconciliation', () => {
 
   it('calculates estimated costs from proposal item crew_meta', async () => {
     proposalBuilder.maybeSingle.mockResolvedValue({ data: { id: 'prop-1' }, error: null });
-    itemsBuilder.then.mockImplementation((resolve: Function) =>
+    itemsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [
           {
@@ -96,7 +96,7 @@ describe('getCrewCostReconciliation', () => {
         error: null,
       }),
     );
-    crewBuilder.then.mockImplementation((resolve: Function) =>
+    crewBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -108,7 +108,7 @@ describe('getCrewCostReconciliation', () => {
 
   it('skips bundle children (non-header with package_instance_id)', async () => {
     proposalBuilder.maybeSingle.mockResolvedValue({ data: { id: 'prop-1' }, error: null });
-    itemsBuilder.then.mockImplementation((resolve: Function) =>
+    itemsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [
           {
@@ -128,7 +128,7 @@ describe('getCrewCostReconciliation', () => {
         error: null,
       }),
     );
-    crewBuilder.then.mockImplementation((resolve: Function) =>
+    crewBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
 
@@ -138,7 +138,7 @@ describe('getCrewCostReconciliation', () => {
 
   it('computes overage from actual crew costs', async () => {
     proposalBuilder.maybeSingle.mockResolvedValue({ data: { id: 'prop-1' }, error: null });
-    itemsBuilder.then.mockImplementation((resolve: Function) =>
+    itemsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [
           {
@@ -158,7 +158,7 @@ describe('getCrewCostReconciliation', () => {
         error: null,
       }),
     );
-    crewBuilder.then.mockImplementation((resolve: Function) =>
+    crewBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [
           { role_note: 'Lighting', day_rate: 500 }, // actual > estimated ($400)
@@ -175,7 +175,7 @@ describe('getCrewCostReconciliation', () => {
 
   it('merges roles from both estimated and actual sides', async () => {
     proposalBuilder.maybeSingle.mockResolvedValue({ data: { id: 'prop-1' }, error: null });
-    itemsBuilder.then.mockImplementation((resolve: Function) =>
+    itemsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [
           {
@@ -195,7 +195,7 @@ describe('getCrewCostReconciliation', () => {
         error: null,
       }),
     );
-    crewBuilder.then.mockImplementation((resolve: Function) =>
+    crewBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [
           { role_note: 'DJ', day_rate: 600 },
@@ -214,10 +214,10 @@ describe('getCrewCostReconciliation', () => {
 
   it('labels crew with null role_note as "Unspecified"', async () => {
     proposalBuilder.maybeSingle.mockResolvedValue({ data: { id: 'prop-1' }, error: null });
-    itemsBuilder.then.mockImplementation((resolve: Function) =>
+    itemsBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({ data: [], error: null }),
     );
-    crewBuilder.then.mockImplementation((resolve: Function) =>
+    crewBuilder.then.mockImplementation((resolve: (...args: unknown[]) => unknown) =>
       resolve({
         data: [{ role_note: null, day_rate: 300 }],
         error: null,
