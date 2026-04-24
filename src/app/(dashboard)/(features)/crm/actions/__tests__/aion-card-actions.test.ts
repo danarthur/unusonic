@@ -96,9 +96,9 @@ function wireSystemClient(opts: {
   };
   updateChain.eq = vi.fn(() => updateChain);
   // Make it awaitable: after two `.eq` calls, `await` lands on the .then below.
-  (updateChain as unknown as PromiseLike<typeof updateResult>).then = (
-    resolve: (v: typeof updateResult) => unknown,
-  ) => Promise.resolve(resolve(updateResult)) as Promise<void>;
+  (updateChain as unknown as PromiseLike<typeof updateResult>).then = ((
+    resolve?: ((value: typeof updateResult) => unknown) | null,
+  ) => Promise.resolve(resolve ? resolve(updateResult) : updateResult) as Promise<unknown>) as PromiseLike<typeof updateResult>['then'];
 
   const insightsChain: Record<string, ReturnType<typeof vi.fn>> = {
     select: vi.fn(() => selectChain),
@@ -213,7 +213,7 @@ describe('acceptAionCardAdvance', () => {
       (c) => c[0] === 'record_deal_transition_with_actor',
     );
     expect(rpcCall).toBeDefined();
-    const args = rpcCall![1] as Record<string, unknown>;
+    const args = (rpcCall as unknown as [string, Record<string, unknown>])[1];
     expect(args).toMatchObject({
       p_deal_id: DEAL,
       p_to_stage_id: TARGET_STAGE,
@@ -264,7 +264,7 @@ describe('revertAionCardAdvance', () => {
       (c) => c[0] === 'record_deal_transition_with_actor',
     );
     expect(rpcCall).toBeDefined();
-    const args = rpcCall![1] as Record<string, unknown>;
+    const args = (rpcCall as unknown as [string, Record<string, unknown>])[1];
     expect(args).toMatchObject({
       p_deal_id: DEAL,
       p_to_stage_id: PRIOR_STAGE,           // back to where we came from
