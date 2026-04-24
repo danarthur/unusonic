@@ -91,8 +91,8 @@ export default function BridgeInstallPage() {
                   </li>
                   <li>
                     <strong>System Settings.</strong> Open System Settings →
-                    Privacy &amp; Security, scroll down, and click "Open
-                    Anyway" next to the Bridge warning.
+                    Privacy &amp; Security, scroll down, and click &ldquo;Open
+                    Anyway&rdquo; next to the Bridge warning.
                   </li>
                 </ul>
               </>

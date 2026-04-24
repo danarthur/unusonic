@@ -80,7 +80,7 @@ export default async function RosterSettingsPage() {
           <div>
             <h2 className="text-base font-medium tracking-tight text-[var(--stage-text-primary)]">Job titles</h2>
             <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
-              Primary filter for crew assignment. "Show me all DJs."
+              Primary filter for crew assignment. &ldquo;Show me all DJs.&rdquo;
             </p>
           </div>
           <JobTitleManager workspaceId={workspace.id} initialTitles={jobTitles} />
@@ -90,7 +90,7 @@ export default async function RosterSettingsPage() {
           <div>
             <h2 className="text-base font-medium tracking-tight text-[var(--stage-text-primary)]">Skill presets</h2>
             <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">
-              Secondary filter for crew assignment. "DJs who also know GrandMA3."
+              Secondary filter for crew assignment. &ldquo;DJs who also know GrandMA3.&rdquo;
             </p>
           </div>
           <SkillPresetManager workspaceId={workspace.id} initialPresets={skillPresets} />

@@ -55,6 +55,18 @@ const eslintConfig = defineConfig([
     ".claude/**",
   ]),
 
+  // ─── Script files — CommonJS is intentional ───────────────────────────
+  // Node CLI scripts in scripts/*.js run directly via `node` without the
+  // Next.js bundler; CommonJS `require()` is the simpler, stable pattern
+  // here. Turning off @typescript-eslint/no-require-imports for this glob
+  // only — it still catches `require()` in src/ where ESM is the rule.
+  {
+    files: ["scripts/**/*.{js,mjs,cjs}"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+
   // ─── Entity attribute access guardrail ──────────────────────────────────────
   // Ban direct bracket/dot access on variables named `attrs` in server actions
   // and API files — any new read path that bypasses readEntityAttrs() will be

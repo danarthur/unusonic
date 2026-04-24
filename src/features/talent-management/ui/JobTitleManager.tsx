@@ -63,7 +63,7 @@ export function JobTitleManager({ workspaceId, initialTitles }: JobTitleManagerP
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
-          Standardized titles for your roster — "DJ", "Stage Manager", etc. Members select one of these when setting their job title, enabling exact crew filtering during assignment.
+          Standardized titles for your roster — &ldquo;DJ&rdquo;, &ldquo;Stage Manager&rdquo;, etc. Members select one of these when setting their job title, enabling exact crew filtering during assignment.
         </p>
       </div>
 

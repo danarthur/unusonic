@@ -13,7 +13,7 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
     return (
       <div className="flex-1 w-full max-w-2xl mx-auto px-4 py-12">
         <div className="text-center text-[var(--stage-text-primary)] mt-20 font-light italic">
-          "Ready for input, {SITE_CONFIG.owner}."
+          &ldquo;Ready for input, {SITE_CONFIG.owner}.&rdquo;
         </div>
       </div>
     );

@@ -312,7 +312,7 @@ export function EmployeeEntityForm({
           <div className="space-y-1.5">
             <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">Profile not linked</p>
             <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] leading-relaxed">
-              This member hasn't linked their profile yet. Once they join Unusonic, their full profile will be available here.
+              This member hasn&apos;t linked their profile yet. Once they join Unusonic, their full profile will be available here.
             </p>
           </div>
           <Button variant="ghost" onClick={() => router.push(returnPath)} className="gap-2 mt-2">
@@ -709,7 +709,7 @@ export function EmployeeEntityForm({
                   <div className="flex flex-wrap items-center gap-2 rounded-xl border-l-[3px] border-l-[var(--color-unusonic-warning)] bg-[var(--stage-surface)] px-3 py-2.5">
                     <AlertTriangle className="size-3.5 text-[var(--color-unusonic-warning)] flex-shrink-0" strokeWidth={1.5} />
                     <p className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-warning)] flex-1">
-                      This member won't appear in scheduling suggestions.
+                      This member won&apos;t appear in scheduling suggestions.
                     </p>
                     <div className="flex gap-1">
                       <Button

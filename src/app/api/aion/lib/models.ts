@@ -17,6 +17,8 @@
  */
 
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * Resolve the Anthropic API key in a way that survives the Claude Desktop
@@ -33,8 +35,6 @@ function resolveAnthropicApiKey(): string | undefined {
     // Only runs if shell env poisoned the var. Next dev + node runtime only —
     // edge runtime would need a different approach, but chat route runs on
     // nodejs per `export const runtime = 'nodejs'` in route.ts.
-    const { readFileSync } = require('node:fs');
-    const { resolve } = require('node:path');
     const raw = readFileSync(resolve(process.cwd(), '.env.local'), 'utf8');
     for (const line of raw.split(/\r?\n/)) {
       const m = /^ANTHROPIC_API_KEY\s*=\s*(.+)$/.exec(line);

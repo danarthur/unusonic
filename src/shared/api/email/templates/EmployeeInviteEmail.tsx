@@ -43,7 +43,7 @@ export function EmployeeInviteEmail({
         <Container style={container}>
           <Section style={section}>
             <EmailBrandHeader color="#999999" wordmarkColor="#fafafa" marginBottom="20px" />
-            <Text style={heading}>You're invited.</Text>
+            <Text style={heading}>You&apos;re invited.</Text>
             <Text style={body}>
               {whoInvited} has added you to their team on Unusonic
               {roleName ? ` as ${roleName}` : ''}.
@@ -53,7 +53,7 @@ export function EmployeeInviteEmail({
               Get started
             </Button>
             <Text style={footer}>
-              If you didn't expect this, you can ignore this email.
+              If you didn&apos;t expect this, you can ignore this email.
             </Text>
           </Section>
         </Container>
