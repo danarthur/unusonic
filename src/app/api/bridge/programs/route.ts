@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   horizonDate.setDate(horizonDate.getDate() + horizonDays);
 
   // 1. Confirmed, non-declined deal_crew rows for this entity.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data: crewRows, error: crewErr } = await system
     .schema('ops')
     .from('deal_crew')
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
   }
 
   // 3. Fetch events in horizon with DJ program data.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data: events, error: eventErr } = await system
     .schema('ops')
     .from('events')
@@ -121,7 +121,7 @@ export async function GET(request: Request) {
     .filter((id): id is string => id !== null);
   const venueNameById = new Map<string, string>();
   if (venueIds.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { data: venues } = await system
       .schema('directory')
       .from('entities')

@@ -102,7 +102,7 @@ export async function verifyOtpChallenge(input: VerifyOtpInput): Promise<VerifyO
   });
 
   if (error) {
-    // eslint-disable-next-line no-console
+     
     console.error('[client-portal/otp] verify failed', {
       code: error.code,
       message: error.message,

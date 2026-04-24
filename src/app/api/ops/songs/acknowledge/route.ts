@@ -71,7 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const requestId = req.headers.get('x-request-id');
 
   // --- Read event (cross-workspace protection via staff RLS) ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
   const { data: eventRow } = await crossSchema
     .schema('ops')
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // --- Call the RPC as authenticated ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data, error } = await supabase.rpc('ops_songs_acknowledge_client_request', {
     p_event_id: input.eventId,
     p_entry_id: input.entryId,

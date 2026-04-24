@@ -326,7 +326,7 @@ export function DossierEditor({ open, onOpenChange, details, sourceOrgId }: Doss
                       />
                       <Input
                         value={brandColor}
-                        // eslint-disable-next-line stage-engineering/no-raw-colors -- color picker JS default
+                         
                         onChange={(e) => setBrandColor(e.target.value || 'oklch(0 0 0)')}
                         className="flex-1 stage-input font-mono text-[length:var(--stage-label-size)]"
                       />

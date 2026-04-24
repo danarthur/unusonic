@@ -165,7 +165,7 @@ export async function getClientSongsPageData(
 
   const supabase = getSystemClient();
   // directory + ops schemas aren't in the public Database type surface.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
 
   // --- 1. Entity ---

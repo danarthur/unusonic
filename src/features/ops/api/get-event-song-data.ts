@@ -58,7 +58,7 @@ export async function getEventSongData(eventId: string): Promise<EventSongData> 
 
   const supabase = getSystemClient();
   // ops schema isn't in the public Database type surface.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
 
   const { data } = await crossSchema

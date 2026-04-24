@@ -73,7 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // We read the event as the authenticated user — RLS will block any
   // cross-workspace read, giving us a second line of defense before the
   // RPC's internal is_workspace_member() check.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
   const { data: eventRow } = await crossSchema
     .schema('ops')
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // --- Call the RPC as authenticated (uses the staff JWT, not service_role) ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data, error } = await supabase.rpc('ops_songs_promote_client_request', {
     p_event_id: input.eventId,
     p_entry_id: input.entryId,

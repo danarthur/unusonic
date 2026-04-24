@@ -113,7 +113,7 @@ export function ConnectedAccounts({
           <button
             onClick={handleConnectSpotify}
             disabled={isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1DB954] text-white hover:bg-[#1ed760] transition-colors disabled:opacity-[0.45]"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1DB954] text-[oklch(1_0_0)] hover:bg-[#1ed760] transition-colors disabled:opacity-[0.45]"
           >
             {isPending ? <Loader2 className="size-3 animate-spin" /> : <ExternalLink className="size-3" />}
             Connect

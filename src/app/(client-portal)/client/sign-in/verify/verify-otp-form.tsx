@@ -135,7 +135,7 @@ export function VerifyOtpForm() {
   }, [digits, challengeId, turnstileToken, router]);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16 text-stage-text-primary">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16 text-stage-text-[var(--stage-text-primary)]">
       <header className="mb-10 text-center">
         <p className="text-sm uppercase tracking-[0.18em] text-stage-text-tertiary">
           Client portal
@@ -168,7 +168,7 @@ export function VerifyOtpForm() {
                 onChange={e => handleDigitChange(i, e.target.value)}
                 onKeyDown={e => handleKeyDown(i, e)}
                 aria-label={`Digit ${i + 1} of 6`}
-                className="h-14 w-11 rounded-md border border-stage-border-subtle bg-stage-canvas text-center text-xl font-medium text-stage-text-primary focus:border-stage-accent focus:outline-none"
+                className="h-14 w-11 rounded-md border border-stage-border-subtle bg-stage-canvas text-center text-xl font-medium text-stage-text-[var(--stage-text-primary)] focus:border-stage-accent focus:outline-none"
               />
             ))}
           </div>

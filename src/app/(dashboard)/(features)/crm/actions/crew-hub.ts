@@ -410,8 +410,8 @@ export async function getCrewOwnedKit(input: {
     }[];
 
     // Items already on this event for this supplier — so we can grey them out.
-    let onEventCatalogIds = new Set<string>();
-    let onEventNames = new Set<string>();
+    const onEventCatalogIds = new Set<string>();
+    const onEventNames = new Set<string>();
     if (parsed.data.eventId) {
       const { data: onEvent } = await supabase
         .schema('ops')

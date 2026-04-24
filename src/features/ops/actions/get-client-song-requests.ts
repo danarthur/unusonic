@@ -40,7 +40,7 @@ export async function getClientSongRequestsForEvent(
   }
 
   // Cross-schema read — ops schema isn't in the generated Database surface.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
   const { data } = await crossSchema
     .schema('ops')

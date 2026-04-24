@@ -295,7 +295,7 @@ export function ProfileAvatarUpload({
                     toast.error(result.error || 'Failed to remove avatar');
                   }
                 }}
-                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-unusonic-error)] text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity z-10"
+                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-unusonic-error)] text-[oklch(1_0_0)] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity z-10"
               >
                 <X className="w-3 h-3" />
               </button>

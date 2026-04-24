@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   // Per-IP rate limit: 10 attempts/hour. Checked AFTER format validation so
   // malformed requests don't consume the budget. Failures here are distinct
   // from code failures so legitimate users can tell they're being throttled.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data: allowed, error: rateErr } = await system.rpc(
     'check_bridge_pair_rate_limit',
     { p_client_ip: getClientIp(request) },

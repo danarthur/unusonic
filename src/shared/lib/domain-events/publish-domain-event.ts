@@ -32,7 +32,7 @@ export async function publishDomainEvent<T extends DomainEventType>(args: {
 }): Promise<{ ok: boolean }> {
   try {
     const supabase = getSystemClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { error } = await supabase
       .schema('ops')
       .from('domain_events')

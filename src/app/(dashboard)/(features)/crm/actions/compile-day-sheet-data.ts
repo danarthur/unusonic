@@ -56,7 +56,7 @@ export async function compileDaySheetData(
   const supabase = await createClient();
 
   // 1. Fetch event
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not typed in PostgREST client
+   
   const { data: evt } = await supabase
     .schema('ops')
     .from('events')

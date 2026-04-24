@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unknown event' }, { status: 404 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { count: ownedCount, error: crewErr } = await system
     .schema('ops')
     .from('deal_crew')

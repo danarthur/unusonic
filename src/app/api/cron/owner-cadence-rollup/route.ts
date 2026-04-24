@@ -74,7 +74,7 @@ export async function GET(req: Request) {
         // Purge cadence facts for this workspace — honors the opt-in copy.
         purged += await purgeCadenceFacts(db, ws.id).catch((e) => {
           errors++;
-          // eslint-disable-next-line no-console
+           
           console.error('[owner-cadence-rollup] purge failed', ws.id, e);
           return 0;
         });
@@ -86,7 +86,7 @@ export async function GET(req: Request) {
       // last 180 days. Skipping inactive users avoids tombstone profiles.
       const owners = await fetchActiveOwnerIds(db, ws.id).catch((e) => {
         errors++;
-        // eslint-disable-next-line no-console
+         
         console.error('[owner-cadence-rollup] owner lookup failed', ws.id, e);
         return [] as string[];
       });
@@ -98,7 +98,7 @@ export async function GET(req: Request) {
             if (rolledOne) rolled++;
           } catch (err) {
             errors++;
-            // eslint-disable-next-line no-console
+             
             console.error(
               '[owner-cadence-rollup] rollup failed',
               { ws: ws.id, owner: ownerId, archetype },
@@ -109,7 +109,7 @@ export async function GET(req: Request) {
       }
     }
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.error('[owner-cadence-rollup] fatal', err);
     return NextResponse.json(
       { success: false, rolled, purged, errors: errors + 1 },

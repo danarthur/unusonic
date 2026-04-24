@@ -77,7 +77,7 @@ export async function syncCrewRatesToAssignments(
     // handoff path INSERTs with `dc.confirmed_at ? 'confirmed' : 'requested'`
     // which is still correct for fresh inserts, but on re-run we must
     // respect any portal confirmations that arrived between handoff and now.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { data: existingAssignments } = await supabase
       .schema('ops')
       .from('crew_assignments')
@@ -147,7 +147,7 @@ export async function syncCrewRatesToAssignments(
         // trigger on crew_assignments requires deal_crew.confirmed_at to
         // already be set for status='confirmed' writes, which is true by
         // construction here (we just read `dc.confirmed_at` from the source).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         await supabase
           .schema('ops')
           .from('crew_assignments')

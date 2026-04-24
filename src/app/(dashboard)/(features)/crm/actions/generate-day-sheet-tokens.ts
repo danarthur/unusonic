@@ -38,7 +38,7 @@ export async function generateDaySheetTokens(
   const supabase = await createClient();
 
   // 1. Get event starts_at for expiry calculation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not typed in PostgREST client
+   
   const { data: evt } = await supabase
     .schema('ops')
     .from('events')
@@ -99,7 +99,7 @@ export async function generateDaySheetTokens(
   }
 
   // 3. Delete existing tokens for this event (fresh batch)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not typed
+   
   await supabase
     .schema('ops')
     .from('day_sheet_tokens')
@@ -117,7 +117,7 @@ export async function generateDaySheetTokens(
     expires_at: expiresAt,
   }));
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not typed
+   
   const { data: inserted, error: insertError } = await supabase
     .schema('ops')
     .from('day_sheet_tokens')

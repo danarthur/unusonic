@@ -86,7 +86,7 @@ export async function resolveEventDj(eventId: string): Promise<ResolvedDealConta
   const supabase = getSystemClient();
   // ops + directory schemas aren't in the public Database type surface.
   // Cast once — matches the pattern in context.ts and resolve-deal-contact.ts.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
 
   // --- 1. Event → workspace id ---

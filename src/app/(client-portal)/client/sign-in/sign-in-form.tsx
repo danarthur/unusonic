@@ -76,14 +76,14 @@ export function SignInForm({ searchParamsPromise }: Props) {
 
   if (sent) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16 text-stage-text-primary">
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16 text-stage-text-[var(--stage-text-primary)]">
         <header className="mb-10 text-center">
           <p className="text-sm uppercase tracking-[0.18em] text-stage-text-tertiary">
             Client portal
           </p>
           <h1 className="mt-2 text-2xl font-medium">Check your email</h1>
           <p className="mt-4 text-sm text-stage-text-secondary">
-            If an account exists for <strong className="text-stage-text-primary">{email.trim().toLowerCase()}</strong>,
+            If an account exists for <strong className="text-stage-text-[var(--stage-text-primary)]">{email.trim().toLowerCase()}</strong>,
             you&rsquo;ll receive a sign-in link or code shortly.
           </p>
           <p className="mt-3 text-xs text-stage-text-tertiary">
@@ -96,7 +96,7 @@ export function SignInForm({ searchParamsPromise }: Props) {
           <button
             type="button"
             onClick={() => router.push('/client/sign-in/verify')}
-            className="text-sm text-stage-text-secondary underline underline-offset-2 hover:text-stage-text-primary transition-colors"
+            className="text-sm text-stage-text-secondary underline underline-offset-2 hover:text-stage-text-[var(--stage-text-primary)] transition-colors"
           >
             I have a 6-digit code
           </button>
@@ -115,7 +115,7 @@ export function SignInForm({ searchParamsPromise }: Props) {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16 text-stage-text-primary">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16 text-stage-text-[var(--stage-text-primary)]">
       <header className="mb-10 text-center">
         <p className="text-sm uppercase tracking-[0.18em] text-stage-text-tertiary">
           Client portal
@@ -144,7 +144,7 @@ export function SignInForm({ searchParamsPromise }: Props) {
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="mt-2 w-full rounded-md border border-stage-border-subtle bg-stage-canvas px-3 py-2 text-stage-text-primary placeholder:text-stage-text-tertiary focus:border-stage-accent focus:outline-none"
+            className="mt-2 w-full rounded-md border border-stage-border-subtle bg-stage-canvas px-3 py-2 text-stage-text-[var(--stage-text-primary)] placeholder:text-stage-text-tertiary focus:border-stage-accent focus:outline-none"
           />
         </label>
 

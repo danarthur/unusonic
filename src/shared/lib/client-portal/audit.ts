@@ -128,7 +128,7 @@ export async function logAccess(input: LogAccessInput): Promise<void> {
 
   if (error) {
     // Never throw from audit writes — don't break the user's request on a log failure.
-    // eslint-disable-next-line no-console
+     
     console.error('[client-portal/audit] logAccess failed', {
       code: error.code,
       message: error.message,

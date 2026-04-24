@@ -98,7 +98,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (mintError || !mintData) {
     // Mint failed — render anonymously, log the failure, don't block the user.
-    // eslint-disable-next-line no-console
+     
     console.error('[client-portal/mint-from-proposal] mint failed', {
       proposalId: resolved.proposalId,
       code: mintError?.code,
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     userAgent: req.headers.get('user-agent'),
     metadata: { via: 'mint-from-proposal' },
   }).catch((err) => {
-    // eslint-disable-next-line no-console
+     
     console.error('[client-portal/mint-from-proposal] audit log failed', err);
   });
 

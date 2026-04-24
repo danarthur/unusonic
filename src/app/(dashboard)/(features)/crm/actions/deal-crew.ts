@@ -411,7 +411,7 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
     // every surface agrees". Pre-handoff (no event row) the lookup skips.
     let confirmationOverlay: Awaited<ReturnType<typeof resolveCrewConfirmationBatch>> | null = null;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const { data: eventRow } = await supabase
         .schema('ops')
         .from('events')

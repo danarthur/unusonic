@@ -6,7 +6,7 @@
  * Mobile-first, light theme (inherits portal layout).
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- system client ops/directory schema not typed in PostgREST */
+ 
 
 import { notFound } from 'next/navigation';
 import { getSystemClient } from '@/shared/api/supabase/system';

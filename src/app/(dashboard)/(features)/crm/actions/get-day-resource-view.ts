@@ -94,7 +94,7 @@ export async function getDayResourceView(date: string): Promise<DayResourceView 
 
   // ── 2. Batch-fetch deal_crew for all deals on this day ────────────────────
   const dealIds = [...new Set(dayEvents.map((e) => e.deal_id).filter(Boolean))] as string[];
-  let crewByDealId = new Map<string, DayCrewSlot[]>();
+  const crewByDealId = new Map<string, DayCrewSlot[]>();
 
   if (dealIds.length > 0) {
     const { data: crewRows } = await supabase

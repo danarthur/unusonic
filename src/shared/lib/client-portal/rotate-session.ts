@@ -49,7 +49,7 @@ export async function rotateClientPortalSession(options: {
   });
 
   if (error) {
-    // eslint-disable-next-line no-console
+     
     console.error('[client-portal/rotate] rotate failed', {
       code: error.code,
       message: error.message,

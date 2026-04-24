@@ -312,7 +312,7 @@ export async function dismissAionCardPipeline(
 export async function logAionCardEvent(event: AionCardEvent): Promise<void> {
   try {
     // Dev observability: structured log so the event shape is obvious.
-    // eslint-disable-next-line no-console
+     
     console.log('[aion-card]', JSON.stringify(event));
 
     const workspaceId = await getActiveWorkspaceId();
@@ -340,7 +340,7 @@ export async function logAionCardEvent(event: AionCardEvent): Promise<void> {
       });
   } catch (err) {
     // Intentionally swallowed — telemetry must never break the user's flow.
-    // eslint-disable-next-line no-console
+     
     console.error('[aion-card] logAionCardEvent failed:', err);
   }
 }
@@ -394,7 +394,7 @@ export async function logAionCardCadenceAccuracy(input: {
         },
       });
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.error('[aion-card] logAionCardCadenceAccuracy failed:', err);
   }
 }

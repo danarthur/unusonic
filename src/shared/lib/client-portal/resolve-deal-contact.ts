@@ -115,7 +115,7 @@ export async function resolveDealContact(
   const supabase = getSystemClient();
   // directory schema isn't in the generated Database type's PostgREST surface.
   // Cast once — matches the pattern in context.ts.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
 
   // --- Load the deal row (workspace-scoped) ---

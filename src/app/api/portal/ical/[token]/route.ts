@@ -25,7 +25,7 @@ export async function GET(
   if (!profile) return new NextResponse('Not found', { status: 404 });
 
   // Resolve person entity
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data: person } = await system
     .schema('directory')
     .from('entities')
@@ -37,7 +37,7 @@ export async function GET(
   if (!person) return new NextResponse('Not found', { status: 404 });
 
   // Fetch upcoming assignments (next 6 months)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data: assignments } = await system
     .schema('ops')
     .from('entity_crew_schedule')

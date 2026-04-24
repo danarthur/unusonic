@@ -37,7 +37,7 @@ export async function getPublicEvent(token: string): Promise<PublicEventDTO | nu
   if (!token?.trim()) return null;
 
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- system client types don't include ops schema
+   
   const crossSchema = supabase;
 
   // 1. Event by client_portal_token

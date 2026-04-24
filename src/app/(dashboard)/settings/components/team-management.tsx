@@ -392,7 +392,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                                   <Loader2 className="w-5 h-5 text-[var(--stage-text-secondary)] animate-spin" />
                                 ) : isEnabled ? (
                                   <div className="w-6 h-6 rounded-full bg-[var(--color-unusonic-success)] flex items-center justify-center">
-                                    <Check className="w-3.5 h-3.5 text-white" />
+                                    <Check className="w-3.5 h-3.5 text-[oklch(1_0_0)]" />
                                   </div>
                                 ) : (
                                   <div className="w-6 h-6 rounded-full border-2 border-[var(--stage-border-hover)]" />

@@ -160,7 +160,7 @@ export function SpotifyPlaylistSection({
           <button
             onClick={handleConnect}
             disabled={isPending}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-xs font-medium bg-[#1DB954] text-white hover:bg-[#1ed760] transition-colors disabled:opacity-[0.45]"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-xs font-medium bg-[#1DB954] text-[oklch(1_0_0)] hover:bg-[#1ed760] transition-colors disabled:opacity-[0.45]"
           >
             {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <SpotifyIcon className="size-3.5" />}
             Connect Spotify

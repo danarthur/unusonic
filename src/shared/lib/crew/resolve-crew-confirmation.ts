@@ -104,7 +104,7 @@ export async function resolveCrewConfirmationBatch(
   //    resolve to a deal, we gracefully return empty states.
   //    Uses `supabase.schema('ops')` because ops types are not
   //    generated (see CLAUDE.md D2 drift).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data: eventRow } = await supabase
     .schema('ops')
     .from('events')
@@ -115,7 +115,7 @@ export async function resolveCrewConfirmationBatch(
   const dealId = (eventRow as { deal_id?: string | null } | null)?.deal_id ?? null;
 
   // 2) Portal side: crew_assignments rows for this event.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const { data: portalRows } = await supabase
     .schema('ops')
     .from('crew_assignments')
@@ -138,7 +138,7 @@ export async function resolveCrewConfirmationBatch(
   };
   let dealCrewRows: DcRow[] = [];
   if (dealId) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { data: dcData } = await supabase
       .schema('ops')
       .from('deal_crew')

@@ -19,7 +19,7 @@ export function PayNowButton({ token, acceptOnlinePayments }: PayNowButtonProps)
         <button
           type="button"
           disabled
-          className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white opacity-50 cursor-not-allowed"
+          className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-[oklch(1_0_0)] opacity-50 cursor-not-allowed"
         >
           Pay now
         </button>
@@ -58,7 +58,7 @@ export function PayNowButton({ token, acceptOnlinePayments }: PayNowButtonProps)
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-[oklch(1_0_0)] transition hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Redirecting to Stripe…' : 'Pay now'}
       </button>

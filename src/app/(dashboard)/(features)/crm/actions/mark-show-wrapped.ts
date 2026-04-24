@@ -60,7 +60,7 @@ export async function markShowWrapped(eventId: string): Promise<WrapShowResult> 
 
     const supabase = await createClient();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { data: existing, error: fetchErr } = await supabase
       .schema('ops')
       .from('events')
@@ -79,7 +79,7 @@ export async function markShowWrapped(eventId: string): Promise<WrapShowResult> 
     }
 
     const archivedAt = new Date().toISOString();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { error: updateErr } = await supabase
       .schema('ops')
       .from('events')
@@ -139,7 +139,7 @@ export async function undoMarkShowWrapped(eventId: string): Promise<WrapShowResu
 
     const supabase = await createClient();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { data: existing, error: fetchErr } = await supabase
       .schema('ops')
       .from('events')
@@ -178,7 +178,7 @@ export async function undoMarkShowWrapped(eventId: string): Promise<WrapShowResu
     const nextStatus = row.show_ended_at ? 'completed' : 'in_progress';
     const nextLifecycle = row.show_ended_at ? 'post' : 'live';
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const { error: updateErr } = await supabase
       .schema('ops')
       .from('events')

@@ -73,7 +73,7 @@ export async function checkRateLimit(
 
   if (error) {
     // Fail closed on DB errors — deny rather than accidentally letting abuse through.
-    // eslint-disable-next-line no-console
+     
     console.error('[client-portal/rate-limit] check failed', {
       code: error.code,
       message: error.message,

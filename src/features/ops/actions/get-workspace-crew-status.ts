@@ -87,8 +87,8 @@ export async function getWorkspaceCrewStatus(
     ...new Set(allAssignments.map((a) => a.entity_id).filter(Boolean) as string[]),
   ];
 
-  let phoneMap: Record<string, string | null> = {};
-  let nameMap: Record<string, string | null> = {};
+  const phoneMap: Record<string, string | null> = {};
+  const nameMap: Record<string, string | null> = {};
 
   if (entityIds.length > 0) {
     const { data: entities } = await supabase

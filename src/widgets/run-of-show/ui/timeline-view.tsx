@@ -149,7 +149,7 @@ export function TimelineView({
   }
 
   // Track cumulative pixel offset per cue for absolute positioning
-  let cumulativePx = 0;
+  const cumulativePx = 0;
 
   return (
     <div className={cn('relative', className)} style={{ minHeight: totalHeight }}>

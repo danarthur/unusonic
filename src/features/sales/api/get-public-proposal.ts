@@ -20,7 +20,7 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
   if (!token?.trim()) return null;
 
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- system client types don't include directory/ops/cortex schemas
+   
   const crossSchema = supabase;
 
   // 1. Proposal by public_token

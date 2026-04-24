@@ -240,7 +240,7 @@ export default async function PublicInvoicePage({
           </p>
           <a
             href={`/i/${token}`}
-            className="mt-4 inline-flex items-center rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="mt-4 inline-flex items-center rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-[oklch(1_0_0)] hover:bg-gray-800"
           >
             Try again
           </a>
@@ -278,7 +278,7 @@ export default async function PublicInvoicePage({
     <div className="min-h-dvh bg-gray-50">
       {/* ── Main card ─────────────────────────────────────────────── */}
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-        <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="overflow-hidden rounded-xl bg-[oklch(1_0_0)] shadow-sm ring-1 ring-gray-200">
           {/* ── Header ──────────────────────────────────────────── */}
           <div className="border-b border-gray-100 px-6 py-6 sm:px-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

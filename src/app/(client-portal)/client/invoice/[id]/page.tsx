@@ -68,7 +68,7 @@ export default async function ClientInvoicePage({
 
   const workspaceId = context.activeEntity.ownerWorkspaceId;
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const crossSchema = supabase;
 
   // finance.invoices ownership is enforced via bill_to_entity_id, which

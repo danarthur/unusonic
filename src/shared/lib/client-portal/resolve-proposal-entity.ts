@@ -43,7 +43,7 @@ export async function resolveClientEntityForProposal(
   });
 
   if (error) {
-    // eslint-disable-next-line no-console
+     
     console.error('[client-portal/resolve-proposal-entity] RPC failed', {
       code: error.code,
       message: error.message,

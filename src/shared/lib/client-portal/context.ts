@@ -78,7 +78,7 @@ export async function getClientPortalContext(): Promise<ClientPortalContext> {
     const system = getSystemClient();
     // Cross-schema query — directory schema isn't in the generated Database
     // type's public surface, so cast to any (matches pattern in get-public-event.ts).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const crossSchema = system;
     const { data: entities, error } = await crossSchema
       .schema('directory')
@@ -137,7 +137,7 @@ export async function getClientPortalContext(): Promise<ClientPortalContext> {
       .maybeSingle();
 
     if (!tokenErr && tokenRow && new Date(tokenRow.expires_at).getTime() > Date.now()) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const crossSchema = system;
       const { data: entity } = await crossSchema
         .schema('directory')
