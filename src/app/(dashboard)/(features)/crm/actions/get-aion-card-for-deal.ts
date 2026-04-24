@@ -299,7 +299,7 @@ export async function getAionCardSummariesForDeals(
 
   // Follow-ups per deal (pending, not superseded).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data: fuRows } = await (system as any)
+  const { data: fuRows } = await system
     .schema('ops')
     .from('follow_up_queue')
     .select('deal_id')
@@ -370,7 +370,7 @@ async function fetchEventsForDeal(
   dealId: string,
 ): Promise<{ upcoming: string[]; past: string[] }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data } = await (system as any)
+  const { data } = await system
     .schema('ops')
     .from('events')
     .select('starts_at, archived_at')
@@ -413,7 +413,7 @@ async function fetchActiveFollowUps(
   dealId: string,
 ): Promise<FollowUpRow[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data } = await (system as any)
+  const { data } = await system
     .schema('ops')
     .from('follow_up_queue')
     .select('id, deal_id, reason, reason_type, suggested_channel, priority_score, priority_ceiling, escalation_count, linked_insight_id, created_at, acted_at, context_snapshot')
@@ -459,7 +459,7 @@ async function fetchStage(
   stageId: string,
 ): Promise<{ label: string | null; tags: string[]; rotting_days: number | null } | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data } = await (system as any)
+  const { data } = await system
     .schema('ops')
     .from('pipeline_stages')
     .select('label, tags, rotting_days')
@@ -483,7 +483,7 @@ async function buildStallSnapshot(
 
   // Most-recent transition INTO the current stage = when dwell started.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data } = await (system as any)
+  const { data } = await system
     .schema('ops')
     .from('deal_transitions')
     .select('entered_at, to_stage_id')
@@ -576,7 +576,7 @@ async function fetchContactWorkingNotes(
   communicationStyle: string | null;
 } | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema cast
-  const { data } = await (system as any)
+  const { data } = await system
     .schema('cortex')
     .from('entity_working_notes')
     .select('dnr_flagged, preferred_channel, communication_style')
@@ -617,7 +617,7 @@ async function hasRecentDealActivity(
 
   // Captures (cortex)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema cast
-  const { data: captures } = await (system as any)
+  const { data: captures } = await system
     .schema('cortex')
     .from('capture_events')
     .select('id')
@@ -630,7 +630,7 @@ async function hasRecentDealActivity(
 
   // Deal notes (ops)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data: notes } = await (system as any)
+  const { data: notes } = await system
     .schema('ops')
     .from('deal_notes')
     .select('id')
@@ -642,7 +642,7 @@ async function hasRecentDealActivity(
 
   // Human-initiated follow-up acts in the window
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data: logs } = await (system as any)
+  const { data: logs } = await system
     .schema('ops')
     .from('follow_up_log')
     .select('id')
@@ -658,7 +658,7 @@ async function fetchContactFirstName(
   entityId: string,
 ): Promise<string | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- directory schema cast
-  const { data } = await (system as any)
+  const { data } = await system
     .schema('directory')
     .from('entities')
     .select('display_name, attributes')

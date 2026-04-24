@@ -43,7 +43,7 @@ async function resolveDefaultPipelineId(
   workspaceId: string,
 ): Promise<string | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST types
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('pipelines')
     .select('id')
@@ -78,7 +78,7 @@ export async function resolveStageByTag(
   if (!pipelineId) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST types
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('pipeline_stages')
     .select('id, pipeline_id, slug, kind, tags')
@@ -105,7 +105,7 @@ export async function resolveStageByKind(
   if (!pipelineId) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST types
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('pipeline_stages')
     .select('id, pipeline_id, slug, kind, tags')
@@ -131,7 +131,7 @@ export async function resolveStageBySlug(
   if (!pipelineId) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST types
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('ops')
     .from('pipeline_stages')
     .select('id, pipeline_id, slug, kind, tags')

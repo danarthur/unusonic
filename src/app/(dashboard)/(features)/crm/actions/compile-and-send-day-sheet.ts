@@ -336,7 +336,7 @@ export async function compileAndSendDaySheet(input: {
 
         const resendMessageId = (sendResult as { data?: { id?: string } | null } | null)?.data?.id ?? null;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: logErr } = await (supabase as any)
+        const { error: logErr } = await supabase
           .schema('ops')
           .from('crew_comms_log')
           .insert({

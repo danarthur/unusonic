@@ -52,7 +52,7 @@ export async function spawnInvoicesFromProposal(
   // Call the RPC via system client (service role — required for SECURITY DEFINER)
   const system = getSystemClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-  const { data, error } = await (system as any)
+  const { data, error } = await system
     .schema('finance')
     .rpc('spawn_invoices_from_proposal', { p_proposal_id: proposalId });
 
@@ -137,7 +137,7 @@ export async function recordManualPayment(
 
   // Verify caller has workspace access to this invoice
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data: invoice, error: authErr } = await (sessionClient as any)
+  const { data: invoice, error: authErr } = await sessionClient
     .schema('finance')
     .from('invoices')
     .select('id')
@@ -172,21 +172,21 @@ async function callRecordPaymentRpc(
   const system = getSystemClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data: paymentId, error } = await (system as any)
+  const { data: paymentId, error } = await system
     .schema('finance')
     .rpc('record_payment', {
       p_invoice_id: input.invoiceId,
       p_amount: input.amount,
       p_method: input.method,
       p_received_at: input.receivedAt ?? new Date().toISOString(),
-      p_reference: input.reference ?? null,
-      p_notes: input.notes ?? null,
-      p_stripe_payment_intent_id: input.stripePaymentIntentId ?? null,
-      p_stripe_charge_id: input.stripeChargeId ?? null,
+      p_reference: input.reference ?? undefined,
+      p_notes: input.notes ?? undefined,
+      p_stripe_payment_intent_id: input.stripePaymentIntentId ?? undefined,
+      p_stripe_charge_id: input.stripeChargeId ?? undefined,
       p_status: input.status ?? 'succeeded',
-      p_recorded_by_user_id: userId,
-      p_parent_payment_id: input.parentPaymentId ?? null,
-      p_attachment_storage_path: input.attachmentStoragePath ?? null,
+      p_recorded_by_user_id: userId ?? undefined,
+      p_parent_payment_id: input.parentPaymentId ?? undefined,
+      p_attachment_storage_path: input.attachmentStoragePath ?? undefined,
     });
 
   if (error) {

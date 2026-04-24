@@ -72,7 +72,7 @@ export async function GET(req: Request) {
   // 1. Pull due pins via the helper RPC (oldest-last_refreshed-at first).
   //    cortex is not in the typed schema exposure — cast per CLAUDE.md rule.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema not in generated supabase types; .schema('cortex') requires an any-cast (CLAUDE.md PR-INFRA-2)
-  const { data: dueData, error: dueErr } = await (system as any)
+  const { data: dueData, error: dueErr } = await system
     .schema('cortex')
     .rpc('due_lobby_pins', { p_limit: CRON_PIN_REFRESH_BATCH });
 
@@ -203,7 +203,7 @@ async function refreshPin(
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema not in generated supabase types; .schema('cortex') requires an any-cast (CLAUDE.md PR-INFRA-2)
-  const { error: updateErr } = await (system as any)
+  const { error: updateErr } = await system
     .schema('cortex')
     .rpc('update_lobby_pin_value', {
       p_pin_id: pin.pin_id,
@@ -247,7 +247,7 @@ async function recordFailure(
   try {
     const system = getSystemClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema not in generated supabase types; .schema('cortex') requires an any-cast (CLAUDE.md PR-INFRA-2)
-    const { error: markErr } = await (system as any)
+    const { error: markErr } = await system
       .schema('cortex')
       .rpc('mark_lobby_pin_failure', {
         p_pin_id: pin.pin_id,

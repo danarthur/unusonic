@@ -88,7 +88,7 @@ async function getFinanceDashboardData(
 
     // Fetch invoices
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-    const { data: invoiceRows, error: invErr } = await (supabase as any)
+    const { data: invoiceRows, error: invErr } = await supabase
       .schema('finance')
       .from('invoices')
       .select(
@@ -106,7 +106,7 @@ async function getFinanceDashboardData(
 
     // Fetch balances view
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-    const { data: balanceRows } = await (supabase as any)
+    const { data: balanceRows } = await supabase
       .schema('finance')
       .from('invoice_balances')
       .select('invoice_id, total_amount, paid_amount, balance_due, days_overdue');
@@ -121,7 +121,7 @@ async function getFinanceDashboardData(
     let lineItemRows: LineItemRow[] = [];
     if (invoiceIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-      const { data: liRows } = await (supabase as any)
+      const { data: liRows } = await supabase
         .schema('finance')
         .from('invoice_line_items')
         .select('id, invoice_id, description, quantity, unit_price, amount, item_kind')

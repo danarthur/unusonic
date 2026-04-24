@@ -99,7 +99,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // ops.messages: uniform stamp by event type. Safe to UPDATE with no WHERE
     // match — no-op if this email_id doesn't belong to a messages row.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const opsClient: any = (supabase as any).schema('ops');
+    const opsClient: any = supabase.schema('ops');
     if (body.type === 'email.delivered') {
       await opsClient.from('messages').update({ delivered_at: now }).eq('provider_message_id', emailId);
     } else if (body.type === 'email.bounced') {
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .eq('resend_message_id', emailId);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: sourceRow } = await (supabase as any)
+      const { data: sourceRow } = await supabase
         .schema('ops')
         .from('crew_comms_log')
         .select('id, workspace_id, deal_crew_id, event_id, payload')
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       if (sourceRow) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any)
+        await supabase
           .schema('ops')
           .from('crew_comms_log')
           .insert({
@@ -145,7 +145,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             summary: isDelivered ? 'Day sheet delivered' : 'Day sheet bounced',
             payload: {
               source_log_id: sourceRow.id,
-              recipient_email: sourceRow.payload?.recipient_email ?? null,
+              recipient_email:
+                (sourceRow.payload && typeof sourceRow.payload === 'object' && !Array.isArray(sourceRow.payload)
+                  ? (sourceRow.payload as { recipient_email?: string | null }).recipient_email
+                  : null) ?? null,
             },
           });
       }

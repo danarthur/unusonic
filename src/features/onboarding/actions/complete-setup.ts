@@ -106,7 +106,7 @@ export async function initializeOrganization(
 
     // 2. Create directory.entities company (replaces commercial_organizations)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- directory schema not in generated types for service-role client
-    const dirDb = (db as any).schema('directory');
+    const dirDb = db.schema('directory');
     const { data: orgEntity, error: orgError } = await dirDb
       .from('entities')
       .insert({

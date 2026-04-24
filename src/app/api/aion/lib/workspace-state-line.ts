@@ -48,7 +48,7 @@ export async function resolveWorkspaceStateLine(
         .in('status', ['inquiry', 'proposal', 'contract_sent', 'negotiation']),
       // Upcoming shows in the next 14 days via ops.events.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema path
-      (supabase as any)
+      supabase
         .schema('ops')
         .from('events')
         .select('id', { count: 'exact', head: true })

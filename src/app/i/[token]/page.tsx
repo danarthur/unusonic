@@ -109,7 +109,7 @@ export async function generateMetadata({
 async function fetchInvoice(token: string): Promise<PublicInvoiceData | null> {
   const system = getSystemClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-  const { data, error } = await (system as any)
+  const { data, error } = await system
     .schema('finance')
     .rpc('get_public_invoice', { p_token: token });
 
@@ -132,9 +132,18 @@ async function fetchInvoice(token: string): Promise<PublicInvoiceData | null> {
 
   if (!data) return null;
 
-  // RPC returns a single row or an array with one element
-  const row = Array.isArray(data) ? data[0] : data;
-  return row ?? null;
+  // RPC returns a single row or an array with one element.
+  // TODO(finance): get_public_invoice RPC currently doesn't return
+  // workspace_id or accept_online_payments; PublicInvoiceData declares them
+  // for downstream callers. Cast at the boundary until the RPC is updated.
+  const rawRow = Array.isArray(data) ? data[0] : data;
+  if (!rawRow) return null;
+  return {
+    ...rawRow,
+    workspace_id: (rawRow as { workspace_id?: string }).workspace_id ?? '',
+    accept_online_payments:
+      (rawRow as { accept_online_payments?: boolean }).accept_online_payments ?? false,
+  } as unknown as PublicInvoiceData;
 }
 
 // ---------------------------------------------------------------------------

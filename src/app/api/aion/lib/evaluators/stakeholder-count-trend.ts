@@ -47,12 +47,17 @@ export async function evaluateStakeholderCountTrend(
   // is source→target directed; we look at edges with source=deal_id on
   // either side. The edge-type DEAL_STAKEHOLDER is the P0 stakeholder tag;
   // other types (PLANNER, VENDOR, VENUE) are domain edges, not sales ones.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema cast
-  const { data: edges } = await (system as any)
+  //
+  // cortex.relationships has no workspace_id column — workspace scoping comes
+  // from the source_entity_id → directory.entities.owner_workspace_id chain.
+  // Since we filter by source_entity_id IN dealIds (from the workspace-scoped
+  // deals query above), the workspace boundary is preserved.
+  const dealIdList = dealRows.map((d) => d.id);
+  const { data: edges } = await system
     .schema('cortex')
     .from('relationships')
     .select('source_entity_id, target_entity_id, relationship_type, created_at')
-    .eq('workspace_id', workspaceId)
+    .in('source_entity_id', dealIdList)
     .in('relationship_type', ['DEAL_STAKEHOLDER', 'PLANNER', 'BILL_TO', 'VENDOR'])
     .gte('created_at', fourteenDaysAgo);
 

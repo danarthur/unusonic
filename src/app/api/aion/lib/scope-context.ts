@@ -84,7 +84,7 @@ export async function resolveSessionScope(sessionId: string): Promise<SessionSco
   // for aion_sessions (scope columns added in migration 20260512000100) —
   // matches the repo-wide pattern for cortex / ops reads per CLAUDE.md
   // §Schema source of truth.
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .from('aion_sessions')
     .select('scope_type, scope_entity_id, title, archived_at')

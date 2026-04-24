@@ -99,7 +99,7 @@ async function resolveSummaryScopeIds(
 ): Promise<string[]> {
   if (!include) return [entityId];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('cortex')
     .from('relationships')
     .select('source_entity_id, target_entity_id')
@@ -162,7 +162,7 @@ export async function getEntitySummary(
 
   // ── 2. Recent captures (across this entity + any affiliated) ─────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: captureRows } = await (supabase as any)
+  const { data: captureRows } = await supabase
     .schema('cortex')
     .from('capture_events')
     .select('created_at, parsed_note, transcript, visibility, user_id, resolved_entity_id')
@@ -176,7 +176,7 @@ export async function getEntitySummary(
 
   // ── 3. User's suppressed facts (for pinned-fact overrides) ────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: suppressRows } = await (supabase as any)
+  const { data: suppressRows } = await supabase
     .schema('cortex')
     .from('aion_memory')
     .select('fact')
@@ -377,7 +377,7 @@ export async function suppressPinnedFact(
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).schema('cortex').rpc('save_aion_memory', {
+    await supabase.schema('cortex').rpc('save_aion_memory', {
       p_workspace_id: workspaceId,
       p_scope: 'procedural',
       p_fact: `${SuppressPrefix}${trimmed.toLowerCase()}`,

@@ -146,7 +146,7 @@ export async function GET(req: Request) {
           body = text.trim().slice(0, 350);
         }
 
-        await (db as any).schema('ops').from('daily_briefings').insert({
+        await db.schema('ops').from('daily_briefings').insert({
           workspace_id: ws.id,
           body,
           facts_json: facts,

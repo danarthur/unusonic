@@ -88,7 +88,7 @@ async function getPersonMetrics(
   // show assignment). Best proxy for "shows worked together" without schema
   // changes. Only count non-declined.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: crewCount, error: crewErr } = await (supabase as any)
+  const { count: crewCount, error: crewErr } = await supabase
     .schema('ops')
     .from('deal_crew')
     .select('id', { count: 'exact', head: true })
@@ -100,7 +100,7 @@ async function getPersonMetrics(
 
   // Last contact: most recent capture about the person.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lastCapture } = await (supabase as any)
+  const { data: lastCapture } = await supabase
     .schema('cortex')
     .from('capture_events')
     .select('created_at')
@@ -131,7 +131,7 @@ async function getVenueMetrics(
 ): Promise<GetPromotedMetricsResult> {
   // Shows hosted: count of ops.events where venue_entity_id = this venue.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: showsCount } = await (supabase as any)
+  const { count: showsCount } = await supabase
     .schema('ops')
     .from('events')
     .select('id', { count: 'exact', head: true })
@@ -140,7 +140,7 @@ async function getVenueMetrics(
 
   // Last contact: latest capture about this venue.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lastCapture } = await (supabase as any)
+  const { data: lastCapture } = await supabase
     .schema('cortex')
     .from('capture_events')
     .select('created_at')
@@ -171,7 +171,7 @@ async function getCompanyMetrics(
 ): Promise<GetPromotedMetricsResult> {
   // Team count: distinct affiliated people via cortex.relationships.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: edgeRows } = await (supabase as any)
+  const { data: edgeRows } = await supabase
     .schema('cortex')
     .from('relationships')
     .select('source_entity_id, target_entity_id')

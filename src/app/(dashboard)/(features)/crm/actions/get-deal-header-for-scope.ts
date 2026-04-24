@@ -71,7 +71,7 @@ export async function getDealHeaderForScope(
   let stageKind: DealHeaderForScope['stageKind'] = null;
 
   if (deal.stage_id) {
-    const { data: stageRow } = await (supabase as any)
+    const { data: stageRow } = await supabase
       .schema('ops')
       .from('pipeline_stages')
       .select('label, kind')

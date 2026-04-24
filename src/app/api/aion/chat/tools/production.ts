@@ -325,7 +325,7 @@ export function createProductionTools(ctx: AionToolContext) {
       // Verify invoice exists and is accessible (RLS enforces workspace scoping)
       const supabase = await createClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-      const { data: invoice } = await (supabase as any)
+      const { data: invoice } = await supabase
         .schema('finance')
         .from('invoices')
         .select('id, event_id')

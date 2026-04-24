@@ -29,7 +29,7 @@ export async function getQboConfig(workspaceId: string): Promise<QboConfig | nul
   const system = getSystemClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data: conn, error } = await (system as any)
+  const { data: conn, error } = await system
     .schema('finance')
     .from('qbo_connections')
     .select('realm_id, access_token_secret_id, access_token_expires_at, status')
@@ -39,7 +39,9 @@ export async function getQboConfig(workspaceId: string): Promise<QboConfig | nul
 
   if (error || !conn) return null;
 
-  // Read the access token from Vault
+  // Read the access token from Vault. The `vault` schema is managed by
+  // Supabase and not in our generated Database type — cast to access it.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vault is a Supabase-managed schema outside our type surface
   const { data: secretRow } = await (system as any)
     .schema('vault')
     .from('decrypted_secrets')
@@ -51,7 +53,7 @@ export async function getQboConfig(workspaceId: string): Promise<QboConfig | nul
 
   return {
     realm_id: conn.realm_id,
-    access_token: secretRow.decrypted_secret,
+    access_token: secretRow.decrypted_secret as string,
     refresh_token: '', // Not exposed via this path; use get_fresh_qbo_token RPC for full refresh
     token_expires_at: conn.access_token_expires_at,
   };
@@ -80,7 +82,7 @@ export async function saveQboTokens(
 
   // Check if connection already exists
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existing } = await (system as any)
+  const { data: existing } = await system
     .schema('finance')
     .from('qbo_connections')
     .select('id, access_token_secret_id, refresh_token_secret_id')
@@ -100,7 +102,7 @@ export async function saveQboTokens(
 
     // Update connection row
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (system as any)
+    await system
       .schema('finance')
       .from('qbo_connections')
       .update({
@@ -130,7 +132,7 @@ export async function saveQboTokens(
 
     // Insert connection row
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (system as any)
+    const { error } = await system
       .schema('finance')
       .from('qbo_connections')
       .insert({
@@ -160,7 +162,7 @@ export async function disconnectQbo(workspaceId: string): Promise<void> {
 
   // Read secret IDs before deleting
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: conn } = await (system as any)
+  const { data: conn } = await system
     .schema('finance')
     .from('qbo_connections')
     .select('access_token_secret_id, refresh_token_secret_id')
@@ -189,7 +191,7 @@ export async function disconnectQbo(workspaceId: string): Promise<void> {
 
   // Delete the connection row
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (system as any)
+  await system
     .schema('finance')
     .from('qbo_connections')
     .delete()

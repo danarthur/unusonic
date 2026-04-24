@@ -33,7 +33,7 @@ export async function pushInvoiceToQbo(
 
   // ── Load invoice + line items + connection ─────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: invoice } = await (system as any)
+  const { data: invoice } = await system
     .schema('finance')
     .from('invoices')
     .select(`
@@ -47,7 +47,7 @@ export async function pushInvoiceToQbo(
   if (!invoice) return { success: false, error: 'Invoice not found' };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: conn } = await (system as any)
+  const { data: conn } = await system
     .schema('finance')
     .from('qbo_connections')
     .select('realm_id, default_item_ids, default_tax_code_id')
@@ -58,7 +58,7 @@ export async function pushInvoiceToQbo(
   if (!conn) return { success: false, error: 'No active QBO connection' };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lineItems } = await (system as any)
+  const { data: lineItems } = await system
     .schema('finance')
     .from('invoice_line_items')
     .select('description, quantity, unit_price, amount, item_kind, is_taxable')
@@ -67,7 +67,7 @@ export async function pushInvoiceToQbo(
 
   // ── Resolve customer ───────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existingMap } = await (system as any)
+  const { data: existingMap } = await system
     .schema('finance')
     .from('qbo_entity_map')
     .select('qbo_id, qbo_sync_token')
@@ -85,7 +85,7 @@ export async function pushInvoiceToQbo(
   } else {
     // Try exact-match auto-link: query QBO for customer with same display name
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: entity } = await (system as any)
+    const { data: entity } = await system
       .schema('directory')
       .from('entities')
       .select('display_name')
@@ -123,7 +123,7 @@ export async function pushInvoiceToQbo(
         qboCustomerSyncToken = matches[0].SyncToken;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (system as any).schema('finance').from('qbo_entity_map').insert({
+        await system.schema('finance').from('qbo_entity_map').insert({
           workspace_id: workspaceId,
           local_type: 'entity',
           local_id: invoice.bill_to_entity_id,
@@ -133,7 +133,7 @@ export async function pushInvoiceToQbo(
           last_synced_at: new Date().toISOString(),
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (system as any).schema('finance').from('qbo_sync_log').insert({
+        await system.schema('finance').from('qbo_sync_log').insert({
           workspace_id: workspaceId,
           local_type: 'entity',
           local_id: invoice.bill_to_entity_id,
@@ -163,7 +163,7 @@ export async function pushInvoiceToQbo(
         qboCustomerSyncToken = createResult.Customer.SyncToken;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (system as any).schema('finance').from('qbo_entity_map').insert({
+        await system.schema('finance').from('qbo_entity_map').insert({
           workspace_id: workspaceId,
           local_type: 'entity',
           local_id: invoice.bill_to_entity_id,
@@ -242,7 +242,7 @@ export async function pushInvoiceToQbo(
 
     // Update invoice with QBO IDs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (system as any).schema('finance').from('invoices').update({
+    await system.schema('finance').from('invoices').update({
       qbo_invoice_id: qboId,
       qbo_sync_token: syncToken,
       qbo_last_sync_at: new Date().toISOString(),
@@ -252,7 +252,7 @@ export async function pushInvoiceToQbo(
 
     // Update entity map
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (system as any).schema('finance').from('qbo_entity_map').upsert({
+    await system.schema('finance').from('qbo_entity_map').upsert({
       workspace_id: workspaceId,
       local_type: 'invoice',
       local_id: invoiceId,
@@ -264,7 +264,7 @@ export async function pushInvoiceToQbo(
 
     // Log success
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (system as any).schema('finance').from('qbo_sync_log').insert({
+    await system.schema('finance').from('qbo_sync_log').insert({
       workspace_id: workspaceId,
       local_type: 'invoice',
       local_id: invoiceId,
@@ -284,7 +284,7 @@ export async function pushInvoiceToQbo(
 
     // Log failure
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (system as any).schema('finance').from('qbo_sync_log').insert({
+    await system.schema('finance').from('qbo_sync_log').insert({
       workspace_id: workspaceId,
       local_type: 'invoice',
       local_id: invoiceId,
@@ -298,7 +298,7 @@ export async function pushInvoiceToQbo(
 
     // Update invoice sync status
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (system as any).schema('finance').from('invoices').update({
+    await system.schema('finance').from('invoices').update({
       qbo_last_error: errorMessage,
       qbo_sync_status: 'failed',
     }).eq('id', invoiceId);
@@ -326,7 +326,7 @@ function createQbClient(workspaceId: string, realmId: string): QuickBooksClient 
     refreshViaRpc: async () => {
       const system = getSystemClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance.get_fresh_qbo_token isn't in the public PostgREST schema slice generated into supabase.ts
-      const { data, error } = await (system as any)
+      const { data, error } = await system
         .schema('finance')
         .rpc('get_fresh_qbo_token', { p_workspace_id: workspaceId });
       if (error) throw new Error(`get_fresh_qbo_token failed: ${error.message}`);

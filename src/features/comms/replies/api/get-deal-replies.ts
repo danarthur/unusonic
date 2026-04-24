@@ -67,7 +67,7 @@ export async function getDealReplies(dealId: string): Promise<ReplyThread[]> {
     // ops schema not exposed via PostgREST — match existing ops.* caller
     // pattern of casting to any.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST exposed schemas
-    const opsClient: any = (supabase as any).schema('ops');
+    const opsClient: any = supabase.schema('ops');
 
     type ThreadRow = {
       id: string;

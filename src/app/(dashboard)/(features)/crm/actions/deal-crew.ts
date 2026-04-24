@@ -1597,7 +1597,7 @@ export async function updateCrewDispatch(
           : `total ${delta > 0 ? '+' : '−'}$${Math.abs(delta).toLocaleString()}`;
         const { data: { user } } = await supabase.auth.getUser();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any)
+        await supabase
           .schema('ops')
           .from('crew_comms_log')
           .insert({

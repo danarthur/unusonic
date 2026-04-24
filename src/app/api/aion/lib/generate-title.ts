@@ -160,7 +160,7 @@ type SessionState = {
 async function readSessionState(sessionId: string): Promise<SessionState> {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex not in generated PostgREST types
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('cortex')
     .from('aion_sessions')
     .select('title, title_locked, scope_type, scope_entity_id')

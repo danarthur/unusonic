@@ -53,7 +53,7 @@ export default async function PipelineSettingsPage() {
   });
   if (!hasCap) redirect('/settings');
 
-  const { data: pipelineRow } = await (supabase as any)
+  const { data: pipelineRow } = await supabase
     .schema('ops')
     .from('pipelines')
     .select(

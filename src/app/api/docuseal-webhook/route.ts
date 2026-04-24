@@ -228,7 +228,7 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
   // Non-blocking: failure here should not prevent the rest of the webhook from completing.
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-    await (supabase as any).schema('finance').rpc('spawn_invoices_from_proposal', {
+    await supabase.schema('finance').rpc('spawn_invoices_from_proposal', {
       p_proposal_id: proposalId,
     });
   } catch (e) {

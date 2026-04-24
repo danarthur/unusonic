@@ -57,7 +57,7 @@ export async function seedHandoffNarrative(params: {
 
   // Venue name from the event (handover wrote venue_entity_id + location_name).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema varies by PostgREST exposure
-  const eventsClient = (system as any).schema('ops');
+  const eventsClient = system.schema('ops');
   const { data: event } = await eventsClient
     .from('events')
     .select('location_name')

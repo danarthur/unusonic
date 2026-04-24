@@ -336,7 +336,7 @@ async function checkFollowUpStale(insight: InsightRow): Promise<boolean> {
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const dealId = (insight.context.dealId as string) ?? insight.entity_id;
 
-    const { data: notes } = await (system as any)
+    const { data: notes } = await system
       .schema('ops')
       .from('deal_notes')
       .select('id')
@@ -346,7 +346,7 @@ async function checkFollowUpStale(insight: InsightRow): Promise<boolean> {
 
     if (notes?.length) return true;
 
-    const { data: logs } = await (system as any)
+    const { data: logs } = await system
       .schema('ops')
       .from('follow_up_log')
       .select('id')

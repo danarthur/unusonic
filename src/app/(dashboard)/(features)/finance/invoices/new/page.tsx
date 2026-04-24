@@ -57,7 +57,7 @@ export default async function NewInvoicePage() {
 
   // Fetch entities for the bill-to picker
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- directory schema
-  const { data: entityRows } = await (supabase as any)
+  const { data: entityRows } = await supabase
     .schema('directory')
     .from('entities')
     .select('id, display_name, type')
@@ -76,7 +76,7 @@ export default async function NewInvoicePage() {
 
   // Fetch events for optional linking
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not yet in PostgREST types
-  const { data: eventRows } = await (supabase as any)
+  const { data: eventRows } = await supabase
     .schema('ops')
     .from('events')
     .select('id, title, deal_id')

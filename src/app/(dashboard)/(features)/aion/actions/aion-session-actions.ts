@@ -65,7 +65,7 @@ export async function getSessionList(
   // for the scope columns (added 20260512000100) and the multi-thread columns
   // (added 20260512000300). Cortex is exposed through PostgREST but the
   // generated type graph is stale — matches the repo-wide pattern.
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .from('aion_sessions')
     .select(
@@ -343,7 +343,7 @@ export async function continueSessionInNewChat(
 
   try {
     // Read the source for its scope + title.
-    const { data: source, error: readErr } = await (supabase as any)
+    const { data: source, error: readErr } = await supabase
       .schema('cortex')
       .from('aion_sessions')
       .select('workspace_id, scope_type, scope_entity_id, title')
@@ -399,7 +399,7 @@ export async function getArchivedSessionList(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: 'Not authenticated' };
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .from('aion_sessions')
     .select(

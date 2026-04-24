@@ -84,7 +84,7 @@ async function autoFillWorkingNotes(
   signals: NonNullable<CaptureParseResult['working_notes_signals']>,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existing } = await (supabase as any)
+  const { data: existing } = await supabase
     .schema('cortex')
     .from('entity_working_notes')
     .select('communication_style, dnr_flagged, dnr_reason, preferred_channel')
@@ -128,7 +128,7 @@ async function autoFillWorkingNotes(
   if (Object.keys(patch).length === 0) return;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).schema('cortex').rpc('upsert_entity_working_notes', {
+  await supabase.schema('cortex').rpc('upsert_entity_working_notes', {
     p_workspace_id: workspaceId,
     p_entity_id: entityId,
     p_communication_style: patch.p_communication_style ?? null,
@@ -279,7 +279,7 @@ export async function confirmCapture(
   // cortex RPCs must be called with explicit .schema('cortex') — the default
   // schema is public and this function only exists in cortex.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: captureId, error: rpcError } = await (supabase as any)
+  const { data: captureId, error: rpcError } = await supabase
     .schema('cortex')
     .rpc('write_capture_confirmed', {
       p_workspace_id: workspaceId,

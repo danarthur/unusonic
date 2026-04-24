@@ -42,7 +42,7 @@ export async function evaluateStageAdvanceSuggestion(
   // one workspace may tag its "Inquiry" stage `initial_contact`, another
   // may have split it into three stages that all share the same tag.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema
-  const { data: stages } = await (system as any)
+  const { data: stages } = await system
     .schema('ops')
     .from('pipeline_stages')
     .select('id, tags, pipeline_id, pipelines!inner(workspace_id, is_default)')

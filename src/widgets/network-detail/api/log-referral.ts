@@ -36,7 +36,7 @@ export async function logReferral(
   if (!user) return { ok: false, error: 'Unauthorized.' };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .rpc('log_referral', {
       p_workspace_id: input.workspaceId,
@@ -66,7 +66,7 @@ export async function deleteReferral(
   if (!user) return { ok: false, error: 'Unauthorized.' };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .rpc('delete_referral', { p_referral_id: referralId });
 

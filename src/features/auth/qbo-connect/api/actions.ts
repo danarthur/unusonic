@@ -247,7 +247,7 @@ export async function exchangeCode(
     if (Object.keys(createdItemIds).length > 0) {
       const system = getSystemClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (system as any)
+      await system
         .schema('finance')
         .from('qbo_connections')
         .update({ default_item_ids: createdItemIds })

@@ -48,7 +48,7 @@ export async function sendReply(input: {
     if (!user) return { success: false, error: 'Not authenticated' };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST exposed schemas
-    const opsClient: any = (supabase as any).schema('ops');
+    const opsClient: any = supabase.schema('ops');
 
     // ── 1. Resolve thread + target recipient ─────────────────────────────
     // The to-address is the sender of the most recent inbound message in the

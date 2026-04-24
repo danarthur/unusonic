@@ -53,7 +53,7 @@ export async function evaluateCalendarCollision(
   // Preferred driving date = min-upcoming starts_at on ops.events for the deal;
   // fallback = deals.proposed_date. Resolve per deal.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data: events } = await (system as any)
+  const { data: events } = await system
     .schema('ops')
     .from('events')
     .select('deal_id, starts_at, archived_at')

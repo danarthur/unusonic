@@ -62,7 +62,7 @@ export async function checkDateFeasibility(
     // rather than literal status slugs, which all collapsed to 'working'.
     // Query the workspace's default pipeline's stages tagged with
     // initial_contact or proposal_sent, then count deals in those stages.
-    const { data: tentativePipeline } = await (supabase as any)
+    const { data: tentativePipeline } = await supabase
       .schema('ops')
       .from('pipelines')
       .select('id, pipeline_stages(id, tags, is_archived)')

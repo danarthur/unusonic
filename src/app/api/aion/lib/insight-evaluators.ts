@@ -179,7 +179,7 @@ async function getUpcomingShowsWithCrew(workspaceId: string): Promise<UpcomingSh
   const nowIso = new Date().toISOString();
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data: events } = await (system as any)
+  const { data: events } = await system
     .schema('ops')
     .from('events')
     .select('id, deal_id, title, starts_at, event_archetype, archived_at, lifecycle_status')
@@ -193,7 +193,7 @@ async function getUpcomingShowsWithCrew(workspaceId: string): Promise<UpcomingSh
   const eventIds = (events as any[]).map((e) => e.id as string);
 
   // Single batch query: event-scoped crew rows only.
-  const { data: allCrew } = await (system as any)
+  const { data: allCrew } = await system
     .schema('ops')
     .from('deal_crew')
     .select('id, deal_id, event_id, confirmed_at, entity_id')
@@ -422,18 +422,18 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
       ? system.schema('directory').from('entities').select('id, name').in('id', orgIds)
       : Promise.resolve({ data: [] as any[] }),
     // Batch: deals with recent notes
-    (system as any).schema('ops').from('deal_notes')
+    system.schema('ops').from('deal_notes')
       .select('deal_id')
       .in('deal_id', dealIds)
       .gte('created_at', fourteenDaysAgo),
     // Batch: deals with recent follow-up log entries
-    (system as any).schema('ops').from('follow_up_log')
+    system.schema('ops').from('follow_up_log')
       .select('deal_id')
       .in('deal_id', dealIds)
       .gte('created_at', fourteenDaysAgo),
     // Phase 2c: batch-fetch stage labels so copy is rename-safe
     stageIds.length > 0
-      ? (system as any).schema('ops').from('pipeline_stages').select('id, label').in('id', stageIds)
+      ? system.schema('ops').from('pipeline_stages').select('id, label').in('id', stageIds)
       : Promise.resolve({ data: [] as any[] }),
   ]);
 

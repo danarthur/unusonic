@@ -78,7 +78,7 @@ export async function getDealTimeline(
     // Ops schema types aren't exposed via PostgREST yet (see CLAUDE.md §"Schema
     // source of truth"), so all ops.* callers cast to any when using .schema().
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST exposed schemas; matches existing ops.* caller pattern
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .schema('ops')
       .from('deal_timeline_v')
       .select(

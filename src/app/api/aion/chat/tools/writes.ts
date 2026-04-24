@@ -28,6 +28,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import type { Json } from '@/types/supabase';
 import { envelope } from '../../lib/retrieval-envelope';
 import { getSubstrateCounts } from '../../lib/substrate-counts';
 import { dealInWorkspace } from '../../lib/deal-in-workspace';
@@ -299,20 +300,18 @@ async function logWriteDraft(params: {
   inputParams:  Record<string, unknown>;
 }): Promise<string> {
   const system = getSystemClient();
-  // Cast the service client — the generated types unwrap jsonb columns to a
-  // strict recursive Json type that doesn't accept `Record<string, unknown>`
-  // directly, and the table has no INSERT RLS policy so every authenticated
-  // path goes through service role anyway.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const opsWriteLog = (system as any).schema('ops').from('aion_write_log');
-  const { data, error } = await opsWriteLog
+  // The generated Json type is a strict recursive shape that doesn't directly
+  // accept Record<string, unknown>. Widen at the insert site.
+  const { data, error } = await system
+    .schema('ops')
+    .from('aion_write_log')
     .insert({
       workspace_id:  params.workspaceId,
       user_id:       params.userId,
       tool_name:     params.toolName,
       deal_id:       params.dealId,
-      artifact_ref:  params.artifactRef,
-      input_params:  params.inputParams,
+      artifact_ref:  params.artifactRef as unknown as Json,
+      input_params:  params.inputParams as unknown as Json,
     })
     .select('id')
     .single();

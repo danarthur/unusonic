@@ -38,7 +38,7 @@ export async function sendInvoice(
 
   // ── 1. Verify caller access + fetch invoice ────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data: invoice, error: fetchErr } = await (sessionClient as any)
+  const { data: invoice, error: fetchErr } = await sessionClient
     .schema('finance')
     .from('invoices')
     .select(`
@@ -60,7 +60,7 @@ export async function sendInvoice(
 
   // ── 2. Assign invoice number ───────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: invoiceNumber, error: numErr } = await (system as any)
+  const { data: invoiceNumber, error: numErr } = await system
     .schema('finance')
     .rpc('next_invoice_number', { p_workspace_id: invoice.workspace_id });
 
@@ -80,7 +80,7 @@ export async function sendInvoice(
 
   // Read line items to compute taxable subtotal
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lineItems } = await (system as any)
+  const { data: lineItems } = await system
     .schema('finance')
     .from('invoice_line_items')
     .select('id, amount, is_taxable, item_kind')
@@ -113,7 +113,7 @@ export async function sendInvoice(
   // ── 4. Snapshot bill_to and from ───────────────────────────────────────────
   // Read the bill_to entity (directory schema)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: entity } = await (system as any)
+  const { data: entity } = await system
     .schema('directory')
     .from('entities')
     .select('display_name, type, attributes')
@@ -179,7 +179,7 @@ export async function sendInvoice(
   //       idempotency: a concurrent double-click either stages here or bails
   //       cleanly, rather than both runs allocating a second invoice number.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: stageErr, count: stageCount } = await (system as any)
+  const { error: stageErr, count: stageCount } = await system
     .schema('finance')
     .from('invoices')
     .update(
@@ -290,7 +290,7 @@ export async function sendInvoice(
 
   // ── 7a. Atomic flip: only now mark as sent ─────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: flipErr } = await (system as any)
+  const { error: flipErr } = await system
     .schema('finance')
     .from('invoices')
     .update({ status: 'sent', sent_at: nowIso })
@@ -303,7 +303,7 @@ export async function sendInvoice(
   // ── 8. Enqueue QBO push (if connected) ─────────────────────────────────────
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: qboConn } = await (system as any)
+    const { data: qboConn } = await system
       .schema('finance')
       .from('qbo_connections')
       .select('id')
@@ -313,7 +313,7 @@ export async function sendInvoice(
 
     if (qboConn) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (system as any)
+      await system
         .schema('finance')
         .from('sync_jobs')
         .insert({

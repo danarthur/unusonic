@@ -139,13 +139,13 @@ export async function getPersonProductions(
   // ── 2. Find deals via stakeholder and crew edges ──────────────────────────
   const [{ data: stakeholderRows }, { data: crewRows }] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    supabase
       .schema('ops')
       .from('deal_stakeholders')
       .select('deal_id, role')
       .eq('entity_id', entityId),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    supabase
       .schema('ops')
       .from('deal_crew')
       .select('deal_id, role_note, department')
@@ -186,7 +186,7 @@ export async function getPersonProductions(
 
   // ── 3. Events where person is client directly ────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: eventsByClient } = await (supabase as any)
+  const { data: eventsByClient } = await supabase
     .schema('ops')
     .from('events')
     .select('id, title, starts_at, status, lifecycle_status, deal_id, client_entity_id')
@@ -207,7 +207,7 @@ export async function getPersonProductions(
 
   if (dealEventIds.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: linkedEvents } = await (supabase as any)
+    const { data: linkedEvents } = await supabase
       .schema('ops')
       .from('events')
       .select('id, title, starts_at, status, lifecycle_status, deal_id, client_entity_id')

@@ -71,7 +71,7 @@ async function loadCapture(
 ): Promise<CaptureRow | null> {
   // cortex schema isn't in generated types — cast through any for the chain.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('cortex')
     .from('capture_events')
     .select(
@@ -123,7 +123,7 @@ export async function updateCapture(
 
   // All mutation RPCs live in cortex; must call with explicit schema.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cortex = (supabase as any).schema('cortex');
+  const cortex = supabase.schema('cortex');
 
   switch (input.action) {
     case 'edit': {

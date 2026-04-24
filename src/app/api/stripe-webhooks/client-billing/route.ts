@@ -19,6 +19,7 @@ import type Stripe from 'stripe';
 import * as Sentry from '@sentry/nextjs';
 import { getStripe } from '@/shared/api/stripe/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import type { Json } from '@/types/supabase';
 import { recordPaymentFromWebhook } from '@/features/finance/api/invoice-actions';
 
 export const runtime = 'nodejs';
@@ -62,8 +63,10 @@ export async function POST(req: NextRequest) {
     ?? null;
 
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data: dedupRow } = await (supabase as any)
+  // Stripe.Event.data.object is a class union from the SDK that doesn't match
+  // Supabase's recursive Json type. Serialize-safe in practice (Stripe ships
+  // it over the wire as JSON); cast at the insert boundary.
+  const { data: dedupRow } = await supabase
     .schema('finance')
     .from('stripe_webhook_events')
     .insert({
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest) {
       source: 'client_billing',
       event_type: event.type,
       workspace_id: workspaceId,
-      payload: event.data.object,
+      payload: event.data.object as unknown as Json,
       received_at: new Date().toISOString(),
     })
     .select('stripe_event_id')
@@ -112,7 +115,7 @@ export async function POST(req: NextRequest) {
     // otherwise the unique constraint sends every retry into the silent
     // `!dedupRow → deduplicated: true` branch and the event never processes.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).schema('finance').from('stripe_webhook_events')
+    await supabase.schema('finance').from('stripe_webhook_events')
       .delete()
       .eq('stripe_event_id', event.id);
     Sentry.logger.error('stripe.clientBilling.routingFailed', {
@@ -126,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   // Mark as processed
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).schema('finance').from('stripe_webhook_events')
+  await supabase.schema('finance').from('stripe_webhook_events')
     .update({ processed_at: new Date().toISOString() })
     .eq('stripe_event_id', event.id);
 
@@ -259,7 +262,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       const wsId = (dealRow as { workspace_id: string } | null)?.workspace_id;
       if (wsId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex not in generated types for system client
-        await (supabase as any)
+        await supabase
           .schema('cortex')
           .rpc('resolve_aion_proactive_lines_by_artifact', {
             p_workspace_id: wsId,
@@ -435,7 +438,7 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 
   // Update any pending payment rows for this payment intent to failed
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .schema('finance')
     .from('payments')
     .update({ status: 'failed', failure_reason: paymentIntent.last_payment_error?.message ?? null })
@@ -470,7 +473,7 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
 
   // Look up the original payment by stripe_payment_intent_id
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: originalPayment } = await (supabase as any)
+  const { data: originalPayment } = await supabase
     .schema('finance')
     .from('payments')
     .select('id, invoice_id')

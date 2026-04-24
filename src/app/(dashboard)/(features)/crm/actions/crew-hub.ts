@@ -96,7 +96,7 @@ export async function getCrewCommsLog(dealCrewId: string): Promise<CrewCommsLogE
   try {
     const supabase = await createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .schema('ops')
       .from('crew_comms_log')
       .select('id, channel, event_type, occurred_at, actor_user_id, summary, payload')
@@ -211,7 +211,7 @@ export async function updateCrewNotes(input: {
   try {
     const supabase = await createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .schema('ops')
       .from('deal_crew')
       .update({ notes: parsed.data.note })
@@ -259,7 +259,7 @@ export async function logCrewPhoneCall(input: {
     const { data: { user } } = await supabase.auth.getUser();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .schema('ops')
       .from('crew_comms_log')
       .insert({
@@ -606,12 +606,12 @@ export async function replaceCrewMember(input: {
     const { data: { user } } = await supabase.auth.getUser();
     const actorUserId = user?.id ?? null;
 
-    // 1. Load the row we're replacing. Pull only the fields we need to clone.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: original, error: originalErr } = await (supabase as any)
+    // 1. Load the row we're replacing. Pull only the fields we need to clone
+    // plus confirmed_at for rollback-state handling.
+    const { data: original, error: originalErr } = await supabase
       .schema('ops')
       .from('deal_crew')
-      .select('id, deal_id, workspace_id, role_note, source, catalog_item_id, department, call_time, call_time_slot_id, day_rate, entity_id')
+      .select('id, deal_id, workspace_id, role_note, source, catalog_item_id, department, call_time, call_time_slot_id, day_rate, entity_id, confirmed_at')
       .eq('id', parsed.data.dealCrewId)
       .eq('workspace_id', workspaceId)
       .maybeSingle();
@@ -630,7 +630,7 @@ export async function replaceCrewMember(input: {
 
     // 2. Resolve the event_id for log + audit context.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: evt } = await (supabase as any)
+    const { data: evt } = await supabase
       .schema('ops')
       .from('events')
       .select('id')
@@ -641,7 +641,7 @@ export async function replaceCrewMember(input: {
     // 3. Mark original row replaced. Preserve confirmed_at/declined_at history;
     //    we only change status so ordering filters stay sensible.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: markErr } = await (supabase as any)
+    const { error: markErr } = await supabase
       .schema('ops')
       .from('deal_crew')
       .update({ status: 'replaced' })
@@ -656,7 +656,7 @@ export async function replaceCrewMember(input: {
     //    reject if the new person is already on this deal — we catch that and
     //    translate to a useful error instead of a raw Postgres message.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: inserted, error: insertErr } = await (supabase as any)
+    const { data: inserted, error: insertErr } = await supabase
       .schema('ops')
       .from('deal_crew')
       .insert({
@@ -680,7 +680,7 @@ export async function replaceCrewMember(input: {
       // 'replaced' row and no replacement. Best-effort: if the rollback also
       // fails the PM will see the replaced status and can manually recover.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
+      await supabase
         .schema('ops')
         .from('deal_crew')
         .update({ status: original.entity_id ? (original.confirmed_at ? 'confirmed' : 'pending') : 'pending' })
@@ -701,7 +701,7 @@ export async function replaceCrewMember(input: {
     //    story from either angle. Failures here are non-fatal.
     const nowIso = new Date().toISOString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    await supabase
       .schema('ops')
       .from('crew_comms_log')
       .insert([

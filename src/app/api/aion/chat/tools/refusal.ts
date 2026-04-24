@@ -103,15 +103,12 @@ async function persistRefusal(input: PersistInput): Promise<void> {
   try {
     const { getSystemClient } = await import('@/shared/api/supabase/system');
     const system = getSystemClient();
-    // Non-public schemas (`cortex`) require the runtime escape hatch because
-    // src/types/supabase.ts only covers `public` today (see CLAUDE.md rule 6).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- schema() is not typed for cortex
-    const { error } = await (system as any).schema('cortex').rpc('record_refusal', {
+    const { error } = await system.schema('cortex').rpc('record_refusal', {
       p_workspace_id: input.workspaceId,
       p_user_id: input.userId,
       p_question: input.question,
       p_reason: input.reason,
-      p_attempted_metric_id: input.attemptedMetricId ?? null,
+      p_attempted_metric_id: input.attemptedMetricId ?? undefined,
     });
     if (error) {
       console.error('[aion/refusal] record_refusal failed:', error.message);

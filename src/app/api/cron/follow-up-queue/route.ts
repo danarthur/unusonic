@@ -149,7 +149,7 @@ export async function GET(req: Request) {
     const stageIds = [...new Set(deals.map((d) => (d as { stage_id: string | null }).stage_id).filter(Boolean) as string[])];
     const stageRottingMap = new Map<string, number | null>();
     if (stageIds.length > 0) {
-      const { data: stageRows } = await (supabase as any)
+      const { data: stageRows } = await supabase
         .schema('ops')
         .from('pipeline_stages')
         .select('id, rotting_days')

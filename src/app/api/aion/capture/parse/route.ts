@@ -218,7 +218,7 @@ async function fetchWorkspaceContext(
     // ops.events is not in generated types (cortex/ops/directory/finance
     // schemas are not PostgREST-exposed for types) — cast through any.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    supabase
       .schema('ops')
       .from('events')
       .select('id, title, starts_at')

@@ -193,7 +193,7 @@ export async function callMetric(
   // generated supabase types only cover public; the finance schema is reached
   // via the runtime escape hatch (tracked as PR-INFRA-2 in CLAUDE.md).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (client as any)
+  const { data, error } = await client
     .schema(definition.rpcSchema)
     .rpc(definition.rpcName, rpcArgs);
 

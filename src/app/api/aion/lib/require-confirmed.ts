@@ -25,6 +25,7 @@
  */
 
 import { getSystemClient } from '@/shared/api/supabase/system';
+import type { Json } from '@/types/supabase';
 
 export class ConfirmationError extends Error {
   constructor(message: string, public readonly code: ConfirmationErrorCode) {
@@ -110,12 +111,12 @@ export async function markExecuted(
   result: Record<string, unknown>,
 ): Promise<void> {
   const system = getSystemClient();
-  // Cast — aion_write_log.result is jsonb and the generated types' Json
-  // recursive type refuses Record<string, unknown> without a widening cast.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const opsLog = (system as any).schema('ops').from('aion_write_log');
-  const { error } = await opsLog
-    .update({ executed_at: new Date().toISOString(), result })
+  // aion_write_log.result is jsonb; the generated Json recursive type refuses
+  // Record<string, unknown> directly, so we widen at the call site.
+  const { error } = await system
+    .schema('ops')
+    .from('aion_write_log')
+    .update({ executed_at: new Date().toISOString(), result: result as unknown as Json })
     .eq('id', draftId)
     .is('executed_at', null);
 

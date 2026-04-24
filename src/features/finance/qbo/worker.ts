@@ -34,7 +34,7 @@ export async function processQboSyncJobs(): Promise<WorkerResult> {
   // Only jobs that are queued/failed AND past their next_attempt_at.
   // Ordered by next_attempt_at ascending (oldest first).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: jobs } = await (system as any)
+  const { data: jobs } = await system
     .schema('finance')
     .from('sync_jobs')
     .select('id, workspace_id, job_kind, local_id, state, attempt_number, depends_on_job_id')
@@ -55,7 +55,7 @@ export async function processQboSyncJobs(): Promise<WorkerResult> {
     // Dependency check: skip if depends_on_job_id exists and that job hasn't succeeded
     if (job.depends_on_job_id) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: depJob } = await (system as any)
+      const { data: depJob } = await system
         .schema('finance')
         .from('sync_jobs')
         .select('state')
@@ -71,7 +71,7 @@ export async function processQboSyncJobs(): Promise<WorkerResult> {
     // Lease the job (optimistic lock)
     const leaseId = `worker-${Date.now()}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: leased } = await (system as any)
+    const { data: leased } = await system
       .schema('finance')
       .from('sync_jobs')
       .update({
@@ -110,7 +110,7 @@ export async function processQboSyncJobs(): Promise<WorkerResult> {
     // ── Update job state ─────────────────────────────────────────────────────
     if (jobResult.success) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (system as any).schema('finance').from('sync_jobs').update({
+      await system.schema('finance').from('sync_jobs').update({
         state: 'succeeded',
         attempt_number: attemptNumber,
         last_error: null,
@@ -121,7 +121,7 @@ export async function processQboSyncJobs(): Promise<WorkerResult> {
     } else if (jobResult.needsCustomerMapping) {
       // Park in pending_mapping — waits for user to map the customer manually
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (system as any).schema('finance').from('sync_jobs').update({
+      await system.schema('finance').from('sync_jobs').update({
         state: 'pending_mapping',
         attempt_number: attemptNumber,
         last_error: jobResult.error ?? 'Needs customer mapping',
@@ -132,7 +132,7 @@ export async function processQboSyncJobs(): Promise<WorkerResult> {
     } else if (attemptNumber >= MAX_ATTEMPTS) {
       // Dead letter — persistent dashboard banner, admin email
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (system as any).schema('finance').from('sync_jobs').update({
+      await system.schema('finance').from('sync_jobs').update({
         state: 'dead_letter',
         attempt_number: attemptNumber,
         last_error: jobResult.error ?? 'Max attempts exceeded',
@@ -146,7 +146,7 @@ export async function processQboSyncJobs(): Promise<WorkerResult> {
       const nextAttemptAt = new Date(Date.now() + backoffSec * 1000).toISOString();
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (system as any).schema('finance').from('sync_jobs').update({
+      await system.schema('finance').from('sync_jobs').update({
         state: 'failed',
         attempt_number: attemptNumber,
         next_attempt_at: nextAttemptAt,

@@ -20,6 +20,7 @@ import type Stripe from 'stripe';
 import * as Sentry from '@sentry/nextjs';
 import { getStripe } from '@/shared/api/stripe/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import type { Json } from '@/types/supabase';
 import { sendTrialEndingEmail } from '@/shared/api/email/send';
 
 export const runtime = 'nodejs';
@@ -55,15 +56,16 @@ export async function POST(req: NextRequest) {
 
   // ── Event dedup via finance.stripe_webhook_events ──────────────────────────
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data: dedupRow } = await (supabase as any)
+  // Stripe.Event.data.object is a class union from the SDK that doesn't match
+  // Supabase's recursive Json type. Cast at the insert boundary.
+  const { data: dedupRow } = await supabase
     .schema('finance')
     .from('stripe_webhook_events')
     .insert({
       stripe_event_id: event.id,
       source: 'subscription',
       event_type: event.type,
-      payload: event.data.object,
+      payload: event.data.object as unknown as Json,
       received_at: new Date().toISOString(),
     })
     .select('stripe_event_id')
@@ -107,7 +109,7 @@ export async function POST(req: NextRequest) {
     const message = e instanceof Error ? e.message : String(e);
     Sentry.captureException(e);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).schema('finance').from('stripe_webhook_events')
+    await supabase.schema('finance').from('stripe_webhook_events')
       .update({ processing_error: message })
       .eq('stripe_event_id', event.id);
     return json({ error: 'Internal error' }, 500);
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest) {
 
   // Mark as processed
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).schema('finance').from('stripe_webhook_events')
+  await supabase.schema('finance').from('stripe_webhook_events')
     .update({ processed_at: new Date().toISOString() })
     .eq('stripe_event_id', event.id);
 

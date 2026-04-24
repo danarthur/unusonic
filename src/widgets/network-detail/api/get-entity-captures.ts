@@ -114,7 +114,7 @@ async function resolveAffiliatedEntityIds(
   entityId: string,
 ): Promise<string[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .schema('cortex')
     .from('relationships')
     .select('source_entity_id, target_entity_id')
@@ -158,7 +158,7 @@ export async function getEntityCaptures(
   // cortex schema isn't in generated types (see CLAUDE.md schema note) —
   // cast through any for the query chain.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .from('capture_events')
     .select(
@@ -236,7 +236,7 @@ export async function getEntityCaptures(
       : Promise.resolve({ data: [] as { id: string; title: string | null }[] }),
     eventIds.length > 0
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? (supabase as any)
+      ? supabase
           .schema('ops')
           .from('events')
           .select('id, title')

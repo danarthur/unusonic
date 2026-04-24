@@ -15,7 +15,7 @@ export async function getTodaysBrief(): Promise<TodaysBriefData> {
 
   const supabase = await createClient();
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('ops')
     .from('daily_briefings')
     .select('body, facts_json, generated_at')

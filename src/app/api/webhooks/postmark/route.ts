@@ -170,7 +170,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload): Promise<Inbo
   const supabase = getSystemClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema not in PostgREST exposed schemas
-  const { data: threadRow } = await (supabase as any)
+  const { data: threadRow } = await supabase
     .schema('ops')
     .from('message_threads')
     .select('id, workspace_id, deal_id, provider_thread_key')
@@ -243,7 +243,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload): Promise<Inbo
 
   // 7. Fire the RPC. Idempotent on provider_message_id; retries safe.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: newMessageId, error } = await (supabase as any)
+  const { data: newMessageId, error } = await supabase
     .schema('ops')
     .rpc('record_inbound_message', { p_payload: rpcPayload });
 
@@ -288,7 +288,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload): Promise<Inbo
     for (const signalType of ['dead_silence', 'proposal_engagement'] as const) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any)
+        await supabase
           .schema('cortex')
           .rpc('resolve_aion_proactive_lines_by_deal', {
             p_workspace_id: threadRow.workspace_id,
@@ -327,7 +327,7 @@ async function maybeFireUrgentInsight(
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: msgRow } = await (supabase as any)
+    const { data: msgRow } = await supabase
       .schema('ops')
       .from('messages')
       .select('urgency_keyword_match')
@@ -342,7 +342,7 @@ async function maybeFireUrgentInsight(
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).schema('cortex').rpc('upsert_aion_insight', {
+    await supabase.schema('cortex').rpc('upsert_aion_insight', {
       p_workspace_id: workspaceId,
       p_trigger_type: 'inbound_reply_urgent',
       p_entity_type: 'deal',

@@ -320,7 +320,7 @@ export async function logAionCardEvent(event: AionCardEvent): Promise<void> {
 
     const system = getSystemClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-    await (system as any)
+    await system
       .schema('ops')
       .from('deal_activity_log')
       .insert({
@@ -372,7 +372,7 @@ export async function logAionCardCadenceAccuracy(input: {
 
     const system = getSystemClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-    await (system as any)
+    await system
       .schema('ops')
       .from('deal_activity_log')
       .insert({

@@ -50,7 +50,7 @@ export async function updateWorkingNotes(
   if (!user) return { ok: false, error: 'Unauthorized.' };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .rpc('upsert_entity_working_notes', {
       p_workspace_id: workspaceId,

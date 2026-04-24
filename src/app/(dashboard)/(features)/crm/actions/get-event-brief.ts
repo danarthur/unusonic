@@ -69,7 +69,7 @@ export async function getEventBrief(eventId: string): Promise<EventBriefResult> 
   const dealId = summary.deal_id;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema varies by PostgREST exposure
-  const opsClient = (system as any).schema('ops');
+  const opsClient = system.schema('ops');
 
   const [crewStats, latestMessages, proactiveLines, invoiceState] = await Promise.all([
     dealId ? fetchCrewStats(opsClient, dealId) : Promise.resolve({ total: 0, confirmed: 0 }),
@@ -182,27 +182,21 @@ async function fetchProactiveLines(
   system: ReturnType<typeof getSystemClient>,
   dealId: string,
 ): Promise<BriefInsight[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema cast
-  const cortexClient = (system as any).schema('cortex');
-  const { data } = await cortexClient
+  const { data } = await system
+    .schema('cortex')
     .from('aion_insights')
-    .select('id, trigger_type, title, urgency, status')
+    .select('id, trigger_type, title, priority, status')
     .eq('entity_type', 'deal')
     .eq('entity_id', dealId)
     .in('status', ['pending', 'surfaced'])
     .order('created_at', { ascending: false })
     .limit(5);
 
-  return ((data ?? []) as Array<{
-    id: string;
-    trigger_type: string;
-    title: string;
-    urgency: string | null;
-  }>).map((row) => ({
+  return (data ?? []).map((row) => ({
     id: row.id,
     triggerType: row.trigger_type,
     title: row.title,
-    urgency: row.urgency,
+    urgency: row.priority != null ? String(row.priority) : null,
   }));
 }
 
@@ -210,26 +204,21 @@ async function fetchInvoiceState(
   system: ReturnType<typeof getSystemClient>,
   dealId: string,
 ): Promise<{ outstanding: number; paid: number }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema cast
-  const financeClient = (system as any).schema('finance');
-  const { data } = await financeClient
+  const { data } = await system
+    .schema('finance')
     .from('invoices')
-    .select('total_cents, amount_paid_cents, status')
+    .select('total_amount, paid_amount, status')
     .eq('deal_id', dealId);
 
-  const rows = (data ?? []) as Array<{
-    total_cents: number | null;
-    amount_paid_cents: number | null;
-    status: string | null;
-  }>;
+  const rows = data ?? [];
 
   let outstanding = 0;
   let paid = 0;
   for (const row of rows) {
-    const total = row.total_cents ?? 0;
-    const paidCents = row.amount_paid_cents ?? 0;
-    paid += paidCents;
-    outstanding += Math.max(0, total - paidCents);
+    const total = Number(row.total_amount ?? 0);
+    const paidAmount = Number(row.paid_amount ?? 0);
+    paid += paidAmount;
+    outstanding += Math.max(0, total - paidAmount);
   }
   return { outstanding, paid };
 }

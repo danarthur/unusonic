@@ -154,7 +154,7 @@ async function rollOwnerArchetype(
   archetype: CadenceArchetype,
 ): Promise<boolean> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema cast
-  const { data, error } = await (db as any)
+  const { data, error } = await db
     .schema('ops')
     .rpc('metric_owner_cadence_profile', {
       p_workspace_id: workspaceId,

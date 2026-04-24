@@ -37,14 +37,23 @@ export async function createInvoiceCheckoutSession(
   const supabase = getSystemClient();
 
   // Fetch the invoice via the same RPC the public page uses.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('finance')
     .rpc('get_public_invoice', { p_token: trimmed });
 
   if (error) return { url: null, error: error.message };
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return { url: null, error: 'Invoice not found' };
+  const rawRow = Array.isArray(data) ? data[0] : data;
+  if (!rawRow) return { url: null, error: 'Invoice not found' };
+
+  // TODO(finance): finance.get_public_invoice RPC doesn't currently return
+  // workspace_id / accept_online_payments. The Stripe-checkout flow relies on
+  // both. Cast at the boundary until the RPC is updated to include them, then
+  // drop the cast. Runtime behavior unchanged — if the fields are absent at
+  // runtime we return the same "no online payments" error users already see.
+  const row = rawRow as typeof rawRow & {
+    workspace_id?: string;
+    accept_online_payments?: boolean;
+  };
 
   if (!row.accept_online_payments) {
     return { url: null, error: 'This workspace does not accept online payments yet' };

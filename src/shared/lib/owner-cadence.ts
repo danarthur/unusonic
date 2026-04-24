@@ -58,7 +58,7 @@ export async function getOwnerCadenceProfile(
   const system = getSystemClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops RPC surfaced via typed regen; cast for call convention
-  const { data, error } = await (system as any)
+  const { data, error } = await system
     .schema('ops')
     .rpc('metric_owner_cadence_profile', {
       p_workspace_id: workspaceId,

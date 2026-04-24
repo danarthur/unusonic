@@ -69,7 +69,7 @@ export async function getTeamPreview(
   // 1. Pull affiliation edges both directions. Either source or target can be
   //    the company; the other side is the candidate person.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: edgeRows, error: edgeErr } = await (supabase as any)
+  const { data: edgeRows, error: edgeErr } = await supabase
     .schema('cortex')
     .from('relationships')
     .select('source_entity_id, target_entity_id, relationship_type, context_data')
@@ -134,7 +134,7 @@ export async function getTeamPreview(
     visibility: CaptureVisibility;
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: captureRows } = await (supabase as any)
+  const { data: captureRows } = await supabase
     .schema('cortex')
     .from('capture_events')
     .select('id, resolved_entity_id, parsed_note, transcript, created_at, visibility')
@@ -154,7 +154,7 @@ export async function getTeamPreview(
 
   // 4. DNR flags per person from entity_working_notes.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: wnRows } = await (supabase as any)
+  const { data: wnRows } = await supabase
     .schema('cortex')
     .from('entity_working_notes')
     .select('entity_id, dnr_flagged')

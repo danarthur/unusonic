@@ -47,7 +47,7 @@ export async function acceptStageSuggestion(
 
   // Resolve the target stage by tag on this workspace's default pipeline.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ops schema
-  const { data: stages } = await (supabase as any)
+  const { data: stages } = await supabase
     .schema('ops')
     .from('pipeline_stages')
     .select('id, slug, tags, kind, pipeline_id, pipelines!inner(workspace_id, is_default)')

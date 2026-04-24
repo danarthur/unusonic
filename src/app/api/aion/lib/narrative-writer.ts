@@ -35,7 +35,7 @@ export async function writeDealNarrative(params: {
     : { authored_by: `system:${params.author.subsystem}` };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cortexRpc = (system as any).schema('cortex');
+  const cortexRpc = system.schema('cortex');
   const { data, error } = await cortexRpc.rpc('upsert_memory_embedding', {
     p_workspace_id:    params.workspaceId,
     p_source_type:     'narrative',

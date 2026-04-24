@@ -88,7 +88,7 @@ export async function getWorkingNotes(
   if (!user) return { ok: false, error: 'Unauthorized.' };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .schema('cortex')
     .from('entity_working_notes')
     .select(

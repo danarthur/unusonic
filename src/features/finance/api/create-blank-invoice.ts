@@ -80,25 +80,36 @@ export async function createBlankInvoice(
 
   const system = getSystemClient();
 
+  // Allocate a per-workspace monotonic invoice number first — finance.invoices
+  // requires invoice_number NOT NULL with no default (per-workspace sequence
+  // table in finance.invoice_number_sequences).
+  const { data: invoiceNumber, error: numberErr } = await system
+    .schema('finance')
+    .rpc('next_invoice_number', { p_workspace_id: input.workspaceId });
+
+  if (numberErr || !invoiceNumber) {
+    return { invoiceId: null, error: `Failed to allocate invoice number: ${numberErr?.message ?? 'unknown'}` };
+  }
+
   // Insert invoice
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-  const { data: invoice, error: insertErr } = await (system as any)
+  const { data: invoice, error: insertErr } = await system
     .schema('finance')
     .from('invoices')
     .insert({
       workspace_id: input.workspaceId,
+      invoice_number: invoiceNumber,
       // invoice_kind CHECK is ('deposit' | 'progress' | 'final' | 'standalone' | 'credit_note').
       // "standard" was the legacy label and violates the constraint — use 'standalone'
       // for the blank-invoice path (no proposal parent).
       invoice_kind: 'standalone',
       status: 'draft',
       bill_to_entity_id: input.billToEntityId,
-      billing_email: input.billingEmail ?? null,
-      event_id: input.eventId ?? null,
-      deal_id: input.dealId ?? null,
-      po_number: input.poNumber ?? null,
-      notes_to_client: input.notesToClient ?? null,
-      terms: input.terms ?? null,
+      billing_email: input.billingEmail ?? undefined,
+      event_id: input.eventId ?? undefined,
+      deal_id: input.dealId ?? undefined,
+      po_number: input.poNumber ?? undefined,
+      notes_to_client: input.notesToClient ?? undefined,
+      terms: input.terms ?? undefined,
       subtotal_amount: subtotal,
       discount_amount: 0,
       tax_amount: 0,
@@ -128,6 +139,7 @@ export async function createBlankInvoice(
       const isDiscountKind = li.itemKind === 'discount' || li.itemKind === 'adjustment';
       return {
         invoice_id: invoiceId,
+        workspace_id: input.workspaceId,
         position: idx + 1,
         item_kind: li.itemKind,
         description: li.description,
@@ -139,8 +151,7 @@ export async function createBlankInvoice(
       };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-    const { error: liErr } = await (system as any)
+    const { error: liErr } = await system
       .schema('finance')
       .from('invoice_line_items')
       .insert(rows);
@@ -150,8 +161,7 @@ export async function createBlankInvoice(
         '[createBlankInvoice] Line items insert failed, rolling back invoice:',
         { invoiceId, lineItemCount: input.lineItems.length, code: liErr.code, message: liErr.message },
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
-      await (system as any)
+      await system
         .schema('finance')
         .from('invoices')
         .delete()

@@ -872,7 +872,7 @@ export async function getNetworkNodeDetails(
   const sys = getSystemClient();
 
   if (targetEntityIdForCrew) {
-    const { data: crewRels } = await (sys as any)
+    const { data: crewRels } = await sys
       .schema('cortex').from('relationships')
       .select('id, source_entity_id, context_data')
       .eq('target_entity_id', targetEntityIdForCrew)
@@ -881,7 +881,7 @@ export async function getNetworkNodeDetails(
 
     if (crewRels?.length) {
       const personEntIds = [...new Set(crewRels.map((r) => r.source_entity_id))];
-      const { data: personEnts } = await (sys as any)
+      const { data: personEnts } = await sys
         .schema('directory').from('entities')
         .select('id, display_name, avatar_url, attributes')
         .in('id', personEntIds) as { data: { id: string; display_name: string | null; avatar_url: string | null; attributes: unknown }[] | null };
