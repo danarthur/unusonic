@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Layers } from 'lucide-react';
 import { StreamCard, type StreamCardItem } from './stream-card';
@@ -24,6 +24,7 @@ import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-s
 import { filterByMode, type StreamMode } from './stream-filter';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
+import { getUnseenPillCountsForDeals } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
 
 export type { StreamMode };
 
@@ -63,6 +64,33 @@ export function Stream({
   const [sort, setSort] = useState<StreamSort>(INITIAL_SORT);
   const [sortBeforeAttention, setSortBeforeAttention] = useState<StreamSort | null>(null);
   const [dayViewDate, setDayViewDate] = useState<string | null>(null);
+
+  // Wk 10 D7 — single bulk-fetch for unseen-pill counts across visible deals.
+  // Refetches when the deal set changes (membership keyed by sorted ids); the
+  // partial index `aion_proactive_lines_unseen_per_deal_idx` makes this O(unseen)
+  // regardless of how many cards are in view. Filter/sort state stays local —
+  // we always keep the full deal-id set so a card scrolling back into view
+  // already has its dot resolved without another round trip.
+  const dealIds = useMemo(
+    () => items.filter((i) => i.source === 'deal').map((i) => i.id),
+    [items],
+  );
+  const dealIdsKey = useMemo(() => [...dealIds].sort().join(','), [dealIds]);
+  const [unseenPillCounts, setUnseenPillCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (dealIds.length === 0) {
+      setUnseenPillCounts({});
+      return;
+    }
+    let cancelled = false;
+    getUnseenPillCountsForDeals(dealIds)
+      .then((counts) => { if (!cancelled) setUnseenPillCounts(counts); })
+      .catch(() => { if (!cancelled) setUnseenPillCounts({}); });
+    return () => { cancelled = true; };
+    // dealIdsKey collapses array identity into a stable string so the effect
+    // doesn't refire on every render that hands us a new but equivalent array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dealIdsKey]);
 
   const handleFiltersChange = (newFilters: StreamFilters) => {
     const wasAttention = filters.needsAttention;
@@ -259,6 +287,7 @@ export function Stream({
           onOpenDayView={setDayViewDate}
           mode={mode}
           pipelineStages={pipelineStages}
+          unseenPillCounts={unseenPillCounts}
         />
       </div>
 
@@ -299,6 +328,7 @@ function DateGroupedList({
   onOpenDayView,
   mode,
   pipelineStages,
+  unseenPillCounts,
 }: {
   items: StreamCardItem[];
   selectedId: string | null;
@@ -309,6 +339,9 @@ function DateGroupedList({
   onOpenDayView: (date: string) => void;
   mode: string;
   pipelineStages?: readonly WorkspacePipelineStage[];
+  /** Wk 10 D7 — deal_id → unseen Aion pill count, fetched in bulk by the
+   *  parent. Only deal rows ever have a non-zero entry; events stay false. */
+  unseenPillCounts: Record<string, number>;
 }) {
   // Build date groups: { date: string | null, items: StreamCardItem[] }[]
   // Items are already sorted, so we preserve order and insert headers between date changes.
@@ -387,6 +420,9 @@ function DateGroupedList({
               selected={selectedId === item.id}
               onClick={() => onSelect(item.id)}
               pipelineStages={pipelineStages}
+              hasUnseenPill={
+                item.source === 'deal' && (unseenPillCounts[item.id] ?? 0) > 0
+              }
             />
           ))}
         </li>

@@ -19,12 +19,39 @@ const hoisted = vi.hoisted(() => {
     user: null as { id: string } | null,
     disablesRows: [] as Array<Record<string, unknown>>,
     disablesError: null as { message: string } | null,
+    proactiveLineRows: [] as Array<Record<string, unknown>>,
+    proactiveLineError: null as { message: string } | null,
   };
   return { state };
 });
 
 const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 const fromCalls: string[] = [];
+const proactiveLineFilterCalls: Array<{ method: string; args: unknown[] }> = [];
+
+// Thenable chain for `.schema('cortex').from('aion_proactive_lines').select(...).in(...).is(...).gt(...)`
+// — resolves to {data, error} when awaited as the terminal of a builder chain.
+function makeProactiveLineThenable() {
+  const chain: Record<string, unknown> = {};
+  const record = (method: string) =>
+    function (this: unknown, ...args: unknown[]) {
+      proactiveLineFilterCalls.push({ method, args });
+      return chain;
+    };
+  chain.select = record('select');
+  chain.in = record('in');
+  chain.is = record('is');
+  chain.gt = record('gt');
+  chain.eq = record('eq');
+  chain.then = (
+    onFulfilled: (v: { data: unknown; error: unknown }) => unknown,
+  ) =>
+    onFulfilled({
+      data: hoisted.state.proactiveLineRows,
+      error: hoisted.state.proactiveLineError,
+    });
+  return chain;
+}
 
 vi.mock('@/shared/api/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -32,6 +59,11 @@ vi.mock('@/shared/api/supabase/server', () => ({
       getUser: async () => ({ data: { user: hoisted.state.user }, error: null }),
     },
     schema: () => ({
+      from: (table: string) => {
+        fromCalls.push(`schema:${table}`);
+        if (table === 'aion_proactive_lines') return makeProactiveLineThenable();
+        return makeProactiveLineThenable();
+      },
       rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
         rpcCalls.push({ name, args });
         return {
@@ -85,6 +117,7 @@ import {
   submitPillFeedback,
   resurfaceMutedReason,
   getActiveSignalDisablesForWorkspace,
+  getUnseenPillCountsForDeals,
 } from '../pill-history-actions';
 
 beforeEach(() => {
@@ -95,8 +128,11 @@ beforeEach(() => {
   hoisted.state.user = { id: 'user-1' };
   hoisted.state.disablesRows = [];
   hoisted.state.disablesError = null;
+  hoisted.state.proactiveLineRows = [];
+  hoisted.state.proactiveLineError = null;
   rpcCalls.length = 0;
   fromCalls.length = 0;
+  proactiveLineFilterCalls.length = 0;
 });
 
 afterEach(() => {
@@ -180,6 +216,78 @@ describe('resurfaceMutedReason', () => {
       name: 'resurface_muted_reason',
       args: { p_workspace_id: 'ws-1', p_signal_type: 'proposal_engagement' },
     });
+  });
+});
+
+describe('getUnseenPillCountsForDeals', () => {
+  it('short-circuits empty input without touching the supabase client', async () => {
+    const result = await getUnseenPillCountsForDeals([]);
+    expect(result).toEqual({});
+    // Empty input MUST NOT round-trip — proves the partial-index read isn't
+    // even attempted when the parent passes nothing to count.
+    expect(fromCalls).not.toContain('schema:aion_proactive_lines');
+    expect(proactiveLineFilterCalls).toHaveLength(0);
+  });
+
+  it('groups rows by deal_id into a Record<dealId, count>', async () => {
+    hoisted.state.proactiveLineRows = [
+      { deal_id: 'deal-1' },
+      { deal_id: 'deal-1' },
+      { deal_id: 'deal-2' },
+      { deal_id: 'deal-3' },
+      { deal_id: 'deal-1' },
+    ];
+    const result = await getUnseenPillCountsForDeals(['deal-1', 'deal-2', 'deal-3']);
+    expect(result).toEqual({ 'deal-1': 3, 'deal-2': 1, 'deal-3': 1 });
+  });
+
+  it('omits deals with zero unseen pills (sparse map, not a dense object)', async () => {
+    hoisted.state.proactiveLineRows = [{ deal_id: 'deal-2' }];
+    const result = await getUnseenPillCountsForDeals(['deal-1', 'deal-2', 'deal-3']);
+    expect(result).toEqual({ 'deal-2': 1 });
+    expect('deal-1' in result).toBe(false);
+    expect('deal-3' in result).toBe(false);
+  });
+
+  it('applies the partial-index predicate (dismissed_at, resolved_at, seen_at all null + expires_at > now)', async () => {
+    hoisted.state.proactiveLineRows = [];
+    await getUnseenPillCountsForDeals(['deal-1', 'deal-2']);
+
+    expect(fromCalls).toContain('schema:aion_proactive_lines');
+
+    const isCalls = proactiveLineFilterCalls.filter((c) => c.method === 'is');
+    // Three index-predicate columns must all be checked for null.
+    expect(isCalls).toEqual(
+      expect.arrayContaining([
+        { method: 'is', args: ['dismissed_at', null] },
+        { method: 'is', args: ['resolved_at', null] },
+        { method: 'is', args: ['seen_at', null] },
+      ]),
+    );
+
+    const inCall = proactiveLineFilterCalls.find((c) => c.method === 'in');
+    expect(inCall?.args?.[0]).toBe('deal_id');
+    expect(inCall?.args?.[1]).toEqual(['deal-1', 'deal-2']);
+
+    const gtCall = proactiveLineFilterCalls.find((c) => c.method === 'gt');
+    expect(gtCall?.args?.[0]).toBe('expires_at');
+    expect(typeof gtCall?.args?.[1]).toBe('string');
+  });
+
+  it('returns an empty map when the read errors (RLS denial, network, etc.)', async () => {
+    hoisted.state.proactiveLineRows = [];
+    hoisted.state.proactiveLineError = { message: 'permission denied' };
+    const result = await getUnseenPillCountsForDeals(['deal-1']);
+    expect(result).toEqual({});
+  });
+
+  it('does not call the cortex.aion_insights API surface (cross-table isolation)', async () => {
+    await getUnseenPillCountsForDeals(['deal-1']);
+    // Source-discipline guard below already enforces this on the file as a
+    // whole — this assertion confirms the runtime path stays clean too.
+    expect(fromCalls).not.toContain('schema:aion_insights');
+    expect(fromCalls).not.toContain('aion_insights');
+    expect(rpcCalls.find((c) => c.name === 'upsert_aion_insight')).toBeUndefined();
   });
 });
 

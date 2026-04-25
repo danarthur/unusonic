@@ -8,6 +8,7 @@
  *   - submitPillFeedback(lineId, feedback)  — useful/not_useful chip
  *   - resurfaceMutedReason(workspaceId, signalType) — owner Resurface
  *   - getActiveSignalDisablesForWorkspace(workspaceId) — Sheet's muted strip
+ *   - getUnseenPillCountsForDeals(dealIds)  — bulk badge-count fetch
  *
  * Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.7
  * Design: docs/reference/aion-pill-history-design.md
@@ -168,4 +169,47 @@ export async function getActiveSignalDisablesForWorkspace(
 
   if (error) return { rows: [], error: error.message };
   return { rows: (data ?? []) as ActiveSignalDisable[] };
+}
+
+/**
+ * Bulk badge-count fetch — one round trip for many deals. Returns
+ * Record<dealId, unseenCount> so a parent that renders N cards can resolve
+ * the dot per card without N+1 reads.
+ *
+ * The query is shaped to match the Wk 10 partial index
+ * `cortex.aion_proactive_lines_unseen_per_deal_idx`
+ *   (deal_id, expires_at DESC) WHERE dismissed_at IS NULL AND resolved_at IS NULL AND seen_at IS NULL
+ * The volatile `expires_at > now()` predicate lives outside the index but the
+ * planner can range-scan against the indexed expires_at column for a tight plan.
+ *
+ * RLS: cortex.aion_proactive_lines has SELECT for authenticated where
+ * `workspace_id IN get_my_workspace_ids()` — a cross-workspace deal_id passed
+ * by a malicious caller is silently filtered out, so no separate workspace
+ * gate is needed here. Empty input short-circuits to {}.
+ */
+export async function getUnseenPillCountsForDeals(
+  dealIds: string[],
+): Promise<Record<string, number>> {
+  if (dealIds.length === 0) return {};
+
+  const supabase = await createClient();
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .schema('cortex')
+    .from('aion_proactive_lines')
+    .select('deal_id')
+    .in('deal_id', dealIds)
+    .is('dismissed_at', null)
+    .is('resolved_at', null)
+    .is('seen_at', null)
+    .gt('expires_at', nowIso);
+
+  if (error || !data) return {};
+
+  const counts: Record<string, number> = {};
+  for (const row of data as Array<{ deal_id: string }>) {
+    counts[row.deal_id] = (counts[row.deal_id] ?? 0) + 1;
+  }
+  return counts;
 }

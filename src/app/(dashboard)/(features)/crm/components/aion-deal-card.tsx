@@ -61,7 +61,10 @@ import { ProactiveLineContainer } from './proactive-line-pill';
 import type { ProactiveLine } from '../actions/proactive-line-actions';
 import { AionMarkdown } from '@/app/(dashboard)/(features)/aion/components/AionMarkdown';
 import { PillUnseenDot } from '@/app/(dashboard)/(features)/aion/components/PillUnseenDot';
-import { getActiveSignalDisablesForWorkspace } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
+import {
+  getActiveSignalDisablesForWorkspace,
+  getUnseenPillCountsForDeals,
+} from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
 
 // Lazy-load the pill-history Sheet — keeps Prism mount budget unchanged
 // (design §4.1). Only fetches when the user actually opens History.
@@ -270,6 +273,24 @@ export function AionDealCard({
       .catch(() => { if (!cancelled) setHasMutedSignal(false); });
     return () => { cancelled = true; };
   }, [workspaceId]);
+
+  // Wk 10 D7 — chat-collapsed unseen-pill dot. Reuses the bulk-fetch action
+  // with a single-deal payload so this code path stays canonical even though
+  // the card is rendered one-deal-at-a-time. The Sheet stamps seen on every
+  // visible row when opened, so closing the Sheet flips this back to false
+  // on the next refetch trigger (history sheet open/close).
+  const [hasUnseenPill, setHasUnseenPill] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    getUnseenPillCountsForDeals([data.dealId])
+      .then((counts) => {
+        if (!cancelled) setHasUnseenPill((counts[data.dealId] ?? 0) > 0);
+      })
+      .catch(() => { if (!cancelled) setHasUnseenPill(false); });
+    return () => { cancelled = true; };
+    // Refetch when the history sheet closes — markPillSeen runs on open, so
+    // the unseen count drops to zero by the time the user dismisses the Sheet.
+  }, [data.dealId, historySheetOpen]);
 
   // Proactive-line "Ask Aion" handler. Click on the pill headline posts the
   // insight as a user message into the deal-scoped thread so Aion can riff on
@@ -508,6 +529,11 @@ export function AionDealCard({
             >
               <span className="flex items-center gap-2 min-w-0">
                 <AionMark size={14} status="ambient" />
+                <PillUnseenDot
+                  show={hasUnseenPill}
+                  ariaLabel="Unseen Aion pill on this deal"
+                  size={7}
+                />
                 <span className="truncate">
                   {messages.length > 0
                     ? `Aion chat · ${messages.length} message${messages.length === 1 ? '' : 's'}`
