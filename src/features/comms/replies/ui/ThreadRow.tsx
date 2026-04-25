@@ -60,15 +60,26 @@ export function ThreadRow({ thread, onExpand, onRefresh }: ThreadRowProps) {
 
   const suffix = participantSuffix(thread);
 
+  // Row is a div-as-button so the inner overflow-menu kebab can be a real
+  // <button> without producing a nested-interactive HTML hydration error
+  // (Next 16 / React 19 strict). aria-keyboard handling restores the
+  // semantics we lose by not using a real <button> outer.
   return (
-    <motion.button
-      type="button"
+    <motion.div
       layout
+      role="button"
+      tabIndex={0}
       onClick={onExpand}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onExpand();
+        }
+      }}
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: isSnoozed ? 0.5 : 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="flex w-full text-left transition-colors"
+      className="flex w-full text-left transition-colors focus-visible:outline-none"
       aria-label={`Expand thread ${thread.subject ?? ''}`}
       style={{
         padding: 'var(--stage-gap-wide, 12px)',
@@ -84,6 +95,14 @@ export function ThreadRow({ thread, onExpand, onRefresh }: ThreadRowProps) {
         e.currentTarget.style.borderColor = 'var(--stage-edge-subtle)';
       }}
       onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+        e.currentTarget.style.borderColor = 'transparent';
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.background = 'oklch(1 0 0 / 0.04)';
+        e.currentTarget.style.borderColor = 'var(--stage-edge-subtle)';
+      }}
+      onBlur={(e) => {
         e.currentTarget.style.background = 'transparent';
         e.currentTarget.style.borderColor = 'transparent';
       }}
@@ -244,6 +263,6 @@ export function ThreadRow({ thread, onExpand, onRefresh }: ThreadRowProps) {
           )}
         </div>
       </div>
-    </motion.button>
+    </motion.div>
   );
 }
