@@ -743,6 +743,23 @@ export const METRICS: Record<string, MetricDefinition> = {
     notes: 'Spec: docs/reference/sales-dashboard-design.md §5.5',
   },
 
+  'lobby.recent_replies': {
+    id: 'lobby.recent_replies',
+    kind: 'widget',
+    widgetKey: 'recent-replies',
+    argsSchema: noArgsSchema,
+    requiredCapabilities: ['deals:read:global'],
+    refreshability: 'manual',
+    roles: ['owner', 'pm'],
+    title: 'Recent replies',
+    description: 'Cross-deal feed of latest inbound client messages. One tap deep-links into the right deal\'s Replies card. Auto-replies aggregated to a muted footer row.',
+    emptyState: {
+      title: 'Nothing in the last 24 hours',
+      body: 'When clients write back, you\'ll see it here first.',
+    },
+    notes: 'Closes the discoverability gap on the per-deal Replies card. Spec: docs/reference/replies-card-v2-design.md §6 PR #22.',
+  },
+
   'lobby.weekly_tally': {
     id: 'lobby.weekly_tally',
     kind: 'widget',
