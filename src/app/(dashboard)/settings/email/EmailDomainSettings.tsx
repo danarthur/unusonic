@@ -1,13 +1,27 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Copy, RefreshCw, Trash2, Globe, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  RefreshCw,
+  Trash2,
+  Globe,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
+  Cloud,
+  Send,
+} from 'lucide-react';
 import {
   addSendingDomain,
   verifySendingDomain,
   removeSendingDomain,
   preflightSendingDomain,
+  detectDnsProvider,
+  sendVerificationTestEmail,
   type PreflightFinding,
 } from '@/features/org-management/api/email-domain-actions';
 import type { DnsRecord } from '@/shared/api/resend/domains';
@@ -23,12 +37,25 @@ interface EmailDomainSettingsProps {
   initialDmarcStatus: string | null;
 }
 
-// ── Spring preset ──────────────────────────────────────────────────────────────
-
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 const spring = STAGE_HEAVY;
 
-// ── Status pill ────────────────────────────────────────────────────────────────
+// ── Live polling cadence ───────────────────────────────────────────────────────
+//
+// Resend's domain.updated webhook is the canonical signal, but we ALSO poll
+// from the client while the user is on the page so verification feedback is
+// instant (Marcus's "live status of EACH individual record" ask, and Resend's
+// own design blog credits this pattern with their conversion lift).
+//
+// Cadence: aggressive for the first 5 minutes (30s), then back off to 60s
+// for the next 30 minutes, then stop. After 35 minutes the user has either
+// finished or walked away — let the webhook handle long-tail propagation.
+const POLL_FAST_INTERVAL_MS = 30 * 1000;
+const POLL_FAST_DURATION_MS = 5 * 60 * 1000;
+const POLL_SLOW_INTERVAL_MS = 60 * 1000;
+const POLL_TOTAL_DURATION_MS = 35 * 60 * 1000;
+
+// ── Status pills ────────────────────────────────────────────────────────────────
 
 function StatusPill({ status }: { status: string }) {
   if (status === 'verified') {
@@ -55,6 +82,58 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function RecordStatusPill({ status }: { status: string }) {
+  if (status === 'verified') {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-full"
+        style={{
+          width: 14,
+          height: 14,
+          background: 'var(--color-unusonic-success)',
+          color: 'oklch(0.16 0 0)',
+        }}
+        title="Verified"
+        aria-label="Verified"
+      >
+        <Check className="w-2.5 h-2.5" strokeWidth={3} />
+      </span>
+    );
+  }
+  if (status === 'failure' || status === 'temporary_failure') {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-full"
+        style={{
+          width: 14,
+          height: 14,
+          background: 'var(--color-unusonic-error)',
+          color: 'oklch(0.16 0 0)',
+        }}
+        title={status === 'temporary_failure' ? 'Temporary failure' : 'Failed'}
+        aria-label={status === 'temporary_failure' ? 'Temporary failure' : 'Failed'}
+      >
+        <AlertCircle className="w-2.5 h-2.5" strokeWidth={2.5} />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full"
+      style={{
+        width: 14,
+        height: 14,
+        border: '1.5px solid var(--color-unusonic-warning)',
+        color: 'var(--color-unusonic-warning)',
+      }}
+      title="Pending"
+      aria-label="Pending"
+    >
+      <Clock className="w-2 h-2" strokeWidth={2.5} />
+    </span>
+  );
+}
+
 function DmarcBadge({ dmarcStatus }: { dmarcStatus: string | null }) {
   if (dmarcStatus === 'configured') {
     return (
@@ -72,13 +151,22 @@ function DmarcBadge({ dmarcStatus }: { dmarcStatus: string | null }) {
   );
 }
 
-// ── DNS record row ─────────────────────────────────────────────────────────────
+// ── DNS record row (with per-record status pill) ───────────────────────────────
 
-function DnsRecordRow({ label, type, name, value }: {
+function DnsRecordRow({
+  label,
+  type,
+  name,
+  value,
+  recordStatus,
+}: {
   label: string;
   type: string;
   name: string;
   value: string;
+  /** Per-record status from Resend's response. Omitted (no pill rendered) for
+   *  records we generate ourselves like the Unusonic-suggested DMARC. */
+  recordStatus?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -90,20 +178,178 @@ function DnsRecordRow({ label, type, name, value }: {
   }
 
   return (
-    <div className="grid grid-cols-[80px_60px_1fr_1fr_40px] gap-3 items-start py-3 border-b border-[var(--stage-border)] last:border-0">
-      <span className="text-xs font-medium text-[var(--stage-text-secondary)] pt-0.5">{label}</span>
+    <div className="grid grid-cols-[80px_60px_1fr_1fr_56px] gap-3 items-start py-3 border-b border-[var(--stage-border)] last:border-0">
+      <span className="text-xs font-medium text-[var(--stage-text-secondary)] pt-0.5 inline-flex items-center gap-1.5">
+        {label}
+      </span>
       <span className="inline-flex items-center px-1.5 py-0.5 rounded stage-badge-text font-mono bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] border border-[var(--stage-border)] w-fit">
         {type}
       </span>
       <span className="text-xs font-mono text-[var(--stage-text-primary)] break-all">{name}</span>
       <span className="text-xs font-mono text-[var(--stage-text-primary)] break-all">{value}</span>
+      <div className="flex items-center justify-end gap-1.5 shrink-0">
+        {recordStatus && <RecordStatusPill status={recordStatus} />}
+        <button
+          onClick={handleCopy}
+          className="stage-hover overflow-hidden flex items-center justify-center w-7 h-7 rounded-[var(--stage-radius-button)] transition-colors text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] shrink-0"
+          title="Copy value"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-[var(--color-unusonic-success)]" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Failure copy with common causes (collapsible details) ──────────────────────
+
+function FailureGuidance({ providerLabel }: { providerLabel: string | null }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const causes = [
+    {
+      title: 'DNS hasn\u2019t propagated yet',
+      body: 'DNS changes can take up to 24 hours to reach all servers. We\u2019re still checking — this resolves on its own most of the time.',
+    },
+    {
+      title: 'Cloudflare proxy is on (orange cloud)',
+      body: 'CNAMEs proxied through Cloudflare\u2019s HTTP layer never reach the email vendor. Set the proxy status to "DNS only" (grey cloud) for our records.',
+    },
+    {
+      title: 'Records added on the wrong domain level',
+      body: 'Some registrars auto-append the domain. If your record value ends in a duplicated domain (e.g. "value.yourdomain.com"), remove the trailing copy.',
+    },
+    {
+      title: 'Existing records conflict with ours',
+      body: 'You may already have an SPF or DMARC record on the apex domain. We use a subdomain to avoid this — check that you added our records on the correct subdomain, not the apex.',
+    },
+  ];
+
+  return (
+    <div className="rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] p-4 space-y-2">
+      <p className="text-sm text-[var(--stage-text-primary)] leading-relaxed">
+        We couldn\u2019t verify some records yet.{' '}
+        {providerLabel === 'Cloudflare'
+          ? 'Cloudflare orange-cloud proxy is the most common cause for the records we just asked you to add.'
+          : 'DNS propagation usually finishes within an hour but can take up to 24.'}{' '}
+        We\u2019ll keep checking automatically.
+      </p>
       <button
-        onClick={handleCopy}
-        className="stage-hover overflow-hidden flex items-center justify-center w-8 h-8 rounded-[var(--stage-radius-button)] transition-colors text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] shrink-0"
-        title="Copy value"
+        type="button"
+        onClick={() => setShowDetails((v) => !v)}
+        className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] inline-flex items-center gap-1"
       >
-        {copied ? <Check className="w-3.5 h-3.5 text-[var(--color-unusonic-success)]" /> : <Copy className="w-3.5 h-3.5" />}
+        <ChevronDown
+          className={`w-3 h-3 transition-transform ${showDetails ? 'rotate-180' : ''}`}
+        />
+        {showDetails ? 'Hide details' : 'Show common causes'}
       </button>
+      <AnimatePresence initial={false}>
+        {showDetails && (
+          <motion.ul
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={spring}
+            className="mt-2 space-y-2 overflow-hidden"
+          >
+            {causes.map((c) => (
+              <li key={c.title} className="text-xs leading-relaxed">
+                <span className="font-medium text-[var(--stage-text-primary)] block">
+                  {c.title}
+                </span>
+                <span className="text-[var(--stage-text-secondary)]">{c.body}</span>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Cloudflare orange-cloud warning banner ─────────────────────────────────────
+//
+// Field Expert convergence: Cloudflare-proxied CNAMEs never reach the email
+// vendor — DKIM records resolve to Cloudflare's edge, fail verification
+// silently. Universal across SES, Resend, Postmark, SendGrid. Worth a
+// dedicated callout when we detect Cloudflare nameservers.
+
+function CloudflareWarning() {
+  return (
+    <div
+      className="rounded-[var(--stage-radius-input)] border border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/5 p-3 flex items-start gap-2"
+      role="note"
+    >
+      <Cloud className="w-4 h-4 shrink-0 mt-0.5 text-[var(--color-unusonic-warning)]" />
+      <div className="text-xs leading-relaxed">
+        <span className="font-medium text-[var(--stage-text-primary)] block mb-0.5">
+          Cloudflare detected
+        </span>
+        <span className="text-[var(--stage-text-secondary)]">
+          For each CNAME record we ask you to add, set the proxy status to{' '}
+          <strong className="text-[var(--stage-text-primary)]">DNS only</strong>{' '}
+          (grey cloud icon, not orange). Cloudflare\u2019s proxy mode breaks DKIM
+          verification \u2014 this is the #1 cause of failed setups.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Before/after preview pane ──────────────────────────────────────────────────
+//
+// Marcus's "dopamine hit" — show what the bride's mom will see in her inbox
+// after verification. Updates live as the user types in the wizard inputs.
+
+function SenderPreview({
+  domainInput,
+  fromNameInput,
+  fromLocalpartInput,
+}: {
+  domainInput: string;
+  fromNameInput: string;
+  fromLocalpartInput: string;
+}) {
+  const trimmedDomain = domainInput.trim().toLowerCase();
+  const trimmedName = fromNameInput.trim();
+  const trimmedLocal = fromLocalpartInput.trim() || 'hello';
+  const validDomain = trimmedDomain && trimmedDomain.split('.').length >= 3;
+
+  return (
+    <div className="rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] p-4">
+      <p className="text-xs text-[var(--stage-text-secondary)] mb-3">
+        How clients see your emails
+      </p>
+      <div className="grid grid-cols-2 gap-4 text-xs">
+        <div className="space-y-1.5">
+          <p className="stage-label text-[var(--stage-text-tertiary)] uppercase tracking-wide">
+            Today
+          </p>
+          <p className="text-[var(--stage-text-secondary)] font-mono break-all">
+            Unusonic
+          </p>
+          <p className="text-[var(--stage-text-tertiary)] font-mono break-all">
+            hello@unusonic.com
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <p className="stage-label text-[var(--color-unusonic-success)] uppercase tracking-wide">
+            After verification
+          </p>
+          <p className="text-[var(--stage-text-primary)] font-mono break-all">
+            {trimmedName || 'Your name'}
+          </p>
+          <p
+            className={`font-mono break-all ${
+              validDomain
+                ? 'text-[var(--stage-text-primary)]'
+                : 'text-[var(--stage-text-tertiary)]'
+            }`}
+          >
+            {trimmedLocal}@{validDomain ? trimmedDomain : 'mail.yourdomain.com'}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -130,25 +376,42 @@ export function EmailDomainSettings({
   const [fromNameInput, setFromNameInput] = useState('');
   const [fromLocalpartInput, setFromLocalpartInput] = useState('hello');
 
-  // Preflight DNS findings — runs on domain-input blur to surface "your existing
-  // email keeps working" reassurance before the user commits. Closes Marcus's
-  // #1 fear from the User Advocate research run on 2026-04-25.
+  // Preflight DNS findings
   const [preflightFindings, setPreflightFindings] = useState<PreflightFinding[]>([]);
   const [preflightChecking, setPreflightChecking] = useState(false);
+
+  // Provider detection (Cloudflare warning + future registrar-specific copy)
+  const [providerLabel, setProviderLabel] = useState<string | null>(null);
+
+  // Send-test feedback
+  const [testSendStatus, setTestSendStatus] = useState<
+    | { state: 'idle' }
+    | { state: 'sending' }
+    | { state: 'sent'; recipient: string }
+    | { state: 'error'; message: string }
+  >({ state: 'idle' });
+
+  // Polling state
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const pollStartRef = useRef<number | null>(null);
 
   function runPreflight(value: string) {
     const trimmed = value.trim();
     if (!trimmed || trimmed.split('.').length < 3) {
       setPreflightFindings([]);
+      setProviderLabel(null);
       return;
     }
     setPreflightChecking(true);
-    preflightSendingDomain(trimmed)
-      .then((result) => {
-        if (result.ok) {
-          setPreflightFindings(result.findings);
+    Promise.all([preflightSendingDomain(trimmed), detectDnsProvider(trimmed)])
+      .then(([preflight, providerResult]) => {
+        if (preflight.ok) {
+          setPreflightFindings(preflight.findings);
         } else {
           setPreflightFindings([]);
+        }
+        if (providerResult.ok) {
+          setProviderLabel(providerResult.label);
         }
       })
       .catch(() => setPreflightFindings([]))
@@ -167,21 +430,11 @@ export function EmailDomainSettings({
     : status === 'verified' ? 'verified'
     : 'pending';
 
-  // ── Unusonic DMARC record value ───────────────────────────────────────────────
-  //
-  // Recommend p=quarantine (not p=none) because p=none provides ZERO protection
-  // against spoofed phishing emails — anyone can send mail claiming to be from
-  // the workspace's domain and Gmail/Outlook will deliver it to inboxes.
-  // Quarantine drops failed-DMARC mail to spam, which is the minimum responsible
-  // posture for a customer-facing wedding/production-services brand. The Field
-  // Expert research pass on 2026-04-25 documented this as the convergent
-  // recommendation across HubSpot, Klaviyo, Postmark, and Resend's own guidance.
-  //
-  // rua= sends aggregate reports to dmarc-aggregate@unusonic.com so we can
-  // surface a "Deliverability — last 7 days" panel in the workspace's Settings
-  // post-PR #24. adkim=r/aspf=r (relaxed) avoids the strict-alignment pitfalls
-  // that bite when subdomains differ slightly (Resend's send.* return-path).
-  // pct=100 applies the policy to 100% of mail (not a 10% rollout sample).
+  const allRecordsVerified = dnsRecords.length > 0 && dnsRecords.every((r) => r.status === 'verified');
+  const hasRecordFailure = dnsRecords.some((r) => r.status === 'failure');
+  const isCloudflare = providerLabel === 'Cloudflare';
+
+  // ── DMARC record value ──────────────────────────────────────────────────────
   const dmarcRecordValue =
     'v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-aggregate@unusonic.com; adkim=r; aspf=r;';
   const dmarcRecordName = domain ? `_dmarc.${domain}` : '_dmarc.yourdomain.com';
@@ -196,7 +449,8 @@ export function EmailDomainSettings({
         setError(result.error);
         return;
       }
-      setDomain(domainInput.toLowerCase().trim());
+      const cleanedDomain = domainInput.toLowerCase().trim();
+      setDomain(cleanedDomain);
       setStatus('pending');
       setFromName(fromNameInput || null);
       setFromLocalpart(fromLocalpartInput || 'hello');
@@ -204,6 +458,11 @@ export function EmailDomainSettings({
       setDomainInput('');
       setFromNameInput('');
       setFromLocalpartInput('hello');
+      // Detect provider for the now-active domain so the warning appears
+      // without waiting for an onBlur cycle.
+      detectDnsProvider(cleanedDomain).then((p) => {
+        if (p.ok) setProviderLabel(p.label);
+      });
     });
   }
 
@@ -220,6 +479,7 @@ export function EmailDomainSettings({
       if (result.dnsRecords.length > 0) {
         setDnsRecords(result.dnsRecords);
       }
+      setLastChecked(new Date());
     });
   }
 
@@ -237,8 +497,82 @@ export function EmailDomainSettings({
       setFromLocalpart('hello');
       setDmarcStatus(null);
       setDnsRecords([]);
+      setLastChecked(null);
+      setTestSendStatus({ state: 'idle' });
     });
   }
+
+  function handleSendTest() {
+    setTestSendStatus({ state: 'sending' });
+    sendVerificationTestEmail()
+      .then((result) => {
+        if (result.ok) {
+          setTestSendStatus({ state: 'sent', recipient: result.recipientEmail });
+        } else {
+          setTestSendStatus({ state: 'error', message: result.error });
+        }
+      })
+      .catch((err) =>
+        setTestSendStatus({
+          state: 'error',
+          message: err instanceof Error ? err.message : 'Failed to send test',
+        }),
+      );
+  }
+
+  // ── Live polling while pending ──────────────────────────────────────────────
+  //
+  // Auto-fires verifySendingDomain on the cadence above. Stops once verified
+  // or the total duration elapses. The webhook handler picks up long-tail
+  // verifications when the user has navigated away — this client-side
+  // polling is the conversion lever for users still on the page.
+  useEffect(() => {
+    if (stateKey !== 'pending') return;
+    if (allRecordsVerified) return;
+
+    if (pollStartRef.current === null) {
+      pollStartRef.current = Date.now();
+    }
+
+    const tick = () => {
+      const elapsed = Date.now() - (pollStartRef.current ?? Date.now());
+      if (elapsed > POLL_TOTAL_DURATION_MS) {
+        return;
+      }
+      // Skip this tick if a manual transition is in flight.
+      if (isPending) return;
+      verifySendingDomain()
+        .then((result) => {
+          if (result.ok) {
+            setStatus(result.status);
+            setDmarcStatus(result.dmarcStatus);
+            if (result.dnsRecords.length > 0) {
+              setDnsRecords(result.dnsRecords);
+            }
+            setLastChecked(new Date());
+          }
+        })
+        .catch(() => {
+          // Network blip — silent; next tick will retry.
+        });
+    };
+
+    const elapsed = Date.now() - (pollStartRef.current ?? Date.now());
+    const interval =
+      elapsed < POLL_FAST_DURATION_MS ? POLL_FAST_INTERVAL_MS : POLL_SLOW_INTERVAL_MS;
+    const handle = setInterval(tick, interval);
+
+    return () => {
+      clearInterval(handle);
+    };
+  }, [stateKey, allRecordsVerified, isPending]);
+
+  // Reset poll start when transitioning back to a pending state from elsewhere.
+  useEffect(() => {
+    if (stateKey === 'verified' || stateKey === 'none') {
+      pollStartRef.current = null;
+    }
+  }, [stateKey]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -290,21 +624,15 @@ export function EmailDomainSettings({
                   Use a subdomain like mail.yourdomain.com to avoid conflicts with your existing email.
                 </p>
 
-                {/* Preflight findings — non-blocking, surfaces what the
-                    user's existing DNS already does so they know our setup
-                    won't touch their inbox. */}
                 {preflightChecking && (
                   <p className="mt-2 text-xs text-[var(--stage-text-secondary)] inline-flex items-center gap-1.5">
                     <RefreshCw className="w-3 h-3 animate-spin" />
-                    Checking your domain…
+                    Checking your domain\u2026
                   </p>
                 )}
 
                 {preflightFindings.length > 0 && (
-                  <ul
-                    className="mt-2 space-y-1.5"
-                    aria-label="DNS preflight findings"
-                  >
+                  <ul className="mt-2 space-y-1.5" aria-label="DNS preflight findings">
                     {preflightFindings.map((finding) => (
                       <li
                         key={finding.code}
@@ -353,12 +681,19 @@ export function EmailDomainSettings({
                 </div>
               </div>
 
+              {/* Before/after preview — Marcus's dopamine hit */}
+              <SenderPreview
+                domainInput={domainInput}
+                fromNameInput={fromNameInput}
+                fromLocalpartInput={fromLocalpartInput}
+              />
+
               <button
                 onClick={handleAdd}
                 disabled={!domainInput.trim() || isPending}
                 className="px-4 py-2 rounded-[var(--stage-radius-button)] text-sm font-medium tracking-tight stage-btn stage-btn-primary disabled:opacity-45 disabled:cursor-not-allowed transition-colors"
               >
-                {isPending ? 'Adding…' : 'Add domain'}
+                {isPending ? 'Adding\u2026' : 'Set up sending'}
               </button>
             </div>
           </motion.div>
@@ -383,13 +718,20 @@ export function EmailDomainSettings({
                   {status && <StatusPill status={status} />}
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--stage-text-tertiary)] inline-flex items-center gap-1.5">
+                    <RefreshCw
+                      className={`w-3 h-3 ${isPending ? 'animate-spin text-[var(--stage-text-secondary)]' : ''}`}
+                    />
+                    {lastChecked
+                      ? `Last checked ${Math.max(0, Math.round((Date.now() - lastChecked.getTime()) / 1000))}s ago`
+                      : 'Checking\u2026'}
+                  </span>
                   <button
                     onClick={handleVerify}
                     disabled={isPending}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-[var(--stage-border)] transition-colors disabled:opacity-45"
                   >
-                    <RefreshCw className={`w-3 h-3 ${isPending ? 'animate-spin' : ''}`} />
-                    Check verification
+                    Check now
                   </button>
                   <button
                     onClick={handleRemove}
@@ -403,23 +745,25 @@ export function EmailDomainSettings({
               </div>
             </div>
 
+            {/* Cloudflare warning + failure guidance */}
+            {isCloudflare && <CloudflareWarning />}
+            {hasRecordFailure && <FailureGuidance providerLabel={providerLabel} />}
+
             {/* DNS records */}
             <div className="stage-panel p-5">
               <div className="mb-4">
                 <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)]">DNS records</h3>
                 <p className="mt-0.5 text-xs text-[var(--stage-text-secondary)]">
-                  Add these records to your DNS provider. Verification can take up to 72 hours.
+                  Add these records to your DNS provider. Verification can take up to 72 hours \u2014 we keep checking.
                 </p>
               </div>
 
-              {/* Table header */}
-              <div className="grid grid-cols-[80px_60px_1fr_1fr_40px] gap-3 pb-2 border-b border-[var(--stage-border)]">
+              <div className="grid grid-cols-[80px_60px_1fr_1fr_56px] gap-3 pb-2 border-b border-[var(--stage-border)]">
                 {['Type', 'DNS', 'Host', 'Value', ''].map((h) => (
                   <span key={h} className="stage-label text-[var(--stage-text-secondary)]">{h}</span>
                 ))}
               </div>
 
-              {/* Resend-provided records (SPF, DKIM, MX) */}
               {dnsRecords
                 .filter((r) => r.record !== 'DMARC')
                 .map((r, i) => (
@@ -429,10 +773,10 @@ export function EmailDomainSettings({
                     type={r.type}
                     name={r.name}
                     value={r.value}
+                    recordStatus={r.status}
                   />
                 ))}
 
-              {/* Unusonic-generated DMARC record */}
               <DnsRecordRow
                 label="DMARC"
                 type="TXT"
@@ -440,7 +784,6 @@ export function EmailDomainSettings({
                 value={dmarcRecordValue}
               />
 
-              {/* DMARC status */}
               <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[var(--stage-border)]">
                 <span className="text-xs text-[var(--stage-text-secondary)]">DMARC status:</span>
                 <DmarcBadge dmarcStatus={dmarcStatus} />
@@ -459,7 +802,6 @@ export function EmailDomainSettings({
             transition={spring}
             className="stage-panel p-5 space-y-4"
           >
-            {/* Domain + status */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Globe className="w-4 h-4 text-[var(--color-unusonic-success)] shrink-0" />
@@ -476,7 +818,6 @@ export function EmailDomainSettings({
               </button>
             </div>
 
-            {/* From address preview */}
             <div className="stage-panel px-4 py-3">
               <p className="text-xs text-[var(--stage-text-secondary)] mb-1">Emails will be sent from:</p>
               <p className="text-sm font-mono text-[var(--stage-text-primary)] tracking-tight">
@@ -485,7 +826,44 @@ export function EmailDomainSettings({
               </p>
             </div>
 
-            {/* DMARC status */}
+            {/* Send-a-test row */}
+            <div className="rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] p-3 flex items-center justify-between gap-3">
+              <div className="text-xs leading-relaxed">
+                <span className="text-[var(--stage-text-primary)] block font-medium">
+                  Verify it works in your inbox
+                </span>
+                <span className="text-[var(--stage-text-secondary)]">
+                  We\u2019ll send a test email to your account address. Check the From line and DKIM signature.
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {testSendStatus.state === 'sent' && (
+                  <span className="text-xs text-[var(--color-unusonic-success)] inline-flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Sent to {testSendStatus.recipient}
+                  </span>
+                )}
+                {testSendStatus.state === 'error' && (
+                  <span className="text-xs text-[var(--color-unusonic-error)] inline-flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {testSendStatus.message}
+                  </span>
+                )}
+                <button
+                  onClick={handleSendTest}
+                  disabled={testSendStatus.state === 'sending'}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-[var(--stage-border)] transition-colors disabled:opacity-45"
+                >
+                  {testSendStatus.state === 'sending' ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Send className="w-3 h-3" />
+                  )}
+                  {testSendStatus.state === 'sending' ? 'Sending\u2026' : 'Send test'}
+                </button>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               <span className="text-xs text-[var(--stage-text-secondary)]">DMARC:</span>
               <DmarcBadge dmarcStatus={dmarcStatus} />

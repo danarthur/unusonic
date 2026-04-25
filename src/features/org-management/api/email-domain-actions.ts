@@ -352,6 +352,190 @@ export async function preflightSendingDomain(
   return { ok: true, findings };
 }
 
+// ── detectDnsProvider ──────────────────────────────────────────────────────────
+
+export type DetectDnsProviderResult =
+  | {
+      ok: true;
+      /** Stable machine-readable provider identifier — empty string when not recognized. */
+      provider:
+        | 'cloudflare'
+        | 'godaddy'
+        | 'namecheap'
+        | 'route53'
+        | 'google-domains'
+        | 'squarespace'
+        | 'vercel'
+        | 'wix'
+        | '';
+      /** Display label for the UI. Always present (defaults to 'Unknown registrar'). */
+      label: string;
+      /** Source nameserver hostnames we matched against. Empty array if lookup failed. */
+      nameservers: string[];
+    }
+  | { ok: false; error: string };
+
+const PROVIDER_PATTERNS: Array<{
+  pattern: RegExp;
+  provider: NonNullable<Extract<DetectDnsProviderResult, { ok: true }>['provider']>;
+  label: string;
+}> = [
+  // Cloudflare uses "<word>.<word>.ns.cloudflare.com" patterns. Match anything
+  // ending in cloudflare.com to be permissive — they don't change this.
+  { pattern: /\.cloudflare\.com$/i, provider: 'cloudflare', label: 'Cloudflare' },
+  // GoDaddy: "ns##.domaincontrol.com"
+  { pattern: /\.domaincontrol\.com$/i, provider: 'godaddy', label: 'GoDaddy' },
+  // Namecheap: "dns#.registrar-servers.com"
+  { pattern: /\.registrar-servers\.com$/i, provider: 'namecheap', label: 'Namecheap' },
+  // Route53: "ns-####.awsdns-##.{com,net,org,co.uk}"
+  { pattern: /\.awsdns-/i, provider: 'route53', label: 'AWS Route 53' },
+  // Google Cloud DNS / Google Domains: "ns-cloud-{a,b,c,d}#.googledomains.com" or "ns#.googledomains.com"
+  { pattern: /\.googledomains\.com$/i, provider: 'google-domains', label: 'Google Domains' },
+  // Squarespace: "ns-cloud-{...}.googledomains.com" — overlaps with Google. Prefer
+  // the squarespacedns pattern when it exists.
+  { pattern: /\.squarespacedns\.com$/i, provider: 'squarespace', label: 'Squarespace' },
+  // Vercel: "ns#.vercel-dns.com"
+  { pattern: /\.vercel-dns\.com$/i, provider: 'vercel', label: 'Vercel' },
+  // Wix: "ns#.wixdns.net"
+  { pattern: /\.wixdns\.net$/i, provider: 'wix', label: 'Wix' },
+];
+
+/**
+ * Detect the user's DNS hosting provider for the parent domain. Drives the
+ * wizard's registrar-specific instructions and the Cloudflare orange-cloud
+ * proxy warning (Field Expert convergence: Cloudflare's proxy mode breaks
+ * DKIM CNAMEs silently — the #1 source of failed verifications across every
+ * SaaS email vendor's support docs).
+ */
+export async function detectDnsProvider(
+  domain: string,
+): Promise<DetectDnsProviderResult> {
+  const parsed = subdomainSchema.safeParse(domain);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid domain.' };
+  }
+
+  // Lookup NS on the parent (where DNS is authoritatively delegated).
+  const parts = parsed.data.toLowerCase().split('.');
+  const parentDomain = parts.slice(1).join('.');
+
+  let nameservers: string[] = [];
+  try {
+    const ns = await dns.resolveNs(parentDomain);
+    nameservers = ns.map((s) => s.toLowerCase());
+  } catch {
+    // No NS records — could be a parked or unconfigured domain.
+    return { ok: true, provider: '', label: 'Unknown registrar', nameservers: [] };
+  }
+
+  for (const { pattern, provider, label } of PROVIDER_PATTERNS) {
+    if (nameservers.some((ns) => pattern.test(ns))) {
+      return { ok: true, provider, label, nameservers };
+    }
+  }
+
+  return { ok: true, provider: '', label: 'Unknown registrar', nameservers };
+}
+
+// ── sendVerificationTestEmail ──────────────────────────────────────────────────
+
+export type SendTestEmailResult =
+  | { ok: true; recipientEmail: string }
+  | { ok: false; error: string };
+
+/**
+ * Send a small test email to the active user's auth email address from the
+ * workspace's verified sending domain. Lets the user verify in their own
+ * inbox that:
+ *   - Mail arrives (sender reputation isn't poisoned)
+ *   - From line matches expectations (no "via X" suffix, no Reply-To weirdness)
+ *   - DKIM signature is valid (look at the email's headers in Gmail's "Show original")
+ *
+ * Marcus's #10 from the User Advocate research: "I want to see what the
+ * bride's mom will see. I want to look at the From line in my own inbox."
+ *
+ * Required state: workspace has `sending_domain_status === 'verified'`. We
+ * refuse to send if not — there's no fallback to platform sender for this
+ * action; the test exists specifically to prove the BYO setup works.
+ */
+export async function sendVerificationTestEmail(): Promise<SendTestEmailResult> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return { ok: false, error: 'No active workspace.' };
+
+  const authResult = await requireAdminOrOwner(workspaceId);
+  if (!authResult.ok) return authResult;
+  const { supabase } = authResult;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) {
+    return { ok: false, error: 'No email on file for the current user.' };
+  }
+
+  const { data: ws } = await supabase
+    .from('workspaces')
+    .select('sending_domain, sending_domain_status, sending_from_name, sending_from_localpart')
+    .eq('id', workspaceId)
+    .maybeSingle();
+
+  if (!ws?.sending_domain || ws.sending_domain_status !== 'verified') {
+    return {
+      ok: false,
+      error: 'Verify your sending domain before sending a test email.',
+    };
+  }
+
+  const fromName = ws.sending_from_name?.trim() || 'Unusonic';
+  const localpart = ws.sending_from_localpart ?? 'hello';
+  const fromAddress = `${fromName} <${localpart}@${ws.sending_domain}>`;
+
+  // Lazy-import the Resend client to avoid loading the SDK on this action's
+  // initial bundle when no test is ever sent.
+  const { getResend } = await import('@/shared/api/email/core');
+  const resend = getResend();
+  if (!resend) {
+    return { ok: false, error: 'Email service is not configured.' };
+  }
+
+  const subject = `Test from ${ws.sending_domain}`;
+  const text = [
+    `Hi — this is a verification test from your Unusonic workspace.`,
+    ``,
+    `If you're seeing this, your custom sending domain is working correctly.`,
+    `Check the From line and click "Show original" in Gmail (or equivalent) to`,
+    `verify the DKIM signature passes.`,
+    ``,
+    `From: ${fromAddress}`,
+    `Sent: ${new Date().toISOString()}`,
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 540px; margin: 0 auto; padding: 24px;">
+      <p style="color: #111;">Hi &mdash; this is a verification test from your Unusonic workspace.</p>
+      <p style="color: #444;">If you're seeing this, your custom sending domain is working correctly. Check the From line and click <strong>"Show original"</strong> in Gmail (or equivalent) to verify the DKIM signature passes.</p>
+      <hr style="border: 0; border-top: 1px solid #e5e5e5; margin: 24px 0;">
+      <p style="color: #888; font-size: 12px; font-family: ui-monospace, SFMono-Regular, monospace;">From: ${fromAddress}</p>
+      <p style="color: #888; font-size: 12px; font-family: ui-monospace, SFMono-Regular, monospace;">Sent: ${new Date().toISOString()}</p>
+    </div>
+  `;
+
+  const { data, error: sendErr } = await resend.emails.send({
+    from: fromAddress,
+    to: [user.email],
+    subject,
+    text,
+    html,
+  });
+
+  if (sendErr || !data?.id) {
+    return {
+      ok: false,
+      error: sendErr?.message ?? 'Failed to send test email.',
+    };
+  }
+
+  return { ok: true, recipientEmail: user.email };
+}
+
 // ── removeSendingDomain ────────────────────────────────────────────────────────
 
 export type RemoveSendingDomainResult = { ok: true } | { ok: false; error: string };
