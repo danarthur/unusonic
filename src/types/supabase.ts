@@ -160,15 +160,22 @@ export type Database = {
           created_at: string
           created_date_local: string
           deal_id: string
+          dismiss_reason: string | null
           dismissed_at: string | null
           dismissed_by: string | null
           expires_at: string
+          feedback_at: string | null
+          feedback_by: string | null
           headline: string
           id: string
           payload: Json
           resolved_at: string | null
+          seen_at: string | null
+          seen_by: string | null
           session_id: string | null
           signal_type: string
+          soonest_redeliver_at: string | null
+          user_feedback: string | null
           workspace_id: string
         }
         Insert: {
@@ -176,15 +183,22 @@ export type Database = {
           created_at?: string
           created_date_local: string
           deal_id: string
+          dismiss_reason?: string | null
           dismissed_at?: string | null
           dismissed_by?: string | null
           expires_at?: string
+          feedback_at?: string | null
+          feedback_by?: string | null
           headline: string
           id?: string
           payload?: Json
           resolved_at?: string | null
+          seen_at?: string | null
+          seen_by?: string | null
           session_id?: string | null
           signal_type: string
+          soonest_redeliver_at?: string | null
+          user_feedback?: string | null
           workspace_id: string
         }
         Update: {
@@ -192,15 +206,22 @@ export type Database = {
           created_at?: string
           created_date_local?: string
           deal_id?: string
+          dismiss_reason?: string | null
           dismissed_at?: string | null
           dismissed_by?: string | null
           expires_at?: string
+          feedback_at?: string | null
+          feedback_by?: string | null
           headline?: string
           id?: string
           payload?: Json
           resolved_at?: string | null
+          seen_at?: string | null
+          seen_by?: string | null
           session_id?: string | null
           signal_type?: string
+          soonest_redeliver_at?: string | null
+          user_feedback?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -302,6 +323,78 @@ export type Database = {
           title_locked?: boolean
           updated_at?: string
           user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      aion_user_signal_mutes: {
+        Row: {
+          created_at: string
+          deal_id: string
+          id: string
+          muted_until: string
+          signal_type: string
+          trigger_dismissal_ids: string[]
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          deal_id: string
+          id?: string
+          muted_until: string
+          signal_type: string
+          trigger_dismissal_ids?: string[]
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          deal_id?: string
+          id?: string
+          muted_until?: string
+          signal_type?: string
+          trigger_dismissal_ids?: string[]
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      aion_workspace_signal_disables: {
+        Row: {
+          created_at: string
+          disabled_until: string
+          fires_sampled: number
+          hit_rate: number
+          id: string
+          not_useful_count: number
+          owner_notified_at: string | null
+          signal_type: string
+          triggered_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          disabled_until: string
+          fires_sampled: number
+          hit_rate: number
+          id?: string
+          not_useful_count: number
+          owner_notified_at?: string | null
+          signal_type: string
+          triggered_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          disabled_until?: string
+          fires_sampled?: number
+          hit_rate?: number
+          id?: string
+          not_useful_count?: number
+          owner_notified_at?: string | null
+          signal_type?: string
+          triggered_by?: string | null
           workspace_id?: string
         }
         Relationships: []
@@ -739,6 +832,10 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: undefined
       }
+      check_signal_disabled: {
+        Args: { p_signal_type: string; p_workspace_id: string }
+        Returns: boolean
+      }
       claim_memory_pending_batch: {
         Args: { p_limit?: number }
         Returns: {
@@ -783,7 +880,7 @@ export type Database = {
       delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       dismiss_aion_insight: { Args: { p_insight_id: string }; Returns: boolean }
       dismiss_aion_proactive_line: {
-        Args: { p_line_id: string }
+        Args: { p_line_id: string; p_reason?: string }
         Returns: boolean
       }
       dismiss_capture: { Args: { p_capture_id: string }; Returns: boolean }
@@ -840,10 +937,15 @@ export type Database = {
         }
         Returns: {
           above_threshold: boolean
+          already_handled: number
           dismiss_rate: number
+          hit_rate: number
+          not_useful_count: number
+          not_useful_rate: number
           signal_type: string
           total_dismissed: number
           total_emitted: number
+          would_auto_disable: boolean
         }[]
       }
       hybrid_search: {
@@ -861,6 +963,31 @@ export type Database = {
           id: string
           metadata: Json
           similarity: number
+        }[]
+      }
+      is_user_signal_muted: {
+        Args: { p_deal_id: string; p_signal_type: string }
+        Returns: boolean
+      }
+      list_aion_proactive_history: {
+        Args: { p_days?: number; p_deal_id: string }
+        Returns: {
+          artifact_ref: Json
+          created_at: string
+          deal_id: string
+          dismiss_reason: string
+          dismissed_at: string
+          dismissed_by: string
+          expires_at: string
+          feedback_at: string
+          headline: string
+          id: string
+          payload: Json
+          resolved_at: string
+          seen_at: string
+          signal_type: string
+          user_feedback: string
+          workspace_id: string
         }[]
       }
       list_lobby_pin_health: {
@@ -905,6 +1032,7 @@ export type Database = {
         Args: { p_error?: string; p_id: string; p_status: string }
         Returns: undefined
       }
+      mark_pill_seen: { Args: { p_line_id: string }; Returns: boolean }
       match_memory: {
         Args: {
           p_entity_ids?: string[]
@@ -1013,6 +1141,10 @@ export type Database = {
           session_id: string
         }[]
       }
+      resurface_muted_reason: {
+        Args: { p_signal_type: string; p_workspace_id: string }
+        Returns: boolean
+      }
       review_feature_request: {
         Args: { p_decision: string; p_note?: string; p_request_id: string }
         Returns: boolean
@@ -1059,6 +1191,10 @@ export type Database = {
       set_aion_session_title: {
         Args: { p_lock?: boolean; p_session_id: string; p_title: string }
         Returns: undefined
+      }
+      submit_pill_feedback: {
+        Args: { p_feedback: string; p_line_id: string }
+        Returns: boolean
       }
       substrate_counts: {
         Args: { p_window_days?: number; p_workspace_id: string }
@@ -3738,6 +3874,63 @@ export type Database = {
         }
         Relationships: []
       }
+      inbound_raw_payloads: {
+        Row: {
+          id: string
+          message_id: string | null
+          parse_reason: string | null
+          parse_status: string
+          processed_at: string | null
+          provider: string
+          provider_message_id: string | null
+          raw_payload: Json
+          received_at: string
+          thread_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          id?: string
+          message_id?: string | null
+          parse_reason?: string | null
+          parse_status?: string
+          processed_at?: string | null
+          provider: string
+          provider_message_id?: string | null
+          raw_payload: Json
+          received_at?: string
+          thread_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          id?: string
+          message_id?: string | null
+          parse_reason?: string | null
+          parse_status?: string
+          processed_at?: string | null
+          provider?: string
+          provider_message_id?: string | null
+          raw_payload?: Json
+          received_at?: string
+          thread_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_raw_payloads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_raw_payloads_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "message_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kit_templates: {
         Row: {
           created_at: string
@@ -3819,9 +4012,16 @@ export type Database = {
           id: string
           last_message_at: string
           needs_resolution: boolean
+          owed_override: boolean | null
+          owed_override_at: string | null
+          owed_override_by_user_id: string | null
           primary_entity_id: string | null
           provider_thread_key: string
+          snoozed_by_user_id: string | null
+          snoozed_until: string | null
           subject: string | null
+          triaged_at: string | null
+          triaged_by_user_id: string | null
           unread_by_user_ids: string[]
           workspace_id: string
         }
@@ -3833,9 +4033,16 @@ export type Database = {
           id?: string
           last_message_at?: string
           needs_resolution?: boolean
+          owed_override?: boolean | null
+          owed_override_at?: string | null
+          owed_override_by_user_id?: string | null
           primary_entity_id?: string | null
           provider_thread_key: string
+          snoozed_by_user_id?: string | null
+          snoozed_until?: string | null
           subject?: string | null
+          triaged_at?: string | null
+          triaged_by_user_id?: string | null
           unread_by_user_ids?: string[]
           workspace_id: string
         }
@@ -3847,9 +4054,16 @@ export type Database = {
           id?: string
           last_message_at?: string
           needs_resolution?: boolean
+          owed_override?: boolean | null
+          owed_override_at?: string | null
+          owed_override_by_user_id?: string | null
           primary_entity_id?: string | null
           provider_thread_key?: string
+          snoozed_by_user_id?: string | null
+          snoozed_until?: string | null
           subject?: string | null
+          triaged_at?: string | null
+          triaged_by_user_id?: string | null
           unread_by_user_ids?: string[]
           workspace_id?: string
         }
@@ -3860,6 +4074,7 @@ export type Database = {
           ai_classification: string | null
           ai_summary: string | null
           attachments: Json
+          auto_reply_reason: string | null
           body_html: string | null
           body_text: string | null
           bounced_at: string | null
@@ -3874,6 +4089,7 @@ export type Database = {
           hide_from_portal: boolean
           id: string
           in_reply_to: string | null
+          is_auto_reply: boolean
           opened_at: string | null
           provider_message_id: string | null
           replied_at: string | null
@@ -3887,6 +4103,7 @@ export type Database = {
           ai_classification?: string | null
           ai_summary?: string | null
           attachments?: Json
+          auto_reply_reason?: string | null
           body_html?: string | null
           body_text?: string | null
           bounced_at?: string | null
@@ -3901,6 +4118,7 @@ export type Database = {
           hide_from_portal?: boolean
           id?: string
           in_reply_to?: string | null
+          is_auto_reply?: boolean
           opened_at?: string | null
           provider_message_id?: string | null
           replied_at?: string | null
@@ -3914,6 +4132,7 @@ export type Database = {
           ai_classification?: string | null
           ai_summary?: string | null
           attachments?: Json
+          auto_reply_reason?: string | null
           body_html?: string | null
           body_text?: string | null
           bounced_at?: string | null
@@ -3928,6 +4147,7 @@ export type Database = {
           hide_from_portal?: boolean
           id?: string
           in_reply_to?: string | null
+          is_auto_reply?: boolean
           opened_at?: string | null
           provider_message_id?: string | null
           replied_at?: string | null
@@ -4950,6 +5170,14 @@ export type Database = {
       }
       seed_default_triggers: {
         Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      set_owed_override: {
+        Args: { p_override: boolean; p_thread_id: string }
+        Returns: undefined
+      }
+      snooze_thread: {
+        Args: { p_snoozed_until: string; p_thread_id: string }
         Returns: undefined
       }
       stamp_outbound_provider_id: {
