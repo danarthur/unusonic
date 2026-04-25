@@ -7,6 +7,8 @@ import {
   addSendingDomain,
   verifySendingDomain,
   removeSendingDomain,
+  preflightSendingDomain,
+  type PreflightFinding,
 } from '@/features/org-management/api/email-domain-actions';
 import type { DnsRecord } from '@/shared/api/resend/domains';
 
@@ -128,6 +130,31 @@ export function EmailDomainSettings({
   const [fromNameInput, setFromNameInput] = useState('');
   const [fromLocalpartInput, setFromLocalpartInput] = useState('hello');
 
+  // Preflight DNS findings — runs on domain-input blur to surface "your existing
+  // email keeps working" reassurance before the user commits. Closes Marcus's
+  // #1 fear from the User Advocate research run on 2026-04-25.
+  const [preflightFindings, setPreflightFindings] = useState<PreflightFinding[]>([]);
+  const [preflightChecking, setPreflightChecking] = useState(false);
+
+  function runPreflight(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.split('.').length < 3) {
+      setPreflightFindings([]);
+      return;
+    }
+    setPreflightChecking(true);
+    preflightSendingDomain(trimmed)
+      .then((result) => {
+        if (result.ok) {
+          setPreflightFindings(result.findings);
+        } else {
+          setPreflightFindings([]);
+        }
+      })
+      .catch(() => setPreflightFindings([]))
+      .finally(() => setPreflightChecking(false));
+  }
+
   // Error / feedback
   const [error, setError] = useState<string | null>(null);
 
@@ -141,8 +168,22 @@ export function EmailDomainSettings({
     : 'pending';
 
   // ── Unusonic DMARC record value ───────────────────────────────────────────────
-
-  const dmarcRecordValue = 'v=DMARC1; p=none; sp=none; adkim=s; aspf=r;';
+  //
+  // Recommend p=quarantine (not p=none) because p=none provides ZERO protection
+  // against spoofed phishing emails — anyone can send mail claiming to be from
+  // the workspace's domain and Gmail/Outlook will deliver it to inboxes.
+  // Quarantine drops failed-DMARC mail to spam, which is the minimum responsible
+  // posture for a customer-facing wedding/production-services brand. The Field
+  // Expert research pass on 2026-04-25 documented this as the convergent
+  // recommendation across HubSpot, Klaviyo, Postmark, and Resend's own guidance.
+  //
+  // rua= sends aggregate reports to dmarc-aggregate@unusonic.com so we can
+  // surface a "Deliverability — last 7 days" panel in the workspace's Settings
+  // post-PR #24. adkim=r/aspf=r (relaxed) avoids the strict-alignment pitfalls
+  // that bite when subdomains differ slightly (Resend's send.* return-path).
+  // pct=100 applies the policy to 100% of mail (not a 10% rollout sample).
+  const dmarcRecordValue =
+    'v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-aggregate@unusonic.com; adkim=r; aspf=r;';
   const dmarcRecordName = domain ? `_dmarc.${domain}` : '_dmarc.yourdomain.com';
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -242,11 +283,47 @@ export function EmailDomainSettings({
                   placeholder="mail.yourdomain.com"
                   value={domainInput}
                   onChange={(e) => setDomainInput(e.target.value)}
+                  onBlur={(e) => runPreflight(e.target.value)}
                   className="w-full px-3 py-2 rounded-[var(--stage-radius-input)] bg-[var(--ctx-well)] border border-[var(--stage-border)] text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--stage-border-focus)] transition-[border-color,box-shadow] font-mono"
                 />
                 <p className="mt-1 text-xs text-[var(--stage-text-secondary)]">
                   Use a subdomain like mail.yourdomain.com to avoid conflicts with your existing email.
                 </p>
+
+                {/* Preflight findings — non-blocking, surfaces what the
+                    user's existing DNS already does so they know our setup
+                    won't touch their inbox. */}
+                {preflightChecking && (
+                  <p className="mt-2 text-xs text-[var(--stage-text-secondary)] inline-flex items-center gap-1.5">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Checking your domain…
+                  </p>
+                )}
+
+                {preflightFindings.length > 0 && (
+                  <ul
+                    className="mt-2 space-y-1.5"
+                    aria-label="DNS preflight findings"
+                  >
+                    {preflightFindings.map((finding) => (
+                      <li
+                        key={finding.code}
+                        className={`text-xs leading-relaxed flex items-start gap-1.5 ${
+                          finding.severity === 'warning'
+                            ? 'text-[var(--color-unusonic-warning)]'
+                            : 'text-[var(--stage-text-secondary)]'
+                        }`}
+                      >
+                        {finding.severity === 'warning' ? (
+                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                        ) : (
+                          <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5 text-[var(--color-unusonic-success)]" />
+                        )}
+                        <span>{finding.message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
