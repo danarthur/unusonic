@@ -1,21 +1,23 @@
 'use server';
 
 /**
- * Proactive-line server actions — Phase 2 Sprint 2 / Week 5.
+ * Proactive-line server actions.
  *
- * Thin server actions that power <ProactiveLinePill> on the deal card:
- *
- *   - getActiveProactiveLine(dealId) — read the single active line
- *   - dismissProactiveLine(lineId)   — mark dismissed
+ *   - getActiveProactiveLine(dealId) — read the single active line, gated by
+ *     per-user mute (D6) + workspace disable (D8) via cortex.is_user_signal_muted.
+ *   - dismissProactiveLine(lineId, reason) — Wk 10 D5 three-reason taxonomy.
  *
  * Read uses the user-scoped client (RLS clamps workspace). Dismiss calls the
- * cortex RPC which performs its own auth + workspace-member check.
+ * cortex RPC which performs its own auth + workspace-member check and runs
+ * the inline D6/D8 mute logic.
  *
- * Plan: docs/reference/aion-deal-chat-phase2-plan.md §3.2.3 + §3.2.4.
+ * Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.7.
  */
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
+
+export type DismissReason = 'not_useful' | 'already_handled' | 'snooze';
 
 export type ProactiveLine = {
   id: string;
@@ -30,11 +32,13 @@ export type ProactiveLine = {
 
 /**
  * Return the single active proactive line for a deal. "Active" = not
- * dismissed, not resolved, and not yet expired. Expired/dismissed lines move
- * out of the pinned slot entirely per Critic §Risk 3 ("strike-through
- * soft-expire hides new alerts") — they belong to a separate history surface.
+ * dismissed, not resolved, not expired, AND not silenced for the caller via
+ * D6 per-user mute or D8 workspace disable. The mute check is a single RPC
+ * round-trip after the row fetch — adds ~2-5ms but keeps muted signals out
+ * of the pinned-pill slot per Wk 10 D6/D8 spec.
  *
- * Returns null when no active line exists.
+ * Returns null when no active line exists OR the active line's signal_type
+ * is muted for this caller.
  */
 export async function getActiveProactiveLine(
   dealId: string,
@@ -55,32 +59,50 @@ export async function getActiveProactiveLine(
     .maybeSingle();
 
   if (error || !data) return null;
-  return data as ProactiveLine;
+  const line = data as ProactiveLine;
+
+  // D6/D8 gate — workspace disable trumps per-user; either suppresses render.
+  const { data: muted } = await supabase
+    .schema('cortex')
+    .rpc('is_user_signal_muted', {
+      p_signal_type: line.signal_type,
+      p_deal_id: dealId,
+    });
+  if (muted === true) return null;
+
+  return line;
 }
 
 /**
- * Dismiss a proactive line. The cortex RPC enforces auth + workspace
- * membership; this action is a thin wrapper that also re-validates the deal
- * page so the optimistic UI clears cleanly.
+ * Dismiss a proactive line with a reason. The cortex RPC enforces auth +
+ * workspace-member check, applies the snooze 24h floor for `snooze`, and
+ * runs inline D6 (per-user 30d tuple mute) and D8 (workspace 30d disable)
+ * checks for `not_useful`.
+ *
+ * Reason mapping (telemetry → owner UI):
+ *   - already_handled  → "Got it"
+ *   - not_useful       → "Not relevant"
+ *   - snooze           → "Ask me later"
  */
 export async function dismissProactiveLine(
   lineId: string,
+  reason: DismissReason,
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .schema('cortex')
-    .rpc('dismiss_aion_proactive_line', { p_line_id: lineId });
+    .rpc('dismiss_aion_proactive_line', {
+      p_line_id: lineId,
+      p_reason: reason,
+    });
 
   if (error) {
     return { success: false, error: error.message };
   }
-  // RPC returns true on success, false when the line didn't exist / was
-  // already dismissed. Either way there's nothing for us to undo.
   if (data !== true) {
     return { success: false, error: 'Line not found or already dismissed.' };
   }
 
-  // Invalidate the CRM page so the pill disappears on the next render.
   revalidatePath('/crm');
   return { success: true };
 }
