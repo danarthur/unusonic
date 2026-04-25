@@ -130,17 +130,44 @@ export async function sendReply(input: {
       return { success: false, error: 'Email service is not configured' };
     }
 
+    // Reply-To rule (closes Marcus's #11 trust hinge from the User Advocate
+    // research run on 2026-04-25). The alias `thread-{uuid}@replies.unusonic.com`
+    // works for routing reply mail back through Postmark, BUT setting it as a
+    // Reply-To when the From header is on a workspace's CUSTOM domain creates
+    // a cross-domain Reply-To mismatch that every email security tool flags
+    // as a phishing signal.
+    //
+    // Phase 1 policy: only attach the Reply-To alias when the From domain is
+    // unusonic.com (the platform domain). Workspaces that have verified their
+    // own domain skip the alias — replies route via the recipient hitting
+    // "Reply" in their mail client, which uses the From address by default.
+    // Inbound on the workspace's own domain ships in Phase 1.5 (per
+    // docs/roadmap/byo-sending-domain.md).
+    const fromDomain = (() => {
+      const match = fromAddress.match(/<([^>]+)>/);
+      const email = match ? match[1] : fromAddress;
+      const at = email.lastIndexOf('@');
+      return at === -1 ? '' : email.slice(at + 1).trim().toLowerCase();
+    })();
     const replyToAlias = `thread-${threadRow.id}@replies.unusonic.com`;
+    const isPlatformDomain = fromDomain === 'unusonic.com' || fromDomain.endsWith('.unusonic.com');
 
-    const { data: sendResult, error: sendErr } = await resend.emails.send({
+    const sendArgs: Parameters<typeof resend.emails.send>[0] = {
       from: fromAddress,
       to: [toAddress],
       subject,
       text: parsed.data.bodyText,
-      // Match the array-form used by senders/proposal.ts. Resend accepts
-      // both but the array form is what the rest of the codebase uses.
-      replyTo: [replyToAlias],
-    });
+    };
+    if (isPlatformDomain) {
+      // Same root domain — alias matches sender's reputation. Safe to attach.
+      sendArgs.replyTo = [replyToAlias];
+    }
+    // else: workspace has BYO domain. Omit Reply-To; let the recipient's
+    // "Reply" button use the From address natively. Replies-card mirroring
+    // for these workspaces becomes feature-gated on Phase 1.5 BYO-inbound
+    // (replies.theirdomain.com → Postmark) — defer.
+
+    const { data: sendResult, error: sendErr } = await resend.emails.send(sendArgs);
 
     if (sendErr || !sendResult?.id) {
       // Draft row stays in the DB with provider_message_id = NULL. Log and
