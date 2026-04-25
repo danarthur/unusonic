@@ -49,6 +49,7 @@ import { ThisWeekWidget } from '@/widgets/this-week';
 import { TodaysBriefWidget } from '@/widgets/todays-brief';
 import { AwaitingSignatureWidget } from '@/widgets/awaiting-signature';
 import { GoneQuietWidget } from '@/widgets/gone-quiet';
+import { RecentRepliesWidget } from '@/widgets/recent-replies';
 import { WeeklyTallyWidget } from '@/widgets/weekly-tally';
 import { RealTimeLogisticsWidget } from '@/widgets/real-time-logistics';
 import { PaymentHealthWidget } from '@/widgets/payment-health';
@@ -143,6 +144,7 @@ const RENDERERS: Record<string, LobbyCardRenderer> = {
   'lobby.this_week': () => <ThisWeekWidget />,
   'lobby.awaiting_signature': () => <AwaitingSignatureWidget />,
   'lobby.gone_quiet': () => <GoneQuietWidget />,
+  'lobby.recent_replies': () => <RecentRepliesWidget />,
   'lobby.weekly_tally': () => <WeeklyTallyWidget />,
   'lobby.active_production': () => <ActiveProductionWidget />,
   'lobby.real_time_logistics': () => <RealTimeLogisticsWidget />,
