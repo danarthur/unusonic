@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Copy, RefreshCw, Trash2, Globe, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Check, Copy, RefreshCw, Trash2, Globe, AlertCircle, CheckCircle2, Clock, Send } from 'lucide-react';
 import {
   addSendingDomain,
   verifySendingDomain,
   removeSendingDomain,
 } from '@/features/org-management/api/email-domain-actions';
 import type { DnsRecord } from '@/shared/api/resend/domains';
+import { RescueHandoffDialog } from './RescueHandoffDialog';
+import { RescueHandoffHistory } from './RescueHandoffHistory';
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -130,6 +132,10 @@ export function EmailDomainSettings({
 
   // Error / feedback
   const [error, setError] = useState<string | null>(null);
+
+  // Rescue handoff dialog state
+  const [rescueOpen, setRescueOpen] = useState(false);
+  const [rescueRefreshKey, setRescueRefreshKey] = useState(0);
 
   const [isPending, startTransition] = useTransition();
 
@@ -328,11 +334,21 @@ export function EmailDomainSettings({
 
             {/* DNS records */}
             <div className="stage-panel p-5">
-              <div className="mb-4">
-                <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)]">DNS records</h3>
-                <p className="mt-0.5 text-xs text-[var(--stage-text-secondary)]">
-                  Add these records to your DNS provider. Verification can take up to 72 hours.
-                </p>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium tracking-tight text-[var(--stage-text-primary)]">DNS records</h3>
+                  <p className="mt-0.5 text-xs text-[var(--stage-text-secondary)]">
+                    Add these records to your DNS provider. Verification can take up to 72 hours.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setRescueOpen(true)}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--stage-radius-button)] text-xs font-medium tracking-tight bg-[var(--stage-surface-elevated)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-[var(--stage-border)] transition-colors"
+                  title="Send these records to your web designer or IT contact"
+                >
+                  <Send className="w-3 h-3" />
+                  Send to your tech person
+                </button>
               </div>
 
               {/* Table header */}
@@ -369,6 +385,9 @@ export function EmailDomainSettings({
                 <DmarcBadge dmarcStatus={dmarcStatus} />
               </div>
             </div>
+
+            {/* Rescue handoff history (only renders when there are sends) */}
+            <RescueHandoffHistory refreshKey={rescueRefreshKey} />
           </motion.div>
         )}
 
@@ -416,6 +435,12 @@ export function EmailDomainSettings({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <RescueHandoffDialog
+        open={rescueOpen}
+        onOpenChange={setRescueOpen}
+        onSent={() => setRescueRefreshKey((k) => k + 1)}
+      />
     </div>
   );
 }
