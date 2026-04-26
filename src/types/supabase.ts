@@ -12,6 +12,37 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  aion: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      metric_brief_open_kill_check: {
+        Args: {
+          p_min_repeats?: number
+          p_repeat_window_days?: number
+          p_window_days?: number
+        }
+        Returns: {
+          first_open: string
+          last_open: string
+          max_in_window: number
+          total_opens: number
+          user_id: string
+          workspace_id: string
+        }[]
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   cortex: {
     Tables: {
       aion_insights: {
@@ -8287,6 +8318,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  aion: {
+    Enums: {},
+  },
   cortex: {
     Enums: {},
   },

@@ -42,7 +42,7 @@ if (!projectRef || projectRef.length < 10) {
   process.exit(1);
 }
 
-const cmd = `npx supabase gen types typescript --project-id ${projectRef} --schema public,directory,cortex,ops,finance`;
+const cmd = `npx supabase gen types typescript --project-id ${projectRef} --schema public,directory,cortex,ops,finance,aion`;
 
 // Forward loaded env vars (esp. SUPABASE_ACCESS_TOKEN from .env.local) to the
 // supabase CLI child process. Without this, the CLI sees only process.env and
