@@ -4,7 +4,6 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import dns from 'dns/promises';
 import { z } from 'zod';
-import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import {
   addResendDomain,
@@ -12,6 +11,7 @@ import {
   deleteResendDomain,
   type DnsRecord,
 } from '@/shared/api/resend/domains';
+import { requireAdminOrOwner } from './auth-helpers';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -41,32 +41,6 @@ const subdomainSchema = z
     /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?){2,}$/i,
     'Use a subdomain like mail.yourdomain.com to avoid conflicts with your existing email.'
   );
-
-// ── Auth helper ────────────────────────────────────────────────────────────────
-
-async function requireAdminOrOwner(workspaceId: string): Promise<
-  | { ok: true; supabase: Awaited<ReturnType<typeof createClient>> }
-  | { ok: false; error: string }
-> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: 'Not authenticated.' };
-
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('role')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    return { ok: false, error: 'Unauthorized. Owner or admin role required.' };
-  }
-
-  return { ok: true, supabase };
-}
 
 // ── addSendingDomain ───────────────────────────────────────────────────────────
 
