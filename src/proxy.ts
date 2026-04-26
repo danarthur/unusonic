@@ -33,6 +33,7 @@ export const WEBHOOK_ROUTES = [
 export const PUBLIC_ROUTES = [
   '/login', '/signup', '/forgot-password', '/auth/callback',
   '/p/', '/claim', '/confirm', '/crew/', '/bridge', '/dns-help/',
+  '/legal',
   '/api/auth/passkey/authenticate', '/api/auth/recover/request',
   ...WEBHOOK_ROUTES,
 ];
@@ -212,7 +213,7 @@ export async function proxy(request: NextRequest) {
   // `/` is a passthrough so authed users can still see the marketing landing
   // page (Notion-style). They enter the app by clicking Sign in, which hits
   // /login and silently re-auths through this same rule.
-  const isPassthrough = pathname === '/' || pathname === '/auth/callback' || pathname.startsWith('/p/') || pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew/') || pathname.startsWith('/bridge') || pathname.startsWith('/dns-help/');
+  const isPassthrough = pathname === '/' || pathname === '/auth/callback' || pathname.startsWith('/p/') || pathname.startsWith('/claim') || pathname.startsWith('/confirm') || pathname.startsWith('/crew/') || pathname.startsWith('/bridge') || pathname.startsWith('/dns-help/') || pathname.startsWith('/legal');
   if (userId && isPublic && !isPassthrough) {
     if (!hasWorkspace) {
       return NextResponse.redirect(new URL('/onboarding', request.url));

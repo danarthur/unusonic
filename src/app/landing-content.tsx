@@ -7,6 +7,7 @@ import { LivingLogo } from '@/shared/ui/branding/living-logo';
 import { Lockup } from '@/shared/ui/branding/lockup';
 import { Wordmark } from '@/shared/ui/branding/wordmark';
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
+import { LandingFooter } from '@/shared/ui/marketing/landing-footer';
 
 /**
  * Marketing landing page rendered at /. Sign-in routes to /login where
@@ -896,49 +897,8 @@ function LandingCTA() {
   );
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────
-
-function LandingFooter() {
-  const cols = [
-    { title: 'Product', items: ['Overview', 'Aion', 'Security'] },
-    { title: 'Company', items: ['About', 'Contact'] },
-    { title: 'Resources', items: ['Docs', 'Status'] },
-    { title: 'Legal', items: ['Privacy', 'Terms'] },
-  ];
-  return (
-    <footer className="relative py-16 px-6 border-t border-[oklch(1_0_0_/_0.06)]">
-      <div className="max-w-6xl mx-auto grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-10">
-        <div className="flex flex-col gap-3">
-          <div className="text-[var(--stage-text-primary)]">
-            <Lockup variant="horizontal" size="sm" status="idle" />
-          </div>
-          <p className="text-xs text-[var(--stage-text-secondary)]/70 font-light max-w-xs">
-            The event operating system.
-          </p>
-        </div>
-        {cols.map((col) => (
-          <div key={col.title} className="flex flex-col gap-3">
-            <h4 className="text-[10px] uppercase tracking-[0.24em] text-[var(--stage-text-secondary)]/70">
-              {col.title}
-            </h4>
-            {col.items.map((item) => (
-              <span
-                key={item}
-                className="text-sm text-[var(--stage-text-secondary)]/80 font-light"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="max-w-6xl mx-auto mt-12 pt-6 border-t border-[oklch(1_0_0_/_0.04)] flex flex-col sm:flex-row gap-2 justify-between text-xs text-[var(--stage-text-secondary)]/60">
-        <span>© {new Date().getFullYear()} Unusonic</span>
-        <span>Built for event production.</span>
-      </div>
-    </footer>
-  );
-}
+// LandingFooter lives in src/shared/ui/marketing/landing-footer.tsx so the
+// legal pages can share the same nav.
 
 // ─── Composition ──────────────────────────────────────────────────────────
 

@@ -246,6 +246,19 @@ function ComposeStage({
           ? 'The text comes from a Unusonic number. Reply STOP to opt out. The link works for 30 days.'
           : 'The email comes from your name (so it doesn\u2019t look like spam). Replies go to you. The link works for 30 days.'}
       </p>
+
+      <p className="text-[11px] text-[var(--stage-text-secondary)]/70 leading-relaxed">
+        By sending, you confirm this person has agreed to receive {isSms ? 'a text' : 'an email'} from your business. See our{' '}
+        <a
+          href={isSms ? '/legal/sms' : '/legal/terms'}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors underline underline-offset-2 decoration-[oklch(1_0_0_/_0.15)]"
+        >
+          {isSms ? 'SMS Policy' : 'Terms'}
+        </a>
+        .
+      </p>
     </>
   );
 }
