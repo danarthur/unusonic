@@ -1052,6 +1052,21 @@ export type Database = {
           source_type: string
         }[]
       }
+      metric_brief_open_kill_check: {
+        Args: {
+          p_min_repeats?: number
+          p_repeat_window_days?: number
+          p_window_days?: number
+        }
+        Returns: {
+          first_open: string
+          last_open: string
+          max_in_window: number
+          total_opens: number
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       migrate_session_scope: {
         Args: {
           p_new_scope_entity_id: string
@@ -2507,25 +2522,460 @@ export type Database = {
       aion_events: {
         Row: {
           created_at: string
+          duration_ms: number | null
           event_type: string
           id: string
           payload: Json
+          session_id: string | null
           user_id: string | null
           workspace_id: string | null
         }
         Insert: {
           created_at?: string
+          duration_ms?: number | null
           event_type: string
           id?: string
           payload?: Json
+          session_id?: string | null
           user_id?: string | null
           workspace_id?: string | null
         }
         Update: {
           created_at?: string
+          duration_ms?: number | null
           event_type?: string
           id?: string
           payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m04: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m05: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m06: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m07: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m08: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m09: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m10: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m11: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2026m12: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2027m01: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2027m02: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2027m03: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      aion_events_y2027m04: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string | null
           user_id?: string | null
           workspace_id?: string | null
         }

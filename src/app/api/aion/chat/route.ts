@@ -389,6 +389,8 @@ export async function POST(req: Request) {
     userRole: userRole ?? 'viewer',
     canWrite,
     workspaceId,
+    userId: user.id,
+    sessionId: normalizedSessionId,
   });
 
   // 11. Stream response with tool-calling loop
