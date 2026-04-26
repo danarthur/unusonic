@@ -15,6 +15,8 @@ import {
   Archive,
   ArchiveRestore,
   GitBranch,
+  SlidersHorizontal,
+  Mic2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -26,6 +28,7 @@ import {
   unarchiveSession,
   type DbSessionMeta,
 } from '@/app/(dashboard)/(features)/aion/actions/aion-session-actions';
+import { resetAionVoiceConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 import { useRequiredWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 
 // ---------------------------------------------------------------------------
@@ -331,6 +334,7 @@ export function AionSidebar({
                   >
                     <Plus size={15} strokeWidth={1.5} />
                   </button>
+                  <SidebarSettingsMenu />
                   <button
                     type="button"
                     onClick={onToggle}
@@ -907,6 +911,87 @@ function SessionOverflowMenu({
                 onClick={() => setConfirmingDelete(true)}
               />
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar header settings menu — Wk 11 §3.8 surfaces "Tune Aion's voice".
+//
+// The 4-step voice-onboarding flow is no longer forced on first chat (the
+// chat route now treats voice_default_derived as configured). Owners who
+// want to retune their default voice click here, which drops the stored
+// voice + voice_default_derived flag; the next chat re-enters the explicit
+// no_voice → no_example → no_guardrails → needs_test_draft sequence.
+// ---------------------------------------------------------------------------
+
+function SidebarSettingsMenu() {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close. Matches the per-session overflow pattern below.
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const handleTuneVoice = useCallback(async () => {
+    if (pending) return;
+    setPending(true);
+    try {
+      const result = await resetAionVoiceConfig();
+      if (!result.success) {
+        toast.error(result.error ?? 'Could not reset voice.');
+        return;
+      }
+      toast.success('Voice reset — start a new chat to retune Aion.');
+      setOpen(false);
+    } finally {
+      setPending(false);
+    }
+  }, [pending]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Aion settings"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="p-1.5 rounded-[6px] text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]"
+      >
+        <SlidersHorizontal size={15} strokeWidth={1.5} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={STAGE_LIGHT}
+            className={cn(
+              'absolute right-0 top-full mt-1 z-30 min-w-44 rounded-md p-1',
+              'bg-[var(--stage-surface-raised)] border border-[var(--stage-edge-subtle)]',
+              'shadow-lg text-xs',
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MenuItem
+              icon={<Mic2 size={11} strokeWidth={1.5} />}
+              label={pending ? 'Resetting…' : "Tune Aion's voice"}
+              onClick={handleTuneVoice}
+            />
           </motion.div>
         )}
       </AnimatePresence>

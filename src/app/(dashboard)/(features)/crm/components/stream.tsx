@@ -87,9 +87,7 @@ export function Stream({
       .then((counts) => { if (!cancelled) setUnseenPillCounts(counts); })
       .catch(() => { if (!cancelled) setUnseenPillCounts({}); });
     return () => { cancelled = true; };
-    // dealIdsKey collapses array identity into a stable string so the effect
-    // doesn't refire on every render that hands us a new but equivalent array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dealIdsKey collapses array identity into a stable string so the effect doesn't refire on every render that hands us a new but equivalent array.
   }, [dealIdsKey]);
 
   const handleFiltersChange = (newFilters: StreamFilters) => {
