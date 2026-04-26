@@ -35,6 +35,43 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      metric_dismiss_rate: {
+        Args: { p_min_sample?: number; p_window_days?: number }
+        Returns: {
+          above_threshold: boolean
+          not_useful_count: number
+          not_useful_rate: number
+          signal_type: string
+          total_emitted: number
+        }[]
+      }
+      metric_hit_rate: {
+        Args: { p_min_sample?: number; p_window_days?: number }
+        Returns: {
+          already_handled_count: number
+          hit_rate: number
+          meets_min_sample: boolean
+          signal_type: string
+          total_emitted: number
+        }[]
+      }
+      metric_pill_click_through: {
+        Args: { p_window_days?: number }
+        Returns: {
+          click_through_rate: number
+          total_clicks: number
+          total_emits: number
+        }[]
+      }
+      metric_tool_depth: {
+        Args: { p_window_days?: number }
+        Returns: {
+          avg_depth: number
+          p95_depth: number
+          threshold_exceeded: boolean
+          total_turns: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

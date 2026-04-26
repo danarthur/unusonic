@@ -16,6 +16,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { recordPillDismissTelemetry } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
 
 export type DismissReason = 'not_useful' | 'already_handled' | 'snooze';
 
@@ -102,6 +103,12 @@ export async function dismissProactiveLine(
   if (data !== true) {
     return { success: false, error: 'Line not found or already dismissed.' };
   }
+
+  // Wk 15a-ii — pill_dismiss telemetry. Helper lives in pill-history-actions
+  // so this file stays clean of any service-role import; the source-discipline
+  // guard ensures the dismiss path itself never bypasses RLS.
+  // Fire-and-forget.
+  void recordPillDismissTelemetry(lineId, reason);
 
   revalidatePath('/crm');
   return { success: true };
