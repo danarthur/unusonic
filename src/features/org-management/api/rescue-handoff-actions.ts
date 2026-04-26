@@ -20,6 +20,8 @@ import * as Sentry from '@sentry/nextjs';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { baseUrl } from '@/shared/api/email/core';
 import { sendDnsHandoffEmail } from '@/shared/api/email/senders/system';
+import { sendDnsHandoffSms } from '@/shared/api/sms/senders/system';
+import { detectRecipientKind } from '@/shared/api/sms/validation';
 import {
   getResendDomainStatus,
   type DnsRecord,
@@ -29,23 +31,20 @@ import { requireAdminOrOwner, type SupabaseServerClient } from './auth-helpers';
 // ── Validation ────────────────────────────────────────────────────────────────
 
 const handoffInputSchema = z.object({
-  recipientEmail: z
-    .string()
-    .trim()
-    .min(3, 'Recipient email is required.')
-    .email('Enter a valid email address.'),
+  recipient: z.string().trim().min(3, 'Enter an email or phone number.'),
   recipientName: z.string().trim().max(120, 'Recipient name too long.').optional().nullable(),
   message: z.string().trim().max(2000, 'Note too long.').optional().nullable(),
 });
 
 type ValidatedHandoffInput = {
-  recipientEmail: string;
+  recipient: string;
+  recipientKind: 'email' | 'sms';
   recipientName: string | null;
   message: string | null;
 };
 
 function validateHandoffInput(input: {
-  recipientEmail: string;
+  recipient: string;
   recipientName?: string | null;
   message?: string | null;
 }): { ok: true; data: ValidatedHandoffInput } | { ok: false; error: string } {
@@ -53,10 +52,15 @@ function validateHandoffInput(input: {
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input.' };
   }
+  const detected = detectRecipientKind(parsed.data.recipient);
+  if (detected.kind === 'invalid') {
+    return { ok: false, error: 'Enter a valid email or phone number.' };
+  }
   return {
     ok: true,
     data: {
-      recipientEmail: parsed.data.recipientEmail.toLowerCase(),
+      recipient: detected.value,
+      recipientKind: detected.kind,
       recipientName: parsed.data.recipientName ?? null,
       message: parsed.data.message ?? null,
     },
@@ -177,19 +181,65 @@ type DispatchPayload = {
   workspaceId: string;
   sender: SenderIdentity;
   workspace: WorkspaceContext;
-  recipientEmail: string;
+  recipient: string;
+  recipientKind: 'email' | 'sms';
   recipientName: string | null;
   message: string | null;
   records: DnsRecord[];
 };
 
-/** Insert handoff row + send email + stamp message id (or revoke on send failure). */
+type DispatchOutcome =
+  | { ok: true; resendMessageId?: string | null; twilioSid?: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Send via the channel that matches the recipient kind. Email carries the
+ * full records body; SMS carries only the link (segment-cost trade-off).
+ */
+async function dispatchHandoff(args: {
+  payload: DispatchPayload;
+  setupUrl: string;
+  expiresAt: Date;
+}): Promise<DispatchOutcome> {
+  const { payload, setupUrl, expiresAt } = args;
+  if (payload.recipientKind === 'sms') {
+    const sms = await sendDnsHandoffSms({
+      to: payload.recipient,
+      ownerName: payload.sender.ownerName,
+      ownerCompany: payload.workspace.name,
+      domain: payload.workspace.sendingDomain,
+      setupUrl,
+    });
+    return sms.ok ? { ok: true, twilioSid: sms.sid } : sms;
+  }
+  const email = await sendDnsHandoffEmail({
+    to: payload.recipient,
+    ownerName: payload.sender.ownerName,
+    ownerEmail: payload.sender.ownerEmail,
+    ownerCompany: payload.workspace.name,
+    domain: payload.workspace.sendingDomain,
+    setupUrl,
+    records: payload.records.map((r) => ({
+      record: r.record,
+      type: r.type,
+      name: r.name,
+      value: r.value,
+      priority: r.priority ?? null,
+    })),
+    senderMessage: payload.message,
+    expiresLabel: formatExpiresLabel(expiresAt),
+  });
+  return email.ok ? { ok: true, resendMessageId: email.resendMessageId } : email;
+}
+
+/** Insert handoff row + send via the channel + stamp provider id (or revoke on send failure). */
 async function insertAndDispatch(
   payload: DispatchPayload,
 ): Promise<{ ok: true; handoffId: string; setupUrl: string } | { ok: false; error: string }> {
   const token = generateHandoffToken();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  const { supabase, workspaceId, sender, workspace, recipientEmail, recipientName, message, records } = payload;
+  const { supabase, workspaceId, sender, workspace, recipient, recipientKind, recipientName, message, records } = payload;
+  void sender;
 
   const { data: handoff, error: insertErr } = await supabase
     .schema('ops')
@@ -198,8 +248,8 @@ async function insertAndDispatch(
       workspace_id: workspaceId,
       kind: 'dns_helper',
       public_token: token,
-      recipient: recipientEmail,
-      recipient_kind: 'email',
+      recipient,
+      recipient_kind: recipientKind,
       recipient_name: recipientName,
       sender_user_id: (await supabase.auth.getUser()).data.user!.id,
       sender_message: message,
@@ -216,28 +266,12 @@ async function insertAndDispatch(
   const handoffId = (handoff as { id: string }).id;
   const setupUrl = `${baseUrl.replace(/\/$/, '')}/dns-help/${token}`;
 
-  const sendResult = await sendDnsHandoffEmail({
-    to: recipientEmail,
-    ownerName: sender.ownerName,
-    ownerEmail: sender.ownerEmail,
-    ownerCompany: workspace.name,
-    domain: workspace.sendingDomain,
-    setupUrl,
-    records: records.map((r) => ({
-      record: r.record,
-      type: r.type,
-      name: r.name,
-      value: r.value,
-      priority: r.priority ?? null,
-    })),
-    senderMessage: message,
-    expiresLabel: formatExpiresLabel(expiresAt),
-  });
+  const sendResult = await dispatchHandoff({ payload, setupUrl, expiresAt });
 
   if (!sendResult.ok) {
-    Sentry.captureMessage('dns-handoff: email send failed', {
+    Sentry.captureMessage('dns-handoff: send failed', {
       level: 'warning',
-      extra: { handoffId, error: sendResult.error },
+      extra: { handoffId, recipientKind, error: sendResult.error },
       tags: { area: 'byo-rescue' },
     });
     await supabase
@@ -245,14 +279,18 @@ async function insertAndDispatch(
       .from('handoff_links')
       .update({ revoked_at: new Date().toISOString() })
       .eq('id', handoffId);
-    return { ok: false, error: `Could not send email: ${sendResult.error}` };
+    const channel = recipientKind === 'sms' ? 'SMS' : 'email';
+    return { ok: false, error: `Could not send ${channel}: ${sendResult.error}` };
   }
 
-  if (sendResult.resendMessageId) {
+  const stamp: { resend_message_id?: string; twilio_message_sid?: string } = {};
+  if (sendResult.resendMessageId) stamp.resend_message_id = sendResult.resendMessageId;
+  if (sendResult.twilioSid) stamp.twilio_message_sid = sendResult.twilioSid;
+  if (Object.keys(stamp).length > 0) {
     await supabase
       .schema('ops')
       .from('handoff_links')
-      .update({ resend_message_id: sendResult.resendMessageId })
+      .update(stamp)
       .eq('id', handoffId);
   }
 
@@ -267,11 +305,14 @@ export type SendDnsRecordsResult =
 
 /**
  * Send the wizard's current DNS records to a tech-person recipient.
- * Snapshots records at send-time, mints a 30-day public token, sends the
- * email via the system sender (From-name = owner, Reply-To = owner).
+ * Snapshots records at send-time, mints a 30-day public token, sends via
+ * the channel matching the recipient (email → full body + records inline,
+ * SMS → short link). From-name (email) and From-context (SMS) identify the
+ * owner so the recipient sees a personal handoff, not a Unusonic blast.
  */
 export async function sendDnsRecordsToHelper(input: {
-  recipientEmail: string;
+  /** Email address OR E.164/US-formatted phone number — detected automatically. */
+  recipient: string;
   recipientName?: string | null;
   message?: string | null;
 }): Promise<SendDnsRecordsResult> {
@@ -304,7 +345,8 @@ export async function sendDnsRecordsToHelper(input: {
     workspaceId,
     sender,
     workspace,
-    recipientEmail: validated.data.recipientEmail,
+    recipient: validated.data.recipient,
+    recipientKind: validated.data.recipientKind,
     recipientName: validated.data.recipientName,
     message: validated.data.message,
     records: snapshot.records,

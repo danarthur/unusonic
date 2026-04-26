@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState, useTransition } from 'react';
-import { Check, Clock, RotateCcw, Trash2, AlertCircle, Mail } from 'lucide-react';
+import { Check, Clock, RotateCcw, Trash2, AlertCircle, Mail, MessageSquare } from 'lucide-react';
 import {
   getRescueHandoffHistory,
   resendRescueHandoff,
@@ -135,7 +135,11 @@ export function RescueHandoffHistory({ refreshKey = 0 }: RescueHandoffHistoryPro
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-[var(--stage-text-secondary)] shrink-0" />
+                  {h.recipientKind === 'sms' ? (
+                    <MessageSquare className="w-3.5 h-3.5 text-[var(--stage-text-secondary)] shrink-0" aria-label="SMS" />
+                  ) : (
+                    <Mail className="w-3.5 h-3.5 text-[var(--stage-text-secondary)] shrink-0" aria-label="Email" />
+                  )}
                   <span className="text-sm font-medium text-[var(--stage-text-primary)] truncate">
                     {h.recipientName ? `${h.recipientName} · ` : ''}
                     {h.recipient}
