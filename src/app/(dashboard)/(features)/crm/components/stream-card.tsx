@@ -27,6 +27,7 @@ import { updateDealStatus } from '../actions/update-deal-status';
 import { readEventStatusFromLifecycle } from '@/shared/lib/event-status/read-event-status';
 import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { AionSuggestionRow } from './aion-suggestion-row';
+import { PillUnseenDot } from '@/app/(dashboard)/(features)/aion/components/PillUnseenDot';
 
 export type StreamCardItem = {
   id: string;
@@ -127,6 +128,7 @@ export function StreamCard({
   selected,
   onClick,
   pipelineStages,
+  hasUnseenPill = false,
   className,
 }: {
   item: StreamCardItem;
@@ -136,6 +138,10 @@ export function StreamCard({
    *  human-readable label the workspace configured. Falls back to KIND_LABELS
    *  when a stage can't be found. */
   pipelineStages?: readonly WorkspacePipelineStage[];
+  /** Wk 10 D7 — true when this deal has ≥1 unseen Aion proactive line.
+   *  Resolved by the parent stream from a single bulk-fetch query so the
+   *  badge doesn't N+1 a per-card read. Always false for event rows. */
+  hasUnseenPill?: boolean;
   className?: string;
 }) {
   // Pass 3 Phase 2 — route lifecycle_status reads through the canonical helper
@@ -319,6 +325,14 @@ export function StreamCard({
           {/* Row 1: Title + (stage chip) + kebab */}
           <div className="flex items-baseline justify-between gap-2 min-w-0">
             <h3 className="stage-readout truncate leading-none flex items-center gap-1.5 min-w-0 flex-1">
+              {/* Wk 10 D7 — leading-edge unseen-pill dot. Achromatic accent;
+                  distinct from the chromatic show_health_status dot below.
+                  Boolean per Stage Engineering convention — no count number. */}
+              <PillUnseenDot
+                show={hasUnseenPill}
+                ariaLabel="Unseen Aion pill on this deal"
+                size={7}
+              />
               {item.show_health_status && (
                 <span
                   className="size-2 rounded-full shrink-0 inline-block"

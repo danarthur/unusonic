@@ -237,8 +237,15 @@ export type OnboardingState =
  *   3. no_guardrails → ask about rules
  *   4. needs_test_draft → offer to generate a test draft
  *   5. configured → surface queue or idle
+ *
+ * Wk 11 §3.8 — when `voice_default_derived === true` the voice was synthesized
+ * by getAionConfig from the workspace name. Treat that as configured so the
+ * 4-step forcing block in the chat route never fires for newcomers; owners
+ * who want to retune use the Sidebar overflow → "Tune Aion's voice" affordance
+ * which calls resetAionVoiceConfig.
  */
 export function getOnboardingState(config: AionConfig): OnboardingState {
+  if (config.voice_default_derived === true) return 'configured';
   const v = config.voice;
   if (!v?.description) return 'no_voice';
   if (!v?.example_message) return 'no_example';

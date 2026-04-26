@@ -132,18 +132,29 @@ describe('isSignalMuted', () => {
   });
 });
 
-// ─── fetchAutoDisabledSignals (Week 6) ──────────────────────────────────────
+// ─── fetchAutoDisabledSignals — soft (35%) + hard (Wk 10 D8) gates ─────────
 
-function makeRpcClient(rpcData: Array<{ signal_type: string; above_threshold: boolean }>) {
+function makeRpcClient(
+  rpcData: Array<{ signal_type: string; above_threshold: boolean }>,
+  hardDisables: Array<{ signal_type: string }> = [],
+) {
   return {
     schema: () => ({
       rpc: async () => ({ data: rpcData, error: null }),
+      from: () => {
+        const chain = {
+          select: () => chain,
+          eq:     () => chain,
+          gt:     async () => ({ data: hardDisables, error: null }),
+        };
+        return chain;
+      },
     }),
   } as unknown as Parameters<typeof fetchAutoDisabledSignals>[0];
 }
 
 describe('fetchAutoDisabledSignals', () => {
-  it('returns an empty set when no signal is above threshold', async () => {
+  it('returns an empty set when no signal is above threshold and no hard disable', async () => {
     const client = makeRpcClient([
       { signal_type: 'money_event', above_threshold: false },
       { signal_type: 'dead_silence', above_threshold: false },
@@ -152,7 +163,7 @@ describe('fetchAutoDisabledSignals', () => {
     expect(disabled.size).toBe(0);
   });
 
-  it('collects every signal_type that is above threshold', async () => {
+  it('collects every signal_type that is above the soft threshold', async () => {
     const client = makeRpcClient([
       { signal_type: 'money_event', above_threshold: false },
       { signal_type: 'proposal_engagement', above_threshold: true },
@@ -164,8 +175,17 @@ describe('fetchAutoDisabledSignals', () => {
     expect(disabled.has('money_event')).toBe(false);
   });
 
-  it('tolerates empty RPC payload (first-run workspace)', async () => {
-    const client = makeRpcClient([]);
+  it('unions D8 hard disables with the soft gate', async () => {
+    const client = makeRpcClient(
+      [{ signal_type: 'money_event', above_threshold: false }],
+      [{ signal_type: 'money_event' }],
+    );
+    const disabled = await fetchAutoDisabledSignals(client, 'ws-1');
+    expect(disabled.has('money_event')).toBe(true);
+  });
+
+  it('tolerates empty payloads on both sides (first-run workspace)', async () => {
+    const client = makeRpcClient([], []);
     const disabled = await fetchAutoDisabledSignals(client, 'ws-fresh');
     expect(disabled.size).toBe(0);
   });

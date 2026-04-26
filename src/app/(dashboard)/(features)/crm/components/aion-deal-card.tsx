@@ -32,10 +32,11 @@
  */
 
 import * as React from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowRight, ChevronDown, ChevronUp, ExternalLink, MessageSquare, Mic, Plus, Sparkles } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp, ExternalLink, History, MessageSquare, Mic, Plus, Sparkles } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { Button } from '@/shared/ui/button';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
@@ -59,6 +60,18 @@ import {
 import { ProactiveLineContainer } from './proactive-line-pill';
 import type { ProactiveLine } from '../actions/proactive-line-actions';
 import { AionMarkdown } from '@/app/(dashboard)/(features)/aion/components/AionMarkdown';
+import { PillUnseenDot } from '@/app/(dashboard)/(features)/aion/components/PillUnseenDot';
+import {
+  getActiveSignalDisablesForWorkspace,
+  getUnseenPillCountsForDeals,
+} from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
+
+// Lazy-load the pill-history Sheet — keeps Prism mount budget unchanged
+// (design §4.1). Only fetches when the user actually opens History.
+const PillHistorySheet = dynamic(
+  () => import('@/app/(dashboard)/(features)/aion/components/PillHistorySheet').then((m) => m.PillHistorySheet),
+  { ssr: false },
+);
 
 // ---------------------------------------------------------------------------
 // Types + public API
@@ -248,6 +261,37 @@ export function AionDealCard({
     });
   }, [collapseStorageKey]);
 
+  // Pill-history Sheet — Wk 10 D7. Lazy-loaded; the muted-indicator dot on
+  // the History button signals an active workspace disable so owners can
+  // discover the Resurface affordance without opening blind.
+  const [historySheetOpen, setHistorySheetOpen] = React.useState(false);
+  const [hasMutedSignal, setHasMutedSignal] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    getActiveSignalDisablesForWorkspace(workspaceId)
+      .then((r) => { if (!cancelled) setHasMutedSignal(r.rows.length > 0); })
+      .catch(() => { if (!cancelled) setHasMutedSignal(false); });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
+  // Wk 10 D7 — chat-collapsed unseen-pill dot. Reuses the bulk-fetch action
+  // with a single-deal payload so this code path stays canonical even though
+  // the card is rendered one-deal-at-a-time. The Sheet stamps seen on every
+  // visible row when opened, so closing the Sheet flips this back to false
+  // on the next refetch trigger (history sheet open/close).
+  const [hasUnseenPill, setHasUnseenPill] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    getUnseenPillCountsForDeals([data.dealId])
+      .then((counts) => {
+        if (!cancelled) setHasUnseenPill((counts[data.dealId] ?? 0) > 0);
+      })
+      .catch(() => { if (!cancelled) setHasUnseenPill(false); });
+    return () => { cancelled = true; };
+    // Refetch when the history sheet closes — markPillSeen runs on open, so
+    // the unseen count drops to zero by the time the user dismisses the Sheet.
+  }, [data.dealId, historySheetOpen]);
+
   // Proactive-line "Ask Aion" handler. Click on the pill headline posts the
   // insight as a user message into the deal-scoped thread so Aion can riff on
   // it. Plan §3.2.4: "Click expands the thread with the insight auto-posted
@@ -407,7 +451,32 @@ export function AionDealCard({
           )}
 
           <div className="flex-1 min-w-0 flex flex-col">
-            <TopBar data={data} />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <TopBar data={data} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistorySheetOpen(true)}
+                aria-label={hasMutedSignal ? 'Pill history (signals paused)' : 'Pill history'}
+                title={hasMutedSignal ? 'History — signals paused' : 'History'}
+                className={cn(
+                  'shrink-0 flex items-center gap-1 rounded-[4px] px-1.5 py-0.5',
+                  'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
+                  'hover:bg-[oklch(1_0_0_/_0.06)]',
+                  'transition-colors duration-[80ms]',
+                  'focus:outline-none focus-visible:text-[var(--stage-text-primary)]',
+                )}
+              >
+                <History size={13} strokeWidth={1.5} aria-hidden />
+                <span className="text-[0.72rem]">History</span>
+                <PillUnseenDot
+                  show={hasMutedSignal}
+                  ariaLabel="One or more signals are paused"
+                  size={6}
+                />
+              </button>
+            </div>
 
             <div className="space-y-3 max-w-[640px] mt-3">
               <ProactiveLineContainer
@@ -460,6 +529,11 @@ export function AionDealCard({
             >
               <span className="flex items-center gap-2 min-w-0">
                 <AionMark size={14} status="ambient" />
+                <PillUnseenDot
+                  show={hasUnseenPill}
+                  ariaLabel="Unseen Aion pill on this deal"
+                  size={7}
+                />
                 <span className="truncate">
                   {messages.length > 0
                     ? `Aion chat · ${messages.length} message${messages.length === 1 ? '' : 's'}`
@@ -510,6 +584,15 @@ export function AionDealCard({
           )}
         </AnimatePresence>
       </StagePanel>
+
+      {historySheetOpen && (
+        <PillHistorySheet
+          open={historySheetOpen}
+          onOpenChange={setHistorySheetOpen}
+          dealId={data.dealId}
+          workspaceId={workspaceId}
+        />
+      )}
     </motion.div>
   );
 }

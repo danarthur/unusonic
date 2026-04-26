@@ -72,29 +72,44 @@ export function isWithinEmissionWindow(now: Date, timezone: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-disable gate — dismiss-rate > 35% over 7d on >=3 emissions → skip type.
+// Auto-disable gate — two layers as of Wk 10:
+//   (1) Soft: dismiss-rate (not_useful only) > 35% over 7d on >=3 emissions.
+//       In-memory per-cron-run; doesn't persist.
+//   (2) Hard (D8): cortex.aion_workspace_signal_disables row with
+//       disabled_until > now(). Persistent until owner Resurfaces or 30d.
+// Both unioned — if either side flags a signal, the cron skips that type.
 // ---------------------------------------------------------------------------
 
-/**
- * Fetch per-signal-type auto-disable flags for a workspace. Plan §3.2.4:
- * "If any signal's dismiss-rate > 35% on 7 days, disable that type by default."
- * The cron calls this ONCE per workspace per run and uses the result to filter
- * candidates before the throttle + emit path.
- */
 export async function fetchAutoDisabledSignals(
   client: SystemClient,
   workspaceId: string,
 ): Promise<Set<SignalType>> {
   const disabled = new Set<SignalType>();
-  const { data } = await client
+
+  // (1) Soft gate — 35% over 7d (legacy, plan §3.2.4).
+  const ratesPromise = client
     .schema('cortex')
     .rpc('get_proactive_line_dismiss_rates', {
       p_workspace_id: workspaceId,
       p_window_days: 7,
       p_min_sample: 3,
     });
-  for (const row of (data ?? []) as { signal_type: SignalType; above_threshold: boolean }[]) {
+
+  // (2) Hard gate — D8 workspace_signal_disables (Wk 10).
+  const disablesPromise = client
+    .schema('cortex')
+    .from('aion_workspace_signal_disables')
+    .select('signal_type')
+    .eq('workspace_id', workspaceId)
+    .gt('disabled_until', new Date().toISOString());
+
+  const [{ data: rates }, { data: hardDisables }] = await Promise.all([ratesPromise, disablesPromise]);
+
+  for (const row of (rates ?? []) as { signal_type: SignalType; above_threshold: boolean }[]) {
     if (row.above_threshold) disabled.add(row.signal_type);
+  }
+  for (const row of (hardDisables ?? []) as { signal_type: SignalType }[]) {
+    disabled.add(row.signal_type);
   }
   return disabled;
 }

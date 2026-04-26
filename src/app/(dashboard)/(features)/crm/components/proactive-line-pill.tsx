@@ -1,43 +1,38 @@
 'use client';
 
 /**
- * Proactive-line pill on the deal card — Phase 2 Sprint 2 / Week 5.
+ * Proactive-line pill on the deal card.
  *
- * Single pinned line surfaced above the Aion voice paragraph. One pill max
- * per deal at any time. Three affordances:
+ * Wk 10 D5/D7 update — three dismiss reasons replace the single ×:
+ *   - "Got it" (already_handled)   — tunes hit-rate, doesn't mute (G)
+ *   - "Not relevant" (not_useful)  — feeds D6/D8 mute math          (D)
+ *   - "Later" (snooze)             — 24h floor, all gates still apply (N)
  *
- *   - Click the headline → pose it as a chat question in the deal thread
- *     (user message, not system) so the conversation feels natural.
- *   - Dismiss (×) → optimistic hide + cortex.dismiss_aion_proactive_line RPC.
- *     Throttle math (2 dismisses in 14d → mute 7d) is applied server-side
- *     in the evaluator cron, not here.
- *   - No other CTAs. Plan §3.2.4: "Pill shape: signal-type icon + headline
- *     + artifact link + dismiss button. Click expands the thread with the
- *     insight auto-posted as a system message to kick off a conversation."
+ * The pill stamps `seen_at` once on mount via cortex.mark_pill_seen so the
+ * 72h badge clears even if the owner reads-and-walks-away. Dismissal also
+ * counts as seen (the RPC stamps via COALESCE — first stamp wins).
  *
- * Plan: docs/reference/aion-deal-chat-phase2-plan.md §3.2.
+ * Plan: docs/reference/aion-deal-chat-phase3-plan.md §3.7
  */
 
 import * as React from 'react';
-import { AlertCircle, DollarSign, Eye, Clock, X } from 'lucide-react';
+import { AlertCircle, DollarSign, Eye, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import {
   dismissProactiveLine,
   getActiveProactiveLine,
+  type DismissReason,
   type ProactiveLine,
 } from '../actions/proactive-line-actions';
+import { markPillSeen } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
 
 interface ProactiveLinePillProps {
   line: ProactiveLine;
-  /** Called when the user clicks the headline to open the thread. The parent
-   *  typically sends the headline as a user message via sendChatMessage. */
+  /** Called when the user clicks the headline to open the thread. */
   onAsk: (line: ProactiveLine) => void;
 }
 
-// Signal-type → icon + accent mapping. Accent is a single-digit lightness
-// shift within Stage's OKLCH scale; no chromatic accent per the achromatic
-// design decision.
 const SIGNAL_ICON = {
   money_event: DollarSign,
   proposal_engagement: Eye,
@@ -50,29 +45,65 @@ const SIGNAL_LABEL = {
   dead_silence: 'Silence',
 } as const;
 
+// Owner-facing labels per Wk 10 D5 lock. Telemetry field names live in the
+// reason column; UI never shows them.
+type DismissAffordance = {
+  label: string;
+  reason: DismissReason;
+  hotkey: 'g' | 'd' | 'n';
+  hotkeyDisplay: 'G' | 'D' | 'N';
+};
+
+const DISMISS_AFFORDANCES: readonly DismissAffordance[] = [
+  { label: 'Got it',       reason: 'already_handled', hotkey: 'g', hotkeyDisplay: 'G' },
+  { label: 'Not relevant', reason: 'not_useful',      hotkey: 'd', hotkeyDisplay: 'D' },
+  { label: 'Later',        reason: 'snooze',          hotkey: 'n', hotkeyDisplay: 'N' },
+] as const;
+
 export function ProactiveLinePill({ line, onAsk }: ProactiveLinePillProps) {
-  // Optimistic dismissal: the pill vanishes the moment the user clicks, then
-  // the RPC confirms in the background. Any failure restores the pill with a
-  // toast — the user stays in control.
   const [hidden, setHidden] = React.useState(false);
-  const [isPending, startTransition] = React.useTransition();
+  const [pendingReason, setPendingReason] = React.useState<DismissReason | null>(null);
+  const [, startTransition] = React.useTransition();
   const Icon = SIGNAL_ICON[line.signal_type] ?? AlertCircle;
   const label = SIGNAL_LABEL[line.signal_type] ?? 'Aion';
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+
+  // D7 — pinned-pill render counts as seen (design Q2). Idempotent on the
+  // server; first stamp wins.
+  React.useEffect(() => {
+    if (!line?.id) return;
+    void markPillSeen(line.id);
+  }, [line?.id]);
 
   const handleDismiss = React.useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      if (isPending) return;
+    (reason: DismissReason) => {
+      if (pendingReason !== null) return;
+      setPendingReason(reason);
       setHidden(true);
       startTransition(async () => {
-        const result = await dismissProactiveLine(line.id);
+        const result = await dismissProactiveLine(line.id, reason);
         if (!result.success) {
           setHidden(false);
+          setPendingReason(null);
           toast.error(result.error ?? 'Could not dismiss that.');
         }
       });
     },
-    [line.id, isPending],
+    [line.id, pendingReason],
+  );
+
+  // Hotkeys G / D / N work when the pill (or its descendants) hold focus.
+  const handleKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const k = event.key.toLowerCase();
+      const hit = DISMISS_AFFORDANCES.find((a) => a.hotkey === k);
+      if (hit) {
+        event.preventDefault();
+        handleDismiss(hit.reason);
+      }
+    },
+    [handleDismiss],
   );
 
   const handleAsk = React.useCallback(() => {
@@ -83,9 +114,12 @@ export function ProactiveLinePill({ line, onAsk }: ProactiveLinePillProps) {
 
   return (
     <div
+      ref={containerRef}
       role="alert"
       aria-label={`${label} signal \u2014 ${line.headline}`}
       data-signal-type={line.signal_type}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
       className={cn(
         'group relative flex items-center gap-2 px-3 py-2',
         'rounded-[6px]',
@@ -94,6 +128,7 @@ export function ProactiveLinePill({ line, onAsk }: ProactiveLinePillProps) {
         'transition-colors duration-[120ms]',
         'hover:bg-[oklch(1_0_0_/_0.05)]',
         'hover:border-[oklch(1_0_0_/_0.12)]',
+        'focus:outline-none focus-visible:border-[oklch(1_0_0_/_0.18)]',
       )}
     >
       <Icon
@@ -116,36 +151,52 @@ export function ProactiveLinePill({ line, onAsk }: ProactiveLinePillProps) {
           Ask Aion →
         </span>
       </button>
-      <button
-        type="button"
-        onClick={handleDismiss}
-        disabled={isPending}
-        aria-label="Dismiss this alert"
+      <div
         className={cn(
-          'shrink-0 p-1 rounded-[4px]',
-          'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
-          'hover:bg-[oklch(1_0_0_/_0.06)]',
-          'transition-colors duration-[80ms]',
-          'opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100',
-          isPending && 'opacity-50 cursor-not-allowed',
+          'shrink-0 flex items-center gap-2 text-[0.76rem]',
+          'text-[var(--stage-text-tertiary)]',
+          // Visible by default on touch / always-on-mobile via media query;
+          // fades in on hover/focus on desktop. Stage Engineering: subtle.
+          'opacity-0 group-hover:opacity-100',
+          'group-focus-within:opacity-100',
+          '[@media(hover:none)]:opacity-100',
         )}
+        aria-label="Dismiss options"
       >
-        <X size={12} strokeWidth={2} />
-      </button>
+        {DISMISS_AFFORDANCES.map((a, idx) => (
+          <React.Fragment key={a.reason}>
+            {idx > 0 && (
+              <span aria-hidden className="text-[var(--stage-text-tertiary)] opacity-50">
+                ·
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleDismiss(a.reason); }}
+              disabled={pendingReason !== null}
+              aria-keyshortcuts={a.hotkeyDisplay}
+              aria-label={`${a.label} — dismiss as ${a.reason} (${a.hotkeyDisplay})`}
+              className={cn(
+                'rounded-[4px] px-1.5 py-0.5',
+                'hover:text-[var(--stage-text-secondary)]',
+                'hover:bg-[oklch(1_0_0_/_0.06)]',
+                'transition-colors duration-[80ms]',
+                'focus:outline-none focus-visible:text-[var(--stage-text-primary)]',
+                pendingReason !== null && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              {a.label}
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Container — fetches the active line and renders the pill (or nothing).
-// Mount in the deal card; it self-fetches so the existing AionCardData
-// pipeline stays untouched.
-// ---------------------------------------------------------------------------
-
 interface ProactiveLineContainerProps {
   dealId: string;
-  /** Called when the user clicks the headline. Typically wires to
-   *  sendChatMessage on the deal-scoped session. */
+  /** Called when the user clicks the headline. */
   onAsk: (line: ProactiveLine) => void;
 }
 
@@ -164,16 +215,12 @@ export function ProactiveLineContainer({ dealId, onAsk }: ProactiveLineContainer
       })
       .catch(() => {
         if (cancelled) return;
-        // Silent failure — the pill is an enhancement; the rest of the card
-        // renders regardless.
         setLine(null);
         setLoaded(true);
       });
     return () => { cancelled = true; };
   }, [dealId]);
 
-  // Render nothing until the fetch resolves so we don't flicker an empty
-  // block on the initial mount.
   if (!loaded || !line) return null;
 
   return <ProactiveLinePill line={line} onAsk={onAsk} />;
