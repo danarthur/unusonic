@@ -148,7 +148,8 @@ describe('pgTAP partner — supabase/tests/database/01100-aion-cross-workspace-r
       'cortex.list_aion_proactive_history',
       'cortex.mark_pill_seen',
       'cortex.migrate_session_scope',
-      'cortex.metric_brief_open_kill_check',
+      // Wk 15-pre: kill-metric moved from cortex.* to aion.* (admin namespace).
+      'aion.metric_brief_open_kill_check',
       'cortex.check_signal_disabled',
     ]) {
       expect(sql).toContain(rpc);

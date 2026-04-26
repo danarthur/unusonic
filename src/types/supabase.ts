@@ -1052,21 +1052,6 @@ export type Database = {
           source_type: string
         }[]
       }
-      metric_brief_open_kill_check: {
-        Args: {
-          p_min_repeats?: number
-          p_repeat_window_days?: number
-          p_window_days?: number
-        }
-        Returns: {
-          first_open: string
-          last_open: string
-          max_in_window: number
-          total_opens: number
-          user_id: string
-          workspace_id: string
-        }[]
-      }
       migrate_session_scope: {
         Args: {
           p_new_scope_entity_id: string

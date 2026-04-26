@@ -255,14 +255,14 @@ SELECT throws_ok(
 );
 SELECT test_reset_role();
 
--- 13. cortex.metric_brief_open_kill_check: REVOKEd from authenticated.
+-- 13. aion.metric_brief_open_kill_check: REVOKEd from authenticated.
 --    Service-role-only by design; admin route gates via isAionAdmin().
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
 SELECT throws_ok(
-  $$SELECT * FROM cortex.metric_brief_open_kill_check(90, 7, 2)$$,
+  $$SELECT * FROM aion.metric_brief_open_kill_check(90, 7, 2)$$,
   '42501',
   NULL,
-  'cortex.metric_brief_open_kill_check: authenticated EXECUTE rejected'
+  'aion.metric_brief_open_kill_check: authenticated EXECUTE rejected'
 );
 SELECT test_reset_role();
 

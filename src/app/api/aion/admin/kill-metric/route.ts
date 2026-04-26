@@ -41,9 +41,17 @@ export async function GET(req: Request) {
   const repeatWindowDays = parseIntParam(url.searchParams.get('repeat_window_days'), 7);
   const minRepeats      = parseIntParam(url.searchParams.get('min_repeats'),        2);
 
-  const system = getSystemClient();
+  // Wk 15-pre — function moved from cortex.* to aion.* (admin/observability
+  // namespace). The route still gates via isAionAdmin above; the schema move
+  // makes the boundary auditable in pg_proc grep. The `as any` cast mirrors
+  // the existing pattern in writes.ts/get-event-brief.ts for schemas not yet
+  // listed in the Supabase Dashboard's exposed-schemas (so absent from the
+  // generated `Database` type). Casts can be dropped after `aion` is added
+  // to the dashboard and `npm run db:types` regenerates.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- aion schema not yet in Supabase Dashboard exposed-schemas
+  const system = getSystemClient() as any;
   const { data, error } = await system
-    .schema('cortex')
+    .schema('aion')
     .rpc('metric_brief_open_kill_check', {
       p_window_days:        windowDays,
       p_repeat_window_days: repeatWindowDays,
