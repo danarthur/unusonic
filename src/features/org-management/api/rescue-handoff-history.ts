@@ -133,7 +133,7 @@ export async function resendRescueHandoff(handoffId: string): Promise<ResendResc
   const o = original as { recipient: string; recipient_name: string | null; sender_message: string | null };
 
   const sendResult = await sendDnsRecordsToHelper({
-    recipientEmail: o.recipient,
+    recipient: o.recipient,
     recipientName: o.recipient_name,
     message: o.sender_message,
   });
