@@ -4,6 +4,7 @@
  * @module app/(auth)/signup
  */
 
+import Link from 'next/link';
 import { SmartLoginForm } from '@/features/auth/smart-login';
 
 export const metadata = {
@@ -26,8 +27,25 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
         <div className="absolute inset-0 grain-overlay" aria-hidden />
       </div>
 
-      <div className="relative z-10 w-full">
+      <div className="relative z-10 w-full flex flex-col items-center gap-6">
         <SmartLoginForm redirectTo={redirectTo} defaultMode="signup" defaultEmail={email} />
+        <p className="text-[11px] text-[var(--stage-text-secondary)]/55 max-w-sm text-center leading-relaxed">
+          By creating an account you agree to our{' '}
+          <Link
+            href="/legal/terms"
+            className="text-[var(--stage-text-secondary)]/85 hover:text-[var(--stage-text-primary)] transition-colors underline underline-offset-2 decoration-[oklch(1_0_0_/_0.18)]"
+          >
+            Terms
+          </Link>
+          {' '}and{' '}
+          <Link
+            href="/legal/privacy"
+            className="text-[var(--stage-text-secondary)]/85 hover:text-[var(--stage-text-primary)] transition-colors underline underline-offset-2 decoration-[oklch(1_0_0_/_0.18)]"
+          >
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );
