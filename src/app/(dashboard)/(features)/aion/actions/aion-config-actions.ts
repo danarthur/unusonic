@@ -3,6 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { revalidatePath } from 'next/cache';
+import { applyVoiceDefaultIfEmpty } from './aion-config-helpers';
 
 // =============================================================================
 // Types
@@ -71,6 +72,10 @@ export type AionConfig = {
    */
   voice_default_derived?: boolean;
 };
+
+// Pure helpers (synthesizeDefaultVoice, applyVoiceDefaultIfEmpty) live in
+// `./aion-config-helpers.ts` — Next.js 16 requires every export from a
+// 'use server' module to be async, so the sync helpers had to move out.
 
 // =============================================================================
 // Voice synthesis (Wk 11 §3.8)

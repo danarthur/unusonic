@@ -11,8 +11,8 @@ import { describe, it, expect } from 'vitest';
 import {
   synthesizeDefaultVoice,
   applyVoiceDefaultIfEmpty,
-  type AionConfig,
-} from '../aion-config-actions';
+} from '../aion-config-helpers';
+import type { AionConfig } from '../aion-config-actions';
 import { getOnboardingState } from '../../lib/aion-chat-types';
 
 describe('synthesizeDefaultVoice', () => {
