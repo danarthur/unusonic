@@ -722,7 +722,18 @@ export function Prism({
             selectedId={selectedId ?? '—'} | source={selectedItem?.source ?? '—'} | lens={lens} | loading={String(loading)} | deal={deal?.id ?? 'null'} | linkedDeal={linkedDeal?.id ?? 'null'}
           </div>
         )}
-        {loading ? (
+        {/* Stale-while-revalidate: when navigating between deals, keep showing
+            the previous deal's content until the new fetch resolves. The user
+            perceives ONE atomic transition instead of "deal A → spinner → deal B"
+            — the User Advocate's "never show intermediate states between Deal A
+            and Deal B" rule. Skeleton only on the very first load when there's
+            genuinely nothing to show.
+
+            Logic:
+              !deal && !eventSummary && loading → first load, show skeleton
+              otherwise → render whatever we have; new data swaps in atomically
+                          when Promise.all resolves */}
+        {!deal && !eventSummary && loading ? (
           <div className="flex flex-col items-center justify-center min-h-[200px] gap-4">
             <div className="h-10 w-10 stage-skeleton" style={{ background: 'var(--stage-surface)', borderRadius: 'var(--stage-radius-nested, 8px)' }} aria-hidden />
             <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">Loading...</p>

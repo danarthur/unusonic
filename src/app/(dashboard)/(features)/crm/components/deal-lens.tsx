@@ -165,11 +165,15 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
   // Unified timeline (ops.deal_timeline_v — unions deal_activity_log +
   // follow_up_log). null = not yet fetched; [] = fetched, no entries.
+  // Note: we deliberately do NOT clear `activity` to null on deal.id change —
+  // showing the previous deal's timeline briefly during transition is much
+  // less jarring than flashing a "Loading…" placeholder. Atomic swap when
+  // the new fetch resolves. (User Advocate: "never show intermediate states
+  // between Deal A and Deal B".)
   const [activity, setActivity] = useState<DealTimelineEntry[] | null>(null);
   const [activityExpanded, setActivityExpanded] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    setActivity(null);
     getDealTimeline(deal.id).then((entries) => {
       if (!cancelled) setActivity(entries);
     }).catch(() => {
@@ -1225,16 +1229,9 @@ function DealActivitySection({
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
-  if (entries === null) {
-    return (
-      <p
-        className="text-sm"
-        style={{ color: 'var(--stage-text-tertiary)' }}
-      >
-        Loading…
-      </p>
-    );
-  }
+  // Silent loading: returning null while we wait avoids the "Loading…" text
+  // flash that read as a wave. The section just appears when ready.
+  if (entries === null) return null;
 
   if (entries.length === 0) {
     return (
