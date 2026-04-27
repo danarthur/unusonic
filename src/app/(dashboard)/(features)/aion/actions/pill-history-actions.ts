@@ -17,6 +17,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { revalidatePath } from 'next/cache';
+import { recordAionEvent } from '@/app/api/aion/lib/event-logger';
 
 export type PillHistoryRow = {
   id: string;
@@ -69,6 +70,91 @@ export async function getPillHistoryForDeal(
     return { rows: [], error: error.message };
   }
   return { rows: (data ?? []) as PillHistoryRow[] };
+}
+
+/**
+ * Wk 15a-ii — pill_dismiss telemetry helper. Lives here (not in the dismiss
+ * action's own file) so that file's source-discipline guard against
+ * getSystemClient stays clean — the dismiss path proper goes through the
+ * SECURITY DEFINER RPC; only this telemetry sidecar uses service-role.
+ *
+ * Fire-and-forget by design: a telemetry hiccup never blocks the dismiss
+ * action's success path.
+ */
+export async function recordPillDismissTelemetry(
+  lineId: string,
+  reason: 'not_useful' | 'already_handled' | 'snooze',
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const system = getSystemClient();
+    const { data: line } = await system
+      .schema('cortex')
+      .from('aion_proactive_lines')
+      .select('workspace_id, signal_type, deal_id')
+      .eq('id', lineId)
+      .maybeSingle();
+    if (!line) return;
+
+    await recordAionEvent({
+      eventType:   'aion.pill_dismiss',
+      workspaceId: line.workspace_id,
+      userId:      user.id,
+      payload: {
+        line_id:     lineId,
+        signal_type: line.signal_type,
+        deal_id:     line.deal_id,
+        reason,
+      },
+    });
+  } catch {
+    // Telemetry never throws into the action's success path.
+  }
+}
+
+/**
+ * Wk 15a-ii — pill_click telemetry. Fired when the owner taps the pill
+ * headline (Ask Aion → handler in proactive-line-pill.tsx). The aion.pill_emit
+ * counterpart fires from the cron emit path; the ratio is the §3.10 card 5
+ * click-through-rate metric. Fire-and-forget — never blocks the chat handler.
+ */
+export async function recordPillClick(
+  lineId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated.' };
+
+    const system = getSystemClient();
+    const { data: line } = await system
+      .schema('cortex')
+      .from('aion_proactive_lines')
+      .select('workspace_id, signal_type, deal_id')
+      .eq('id', lineId)
+      .maybeSingle();
+    if (!line) return { success: false, error: 'Pill not found.' };
+
+    await recordAionEvent({
+      eventType:   'aion.pill_click',
+      workspaceId: line.workspace_id,
+      userId:      user.id,
+      payload: {
+        line_id:     lineId,
+        signal_type: line.signal_type,
+        deal_id:     line.deal_id,
+      },
+    });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Telemetry failed.',
+    };
+  }
 }
 
 /**

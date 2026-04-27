@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/aion-activity-embed",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/aion-events-partition-lifecycle",
+      "schedule": "30 3 * * *"
     }
   ]
 }

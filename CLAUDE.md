@@ -88,19 +88,30 @@ Layers import only from layers **below**: `App → Widgets → Features → Enti
 
 ## Database Architecture
 
-### Five Schemas
+### Six Schemas
 
 **Do not create new tables in `public`.**
 
 | Schema | Domain | Contents |
 |---|---|---|
 | `directory` | Identity | `directory.entities` — people, companies, venues |
-| `ops` | Operations | Projects, events, assignments, logistics (agnostic to human details) |
+| `ops` | Operations | Projects, events, assignments, logistics, telemetry (`ops.aion_events` — append-only Aion event log, monthly partitioned) |
 | `finance` | Commercials | Invoices (`finance.invoices`, `invoice_line_items`), payments (`finance.payments`), QBO sync (`qbo_connections`, `qbo_entity_map`, `sync_jobs`, `qbo_sync_log`), tax rates, bills (AP, schema-only), Stripe webhook dedup. See `docs/audits/billing-redesign-final-plan-2026-04-11.md`. |
-| `cortex` | Intelligence | Graph edges (`cortex.relationships`), AI memory/RAG (`cortex.memory`) |
+| `cortex` | Intelligence | Graph edges (`cortex.relationships`), AI memory/RAG (`cortex.memory`), Aion data substrate per workspace (`cortex.aion_sessions`, `aion_messages`, `aion_proactive_lines`, `aion_user_signal_mutes`, `aion_workspace_signal_disables`, `aion_insights`). User-facing RPCs: `cortex.dismiss_aion_proactive_line`, `mark_pill_seen`, `list_aion_proactive_history`, `migrate_session_scope`, `is_user_signal_muted`, etc. |
+| `aion` | Admin / observability | Cross-workspace admin telemetry RPCs (`aion.metric_brief_open_kill_check`, future `metric_dismiss_rate_admin`, `metric_hit_rate_admin`, `metric_tool_depth`, `metric_pill_click_through`). Service-role only by default; admin route handlers gate via `isAionAdmin()`. **Distinct from `cortex.*`** — cortex is per-workspace data substrate; `aion.*` is cross-workspace observability. |
 | `public` | Legacy | Active migration to above schemas. No new tables. |
 
 **Exception:** `public.invitations`, `passkeys`, `guardians`, `recovery_shards` live in `public` because they operate before workspace context (pre-auth boundary).
+
+### Where new schema objects go
+
+- **New people / companies / venues / contacts** → `directory.entities` + `cortex.relationships` edges. Never specific FK columns.
+- **New project / event / assignment / logistics tables** → `ops.*` (agnostic to human details — rates, titles, perms live on edges, not columns).
+- **New invoice / payment / tax / bills tables** → `finance.*`.
+- **New Aion user-facing RPC** (called from chat/UI on a workspace's data) → `cortex.*`. Workspace-scoped.
+- **New Aion admin/observability/telemetry RPC** (cross-workspace aggregate, admin-only via `isAionAdmin()`) → `aion.*`. Default REVOKE PUBLIC/anon/authenticated; GRANT only to `service_role`.
+- **New telemetry event log row** → `ops.aion_events` (append-only, partitioned). Use `recordAionEvent()` helper at `src/app/api/aion/lib/event-logger.ts`.
+- **New auth/recovery/invite primitive that runs before workspace context** → `public.*` (pre-auth exception only).
 
 ### Three Supabase Clients
 
@@ -146,7 +157,7 @@ These tables live in `public` because they pre-date the five-schema split. They 
 ## Core Architectural Patterns
 
 ### 1. Domain-Schema Isolation
-New tables go in their correct schema — never `public`. People/companies/venues → `directory`. Events/projects/assignments → `ops`. Graph edges/AI/embeddings → `cortex`.
+New tables go in their correct schema — never `public`. People/companies/venues → `directory`. Events/projects/assignments/event-log telemetry → `ops`. Graph edges + AI memory/RAG + per-workspace Aion data substrate → `cortex`. Cross-workspace Aion admin/observability RPCs → `aion`.
 
 ### 2. Context Mesh (Relationships as Edges)
 No specific FK columns (`employer_id`, `vendor_id`). Use `cortex.relationships` with typed `context_data` JSONB.
@@ -226,6 +237,8 @@ Call via `supabase.rpc(...)`, never raw SQL from app code:
 - `finance.metric_sales_tax_worksheet(workspace_id, period_start, period_end, tz?)` — table of per-jurisdiction sales tax over period
 - `finance.metric_1099_worksheet(workspace_id, year)` — table of per-vendor totals from finance.bills, flags ≥$600 IRS threshold
 - `finance._metric_resolve_tz`, `finance._metric_assert_membership` — internal helpers for the metric RPCs; call via `src/shared/lib/metrics/call.ts`, never directly
+- `aion.metric_brief_open_kill_check(window_days, repeat_window_days, min_repeats)` — Phase 3 §3.10 admin telemetry. Repeat-user stats for the §3.9 brief-me kill metric. Service-role only; gated at the admin route by `isAionAdmin()`. New admin metric RPCs go in `aion.*`, not `cortex.*`.
+- `cortex.dismiss_aion_proactive_line(line_id, reason)`, `cortex.mark_pill_seen(line_id)`, `cortex.list_aion_proactive_history(deal_id, days?)`, `cortex.is_user_signal_muted(signal_type, deal_id)`, `cortex.resurface_muted_reason(workspace_id, signal_type)`, `cortex.submit_pill_feedback(line_id, feedback)`, `cortex.check_signal_disabled(workspace_id, signal_type)` (service-role only), `cortex.get_proactive_line_dismiss_rates(workspace_id, window?, min_sample?)`, `cortex.migrate_session_scope(session_id, scope_type, scope_entity_id)` — Aion user-facing data-substrate RPCs. New per-workspace Aion RPCs go in `cortex.*`, not `aion.*`.
 - `get_member_permissions`, `member_has_permission`, `user_has_workspace_role` — auth
 - `get_member_role_slug(p_workspace_id)` — role routing (employee portal)
 - `patch_entity_attributes` — safe JSONB merge; always validate via Zod schema first

@@ -187,6 +187,18 @@ async function runForWorkspace(
         });
       if (lineId) {
         outcome.emitted += 1;
+        // Wk 15a-ii — telemetry. recordAionEvent is fire-and-forget by design;
+        // a failed insert never blocks the emit path.
+        const { recordAionEvent } = await import('@/app/api/aion/lib/event-logger');
+        void recordAionEvent({
+          eventType:    'aion.pill_emit',
+          workspaceId:  ws.id,
+          payload: {
+            line_id:     typeof lineId === 'string' ? lineId : String(lineId),
+            signal_type: c.signal_type,
+            deal_id:     c.deal_id,
+          },
+        });
       } else {
         // Either the per-deal kill toggle blocked it or the daily cap fired.
         outcome.capped += 1;

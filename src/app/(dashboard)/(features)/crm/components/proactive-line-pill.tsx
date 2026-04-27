@@ -25,7 +25,7 @@ import {
   type DismissReason,
   type ProactiveLine,
 } from '../actions/proactive-line-actions';
-import { markPillSeen } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
+import { markPillSeen, recordPillClick } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
 
 interface ProactiveLinePillProps {
   line: ProactiveLine;
@@ -107,6 +107,10 @@ export function ProactiveLinePill({ line, onAsk }: ProactiveLinePillProps) {
   );
 
   const handleAsk = React.useCallback(() => {
+    // Wk 15a-ii — pill_click telemetry. Fire-and-forget; never blocks the
+    // ask-Aion handler. The aion.pill_emit counterpart fires from the cron
+    // emit path; ratio is the §3.10 admin dashboard click-through metric.
+    void recordPillClick(line.id);
     onAsk(line);
   }, [line, onAsk]);
 
