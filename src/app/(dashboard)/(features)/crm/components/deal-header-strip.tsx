@@ -323,7 +323,6 @@ export function DealHeaderStrip({
     if (result.success) {
       toast.success(`${org.name} added as client.`);
       onStakeholdersChange();
-      router.refresh();
     } else {
       toast.error(result.error);
     }
@@ -371,12 +370,11 @@ export function DealHeaderStrip({
       if (result.success) {
         toast.success(`${org.name} added.`);
         onStakeholdersChange();
-        router.refresh();
       } else {
         toast.error(result.error);
       }
     },
-    [deal.id, onStakeholdersChange, router, handleSelectClientOrg],
+    [deal.id, onStakeholdersChange, handleSelectClientOrg],
   );
 
   const handleSlotGhostCreate = useCallback(
@@ -396,7 +394,6 @@ export function DealHeaderStrip({
         if (result.success) {
           toast.success(`${name} added as client.`);
           onStakeholdersChange();
-          router.refresh();
         } else {
           toast.error(result.error);
         }
@@ -424,19 +421,17 @@ export function DealHeaderStrip({
       if (result.success) {
         toast.success(`${name} added.`);
         onStakeholdersChange();
-        router.refresh();
       } else {
         toast.error(result.error);
       }
     },
-    [deal.id, onStakeholdersChange, router],
+    [deal.id, onStakeholdersChange],
   );
 
   const handleRemove = async (stakeholderId: string) => {
     const result = await removeDealStakeholder(deal.id, stakeholderId);
     if (result.success) {
       onStakeholdersChange();
-      router.refresh();
     } else {
       toast.error(result.error);
     }
@@ -454,13 +449,12 @@ export function DealHeaderStrip({
       if (result.success) {
         toast.success('Primary host updated.');
         onStakeholdersChange();
-        router.refresh();
       } else {
         setHosts(snapshot);
         toast.error(result.error);
       }
     },
-    [deal.id, hosts, onStakeholdersChange, router],
+    [deal.id, hosts, onStakeholdersChange],
   );
 
   // POC toggles: one shared helper that targets either the day_of_poc or
@@ -489,12 +483,11 @@ export function DealHeaderStrip({
         const label = role === 'day_of' ? 'Day-of contact' : 'Deal contact';
         toast.success(target.currentlyActive ? `${label} cleared.` : `${label} updated.`);
         onStakeholdersChange();
-        router.refresh();
       } else {
         toast.error(result.error);
       }
     },
-    [deal.id, onStakeholdersChange, router],
+    [deal.id, onStakeholdersChange],
   );
 
   const handleMakePoc = useCallback(
@@ -1170,7 +1163,6 @@ export function DealHeaderStrip({
           onSaved={() => {
             setCoupleEdit(null);
             onStakeholdersChange();
-            router.refresh();
           }}
         />
       )}
@@ -1185,7 +1177,6 @@ export function DealHeaderStrip({
           onSaved={() => {
             setIndividualEdit(null);
             onStakeholdersChange();
-            router.refresh();
           }}
         />
       )}
