@@ -34,6 +34,31 @@ export async function listWorkspaceSkillPresets(): Promise<string[]> {
   return (data ?? []).map((r: { skill_tag: string }) => r.skill_tag);
 }
 
+/**
+ * Phase 2.1 — return the workspace's canonical role taxonomy from
+ * ops.workspace_job_titles. These are the "crew role" buckets the feasibility
+ * chip counts pools against (DJ, Audio A1, Lighting Director, etc.).
+ *
+ * Used alongside listWorkspaceSkillPresets so the EmployeeEntityForm picker
+ * can render canonical roles in their own optgroup ("Drives crew pools") and
+ * the rest as "Other skills."
+ */
+export async function listWorkspaceCanonicalRoles(): Promise<string[]> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .schema('ops')
+    .from('workspace_job_titles')
+    .select('title, sort_order')
+    .eq('workspace_id', workspaceId)
+    .order('sort_order')
+    .order('title');
+
+  return (data ?? []).map((r: { title: string }) => r.title);
+}
+
 export async function addWorkspaceSkillPreset(
   input: unknown
 ): Promise<PresetActionResult> {

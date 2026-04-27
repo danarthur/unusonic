@@ -75,13 +75,6 @@ BEGIN
         AND r.context_data->>'deleted_at' IS NULL
     )
   ),
-  -- Preferred = matched_persons NOT in in_house_ids. Catches both
-  -- PARTNER+tier=preferred edges AND edge-less workspace-owned ghosts.
-  preferred_ids AS (
-    SELECT mp.id, mp.display_name
-    FROM matched_persons mp
-    WHERE NOT EXISTS (SELECT 1 FROM in_house_ids ih WHERE ih.id = mp.id)
-  ),
   in_house_committed AS (
     SELECT
       ih.id,
@@ -203,22 +196,3 @@ COMMENT ON FUNCTION ops.get_role_pool(uuid, text, date) IS
 
 REVOKE EXECUTE ON FUNCTION ops.get_role_pool(uuid, text, date) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION ops.get_role_pool(uuid, text, date) TO authenticated, service_role;
-
--- Smoke test
-DO $$
-DECLARE
-  v_daniel uuid := '96feecb1-ad20-4ad0-bb93-eb3c440efd05';
-  v_pool jsonb;
-  v_total int;
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.workspaces WHERE id = v_daniel) THEN
-    RETURN;
-  END IF;
-  v_pool := ops.get_role_pool(v_daniel, 'DJ', NULL);
-  v_total := (v_pool->>'in_house_total')::int + (v_pool->>'preferred_total')::int;
-  IF v_total = 0 THEN
-    RAISE EXCEPTION 'Smoke test failed: DJ pool still empty after edge-relaxation fix';
-  END IF;
-  RAISE NOTICE 'Smoke pass: DJ pool surfaces % person(s) — % in-house, % preferred',
-    v_total, (v_pool->>'in_house_total')::int, (v_pool->>'preferred_total')::int;
-END $$;

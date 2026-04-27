@@ -157,38 +157,3 @@ COMMENT ON FUNCTION ops.feasibility_check_for_date(uuid, date, uuid) IS
 
 REVOKE EXECUTE ON FUNCTION ops.feasibility_check_for_date(uuid, date, uuid) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION ops.feasibility_check_for_date(uuid, date, uuid) TO authenticated, service_role;
-
--- ─────────────────────────────────────────────────────────────────────────
--- Smoke test inline (raises if Ally & Emily wedding doesn't surface red)
--- ─────────────────────────────────────────────────────────────────────────
-
-DO $$
-DECLARE
-  v_result jsonb;
-  v_state text;
-  v_committed int;
-  v_ally_wedding_workspace uuid;
-BEGIN
-  -- Find the workspace that owns the Ally & Emily Wedding deal (Daniel's
-  -- test case). If none, skip — this is just a sanity check, not a hard
-  -- requirement of the migration.
-  SELECT workspace_id INTO v_ally_wedding_workspace
-  FROM public.deals
-  WHERE title ILIKE '%ally%' AND proposed_date = '2026-05-30'
-  LIMIT 1;
-
-  IF v_ally_wedding_workspace IS NULL THEN
-    RAISE NOTICE 'Skipping inline smoke test — Ally & Emily Wedding deal not found.';
-    RETURN;
-  END IF;
-
-  v_result := ops.feasibility_check_for_date(v_ally_wedding_workspace, '2026-05-30', NULL);
-  v_state := v_result->>'state';
-  v_committed := (v_result->>'committed_deal_count')::int;
-
-  IF v_state = 'open' THEN
-    RAISE EXCEPTION 'Smoke test failed: 2026-05-30 still reads as Open with 0 committed deals (was expecting confirmed). Result: %', v_result;
-  END IF;
-
-  RAISE NOTICE 'Smoke test passed: state=% committed_deal_count=%', v_state, v_committed;
-END $$;

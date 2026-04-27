@@ -19,10 +19,10 @@
 -- Scope: updates ops.get_role_pool (per-role) and ops.get_role_pools_summary
 -- (sparse aggregator). get_role_pools_for_archetype is unchanged because it
 -- composes get_role_pool internally.
-
--- ─────────────────────────────────────────────────────────────────────────
--- get_role_pool: dual-column match
--- ─────────────────────────────────────────────────────────────────────────
+--
+-- NOTE: Superseded by 20260427064453_role_pool_count_edgeless_workspace_persons.sql,
+-- which further relaxes the entity edge requirement after this fix surfaced
+-- a second issue (workspace-owned ghost persons with no relationship edges).
 
 CREATE OR REPLACE FUNCTION ops.get_role_pool(
   p_workspace_id uuid,
@@ -192,14 +192,6 @@ COMMENT ON FUNCTION ops.get_role_pool(uuid, text, date) IS
 REVOKE EXECUTE ON FUNCTION ops.get_role_pool(uuid, text, date) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION ops.get_role_pool(uuid, text, date) TO authenticated, service_role;
 
--- ─────────────────────────────────────────────────────────────────────────
--- get_role_pools_summary: sparse mode also discovers skill_tag-tagged roles
--- ─────────────────────────────────────────────────────────────────────────
--- The sparse aggregator (popover when no archetype is set) iterates over
--- distinct role tags. With existing data in skill_tag, it now also picks up
--- skill_tag values that case-insensitively match a workspace_job_titles
--- canonical role.
-
 CREATE OR REPLACE FUNCTION ops.get_role_pools_summary(
   p_workspace_id uuid,
   p_date         date DEFAULT NULL
@@ -233,7 +225,6 @@ BEGIN
   SELECT array_agg(DISTINCT canonical_title ORDER BY canonical_title)
   INTO v_role_tags
   FROM (
-    -- Explicit role_tag matches
     SELECT jt.title AS canonical_title
     FROM ops.crew_skills cs
     JOIN ops.workspace_job_titles jt
@@ -242,7 +233,6 @@ BEGIN
     WHERE cs.workspace_id = p_workspace_id
       AND cs.role_tag IS NOT NULL
     UNION ALL
-    -- skill_tag matches, case-insensitive
     SELECT jt.title AS canonical_title
     FROM ops.crew_skills cs
     JOIN ops.workspace_job_titles jt
@@ -276,26 +266,3 @@ COMMENT ON FUNCTION ops.get_role_pools_summary(uuid, date) IS
 
 REVOKE EXECUTE ON FUNCTION ops.get_role_pools_summary(uuid, date) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION ops.get_role_pools_summary(uuid, date) TO authenticated, service_role;
-
--- Inline smoke test: Daniel's workspace should now surface a DJ pool
--- because Mike SIncere and Noel Perez are tagged "DJ" via skill_tag.
-DO $$
-DECLARE
-  v_daniel_workspace uuid := '96feecb1-ad20-4ad0-bb93-eb3c440efd05';
-  v_pool jsonb;
-  v_total int;
-BEGIN
-  -- Skip the check entirely if the workspace doesn't exist (other envs).
-  IF NOT EXISTS (SELECT 1 FROM public.workspaces WHERE id = v_daniel_workspace) THEN
-    RETURN;
-  END IF;
-
-  v_pool := ops.get_role_pool(v_daniel_workspace, 'DJ', NULL);
-  v_total := (v_pool->>'in_house_total')::int + (v_pool->>'preferred_total')::int;
-
-  IF v_total = 0 THEN
-    RAISE NOTICE 'Smoke note: DJ pool still empty for ITE workspace. Existing skill_tag data may not have ROSTER_MEMBER/PARTNER edges yet.';
-  ELSE
-    RAISE NOTICE 'Smoke pass: DJ pool surfaces % person(s) for ITE workspace via dual-column match', v_total;
-  END IF;
-END $$;

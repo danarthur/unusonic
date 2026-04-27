@@ -84,7 +84,6 @@ CREATE OR REPLACE FUNCTION ops._feasibility_soft_load(
   SET search_path TO 'pg_catalog', 'ops', 'public'
 AS $function$
   WITH
-  -- Confirmed shows in the 72h window (36h on each side).
   events_in_window AS (
     SELECT count(*) AS c
     FROM ops.events e
@@ -95,8 +94,6 @@ AS $function$
       AND e.starts_at <= ((p_date + 1)::timestamptz + interval '36 hours')
       AND COALESCE(e.ends_at, e.starts_at) >= ((p_date)::timestamptz - interval '36 hours')
   ),
-  -- Open deals in the 72h window — non-terminal, non-archived, dated.
-  -- Mirror Phase 1's tag set + Sprint 1's contract_out/signed/etc.
   tentative_stages AS (
     SELECT s.id
     FROM ops.pipelines       p

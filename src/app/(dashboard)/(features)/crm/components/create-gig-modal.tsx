@@ -24,7 +24,7 @@ import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
 import type { OptimisticUpdate } from './crm-production-queue';
 import { DEAL_ARCHETYPES, DEAL_ARCHETYPE_LABELS } from '../actions/deal-model';
-import { FeasibilityBadge } from './create-gig-modal/feasibility-badge';
+import { FeasibilityChip } from './create-gig-modal/feasibility-chip';
 import { LeadSourceSelector } from './create-gig-modal/lead-source-selector';
 import {
   Q1HostKindPills,
@@ -230,19 +230,26 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   }, [plannerQuery]);
 
   // Feasibility check — single-day only; multi-day and series each get their
-  // own per-date feasibility rendering inside DateStage.
+  // own per-date feasibility rendering inside DateStage. Runs as soon as a
+  // valid date is entered (no archetype gate) so the chip surfaces conflicts
+  // at the typing moment per the date-availability-badge-design doc.
   useEffect(() => {
-    if (dateKind !== 'single' || !eventDate || !eventArchetype || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    if (dateKind !== 'single' || !eventDate || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
       setFeasibility(null);
       return;
     }
     let cancelled = false;
     setFeasibilityLoading(true);
-    checkDateFeasibility(eventDate)
-      .then((res) => { if (!cancelled) setFeasibility(res); })
-      .finally(() => { if (!cancelled) setFeasibilityLoading(false); });
-    return () => { cancelled = true; };
-  }, [eventDate, eventArchetype, dateKind]);
+    const handle = setTimeout(() => {
+      checkDateFeasibility(eventDate)
+        .then((res) => { if (!cancelled) setFeasibility(res); })
+        .finally(() => { if (!cancelled) setFeasibilityLoading(false); });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [eventDate, dateKind]);
 
   useEffect(() => {
     if (!open) return;
@@ -695,13 +702,14 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                           endTime={endTime}
                           setEndTime={setEndTime}
                         />
-                        {dateKind === 'single' && eventDate && eventArchetype && (
+                        {dateKind === 'single' && eventDate && (
                           <div className="flex items-center gap-2 min-w-0 mt-3">
-                            {feasibilityLoading ? (
-                              <span className="text-sm text-[var(--stage-text-secondary)]">Checking availability…</span>
-                            ) : feasibility ? (
-                              <FeasibilityBadge status={feasibility.status} message={feasibility.message} />
-                            ) : null}
+                            <FeasibilityChip
+                              date={eventDate}
+                              feasibility={feasibility}
+                              loading={feasibilityLoading}
+                              archetypeSlug={eventArchetype}
+                            />
                           </div>
                         )}
                       </div>
