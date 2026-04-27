@@ -33,6 +33,7 @@ import { formatRelTime } from '@/shared/lib/format-currency';
 import { updateDealScalars } from '../actions/update-deal-scalars';
 import { ProductionTeamCard } from './production-team-card';
 import { AionSuggestionRow } from './aion-suggestion-row';
+import { ConflictsPanel } from './conflicts-panel';
 import { AionDealCard } from './aion-deal-card';
 import { getAionCardBundle, type AionCardBundle } from '../actions/get-aion-card-bundle';
 import {
@@ -796,6 +797,10 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
         {/* ── Right column ── */}
         <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+          {/* Conflicts panel — Phase 2.1 Sprint 4 wired to live data via
+              ops.feasibility_check_for_deal. Mark handled / Reopen persist
+              through ops.set_deal_open_item_state. */}
+          <ConflictsPanel dealId={deal.id} />
           {/* Proposal card */}
           {!isLocked && (
             <StagePanel elevated className="flex flex-col" style={{ padding: 'var(--stage-padding, 16px)', overflow: 'visible' }}>

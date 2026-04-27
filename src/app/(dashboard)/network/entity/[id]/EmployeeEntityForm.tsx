@@ -31,7 +31,7 @@ import {
   updateCrewSkillProficiency,
   getCrewSkillsForEntity,
 } from '@/features/talent-management/api/crew-skill-actions';
-import { listWorkspaceSkillPresets } from '@/features/talent-management/api/skill-preset-actions';
+import { listWorkspaceSkillPresets, listWorkspaceCanonicalRoles } from '@/features/talent-management/api/skill-preset-actions';
 import {
   getEntityCapabilities,
   addEntityCapability,
@@ -176,6 +176,10 @@ export function EmployeeEntityForm({
   // ── Skills state ──────────────────────────────────────────────────────────────
   const [crewSkills, setCrewSkills] = React.useState<CrewSkillDTO[]>([]);
   const [skillPresets, setSkillPresets] = React.useState<string[]>([]);
+  // Phase 2.1 — canonical roles drive the feasibility chip's pool counts.
+  // Surfaced in their own optgroup at the top of the picker so the user knows
+  // which tags carry that special weight.
+  const [canonicalRoles, setCanonicalRoles] = React.useState<string[]>([]);
   const [addSkillTag, setAddSkillTag] = React.useState('');
   const [addSkillLevel, setAddSkillLevel] = React.useState<SkillLevel | ''>('');
   const [skillsLoading, setSkillsLoading] = React.useState(false);
@@ -212,8 +216,10 @@ export function EmployeeEntityForm({
 
   React.useEffect(() => {
     let cancelled = false;
-    listWorkspaceSkillPresets().then((p) => {
-      if (!cancelled) setSkillPresets(p.length > 0 ? p : FALLBACK_SKILL_PRESETS);
+    Promise.all([listWorkspaceSkillPresets(), listWorkspaceCanonicalRoles()]).then(([presets, roles]) => {
+      if (cancelled) return;
+      setSkillPresets(presets.length > 0 ? presets : FALLBACK_SKILL_PRESETS);
+      setCanonicalRoles(roles);
     });
     return () => { cancelled = true; };
   }, []);
@@ -538,53 +544,72 @@ export function EmployeeEntityForm({
           </div>
         </AccordionSection>
 
-        {/* 3 — Skills */}
-        <AccordionSection label="Skills" icon={Wrench} defaultOpen>
+        {/* 3 — Roles & skills (Phase 2.1: split picker by canonical-role-vs-other) */}
+        <AccordionSection label="Roles & skills" icon={Wrench} defaultOpen>
+          <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)] -mt-2 mb-2 leading-relaxed">
+            Crew roles drive the feasibility chip&rsquo;s pool counts. Other skills are granular technical capabilities (gear, software, certifications).
+          </p>
+
           {/* Existing skills */}
           <div className="space-y-2">
             <AnimatePresence initial={false}>
-              {crewSkills.map((s) => (
-                <motion.div
-                  key={s.id}
-                  layout
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={STAGE_MEDIUM}
-                  className="overflow-hidden"
-                >
-                  <div className="flex items-center gap-2 rounded-xl border border-[var(--stage-edge-subtle)]/50 bg-[var(--ctx-card)] px-3 py-2">
-                    <span className="flex-1 text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{s.skill_tag}</span>
-                    <select
-                      value={s.proficiency ?? ''}
-                      onChange={(e) => {
-                        const val = e.target.value as SkillLevel;
-                        if (val) handleUpdateProficiency(s.id, val);
-                      }}
-                      className="stage-input px-2 py-0.5 text-xs"
-                    >
-                      <option value="">Level</option>
-                      {PROFICIENCY_LEVELS.map((l) => (
-                        <option key={l.value} value={l.value}>{l.label}</option>
-                      ))}
-                    </select>
-                    <motion.button
-                      type="button"
-                      onClick={() => handleRemoveSkill(s.id)}
-                      transition={STAGE_MEDIUM}
-                      className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-unusonic-error)] ring-offset-2 ring-offset-[var(--stage-void)] rounded"
-                      aria-label={`Remove ${s.skill_tag}`}
-                    >
-                      <X className="size-3.5" strokeWidth={1.5} />
-                    </motion.button>
-                  </div>
-                </motion.div>
-              ))}
+              {crewSkills.map((s) => {
+                const isCanonicalRole = canonicalRoles.some(
+                  (r) => r.toLowerCase() === s.skill_tag.toLowerCase(),
+                );
+                return (
+                  <motion.div
+                    key={s.id}
+                    layout
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={STAGE_MEDIUM}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex items-center gap-2 rounded-xl border border-[var(--stage-edge-subtle)]/50 bg-[var(--ctx-card)] px-3 py-2">
+                      <span className="flex-1 flex items-baseline gap-2 min-w-0">
+                        <span className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] truncate">{s.skill_tag}</span>
+                        {isCanonicalRole && (
+                          <span
+                            className="text-[10px] uppercase tracking-[0.05em] text-[var(--stage-text-tertiary)] shrink-0"
+                            title="This skill is a canonical crew role and drives feasibility chip pool counts."
+                          >
+                            Role
+                          </span>
+                        )}
+                      </span>
+                      <select
+                        value={s.proficiency ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value as SkillLevel;
+                          if (val) handleUpdateProficiency(s.id, val);
+                        }}
+                        className="stage-input px-2 py-0.5 text-xs"
+                      >
+                        <option value="">Level</option>
+                        {PROFICIENCY_LEVELS.map((l) => (
+                          <option key={l.value} value={l.value}>{l.label}</option>
+                        ))}
+                      </select>
+                      <motion.button
+                        type="button"
+                        onClick={() => handleRemoveSkill(s.id)}
+                        transition={STAGE_MEDIUM}
+                        className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-unusonic-error)] ring-offset-2 ring-offset-[var(--stage-void)] rounded"
+                        aria-label={`Remove ${s.skill_tag}`}
+                      >
+                        <X className="size-3.5" strokeWidth={1.5} />
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
 
           {crewSkills.length === 0 && (
-            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">No skills yet.</p>
+            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Nothing tagged yet.</p>
           )}
 
           {/* Add form */}
@@ -594,10 +619,32 @@ export function EmployeeEntityForm({
               onChange={(e) => setAddSkillTag(e.target.value)}
               className="stage-input flex-1"
             >
-              <option value="">Add skill…</option>
-              {skillPresets
-                .filter((t) => !crewSkills.some((s) => s.skill_tag === t))
-                .map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="">Add role or skill…</option>
+              {(() => {
+                const taken = new Set(crewSkills.map((s) => s.skill_tag.toLowerCase()));
+                // Canonical roles first (drives chip), then other skill presets
+                // that aren't already canonical roles. Both filtered to exclude
+                // tags the user has already added.
+                const rolesToShow = canonicalRoles.filter((r) => !taken.has(r.toLowerCase()));
+                const canonicalLower = new Set(canonicalRoles.map((r) => r.toLowerCase()));
+                const otherToShow = skillPresets.filter(
+                  (s) => !taken.has(s.toLowerCase()) && !canonicalLower.has(s.toLowerCase()),
+                );
+                return (
+                  <>
+                    {rolesToShow.length > 0 && (
+                      <optgroup label="Crew roles · drives feasibility chip">
+                        {rolesToShow.map((t) => <option key={`role-${t}`} value={t}>{t}</option>)}
+                      </optgroup>
+                    )}
+                    {otherToShow.length > 0 && (
+                      <optgroup label="Other skills">
+                        {otherToShow.map((t) => <option key={`skill-${t}`} value={t}>{t}</option>)}
+                      </optgroup>
+                    )}
+                  </>
+                );
+              })()}
             </select>
             <select
               value={addSkillLevel}

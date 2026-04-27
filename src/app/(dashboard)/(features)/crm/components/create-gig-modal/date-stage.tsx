@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Calendar, ChevronDown, Plus, X } from 'lucide-react';
+import { Calendar, ChevronDown, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { RRule, Weekday, Frequency } from 'rrule';
 import { cn } from '@/shared/lib/utils';
@@ -16,6 +16,7 @@ import {
   type DatedFeasibilityResult,
   type FeasibilityStatus,
 } from '../../actions/check-date-feasibility';
+import { FeasibilityChip } from './feasibility-chip';
 import type { SeriesRule, SeriesArchetype } from '@/shared/lib/series-rule';
 import { expandSeriesRule, SERIES_ARCHETYPES } from '@/shared/lib/series-rule';
 import { EventTypeCombobox } from './event-type-combobox';
@@ -125,19 +126,6 @@ function buildWeeklyPatternDates(
   return { rrule: rule.toString(), dates: instances };
 }
 
-function statusColor(status: FeasibilityStatus | undefined): string {
-  switch (status) {
-    case 'clear':
-      return 'var(--color-unusonic-success, oklch(0.74 0.17 142))';
-    case 'caution':
-      return 'var(--color-unusonic-warning, oklch(0.80 0.14 73))';
-    case 'critical':
-      return 'var(--color-unusonic-error, oklch(0.70 0.18 28))';
-    default:
-      return 'var(--stage-text-tertiary)';
-  }
-}
-
 export function DateStage({
   eventArchetype,
   setEventArchetype,
@@ -191,7 +179,9 @@ export function DateStage({
   const [extraDates, setExtraDates] = useState<string[]>([]); // add-one-off dates
   const [tz] = useState(() => resolveBrowserTimezone());
 
-  // ── Per-date feasibility (series + multi-day)
+  // ── Per-date feasibility (series + multi-day). Single-day mode is rendered
+  //    by the parent modal (it owns the eventDate single-day check + chip)
+  //    so DateStage only manages multi-day and series checks here.
   const [perDateFeasibility, setPerDateFeasibility] = useState<Record<string, DatedFeasibilityResult>>({});
   const [feasibilityLoading, setFeasibilityLoading] = useState(false);
 
@@ -470,6 +460,7 @@ export function DateStage({
                 startDate={eventDate}
                 endDate={proposedEndDate}
                 loading={feasibilityLoading}
+                archetypeSlug={eventArchetype}
               />
             )}
           </div>
@@ -631,21 +622,18 @@ export function DateStage({
               <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
                 {activeDatesInSeries.map((d) => {
                   const fb = perDateFeasibility[d];
-                  const color = statusColor(fb?.status);
+                  const dateLabel = format(parseLocalDateString(d), 'EEE MMM d');
                   return (
-                    <button
+                    <FeasibilityChip
                       key={d}
-                      type="button"
-                      onClick={() => setExdates((xs) => [...xs, d])}
-                      className="group shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-card)] hover:bg-[oklch(1_0_0_/_0.08)] text-[length:var(--stage-input-font-size,13px)] tracking-tight"
-                      title={fb?.message ?? 'Click to remove from series'}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                      <span className="text-[var(--stage-text-primary)]">
-                        {format(parseLocalDateString(d), 'EEE MMM d')}
-                      </span>
-                      <X size={12} className="shrink-0 text-[var(--stage-text-tertiary)] group-hover:text-[var(--stage-text-primary)]" strokeWidth={1.5} />
-                    </button>
+                      date={d}
+                      feasibility={fb ?? null}
+                      loading={feasibilityLoading && !fb}
+                      labelOverride={dateLabel}
+                      archetypeSlug={eventArchetype}
+                      onRemove={() => setExdates((xs) => [...xs, d])}
+                      removeAriaLabel={`Remove ${dateLabel} from series`}
+                    />
                   );
                 })}
                 <AddDateChip onAdd={(d) => setExtraDates((xs) => (xs.includes(d) ? xs : [...xs, d]))} />
@@ -1067,29 +1055,44 @@ function MultiDayBadge({
   startDate,
   endDate,
   loading,
+  archetypeSlug,
 }: {
   feasibility: Record<string, DatedFeasibilityResult>;
   startDate: string;
   endDate: string;
   loading: boolean;
+  archetypeSlug?: string | null;
 }) {
-  // Summarize worst-case status across the two ends
-  const statuses: FeasibilityStatus[] = [feasibility[startDate]?.status, feasibility[endDate]?.status]
-    .filter((x): x is FeasibilityStatus => typeof x === 'string');
+  // Pick the worst date across the range so the chip surfaces the date with
+  // the most severe conflict. The popover shows that date's full conflict
+  // list. (Per-day chips for the full window are out of scope at Fork B —
+  // the user can break the multi-day range into a series if they need
+  // per-day visibility.)
   const rank: Record<FeasibilityStatus, number> = { clear: 0, caution: 1, critical: 2 };
-  const worst: FeasibilityStatus | null = statuses.length === 0
-    ? null
-    : (statuses.reduce((a, b) => (rank[b] > rank[a] ? b : a)) as FeasibilityStatus);
+  const startResult = feasibility[startDate];
+  const endResult = feasibility[endDate];
+  const candidates = [startResult, endResult].filter(
+    (r): r is DatedFeasibilityResult => Boolean(r),
+  );
+
+  if (candidates.length === 0) {
+    return (
+      <div className="flex items-center min-h-[var(--stage-input-height,34px)]">
+        <FeasibilityChip date={startDate} feasibility={null} loading={loading} archetypeSlug={archetypeSlug} />
+      </div>
+    );
+  }
+
+  const worst = candidates.reduce((a, b) => (rank[b.status] > rank[a.status] ? b : a));
+
   return (
-    <div className="flex items-end h-[var(--stage-input-height,34px)] pb-1 text-[length:var(--stage-input-font-size,13px)] text-[var(--stage-text-secondary)]">
-      {loading ? (
-        'Checking availability…'
-      ) : worst ? (
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor(worst) }} />
-          {feasibility[worst === feasibility[startDate]?.status ? startDate : endDate]?.message ?? 'Date range checked.'}
-        </span>
-      ) : null}
+    <div className="flex items-center min-h-[var(--stage-input-height,34px)]">
+      <FeasibilityChip
+        date={worst.date}
+        feasibility={worst}
+        loading={loading}
+        archetypeSlug={archetypeSlug}
+      />
     </div>
   );
 }

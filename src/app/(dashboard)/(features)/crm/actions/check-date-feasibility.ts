@@ -3,130 +3,258 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 export type FeasibilityStatus = 'clear' | 'caution' | 'critical';
+
+/** A confirmed show (ops.events row) that overlaps the queried date. */
+export type FeasibilityShow = {
+  id: string;
+  title: string;
+  starts_at: string;
+  venue_id: string | null;
+};
+
+/**
+ * A pre-handoff deal proposing the queried date.
+ *
+ * `is_committed` distinguishes contract-sent-and-beyond (`contract_out`,
+ * `contract_signed`, `deposit_received`, `ready_for_handoff`) — which
+ * count as bookings — from in-flight deals (`initial_contact`,
+ * `proposal_sent`) which are softer signals.
+ */
+export type FeasibilityDeal = {
+  id: string;
+  title: string;
+  stage_label: string | null;
+  stage_id: string;
+  is_committed: boolean;
+};
+
+/** A preferred-crew self-reported blackout overlapping the queried date. */
+export type FeasibilityBlackout = {
+  entity_id: string;
+  entity_name: string;
+  range_start: string;
+  range_end: string;
+  source: string;
+};
+
+/**
+ * A confirmed event ±36h of the queried date but NOT on the same date.
+ * Sprint 5 — surfaced in the popover Adjacent section.
+ */
+export type FeasibilityAdjacent = {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  venue_id: string | null;
+  local_date: string;
+  side: 'before' | 'after' | 'overlap';
+};
+
+/**
+ * Soft-load aggregate: count of confirmed shows + open deals in the surrounding
+ * 72h. Drives the "Heavy weekend — 3 confirmed in 72h" sub-line in the popover.
+ * Sprint 5.
+ */
+export type FeasibilitySoftLoad = {
+  confirmed_in_72h: number;
+  deals_in_72h: number;
+  is_heavy: boolean;
+};
 
 export type CheckDateFeasibilityResult = {
   status: FeasibilityStatus;
+  /** Short one-liner for chip body + tooltip — see message-generation below. */
   message: string;
-  confirmedCount?: number;
-  dealsCount?: number;
+  confirmedCount: number;
+  dealsCount: number;
+  blackoutCount: number;
+  confirmedShows: FeasibilityShow[];
+  pendingDeals: FeasibilityDeal[];
+  blackouts: FeasibilityBlackout[];
+  /** Sprint 5 — confirmed events ±36h that aren't on the queried date. */
+  adjacentEvents: FeasibilityAdjacent[];
+  /** Sprint 5 — soft-load aggregate over 72h centered on the queried date. */
+  softLoad: FeasibilitySoftLoad;
 };
 
 /** Per-date feasibility row. `date` is the input (yyyy-MM-dd) for chip correlation. */
 export type DatedFeasibilityResult = CheckDateFeasibilityResult & { date: string };
 
-const BADGE_MESSAGES: Record<FeasibilityStatus, string> = {
-  clear: 'Prime Availability. Top 3 Leads Available.',
-  caution: 'Date Congested. 2+ Inquiries Pending. Staffing Tight.',
-  critical: 'Date Fully Booked. No Capacity Available.',
+// ─── State + message resolution ──────────────────────────────────────────────
+
+/**
+ * Resolve status + message from structured signal data.
+ *
+ * "Booked" (red, critical) = at least one ops.events row OR at least one
+ * committed deal (contract-sent and beyond — these are functionally bookings).
+ *
+ * "In flight" (amber, caution) = tentative deals only (initial_contact /
+ * proposal_sent), no commitments.
+ *
+ * "Open" (grey, clear) = nothing on the books.
+ *
+ * Voice: precision instrument (Linear / TE / Stripe register). Sentence case,
+ * no exclamation marks, production vocabulary. Flat technical phrasing per
+ * the Critic's call on the User Advocate vocabulary list.
+ */
+function resolve(
+  confirmedShows: FeasibilityShow[],
+  pendingDeals: FeasibilityDeal[],
+): { status: FeasibilityStatus; message: string } {
+  const committedDeals = pendingDeals.filter((d) => d.is_committed);
+  const tentativeDeals = pendingDeals.filter((d) => !d.is_committed);
+  const bookedCount = confirmedShows.length + committedDeals.length;
+
+  if (bookedCount > 0) {
+    let title: string;
+    if (confirmedShows.length === 1 && committedDeals.length === 0) {
+      title = confirmedShows[0].title;
+    } else if (confirmedShows.length === 0 && committedDeals.length === 1) {
+      title = committedDeals[0].title;
+    } else {
+      return { status: 'critical', message: `Booked — ${bookedCount} shows` };
+    }
+    return { status: 'critical', message: `Booked — ${title}` };
+  }
+
+  if (tentativeDeals.length > 0) {
+    if (tentativeDeals.length === 1) {
+      return { status: 'caution', message: `1 open deal — ${tentativeDeals[0].title}` };
+    }
+    return { status: 'caution', message: `${tentativeDeals.length} open deals` };
+  }
+
+  return { status: 'clear', message: 'Open' };
+}
+
+// ─── Action ──────────────────────────────────────────────────────────────────
+
+const EMPTY_RESULT: CheckDateFeasibilityResult = {
+  status: 'clear',
+  message: 'Open',
+  confirmedCount: 0,
+  dealsCount: 0,
+  blackoutCount: 0,
+  confirmedShows: [],
+  pendingDeals: [],
+  blackouts: [],
+  adjacentEvents: [],
+  softLoad: { confirmed_in_72h: 0, deals_in_72h: 0, is_heavy: false },
 };
 
 /**
  * Read-only feasibility check for a proposed date.
- * Queries ops.events (hard block: schedule) and Deals (soft demand: inquiries).
- * Returns Green/Yellow/Red status for the intake badge. No write.
+ *
+ * Composes three data sources via a single SECURITY DEFINER RPC
+ * (`ops.feasibility_check_for_date`):
+ *   1. ops.events  — confirmed shows overlapping the date (red, drives `confirmed`)
+ *   2. public.deals — open pre-contract deals proposing the date (amber, drives `pending`)
+ *   3. directory.entities.attributes.availability_blackouts — preferred crew with
+ *      self-reported blackouts overlapping the date (informational only at Fork B,
+ *      surfaced in the popover but does not escalate the badge color — see design
+ *      doc open question §9.3)
+ *
+ * Returns the full structured payload so the tap-popover can render named
+ * conflicts with deep links. The legacy `status`/`message` fields are preserved
+ * for backward compatibility with the chip-strip / multi-day-badge consumers
+ * that pre-date the popover.
+ *
+ * `currentDealId` is accepted but optional — the only call site today is the
+ * create-gig modal, which has no deal_id yet (the deal hasn't been saved). The
+ * parameter is reserved for future re-use on existing-deal edit flows.
  */
 export async function checkDateFeasibility(
   date: string,
-  workspaceIdOverride?: string
+  workspaceIdOverride?: string,
+  currentDealId?: string | null,
 ): Promise<CheckDateFeasibilityResult> {
   try {
     const workspaceId = workspaceIdOverride ?? (await getActiveWorkspaceId());
     if (!workspaceId) {
-      return {
-        status: 'clear',
-        message: BADGE_MESSAGES.clear,
-        confirmedCount: 0,
-        dealsCount: 0,
-      };
+      return EMPTY_RESULT;
     }
 
     const dateStr = date.trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      return {
-        status: 'clear',
-        message: 'Select a date to check availability.',
-        confirmedCount: 0,
-        dealsCount: 0,
-      };
+      return { ...EMPTY_RESULT, message: 'Select a date to check availability.' };
     }
-
-    const baseStart = new Date(`${dateStr}T00:00:00.000Z`);
-    const baseEnd = new Date(`${dateStr}T23:59:59.999Z`);
-    const dayStart = new Date(baseStart.getTime() - 12 * 60 * 60 * 1000).toISOString();
-    const dayEnd = new Date(baseEnd.getTime() + 12 * 60 * 60 * 1000).toISOString();
 
     const supabase = await createClient();
 
-    // Phase 3i: "tentative / pending" stages (pre-contract) resolved by tag
-    // rather than literal status slugs, which all collapsed to 'working'.
-    // Query the workspace's default pipeline's stages tagged with
-    // initial_contact or proposal_sent, then count deals in those stages.
-    const { data: tentativePipeline } = await supabase
+    // ops schema isn't in the PostgREST exposed-schemas set yet, so the rpc
+    // call needs `.schema('ops')` and the result is loosely typed. Cast the
+    // jsonb payload to its known shape — the migration documents the contract.
+    const { data, error } = await (supabase as unknown as {
+      schema: (s: string) => {
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: unknown }>;
+      };
+    })
       .schema('ops')
-      .from('pipelines')
-      .select('id, pipeline_stages(id, tags, is_archived)')
-      .eq('workspace_id', workspaceId)
-      .eq('is_default', true)
-      .eq('is_archived', false)
-      .maybeSingle();
+      .rpc('feasibility_check_for_date', {
+        p_workspace_id: workspaceId,
+        p_date: dateStr,
+        p_current_deal_id: currentDealId ?? null,
+      });
 
-    const tentativeStageIds = ((tentativePipeline?.pipeline_stages ?? []) as Array<{ id: string; tags: string[] | null; is_archived: boolean }>)
-      .filter((s) => !s.is_archived && (s.tags ?? []).some((t) => t === 'initial_contact' || t === 'proposal_sent'))
-      .map((s) => s.id);
-
-    const dealsQuery = tentativeStageIds.length > 0
-      ? supabase
-          .from('deals')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', workspaceId)
-          .is('archived_at', null)
-          .eq('proposed_date', dateStr)
-          .in('stage_id', tentativeStageIds)
-      : Promise.resolve({ count: 0 } as { count: number | null });
-
-    const [eventsRes, dealsRes] = await Promise.all([
-      supabase
-            .schema('ops')
-            .from('events')
-            .select('*', { count: 'exact', head: true })
-            .eq('workspace_id', workspaceId)
-            .lte('starts_at', dayEnd)
-            .gte('ends_at', dayStart),
-      dealsQuery,
-    ]);
-
-    const confirmedCount = eventsRes.count ?? 0;
-    const dealsCount = dealsRes.count ?? 0;
-
-    let status: FeasibilityStatus = 'clear';
-    let message = BADGE_MESSAGES.clear;
-
-    if (confirmedCount > 0 && dealsCount > 0) {
-      status = 'caution';
-      message = `${confirmedCount} event${confirmedCount > 1 ? 's' : ''} booked · ${dealsCount} inquiri${dealsCount > 1 ? 'es' : 'y'} pending.`;
-    } else if (confirmedCount > 0) {
-      status = 'caution';
-      message = `${confirmedCount} event${confirmedCount > 1 ? 's' : ''} already booked on this date.`;
-    } else if (dealsCount > 2) {
-      status = 'caution';
-      message = `Date congested — ${dealsCount} inquiries pending.`;
+    if (error) {
+      console.error('[CRM] feasibility_check_for_date error:', error);
+      return EMPTY_RESULT;
     }
+
+    type RpcPayload = {
+      state: 'open' | 'pending' | 'confirmed';
+      confirmed_show_count: number;
+      confirmed_shows: FeasibilityShow[];
+      pending_deal_count: number;
+      pending_deals: FeasibilityDeal[];
+      committed_deal_count?: number;
+      tentative_deal_count?: number;
+      blackout_count: number;
+      blackouts: FeasibilityBlackout[];
+      adjacent_event_count?: number;
+      adjacent_events?: FeasibilityAdjacent[];
+      soft_load?: FeasibilitySoftLoad;
+    };
+
+    const payload = data as RpcPayload | null;
+    if (!payload) return EMPTY_RESULT;
+
+    const confirmedShows = payload.confirmed_shows ?? [];
+    const pendingDeals = payload.pending_deals ?? [];
+    const blackouts = payload.blackouts ?? [];
+    const adjacentEvents = payload.adjacent_events ?? [];
+    const softLoad: FeasibilitySoftLoad = payload.soft_load ?? {
+      confirmed_in_72h: 0,
+      deals_in_72h: 0,
+      is_heavy: false,
+    };
+
+    // Recompute status + message client-side from structured data so the
+    // chip's truth doesn't depend on the RPC's `state` field staying in sync.
+    const { status, message } = resolve(confirmedShows, pendingDeals);
 
     return {
       status,
       message,
-      confirmedCount,
-      dealsCount,
+      confirmedCount: payload.confirmed_show_count ?? confirmedShows.length,
+      dealsCount: payload.pending_deal_count ?? pendingDeals.length,
+      blackoutCount: payload.blackout_count ?? blackouts.length,
+      confirmedShows,
+      pendingDeals,
+      blackouts,
+      adjacentEvents,
+      softLoad,
     };
   } catch (err) {
     console.error('[CRM] checkDateFeasibility error:', err);
-    return {
-      status: 'clear',
-      message: BADGE_MESSAGES.clear,
-      confirmedCount: 0,
-      dealsCount: 0,
-    };
+    return EMPTY_RESULT;
   }
 }
 
@@ -134,17 +262,19 @@ export async function checkDateFeasibility(
  * Batch feasibility check for a series (multiple dates) or multi-day range.
  *
  * - Pass an array of `yyyy-MM-dd` strings for series dates (returns one result per date).
- * - Pass `{ start, end }` for a multi-day range (returns one aggregated result).
+ * - Pass `{ start, end }` for a multi-day range (returns one result per day).
  *
  * Returns a parallel array of {date, status, message, ...}. Callers render each
- * entry as a colored chip (clear/caution/critical) in the Stage 1 chip strip.
+ * entry as a colored chip in the Stage 1 chip strip.
  *
- * Implementation is a single round-trip per date — for long tours (30+ shows)
- * we can batch-query in the future, but P0 correctness beats premature batching.
+ * Implementation runs one RPC per date concurrently. The RPC is cheap (three
+ * indexed joins) so for typical residencies (≤30 dates) this is fine. Long
+ * tours (200+ dates) can be batched via a future window-RPC; not P0.
  */
 export async function checkDatesFeasibility(
   input: string[] | { start: string; end: string },
-  workspaceIdOverride?: string
+  workspaceIdOverride?: string,
+  currentDealId?: string | null,
 ): Promise<DatedFeasibilityResult[]> {
   const workspaceId = workspaceIdOverride ?? (await getActiveWorkspaceId());
   if (!workspaceId) return [];
@@ -153,12 +283,11 @@ export async function checkDatesFeasibility(
     ? input
     : expandDateRangeToList(input.start, input.end);
 
-  // Run one query per date concurrently. The server action is cheap (head+count).
   const results = await Promise.all(
     dates.map(async (d): Promise<DatedFeasibilityResult> => {
-      const r = await checkDateFeasibility(d, workspaceId);
+      const r = await checkDateFeasibility(d, workspaceId, currentDealId);
       return { ...r, date: d };
-    })
+    }),
   );
   return results;
 }
