@@ -31,7 +31,7 @@
  *           wired yet (Gear, Travel) with a "Not tracked yet" subtitle
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, RefreshCcw, ExternalLink, Check } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
@@ -310,7 +310,12 @@ function rowFromServerConflict(c: DealConflict): ConflictRow {
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
 
-export function ConflictsPanel({
+// React.memo wrapper — DealLens is large and re-renders on every keystroke
+// in the title field. Without memo, ConflictsPanel re-runs all its
+// state-derived work (RPC refetch effect aside) on every parent render.
+// Props are simple (dealId/rowsOverride/onRefresh) — default shallow equality
+// works fine.
+function ConflictsPanelImpl({
   dealId,
   rows: rowsOverride,
   onRefresh,
@@ -505,3 +510,5 @@ export function ConflictsPanel({
     </StagePanel>
   );
 }
+
+export const ConflictsPanel = memo(ConflictsPanelImpl);

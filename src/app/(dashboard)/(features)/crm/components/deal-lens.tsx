@@ -213,23 +213,53 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
   const [scalarsSaving, setScalarsSaving] = useState(false);
 
-  const handleSaveScalar = async (patch: Parameters<typeof updateDealScalars>[1]) => {
-    setScalarsSaving(true);
-    const result = await updateDealScalars(deal.id, patch);
-    setScalarsSaving(false);
-    if (!result.success) toast.error(result.error ?? 'Failed to save');
-  };
+  // Stable handler reference — wrapping in useCallback so children memo'd
+  // by React.memo (DealHeaderStrip, etc.) don't re-render every time a
+  // sibling state changes (e.g. keystroke in the title field).
+  const handleSaveScalar = useCallback(
+    async (patch: Parameters<typeof updateDealScalars>[1]) => {
+      setScalarsSaving(true);
+      const result = await updateDealScalars(deal.id, patch);
+      setScalarsSaving(false);
+      if (!result.success) toast.error(result.error ?? 'Failed to save');
+    },
+    [deal.id],
+  );
 
   // Title debounce
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleTitleChange = (value: string) => {
-    setLocalTitle(value);
-    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
-    titleDebounceRef.current = setTimeout(() => {
-      handleSaveScalar({ title: value || null });
-    }, 800);
-  };
+  const handleTitleChange = useCallback(
+    (value: string) => {
+      setLocalTitle(value);
+      if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+      titleDebounceRef.current = setTimeout(() => {
+        handleSaveScalar({ title: value || null });
+      }, 800);
+    },
+    [handleSaveScalar],
+  );
+
+  // Stable scalar-save handler for the header strip. Inline arrow functions
+  // would create fresh references every render, busting any React.memo on
+  // the header strip — so we lift this out and useCallback the dependency
+  // chain.
+  const handleHeaderSaveScalar = useCallback(
+    (patch: Parameters<typeof updateDealScalars>[1]) => {
+      if (patch.proposed_date !== undefined) setLocalDate(patch.proposed_date);
+      if (patch.event_archetype !== undefined) setLocalArchetype(patch.event_archetype);
+      if (patch.budget_estimated !== undefined) setLocalBudget(patch.budget_estimated);
+      handleSaveScalar(patch);
+    },
+    [handleSaveScalar],
+  );
+
+  // Stable no-op fallback for the optional onClientLinked prop. Without this,
+  // the inline `onClientLinked ?? (() => {})` would create a fresh function
+  // every render and break header-strip memoization.
+  const stakeholdersChangeHandler = useCallback(() => {
+    onClientLinked?.();
+  }, [onClientLinked]);
 
   const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -496,17 +526,12 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
         readOnly={isLocked}
         saving={scalarsSaving}
         onTitleChange={handleTitleChange}
-        onSaveScalar={(patch) => {
-          if (patch.proposed_date !== undefined) setLocalDate(patch.proposed_date);
-          if (patch.event_archetype !== undefined) setLocalArchetype(patch.event_archetype);
-          if (patch.budget_estimated !== undefined) setLocalBudget(patch.budget_estimated);
-          handleSaveScalar(patch as Parameters<typeof updateDealScalars>[1]);
-        }}
+        onSaveScalar={handleHeaderSaveScalar}
         deal={deal}
         stakeholders={stakeholders}
         client={client ?? null}
         sourceOrgId={sourceOrgId}
-        onStakeholdersChange={onClientLinked ?? (() => {})}
+        onStakeholdersChange={stakeholdersChangeHandler}
       />
 
       {/* Phase 3 §3.5 — Aion-authored deal narrative. Renders nothing until
@@ -1061,7 +1086,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
             stakeholders={stakeholders}
             client={client ?? null}
             sourceOrgId={sourceOrgId ?? null}
-            onStakeholdersChange={onClientLinked ?? (() => {})}
+            onStakeholdersChange={stakeholdersChangeHandler}
             initialProposal={initialProposal}
           />
 

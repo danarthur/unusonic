@@ -139,7 +139,12 @@ function useBreakpoint(): 'mobile' | 'tablet' | 'desktop' {
 // Main card
 // ---------------------------------------------------------------------------
 
-export function AionDealCard({
+// React.memo wrapper at the bottom of the file — see end. AionDealCard is
+// the heaviest ambient panel (~1500 LOC) and re-rendering it on every
+// parent keystroke is wasted work. Default shallow equality is sufficient
+// here — props are scalar values + a small set of callbacks (which the
+// parent should be stabilizing via useCallback).
+function AionDealCardImpl({
   data,
   context = 'deal_lens',
   dealTitle,
@@ -596,6 +601,8 @@ export function AionDealCard({
     </motion.div>
   );
 }
+
+export const AionDealCard = React.memo(AionDealCardImpl);
 
 // ---------------------------------------------------------------------------
 // Header — AionMark + voice paragraph
