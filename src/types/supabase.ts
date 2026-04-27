@@ -35,6 +35,16 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      metric_cost_per_seat: {
+        Args: { p_window_days?: number }
+        Returns: {
+          cost_per_seat_usd: number
+          seat_count: number
+          total_cost_usd: number
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
       metric_dismiss_rate: {
         Args: { p_min_sample?: number; p_window_days?: number }
         Returns: {
@@ -3091,6 +3101,42 @@ export type Database = {
         }
         Relationships: []
       }
+      archetype_role_requirements: {
+        Row: {
+          archetype_slug: string
+          created_at: string
+          id: string
+          is_optional: boolean
+          notes: string | null
+          qty_required: number
+          role_tag: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          archetype_slug: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          qty_required?: number
+          role_tag: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          archetype_slug?: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          qty_required?: number
+          role_tag?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       assignments: {
         Row: {
           agreed_rate: number | null
@@ -3405,6 +3451,7 @@ export type Database = {
           id: string
           notes: string | null
           proficiency: Database["public"]["Enums"]["skill_level"] | null
+          role_tag: string | null
           skill_tag: string
           updated_at: string
           verified: boolean
@@ -3417,6 +3464,7 @@ export type Database = {
           id?: string
           notes?: string | null
           proficiency?: Database["public"]["Enums"]["skill_level"] | null
+          role_tag?: string | null
           skill_tag: string
           updated_at?: string
           verified?: boolean
@@ -3429,6 +3477,7 @@ export type Database = {
           id?: string
           notes?: string | null
           proficiency?: Database["public"]["Enums"]["skill_level"] | null
+          role_tag?: string | null
           skill_tag?: string
           updated_at?: string
           verified?: boolean
@@ -5597,6 +5646,26 @@ export type Database = {
         }
         Returns: Json
       }
+      get_archetype_role_mix: {
+        Args: { p_archetype_slug: string; p_workspace_id: string }
+        Returns: Json
+      }
+      get_role_pool: {
+        Args: { p_date?: string; p_role_tag: string; p_workspace_id: string }
+        Returns: Json
+      }
+      get_role_pools_for_archetype: {
+        Args: {
+          p_archetype_slug: string
+          p_date?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      get_role_pools_summary: {
+        Args: { p_date?: string; p_workspace_id: string }
+        Returns: Json
+      }
       has_primitive_fired: {
         Args: { p_primitive: string; p_transition_id: string }
         Returns: boolean
@@ -5783,6 +5852,10 @@ export type Database = {
       resolve_stage_by_tag: {
         Args: { p_pipeline_id: string; p_tag: string }
         Returns: string
+      }
+      seed_archetype_role_requirements_for_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
       }
       seed_default_pipeline: {
         Args: { p_workspace_id: string }

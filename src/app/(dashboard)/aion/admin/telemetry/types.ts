@@ -40,3 +40,11 @@ export type KillMetricRow = {
   first_open: string;
   last_open: string;
 };
+
+export type CostPerSeatRow = {
+  workspace_id: string;
+  workspace_name: string;
+  seat_count: number;
+  total_cost_usd: number;
+  cost_per_seat_usd: number | null;
+};

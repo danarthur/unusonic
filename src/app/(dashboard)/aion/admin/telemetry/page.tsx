@@ -39,6 +39,7 @@ export default async function AionTelemetryPage() {
       toolDepth={result.toolDepth}
       clickThrough={result.clickThrough}
       killMetric={result.killMetric}
+      costPerSeat={result.costPerSeat}
       generatedAt={new Date().toISOString()}
       errors={result.errors}
     />

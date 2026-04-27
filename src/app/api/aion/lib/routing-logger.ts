@@ -11,7 +11,7 @@
  * queries only need the outcome row.
  */
 
-import type { ModelTier, Intent } from './models';
+import { MODELS, type ModelTier, type Intent } from './models';
 import { recordAionEvent } from './event-logger';
 
 export type RoutingDecision = {
@@ -44,6 +44,11 @@ export type RoutingOutcome = {
   success: boolean;
   /** Total duration from request to stream close (ms) */
   durationMs: number;
+  /** Wk 16 §3.10 cost-per-seat — input tokens charged for this turn (from streamText `usage`).
+   *  Null when the SDK didn't surface usage (early stream errors). */
+  inputTokens?: number | null;
+  /** Wk 16 §3.10 cost-per-seat — output tokens generated during this turn. */
+  outputTokens?: number | null;
 };
 
 /**
@@ -91,6 +96,14 @@ export function logRoutingDecision(decision: RoutingDecision) {
         message_count: decision.messageCount,
         tools_called: outcome.toolsCalled,
         success: outcome.success,
+        // Wk 16 §3.10 cost-per-seat. Null when usage wasn't surfaced (early
+        // stream error or SDK shape change). The metric RPC treats NULL as 0.
+        input_tokens: outcome.inputTokens ?? null,
+        output_tokens: outcome.outputTokens ?? null,
+        // Concrete model id so cost math is self-correcting if tiers later
+        // split across models (today all tiers route to Haiku 4.5 per the
+        // access restriction in models.ts).
+        model_id: MODELS[decision.tier],
       },
     });
   };

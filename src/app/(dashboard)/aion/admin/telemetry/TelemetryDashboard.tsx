@@ -17,6 +17,7 @@ import type {
   KillMetricRow,
   ToolDepthRow,
   ClickThroughRow,
+  CostPerSeatRow,
 } from './types';
 
 type DashboardErrors = {
@@ -25,6 +26,7 @@ type DashboardErrors = {
   tool: string | null;
   click: string | null;
   kill: string | null;
+  cost: string | null;
 };
 
 interface TelemetryDashboardProps {
@@ -33,6 +35,7 @@ interface TelemetryDashboardProps {
   toolDepth: ToolDepthRow | null;
   clickThrough: ClickThroughRow | null;
   killMetric: KillMetricRow[];
+  costPerSeat: CostPerSeatRow[];
   generatedAt: string;
   errors: DashboardErrors;
 }
@@ -43,6 +46,7 @@ export function TelemetryDashboard({
   toolDepth,
   clickThrough,
   killMetric,
+  costPerSeat,
   generatedAt,
   errors,
 }: TelemetryDashboardProps) {
@@ -67,7 +71,7 @@ export function TelemetryDashboard({
         <KillMetricCard rows={killMetric} error={errors.kill} />
         <ToolDepthCard data={toolDepth} error={errors.tool} />
         <ClickThroughCard data={clickThrough} error={errors.click} />
-        <CostPerSeatPlaceholder />
+        <CostPerSeatCard rows={costPerSeat} error={errors.cost} />
         <DismissRateCard rows={dismissRate} error={errors.dismiss} />
         <HitRateCard rows={hitRate} error={errors.hit} />
       </div>
@@ -231,17 +235,35 @@ function ClickThroughCard({ data, error }: { data: ClickThroughRow | null; error
   );
 }
 
-// ─── Cost per seat (placeholder) ───────────────────────────────────────────
+// ─── Cost per seat ─────────────────────────────────────────────────────────
 
-function CostPerSeatPlaceholder() {
+function CostPerSeatCard({ rows, error }: { rows: CostPerSeatRow[]; error: string | null }) {
+  if (rows.length === 0) {
+    return (
+      <Card title="Cost per seat" subtitle="30d window · LLM + embeddings" error={error}>
+        <div className="flex items-baseline gap-3">
+          <span className="text-[28px] tabular-nums text-[var(--stage-text-tertiary)] leading-none">$0.00</span>
+          <span className="text-[12px] text-[var(--stage-text-tertiary)]">no traffic</span>
+        </div>
+        <p className="mt-2 text-[11px] text-[var(--stage-text-tertiary)]">
+          accumulating — turns + embeddings populate once workspaces use Aion
+        </p>
+      </Card>
+    );
+  }
+  const totalCost = rows.reduce((sum, r) => sum + Number(r.total_cost_usd ?? 0), 0);
+  const totalSeats = rows.reduce((sum, r) => sum + Number(r.seat_count ?? 0), 0);
+  const avgPerSeat = totalSeats > 0 ? totalCost / totalSeats : 0;
   return (
-    <Card title="Cost per seat" subtitle="model usage × tier prices · deferred">
+    <Card title="Cost per seat" subtitle="30d window · LLM + embeddings" error={error}>
       <div className="flex items-baseline gap-3">
-        <span className="text-[28px] tabular-nums text-[var(--stage-text-tertiary)] leading-none">—</span>
+        <span className="text-[28px] tabular-nums text-[var(--stage-text-primary)] leading-none">
+          ${avgPerSeat.toFixed(2)}
+        </span>
+        <span className="text-[12px] text-[var(--stage-text-tertiary)]">avg</span>
       </div>
       <p className="mt-2 text-[11px] text-[var(--stage-text-tertiary)]">
-        ships when Voyage / TTS cost streams are wired (Wk 16+). Tier
-        pricing × turn_complete tier counts already available.
+        ${totalCost.toFixed(2)} total across {rows.length} {rows.length === 1 ? 'workspace' : 'workspaces'} · {totalSeats} {totalSeats === 1 ? 'seat' : 'seats'}
       </p>
     </Card>
   );

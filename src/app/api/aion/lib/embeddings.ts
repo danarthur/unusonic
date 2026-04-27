@@ -11,8 +11,14 @@
 import { embed, embedMany } from 'ai';
 import { createVoyage } from 'voyage-ai-provider';
 import type { Json } from '@/types/supabase';
+import { recordAionEvent } from './event-logger';
 
 const voyage = createVoyage({ apiKey: process.env.VOYAGE_API_KEY! });
+
+// Wk 16 §3.10 cost-per-seat. Voyage voyage-3 list price is $0.06 per million
+// input tokens (rotation requires a code change — fine at v1 since prices
+// shift ~yearly; promotion to a tier_pricing table is a Wk 17+ exercise).
+const VOYAGE_3_USD_PER_MTOK = 0.06;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -156,6 +162,28 @@ export type EmbedItem = {
 const EMBED_BATCH_SIZE = 96;
 
 /**
+ * Wk 16 §3.10 cost-per-seat. Group chunk items by workspace and prorate the
+ * chunk's total token usage. Telemetry never throws; failures log but don't
+ * block the upsert.
+ */
+function emitEmbedCostForChunk(chunkItems: EmbedItem[], usage: { tokens?: number } | undefined): void {
+  const totalTokens = typeof usage?.tokens === 'number' ? usage.tokens : null;
+  const wsCount = new Map<string, number>();
+  for (const item of chunkItems) {
+    wsCount.set(item.workspaceId, (wsCount.get(item.workspaceId) ?? 0) + 1);
+  }
+  for (const [workspaceId, itemCount] of wsCount) {
+    const tokens = totalTokens !== null ? Math.round((itemCount / chunkItems.length) * totalTokens) : null;
+    const usd = tokens !== null ? (tokens / 1_000_000) * VOYAGE_3_USD_PER_MTOK : 0;
+    void recordAionEvent({
+      eventType: 'aion.embed_cost',
+      workspaceId,
+      payload: { items: itemCount, tokens, model: 'voyage-3', usd },
+    });
+  }
+}
+
+/**
  * Batch-embed and upsert many items in one flow.
  *
  *  1. Empty-content items are skipped (no API call).
@@ -188,13 +216,16 @@ export async function upsertEmbeddingBatch(items: EmbedItem[]): Promise<UpsertOu
   for (let offset = 0; offset < activeTexts.length; offset += EMBED_BATCH_SIZE) {
     const chunkValues = activeTexts.slice(offset, offset + EMBED_BATCH_SIZE);
     try {
-      const { embeddings: chunkEmbeddings } = await embedMany({
+      const result = await embedMany({
         model: voyage.textEmbeddingModel('voyage-3'),
         values: chunkValues,
       });
+      const chunkEmbeddings = result.embeddings;
       for (let j = 0; j < chunkEmbeddings.length; j++) {
         embeddings[offset + j] = chunkEmbeddings[j];
       }
+      const chunkItems = activeIndexes.slice(offset, offset + chunkValues.length).map((idx) => items[idx]);
+      emitEmbedCostForChunk(chunkItems, (result as { usage?: { tokens?: number } }).usage);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(

@@ -27,7 +27,10 @@ export type AionEventType =
   | 'aion.tool_call'
   | 'aion.pill_emit'
   | 'aion.pill_dismiss'
-  | 'aion.pill_click';
+  | 'aion.pill_click'
+  // Wk 16 §3.10 cost-per-seat — per-batch Voyage embedding cost.
+  // Payload shape: { items: number, tokens: number | null, model: string, usd: number }.
+  | 'aion.embed_cost';
 
 export type RecordAionEventInput = {
   /** event_type column. Use the AionEventType union above. */

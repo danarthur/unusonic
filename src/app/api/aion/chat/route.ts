@@ -51,6 +51,37 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 // =============================================================================
+// Token-usage extraction — Wk 16 §3.10 cost-per-seat
+// =============================================================================
+
+/**
+ * Resolve the streamText `usage` promise into a normalized
+ * `{ inputTokens, outputTokens }` shape. The AI SDK shape varies across
+ * versions (`promptTokens` / `completionTokens` vs `inputTokens` /
+ * `outputTokens`); we accept either. Failures yield nulls so the caller can
+ * still fire the outcome row.
+ */
+async function resolveTokenUsage(usagePromise: PromiseLike<unknown>): Promise<{
+  inputTokens: number | null;
+  outputTokens: number | null;
+}> {
+  try {
+    const u = (await usagePromise) as {
+      inputTokens?: number;
+      outputTokens?: number;
+      promptTokens?: number;
+      completionTokens?: number;
+    };
+    return {
+      inputTokens: u.inputTokens ?? u.promptTokens ?? null,
+      outputTokens: u.outputTokens ?? u.completionTokens ?? null,
+    };
+  } catch {
+    return { inputTokens: null, outputTokens: null };
+  }
+}
+
+// =============================================================================
 // Per-user rate limiting (in-memory sliding window)
 // =============================================================================
 
@@ -533,8 +564,11 @@ export async function POST(req: Request) {
             }
           }
 
-          // Log routing outcome
-          logOutcome({ toolsCalled, success: true, durationMs: 0 });
+          // Log routing outcome — Wk 16 §3.10: thread the real token usage
+          // from streamText's `usage` promise so the cost-per-seat metric has
+          // grounded numbers. The promise resolves once the stream closes.
+          const { inputTokens, outputTokens } = await resolveTokenUsage(result.usage);
+          logOutcome({ toolsCalled, success: true, durationMs: 0, inputTokens, outputTokens });
         } catch (err) {
           console.error('[aion/chat] Stream error:', err);
           controller.enqueue(encoder.encode(`error:I had trouble processing that. Try again in a moment.\n`));
