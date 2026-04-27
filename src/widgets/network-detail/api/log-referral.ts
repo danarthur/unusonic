@@ -37,7 +37,7 @@ export async function logReferral(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
-    .schema('cortex')
+    .schema('finance')
     .rpc('log_referral', {
       p_workspace_id: input.workspaceId,
       p_direction: input.direction,
@@ -67,7 +67,7 @@ export async function deleteReferral(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
-    .schema('cortex')
+    .schema('finance')
     .rpc('delete_referral', { p_referral_id: referralId });
 
   if (error) return { ok: false, error: (error as { message: string }).message };

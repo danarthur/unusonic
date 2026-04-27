@@ -750,45 +750,6 @@ export type Database = {
         }
         Relationships: []
       }
-      referrals: {
-        Row: {
-          client_entity_id: string | null
-          client_name: string | null
-          counterparty_entity_id: string
-          created_at: string
-          created_by: string | null
-          direction: string
-          id: string
-          note: string | null
-          related_deal_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          client_entity_id?: string | null
-          client_name?: string | null
-          counterparty_entity_id: string
-          created_at?: string
-          created_by?: string | null
-          direction: string
-          id?: string
-          note?: string | null
-          related_deal_id?: string | null
-          workspace_id: string
-        }
-        Update: {
-          client_entity_id?: string | null
-          client_name?: string | null
-          counterparty_entity_id?: string
-          created_at?: string
-          created_by?: string | null
-          direction?: string
-          id?: string
-          note?: string | null
-          related_deal_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       relationships: {
         Row: {
           connection_strength: number | null
@@ -964,7 +925,6 @@ export type Database = {
         Args: { p_source_id: string; p_source_type: string }
         Returns: boolean
       }
-      delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       dismiss_aion_insight: { Args: { p_insight_id: string }; Returns: boolean }
       dismiss_aion_proactive_line: {
         Args: { p_line_id: string; p_reason: string }
@@ -1098,18 +1058,6 @@ export type Database = {
           position: number
           title: string
         }[]
-      }
-      log_referral: {
-        Args: {
-          p_client_entity_id?: string
-          p_client_name?: string
-          p_counterparty_entity_id: string
-          p_direction: string
-          p_note?: string
-          p_related_deal_id?: string
-          p_workspace_id: string
-        }
-        Returns: string
       }
       mark_lobby_pin_failure: {
         Args: { p_error_at?: string; p_error_message: string; p_pin_id: string }
@@ -2198,6 +2146,45 @@ export type Database = {
         }
         Relationships: []
       }
+      referrals: {
+        Row: {
+          client_entity_id: string | null
+          client_name: string | null
+          counterparty_entity_id: string
+          created_at: string
+          created_by: string | null
+          direction: string
+          id: string
+          note: string | null
+          related_deal_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_entity_id?: string | null
+          client_name?: string | null
+          counterparty_entity_id: string
+          created_at?: string
+          created_by?: string | null
+          direction: string
+          id?: string
+          note?: string | null
+          related_deal_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_entity_id?: string | null
+          client_name?: string | null
+          counterparty_entity_id?: string
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          id?: string
+          note?: string | null
+          related_deal_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       stripe_webhook_events: {
         Row: {
           event_type: string
@@ -2368,6 +2355,7 @@ export type Database = {
         Args: { p_tz: string; p_workspace_id: string }
         Returns: string
       }
+      delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       get_fresh_qbo_token: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -2398,6 +2386,18 @@ export type Database = {
           terms: string
           total_amount: number
         }[]
+      }
+      log_referral: {
+        Args: {
+          p_client_entity_id?: string
+          p_client_name?: string
+          p_counterparty_entity_id: string
+          p_direction: string
+          p_note?: string
+          p_related_deal_id?: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       metric_1099_worksheet: {
         Args: { p_workspace_id: string; p_year: number }

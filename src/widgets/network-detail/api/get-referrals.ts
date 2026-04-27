@@ -70,7 +70,7 @@ export async function getReferralsForEntity(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
-    .schema('cortex')
+    .schema('finance')
     .from('referrals')
     .select(
       'id, direction, client_name, client_entity_id, related_deal_id, note, created_at, created_by',
