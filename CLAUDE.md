@@ -313,6 +313,7 @@ Matte opaque surfaces, single light source, OKLCH tokens only, achromatic accent
 | `docs/reference/crew-equipment-and-smart-transport-design.md` | Crew gear, transport modes, source tracking, pull sheets |
 | `docs/reference/verified-kit-system-design.md` | Catalog-linked equipment, verification, gap analysis, kit templates |
 | `docs/reference/aion-daily-brief-design.md` | Aion Daily Brief — dispatch API, insight evaluators, widget architecture |
+| `docs/reference/code/perf-patterns.md` | **Performance patterns** — measurement (`PerfOverlay`, `markStart`/`markEnd`), stale-while-revalidate, synchronized reveal, optimistic UI hooks, bundled fetches, lazy loading, RLS optimization, cache stable data. Read before optimizing. |
 | `docs/onboarding-subscription-architecture.md` | Auth, onboarding, billing |
 
 ---
