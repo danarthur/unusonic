@@ -3837,6 +3837,53 @@ export type Database = {
           },
         ]
       }
+      deal_open_items: {
+        Row: {
+          ack_note: string | null
+          acted_at: string | null
+          acted_by: string | null
+          created_at: string
+          deal_id: string
+          id: string
+          item_key: string
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ack_note?: string | null
+          acted_at?: string | null
+          acted_by?: string | null
+          created_at?: string
+          deal_id: string
+          id?: string
+          item_key: string
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ack_note?: string | null
+          acted_at?: string | null
+          acted_by?: string | null
+          created_at?: string
+          deal_id?: string
+          id?: string
+          item_key?: string
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_open_items_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "active_deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_stakeholders: {
         Row: {
           added_at: string
@@ -5548,6 +5595,10 @@ export type Database = {
     }
     Functions: {
       _expand_series_rule: { Args: { p_series_rule: Json }; Returns: string[] }
+      _feasibility_adjacent_events: {
+        Args: { p_date: string; p_workspace_id: string }
+        Returns: Json
+      }
       _feasibility_confirmed_shows: {
         Args: { p_date: string; p_workspace_id: string }
         Returns: Json
@@ -5561,6 +5612,10 @@ export type Database = {
         Returns: Json
       }
       _feasibility_recurring_blackouts: {
+        Args: { p_date: string; p_workspace_id: string }
+        Returns: Json
+      }
+      _feasibility_soft_load: {
         Args: { p_date: string; p_workspace_id: string }
         Returns: Json
       }
@@ -5646,6 +5701,7 @@ export type Database = {
         }
         Returns: Json
       }
+      feasibility_check_for_deal: { Args: { p_deal_id: string }; Returns: Json }
       get_archetype_role_mix: {
         Args: { p_archetype_slug: string; p_workspace_id: string }
         Returns: Json
@@ -5864,6 +5920,15 @@ export type Database = {
       seed_default_triggers: {
         Args: { p_workspace_id: string }
         Returns: undefined
+      }
+      set_deal_open_item_state: {
+        Args: {
+          p_ack_note?: string
+          p_deal_id: string
+          p_item_key: string
+          p_state: string
+        }
+        Returns: Json
       }
       set_owed_override: {
         Args: { p_override: boolean; p_thread_id: string }
