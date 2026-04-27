@@ -8,6 +8,7 @@ import { QueryProvider } from "@/shared/ui/providers/QueryProvider";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { CommandSpineWithNetwork } from "./command-spine-with-network";
 import { ConditionalToaster } from "@/shared/ui/conditional-toaster";
+import { PerfOverlay } from "@/shared/ui/perf-overlay";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -107,6 +108,9 @@ export default function RootLayout({
                   </SessionProvider>
                   <CommandSpineWithNetwork />
                   <ConditionalToaster />
+                  {/* Dev-only perf overlay; toggle with Cmd+Shift+P. Web Vitals
+                      auto-collect once mounted, recent custom marks render too. */}
+                  <PerfOverlay />
                 </CommandPaletteProvider>
               </QueryProvider>
             </NuqsAdapter>
