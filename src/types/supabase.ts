@@ -1101,10 +1101,6 @@ export type Database = {
         }
         Returns: string
       }
-      reset_member_passkey: {
-        Args: { p_member_user_id: string; p_workspace_id: string }
-        Returns: Json
-      }
       resolve_aion_insight: {
         Args: { p_entity_id: string; p_trigger_type: string }
         Returns: boolean
@@ -8234,6 +8230,10 @@ export type Database = {
           p_target_entity_id: string
         }
         Returns: undefined
+      }
+      reset_member_passkey: {
+        Args: { p_member_user_id: string; p_workspace_id: string }
+        Returns: Json
       }
       review_crew_equipment: {
         Args: {

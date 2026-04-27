@@ -128,15 +128,6 @@ type ResetMemberPasskeyResult = {
   passkeys_deleted: number;
 };
 
-type SupabaseWithSchemaRpc = {
-  schema: (s: string) => {
-    rpc: (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
-  };
-};
-
 type SupabaseWithSchemaFrom = {
   schema: (s: string) => {
     from: (t: string) => {
@@ -254,7 +245,9 @@ async function deliverResetEmail(ctx: {
 
 /**
  * Owner-mediated crew recovery — the admin-facing server action that wraps
- * `cortex.reset_member_passkey`.
+ * `public.reset_member_passkey` (moved from cortex.* in Wk 16 cortex
+ * scope-creep cleanup; pre-auth recovery belongs in public alongside
+ * passkeys, guardians, recovery_shards).
  *
  * Flow:
  *   1. Authenticate the caller (regular cookie-based server client).
@@ -286,10 +279,9 @@ export async function adminResetMemberPasskey(params: {
   if (!user) return { ok: false, error: 'Not signed in.' };
 
   // 1. Invoke the RPC. The function is SECURITY DEFINER and enforces role +
-  //    workspace-membership + anti-lockout checks server-side. `.schema('cortex')`
-  //    is required because the RPC lives in cortex, not public.
-  const { data: rpcData, error: rpcError } = await (supabase as unknown as SupabaseWithSchemaRpc)
-    .schema('cortex')
+  //    workspace-membership + anti-lockout checks server-side. Lives in
+  //    public.* (pre-auth recovery boundary), so no .schema() chain is needed.
+  const { data: rpcData, error: rpcError } = await supabase
     .rpc('reset_member_passkey', {
       p_workspace_id: params.workspaceId,
       p_member_user_id: params.targetUserId,

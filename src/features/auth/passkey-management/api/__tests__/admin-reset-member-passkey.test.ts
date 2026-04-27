@@ -111,12 +111,12 @@ vi.mock('@/shared/api/supabase/server', () => ({
       }),
     })),
 
-    // .schema('cortex').rpc(...) — RPC branch.
+    // RPC branch — public.reset_member_passkey (moved from cortex.* in Wk 16
+    // cortex scope-creep cleanup; lives in public alongside passkeys et al).
+    rpc: hoisted.rpcMock,
+
     // .schema('directory').from('entities')... — caller display_name branch.
     schema: vi.fn((s: string) => {
-      if (s === 'cortex') {
-        return { rpc: hoisted.rpcMock };
-      }
       if (s === 'directory') {
         return {
           from: () => ({

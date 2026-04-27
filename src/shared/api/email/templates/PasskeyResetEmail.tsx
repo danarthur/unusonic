@@ -1,6 +1,6 @@
 /**
  * Passkey reset email — sent when a workspace owner or admin resets a crew
- * member's sign-in access via the cortex.reset_member_passkey RPC.
+ * member's sign-in access via the public.reset_member_passkey RPC.
  *
  * Delivered through the global EMAIL_FROM (auth email — never workspace-
  * branded per spoof risk). Links to a Supabase magic link that lands on the

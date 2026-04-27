@@ -1,4 +1,4 @@
--- Login Redesign Phase 1 — cortex.reset_member_passkey
+-- Login Redesign Phase 1 — public.reset_member_passkey
 --
 -- Covers the authorization + side-effect contract documented in
 -- docs/reference/login-redesign-design.md §9. Admin-only; anti-lockout;
@@ -81,7 +81,7 @@ ON CONFLICT (id) DO NOTHING;
 -- 1. Admin of ws_a CAN reset member_a1 of ws_a. Returns target email + count.
 SELECT test_authenticate_as('a0000000-0000-4000-a000-000000000001'::uuid);
 SELECT is(
-  (SELECT cortex.reset_member_passkey(
+  (SELECT public.reset_member_passkey(
     'b0000000-0000-4000-a000-000000000000'::uuid,
     'a0000000-0000-4000-a000-000000000002'::uuid
   ) ->> 'passkeys_deleted'),
@@ -111,7 +111,7 @@ SELECT is(
 -- 4. Resetting a member with no passkeys returns passkeys_deleted=0 successfully.
 SELECT test_authenticate_as('a0000000-0000-4000-a000-000000000001'::uuid);
 SELECT is(
-  (SELECT cortex.reset_member_passkey(
+  (SELECT public.reset_member_passkey(
     'b0000000-0000-4000-a000-000000000000'::uuid,
     'a0000000-0000-4000-a000-000000000003'::uuid
   ) ->> 'passkeys_deleted'),
@@ -123,7 +123,7 @@ SELECT test_reset_role();
 -- 5. Non-admin member of ws_a CANNOT reset another member (ERRCODE 42501).
 SELECT test_authenticate_as('a0000000-0000-4000-a000-000000000002'::uuid);
 SELECT throws_ok(
-  $$SELECT cortex.reset_member_passkey(
+  $$SELECT public.reset_member_passkey(
     'b0000000-0000-4000-a000-000000000000'::uuid,
     'a0000000-0000-4000-a000-000000000003'::uuid
   )$$,
@@ -137,7 +137,7 @@ SELECT test_reset_role();
 --    Caller fails the owner/admin check in ws_b before the membership check.
 SELECT test_authenticate_as('a0000000-0000-4000-a000-000000000001'::uuid);
 SELECT throws_ok(
-  $$SELECT cortex.reset_member_passkey(
+  $$SELECT public.reset_member_passkey(
     'b0000000-0000-4000-b000-000000000000'::uuid,
     'a0000000-0000-4000-b000-000000000002'::uuid
   )$$,
@@ -157,7 +157,7 @@ SELECT is(
 -- 7. Admin cannot reset themselves (anti-lockout).
 SELECT test_authenticate_as('a0000000-0000-4000-a000-000000000001'::uuid);
 SELECT throws_ok(
-  $$SELECT cortex.reset_member_passkey(
+  $$SELECT public.reset_member_passkey(
     'b0000000-0000-4000-a000-000000000000'::uuid,
     'a0000000-0000-4000-a000-000000000001'::uuid
   )$$,
@@ -169,9 +169,9 @@ SELECT test_reset_role();
 
 -- 8. anon does NOT hold EXECUTE on the function (grants audit).
 SELECT is(
-  has_function_privilege('anon', 'cortex.reset_member_passkey(uuid,uuid)', 'EXECUTE'),
+  has_function_privilege('anon', 'public.reset_member_passkey(uuid,uuid)', 'EXECUTE'),
   false,
-  'anon cannot EXECUTE cortex.reset_member_passkey'
+  'anon cannot EXECUTE public.reset_member_passkey'
 );
 
 SELECT * FROM finish();
