@@ -1,6 +1,7 @@
 'use server';
  
 
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { DealStakeholderRole } from '../lib/stakeholder-roles';
@@ -336,6 +337,14 @@ export async function addDealStakeholder(
     await supabase.from('deals').update({ organization_id: organizationId }).eq('id', dealId);
   }
 
+  // Revalidate /crm only when the mutation affects the sidebar — bill_to
+  // (client name on stream card) and venue_contact (location on stream card).
+  // POC / planner / host roles aren't shown on the sidebar, so they keep
+  // the perf gain of no full-page refetch.
+  if (role === 'bill_to' || role === 'venue_contact') {
+    revalidatePath('/crm');
+  }
+
   return { success: true, id: inserted.id };
 }
 
@@ -527,6 +536,11 @@ export async function removeDealStakeholder(dealId: string, stakeholderId: strin
     await supabase.from('deals').update({ venue_id: null }).eq('id', dealId);
   } else if (row?.role === 'bill_to') {
     await supabase.from('deals').update({ organization_id: null }).eq('id', dealId);
+  }
+
+  // Revalidate /crm only when the removed role affected the sidebar.
+  if (row?.role === 'bill_to' || row?.role === 'venue_contact') {
+    revalidatePath('/crm');
   }
 
   return { success: true };

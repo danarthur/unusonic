@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
@@ -31,5 +32,12 @@ export async function linkDealToClient(
     .eq('workspace_id', workspaceId);
 
   if (error) return { success: false, error: error.message };
+
+  // Revalidate /crm so the deals stream sidebar reflects the new client name
+  // (organization_id is the legacy bill_to fallback that drives client_name
+  // on the stream cards). Sidebar staleness was masked previously by the
+  // client-side router.refresh() that we removed in the perf cleanup.
+  revalidatePath('/crm');
+
   return { success: true };
 }
