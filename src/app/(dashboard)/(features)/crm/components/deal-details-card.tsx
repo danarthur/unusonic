@@ -178,11 +178,10 @@ export function DealDetailsCard({
     if (result.success) {
       toast.success(`${org.name} added.`);
       onStakeholdersChange();
-      router.refresh();
     } else {
       toast.error(result.error);
     }
-  }, [deal.id, onStakeholdersChange, router]);
+  }, [deal.id, onStakeholdersChange]);
 
   const handleVendorGhostCreate = useCallback(async (name: string) => {
     const entityId = await createGhostVendorEntity(name);
@@ -192,17 +191,15 @@ export function DealDetailsCard({
     if (result.success) {
       toast.success(`${name} added.`);
       onStakeholdersChange();
-      router.refresh();
     } else {
       toast.error(result.error);
     }
-  }, [deal.id, onStakeholdersChange, router]);
+  }, [deal.id, onStakeholdersChange]);
 
   const handleRemove = async (stakeholderId: string) => {
     const result = await removeDealStakeholder(deal.id, stakeholderId);
     if (result.success) {
       onStakeholdersChange();
-      router.refresh();
     } else {
       toast.error(result.error);
     }
@@ -614,7 +611,6 @@ export function DealDetailsCard({
           onSaved={() => {
             setCoupleEdit(null);
             onStakeholdersChange();
-            router.refresh();
           }}
         />
       )}
@@ -629,7 +625,6 @@ export function DealDetailsCard({
           onSaved={() => {
             setIndividualEdit(null);
             onStakeholdersChange();
-            router.refresh();
           }}
         />
       )}

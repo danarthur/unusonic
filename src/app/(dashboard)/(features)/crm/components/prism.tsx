@@ -313,10 +313,15 @@ export function Prism({
 
   const refetchDealAndClient = () => {
     if (!selectedId || selectedItem?.source !== 'deal') return;
+    // Surgical refetch — three targeted reads cover deal scalars, client
+    // context, and stakeholders. Skipping router.refresh() avoids re-running
+    // the entire page.tsx server component (8 parallel queries) for data the
+    // client already has. Status changes / handover still call router.refresh
+    // explicitly because those affect surfaces beyond this card (deals stream
+    // sidebar status badges, lifecycle transitions).
     getDeal(selectedId).then((d) => setDeal(d ?? null));
     getDealClientContext(selectedId, sourceOrgId).then((c) => setClient(c ?? null));
     getDealStakeholders(selectedId).then((s) => setStakeholders(s ?? []));
-    router.refresh();
   };
 
   // Close status dropdown on outside click

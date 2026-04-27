@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Plus, Building2, ChevronRight, ExternalLink } from 'lucide-react';
 import { OmniSearch } from '@/widgets/network-stream';
@@ -45,7 +45,6 @@ export function ClientConnector({
   onClientLinked,
   compact = true,
 }: ClientConnectorProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [omniOpen, setOmniOpen] = useState(false);
   const [forgeOpen, setForgeOpen] = useState(false);
@@ -58,7 +57,6 @@ export function ClientConnector({
       toast.success('Client linked to this deal.');
       setOmniOpen(false);
       onClientLinked();
-      router.refresh();
     } else {
       toast.error(result.error);
     }
@@ -74,7 +72,6 @@ export function ClientConnector({
     setForgeOpen(false);
     setForgeInitialName('');
     onClientLinked();
-    router.refresh();
   };
 
   // No client linked — always show "+ Add client" button
