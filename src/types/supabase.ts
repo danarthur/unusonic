@@ -72,6 +72,15 @@ export type Database = {
           total_turns: number
         }[]
       }
+      roll_aion_events_partitions: {
+        Args: never
+        Returns: {
+          action: string
+          partition_name: string
+          range_end: string
+          range_start: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -5490,6 +5499,22 @@ export type Database = {
     }
     Functions: {
       _expand_series_rule: { Args: { p_series_rule: Json }; Returns: string[] }
+      _feasibility_confirmed_shows: {
+        Args: { p_date: string; p_workspace_id: string }
+        Returns: Json
+      }
+      _feasibility_open_deals: {
+        Args: {
+          p_date: string
+          p_exclude_deal_id?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      _feasibility_recurring_blackouts: {
+        Args: { p_date: string; p_workspace_id: string }
+        Returns: Json
+      }
       advance_deal_stage: {
         Args: {
           p_deal_id: string
@@ -5563,6 +5588,14 @@ export type Database = {
       event_status_pair_valid: {
         Args: { p_lifecycle: string; p_status: string }
         Returns: boolean
+      }
+      feasibility_check_for_date: {
+        Args: {
+          p_current_deal_id?: string
+          p_date: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       has_primitive_fired: {
         Args: { p_primitive: string; p_transition_id: string }

@@ -640,18 +640,6 @@ export function createCoreTools(ctx: AionToolContext) {
     },
   });
 
-  // NOTE: Removed 2026-04-22 — `search_deals` was a narrower, older tool
-  // that only matched `deals.title` and so silently returned nothing for
-  // wedding-style deals where the couple's names live on the client entity.
-  // It also shadowed `lookup_historical_deals` (knowledge.ts) in Sonnet's
-  // tool pick because its description was simpler; owners asking "how much
-  // did we charge for the Ally & Emily wedding" got an unhelpful miss.
-  //
-  // `lookup_historical_deals` (knowledge.ts) is the unified replacement — it
-  // unions organization_id + main_contact_id + title match and also returns
-  // proposal totals (which search_deals didn't). If you need a cheap "is this
-  // deal in the workspace" check, use get_deal_details with a dealId.
-
   return {
     save_voice_config,
     save_memory,
