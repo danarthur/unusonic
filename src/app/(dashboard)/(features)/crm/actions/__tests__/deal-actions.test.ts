@@ -246,8 +246,8 @@ describe('createDeal', () => {
 
   it('forwards POC by host index when pocFromHostIndex is set', async () => {
     await createDeal({ ...BASE_INDIVIDUAL, pocFromHostIndex: 1 });
-    const call = mockClient.rpc.mock.calls[0]?.[1] as { p_hosts: unknown[]; p_poc: unknown };
-    expect(call?.p_poc).toEqual(call?.p_hosts[0]);
+    const call = mockClient.rpc.mock.calls[0]?.[1] as { p_poc: unknown };
+    expect(call?.p_poc).toEqual({ from_host_index: 1 });
   });
 
   it('builds independent POC payload from poc fields', async () => {

@@ -19,6 +19,7 @@ import {
 
 type EntityShape =
   | { existing_id: string }
+  | { from_host_index: number }
   | { type: 'person' | 'company'; display_name: string; attributes: Record<string, unknown> };
 
 function buildPersonShape(p: PersonHostInput): EntityShape | null {
@@ -204,15 +205,13 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
     }
 
     // ── POC ────────────────────────────────────────────────────────────────
-    // pocFromHostIndex (1-based) → reuse that host's resolved entity. The RPC
-    // resolves the host first, so we pass the same shape — RPC creates ONE
-    // entity but writes both `host` and `day_of_poc` stakeholder rows.
+    // pocFromHostIndex (1-based) tells the RPC to reuse the resolved host
+    // entity rather than insert a second directory.entities row. Without
+    // this, callers that re-pass the host shape end up with two entities
+    // for the same person and the deal-header strip renders them twice.
     let pocPayload: EntityShape | null = null;
-    if (typeof pocFromHostIndex === 'number') {
-      const idx = pocFromHostIndex - 1;
-      if (idx >= 0 && idx < hosts.length) {
-        pocPayload = hosts[idx];
-      }
+    if (typeof pocFromHostIndex === 'number' && pocFromHostIndex >= 1 && pocFromHostIndex <= hosts.length) {
+      pocPayload = { from_host_index: pocFromHostIndex };
     }
     if (!pocPayload && poc) {
       pocPayload = buildPocShape(poc);
