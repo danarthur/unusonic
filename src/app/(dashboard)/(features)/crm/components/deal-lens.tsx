@@ -325,13 +325,20 @@ export function DealLens({
     };
   }, []);
 
+  // Proposal + history are always fetched together. Bundle them into a
+  // single Promise.all so the two server actions hit the network in
+  // parallel and we have one less effect race condition to reason about.
+  // (Server-action overhead is per-call, not per-Promise.all element, but
+  // this reduces the "two skeletons popping in over 200ms" wave to one.)
   useEffect(() => {
     let cancelled = false;
-    getProposalForDeal(deal.id).then((p) => {
-      if (!cancelled) setInitialProposal(p);
-    });
-    getProposalHistoryForDeal(deal.id).then((h) => {
-      if (!cancelled) setProposalHistory(h);
+    Promise.all([
+      getProposalForDeal(deal.id),
+      getProposalHistoryForDeal(deal.id),
+    ]).then(([p, h]) => {
+      if (cancelled) return;
+      setInitialProposal(p);
+      setProposalHistory(h);
     });
     return () => {
       cancelled = true;

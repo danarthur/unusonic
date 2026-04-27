@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, MapPin, Building2, Plus, Loader2, Pencil, X } from 'lucide-react';
@@ -153,7 +153,13 @@ export type DealDetailsCardProps = {
   initialProposal?: ProposalWithItems | null;
 };
 
-export function DealDetailsCard({
+// React.memo at the bottom of the file. DealDetailsCard renders venue +
+// vendor lists with their own slot pickers; on every parent keystroke
+// (e.g. title edit in DealLens) it would otherwise re-run useCallback
+// chains and re-mount picker portals. Default shallow equality is
+// sufficient — props are deal/stakeholders/client/sourceOrgId scalars
+// plus the now-stable onStakeholdersChange callback.
+function DealDetailsCardImpl({
   deal,
   stakeholders,
   client,
@@ -642,3 +648,5 @@ export function DealDetailsCard({
     </>
   );
 }
+
+export const DealDetailsCard = memo(DealDetailsCardImpl);
