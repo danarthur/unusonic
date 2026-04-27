@@ -286,10 +286,41 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
   }, [deal?.id]);
 
   // Fork C bundle — flag check + card data in one round-trip.
+  // Deferred to idle: this is a heavy multi-join (follow_up_queue +
+  // cortex.aion_insights + ops.events + proposals + cadence) that isn't
+  // critical-path UI. Letting the deal paint first and filling the Aion card
+  // in afterward saves ~200ms of perceived load time on every deal navigation.
   useEffect(() => {
-    if (deal?.id) {
-      getAionCardBundle(deal.id).then(setAionBundle);
+    if (!deal?.id) return;
+    let cancelled = false;
+    let idleId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const fire = () => {
+      if (cancelled) return;
+      getAionCardBundle(deal.id).then((b) => {
+        if (!cancelled) setAionBundle(b);
+      });
+    };
+
+    // requestIdleCallback runs after the browser is done painting + handling
+    // critical input. timeout: 1500 means at-most-1.5s delay if the page never
+    // goes idle. Safari shim falls through to setTimeout(200ms) — same intent.
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = (window as Window & {
+        requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number;
+      }).requestIdleCallback(fire, { timeout: 1500 });
+    } else {
+      timeoutId = setTimeout(fire, 200);
     }
+
+    return () => {
+      cancelled = true;
+      if (idleId != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
   }, [deal?.id]);
 
   useEffect(() => {
