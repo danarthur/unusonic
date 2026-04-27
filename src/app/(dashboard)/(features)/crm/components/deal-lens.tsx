@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -8,7 +9,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FileCheck, FileText, ExternalLink, Flame, AlertTriangle } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { PipelineTracker } from '@/features/sales/ui/pipeline-tracker';
-import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
+// ProposalBuilder is heavy (full-page studio with line-item editor, palette,
+// pricing rules). Only rendered when !isLocked (~60% of deals — pre-handoff).
+// Dynamic import strips it from initial bundle for already-handed-off deals.
+const ProposalBuilder = dynamic(
+  () => import('@/features/sales/ui/proposal-builder').then((m) => ({ default: m.ProposalBuilder })),
+  { ssr: false },
+);
 import { getProposalForDeal, getProposalPublicUrl, getProposalHistoryForDeal } from '@/features/sales/api/proposal-actions';
 import type { ProposalHistoryEntry } from '@/features/sales/api/proposal-actions';
 import type { ProposalWithItems } from '@/features/sales/model/types';
@@ -34,7 +41,14 @@ import { updateDealScalars } from '../actions/update-deal-scalars';
 import { ProductionTeamCard } from './production-team-card';
 import { AionSuggestionRow } from './aion-suggestion-row';
 import { ConflictsPanel } from './conflicts-panel';
-import { AionDealCard } from './aion-deal-card';
+// AionDealCard is large (~1500 LOC) and ambient — it fades in after the
+// primary deal block paints (deferred via requestIdleCallback below).
+// Dynamic import strips it from the initial JS bundle so first paint of
+// the deal page doesn't pay for code that won't render until idle.
+const AionDealCard = dynamic(
+  () => import('./aion-deal-card').then((m) => ({ default: m.AionDealCard })),
+  { ssr: false },
+);
 import { getAionCardBundle, type AionCardBundle } from '../actions/get-aion-card-bundle';
 import {
   acceptAionCardAdvance,
