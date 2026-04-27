@@ -106,6 +106,21 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
     // this fails we fall through to the legacy slug-based filter in stream.tsx.
     const pipelinePromise = getWorkspacePipelineStages().catch(() => null);
 
+    // Follow-up queue only needs workspaceId, so kick it off in parallel with
+    // the deals + events + stakeholders + entity-lookup chain. Previously this
+    // was awaited sequentially at the bottom of the load, costing ~50-200ms
+    // we can overlap. Awaited at the merge point below.
+    const followUpQueuePromise: Promise<{ data: Array<{
+      deal_id: string; reason: string; priority_score: number; status: string;
+    }> | null }> = workspaceId
+      ? supabase
+          .schema('ops')
+          .from('follow_up_queue')
+          .select('deal_id, reason, priority_score, status')
+          .eq('workspace_id', workspaceId)
+          .in('status', ['pending', 'snoozed'])
+      : Promise.resolve({ data: [] });
+
     const [dealsRes, eventsRes] = await Promise.all([
     workspaceId
       ? supabase
@@ -260,30 +275,24 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
       return da.localeCompare(db);
     });
 
-    // Merge follow-up queue signals into stream items
-    if (workspaceId) {
-      const { data: queueItems } = await supabase
-        .schema('ops')
-        .from('follow_up_queue')
-        .select('deal_id, reason, priority_score, status')
-        .eq('workspace_id', workspaceId)
-        .in('status', ['pending', 'snoozed']);
-
-      if (queueItems && queueItems.length > 0) {
-        const followUpMap = new Map<string, { reason: string; priority_score: number; status: string }>();
-        for (const q of queueItems as { deal_id: string; reason: string; priority_score: number; status: string }[]) {
-          const existing = followUpMap.get(q.deal_id);
-          if (!existing || q.priority_score > existing.priority_score) {
-            followUpMap.set(q.deal_id, q);
-          }
+    // Merge follow-up queue signals into stream items. Promise was kicked off
+    // at the top of the load — by here it's almost certainly resolved, so the
+    // await is effectively free.
+    const { data: queueItems } = await followUpQueuePromise;
+    if (queueItems && queueItems.length > 0) {
+      const followUpMap = new Map<string, { reason: string; priority_score: number; status: string }>();
+      for (const q of queueItems) {
+        const existing = followUpMap.get(q.deal_id);
+        if (!existing || q.priority_score > existing.priority_score) {
+          followUpMap.set(q.deal_id, q);
         }
-        for (const gig of gigs) {
-          const fu = followUpMap.get(gig.id);
-          if (fu) {
-            gig.followUpReason = fu.reason;
-            gig.followUpPriority = fu.priority_score;
-            gig.followUpStatus = fu.status as 'pending' | 'snoozed';
-          }
+      }
+      for (const gig of gigs) {
+        const fu = followUpMap.get(gig.id);
+        if (fu) {
+          gig.followUpReason = fu.reason;
+          gig.followUpPriority = fu.priority_score;
+          gig.followUpStatus = fu.status as 'pending' | 'snoozed';
         }
       }
     }
