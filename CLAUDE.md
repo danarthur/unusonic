@@ -96,12 +96,12 @@ Layers import only from layers **below**: `App → Widgets → Features → Enti
 |---|---|---|
 | `directory` | Identity | `directory.entities` — people, companies, venues |
 | `ops` | Operations | Projects, events, assignments, logistics, telemetry (`ops.aion_events` — append-only Aion event log, monthly partitioned) |
-| `finance` | Commercials | Invoices (`finance.invoices`, `invoice_line_items`), payments (`finance.payments`), QBO sync (`qbo_connections`, `qbo_entity_map`, `sync_jobs`, `qbo_sync_log`), tax rates, bills (AP, schema-only), Stripe webhook dedup. See `docs/audits/billing-redesign-final-plan-2026-04-11.md`. |
-| `cortex` | Intelligence | Graph edges (`cortex.relationships`), AI memory/RAG (`cortex.memory`), Aion data substrate per workspace (`cortex.aion_sessions`, `aion_messages`, `aion_proactive_lines`, `aion_user_signal_mutes`, `aion_workspace_signal_disables`, `aion_insights`). User-facing RPCs: `cortex.dismiss_aion_proactive_line`, `mark_pill_seen`, `list_aion_proactive_history`, `migrate_session_scope`, `is_user_signal_muted`, etc. |
-| `aion` | Admin / observability | Cross-workspace admin telemetry RPCs (`aion.metric_brief_open_kill_check`, future `metric_dismiss_rate_admin`, `metric_hit_rate_admin`, `metric_tool_depth`, `metric_pill_click_through`). Service-role only by default; admin route handlers gate via `isAionAdmin()`. **Distinct from `cortex.*`** — cortex is per-workspace data substrate; `aion.*` is cross-workspace observability. |
+| `finance` | Commercials | Invoices (`finance.invoices`, `invoice_line_items`), payments (`finance.payments`), QBO sync (`qbo_connections`, `qbo_entity_map`, `sync_jobs`, `qbo_sync_log`), tax rates, bills (AP, schema-only), Stripe webhook dedup, **referrals** (`finance.referrals` + `log_referral`/`delete_referral` RPCs — moved from cortex in Wk 16). See `docs/audits/billing-redesign-final-plan-2026-04-11.md`. |
+| `cortex` | Intelligence | Graph edges (`cortex.relationships`), AI memory/RAG (`cortex.memory`), Aion data substrate per workspace (`cortex.aion_sessions`, `aion_messages`, `aion_proactive_lines`, `aion_user_signal_mutes`, `aion_workspace_signal_disables`, `aion_insights`). User-facing RPCs: `cortex.dismiss_aion_proactive_line`, `mark_pill_seen`, `list_aion_proactive_history`, `migrate_session_scope`, `is_user_signal_muted`, etc. **Scope discipline:** cortex is for graph edges + AI memory + Aion data substrate. Domain-specific tables (entity metadata → `directory.*`, financial ledgers → `finance.*`, pre-auth recovery → `public.*`) belong in their proper schema, not cortex. Captures, lobby pins, ui_notices, consent_log, and feature_access_requests stay in cortex because the AI layer reads/writes them as intelligence-adjacent UX state. |
+| `aion` | Admin / observability | Cross-workspace admin telemetry RPCs (`aion.metric_brief_open_kill_check`, `metric_dismiss_rate`, `metric_hit_rate`, `metric_tool_depth`, `metric_pill_click_through`, `metric_cost_per_seat`, plus `roll_aion_events_partitions` system maintenance). Service-role only by default; admin route handlers gate via `isAionAdmin()`. **Distinct from `cortex.*`** — cortex is per-workspace data substrate; `aion.*` is cross-workspace observability. |
 | `public` | Legacy | Active migration to above schemas. No new tables. |
 
-**Exception:** `public.invitations`, `passkeys`, `guardians`, `recovery_shards` live in `public` because they operate before workspace context (pre-auth boundary).
+**Exception:** `public.invitations`, `passkeys`, `guardians`, `recovery_shards` live in `public` because they operate before workspace context (pre-auth boundary). The same boundary applies to recovery RPCs — `public.reset_member_passkey` (owner-mediated crew recovery, moved from cortex in Wk 16) lives in `public.*` for the same reason.
 
 ### Where new schema objects go
 
@@ -112,6 +112,8 @@ Layers import only from layers **below**: `App → Widgets → Features → Enti
 - **New Aion admin/observability/telemetry RPC** (cross-workspace aggregate, admin-only via `isAionAdmin()`) → `aion.*`. Default REVOKE PUBLIC/anon/authenticated; GRANT only to `service_role`.
 - **New telemetry event log row** → `ops.aion_events` (append-only, partitioned). Use `recordAionEvent()` helper at `src/app/api/aion/lib/event-logger.ts`.
 - **New auth/recovery/invite primitive that runs before workspace context** → `public.*` (pre-auth exception only).
+- **New entity metadata** (per-entity working notes, profile annotations) → `directory.*` alongside `directory.entities`, never cortex.
+- **New financial ledger** (referrals, commission tracking, etc.) → `finance.*`, never cortex.
 
 ### Three Supabase Clients
 
@@ -238,6 +240,11 @@ Call via `supabase.rpc(...)`, never raw SQL from app code:
 - `finance.metric_1099_worksheet(workspace_id, year)` — table of per-vendor totals from finance.bills, flags ≥$600 IRS threshold
 - `finance._metric_resolve_tz`, `finance._metric_assert_membership` — internal helpers for the metric RPCs; call via `src/shared/lib/metrics/call.ts`, never directly
 - `aion.metric_brief_open_kill_check(window_days, repeat_window_days, min_repeats)` — Phase 3 §3.10 admin telemetry. Repeat-user stats for the §3.9 brief-me kill metric. Service-role only; gated at the admin route by `isAionAdmin()`. New admin metric RPCs go in `aion.*`, not `cortex.*`.
+- `aion.metric_dismiss_rate`, `aion.metric_hit_rate`, `aion.metric_tool_depth`, `aion.metric_pill_click_through`, `aion.metric_cost_per_seat(p_window_days)` — Wk 15a/16 admin metrics powering the `/aion/admin/telemetry` dashboard. Service-role only; same gating as above. cost_per_seat aggregates Anthropic chat-turn cost (from `aion.turn_complete` payload's `input_tokens`/`output_tokens`/`model_id`) plus Voyage embedding cost (from `aion.embed_cost` payload's `usd`).
+- `aion.roll_aion_events_partitions()` — Wk 15c partition-lifecycle helper. Creates next 12 months of `ops.aion_events` partitions, drops 180-day-old ones. Idempotent; called daily from `/api/cron/aion-events-partition-lifecycle`.
+- `finance.log_referral(...)`, `finance.delete_referral(referral_id)` — referral ledger writes (moved from cortex.* in Wk 16). Workspace-scoped; authenticated callers gated to workspace members.
+- `directory.upsert_entity_working_notes(...)` — per-entity working notes (communication_style, dnr_flagged, preferred_channel) annotating `directory.entities` (moved from cortex.* in Wk 16).
+- `public.reset_member_passkey(workspace_id, target_user_id)` — owner-mediated crew recovery (moved from cortex.* in Wk 16). Pre-auth boundary alongside `public.passkeys`. Authenticated owners/admins only; anti-lockout enforced; writes audit edge to `cortex.relationships`.
 - `cortex.dismiss_aion_proactive_line(line_id, reason)`, `cortex.mark_pill_seen(line_id)`, `cortex.list_aion_proactive_history(deal_id, days?)`, `cortex.is_user_signal_muted(signal_type, deal_id)`, `cortex.resurface_muted_reason(workspace_id, signal_type)`, `cortex.submit_pill_feedback(line_id, feedback)`, `cortex.check_signal_disabled(workspace_id, signal_type)` (service-role only), `cortex.get_proactive_line_dismiss_rates(workspace_id, window?, min_sample?)`, `cortex.migrate_session_scope(session_id, scope_type, scope_entity_id)` — Aion user-facing data-substrate RPCs. New per-workspace Aion RPCs go in `cortex.*`, not `aion.*`.
 - `get_member_permissions`, `member_has_permission`, `user_has_workspace_role` — auth
 - `get_member_role_slug(p_workspace_id)` — role routing (employee portal)
