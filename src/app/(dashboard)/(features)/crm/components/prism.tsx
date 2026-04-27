@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getDeal, getDealByEventId } from '../actions/get-deal';
 import { getDealClientContext, type DealClientContext } from '../actions/get-deal-client';
 import { getDealStakeholders } from '../actions/deal-stakeholders';
+import { getDealBundle } from '../actions/get-deal-bundle';
 import { getEventSummaryForPrism } from '../actions/get-event-summary';
 import { handoverDeal } from '../actions/handover-deal';
 import { updateDealStatus, type DealStatus } from '../actions/update-deal-status';
@@ -235,14 +236,14 @@ export function Prism({
     }
     setLoading(true);
     if (selectedItem.source === 'deal') {
-      Promise.all([
-        getDeal(selectedId),
-        getDealClientContext(selectedId, sourceOrgId),
-        getDealStakeholders(selectedId),
-      ]).then(([d, c, s]) => {
-        setDeal(d ?? null);
-        setClient(c ?? null);
-        setStakeholders(s ?? []);
+      // One bundled server action instead of three separate roundtrips
+      // (A4/B4 of the perf plan). Server-side parallelization is preserved
+      // — the bundle action calls Promise.all internally, so the wall time
+      // is max(deal, client, stakeholders) instead of sum.
+      getDealBundle(selectedId, sourceOrgId).then(({ deal: d, client: c, stakeholders: s }) => {
+        setDeal(d);
+        setClient(c);
+        setStakeholders(s);
         setEventSummary(null);
         setLoading(false);
         if (d?.event_id) {
@@ -316,15 +317,15 @@ export function Prism({
 
   const refetchDealAndClient = () => {
     if (!selectedId || selectedItem?.source !== 'deal') return;
-    // Surgical refetch — three targeted reads cover deal scalars, client
-    // context, and stakeholders. Skipping router.refresh() avoids re-running
-    // the entire page.tsx server component (8 parallel queries) for data the
-    // client already has. Status changes / handover still call router.refresh
-    // explicitly because those affect surfaces beyond this card (deals stream
-    // sidebar status badges, lifecycle transitions).
-    getDeal(selectedId).then((d) => setDeal(d ?? null));
-    getDealClientContext(selectedId, sourceOrgId).then((c) => setClient(c ?? null));
-    getDealStakeholders(selectedId).then((s) => setStakeholders(s ?? []));
+    // One bundled server action instead of three roundtrips. Mutations that
+    // affect the deals stream sidebar (bill_to, venue_contact, owner change)
+    // handle their own server-side revalidatePath('/crm') in the action —
+    // no client-side router.refresh needed.
+    getDealBundle(selectedId, sourceOrgId).then(({ deal: d, client: c, stakeholders: s }) => {
+      setDeal(d);
+      setClient(c);
+      setStakeholders(s);
+    });
   };
 
   // Close status dropdown on outside click
