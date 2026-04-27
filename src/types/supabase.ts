@@ -880,7 +880,7 @@ export type Database = {
       delete_referral: { Args: { p_referral_id: string }; Returns: boolean }
       dismiss_aion_insight: { Args: { p_insight_id: string }; Returns: boolean }
       dismiss_aion_proactive_line: {
-        Args: { p_line_id: string; p_reason?: string }
+        Args: { p_line_id: string; p_reason: string }
         Returns: boolean
       }
       dismiss_capture: { Args: { p_capture_id: string }; Returns: boolean }
@@ -2504,6 +2504,33 @@ export type Database = {
   }
   ops: {
     Tables: {
+      aion_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
       aion_write_log: {
         Row: {
           artifact_ref: Json
@@ -3870,6 +3897,63 @@ export type Database = {
           suggested_action?: string | null
           suggested_channel?: string | null
           superseded_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      handoff_links: {
+        Row: {
+          confirmed_at: string | null
+          expires_at: string
+          id: string
+          kind: string
+          payload: Json
+          public_token: string
+          recipient: string
+          recipient_kind: string
+          recipient_name: string | null
+          resend_message_id: string | null
+          revoked_at: string | null
+          sender_message: string | null
+          sender_user_id: string
+          sent_at: string
+          twilio_message_sid: string | null
+          workspace_id: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          expires_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          public_token: string
+          recipient: string
+          recipient_kind: string
+          recipient_name?: string | null
+          resend_message_id?: string | null
+          revoked_at?: string | null
+          sender_message?: string | null
+          sender_user_id: string
+          sent_at?: string
+          twilio_message_sid?: string | null
+          workspace_id: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          expires_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          public_token?: string
+          recipient?: string
+          recipient_kind?: string
+          recipient_name?: string | null
+          resend_message_id?: string | null
+          revoked_at?: string | null
+          sender_message?: string | null
+          sender_user_id?: string
+          sent_at?: string
+          twilio_message_sid?: string | null
           workspace_id?: string
         }
         Relationships: []

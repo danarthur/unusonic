@@ -1,38 +1,56 @@
 'use client';
 
 /**
- * RepliesCard — inline card on the Deal Lens showing client ↔ workspace
- * message threads for a deal. Fed by ops.message_threads + ops.messages
- * (workspace RLS; caller sees only their workspace's rows).
+ * RepliesCard v2 — orchestrates the Replies card on the Deal Lens.
  *
- * Phase 1 scope:
- *   • email channel only (SMS chips render visibly in Phase 1.5)
- *   • thread groups as collapsible blocks, newest-first
- *   • Reply action opens the inline composer (wired later in this pack)
- *   • attachment chips download-only (Save to deal files in Phase 1.5)
- *   • no Aion classification badge in Phase 1 — urgency is a keyword flag
+ * See docs/reference/replies-card-v2-design.md.
  *
- * See docs/reference/replies-design.md §3.1.
+ * Composition:
+ *   - Card chrome: title + "Replies · N threads · M unread" + search icon
+ *     + "Compose" (Phase 2B — hidden in PR #20)
+ *   - OwedIndicator: the single "what do I owe" line
+ *   - CardSearchInput: expandable ⌘F search bar
+ *   - Thread list: ThreadRow stacked collapsed, or ExpandedThread for the
+ *     one currently open (one-at-a-time, Apple-Mail style)
+ *   - Empty / loading / search-empty states
+ *
+ * @module features/comms/replies/ui/RepliesCard
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Mail, MessageSquare, Paperclip, Flame } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
-import { cn } from '@/shared/lib/utils';
-import { formatRelTime } from '@/shared/lib/format-currency';
-import { getDealReplies, type ReplyThread, type ReplyMessage } from '../api/get-deal-replies';
-import { ReplyComposer } from './ReplyComposer';
+import { getDealReplies, type ReplyThread } from '../api/get-deal-replies';
+import { ThreadRow } from './ThreadRow';
+import { ExpandedThread } from './ExpandedThread';
+import { OwedIndicator } from './OwedIndicator';
+import { CardSearchInput } from './CardSearchInput';
 
 export type RepliesCardProps = {
   dealId: string;
-  /** Hides actions that require outbound send privileges (post-handover view). */
+  /** Hides outbound-send privileges in Phase 1 (post-handover view). */
   readOnly?: boolean;
 };
 
+function threadMatchesSearch(thread: ReplyThread, query: string): boolean {
+  if (!query.trim()) return true;
+  const needle = query.toLowerCase();
+  if ((thread.subject ?? '').toLowerCase().includes(needle)) return true;
+  if ((thread.latestPreview ?? '').toLowerCase().includes(needle)) return true;
+  return thread.messages.some(
+    (m) =>
+      (m.bodyText ?? '').toLowerCase().includes(needle) ||
+      (m.fromAddress ?? '').toLowerCase().includes(needle),
+  );
+}
+
 export function RepliesCard({ dealId, readOnly = false }: RepliesCardProps) {
   const [threads, setThreads] = useState<ReplyThread[] | null>(null);
+  const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchThreads = useCallback(async () => {
     const data = await getDealReplies(dealId);
@@ -41,50 +59,179 @@ export function RepliesCard({ dealId, readOnly = false }: RepliesCardProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setThreads(null);
-    getDealReplies(dealId).then((data) => {
-      if (!cancelled) setThreads(data);
-    }).catch(() => {
-      if (!cancelled) setThreads([]);
-    });
-    return () => { cancelled = true; };
+    getDealReplies(dealId)
+      .then((data) => {
+        if (!cancelled) setThreads(data);
+      })
+      .catch(() => {
+        if (!cancelled) setThreads([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [dealId]);
 
-  const totalMessages = threads?.reduce((acc, t) => acc + t.messages.length, 0) ?? 0;
-  const hasAny = threads !== null && threads.length > 0;
+  // Keyboard shortcut: ⌘F / Ctrl+F toggles the search input when the card
+  // is focused-within. Use the ResizeObserver-less approach — check if
+  // any descendant has focus.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        // Only hijack if the card has focus-within (user is working inside it).
+        const card = document.getElementById(`replies-card-${dealId}`);
+        if (card && card.contains(document.activeElement)) {
+          e.preventDefault();
+          setSearchOpen(true);
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dealId]);
+
+  const filteredThreads = useMemo(() => {
+    if (!threads) return [];
+    if (!searchQuery.trim()) return threads;
+    return threads.filter((t) => threadMatchesSearch(t, searchQuery));
+  }, [threads, searchQuery]);
+
+  const totalUnread = useMemo(
+    () => threads?.reduce((acc, t) => acc + t.unreadCount, 0) ?? 0,
+    [threads],
+  );
+
+  const threadCount = threads?.length ?? 0;
+  const hasAny = threadCount > 0;
+
+  const expandedThread = useMemo(
+    () => filteredThreads.find((t) => t.id === expandedThreadId) ?? null,
+    [filteredThreads, expandedThreadId],
+  );
 
   return (
-    <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
-      <div
-        className="flex items-center justify-between"
-        style={{ marginBottom: 'var(--stage-gap-wide, 12px)' }}
-      >
-        <p className="stage-label">
-          Replies
-          {totalMessages > 0 && (
-            <span style={{ color: 'var(--stage-text-tertiary)' }}> · {totalMessages}</span>
+    <StagePanel
+      elevated
+      style={{ padding: 'var(--stage-padding, 16px)' }}
+    >
+      <div id={`replies-card-${dealId}`}>
+        {/* Card chrome — title + count chips + search icon */}
+        <div
+          className="flex items-center justify-between"
+          style={{ marginBottom: 'var(--stage-gap-wide, 12px)' }}
+        >
+          <p className="stage-label">
+            Replies
+            {threadCount > 0 && (
+              <>
+                <span style={{ color: 'var(--stage-text-tertiary)' }}>
+                  {' · '}
+                  {threadCount} {threadCount === 1 ? 'thread' : 'threads'}
+                </span>
+                {totalUnread > 0 && (
+                  <span style={{ color: 'var(--stage-text-primary)', fontWeight: 500 }}>
+                    {' · '}
+                    {totalUnread} unread
+                  </span>
+                )}
+              </>
+            )}
+          </p>
+          {hasAny && (
+            <button
+              type="button"
+              aria-label="Search messages"
+              onClick={() => setSearchOpen((v) => !v)}
+              className="inline-flex items-center justify-center rounded-md transition-colors"
+              style={{
+                width: 24,
+                height: 24,
+                color: searchOpen
+                  ? 'var(--stage-text-primary)'
+                  : 'var(--stage-text-tertiary)',
+                background: searchOpen ? 'oklch(1 0 0 / 0.06)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <Search size={14} />
+            </button>
           )}
-        </p>
-      </div>
-
-      {threads === null ? (
-        <RepliesSkeleton />
-      ) : !hasAny ? (
-        <RepliesEmptyState />
-      ) : (
-        <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-          <AnimatePresence initial={false}>
-            {threads.map((thread) => (
-              <ReplyThreadGroup
-                key={thread.id}
-                thread={thread}
-                readOnly={readOnly}
-                onRefresh={fetchThreads}
-              />
-            ))}
-          </AnimatePresence>
         </div>
-      )}
+
+        {threads === null ? (
+          <RepliesSkeleton />
+        ) : !hasAny ? (
+          <RepliesEmptyState />
+        ) : (
+          <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+            {/* Owed indicator */}
+            <OwedIndicator threads={threads} />
+
+            {/* Search input */}
+            <CardSearchInput
+              open={searchOpen}
+              onOpenChange={setSearchOpen}
+              value={searchQuery}
+              onChange={setSearchQuery}
+            />
+
+            {/* Thread list — either all collapsed, or one expanded with
+                the others collapsed. */}
+            <AnimatePresence initial={false}>
+              {expandedThread ? (
+                <motion.div
+                  key={expandedThread.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={STAGE_MEDIUM}
+                >
+                  <ExpandedThread
+                    thread={expandedThread}
+                    onCollapse={() => setExpandedThreadId(null)}
+                    onRefresh={fetchThreads}
+                    readOnly={readOnly}
+                    searchQuery={searchQuery}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="thread-list"
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={STAGE_LIGHT}
+                  className="flex flex-col"
+                  style={{ gap: 'var(--stage-gap, 6px)' }}
+                >
+                  {filteredThreads.length === 0 ? (
+                    <div
+                      className="text-xs"
+                      style={{
+                        color: 'var(--stage-text-tertiary)',
+                        padding: 'var(--stage-gap-wide, 12px)',
+                      }}
+                    >
+                      No threads match &ldquo;{searchQuery}&rdquo;.
+                    </div>
+                  ) : (
+                    filteredThreads.map((thread) => (
+                      <ThreadRow
+                        key={thread.id}
+                        thread={thread}
+                        onExpand={() => setExpandedThreadId(thread.id)}
+                        onRefresh={fetchThreads}
+                      />
+                    ))
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
     </StagePanel>
   );
 }
@@ -123,259 +270,4 @@ function RepliesSkeleton() {
       ))}
     </div>
   );
-}
-
-// =============================================================================
-// Thread group
-// =============================================================================
-
-function ReplyThreadGroup({
-  thread,
-  readOnly,
-  onRefresh,
-}: {
-  thread: ReplyThread;
-  readOnly: boolean;
-  onRefresh: () => void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const [composing, setComposing] = useState(false);
-  const lastMessage = thread.messages[thread.messages.length - 1];
-  const hasUrgentInbound = thread.messages.some(
-    (m) => m.direction === 'inbound' && m.urgencyKeywordMatch,
-  );
-
-  const ChannelIcon = thread.channel === 'email' ? Mail : MessageSquare;
-  const displayName = thread.primaryEntityName ?? lastMessage?.fromAddress ?? 'Unknown sender';
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 2 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={STAGE_LIGHT}
-      className="flex flex-col"
-      style={{
-        borderTop: '1px solid var(--stage-edge-subtle)',
-        paddingTop: 'var(--stage-gap-wide, 12px)',
-      }}
-    >
-      {/* Thread header */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex items-center justify-between w-full text-left"
-        aria-expanded={expanded}
-      >
-        <div className="flex items-center min-w-0" style={{ gap: 'var(--stage-gap, 6px)' }}>
-          <ChannelIcon
-            size={14}
-            className="shrink-0"
-            style={{ color: 'var(--stage-text-tertiary)' }}
-          />
-          <span
-            className="text-sm tracking-tight font-medium truncate"
-            style={{ color: 'var(--stage-text-primary)' }}
-          >
-            {displayName}
-          </span>
-          {hasUrgentInbound && (
-            <Flame
-              size={12}
-              className="shrink-0"
-              style={{ color: 'var(--color-unusonic-warning)' }}
-              aria-label="Urgent keyword matched"
-            />
-          )}
-          {thread.subject && thread.channel === 'email' && (
-            <span
-              className="stage-badge-text truncate"
-              style={{ color: 'var(--stage-text-tertiary)' }}
-            >
-              {thread.subject}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center shrink-0" style={{ gap: 'var(--stage-gap, 6px)' }}>
-          <span
-            className="stage-label tabular-nums"
-            style={{ color: 'var(--stage-text-tertiary)' }}
-            title={lastMessage ? new Date(lastMessage.createdAt).toLocaleString() : ''}
-          >
-            {lastMessage ? formatRelTime(lastMessage.createdAt) : ''}
-          </span>
-          <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={STAGE_LIGHT}>
-            <ChevronDown size={14} style={{ color: 'var(--stage-text-tertiary)' }} />
-          </motion.div>
-        </div>
-      </button>
-
-      {/* Thread body */}
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={STAGE_MEDIUM}
-            style={{ overflow: 'hidden' }}
-          >
-            <div
-              className="flex flex-col"
-              style={{
-                gap: 'var(--stage-gap-wide, 12px)',
-                paddingTop: 'var(--stage-gap-wide, 12px)',
-              }}
-            >
-              {thread.messages.map((m) => (
-                <ReplyMessageRow key={m.id} message={m} />
-              ))}
-
-              {!readOnly && !composing && (
-                <button
-                  type="button"
-                  className="stage-btn stage-btn-secondary text-xs self-start"
-                  onClick={() => setComposing(true)}
-                >
-                  Reply
-                </button>
-              )}
-
-              <AnimatePresence initial={false}>
-                {!readOnly && composing && (
-                  <ReplyComposer
-                    threadId={thread.id}
-                    onSent={() => {
-                      setComposing(false);
-                      onRefresh();
-                    }}
-                    onCancel={() => setComposing(false)}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-// =============================================================================
-// Message row
-// =============================================================================
-
-function ReplyMessageRow({ message }: { message: ReplyMessage }) {
-  const isInbound = message.direction === 'inbound';
-  const senderLabel = isInbound
-    ? message.fromEntityName ?? message.fromAddress
-    : message.sentByName ?? 'You';
-
-  return (
-    <div
-      className="flex flex-col"
-      style={{
-        gap: 'var(--stage-gap, 6px)',
-        padding: 'var(--stage-gap-wide, 12px)',
-        borderRadius: 'var(--stage-radius-nested, 8px)',
-        background: isInbound ? 'var(--ctx-well)' : 'oklch(1 0 0 / 0.02)',
-        borderLeft: isInbound ? '2px solid var(--color-unusonic-info)' : '2px solid transparent',
-      }}
-      data-surface={isInbound ? 'well' : undefined}
-    >
-      <div className="flex items-center justify-between" style={{ gap: 'var(--stage-gap, 6px)' }}>
-        <div className="flex items-center min-w-0" style={{ gap: 'var(--stage-gap, 6px)' }}>
-          <span
-            className="stage-badge-text tracking-wide uppercase shrink-0"
-            style={{
-              color: isInbound
-                ? 'var(--color-unusonic-info)'
-                : 'var(--stage-text-tertiary)',
-            }}
-          >
-            {isInbound ? 'Client' : 'You'}
-          </span>
-          <span
-            className="text-sm tracking-tight truncate"
-            style={{ color: 'var(--stage-text-primary)' }}
-          >
-            {senderLabel}
-          </span>
-        </div>
-        <span
-          className="stage-label shrink-0 tabular-nums"
-          style={{ color: 'var(--stage-text-tertiary)' }}
-          title={new Date(message.createdAt).toLocaleString()}
-        >
-          {formatRelTime(message.createdAt)}
-        </span>
-      </div>
-
-      {message.bodyText && (
-        <p
-          className="text-sm leading-relaxed whitespace-pre-wrap break-words"
-          style={{ color: 'var(--stage-text-primary)' }}
-        >
-          {message.bodyText}
-        </p>
-      )}
-
-      {message.attachments.length > 0 && (
-        <div className="flex flex-wrap" style={{ gap: 'var(--stage-gap, 6px)' }}>
-          {message.attachments.map((att, idx) => (
-            <div
-              key={idx}
-              className={cn(
-                'inline-flex items-center rounded-md',
-                'stage-badge-text',
-              )}
-              style={{
-                gap: '6px',
-                padding: '4px 8px',
-                background: 'oklch(1 0 0 / 0.04)',
-                border: '1px solid var(--stage-edge-subtle)',
-                color: 'var(--stage-text-secondary)',
-              }}
-            >
-              <Paperclip size={12} />
-              <span className="truncate max-w-[220px]">{att.filename ?? 'attachment'}</span>
-              {typeof att.size === 'number' && (
-                <span style={{ color: 'var(--stage-text-tertiary)' }}>
-                  {formatBytes(att.size)}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Outbound delivery status — subtle footer when data arrives. */}
-      {!isInbound && (message.deliveredAt || message.openedAt || message.bouncedAt) && (
-        <div
-          className="flex items-center stage-label"
-          style={{
-            gap: 'var(--stage-gap, 6px)',
-            color: message.bouncedAt
-              ? 'var(--color-unusonic-error)'
-              : 'var(--stage-text-tertiary)',
-          }}
-        >
-          {message.bouncedAt ? (
-            <span>Bounced {formatRelTime(message.bouncedAt)}</span>
-          ) : message.openedAt ? (
-            <span>Opened {formatRelTime(message.openedAt)}</span>
-          ) : message.deliveredAt ? (
-            <span>Delivered {formatRelTime(message.deliveredAt)}</span>
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

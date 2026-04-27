@@ -34,6 +34,7 @@ export const PRESETS: Record<PresetSlug, LayoutPreset> = {
     cardIds: [
       'lobby.todays_brief',
       'lobby.owed_today',
+      'lobby.recent_replies',
       'lobby.this_week',
       'lobby.awaiting_signature',
       'lobby.gone_quiet',
