@@ -766,6 +766,7 @@ export function Prism({
                     stakeholders={stakeholders}
                     sourceOrgId={sourceOrgId}
                     onClientLinked={refetchDealAndClient}
+                    pipelineStages={pipelineStages}
                   />
                 ) : (
                   <div className="stage-panel-elevated p-6 flex flex-col items-center justify-center min-h-[280px] gap-4 text-center">

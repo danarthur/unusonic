@@ -94,6 +94,12 @@ export type DealLensProps = {
   sourceOrgId?: string | null;
   /** Called after linking a client or stakeholder so Prism can refetch. */
   onClientLinked?: () => void;
+  /**
+   * Pipeline stages, lifted from Prism so DealLens doesn't fetch its own
+   * copy on every mount (the value is identical workspace-wide). Pass null
+   * for "still loading"; pass [] to render the legacy fallback.
+   */
+  pipelineStages?: WorkspacePipelineStage[] | null;
 };
 
 /**
@@ -133,7 +139,14 @@ async function emitCadenceAccuracyIfPersonalized(
   });
 }
 
-export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, onClientLinked }: DealLensProps) {
+export function DealLens({
+  deal,
+  client,
+  stakeholders = [],
+  sourceOrgId = null,
+  onClientLinked,
+  pipelineStages: pipelineStagesProp,
+}: DealLensProps) {
   const router = useRouter();
   const isLocked = !!deal.event_id;
   // undefined = not yet fetched; null = fetched, no proposal exists
@@ -165,17 +178,22 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
 
   // Phase 2d-3: workspace pipeline stages for the Deal Lens tracker.
   // null = loading (use hardcoded fallback); [] = no pipeline (fallback).
-  const [pipelineStages, setPipelineStages] = useState<WorkspacePipelineStage[] | null>(null);
+  // Lifted to Prism so we don't fetch the same workspace-wide data twice on
+  // every page load. Falls back to a local fetch only when the prop is
+  // truly omitted (preserves backwards compatibility for any other caller).
+  const [localPipelineStages, setLocalPipelineStages] = useState<WorkspacePipelineStage[] | null>(null);
   useEffect(() => {
+    if (pipelineStagesProp !== undefined) return;
     let cancelled = false;
     getWorkspacePipelineStages().then((result) => {
       if (cancelled) return;
-      setPipelineStages(result?.stages ?? []);
+      setLocalPipelineStages(result?.stages ?? []);
     }).catch(() => {
-      if (!cancelled) setPipelineStages([]);
+      if (!cancelled) setLocalPipelineStages([]);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [pipelineStagesProp]);
+  const pipelineStages = pipelineStagesProp ?? localPipelineStages;
 
   // Unified timeline (ops.deal_timeline_v — unions deal_activity_log +
   // follow_up_log). null = not yet fetched; [] = fetched, no entries.
@@ -389,13 +407,21 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
     };
   }, [deal.event_id]);
 
-  // Refetch proposal when user returns to this tab or navigates back from proposal builder
+  // Refetch proposal when user returns to this tab or navigates back from
+  // proposal builder. Both visibilitychange and focus would fire the same
+  // refetch — debounce so rapid alt-tab cycles don't kick off 2-3 parallel
+  // identical fetches. (Explore agent finding #6.)
   useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const refetch = () => {
-      getProposalForDeal(deal.id).then(setInitialProposal);
-      getProposalPublicUrl(deal.id).then(setPublicProposalUrl);
-      getProposalHistoryForDeal(deal.id).then(setProposalHistory);
-      getFollowUpForDeal(deal.id).then(setQueueItem);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        getProposalForDeal(deal.id).then(setInitialProposal);
+        getProposalPublicUrl(deal.id).then(setPublicProposalUrl);
+        getProposalHistoryForDeal(deal.id).then(setProposalHistory);
+        getFollowUpForDeal(deal.id).then(setQueueItem);
+      }, 250);
     };
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refetch();
@@ -404,6 +430,7 @@ export function DealLens({ deal, client, stakeholders = [], sourceOrgId = null, 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
