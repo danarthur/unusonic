@@ -187,7 +187,10 @@ export function Prism({
   const [linkedProposalUrl, setLinkedProposalUrl] = useState<string | null>(null);
   const [linkedDealLoading, setLinkedDealLoading] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [statusChanging, setStatusChanging] = useState(false);
+  // Kept for backward compatibility with consumers that disable controls
+  // during a status change. With optimistic UI (B2) the pill updates
+  // instantly so this is effectively always false; consumers stay opt-in.
+  const [statusChanging] = useState(false);
   const [lostModalOpen, setLostModalOpen] = useState(false);
   const [pendingOverrideStatus, setPendingOverrideStatus] = useState<string | null>(null);
   const [pipelineStages, setPipelineStages] = useState<WorkspacePipelineStage[] | null>(null);
@@ -336,49 +339,55 @@ export function Prism({
     return () => document.removeEventListener('mousedown', handler);
   }, [statusDropdownOpen]);
 
+  // Status mutations use the optimistic pattern (B2 of the perf plan):
+  // local state flips to the new status BEFORE the server action awaits, so
+  // the pill updates instantly. The action runs in the background; on error,
+  // we revert + toast. server-side revalidatePath('/crm') in updateDealStatus
+  // keeps the deals stream sidebar in sync — no client-side router.refresh
+  // needed.
+
   const handleStatusChange = async (status: string) => {
     if (!deal) return;
     setStatusDropdownOpen(false);
-    setStatusChanging(true);
+    const previousStatus = deal.status;
+    // Optimistic flip — pill paints new status immediately.
+    setDeal((prev) => prev ? { ...prev, status } : prev);
     // Cast is safe: Phase 2b stage slugs are still the legacy seven. Phase 2d
     // stage CRUD will widen updateDealStatus's accepted set.
     const result = await updateDealStatus(deal.id, status as DealStatus);
-    setStatusChanging(false);
-    if (result.success) {
-      setDeal((prev) => prev ? { ...prev, status } : prev);
-      router.refresh();
-    } else {
+    if (!result.success) {
+      // Revert + toast.
+      setDeal((prev) => prev ? { ...prev, status: previousStatus } : prev);
       toast.error(result.error ?? 'Failed to update status');
     }
   };
 
   const handleMarkAsLost = async (reason: LostReason, competitorName: string | null) => {
     if (!deal) return;
+    const previousStatus = deal.status;
+    setLostModalOpen(false);
+    setDeal((prev) => prev ? { ...prev, status: 'lost' } : prev);
     const result = await updateDealStatus(deal.id, 'lost', { lost_reason: reason, lost_to_competitor_name: competitorName });
-    if (result.success) {
-      setLostModalOpen(false);
-      setDeal((prev) => prev ? { ...prev, status: 'lost' } : prev);
-      router.refresh();
-    } else {
+    if (!result.success) {
+      setDeal((prev) => prev ? { ...prev, status: previousStatus } : prev);
       toast.error(result.error ?? 'Failed to mark deal as lost');
     }
   };
 
   const handleOverrideConfirm = async () => {
     if (!deal || !pendingOverrideStatus) return;
-    setStatusChanging(true);
+    const previousStatus = deal.status;
+    const targetStatus = pendingOverrideStatus;
+    setPendingOverrideStatus(null);
+    setDeal((prev) => prev ? { ...prev, status: targetStatus } : prev);
     const result = await updateDealStatus(
       deal.id,
-      pendingOverrideStatus as 'contract_signed' | 'deposit_received' | 'won',
+      targetStatus as 'contract_signed' | 'deposit_received' | 'won',
       undefined,
       true
     );
-    setStatusChanging(false);
-    if (result.success) {
-      setPendingOverrideStatus(null);
-      setDeal((prev) => prev ? { ...prev, status: pendingOverrideStatus } : prev);
-      router.refresh();
-    } else {
+    if (!result.success) {
+      setDeal((prev) => prev ? { ...prev, status: previousStatus } : prev);
       toast.error(result.error ?? 'Failed to update status');
     }
   };
