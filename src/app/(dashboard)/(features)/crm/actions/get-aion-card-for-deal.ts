@@ -558,7 +558,7 @@ async function fetchProposalEngagement(
 // ---------------------------------------------------------------------------
 
 /**
- * `cortex.entity_working_notes` — per-contact operational notes already
+ * `directory.entity_working_notes` — per-contact operational notes already
  * captured by the Network surfaces. Tier 1 reads two columns:
  *   - `dnr_flagged` (do-not-resurrect) → suppress the whole card
  *   - `preferred_channel` → override the follow-up queue's `suggested_channel`
@@ -575,9 +575,9 @@ async function fetchContactWorkingNotes(
   preferredChannel: 'email' | 'sms' | 'phone' | null;
   communicationStyle: string | null;
 } | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cortex schema cast
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- directory schema cast
   const { data } = await system
-    .schema('cortex')
+    .schema('directory')
     .from('entity_working_notes')
     .select('dnr_flagged, preferred_channel, communication_style')
     .eq('workspace_id', workspaceId)

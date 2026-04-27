@@ -155,7 +155,7 @@ export async function getTeamPreview(
   // 4. DNR flags per person from entity_working_notes.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: wnRows } = await supabase
-    .schema('cortex')
+    .schema('directory')
     .from('entity_working_notes')
     .select('entity_id, dnr_flagged')
     .eq('workspace_id', workspaceId)

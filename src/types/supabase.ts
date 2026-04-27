@@ -579,45 +579,6 @@ export type Database = {
         }
         Relationships: []
       }
-      entity_working_notes: {
-        Row: {
-          auto_filled_fields: string[]
-          communication_style: string | null
-          dnr_flagged: boolean
-          dnr_note: string | null
-          dnr_reason: string | null
-          entity_id: string
-          preferred_channel: string | null
-          updated_at: string
-          updated_by: string | null
-          workspace_id: string
-        }
-        Insert: {
-          auto_filled_fields?: string[]
-          communication_style?: string | null
-          dnr_flagged?: boolean
-          dnr_note?: string | null
-          dnr_reason?: string | null
-          entity_id: string
-          preferred_channel?: string | null
-          updated_at?: string
-          updated_by?: string | null
-          workspace_id: string
-        }
-        Update: {
-          auto_filled_fields?: string[]
-          communication_style?: string | null
-          dnr_flagged?: boolean
-          dnr_note?: string | null
-          dnr_reason?: string | null
-          entity_id?: string
-          preferred_channel?: string | null
-          updated_at?: string
-          updated_by?: string | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       feature_access_requests: {
         Row: {
           feature_key: string
@@ -1284,19 +1245,6 @@ export type Database = {
         }
         Returns: string
       }
-      upsert_entity_working_notes: {
-        Args: {
-          p_communication_style?: string
-          p_dnr_flagged?: boolean
-          p_dnr_note?: string
-          p_dnr_reason?: string
-          p_entity_id: string
-          p_preferred_channel?: string
-          p_source?: string
-          p_workspace_id: string
-        }
-        Returns: boolean
-      }
       upsert_memory_embedding: {
         Args: {
           p_content_header?: string
@@ -1446,12 +1394,71 @@ export type Database = {
           },
         ]
       }
+      entity_working_notes: {
+        Row: {
+          auto_filled_fields: string[]
+          communication_style: string | null
+          dnr_flagged: boolean
+          dnr_note: string | null
+          dnr_reason: string | null
+          entity_id: string
+          preferred_channel: string | null
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          auto_filled_fields?: string[]
+          communication_style?: string | null
+          dnr_flagged?: boolean
+          dnr_note?: string | null
+          dnr_reason?: string | null
+          entity_id: string
+          preferred_channel?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          auto_filled_fields?: string[]
+          communication_style?: string | null
+          dnr_flagged?: boolean
+          dnr_note?: string | null
+          dnr_reason?: string | null
+          entity_id?: string
+          preferred_channel?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_working_notes_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      upsert_entity_working_notes: {
+        Args: {
+          p_communication_style?: string
+          p_dnr_flagged?: boolean
+          p_dnr_note?: string
+          p_dnr_reason?: string
+          p_entity_id: string
+          p_preferred_channel?: string
+          p_source?: string
+          p_workspace_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

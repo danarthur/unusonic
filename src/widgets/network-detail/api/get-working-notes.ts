@@ -7,7 +7,7 @@
  *   • dnr — flagged + reason + note ("paid late, three invoices")
  *   • preferred_channel — call / email / sms
  *
- * Storage: `cortex.entity_working_notes`, keyed on (workspace_id, entity_id).
+ * Storage: `directory.entity_working_notes`, keyed on (workspace_id, entity_id).
  * Reads use RLS (workspace members SELECT). Writes via RPC — see
  * update-working-notes.ts.
  *
@@ -89,7 +89,7 @@ export async function getWorkingNotes(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
-    .schema('cortex')
+    .schema('directory')
     .from('entity_working_notes')
     .select(
       'communication_style, dnr_flagged, dnr_reason, dnr_note, preferred_channel, updated_at, updated_by, auto_filled_fields',

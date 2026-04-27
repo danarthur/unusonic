@@ -85,7 +85,7 @@ async function autoFillWorkingNotes(
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: existing } = await supabase
-    .schema('cortex')
+    .schema('directory')
     .from('entity_working_notes')
     .select('communication_style, dnr_flagged, dnr_reason, preferred_channel')
     .eq('workspace_id', workspaceId)
@@ -128,7 +128,7 @@ async function autoFillWorkingNotes(
   if (Object.keys(patch).length === 0) return;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await supabase.schema('cortex').rpc('upsert_entity_working_notes', {
+  await supabase.schema('directory').rpc('upsert_entity_working_notes', {
     p_workspace_id: workspaceId,
     p_entity_id: entityId,
     p_communication_style: patch.p_communication_style ?? null,

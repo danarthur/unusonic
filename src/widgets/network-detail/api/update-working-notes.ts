@@ -51,7 +51,7 @@ export async function updateWorkingNotes(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
-    .schema('cortex')
+    .schema('directory')
     .rpc('upsert_entity_working_notes', {
       p_workspace_id: workspaceId,
       p_entity_id: entityId,
