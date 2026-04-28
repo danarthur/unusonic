@@ -376,9 +376,20 @@ export function DealLens({
   useEffect(() => {
     if (!deal?.id) return;
     let cancelled = false;
-    getAionCardBundle(deal.id).then((b) => {
-      if (!cancelled) setAionBundle(b);
-    });
+    getAionCardBundle(deal.id)
+      .then((b) => {
+        if (!cancelled) setAionBundle(b);
+      })
+      .catch((err) => {
+        // Surface failures rather than swallowing them — without the catch
+        // the .then chain disappears silently when the action throws, leaving
+        // the Aion slot empty and confusing the user. On error we keep
+        // `enabled: true` so the defensive fallback in the JSX still renders
+        // a quiet "watching" placeholder.
+        // eslint-disable-next-line no-console
+        console.error('[Aion bundle] failed to resolve', { dealId: deal.id, error: err });
+        if (!cancelled) setAionBundle({ enabled: true, data: null });
+      });
     return () => {
       cancelled = true;
     };
