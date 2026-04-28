@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, User, Heart, Music } from 'lucide-react';
+import { Building2, User, Users, Music } from 'lucide-react';
 import { Command } from 'cmdk';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { cn } from '@/shared/lib/utils';
@@ -22,7 +22,7 @@ interface Q1PillsProps {
 export function Q1HostKindPills({ hostKind, onChange, pillBase, pillActive, pillInactive }: Q1PillsProps) {
   const opts: Array<{ value: HostKind; label: string; full: string; Icon: typeof User }> = [
     { value: 'individual', label: 'Individual', full: 'Individual host', Icon: User },
-    { value: 'couple', label: 'Couple', full: 'Couple or pair', Icon: Heart },
+    { value: 'couple', label: 'Pair', full: 'Two hosts — couple, family, or co-hosts', Icon: Users },
     { value: 'company', label: 'Company', full: 'Corporate or organisational client', Icon: Building2 },
     { value: 'venue_concert', label: 'Performers', full: 'Performers playing a venue (concert / festival — venue or promoter is the client)', Icon: Music },
   ];

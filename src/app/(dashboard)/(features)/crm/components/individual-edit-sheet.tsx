@@ -102,7 +102,7 @@ export function IndividualEditSheet({ open, onOpenChange, entityId, initialValue
               <p className="stage-label">Client type</p>
               <p className="text-xs text-[var(--stage-text-secondary)]/70">Switch if this client was entered as the wrong type.</p>
               <div className="flex gap-2">
-                {([['company', 'Company'], ['couple', 'Couple']] as const).map(([type, label]) => (
+                {([['company', 'Company'], ['couple', 'Pair']] as const).map(([type, label]) => (
                   <button
                     key={type}
                     type="button"
