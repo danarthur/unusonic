@@ -345,8 +345,13 @@ function AionDealCardImpl({
   // Archive + no outbound = nothing to show
   if (context === 'archive' && !hasOutbound) return null;
 
-  // Collapsed variant
-  if (data.variant === 'collapsed' || (!hasOutbound && !hasPipeline)) return null;
+  // No outbound and no pipeline → render the quiet "watching" empty state
+  // instead of nothing, so users on a fresh deal know Aion is here even
+  // though there's nothing actionable yet. Without this, brand-new deals
+  // looked like "Aion is broken on this deal" — confusing UX.
+  if (data.variant === 'collapsed' || (!hasOutbound && !hasPipeline)) {
+    return <AionEmptyCard data={data} dealTitle={dealTitle} />;
+  }
 
   // Pipeline-only (no outbound) → single-line advance affordance, no briefing
   if (data.variant === 'pipeline_only' && hasPipeline && !hasOutbound) {
@@ -607,6 +612,127 @@ export const AionDealCard = React.memo(AionDealCardImpl);
 // ---------------------------------------------------------------------------
 // Header — AionMark + voice paragraph
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// AionEmptyCard — quiet "watching" state for deals with no signals yet
+// ---------------------------------------------------------------------------
+// Rendered when the deal has zero outbound follow-ups and zero pipeline
+// suggestions (variant === 'collapsed'). Without this, new deals looked
+// like "Aion is broken" — silent omission was confusing UX. The empty
+// state explains what Aion is doing right now and sets expectations.
+//
+// Copy is stage-aware: a fresh inquiry gets different language than a
+// deal post-handoff. All variants share the same structure (AionMark + one
+// quiet sentence) so the visual identity is consistent.
+function AionEmptyCard({
+  data,
+  dealTitle,
+}: {
+  data: AionCardData;
+  dealTitle?: string | null;
+}) {
+  const bp = useBreakpoint();
+  const stageLabel = data.stall?.stageLabel ?? null;
+  const daysOut = data.urgency.daysOut;
+  const message = composeAionEmptyMessage(stageLabel, daysOut);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={STAGE_MEDIUM}
+    >
+      <StagePanel elevated padding="md">
+        {bp === 'mobile' && (
+          <div className="flex items-center gap-2 mb-3">
+            <AionMark size={40} status="loading" />
+            <span
+              className="stage-label tracking-wide uppercase"
+              style={{
+                fontSize: '11px',
+                color: 'var(--stage-text-tertiary, var(--stage-text-secondary))',
+              }}
+            >
+              Aion
+            </span>
+          </div>
+        )}
+        <div className="flex flex-col md:flex-row md:items-center md:gap-5">
+          {bp !== 'mobile' && (
+            <div className="shrink-0 flex flex-col items-center w-[72px] lg:w-[88px]">
+              <span
+                className="stage-label tracking-wide uppercase"
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--stage-text-tertiary, var(--stage-text-secondary))',
+                }}
+              >
+                Aion
+              </span>
+              <div className="flex-1 flex items-center justify-center">
+                <AionMark size={bp === 'tablet' ? 56 : 72} status="loading" />
+              </div>
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p
+              className="leading-snug"
+              style={{
+                fontSize: '14px',
+                color: 'var(--stage-text-secondary)',
+                fontStyle: 'italic',
+              }}
+            >
+              {message}
+            </p>
+            {dealTitle && (
+              <p
+                className="mt-2 stage-label tracking-wide uppercase"
+                style={{
+                  fontSize: '10px',
+                  color: 'var(--stage-text-tertiary)',
+                }}
+              >
+                Watching {dealTitle}
+              </p>
+            )}
+          </div>
+        </div>
+      </StagePanel>
+    </motion.div>
+  );
+}
+
+/** Pure copy logic for the empty state. Stage-aware so the message reads
+ *  like Aion knows where the deal is. Intentionally short, declarative,
+ *  no exclamation. */
+function composeAionEmptyMessage(
+  stageLabel: string | null,
+  daysOut: number | null,
+): string {
+  const stage = (stageLabel ?? '').toLowerCase();
+
+  // Late-stage / progressing deals — owner has done the work, just watching.
+  if (stage.includes('contract') || stage.includes('signed') || stage.includes('deposit') || stage.includes('won')) {
+    if (daysOut != null && daysOut > 0 && daysOut <= 30) {
+      return `Quiet for now — deal's progressing. I'll flag anything that needs attention before show day.`;
+    }
+    return `Quiet for now — deal's progressing. I'll flag if anything stalls.`;
+  }
+
+  // Proposal-sent stages — waiting on client engagement.
+  if (stage.includes('proposal') || stage.includes('sent')) {
+    return `Waiting on the client. I'll surface follow-up timing if it goes quiet.`;
+  }
+
+  // Inquiry / pre-proposal — fresh deal, no proposal yet.
+  if (stage.includes('inquiry') || stage.includes('initial') || stage.includes('lead')) {
+    return `No nudges yet — once you send a proposal, I'll surface follow-up timing and flag anything important.`;
+  }
+
+  // Generic fallback — covers unknown stage names and freshly-created deals.
+  return `Watching this deal. I'll surface anything important as it develops.`;
+}
 
 // VoiceParagraph — Aion's narrative, prose-only. Identity lives in the TopBar.
 function VoiceParagraph({ voice }: { voice: string }) {
