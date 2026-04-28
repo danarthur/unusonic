@@ -587,7 +587,13 @@ export function DealLens({
       {/* Position 2a: Aion card — a panel of its own when the beta is on.
           Sits between the pipeline tracker and the activity log so its
           primary read is "what Aion thinks about this deal," distinct from
-          the factual pipeline state above. */}
+          the factual pipeline state above.
+
+          Renders as long as the flag is enabled, regardless of whether the
+          resolver returned data. When data is null (rare — only when the
+          deal/workspace check fails inside resolveAionCardForDeal), we
+          fall back to AionFallbackCard with a generic "watching" message
+          so the user sees Aion is here even on edge-case deals. */}
       {aionBundle.enabled && aionBundle.data && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -710,6 +716,46 @@ export function DealLens({
               getAionCardBundle(deal.id).then(setAionBundle);
             }}
           />
+        </motion.div>
+      )}
+
+      {/* Defensive fallback: flag enabled but data resolution returned null.
+          Rare in practice (only when the resolver hits an edge case in the
+          deal/workspace check) but without it the user sees an unexplained
+          empty space where the Aion card should be. */}
+      {aionBundle.enabled && !aionBundle.data && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={STAGE_MEDIUM}
+        >
+          <StagePanel elevated padding="md">
+            <div className="flex items-center gap-3">
+              <div
+                className="size-2 rounded-full"
+                style={{ background: 'var(--stage-text-tertiary)' }}
+                aria-hidden
+              />
+              <span
+                className="stage-label tracking-wide uppercase"
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--stage-text-tertiary)',
+                }}
+              >
+                Aion
+              </span>
+              <span
+                className="leading-snug italic"
+                style={{
+                  fontSize: '13px',
+                  color: 'var(--stage-text-secondary)',
+                }}
+              >
+                Watching this deal. I&apos;ll surface anything important as it develops.
+              </span>
+            </div>
+          </StagePanel>
         </motion.div>
       )}
 
