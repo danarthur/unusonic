@@ -359,40 +359,28 @@ export function DealLens({
   }, [deal?.id]);
 
   // Fork C bundle — flag check + card data in one round-trip.
-  // Deferred to idle: this is a heavy multi-join (follow_up_queue +
-  // cortex.aion_insights + ops.events + proposals + cadence) that isn't
-  // critical-path UI. Letting the deal paint first and filling the Aion card
-  // in afterward saves ~200ms of perceived load time on every deal navigation.
+  //
+  // History note: previously deferred via requestIdleCallback (Phase 4) on
+  // the assumption that cellular-bound users would benefit from the
+  // primary deal block painting first. Real-world testing on WiFi
+  // (2026-04-27) showed the trade-off inverts: requestIdleCallback on a
+  // busy hydration page often doesn't fire until the 1500ms safety timeout,
+  // which produces a *visible wave* — the Aion card pops in 1-2s after
+  // everything else. Users perceived this as "loading in sections."
+  //
+  // Reverting to eager fetch on deal.id change. The Aion card can still
+  // render its own skeleton internally if needed, but the FETCH starts
+  // alongside everything else so it lands in the same coordinated paint
+  // window. ~150-300ms slower first paint in exchange for one less wave —
+  // worth it per User Advocate research ("never show intermediate states").
   useEffect(() => {
     if (!deal?.id) return;
     let cancelled = false;
-    let idleId: number | null = null;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const fire = () => {
-      if (cancelled) return;
-      getAionCardBundle(deal.id).then((b) => {
-        if (!cancelled) setAionBundle(b);
-      });
-    };
-
-    // requestIdleCallback runs after the browser is done painting + handling
-    // critical input. timeout: 1500 means at-most-1.5s delay if the page never
-    // goes idle. Safari shim falls through to setTimeout(200ms) — same intent.
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      idleId = (window as Window & {
-        requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number;
-      }).requestIdleCallback(fire, { timeout: 1500 });
-    } else {
-      timeoutId = setTimeout(fire, 200);
-    }
-
+    getAionCardBundle(deal.id).then((b) => {
+      if (!cancelled) setAionBundle(b);
+    });
     return () => {
       cancelled = true;
-      if (idleId != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
-        (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleId);
-      }
-      if (timeoutId != null) clearTimeout(timeoutId);
     };
   }, [deal?.id]);
 

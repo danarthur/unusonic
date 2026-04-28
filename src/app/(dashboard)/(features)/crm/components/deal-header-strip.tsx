@@ -703,7 +703,12 @@ export function DealHeaderStrip({
     );
   };
 
-  const ownerLabel = ownerEntityId ? ownerName ?? 'Loading…' : null;
+  // Owner label resolves async via getEntityDisplayName. Returning null
+  // during the resolve window (rather than a "Loading…" placeholder) avoids
+  // a visible wave — the owner field stays empty for ~200ms then the name
+  // appears, instead of "Loading…" flashing first. Same pattern used for
+  // the activity timeline (User Advocate: "never show intermediate states").
+  const ownerLabel = ownerEntityId && ownerName ? ownerName : null;
 
   // Field-on-surface pattern: labels + values sit directly on the panel.
   const fieldLabel =
@@ -984,6 +989,12 @@ export function DealHeaderStrip({
                     <div className="flex items-center gap-1.5 min-w-0">
                       <User className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
                       <span className="stage-readout truncate">{ownerLabel}</span>
+                    </div>
+                  ) : ownerEntityId ? (
+                    // Owner assigned but name still resolving — show just the
+                    // icon as a quiet placeholder. No "Loading…" text flash.
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <User className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
                     </div>
                   ) : (
                     <span className={emptyValue}>
