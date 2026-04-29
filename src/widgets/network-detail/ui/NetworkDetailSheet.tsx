@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileEdit, Globe, Pencil, Send, Phone, Mail, Clock } from 'lucide-react';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
@@ -544,11 +544,16 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<TabId>('transmission');
 
-  // Fetch details via useQuery when nodeId/kind are provided; fall back to prop
-  const { data: queryDetails } = useQuery({
+  // Fetch details via useQuery when nodeId/kind are provided; fall back to prop.
+  // `placeholderData: keepPreviousData` holds the previous entity's payload
+  // visible while the new fetch is in flight so sibling-switch (entity A →
+  // entity B with the sheet open) doesn't flash a skeleton between them.
+  // See docs/reference/code/perf-patterns.md §2 for the canonical pattern.
+  const { data: queryDetails, isFetching } = useQuery({
     ...networkQueries.nodeDetail(workspaceId ?? '', nodeId ?? '', kind ?? 'external_partner', sourceOrgId),
     enabled: !!nodeId && !!kind && !!workspaceId,
     initialData: detailsProp ?? undefined,
+    placeholderData: keepPreviousData,
   });
   const details = queryDetails ?? detailsProp;
 

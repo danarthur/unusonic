@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useOptimistic } from 'react';
+import { useCallback, useRef, useState, useTransition, useOptimistic } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowUpDown, ChevronDown } from 'lucide-react';
@@ -123,6 +123,13 @@ type OptimisticAction =
 interface StreamLayoutProps {
   nodes: NetworkNode[];
   onNodeClick?: (node: NetworkNode) => void;
+  /**
+   * Optional hover callback fired after a 150ms intent delay. Used by the
+   * orbit view to prefetch the network-detail bundle so the sheet opens
+   * with warm data when the click lands. Per perf-patterns.md §4 (three-tier
+   * anticipatory prefetch).
+   */
+  onNodeHover?: (node: NetworkNode) => void;
   onUnpin?: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
   onPin?: (relationshipId: string) => Promise<{ ok: boolean; error?: string }>;
   hasIdentity?: boolean;
@@ -135,6 +142,7 @@ interface StreamLayoutProps {
 export function StreamLayout({
   nodes,
   onNodeClick,
+  onNodeHover,
   onUnpin,
   onPin,
   hasIdentity = false,
@@ -144,6 +152,25 @@ export function StreamLayout({
   onOpenProfile,
 }: StreamLayoutProps) {
   const router = useRouter();
+
+  // Hover prefetch with intent delay — fires onNodeHover only after the
+  // pointer has rested on a card for 150ms. Cancels if the pointer leaves
+  // before the timer fires, so accidental fly-overs don't trigger fetches.
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleNodeHoverEnter = useCallback(
+    (node: NetworkNode) => {
+      if (!onNodeHover) return;
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = setTimeout(() => onNodeHover(node), 150);
+    },
+    [onNodeHover],
+  );
+  const handleNodeHoverLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
   const [, startTransition] = useTransition();
   const [activeFilter, setActiveFilter] = useState<FilterId>('all');
   const [sort, setSort] = useState<SortId>('relationship');
@@ -331,7 +358,12 @@ export function StreamLayout({
                         )}
                         <div className="grid grid-cols-2 gap-[var(--stage-gap)] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                           {groupNodes.map((node) => (
-                            <div key={node.id} className="h-full">
+                            <div
+                              key={node.id}
+                              className="h-full"
+                              onMouseEnter={() => handleNodeHoverEnter(node)}
+                              onMouseLeave={handleNodeHoverLeave}
+                            >
                               <NetworkCard
                                 node={node}
                                 layoutId={`node-${node.id}`}
@@ -413,7 +445,12 @@ export function StreamLayout({
                   {displayedInnerCircle.length > 0 ? (
                     <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                       {displayedInnerCircle.map((node) => (
-                        <div key={node.id} className="h-full">
+                        <div
+                          key={node.id}
+                          className="h-full"
+                          onMouseEnter={() => handleNodeHoverEnter(node)}
+                          onMouseLeave={handleNodeHoverLeave}
+                        >
                           <NetworkCard
                             node={node}
                             layoutId={`node-${node.id}`}
@@ -567,7 +604,12 @@ export function StreamLayout({
                         className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                       >
                         {displayedNetwork.map((node) => (
-                          <div key={node.id} className="h-full">
+                          <div
+                            key={node.id}
+                            className="h-full"
+                            onMouseEnter={() => handleNodeHoverEnter(node)}
+                            onMouseLeave={handleNodeHoverLeave}
+                          >
                             <NetworkCard
                               node={node}
                               layoutId={`node-${node.id}`}

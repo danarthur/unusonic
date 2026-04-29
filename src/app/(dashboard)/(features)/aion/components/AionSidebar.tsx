@@ -135,6 +135,14 @@ interface AionSidebarProps {
   sessions: SessionMeta[];
   currentSessionId: string;
   onSelect: (id: string) => void;
+  /**
+   * Optional hover-prefetch callback — fired after a 150ms intent delay so
+   * accidental fly-overs don't trigger fetches. The handler should warm the
+   * session's messages cache (e.g. by calling getSessionMessages and writing
+   * to localStorage) so the subsequent click resolves from cache instead of
+   * the DB. perf-patterns.md §4.
+   */
+  onHoverPrefetch?: (id: string) => void;
   onNewChat: () => void;
   onDelete: (id: string) => void;
   /** Fired when the user clicks the "+" on a deal group header. Creates a
@@ -158,6 +166,7 @@ export function AionSidebar({
   sessions,
   currentSessionId,
   onSelect,
+  onHoverPrefetch,
   onNewChat,
   onDelete,
   onNewScopedChat,
@@ -171,6 +180,24 @@ export function AionSidebar({
   const workspaceId = useRequiredWorkspace();
   const [search, setSearch] = useState('');
   const [collapsedDeals, setCollapsedDeals] = useState<Set<string>>(() => new Set());
+
+  // Single shared timer ref so moving the pointer between rows doesn't race
+  // multiple in-flight fetches. The most-recent hover wins.
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleHoverStart = useCallback(
+    (id: string) => {
+      if (!onHoverPrefetch) return;
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = setTimeout(() => onHoverPrefetch(id), 150);
+    },
+    [onHoverPrefetch],
+  );
+  const handleHoverEnd = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
 
   // Archived view — hidden by default (Field Expert: "archived stay searchable
   // but don't clutter the per-deal list"). Loaded lazily on first toggle.
@@ -389,6 +416,8 @@ export function AionSidebar({
                             onUnpin={onUnpin}
                             onArchive={onArchive}
                             onContinueInNewChat={onContinueInNewChat}
+                            onHoverStart={handleHoverStart}
+                            onHoverEnd={handleHoverEnd}
                           />
                         ))}
                       </div>
@@ -417,6 +446,8 @@ export function AionSidebar({
                             onUnpin={onUnpin}
                             onArchive={onArchive}
                             onContinueInNewChat={onContinueInNewChat}
+                            onHoverStart={handleHoverStart}
+                            onHoverEnd={handleHoverEnd}
                           />
                         ))}
                       </div>
@@ -439,6 +470,8 @@ export function AionSidebar({
                             onUnpin={onUnpin}
                             onArchive={onArchive}
                             onContinueInNewChat={onContinueInNewChat}
+                            onHoverStart={handleHoverStart}
+                            onHoverEnd={handleHoverEnd}
                             indented={false}
                           />
                         ))}
@@ -515,6 +548,8 @@ function ProductionGroupRow({
   onUnpin,
   onArchive,
   onContinueInNewChat,
+  onHoverStart,
+  onHoverEnd,
 }: {
   group: ProductionGroup;
   currentSessionId: string;
@@ -527,6 +562,8 @@ function ProductionGroupRow({
   onUnpin?: (id: string) => void;
   onArchive?: (id: string) => void;
   onContinueInNewChat?: (id: string) => void;
+  onHoverStart?: (id: string) => void;
+  onHoverEnd?: () => void;
 }) {
   const containsActive = group.sessions.some((s) => s.id === currentSessionId);
 
@@ -589,6 +626,8 @@ function ProductionGroupRow({
               onUnpin={onUnpin}
               onArchive={onArchive}
               onContinueInNewChat={onContinueInNewChat}
+              onHoverStart={onHoverStart}
+              onHoverEnd={onHoverEnd}
               indented
             />
           ))}
@@ -627,6 +666,8 @@ function EventGroupRow({
   onUnpin,
   onArchive,
   onContinueInNewChat,
+  onHoverStart,
+  onHoverEnd,
 }: {
   group: EventGroup;
   currentSessionId: string;
@@ -638,6 +679,8 @@ function EventGroupRow({
   onUnpin?: (id: string) => void;
   onArchive?: (id: string) => void;
   onContinueInNewChat?: (id: string) => void;
+  onHoverStart?: (id: string) => void;
+  onHoverEnd?: () => void;
 }) {
   const containsActive = group.sessions.some((s) => s.id === currentSessionId);
   const subtitle = formatEventDateShort(group.eventDate);
@@ -690,6 +733,8 @@ function EventGroupRow({
               onUnpin={onUnpin}
               onArchive={onArchive}
               onContinueInNewChat={onContinueInNewChat}
+              onHoverStart={onHoverStart}
+              onHoverEnd={onHoverEnd}
               indented
             />
           ))}
@@ -712,6 +757,8 @@ function SessionRow({
   onUnpin,
   onArchive,
   onContinueInNewChat,
+  onHoverStart,
+  onHoverEnd,
   indented,
 }: {
   session: SessionMeta;
@@ -722,6 +769,8 @@ function SessionRow({
   onUnpin?: (id: string) => void;
   onArchive?: (id: string) => void;
   onContinueInNewChat?: (id: string) => void;
+  onHoverStart?: (id: string) => void;
+  onHoverEnd?: () => void;
   indented: boolean;
 }) {
   const label = sessionLabel(session);
@@ -736,6 +785,8 @@ function SessionRow({
           : 'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)]',
       )}
       onClick={() => onSelect(session.id)}
+      onMouseEnter={onHoverStart ? () => onHoverStart(session.id) : undefined}
+      onMouseLeave={onHoverEnd}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') onSelect(session.id); }}

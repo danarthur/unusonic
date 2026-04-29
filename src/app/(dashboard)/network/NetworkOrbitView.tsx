@@ -1,7 +1,11 @@
 'use client';
 
+import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { StreamLayout } from '@/widgets/network-stream';
+import { networkQueries } from '@/features/network-data/api/queries';
+import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import type { NetworkNode } from '@/entities/network';
 
 interface NetworkOrbitViewProps {
@@ -24,16 +28,33 @@ interface NetworkOrbitViewProps {
  */
 export function NetworkOrbitView({ nodes, onUnpin, onPin, sourceOrgId, hasIdentity = false, hasTeam = false, brandColor = null, onOpenOmni, onOpenProfile }: NetworkOrbitViewProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { workspaceId } = useWorkspace();
 
   const handleNodeClick = (node: NetworkNode) => {
     router.push(`/network?nodeId=${encodeURIComponent(node.id)}&kind=${encodeURIComponent(node.kind)}`);
   };
+
+  // Hover prefetch — by the time the click lands, the network-detail bundle
+  // is already warm in TanStack Query cache. The 150ms intent delay lives in
+  // StreamLayout so accidental fly-overs don't trigger fetches.
+  // perf-patterns.md §4.
+  const handleNodeHover = useCallback(
+    (node: NetworkNode) => {
+      if (!workspaceId) return;
+      queryClient.prefetchQuery(
+        networkQueries.nodeDetail(workspaceId, node.id, node.kind, sourceOrgId),
+      );
+    },
+    [queryClient, workspaceId, sourceOrgId],
+  );
 
   return (
     <>
       <StreamLayout
         nodes={nodes}
         onNodeClick={handleNodeClick}
+        onNodeHover={handleNodeHover}
         onUnpin={onUnpin}
         onPin={onPin}
         hasIdentity={hasIdentity}

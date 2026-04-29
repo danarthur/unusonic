@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { networkQueries } from '@/features/network-data/api/queries';
+import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { motion } from 'framer-motion';
 import { Plus, Building2, ChevronRight, X, User, Pencil, Loader2, MapPin, Network } from 'lucide-react';
 import { OmniSearch } from '@/widgets/network-stream';
@@ -74,6 +77,31 @@ export function StakeholderGrid({
 }: StakeholderGridProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const { workspaceId } = useWorkspace();
+
+  // Hover prefetch for the linked-client card (and any other Network-detail
+  // entry points in this grid). Same 150ms intent-delay pattern as the orbit
+  // view; perf-patterns.md §4.
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleNodePrefetch = useCallback(
+    (nodeId: string, kind: 'internal_employee' | 'extended_team' | 'external_partner') => {
+      if (!workspaceId || !sourceOrgId) return;
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = setTimeout(() => {
+        queryClient.prefetchQuery(
+          networkQueries.nodeDetail(workspaceId, nodeId, kind, sourceOrgId),
+        );
+      }, 150);
+    },
+    [queryClient, workspaceId, sourceOrgId],
+  );
+  const handleNodePrefetchCancel = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
   const [omniOpen, setOmniOpen] = useState(false);
   const [setupHintOpen, setSetupHintOpen] = useState(false);
   const [contactSheetOpen, setContactSheetOpen] = useState(false);
@@ -407,6 +435,8 @@ export function StakeholderGrid({
               <Link
                 href={`/crm?nodeId=${client.relationshipId}&kind=external_partner`}
                 className={cn('flex items-center gap-3', cardClass)}
+                onMouseEnter={() => handleNodePrefetch(client.relationshipId!, 'external_partner')}
+                onMouseLeave={handleNodePrefetchCancel}
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-primary)] font-medium text-sm tracking-tight">
                   {initials(client.organization.name)}

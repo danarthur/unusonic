@@ -77,8 +77,9 @@ interface ChatInterfaceProps {
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspaceId, scopeHeaderVariant = 'full' }) => {
   const {
-    messages, isLoading, addMessage, startNewChat, setWorkspaceId,
+    messages, isLoading, isLoadingSession, addMessage, startNewChat, setWorkspaceId,
     sendChatMessage, sendMessage, sessions, currentSessionId, selectSession,
+    prefetchSession,
     removeSession, createNewScopedChat,
     pinSession, unpinSession, archiveSession, continueSessionInNewChat,
     editAndResend, retryLastMessage, cancelStreaming, streamingMessageId, activeToolLabel,
@@ -296,7 +297,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
     }
   }, []);
 
-  const isEmpty = messages.length === 0;
+  // While the post-selectSession DB fetch is mid-flight on a session that
+  // wasn't in localStorage, hold the empty-landing back so the user doesn't
+  // see a (briefly) misleading "this session is empty" state. The thread
+  // skeleton below replaces it during this window. perf-patterns.md §14.
+  const isEmpty = messages.length === 0 && !isLoadingSession;
 
   return (
     <div className="flex h-full w-full">
@@ -305,6 +310,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
         sessions={sessions}
         currentSessionId={currentSessionId}
         onSelect={handleSelectSession}
+        onHoverPrefetch={prefetchSession}
         onNewChat={handleNewChat}
         onDelete={removeSession}
         onNewScopedChat={({ scopeType, scopeEntityId }) => {
@@ -398,8 +404,31 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ viewState, workspa
             </div>
           )}
 
+          {/* Thread skeleton — shown only during the brief window where the
+              post-selectSession DB fetch is in flight on a cache-miss. Three
+              placeholder bubbles match the message-row shape so the eye
+              doesn't re-parse layout when content arrives. */}
+          {isLoadingSession && messages.length === 0 && (
+            <div className="flex-1 overflow-y-auto py-10 scrollbar-hide pb-36">
+              <div className="max-w-2xl mx-auto px-6 space-y-4">
+                <div className="flex justify-end">
+                  <div className="stage-skeleton h-10 w-2/5 rounded-2xl" />
+                </div>
+                <div className="flex justify-start">
+                  <div className="stage-skeleton h-16 w-4/5 rounded-2xl" />
+                </div>
+                <div className="flex justify-end">
+                  <div className="stage-skeleton h-8 w-1/3 rounded-2xl" />
+                </div>
+                <div className="flex justify-start">
+                  <div className="stage-skeleton h-20 w-3/4 rounded-2xl" />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Message stream */}
-          {!isEmpty && (
+          {!isEmpty && messages.length > 0 && (
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-10 scrollbar-hide pb-36">
               <div className="max-w-2xl mx-auto px-6 space-y-4">
                 <AnimatePresence initial={false}>

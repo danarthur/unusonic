@@ -80,6 +80,16 @@ interface SessionContextType {
   sessions: SessionMeta[];
   currentSessionId: string;
   isLoading: boolean;
+  /**
+   * True while the post-`selectSession` DB fetch is in flight for a session
+   * that wasn't in localStorage. Drives the streaming-first sibling-switch
+   * pattern: ChatInterface renders a thread skeleton instead of the empty
+   * landing screen during this window so the user doesn't see the (briefly)
+   * empty `messages` array as a real "this session is empty" state.
+   * See docs/reference/code/perf-patterns.md §14 (planned) and
+   * docs/reference/load-time-strategy.md §8.
+   */
+  isLoadingSession: boolean;
   /** ID of the message currently being streamed (null when not streaming) */
   streamingMessageId: string | null;
   /** Label of the tool currently being executed (null when idle) */
@@ -114,6 +124,13 @@ interface SessionContextType {
     title?: string | null;
   }) => Promise<string | null>;
   selectSession: (sessionId: string) => void;
+  /**
+   * Hover prefetch — fires getSessionMessages and writes the result to
+   * localStorage so the next selectSession() resolves from cache instead of
+   * paying the DB round-trip. Idempotent + safe to call concurrently;
+   * silently no-ops if the session's messages are already cached.
+   */
+  prefetchSession: (sessionId: string) => void;
   /** Hard-delete — permanent removal. Existing Trash2 affordance in the sidebar. */
   removeSession: (sessionId: string) => void;
   /** Soft-delete — stamps archived_at, preserves history, drops from sidebar. */
@@ -232,6 +249,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [activeToolLabel, setActiveToolLabel] = useState<string | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [modelMode, setModelMode] = useState<AionModelMode>('auto');
   const [viewState, setViewState] = useState<'overview' | 'chat'>('overview');
   const [sessionId, setSessionId] = useState('server');
@@ -316,6 +334,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const raw = window.localStorage.getItem(storage.messagesKey(sessionId));
       if (raw) {
         setMessages(JSON.parse(raw) as Message[]);
+        setIsLoadingSession(false);
         setSessions(prev => {
           if (prev.some(s => s.id === sessionId)) return prev;
           const now = Date.now();
@@ -325,20 +344,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     } catch { /* fall through to DB */ }
 
-    // Not in localStorage — try loading from DB
+    // Not in localStorage — DB-only path. Streaming-first sibling switch
+    // (load-time-strategy.md §8): blank messages immediately so the body
+    // doesn't show the previous session's data, but flag isLoadingSession so
+    // ChatInterface renders a thread skeleton instead of the (potentially
+    // misleading) empty landing screen until DB returns.
     setMessages([]);
-    getSessionMessages(sessionId).then((result) => {
-      if (!result.success || result.messages.length === 0) return;
-      const loaded: Message[] = result.messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        ...(m.structured_content ? { structured: m.structured_content } : {}),
-      }));
-      setMessages(loaded);
-      try { window.localStorage.setItem(storage.messagesKey(sessionId), JSON.stringify(loaded)); } catch { /* ignore */ }
-    }).catch(() => { /* DB unavailable */ });
+    setIsLoadingSession(true);
+    getSessionMessages(sessionId)
+      .then((result) => {
+        if (!result.success || result.messages.length === 0) {
+          // Genuinely empty session (or DB error) — empty landing is correct.
+          setIsLoadingSession(false);
+          return;
+        }
+        const loaded: Message[] = result.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          ...(m.structured_content ? { structured: m.structured_content } : {}),
+        }));
+        setMessages(loaded);
+        setIsLoadingSession(false);
+        try { window.localStorage.setItem(storage.messagesKey(sessionId), JSON.stringify(loaded)); } catch { /* ignore */ }
+      })
+      .catch(() => {
+        // DB unavailable — fall back to empty landing (no skeleton hold).
+        setIsLoadingSession(false);
+      });
 
     setSessions(prev => {
       if (prev.some(s => s.id === sessionId)) return prev;
@@ -448,6 +482,48 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(storage.currentSessionKey, targetSessionId);
     setSessionId(targetSessionId);
   };
+
+  /**
+   * Hover prefetch — warms the session's localStorage cache so the next
+   * selectSession() falls through the fast path at line ~316. Skipped when
+   * we already have the data (cache hit) or when the user is currently on
+   * the session being prefetched (would clobber in-progress streaming).
+   * perf-patterns.md §4.
+   */
+  const prefetchSession = useCallback(
+    (targetSessionId: string) => {
+      if (!isHydrated) return;
+      if (targetSessionId === sessionId) return; // already current
+      try {
+        if (window.localStorage.getItem(storage.messagesKey(targetSessionId))) {
+          return; // already cached
+        }
+      } catch { /* localStorage blocked — fall through to fetch anyway */ }
+
+      getSessionMessages(targetSessionId)
+        .then((result) => {
+          if (!result.success || result.messages.length === 0) return;
+          const loaded: Message[] = result.messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.created_at).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            ...(m.structured_content ? { structured: m.structured_content } : {}),
+          }));
+          try {
+            window.localStorage.setItem(
+              storage.messagesKey(targetSessionId),
+              JSON.stringify(loaded),
+            );
+          } catch { /* ignore */ }
+        })
+        .catch(() => { /* DB unavailable — silent no-op */ });
+    },
+    [isHydrated, sessionId, storage],
+  );
 
   /**
    * Resume-or-create a scope-linked session. Routed through the
@@ -1037,6 +1113,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sessions,
       currentSessionId: sessionId,
       isLoading,
+      isLoadingSession,
       streamingMessageId,
       activeToolLabel,
       setIsLoading,
@@ -1047,6 +1124,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       openScopedSession,
       createNewScopedChat,
       selectSession,
+      prefetchSession,
       removeSession,
       archiveSession,
       pinSession,
