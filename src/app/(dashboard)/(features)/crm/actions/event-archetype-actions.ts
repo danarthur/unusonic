@@ -25,16 +25,27 @@ function toRow(row: DbRow): EventArchetypeRow {
   };
 }
 
-/**
- * List active event archetypes for a workspace: system rows + the workspace's
- * own custom rows, omitting archived. Sorted: system first (alpha), then
- * custom (alpha). Callers render into the EventTypeCombobox dropdown.
- */
-export async function listWorkspaceEventArchetypes(
-  workspaceIdOverride?: string,
+// Module-level cache (Phase 1, load-time-strategy.md §3.3 invalidation matrix).
+// Event archetypes are workspace-immutable from the user's session perspective;
+// they only change via Settings → Event types. Mirrors get-workspace-pipeline-
+// stages and lead-source-actions: 5-min TTL Map keyed by workspace_id.
+// Mutations below explicitly invalidate so settings edits show immediately.
+type ArchetypeCachedEntry = {
+  data: EventArchetypeRow[];
+  expiresAt: number;
+};
+const ARCHETYPE_CACHE = new Map<string, ArchetypeCachedEntry>();
+const ARCHETYPE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function invalidateWorkspaceEventArchetypeCache(
+  workspaceId: string,
+): Promise<void> {
+  ARCHETYPE_CACHE.delete(workspaceId);
+}
+
+async function fetchWorkspaceEventArchetypesUncached(
+  workspaceId: string,
 ): Promise<EventArchetypeRow[]> {
-  const workspaceId = workspaceIdOverride ?? (await getActiveWorkspaceId());
-  if (!workspaceId) return [];
   const supabase = await createClient();
   const { data, error } = await supabase
     .schema('ops')
@@ -49,6 +60,29 @@ export async function listWorkspaceEventArchetypes(
     return [];
   }
   return ((data ?? []) as DbRow[]).map(toRow);
+}
+
+/**
+ * List active event archetypes for a workspace: system rows + the workspace's
+ * own custom rows, omitting archived. Sorted: system first (alpha), then
+ * custom (alpha). Callers render into the EventTypeCombobox dropdown.
+ */
+export async function listWorkspaceEventArchetypes(
+  workspaceIdOverride?: string,
+): Promise<EventArchetypeRow[]> {
+  const workspaceId = workspaceIdOverride ?? (await getActiveWorkspaceId());
+  if (!workspaceId) return [];
+
+  const now = Date.now();
+  const cached = ARCHETYPE_CACHE.get(workspaceId);
+  if (cached && cached.expiresAt > now) return cached.data;
+
+  const data = await fetchWorkspaceEventArchetypesUncached(workspaceId);
+  ARCHETYPE_CACHE.set(workspaceId, {
+    data,
+    expiresAt: now + ARCHETYPE_CACHE_TTL_MS,
+  });
+  return data;
 }
 
 /**
@@ -73,6 +107,7 @@ export async function upsertWorkspaceEventArchetype(
     return { success: false, error: error.message };
   }
   const row = data as EventArchetypeUpsertResult;
+  await invalidateWorkspaceEventArchetypeCache(workspaceId);
   revalidatePath('/settings/event-types');
   return { success: true, row };
 }
@@ -95,6 +130,7 @@ export async function archiveWorkspaceEventArchetype(
       p_slug: slug,
     });
   if (error) return { success: false, error: error.message };
+  await invalidateWorkspaceEventArchetypeCache(workspaceId);
   revalidatePath('/settings/event-types');
   return { success: true };
 }
@@ -112,6 +148,7 @@ export async function unarchiveWorkspaceEventArchetype(
       p_slug: slug,
     });
   if (error) return { success: false, error: error.message };
+  await invalidateWorkspaceEventArchetypeCache(workspaceId);
   revalidatePath('/settings/event-types');
   return { success: true };
 }
@@ -131,6 +168,7 @@ export async function renameWorkspaceEventArchetype(
       p_new_label: newLabel,
     });
   if (error) return { success: false, error: error.message };
+  await invalidateWorkspaceEventArchetypeCache(workspaceId);
   revalidatePath('/settings/event-types');
   return { success: true };
 }
@@ -160,6 +198,7 @@ export async function mergeWorkspaceEventArchetypes(
     });
   if (error) return { success: false, error: error.message };
   const result = data as { moved_deals?: number } | null;
+  await invalidateWorkspaceEventArchetypeCache(workspaceId);
   revalidatePath('/settings/event-types');
   revalidatePath('/crm');
   return { success: true, movedDeals: result?.moved_deals ?? 0 };

@@ -38,15 +38,36 @@ const renameLeadSourceSchema = z.object({
 });
 
 // =============================================================================
+// Module-level cache (Phase 1, load-time-strategy.md §3.3 invalidation matrix)
+// =============================================================================
+// Lead sources are workspace-immutable from the user's session perspective —
+// they only change via the Settings UI. Mirrors get-workspace-pipeline-stages'
+// pattern: 5-min TTL Map keyed by workspace_id. Mutations below explicitly
+// call invalidateWorkspaceLeadSourcesCache(workspaceId) so users see fresh
+// data immediately after settings edits.
+
+type LeadSourcesCachedEntry = {
+  data: WorkspaceLeadSource[];
+  expiresAt: number;
+};
+const LEAD_SOURCES_CACHE = new Map<string, LeadSourcesCachedEntry>();
+const LEAD_SOURCES_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function invalidateWorkspaceLeadSourcesCache(
+  workspaceId: string,
+): Promise<void> {
+  LEAD_SOURCES_CACHE.delete(workspaceId);
+}
+
+// =============================================================================
 // getWorkspaceLeadSources — all active (non-archived) sources for workspace
 // =============================================================================
 
-export async function getWorkspaceLeadSources(): Promise<WorkspaceLeadSource[]> {
-  const workspaceId = await getActiveWorkspaceId();
-  if (!workspaceId) return [];
-
+async function fetchWorkspaceLeadSourcesUncached(
+  workspaceId: string,
+): Promise<WorkspaceLeadSource[]> {
   const supabase = await createClient();
-   
+
   const { data, error } = await supabase
     .schema('ops')
     .from('workspace_lead_sources')
@@ -62,6 +83,22 @@ export async function getWorkspaceLeadSources(): Promise<WorkspaceLeadSource[]> 
   }
 
   return (data ?? []) as WorkspaceLeadSource[];
+}
+
+export async function getWorkspaceLeadSources(): Promise<WorkspaceLeadSource[]> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return [];
+
+  const now = Date.now();
+  const cached = LEAD_SOURCES_CACHE.get(workspaceId);
+  if (cached && cached.expiresAt > now) return cached.data;
+
+  const data = await fetchWorkspaceLeadSourcesUncached(workspaceId);
+  LEAD_SOURCES_CACHE.set(workspaceId, {
+    data,
+    expiresAt: now + LEAD_SOURCES_CACHE_TTL_MS,
+  });
+  return data;
 }
 
 // =============================================================================
@@ -117,6 +154,7 @@ export async function addWorkspaceLeadSource(
     return { ok: false, error: error.message };
   }
 
+  await invalidateWorkspaceLeadSourcesCache(workspaceId);
   revalidatePath('/settings/lead-sources');
   return { ok: true };
 }
@@ -150,6 +188,7 @@ export async function renameWorkspaceLeadSource(
     return { ok: false, error: error.message };
   }
 
+  await invalidateWorkspaceLeadSourcesCache(workspaceId);
   revalidatePath('/settings/lead-sources');
   return { ok: true };
 }
@@ -177,6 +216,7 @@ export async function archiveWorkspaceLeadSource(
 
   if (error) return { ok: false, error: error.message };
 
+  await invalidateWorkspaceLeadSourcesCache(workspaceId);
   revalidatePath('/settings/lead-sources');
   return { ok: true };
 }
@@ -204,6 +244,7 @@ export async function restoreWorkspaceLeadSource(
 
   if (error) return { ok: false, error: error.message };
 
+  await invalidateWorkspaceLeadSourcesCache(workspaceId);
   revalidatePath('/settings/lead-sources');
   return { ok: true };
 }
@@ -243,6 +284,7 @@ export async function removeWorkspaceLeadSource(
 
   if (error) return { ok: false, error: error.message };
 
+  await invalidateWorkspaceLeadSourcesCache(workspaceId);
   revalidatePath('/settings/lead-sources');
   return { ok: true };
 }
