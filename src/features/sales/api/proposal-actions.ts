@@ -979,6 +979,112 @@ export type SendForSignatureResult =
   | { success: true; publicUrl: string; docusealFallback?: { reason: string } }
   | { success: false; error: string };
 
+/**
+ * Internal helper: re-send an already-sent proposal's link to a recipient.
+ * Skips the publish + DocuSeal submission steps (those happen on first send)
+ * and just re-emails the existing public link, stamps reminder_sent_at,
+ * and stores the new Resend message id for delivery tracking.
+ *
+ * Used by sendForSignature when a draft isn't found but an active proposal
+ * exists. Same shape as the main path's return so callers don't need to
+ * branch on send-vs-resend.
+ */
+async function resendActiveProposal(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  proposalId: string;
+  publicToken: string;
+  workspaceId: string;
+  dealId: string;
+  clientEmail: string;
+  clientName: string;
+}): Promise<SendForSignatureResult> {
+  const { supabase, proposalId, publicToken, workspaceId, dealId, clientEmail, clientName } = params;
+
+  const base = getPublicBaseUrl();
+  const publicUrl = base ? `${base}/p/${publicToken}` : `/p/${publicToken}`;
+
+  // Resolve deal title + organization for branding parity with first send.
+  const { data: dealRow } = await supabase
+    .from('deals')
+    .select('title, event_archetype, organization_id')
+    .eq('id', dealId)
+    .maybeSingle();
+  const deal = dealRow as { title?: string | null; event_archetype?: string | null; organization_id?: string | null } | null;
+  const eventTitle = deal?.title ?? 'Proposal';
+
+  // Sender + workspace for the From line and email shell.
+  const { data: { user } } = await supabase.auth.getUser();
+  const senderEmail = user?.email ?? null;
+  const [senderEntRes, workspaceRes] = await Promise.all([
+    user?.id
+      ? supabase.schema('directory').from('entities')
+          .select('display_name')
+          .eq('claimed_by_user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from('workspaces').select('name').eq('id', workspaceId).maybeSingle(),
+  ]);
+  const senderName = (senderEntRes.data as { display_name?: string | null } | null)?.display_name ?? null;
+  const workspaceName = (workspaceRes.data as { name?: string | null } | null)?.name ?? null;
+
+  // Couple-aware subject line uses the client entity type — same lookup as the first-send path.
+  const entityTypeRes = deal?.organization_id
+    ? await supabase
+        .schema('directory')
+        .from('entities')
+        .select('type')
+        .eq('id', deal.organization_id)
+        .maybeSingle()
+    : null;
+  const rawEntityType = (entityTypeRes?.data as { type?: string | null } | null)?.type ?? null;
+  const SUBJECT_ENTITY_TYPES = ['person', 'company', 'venue', 'couple'] as const;
+  type SubjectEntityType = typeof SUBJECT_ENTITY_TYPES[number];
+  const entityType: SubjectEntityType | null =
+    rawEntityType && (SUBJECT_ENTITY_TYPES as readonly string[]).includes(rawEntityType)
+      ? (rawEntityType as SubjectEntityType)
+      : null;
+
+  // Rich proposal data for the email body (event date, total, deposit, payment terms).
+  const proposalData = await getPublicProposal(publicToken);
+  const clientFirstName = clientName?.trim().split(/\s+/)[0] ?? null;
+
+  const senderOptions: SendProposalLinkSenderOptions = {
+    senderName,
+    senderReplyTo: senderEmail,
+    workspaceName,
+    workspaceId,
+    clientFirstName,
+    eventDate: proposalData?.event.startsAt ?? null,
+    total: proposalData?.total ?? null,
+    depositPercent: (proposalData?.proposal as { deposit_percent?: number | null } | undefined)?.deposit_percent ?? null,
+    paymentDueDays: (proposalData?.proposal as { payment_due_days?: number | null } | undefined)?.payment_due_days ?? null,
+    entityType,
+    eventArchetype: deal?.event_archetype ?? null,
+    eventStartTime: proposalData?.event.eventStartTime ?? null,
+    eventEndTime: proposalData?.event.eventEndTime ?? null,
+  };
+
+  const emailResult = await sendProposalLinkEmail(clientEmail, publicUrl, eventTitle, senderOptions);
+  if (!emailResult.ok) {
+    return { success: false, error: emailResult.error ?? 'Failed to send proposal email.' };
+  }
+
+  // Stamp reminder_sent_at + store the new Resend message id so the bounce/
+  // delivery webhook can update the right row. Uses the system client because
+  // the proposal row is owned by service_role for webhook write paths.
+  const sys = getSystemClient();
+  await sys
+    .from('proposals')
+    .update({
+      reminder_sent_at: new Date().toISOString(),
+      ...(emailResult.messageId ? { resend_message_id: emailResult.messageId } : {}),
+    })
+    .eq('id', proposalId)
+    .eq('workspace_id', workspaceId);
+
+  return { success: true, publicUrl };
+}
+
 export async function sendForSignature(
   dealId: string,
   clientEmail: string,
@@ -1003,8 +1109,35 @@ export async function sendForSignature(
     .limit(1)
     .maybeSingle();
 
+  // Resend path — when there's no draft, the proposal was already sent.
+  // Find the most recent active proposal and re-email its link to the
+  // (possibly corrected) recipient. The user clicks "Resend" expecting the
+  // same proposal to go out again, not a new draft to be created.
   if (!draftRow?.id) {
-    return { success: false, error: 'No draft proposal found for this deal.' };
+    const { data: activeRow } = await supabase
+      .from('proposals')
+      .select('id, public_token')
+      .eq('deal_id', dealId)
+      .eq('workspace_id', workspaceMembership)
+      .in('status', ['sent', 'viewed', 'accepted'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const activeProposal = activeRow as { id: string; public_token: string | null } | null;
+    if (!activeProposal?.public_token) {
+      return { success: false, error: 'No proposal found for this deal.' };
+    }
+
+    return await resendActiveProposal({
+      supabase,
+      proposalId: activeProposal.id,
+      publicToken: activeProposal.public_token,
+      workspaceId: workspaceMembership,
+      dealId,
+      clientEmail,
+      clientName,
+    });
   }
 
   const draftProposalId = draftRow.id;

@@ -100,6 +100,8 @@ export type DealLensProps = {
    * for "still loading"; pass [] to render the legacy fallback.
    */
   pipelineStages?: WorkspacePipelineStage[] | null;
+  /** Per-deal signal stack from the Prism bundle. Forwarded to DealDetailsCard. */
+  signals?: import('../lib/compute-deal-signals').DealSignal[];
 };
 
 /**
@@ -146,6 +148,7 @@ export function DealLens({
   sourceOrgId = null,
   onClientLinked,
   pipelineStages: pipelineStagesProp,
+  signals = [],
 }: DealLensProps) {
   const router = useRouter();
   const isLocked = !!deal.event_id;
@@ -263,11 +266,24 @@ export function DealLens({
   // the header strip — so we lift this out and useCallback the dependency
   // chain.
   const handleHeaderSaveScalar = useCallback(
-    (patch: Parameters<typeof updateDealScalars>[1]) => {
+    (patch: {
+      proposed_date?: string | null;
+      event_archetype?: string | null;
+      budget_estimated?: number | null;
+      event_start_time?: string | null;
+      event_end_time?: string | null;
+    }) => {
       if (patch.proposed_date !== undefined) setLocalDate(patch.proposed_date);
-      if (patch.event_archetype !== undefined) setLocalArchetype(patch.event_archetype);
+      if (patch.event_archetype !== undefined) {
+        // Header strip emits the freeform display string; the action accepts
+        // the canonical archetype enum. Cast at the boundary — server-side
+        // Zod parsing will reject anything outside the enum.
+        setLocalArchetype(patch.event_archetype);
+      }
       if (patch.budget_estimated !== undefined) setLocalBudget(patch.budget_estimated);
-      handleSaveScalar(patch);
+      handleSaveScalar(
+        patch as Parameters<typeof updateDealScalars>[1],
+      );
     },
     [handleSaveScalar],
   );
@@ -393,7 +409,10 @@ export function DealLens({
     return () => {
       cancelled = true;
     };
-  }, [deal?.id]);
+    // Refetch on status change too — the Aion card's voice and follow-up rows
+    // depend on the deal's current stage. Without this, an override-to-won
+    // leaves the card showing the previous stage's signals until reload.
+  }, [deal?.id, deal?.status]);
 
   useEffect(() => {
     if (!deal.event_id) {
@@ -1167,6 +1186,7 @@ export function DealLens({
             sourceOrgId={sourceOrgId ?? null}
             onStakeholdersChange={stakeholdersChangeHandler}
             initialProposal={initialProposal}
+            signals={signals}
           />
 
           {/* Next actions — flag ON: suppressed (absorbed by the unified

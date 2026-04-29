@@ -43,45 +43,125 @@ Dev-mode timings are not real perf signal.
 
 ---
 
-## 2. Stale-while-revalidate (don't show intermediate states)
+## 2. Sibling-switch transitions (list-on-left, detail-on-right)
 
-> "Never let it show intermediate states between Deal A and Deal B."
-> — User Advocate
+> "The header changing first is not a small bug — it's an active
+> misinformation event." — User Advocate, 2026-04-28
 
-The single biggest perception fix. When the user navigates between sibling
-items (deal → deal, event → event, entity → entity), keep showing the
-**previous** content during the fetch. Atomically swap to the new content
-when ALL primary data has resolved. Skeleton shown ONLY on the very first
-load when there is genuinely nothing to display.
+The single biggest perception fix on detail panels. When the user switches
+between siblings (deal → deal, event → event, entity → entity), the naive
+implementation has two failure modes:
 
-**Implementation:**
+1. **Wave-y skeleton** — the body flashes a skeleton between every click.
+2. **Fresh header + stale body** — the header updates instantly from list
+   memory, but the body still shows the previous item's data because the
+   server fetch hasn't returned. This looks coherent but lies — users
+   read it as the new item's data and make decisions on it. Worse than a
+   skeleton.
+
+The fix has two layers.
+
+### Layer 1 — make most switches not need a transition
+
+Cache + prefetch turn 90%+ of switches into cache hits, so the visual
+transition only matters for cold misses.
+
+- **TanStack Query** with `staleTime: 30_000` and `gcTime: 5 * 60_000`.
+- **`placeholderData: keepPreviousData`** on the bundle query — the previous
+  item's bundle stays rendered while the new fetch is in flight. This is
+  what makes the dim-and-hold real.
+- **Hover prefetch** on list items, debounced 150ms, hover-capable pointers
+  only. By the time the click lands, the bundle is warm.
+- **Neighbor prefetch** — when a selection lands, prefetch ±1 neighbors in
+  the sorted/filtered view. Covers keyboard arrow-nav and the natural
+  scan-and-click rhythm with bounded server cost (max 2 fetches per nav).
+- **Mutation invalidation** — every mutation that changes the bundle must
+  call `queryClient.invalidateQueries({ queryKey })` or `setQueryData` for
+  the optimistic patch. Cached stale data on revisit is the exact
+  "confidently wrong" failure mode that erodes trust.
+
+### Layer 2 — what to show during the rare cold miss
+
+Use **`<DetailPaneTransition>`** from `@/shared/ui/detail-pane-transition`:
 
 ```tsx
-// BEFORE — wave-y
-{loading ? <Spinner /> : <DealLens deal={deal} />}
-
-// AFTER — stale-while-revalidate
-{(!deal && loading) ? <Skeleton /> : <DealLens deal={deal} />}
+<DetailPaneTransition
+  bundleKey={selectedId}
+  isFirstLoad={query.isPending && !query.data}
+  isFetching={query.isFetching}
+  skeleton={<DetailSkeleton />}
+  scrollContainerRef={scrollRef}
+>
+  <DetailHeader title={bundle.title} status={bundle.status} />
+  <DetailBody {...bundle} />
+</DetailPaneTransition>
 ```
 
-Combined with NOT clearing state at the top of the fetch effect:
+Behavior:
+
+1. **On click** — the rail row updates `selected` state instantly (the click
+   is acknowledged at the source, the click-feedback contract is preserved).
+   The detail pane dims to 70% opacity over 80ms and keeps rendering the
+   previous bundle.
+2. **If fetch <250ms** — pane snaps to full opacity with new content. No
+   skeleton ever shown. Dominant case for warm and ±1-neighbor prefetched
+   switches.
+3. **If fetch ≥250ms** — dimmed pane crossfades to a true skeleton. Honest
+   "I am loading." When data arrives, skeleton snaps to content atomically.
+4. **First-ever load** — skeleton from the start (no dim phase, nothing to
+   hold).
+5. **Scroll resets** to top when a new bundle resolves.
+
+### Caller contract
+
+The `children` you pass to `<DetailPaneTransition>` must derive every
+displayed value (header AND body) from the BUNDLE data, not from the list-
+row memory. The bundle is held by `keepPreviousData` until the new fetch
+arrives, so referencing `bundle.title` keeps the title held back; referencing
+`selectedItem.title` (from the list) flips the title instantly and breaks
+the atomic-swap contract.
 
 ```tsx
-// BEFORE — flashes "Loading…" between deals
-useEffect(() => {
-  setActivity(null);  // <-- this is the wave source
-  fetchActivity(deal.id).then(setActivity);
-}, [deal.id]);
+// WRONG — header sourced from list memory, flips before body resolves
+const title = selectedItem.title;
 
-// AFTER — atomic swap
-useEffect(() => {
-  // No setActivity(null) — let the previous deal's data linger briefly.
-  fetchActivity(deal.id).then(setActivity);
-}, [deal.id]);
+// RIGHT — header sourced from the bundle, held during fetch
+const title = bundle?.deal?.title ?? bundle?.eventSummary?.title;
 ```
 
-The user perceives ONE coordinated transition instead of "Deal A → spinner
-→ Deal B." Real reference: `prism.tsx`'s deal-switching code.
+### Reference implementation
+
+`src/app/(dashboard)/(features)/crm/components/prism.tsx` — the full pattern:
+TanStack `useQuery` with `keepPreviousData`, optimistic mutations via
+`setQueryData`, neighbor prefetch in `production-grid-shell.tsx`, hover
+prefetch in `stream-card.tsx`, `<DetailPaneTransition>` wrapping the pane,
+`<PrismSkeleton>` as the cold-miss fallback.
+
+### Adoption checklist (per surface)
+
+Apply this pattern to any list-on-left + detail-on-right surface:
+
+- [ ] CRM Prism (deal/event) — **shipped 2026-04-28**, reference impl
+- [ ] Network Detail Sheet (contact → contact)
+- [ ] Aion deal-card thread switcher
+- [ ] Aion `/aion` sidebar (cross-deal threads)
+- [ ] Plan tab inner cards on event swap
+
+Each surface needs (1) a bundled server action, (2) a TanStack query factory
+in the feature's `queries.ts`, (3) prefetch wiring on hover + neighbors,
+(4) `<DetailPaneTransition>` wrapping the pane, (5) header sourced from
+bundle data.
+
+### What this replaces
+
+The earlier "stale-while-revalidate" guidance (keep showing prior content,
+don't blank to skeleton) was right for **first loads with multiple data
+sources**, where the wave-y skeleton was the failure mode. It generalized
+incorrectly to sibling-switches, where the dominant failure mode is
+**desync between header (instant) and body (slow)**. The new pattern
+preserves the atomic-swap intuition by holding ALL data — header included
+— until the bundle resolves, while the prefetch substrate keeps the
+dominant case under the 250ms threshold so the dim is invisible.
 
 ---
 

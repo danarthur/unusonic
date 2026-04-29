@@ -282,7 +282,13 @@ export function DealHeaderStrip({
       setOwnerEntityId(deal.owner_entity_id);
       setOwnerName(null);
       toast.error(result.error ?? 'Failed to assign owner');
+      return;
     }
+    // Notify parent so the prism bundle refetches — signals like "No owner"
+    // depend on the bundle's deal data, not just local state. The
+    // server-side revalidatePath('/crm') in assignDealOwner refreshes the
+    // sidebar gigs list but doesn't reach the client-side TanStack cache.
+    onStakeholdersChange();
   };
 
   // ── Client (bill_to) ─────────────────────────────────────────────────────

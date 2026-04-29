@@ -76,6 +76,7 @@ export const envelopeReasonSchema = z.enum([
   'no_ros_for_event',
   'no_financials_for_event',
   'no_proactive_lines',
+  'no_signals_to_report',
   'no_follow_up_queue',
   'no_templates',
   'no_crew_with_equipment',

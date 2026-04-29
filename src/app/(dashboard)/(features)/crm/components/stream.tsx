@@ -38,6 +38,7 @@ export function Stream({
   items,
   selectedId,
   onSelect,
+  onHover,
   addOptimisticGig,
   onRefetchList,
   mode,
@@ -49,6 +50,10 @@ export function Stream({
   items: StreamCardItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Hover prefetch hook. Fires (debounced 150ms) when a user mouses over a
+   *  card, so the detail bundle is warm before the click. Hover-capable
+   *  pointers only. */
+  onHover?: (id: string, source: 'deal' | 'event') => void;
   addOptimisticGig: (update: OptimisticUpdate) => void;
   onRefetchList?: () => Promise<void>;
   mode: StreamMode;
@@ -272,6 +277,7 @@ export function Stream({
           items={filtered}
           selectedId={selectedId}
           onSelect={onSelect}
+          onHover={onHover}
           searchQuery={searchQuery}
           filtersActive={filtersActive}
           onClearFilters={() => {
@@ -320,6 +326,7 @@ function DateGroupedList({
   items,
   selectedId,
   onSelect,
+  onHover,
   searchQuery,
   filtersActive,
   onClearFilters,
@@ -331,6 +338,7 @@ function DateGroupedList({
   items: StreamCardItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onHover?: (id: string, source: 'deal' | 'event') => void;
   searchQuery: string;
   filtersActive: boolean;
   onClearFilters: () => void;
@@ -417,6 +425,7 @@ function DateGroupedList({
               item={item}
               selected={selectedId === item.id}
               onClick={() => onSelect(item.id)}
+              onHover={onHover ? () => onHover(item.id, item.source) : undefined}
               pipelineStages={pipelineStages}
               hasUnseenPill={
                 item.source === 'deal' && (unseenPillCounts[item.id] ?? 0) > 0

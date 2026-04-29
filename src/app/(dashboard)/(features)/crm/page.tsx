@@ -11,8 +11,6 @@ import { getWorkspaceFeatureState } from '@/app/(dashboard)/(features)/aion/acti
 import { AionFirstVisitPrompt } from '@/app/(dashboard)/(features)/aion/components/AionFirstVisitPrompt';
 import type { StreamCardItem } from './components/stream-card';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from './actions/get-workspace-pipeline-stages';
-import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
-
 /** CRM queue item: deal or event row mapped for Production Grid UI. */
 export type CRMQueueItem = {
   id: string;
@@ -66,7 +64,6 @@ export default async function CRMPage({
 
   return (
     <>
-      <AionPageContextSetter type="crm" entityId={selectedId} label={null} />
       <Suspense fallback={<CRMSkeleton />}>
         <CRMDataShell selectedId={selectedId} streamMode={streamMode} />
       </Suspense>
@@ -110,16 +107,17 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
     // the deals + events + stakeholders + entity-lookup chain. Previously this
     // was awaited sequentially at the bottom of the load, costing ~50-200ms
     // we can overlap. Awaited at the merge point below.
-    const followUpQueuePromise: Promise<{ data: Array<{
+    type FollowUpQueueRow = {
       deal_id: string; reason: string; priority_score: number; status: string;
-    }> | null }> = workspaceId
+    };
+    const followUpQueuePromise: PromiseLike<{ data: FollowUpQueueRow[] | null }> = workspaceId
       ? supabase
           .schema('ops')
           .from('follow_up_queue')
           .select('deal_id, reason, priority_score, status')
           .eq('workspace_id', workspaceId)
           .in('status', ['pending', 'snoozed'])
-      : Promise.resolve({ data: [] });
+      : Promise.resolve({ data: [] as FollowUpQueueRow[] });
 
     const [dealsRes, eventsRes] = await Promise.all([
     workspaceId

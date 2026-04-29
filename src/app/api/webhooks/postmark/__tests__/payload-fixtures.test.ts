@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { selectInboundBodyText, type PostmarkInboundPayload } from '../route';
+import { selectInboundBodyText, type PostmarkInboundPayload } from '../__lib__/body-selection';
 import { classifyAutoReply } from '../__lib__/auto-reply';
 import { extractThreadKey } from '../__lib__/thread-key';
 

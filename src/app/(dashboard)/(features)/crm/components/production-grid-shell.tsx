@@ -1,7 +1,7 @@
 'use client';
 
-import { useRouter, usePathname } from 'next/navigation';
-import { useOptimistic, useState, useEffect, useRef, Suspense, useCallback, useMemo } from 'react';
+import { usePathname } from 'next/navigation';
+import { useOptimistic, useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from './stream';
 import { Prism } from './prism';
@@ -13,6 +13,7 @@ import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { crmQueries } from '@/features/crm/api/queries';
 import { queryKeys } from '@/shared/api/query-keys';
 import { cn } from '@/shared/lib/utils';
+import { AionPageContextSetter } from '@/shared/ui/providers/AionPageContextSetter';
 
 // Cache is now managed by TanStack Query — no module-level state needed
 
@@ -55,16 +56,33 @@ type ProductionGridShellProps = {
 };
 
 export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId, loadError, pipelineStages }: ProductionGridShellProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const { workspaceId } = useWorkspace();
   const queryClient = useQueryClient();
   const [isMobile, setIsMobile] = useState(false);
   const [currentStream, setCurrentStream] = useState<StreamMode>(streamMode);
+  // Selection is client state. URL is synced via history.replaceState so deep-
+  // linking and back/forward still work, but selection no longer triggers a
+  // full RSC re-render of /crm (which would refetch every gig + stakeholder +
+  // proposal + entity just to update the highlighted card).
+  const [clientSelectedId, setClientSelectedId] = useState<string | null>(selectedId);
 
   useEffect(() => {
     setCurrentStream(streamMode);
   }, [streamMode]);
+
+  useEffect(() => {
+    setClientSelectedId(selectedId);
+  }, [selectedId]);
+
+  useEffect(() => {
+    const handler = () => {
+      const params = new URLSearchParams(window.location.search);
+      setClientSelectedId(params.get('selected'));
+    };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, []);
 
   // TanStack Query manages the gigs list. RSC props seed the cache for instant first render.
   const { data: clientGigs = gigs } = useQuery({
@@ -99,22 +117,56 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
     return () => mq.removeEventListener('change', fn);
   }, []);
 
-  const selectedItem = selectedId
-    ? optimisticGigs.find((g) => g.id === selectedId) ?? null
+  const selectedItem = clientSelectedId
+    ? optimisticGigs.find((g) => g.id === clientSelectedId) ?? null
     : null;
 
   const setStreamMode = (mode: StreamMode) => setCurrentStream(mode);
 
   const setSelected = (id: string) => {
-    router.replace(`${pathname}?${buildCrmSearch(currentStream, id)}`, { scroll: false });
+    setClientSelectedId(id);
+    window.history.replaceState(null, '', `${pathname}?${buildCrmSearch(currentStream, id)}`);
   };
 
   const clearSelected = () => {
-    router.replace(`${pathname}?${buildCrmSearch(currentStream, null)}`, { scroll: false });
+    setClientSelectedId(null);
+    window.history.replaceState(null, '', `${pathname}?${buildCrmSearch(currentStream, null)}`);
   };
+
+  /**
+   * Prime the TanStack cache for a given gig before the user clicks. Called
+   * from Stream cards on hover (debounced 150ms inside the card). Same shape
+   * as Prism's bundleQuery so a click after a successful prefetch resolves
+   * synchronously from cache — no fetch on switch.
+   */
+  const prefetchBundle = useCallback(
+    (id: string, source: 'deal' | 'event') => {
+      if (!workspaceId) return;
+      const cfg = crmQueries.prismBundle(workspaceId, id, source, currentOrgId ?? null);
+      queryClient.prefetchQuery(cfg);
+    },
+    [queryClient, workspaceId, currentOrgId],
+  );
+
+  // Neighbor prefetch — when a selection lands, warm the bundles for the
+  // sibling immediately above and below in the current sorted/filtered view.
+  // Covers keyboard arrow-nav and the natural scan-and-click rhythm without
+  // the explosive cost of prefetching the whole list.
+  useEffect(() => {
+    if (!clientSelectedId || !workspaceId) return;
+    const idx = optimisticGigs.findIndex((g) => g.id === clientSelectedId);
+    if (idx === -1) return;
+    const neighbors = [optimisticGigs[idx - 1], optimisticGigs[idx + 1]].filter(
+      (g): g is StreamCardItem => !!g,
+    );
+    for (const n of neighbors) {
+      prefetchBundle(n.id, n.source);
+    }
+  }, [clientSelectedId, workspaceId, optimisticGigs, prefetchBundle]);
 
   return (
     <div className="flex flex-col md:flex-row flex-1 min-h-0 relative" data-surface="void" style={{ background: 'var(--stage-void)' }}>
+      <AionPageContextSetter type="crm" entityId={clientSelectedId} label={null} />
       {loadError && (
         <div
           role="alert"
@@ -127,13 +179,14 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
       <aside
         className={cn(
           'flex flex-col shrink-0 w-full md:w-[380px] md:min-w-[320px] max-w-[420px]',
-          selectedId && 'hidden md:flex'
+          clientSelectedId && 'hidden md:flex'
         )}
       >
         <Stream
           items={optimisticGigs}
-          selectedId={selectedId}
+          selectedId={clientSelectedId}
           onSelect={setSelected}
+          onHover={prefetchBundle}
           addOptimisticGig={addOptimisticGig}
           onRefetchList={invalidateGigs}
           mode={currentStream}
@@ -147,10 +200,10 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
       <main
         className={cn(
           'flex flex-col flex-1 min-w-0 min-h-0',
-          !selectedId && 'hidden md:flex'
+          !clientSelectedId && 'hidden md:flex'
         )}
       >
-        {selectedId ? (
+        {clientSelectedId ? (
           <Suspense
             fallback={
               <div className="flex flex-col items-center justify-center flex-1 min-h-[200px] gap-3 text-[var(--stage-text-secondary)] text-sm">
@@ -160,7 +213,7 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
             }
           >
             <Prism
-              selectedId={selectedId}
+              selectedId={clientSelectedId}
               selectedItem={selectedItem}
               onBackToStream={clearSelected}
               showBackToStream={isMobile}

@@ -139,9 +139,19 @@ export default async function DashboardLayout({
 
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Auth-boundary perf (Phase 1, load-time-strategy.md §3.9): proxy.ts
+    // already validated the session via getClaims() (~5ms JWT decode). Use
+    // the same fast path here instead of getUser() (~50-150ms GoTrue
+    // round-trip). RLS still gates every query, so a stale-but-valid JWT
+    // can't leak data; if the user was banned mid-session, GoTrue
+    // refresh-or-fail in AuthGuard catches it on the next visibility tick.
+    const { data: claimsData, error: claimsError } =
+      await supabase.auth.getClaims();
+    const claims = !claimsError ? claimsData?.claims : null;
+    const userId = (claims?.sub as string | undefined) ?? null;
+    const userEmail = (claims?.email as string | undefined) ?? '';
 
-    if (!user) {
+    if (!userId) {
       redirect('/login');
     }
 
@@ -149,10 +159,10 @@ export default async function DashboardLayout({
       supabase
         .from('profiles')
         .select('full_name, avatar_url, onboarding_completed')
-        .eq('id', user.id)
+        .eq('id', userId)
         .maybeSingle(),
-      getActiveWorkspace(supabase, user.id),
-      getAllWorkspaces(supabase, user.id),
+      getActiveWorkspace(supabase, userId),
+      getAllWorkspaces(supabase, userId),
     ]);
 
     const profile = profileResult.data;
@@ -180,7 +190,7 @@ export default async function DashboardLayout({
     }
 
     userData = {
-      email: user.email || '',
+      email: userEmail,
       fullName: profile?.full_name || null,
       avatarUrl: profile?.avatar_url || null,
     };

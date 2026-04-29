@@ -127,6 +127,7 @@ export function StreamCard({
   item,
   selected,
   onClick,
+  onHover,
   pipelineStages,
   hasUnseenPill = false,
   className,
@@ -134,6 +135,13 @@ export function StreamCard({
   item: StreamCardItem;
   selected: boolean;
   onClick: () => void;
+  /**
+   * Optional hover callback used to prefetch the detail bundle. Fires after
+   * a 150ms debounce so a user scanning the list quickly doesn't trigger a
+   * prefetch on every card the cursor crosses. Cancelled on mouse leave.
+   * Hover-capable pointers only.
+   */
+  onHover?: () => void;
   /** Workspace pipeline stages — used to resolve `item.stage_id` into the
    *  human-readable label the workspace configured. Falls back to KIND_LABELS
    *  when a stage can't be found. */
@@ -157,6 +165,12 @@ export function StreamCard({
   // Kebab menu open state
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  // Hover prefetch debounce — set on mouseenter, cleared on mouseleave so a
+  // user scanning the list quickly doesn't fire a prefetch on every card.
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }, []);
 
   // Tracks whether the Aion stage-suggestion row is rendering its own call-
   // to-action. When true, the follow-up reason line above it is suppressed —
@@ -307,6 +321,18 @@ export function StreamCard({
         tabIndex={0}
         onClick={onClick}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
+        onMouseEnter={() => {
+          if (!onHover) return;
+          if (typeof window !== 'undefined' && !window.matchMedia('(hover: hover)').matches) return;
+          if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+          hoverTimerRef.current = setTimeout(() => onHover(), 150);
+        }}
+        onMouseLeave={() => {
+          if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+          }
+        }}
         className={cn(
           'w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
           'transition-[box-shadow] duration-75',

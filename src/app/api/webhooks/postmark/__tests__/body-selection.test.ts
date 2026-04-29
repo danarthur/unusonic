@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { selectInboundBodyText, type PostmarkInboundPayload } from '../route';
+import { selectInboundBodyText, type PostmarkInboundPayload } from '../__lib__/body-selection';
 
 const stub = (overrides: Partial<PostmarkInboundPayload>): PostmarkInboundPayload => ({
   ...overrides,

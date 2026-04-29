@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
 import { Phone, Mail, Building2, ChevronRight, FileText } from 'lucide-react';
 import {
@@ -15,6 +15,7 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { updateClientAddress } from '../actions/update-client-address';
+import { updateIndividualEntity } from '../actions/update-individual-entity';
 import { updatePrivateNotes } from '@/features/network/api/actions';
 import { toast } from 'sonner';
 
@@ -154,8 +155,17 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
   const { organization, mainContact, pastDealsCount, privateNotes } = client;
   const [addressDraft, setAddressDraft] = useState(formatAddress(organization.address));
   const [notesDraft, setNotesDraft] = useState(privateNotes ?? '');
+  const [emailDraft, setEmailDraft] = useState(mainContact?.email ?? '');
+  const [emailSaved, setEmailSaved] = useState(mainContact?.email ?? '');
   const [savingAddress, startAddressSave] = useTransition();
   const [savingNotes, startNotesSave] = useTransition();
+  const [savingEmail, startEmailSave] = useTransition();
+
+  // Re-seed when the contact changes (drawer kept mounted across deals).
+  useEffect(() => {
+    setEmailDraft(mainContact?.email ?? '');
+    setEmailSaved(mainContact?.email ?? '');
+  }, [mainContact?.id, mainContact?.email]);
 
   const handleSaveAddress = () => {
     const parsed = parseAddressLines(addressDraft);
@@ -169,6 +179,38 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
       const result = await updatePrivateNotes(organization.id, notesDraft.trim() || null, null);
       if (!result.ok) toast.error('Failed to save notes.');
       else toast.success('Notes saved.');
+    });
+  };
+
+  const handleSaveEmail = () => {
+    if (!mainContact) return;
+    const trimmed = emailDraft.trim();
+    if (trimmed === emailSaved.trim()) return;
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      toast.error('That email doesn\u2019t look right.');
+      setEmailDraft(emailSaved);
+      return;
+    }
+    const displayName = [mainContact.first_name, mainContact.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || (trimmed || 'Contact');
+    startEmailSave(async () => {
+      const result = await updateIndividualEntity({
+        entityId: mainContact.id,
+        firstName: mainContact.first_name ?? '',
+        lastName: mainContact.last_name ?? '',
+        email: trimmed || null,
+        phone: mainContact.phone ?? null,
+        displayName,
+      });
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to save email.');
+        setEmailDraft(emailSaved);
+        return;
+      }
+      setEmailSaved(trimmed);
+      toast.success('Email updated.');
     });
   };
 
@@ -206,15 +248,30 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
                       {mainContact.phone}
                     </a>
                   )}
-                  {mainContact.email && (
-                    <a
-                      href={`mailto:${mainContact.email}`}
-                      className="flex items-center gap-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors truncate"
-                    >
-                      <Mail size={14} strokeWidth={1.5} />
-                      {mainContact.email}
-                    </a>
-                  )}
+                  {/* Inline-editable email — fix typos without leaving the deal. */}
+                  <div className="flex items-center gap-2 text-[var(--stage-text-secondary)]">
+                    <Mail size={14} strokeWidth={1.5} className="shrink-0" />
+                    <input
+                      type="email"
+                      value={emailDraft}
+                      onChange={(e) => setEmailDraft(e.target.value)}
+                      onBlur={handleSaveEmail}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+                        else if (e.key === 'Escape') {
+                          setEmailDraft(emailSaved);
+                          (e.currentTarget as HTMLInputElement).blur();
+                        }
+                      }}
+                      placeholder="email@example.com"
+                      autoComplete="email"
+                      spellCheck={false}
+                      className="flex-1 min-w-0 bg-transparent border-none px-0 py-0 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-0 truncate"
+                    />
+                    {savingEmail && (
+                      <span className="text-xs text-[var(--stage-text-tertiary)] shrink-0">Saving…</span>
+                    )}
+                  </div>
                 </>
               )}
               {organization.support_email && !mainContact?.email && (

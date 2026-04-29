@@ -9,7 +9,7 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { DispatchSummary } from './dispatch-summary';
 import { CrewDetailRail } from './crew-detail-rail';
 import { DealHeaderStrip } from './deal-header-strip';
-import { EventBriefButton } from './event-brief-button';
+import { AionPlanCard } from './aion-plan-card';
 import { DealDiaryCard } from './deal-diary-card';
 import { CompletionIndicators } from './completion-indicators';
 import { HandoffConfirmStrip } from './handoff-confirm-strip';
@@ -59,6 +59,11 @@ type PlanLensProps = {
   onStakeholdersChange?: () => void;
   /** Called when deal scalars are updated so parent can refetch deal data. */
   onDealUpdated?: () => void;
+  /**
+   * Per-event signal stack from the Prism bundle. Drives the AionPlanCard.
+   * Empty array fires the card's "Nothing drifting" empty state.
+   */
+  eventSignals?: import('../lib/compute-event-signals').EventSignal[];
 };
 
 export function PlanLens({
@@ -73,6 +78,7 @@ export function PlanLens({
   onHandoverSuccess,
   onStakeholdersChange,
   onDealUpdated,
+  eventSignals = [],
 }: PlanLensProps) {
   const isPostHandoff = !!eventId && !!event;
 
@@ -345,31 +351,25 @@ export function PlanLens({
   // ── Render ──
 
   // Shared header strip — editable on Plan (with confirmation for post-handoff changes)
+  // Brief Me moved onto AionPlanCard (Plan Aion v1, 2026-04-28). The card
+  // owns awareness; the header is identity. Keeping Brief Me in both places
+  // would split discovery and dilute the card's primary CTA.
   const headerStrip = deal ? (
-    <div className="flex flex-col gap-2">
-      <DealHeaderStrip
-        title={localTitle}
-        proposedDate={deal.proposed_date}
-        eventArchetype={deal.event_archetype ?? null}
-        saving={scalarsSaving}
-        onTitleChange={handleTitleChange}
-        onSaveScalar={(patch) => {
-          handleSaveScalar(patch as Parameters<typeof updateDealScalars>[1]);
-        }}
-        deal={deal}
-        stakeholders={stakeholders}
-        client={client}
-        sourceOrgId={sourceOrgId ?? null}
-        onStakeholdersChange={onStakeholdersChange ?? (() => {})}
-      />
-      {/* §3.9 Brief me — only post-handoff (event exists). Mobile-primary;
-          renders on desktop too as a secondary affordance. */}
-      {isPostHandoff && eventId && (
-        <div className="flex justify-end">
-          <EventBriefButton eventId={eventId} />
-        </div>
-      )}
-    </div>
+    <DealHeaderStrip
+      title={localTitle}
+      proposedDate={deal.proposed_date}
+      eventArchetype={deal.event_archetype ?? null}
+      saving={scalarsSaving}
+      onTitleChange={handleTitleChange}
+      onSaveScalar={(patch) => {
+        handleSaveScalar(patch as Parameters<typeof updateDealScalars>[1]);
+      }}
+      deal={deal}
+      stakeholders={stakeholders}
+      client={client}
+      sourceOrgId={sourceOrgId ?? null}
+      onStakeholdersChange={onStakeholdersChange ?? (() => {})}
+    />
   ) : null;
 
   let content: React.ReactNode;
@@ -399,6 +399,21 @@ export function PlanLens({
           )}
         </StagePanel>
 
+        {/* ── Tier 1.25: Aion Plan card — drift / silence / conflict + Brief Me ──
+            Sits below the deterministic status surfaces (Show Health,
+            Readiness Ribbon) so its advisory voice doesn't compete with
+            them for status authority. The card answers "what needs my
+            attention?" — different from "what's red?" or "what's left?".
+            See docs/reference/aion-plan-card-design.md. */}
+        {eventId && (
+          <AionPlanCard
+            eventId={eventId}
+            eventTitle={event.title ?? deal?.title ?? null}
+            startsAt={event.starts_at}
+            signals={eventSignals}
+          />
+        )}
+
         {/* ── Tier 1.5: T-0 show control (self-gated to ~24h window) ── */}
         {eventId && (
           <ShowControlStrip
@@ -413,25 +428,10 @@ export function PlanLens({
           />
         )}
 
-        {/* ── Tier 2: At-a-glance KPIs (2-up, full width) ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-          <FinancialSummaryCard
-            crewRows={crewRows}
-            proposalTotal={proposalData?.total ?? null}
-            budgetEstimated={deal?.budget_estimated ?? null}
-            ledgerActual={ledger?.totalCost ?? null}
-            ledgerCollected={ledger?.collected ?? null}
-          />
-          <PlanVitalsStrip
-            guestCountExpected={event.guest_count_expected}
-            guestCountActual={event.guest_count_actual}
-            techRequirements={event.tech_requirements}
-            logisticsDockInfo={event.logistics_dock_info}
-            logisticsPowerInfo={event.logistics_power_info}
-          />
-        </div>
-
-        {/* ── Tier 3: Advancing checklist (full width) ── */}
+        {/* ── Tier 2: Advancing checklist (promoted, full width) ──
+            Production owner's lead question post-handoff is "what do I need
+            to do to be ready?", not "did they pay?". The checklist is the
+            day-by-day to-do; financials drop to a lower tier. */}
         <AdvancingChecklist
           eventId={eventId}
           crewRows={crewRows}
@@ -442,23 +442,28 @@ export function PlanLens({
           transportMode={event.run_of_show_data?.transport_mode ?? null}
         />
 
+        {/* ── Tier 3: Production team (promoted, full width) ──
+            "Who's working this show?" is the next question. Promoting the
+            crew card out of the Workflow column gives it the real estate it
+            needs and clears it from the half-width compromise it lived in. */}
+        {dealId && (
+          <ProductionTeamCard
+            dealId={dealId}
+            sourceOrgId={sourceOrgId ?? null}
+            eventDate={deal?.proposed_date}
+            workspaceId={deal?.workspace_id}
+            isLocked={isPostHandoff}
+            eventId={eventId}
+            onOpenCrewDetail={setSelectedCrewRow}
+          />
+        )}
+
         {/* ── Tier 4: Workflow ↔ Reference (60/40 columns) ── */}
         <div className="flex flex-col lg:flex-row gap-6 min-h-0">
 
-          {/* Left: Workflow — crew, dispatch, comms, agreed scope */}
+          {/* Left: Workflow — dispatch, comms, agreed scope. Production team
+              promoted out to its own full-width tier above. */}
           <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-            {dealId && (
-              <ProductionTeamCard
-                dealId={dealId}
-                sourceOrgId={sourceOrgId ?? null}
-                eventDate={deal?.proposed_date}
-                workspaceId={deal?.workspace_id}
-                isLocked={isPostHandoff}
-                eventId={eventId}
-                onOpenCrewDetail={setSelectedCrewRow}
-              />
-            )}
-
             <DispatchSummary
               eventId={eventId}
               dealId={dealId}
@@ -541,12 +546,49 @@ export function PlanLens({
           </div>
         </div>
 
-        {/* ── Tier 5: Journal (full width) ── */}
+        {/* ── Tier 5: At-a-glance KPIs (demoted, full width) ──
+            Financials + plan vitals are glance-checks, not lead questions
+            post-handoff. When PlanVitalsStrip has nothing to render (no
+            guest count, no tech requirements, no dock/power info — common
+            for fresh handovers), Financial expands to full width instead
+            of leaving an empty slot to the right. */}
+        {(() => {
+          const hasVitals = event.guest_count_expected != null
+            || event.guest_count_actual != null
+            || (event.tech_requirements && Object.keys(event.tech_requirements).length > 0)
+            || !!event.logistics_dock_info
+            || !!event.logistics_power_info;
+          return (
+            <div
+              className={hasVitals ? 'grid grid-cols-1 md:grid-cols-2' : 'grid grid-cols-1'}
+              style={{ gap: 'var(--stage-gap-wide, 12px)' }}
+            >
+              <FinancialSummaryCard
+                crewRows={crewRows}
+                proposalTotal={proposalData?.total ?? null}
+                budgetEstimated={deal?.budget_estimated ?? null}
+                ledgerActual={ledger?.totalCost ?? null}
+                ledgerCollected={ledger?.collected ?? null}
+              />
+              {hasVitals && (
+                <PlanVitalsStrip
+                  guestCountExpected={event.guest_count_expected}
+                  guestCountActual={event.guest_count_actual}
+                  techRequirements={event.tech_requirements}
+                  logisticsDockInfo={event.logistics_dock_info}
+                  logisticsPowerInfo={event.logistics_power_info}
+                />
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── Tier 6: Journal (full width) ── */}
         {dealId && deal?.workspace_id && (
           <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
         )}
 
-        {/* ── Tier 5b: Captures linked to this event (inc. predecessor deal) ── */}
+        {/* ── Tier 6b: Captures linked to this event (inc. predecessor deal) ── */}
         {eventId && deal?.workspace_id && (
           <ProductionCapturesPanel
             workspaceId={deal.workspace_id}
@@ -556,7 +598,7 @@ export function PlanLens({
           />
         )}
 
-        {/* ── Tier 6: Wrap report (full width, post-event only) ── */}
+        {/* ── Tier 7: Wrap report (full width, post-event only) ── */}
         {event && new Date(event.starts_at) < new Date() && (
           <WrapReportCard
             eventId={eventId!}

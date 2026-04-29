@@ -573,6 +573,31 @@ export function createKnowledgeTools(ctx: AionToolContext) {
     },
   });
 
+  const get_deal_signals = tool({
+    description:
+      'Get the per-deal signal stack — observable facts about the deal that a production owner would weigh: deposit status, proposal engagement (hot lead, cooling, unopened), event date pressure, repeat-client status, ownership gap. ' +
+      'These are the same signals shown on the Signals card in the CRM, so your read of the deal will match what the user sees. ' +
+      'Each signal includes a label, a concrete value, polarity (positive/negative/neutral), severity (high/medium/low), and a natural-language sentence you can quote. ' +
+      'Use this when the user asks "how is this deal doing?", "is this one going to close?", or "what should I worry about?" — narrate the signals in prose; never report a percentage.',
+    inputSchema: z.object({ dealId: z.string().optional().describe('The deal ID. Omit to use the deal the user is currently viewing.') }),
+    execute: async (params) => {
+      const dealId = resolveDealId(params.dealId);
+      if (!dealId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'deal_not_found', hint: 'No deal ID provided and no deal in view.' });
+      }
+      const { getDealSignals } = await import('@/app/(dashboard)/(features)/crm/actions/get-deal-signals');
+      const signals = await getDealSignals(dealId);
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(signals, searched, {
+        reason: signals.length === 0 ? 'no_signals_to_report' : 'has_data',
+        hint: signals.length === 0
+          ? 'Deal exists but no observable signals fired — narrate that plainly. Do NOT invent buy signals.'
+          : 'Quote the `sentence` field verbatim or paraphrase tightly. Never aggregate the signals into a probability or score.',
+      });
+    },
+  });
+
   const get_proposal_details = tool({
     description: 'Get proposal details for a deal including line items, status, totals. If no dealId provided, uses the deal the user is currently viewing.',
     inputSchema: z.object({ dealId: z.string().optional().describe('The deal ID. Omit to use the current page context.') }),
@@ -943,6 +968,49 @@ export function createKnowledgeTools(ctx: AionToolContext) {
           type: t.type, label: t.label, amount: t.amount, inbound: t.inbound, status: t.status,
         })),
       }, searched);
+    },
+  });
+
+  // ---- Plan-tab Aion card signals ----
+
+  const get_event_signals = tool({
+    description:
+      'Get the per-event signal stack — drift, silence, and conflict signals for a show in the production phase (post-handoff, pre-show). ' +
+      'These are the same signals shown on the Aion Plan card, so your read of the show will match what the user sees. ' +
+      'Categories: cross-show conflicts (crew/gear double-booked), money timing (deposit overdue, final invoice unsent), run-of-show staleness, stakeholder silence, and show-health overrides. ' +
+      'Each signal includes a label, a concrete value, polarity (positive/negative/neutral), severity (high/medium/low), and a natural-language sentence you can quote. ' +
+      'Use when the user asks "what could go wrong with this show?", "is everything on track?", "what needs my attention?", or "how is Friday looking?". ' +
+      'Narrate in prose; never aggregate the signals into a probability or readiness score (that\u2019s the Show Health pill\u2019s job, not yours).',
+    inputSchema: z.object({
+      eventId: z.string().optional().describe('Event ID (resolved from page/deal context if omitted)'),
+      dealId: z.string().optional().describe('Deal ID — used to look up the linked event when no eventId is given'),
+    }),
+    execute: async (params) => {
+      let eventId = params.eventId;
+      if (!eventId && ctx.pageContext?.type === 'event' && ctx.pageContext.entityId) {
+        eventId = ctx.pageContext.entityId;
+      }
+      if (!eventId && (params.dealId || (ctx.pageContext?.type === 'deal' && ctx.pageContext.entityId))) {
+        const dId = params.dealId ?? ctx.pageContext?.entityId;
+        if (dId) {
+          const deal = await getDeal(dId);
+          eventId = deal?.event_id ?? undefined;
+        }
+      }
+      if (!eventId) {
+        const searched = await getSubstrateCounts(workspaceId);
+        return envelope([], searched, { reason: 'event_not_found', hint: 'No event in view. Provide eventId or dealId for a deal that has been handed over.' });
+      }
+
+      const { getEventSignals } = await import('@/app/(dashboard)/(features)/crm/actions/get-event-signals');
+      const signals = await getEventSignals(eventId);
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(signals, searched, {
+        reason: signals.length === 0 ? 'no_signals_to_report' : 'has_data',
+        hint: signals.length === 0
+          ? 'No signals fired — narrate that the show is advancing on cadence. Do NOT invent concerns.'
+          : 'Quote the `sentence` field verbatim or paraphrase tightly. Lead with the highest-severity signal. Never aggregate into a status verdict.',
+      });
     },
   });
 
@@ -1469,12 +1537,12 @@ export function createKnowledgeTools(ctx: AionToolContext) {
 
   return {
     search_entities, get_entity_details,
-    get_deal_details, get_deal_crew, get_proposal_details,
+    get_deal_details, get_deal_crew, get_deal_signals, get_proposal_details,
     check_crew_availability: check_crew_availability_tool,
     get_entity_schedule, get_calendar_events, get_entity_financial_summary,
     get_pipeline_summary, get_revenue_summary, get_revenue_trend, get_client_concentration, get_client_insights,
     search_workspace_knowledge, get_proactive_insights, dismiss_insight,
-    get_run_of_show, get_event_financials,
+    get_run_of_show, get_event_financials, get_event_signals,
     lookup_historical_deals, lookup_catalog,
     get_latest_messages,
     lookup_client_messages,

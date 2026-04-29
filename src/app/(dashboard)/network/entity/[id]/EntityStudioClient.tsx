@@ -84,16 +84,25 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
     );
   }
 
+  // External-partner persons split by relationship direction. Freelancers /
+  // vendors get the FreelancerEntityForm (skills, business functions, day
+  // rates). Clients are people we work FOR, not people we hire — they need
+  // the plain PersonEntityForm without crew fields.
   if (details.kind === 'external_partner' && dirType === 'person') {
-    return (
-      <FreelancerEntityForm
-        details={details}
-        sourceOrgId={sourceOrgId}
-        initialAttrs={initialEmployeeAttrs ?? null}
-        returnPath={returnPath ?? '/network'}
-        workspaceId={workspaceId ?? undefined}
-      />
-    );
+    const isClient = details.direction === 'client'
+      || details.relationshipTypeRaw === 'client'
+      || details.relationshipTypeRaw === 'client_company';
+    if (!isClient) {
+      return (
+        <FreelancerEntityForm
+          details={details}
+          sourceOrgId={sourceOrgId}
+          initialAttrs={initialEmployeeAttrs ?? null}
+          returnPath={returnPath ?? '/network'}
+          workspaceId={workspaceId ?? undefined}
+        />
+      );
+    }
   }
 
   if (dirType === 'person' && initialPersonAttrs !== undefined) {

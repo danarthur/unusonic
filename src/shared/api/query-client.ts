@@ -31,7 +31,13 @@ function makeQueryClient() {
       queries: {
         staleTime: 60_000,
         gcTime: 300_000,
-        refetchOnWindowFocus: true,
+        // Quiet on tab focus. With our 30-60s staleTime + explicit
+        // invalidateQueries after mutations + real-time subscriptions where
+        // they exist, refetching every active query when the user tabs back
+        // from another window is more disruption than data freshness gain —
+        // they see the whole page reload after a 5-minute Slack detour. This
+        // matches the calm-by-default posture of Linear / Superhuman / Notion.
+        refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
           // Never retry auth errors — surface the overlay immediately
           if (isAuthError(error)) return false;

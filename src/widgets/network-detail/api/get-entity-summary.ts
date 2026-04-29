@@ -70,11 +70,14 @@ type EntityRow = {
 };
 
 function formatFallbackNarrative(entity: EntityRow | null): string {
+  // Used when there are no captures yet — the LLM has nothing to synthesize.
+  // Stay neutral about relationship: a CLIENT entity here was misnarrated
+  // as "on your roster" before, which conflates clients with crew. The
+  // fallback should describe what we know (the entity exists) and prompt
+  // for the action that builds real context (a capture).
   if (!entity) return 'No notes yet — capture a voice note to start building context.';
   const name = entity.display_name ?? 'This contact';
-  const type = entity.type ?? 'contact';
-  const article = type === 'person' ? 'a' : type === 'venue' ? 'a' : 'an';
-  return `${name} is ${article} ${type} on your roster. Leave a voice note to start building context.`;
+  return `No captures on ${name} yet. Leave a voice note to start building context.`;
 }
 
 const AFFILIATION_RELATIONSHIP_TYPES = [

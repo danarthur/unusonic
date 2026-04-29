@@ -8,6 +8,7 @@
     "dev:clean": "node scripts/dev-clean.js",
     "dev:turbo": "npx next dev --turbopack -p 3000",
     "build": "npx next build --webpack",
+    "build:analyze": "ANALYZE=true npx next build --webpack",
     "start": "npx next start -p 3000",
     "lint": "eslint",
     "lint:baseline:snapshot": "node scripts/eslint-baseline.mjs --snapshot",
@@ -92,6 +93,7 @@
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
+    "@next/bundle-analyzer": "^16.2.4",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4.0.0",
     "@testing-library/dom": "^10.4.1",

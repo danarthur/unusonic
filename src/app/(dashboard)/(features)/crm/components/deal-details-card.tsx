@@ -33,6 +33,7 @@ import { getEntityDisplayName } from '../actions/lookup';
 import type { ProposalWithItems } from '@/features/sales/model/types';
 import { formatRelTime } from '@/shared/lib/format-currency';
 import { LeadSourceSheet } from './lead-source-sheet';
+import type { DealSignal } from '../lib/compute-deal-signals';
 
 // =============================================================================
 // Helpers
@@ -46,6 +47,38 @@ function EntityIcon({ entityType, className }: { entityType: string | null | und
 }
 
 const budgetFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+/**
+ * One row in the signal stack — label on the left, fact on the right.
+ * Polarity drives the marker color: positive (success), negative (warning
+ * for medium / error for high), neutral (text-tertiary). Severity decides
+ * how loud the negative read is — a missed deposit shouldn't whisper.
+ */
+function SignalRow({ signal }: { signal: DealSignal }) {
+  const markerColor =
+    signal.polarity === 'positive'
+      ? 'var(--color-unusonic-success)'
+      : signal.polarity === 'negative'
+        ? signal.severity === 'high'
+          ? 'var(--color-unusonic-error)'
+          : 'var(--color-unusonic-warning)'
+        : 'var(--stage-text-tertiary)';
+  return (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <span
+        aria-hidden
+        className="size-1.5 rounded-full shrink-0"
+        style={{ backgroundColor: markerColor }}
+      />
+      <span className="stage-label text-[var(--stage-text-secondary)] shrink-0">
+        {signal.label}
+      </span>
+      <span className="stage-readout text-[var(--stage-text-primary)] truncate ml-auto text-right">
+        {signal.value}
+      </span>
+    </div>
+  );
+}
 
 // =============================================================================
 // VendorSlotPicker — inline search for partners/vendors
@@ -151,6 +184,13 @@ export type DealDetailsCardProps = {
   onStakeholdersChange: () => void;
   /** undefined = still loading, null = fetched but no proposal exists */
   initialProposal?: ProposalWithItems | null;
+  /**
+   * Per-deal signal stack (Path A, 2026-04-28). Replaces the dead
+   * `deal.win_probability` field. Same source as Aion's get_deal_signals
+   * tool — the card and the chat read identical signals from one server
+   * function. See lib/compute-deal-signals.ts.
+   */
+  signals?: DealSignal[];
 };
 
 // React.memo at the bottom of the file. DealDetailsCard renders venue +
@@ -166,6 +206,7 @@ function DealDetailsCardImpl({
   sourceOrgId,
   onStakeholdersChange,
   initialProposal,
+  signals = [],
 }: DealDetailsCardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -361,8 +402,6 @@ function DealDetailsCardImpl({
   const depositPaidAt = initialProposal?.deposit_paid_at;
   const pastDealsCount = client?.pastDealsCount ?? 0;
   const mainContact = client?.mainContact;
-  const winProbability = (deal as DealDetail & { win_probability?: number | null }).win_probability ?? null;
-
   type StatItem = {
     label: string;
     value: string | null;   // null → show empty state
@@ -406,18 +445,6 @@ function DealDetailsCardImpl({
       value: referrerDisplayName ?? 'Loading…',
       onClick: () => setLeadSourceSheetOpen(true),
     }] : []),
-    {
-      label: 'Win probability',
-      value: winProbability != null ? `${winProbability}%` : null,
-      empty: '—',
-      color: winProbability != null
-        ? winProbability >= 70
-          ? 'var(--color-unusonic-success)'
-          : winProbability >= 40
-            ? 'var(--color-unusonic-warning)'
-            : 'var(--color-unusonic-error)'
-        : undefined,
-    },
   ];
 
   // ── Conditional fields: only shown when data exists ──
@@ -550,6 +577,17 @@ function DealDetailsCardImpl({
             );
           })}
         </div>
+
+        {/* Signal stack — observable facts, no number, no bucket. Top 3 by
+            severity so the highest-attention items lead. Aion narrates the
+            same set in prose via its get_deal_signals tool. */}
+        {signals.length > 0 && (
+          <div className="border-t border-[oklch(1_0_0_/_0.06)] mt-4 pt-4 flex flex-col gap-2">
+            {signals.slice(0, 3).map((s) => (
+              <SignalRow key={s.key} signal={s} />
+            ))}
+          </div>
+        )}
 
         {/* Partners / vendors */}
         {hasVendors && (
