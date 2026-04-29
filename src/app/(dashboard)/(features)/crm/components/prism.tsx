@@ -330,14 +330,40 @@ export function Prism({
   }, [isEvent, linkedDeal?.id]);
 
   // Fetch ledger data when the ledger lens is active and an eventId is known.
+  // placeholderData: keepPreviousData holds the previous ledger payload visible
+  // when the user switches deals (sibling-switch within the Ledger lens) so
+  // the body doesn't flash empty between resolves. perf-patterns.md §2.
   const ledgerEventId = isEvent ? selectedId : deal?.event_id ?? null;
   const ledgerQuery = useQuery({
     queryKey: ['crm', workspaceId ?? '', 'ledger', ledgerEventId ?? ''] as const,
     queryFn: () => getEventLedger(ledgerEventId!),
     enabled: lens === 'ledger' && !!ledgerEventId,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
   const ledger: EventLedgerDTO | null = ledgerQuery.data ?? null;
+
+  // Hover prefetch on the Ledger tab — warms the ledger query so the click-
+  // to-paint feels instant. 150ms intent delay matches the Network detail
+  // sheet pattern. perf-patterns.md §4.
+  const ledgerHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleLedgerHover = () => {
+    if (!ledgerEventId) return;
+    if (ledgerHoverTimerRef.current) clearTimeout(ledgerHoverTimerRef.current);
+    ledgerHoverTimerRef.current = setTimeout(() => {
+      queryClient.prefetchQuery({
+        queryKey: ['crm', workspaceId ?? '', 'ledger', ledgerEventId] as const,
+        queryFn: () => getEventLedger(ledgerEventId),
+        staleTime: 30_000,
+      });
+    }, 150);
+  };
+  const handleLedgerHoverLeave = () => {
+    if (ledgerHoverTimerRef.current) {
+      clearTimeout(ledgerHoverTimerRef.current);
+      ledgerHoverTimerRef.current = null;
+    }
+  };
 
   const refetchDealAndClient = () => {
     if (!selectedId) return;
@@ -674,6 +700,7 @@ export function Prism({
           ).map((tab) => {
             const disabled = tab.value === 'ledger' && !isEvent && !deal?.event_id;
             const isActive = lens === tab.value;
+            const isLedgerTab = tab.value === 'ledger';
             return (
               <button
                 key={tab.value}
@@ -682,6 +709,8 @@ export function Prism({
                 aria-selected={isActive}
                 aria-disabled={disabled}
                 onClick={() => !disabled && setLens(tab.value)}
+                onMouseEnter={isLedgerTab && !disabled ? handleLedgerHover : undefined}
+                onMouseLeave={isLedgerTab ? handleLedgerHoverLeave : undefined}
                 disabled={disabled}
                 className={cn(
                   'relative z-10 px-4 py-1.5 stage-label transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',

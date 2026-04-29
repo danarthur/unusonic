@@ -42,7 +42,7 @@ import { Button } from '@/shared/ui/button';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
-import { useSession, type Message as SessionMessage } from '@/shared/ui/providers/SessionContext';
+import { useSession } from '@/shared/ui/providers/SessionContext';
 import { useRequiredWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import type {
   AionCardData,
@@ -65,6 +65,17 @@ import {
   getActiveSignalDisablesForWorkspace,
   getUnseenPillCountsForDeals,
 } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
+import type { AionChatMessage, PrimaryRecommendation } from './aion-deal-card/types';
+import {
+  composeSignals,
+  daysSince,
+  formatRelativeDate,
+  humanizeStageTag,
+} from './aion-deal-card/signals';
+import {
+  ConversationThread,
+  AionChatInput,
+} from './aion-deal-card/conversation-thread';
 
 // Lazy-load the pill-history Sheet — keeps Prism mount budget unchanged
 // (design §4.1). Only fetches when the user actually opens History.
@@ -100,15 +111,10 @@ export type AionDealCardProps = {
 
 // Discriminator for the primary recommendation. Outbound-first bias matches
 // User Advocate's mental model (relationship work > internal stage move).
-type PrimaryRecommendation =
-  | { kind: 'outbound'; row: OutboundRow }
-  | { kind: 'pipeline'; row: PipelineRow };
-
-// Chat conversation message shape — uses SessionContext's Message type so the
-// card renders the same thread rows the Aion tab does. Role can be 'user' |
-// 'assistant' | 'system'; the card's MessageBubble treats anything non-'user'
-// as Aion-authored (visually identical to the legacy 'aion' literal).
-export type AionChatMessage = SessionMessage;
+// PrimaryRecommendation + AionChatMessage moved to ./aion-deal-card/types
+// (Phase 0.5-style split, 2026-04-28). Re-exported above for callers that
+// historically imported them from this file.
+export type { AionChatMessage };
 
 /**
  * Simple tailwind-style breakpoint hook — mirrors `md:` (768) and `lg:` (1024)
@@ -165,6 +171,7 @@ function AionDealCardImpl({
     messages: sessionMessages,
     sessions: allSessions,
     currentSessionId,
+    isLoadingSession,
     openScopedSession,
     createNewScopedChat,
     sendChatMessage,
@@ -513,6 +520,7 @@ function AionDealCardImpl({
             messages={messages}
             threadTitle={threadTitle}
             sessionId={dealSessionId}
+            isLoadingSession={isLoadingSession}
             onNewChat={handleNewChatInScope}
             onCollapse={toggleChatCollapsed}
           />
@@ -827,240 +835,6 @@ function formatShortDate(iso: string): string {
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
-
-// ---------------------------------------------------------------------------
-// Conversation thread — renders user/Aion messages as they accumulate.
-// Empty by default; appears above the input footer once messages exist.
-// Scrolls internally at max-h to keep the card's overall height bounded.
-// Backend wiring persists thread state (deal diary) separately.
-// ---------------------------------------------------------------------------
-
-function ConversationThread({
-  messages,
-  threadTitle,
-  sessionId,
-  onNewChat,
-  onCollapse,
-}: {
-  messages: AionChatMessage[];
-  threadTitle: string;
-  /** Current session id — powers the "Open in Aion" deep-link. NULL during
-   *  the brief mount window before openScopedSession resolves. */
-  sessionId: string | null;
-  /** Spawn a fresh thread in this deal scope (same production, new topic). */
-  onNewChat: () => void;
-  /** Collapse the chat region (thread + input). Parent persists the state
-   *  per-deal so each production remembers its preference. */
-  onCollapse: () => void;
-}) {
-  const endRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (messages.length > 0) {
-      endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  }, [messages.length]);
-
-  if (messages.length === 0) return null;
-
-  // Deep-link into /aion with this session pre-selected. AionPageClient reads
-  // the `session` query param and hands it to selectSession on mount.
-  const openInAionHref = sessionId
-    ? `/aion?session=${encodeURIComponent(sessionId)}`
-    : '/aion';
-
-  return (
-    <div
-      className="mt-3 pt-3 flex flex-col"
-      style={{ borderTop: '1px solid var(--stage-edge-subtle)' }}
-    >
-      {/* Thread header — title + controls. Card compression fix per
-          docs/reference/aion-deal-chat-design.md §3 (sticky header above a
-          fixed-height scroll region keeps the card from becoming a monolith
-          as the thread grows). */}
-      <div className="flex items-center gap-1.5 pb-2">
-        <p
-          className="text-xs truncate flex-1 leading-none"
-          style={{ color: 'var(--stage-text-secondary)' }}
-          title={threadTitle}
-        >
-          {threadTitle}
-        </p>
-        <button
-          type="button"
-          onClick={onNewChat}
-          className={cn(
-            'shrink-0 p-1 rounded-[4px]',
-            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
-            'hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]',
-          )}
-          aria-label="New chat about this production"
-          title="New chat about this production"
-        >
-          <Plus size={13} strokeWidth={1.5} />
-        </button>
-        <Link
-          href={openInAionHref}
-          className={cn(
-            'shrink-0 p-1 rounded-[4px]',
-            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
-            'hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]',
-          )}
-          aria-label="Open in Aion"
-          title="Open in Aion"
-        >
-          <ExternalLink size={13} strokeWidth={1.5} />
-        </Link>
-        <button
-          type="button"
-          onClick={onCollapse}
-          className={cn(
-            'shrink-0 p-1 rounded-[4px]',
-            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
-            'hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]',
-          )}
-          aria-label="Minimize chat"
-          title="Minimize chat"
-        >
-          <ChevronDown size={13} strokeWidth={1.5} />
-        </button>
-      </div>
-
-      {/* Fixed-height scroll region — 320px matches Field Expert spec. Keeps
-          the briefing + signals always visible even as the conversation
-          grows. The "Open in Aion" link is the escape valve for longer
-          reviews of history. */}
-      <div
-        className="h-[320px] overflow-y-auto space-y-2 pr-1"
-        data-surface="elevated"
-      >
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
-        <div ref={endRef} />
-      </div>
-    </div>
-  );
-}
-
-function MessageBubble({ message }: { message: AionChatMessage }) {
-  const isUser = message.role === 'user';
-  // Assistant messages lead with the AionMark living logo as the avatar —
-  // identity signature for every Aion turn. User turns render right-aligned
-  // without an avatar (the user is implicit).
-  return (
-    <div className={cn('flex items-start gap-2', isUser ? 'justify-end' : 'justify-start')}>
-      {!isUser && (
-        <div className="shrink-0 mt-0.5">
-          <AionMark size={22} status="ambient" />
-        </div>
-      )}
-      <div
-        className={cn(
-          'max-w-[80%] rounded-md px-3 py-2 leading-snug',
-          isUser
-            ? 'bg-[var(--stage-surface-raised)] shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]'
-            : 'bg-[var(--ctx-card)]',
-        )}
-        style={{
-          fontSize: 'var(--stage-text-body, 13px)',
-          color: isUser
-            ? 'var(--stage-text-primary)'
-            : 'var(--stage-text-secondary)',
-        }}
-      >
-        {/* Assistant text is run through AionMarkdown so inline <citation>
-            tags render as clickable CitationPills (Phase 2 §3.1.3). User
-            text is left plain — no markdown on human-authored input. */}
-        {!isUser && (message as { preamble?: string }).preamble?.trim() && (
-          <div
-            className="mb-1.5 flex items-start gap-1 text-[0.72rem] italic leading-snug"
-            style={{ color: 'var(--stage-text-tertiary)' }}
-            aria-label="Aion's reasoning"
-          >
-            <Sparkles size={9} strokeWidth={1.5} className="shrink-0 mt-[3px] opacity-60" aria-hidden />
-            <span className="whitespace-pre-wrap">
-              {(message as { preamble?: string }).preamble!.trim()}
-            </span>
-          </div>
-        )}
-        {isUser ? message.content : <AionMarkdown content={message.content} />}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Deal-scoped chat input — scaffold only, backend wires separately.
-// Every message implicitly carries this deal's context, so users never
-// re-state the subject. Microphone button reserves the voice-input slot.
-// ---------------------------------------------------------------------------
-
-function AionChatInput({
-  onSend,
-}: {
-  onSend?: (content: string) => void;
-}) {
-  const [value, setValue] = React.useState('');
-  const inputRef = React.useRef<HTMLInputElement>(null);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    onSend?.(trimmed);
-    setValue('');
-  };
-
-  const handleMicClick = () => {
-    // Placeholder for voice capture — will wire into the existing voice
-    // pipeline (AionVoice component or Web Speech API) in the backend pass.
-    inputRef.current?.focus();
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="flex-1 min-w-0 flex items-center gap-1.5">
-      <div
-        className={cn(
-          'flex items-center flex-1 min-w-0 rounded-md px-3',
-          'bg-[var(--ctx-well)]',
-          'border border-[var(--stage-edge-subtle)]',
-          'focus-within:border-[var(--stage-accent)]',
-          'focus-within:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)]',
-          'transition-colors',
-        )}
-        style={{ height: 'calc(var(--stage-input-height, 34px) - 6px)' }}
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Ask Aion about this deal…"
-          className={cn(
-            'flex-1 min-w-0 bg-transparent outline-none',
-            'text-sm text-[var(--stage-text-primary)]',
-            'placeholder:text-[var(--stage-text-tertiary,var(--stage-text-secondary))]',
-          )}
-        />
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Voice input"
-        onClick={handleMicClick}
-        className="text-[var(--stage-text-secondary)] shrink-0"
-      >
-        <Mic className="size-3.5" aria-hidden />
-      </Button>
-    </form>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Footer actions — one or two co-equal CTAs
-// ---------------------------------------------------------------------------
 
 function FooterActions({
   primary,
@@ -1523,119 +1297,6 @@ function NudgeComposer({
       </div>
     </motion.div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Signals composer — derive a short evidence list from available data.
-// Phase 1: uses what today's composer already ships (reason label, lastTouchAt,
-// cadenceTooltip, voice signals). Phase 2 will replace with a richer
-// source-bound signals array produced by the server composer.
-// ---------------------------------------------------------------------------
-
-function composeSignals({
-  data,
-  primary,
-}: {
-  data: AionCardData;
-  primary: PrimaryRecommendation;
-}): SignalEntry[] {
-  const out: SignalEntry[] = [];
-
-  // Primary recommendation's own evidence first.
-  if (primary.kind === 'outbound') {
-    if (primary.row.reasonLabel) {
-      out.push({ label: 'Status', value: primary.row.reasonLabel, kind: 'context' });
-    }
-    if (primary.row.lastTouchAt) {
-      const days = daysSince(primary.row.lastTouchAt);
-      if (days != null) {
-        out.push({
-          label: 'No reply since',
-          value: formatRelativeDate(primary.row.lastTouchAt, days),
-          kind: 'timing',
-        });
-      }
-    }
-  } else if (primary.row.title) {
-    out.push({ label: 'Ready for', value: primary.row.title, kind: 'context' });
-  }
-
-  // Stall context — "4d in stage (past 7d rot threshold)"
-  if (data.stall?.daysInStage != null) {
-    const dwell = data.stall.daysInStage;
-    const rot = data.stall.stageRottingDays;
-    const value = rot != null && dwell >= rot
-      ? `${dwell}d · past ${rot}d rot threshold`
-      : `${dwell}d`;
-    out.push({ label: 'Stage dwell', value, kind: 'timing' });
-  }
-
-  // Cadence profile — "You typically follow up every 3-5 days"
-  if (data.cadence?.typicalDaysBetweenFollowups != null) {
-    out.push({
-      label: 'Your cadence',
-      value: `every ${data.cadence.typicalDaysBetweenFollowups}d between touches`,
-      kind: 'behavior',
-    });
-  } else if (data.cadenceTooltip) {
-    // Fallback: use the prebuilt tooltip when the numeric profile isn't present.
-    out.push({ label: 'Cadence', value: data.cadenceTooltip, kind: 'behavior' });
-  }
-
-  // Event approach — "38 days out" (only if not already in the snapshot strip
-  // i.e. suppress when we have the full date, since the strip carries it)
-  if (data.urgency.daysOut != null && data.urgency.daysOut <= 14) {
-    // Only surface when imminent — the snapshot strip covers the far-out case.
-    out.push({
-      label: 'Event',
-      value: `${data.urgency.daysOut} day${data.urgency.daysOut === 1 ? '' : 's'} out`,
-      kind: 'timing',
-    });
-  }
-
-  // voiceSignals dedupe — skip slug-shaped entries (they're machine flags,
-  // not display-ready). Only human-case strings get surfaced.
-  for (const sig of data.voiceSignals) {
-    if (/[A-Z]|[ ]/.test(sig) && !out.some((e) => e.value === sig)) {
-      out.push({ label: 'Signal', value: sig, kind: 'context' });
-      if (out.length >= 5) break;
-    }
-  }
-
-  return out.slice(0, 5);
-}
-
-function daysSince(iso: string): number | null {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return null;
-  const now = Date.now();
-  return Math.max(0, Math.floor((now - then) / (24 * 60 * 60 * 1000)));
-}
-
-function formatRelativeDate(iso: string, days: number): string {
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 7) {
-    const weekday = new Date(iso).toLocaleDateString('en-US', { weekday: 'long' });
-    return `${weekday} (${days}d ago)`;
-  }
-  return `${days} days ago`;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function humanizeStageTag(tag: string): string {
-  const map: Record<string, string> = {
-    proposal_sent: 'Proposal',
-    contract_out: 'Contract',
-    contract_signed: 'Contract Signed',
-    deposit_received: 'Deposit Received',
-    ready_for_handoff: 'Handoff',
-    won: 'Won',
-  };
-  return map[tag] ?? tag.replace(/_/g, ' ');
 }
 
 // Silence unused-type warning when PriorityBreakdown import is only used
