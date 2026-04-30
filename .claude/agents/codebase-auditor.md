@@ -153,7 +153,7 @@ All colors must come from OKLCH design tokens in globals.css. Hex bypasses themi
 
 **What NOT to flag:**
 - `bg-[var(--brand-spotify-green)]` and similar — that's the canonical pattern.
-- `bg-[oklch(...)]` / `bg-[var(--stage-*)]` — token-respecting.
+- `bg-[oklch(...)]` / `bg-[var(--stage-{token})]` — token-respecting. (NOTE: do not write the literal wildcard form `var(--stage-*)` anywhere in the repo — Tailwind v4 scans all files and will emit broken CSS.)
 
 ---
 
