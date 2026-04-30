@@ -291,11 +291,19 @@ export function PlanLens({
 
   // Phase 5c of the proposal→gear lineage plan: gear margin (sold vs planned)
   // surfaced as a tier on FinancialSummaryCard.
+  //
+  // Caching tuned to avoid compounding the Plan tab's already-busy network
+  // (100+ parallel fetches in dev mode). Variance is a derived figure — it
+  // doesn't need to refetch every window focus or visibility change. Drift
+  // accept actions invalidate via the gear-card refetch path; for everything
+  // else, 5 min of staleness is fine.
   const { data: gearVariance } = useQuery<GearVarianceResult | null>({
     queryKey: ['plan-lens', 'gear-variance', eventScopedId],
     queryFn: () => (eventScopedId ? getGearVariance(eventScopedId) : Promise.resolve(null)),
     enabled: !!eventScopedId,
     placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Payment milestones for timeline
