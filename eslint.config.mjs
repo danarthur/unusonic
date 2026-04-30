@@ -182,6 +182,26 @@ const eslintConfig = defineConfig([
     },
   },
 
+  // ─── Audit redesign 2026-04-29 — prospective security checks ───────────────
+  // no-mutation-without-authz: server actions using getSystemClient() to
+  //   mutate workspace-scoped rows must call an authz helper first.
+  //   Catches the 2026-04-10 PUBLIC-grants sev-zero shape.
+  // webhook-verify-before-parse: webhook routes must use req.text() for
+  //   raw body so signature verification works.
+  {
+    files: [
+      "src/app/api/**/*.ts",
+      "src/features/**/api/**/*.ts",
+      "src/app/**/actions/**/*.ts",
+      "src/app/**/actions.ts",
+    ],
+    plugins: { "stage-engineering": stageEngineering },
+    rules: {
+      "stage-engineering/no-mutation-without-authz": "warn",
+      "stage-engineering/webhook-verify-before-parse": "error",
+    },
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Protocol v2 — SECURITY BOUNDARIES (error from Day 0)
   // ═══════════════════════════════════════════════════════════════════════════

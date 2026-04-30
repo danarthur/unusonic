@@ -57,6 +57,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let body: ResendWebhookBody;
   try {
+    // eslint-disable-next-line stage-engineering/webhook-verify-before-parse -- header-shared-secret auth (verifySecret above), not body-signed. TODO: upgrade to svix-signed when Resend pushes the migration.
     body = (await req.json()) as ResendWebhookBody;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });

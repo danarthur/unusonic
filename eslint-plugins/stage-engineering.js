@@ -826,6 +826,190 @@ const requireConfirmedBeforeDispatch = {
 };
 
 
+// ── no-mutation-without-authz ────────────────────────────────────────────────
+//
+// Catches the sev-zero shape from the 2026-04-10 PUBLIC-grants incident: a
+// `'use server'` action that uses `getSystemClient()` (service-role, bypasses
+// RLS) to mutate a workspace-scoped row without first reaching an authz helper.
+// RLS is the backstop for cookie-session clients; service-role code paths have
+// no backstop, so the gate must be explicit in app code.
+//
+// Triggers when ALL of:
+//   1. File contains `'use server'` directive.
+//   2. File imports `getSystemClient` from `@/shared/api/supabase/system`.
+//   3. File contains a mutation call: `.insert(`, `.update(`, `.delete(`, `.upsert(`.
+//
+// Passes when the file ALSO imports any of:
+//   - `requireRole`, `requirePermission`, `hasCapability` from permissions
+//   - `requireTierCapability` from tier-gate
+//   - `requireBillingActive` from billing-gate
+//   - `requireFeatureEnabled` from feature-flags
+//   - `requireStepUp` from client-portal/step-up
+//   - `requireWorkspaceMember` (any source — convention)
+//   - Has an `// AUTHZ-OK:` line comment with a reason
+//
+// False positive: a file that gates via a wrapper imported from a sibling
+// module. Silence with `eslint-disable-next-line ... no-mutation-without-authz`
+// at the import or with `// AUTHZ-OK: gates via xWrapper` near the top.
+
+const AUTHZ_HELPER_NAMES = new Set([
+  // Workspace-scoped permission helpers
+  "requireRole",
+  "requirePermission",
+  "hasCapability",
+  "requireTierCapability",
+  "requireBillingActive",
+  "requireFeatureEnabled",
+  "requireWorkspaceMember",
+  "memberHasPermission",
+  "userHasWorkspaceRole",
+  // Client-portal / step-up gates
+  "requireStepUp",
+  // Aion write-tool confirmation gates
+  "requireConfirmed",
+  "markExecuted",
+]);
+
+const SYSTEM_CLIENT_IMPORT = "@/shared/api/supabase/system";
+const MUTATION_METHOD_NAMES = new Set(["insert", "update", "delete", "upsert"]);
+
+const noMutationWithoutAuthz = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Server actions using the service-role client to mutate must call an authz helper first.",
+    },
+    schema: [],
+    messages: {
+      missingAuthz:
+        "Server action uses getSystemClient() to call .{{method}}(...) but doesn't import an authz helper. Service-role bypasses RLS — the workspace-membership check must be explicit in app code. Import one of: requireRole, requirePermission, hasCapability, requireWorkspaceMember. Or add `// AUTHZ-OK: <reason>` comment if the gate is in a wrapper.",
+    },
+  },
+  create(context) {
+    const sourceCode = context.sourceCode;
+    let isUseServerFile = false;
+    let importsSystemClient = false;
+    let importsAuthzHelper = false;
+    let hasAuthzOkComment = false;
+    const mutationCalls = [];
+
+    return {
+      Program(node) {
+        // Check for 'use server' directive at top of file
+        for (const directive of node.body) {
+          if (
+            directive.type === "ExpressionStatement" &&
+            directive.expression?.type === "Literal" &&
+            directive.expression.value === "use server"
+          ) {
+            isUseServerFile = true;
+            break;
+          }
+          // Stop at first non-directive
+          if (directive.type !== "ExpressionStatement") break;
+        }
+
+        // Check for AUTHZ-OK comment anywhere in the file
+        const comments = sourceCode.getAllComments();
+        for (const c of comments) {
+          if (/AUTHZ-OK:/i.test(c.value)) {
+            hasAuthzOkComment = true;
+            break;
+          }
+        }
+      },
+      ImportDeclaration(node) {
+        const src = node.source?.value;
+        if (typeof src !== "string") return;
+
+        if (src === SYSTEM_CLIENT_IMPORT) {
+          importsSystemClient = true;
+        }
+        for (const spec of node.specifiers) {
+          if (spec.type === "ImportSpecifier" && AUTHZ_HELPER_NAMES.has(spec.imported?.name)) {
+            importsAuthzHelper = true;
+          }
+        }
+      },
+      CallExpression(node) {
+        // Match `<expr>.<method>(...)` where method is a mutation
+        const callee = node.callee;
+        if (
+          callee?.type === "MemberExpression" &&
+          callee.property?.type === "Identifier" &&
+          MUTATION_METHOD_NAMES.has(callee.property.name)
+        ) {
+          mutationCalls.push({ node, method: callee.property.name });
+        }
+      },
+      "Program:exit"() {
+        if (!isUseServerFile) return;
+        if (!importsSystemClient) return;
+        if (mutationCalls.length === 0) return;
+        if (importsAuthzHelper || hasAuthzOkComment) return;
+        // Report on the first mutation only — once per file is enough
+        const first = mutationCalls[0];
+        context.report({
+          node: first.node,
+          messageId: "missingAuthz",
+          data: { method: first.method },
+        });
+      },
+    };
+  },
+};
+
+// ── webhook-verify-before-parse ──────────────────────────────────────────────
+//
+// Webhook routes must read the raw request body via `req.text()` (or equivalent)
+// so the signature can be verified against the unmodified bytes. Calling
+// `req.json()` consumes the body and discards the raw form, making signature
+// verification impossible — and any subsequent processing trusts an
+// unauthenticated payload.
+//
+// Triggers when ALL of:
+//   1. File path contains `/webhooks/` (route handler under app/api/.../webhooks/).
+//   2. File contains `req.json()` or `request.json()` call.
+//
+// Silence with eslint-disable when the webhook vendor signs via header (rare;
+// most signed webhooks need raw body).
+
+const webhookVerifyBeforeParse = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Webhook route handlers must use req.text() (raw body) so signature verification works.",
+    },
+    schema: [],
+    messages: {
+      jsonInWebhook:
+        "Webhook route called req.json() — signature verification needs the raw body. Use `await req.text()` and pass the string to the verifier (e.g. `stripe.webhooks.constructEvent(rawBody, sig, secret)`). Then JSON.parse the body if needed AFTER verification.",
+    },
+  },
+  create(context) {
+    const filename = context.filename || context.getFilename();
+    if (!filename.includes("/webhooks/")) return {};
+
+    return {
+      CallExpression(node) {
+        const callee = node.callee;
+        if (
+          callee?.type === "MemberExpression" &&
+          callee.property?.type === "Identifier" &&
+          callee.property.name === "json" &&
+          callee.object?.type === "Identifier" &&
+          /^(req|request)$/.test(callee.object.name)
+        ) {
+          context.report({ node, messageId: "jsonInWebhook" });
+        }
+      },
+    };
+  },
+};
+
+
 // ── Plugin export ────────────────────────────────────────────────────────────
 
 const plugin = {
@@ -848,6 +1032,9 @@ const plugin = {
     "require-wrap-untrusted": requireWrapUntrusted,
     // Phase 3 Sprint 2 §3.5 C3 rail — confirm gate before dispatch
     "require-confirmed-before-dispatch": requireConfirmedBeforeDispatch,
+    // Audit redesign 2026-04-29 — prospective security checks
+    "no-mutation-without-authz": noMutationWithoutAuthz,
+    "webhook-verify-before-parse": webhookVerifyBeforeParse,
   },
 };
 
