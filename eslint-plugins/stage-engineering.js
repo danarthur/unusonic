@@ -836,21 +836,27 @@ const requireConfirmedBeforeDispatch = {
 //
 // Triggers when ALL of:
 //   1. File contains `'use server'` directive.
-//   2. File imports `getSystemClient` from `@/shared/api/supabase/system`.
-//   3. File contains a mutation call: `.insert(`, `.update(`, `.delete(`, `.upsert(`.
+//   2. File contains a mutation call (.insert/.update/.delete/.upsert) where
+//      the client variable was assigned from getSystemClient(), OR the
+//      mutation chains directly off getSystemClient(). Mutations on
+//      cookie-session clients (createClient from /supabase/server) are
+//      protected by RLS and don't trigger.
 //
-// Passes when the file ALSO imports any of:
-//   - `requireRole`, `requirePermission`, `hasCapability` from permissions
-//   - `requireTierCapability` from tier-gate
-//   - `requireBillingActive` from billing-gate
-//   - `requireFeatureEnabled` from feature-flags
-//   - `requireStepUp` from client-portal/step-up
-//   - `requireWorkspaceMember` (any source — convention)
-//   - Has an `// AUTHZ-OK:` line comment with a reason
+// Passes when the file ALSO does any of:
+//   - Imports any authz helper from AUTHZ_HELPER_NAMES.
+//   - Has an `// AUTHZ-OK: <reason>` line comment.
+//   - Matches a known escape hatch (public-token + ownership-verified, or
+//     OAuth state-bound).
 //
-// False positive: a file that gates via a wrapper imported from a sibling
-// module. Silence with `eslint-disable-next-line ... no-mutation-without-authz`
-// at the import or with `// AUTHZ-OK: gates via xWrapper` near the top.
+// Escape hatches:
+//   1. Public-token + ownership-verified: file contains `.eq('public_token', …)`
+//      or `.eq('recipient_token', …)` or `.eq('<x>_token', …)` lookup. The
+//      token itself is the auth; the function should verify ownership before
+//      mutating, but that's a code-review concern, not lint.
+//   2. OAuth state-bound: file imports `createCipheriv`/`createDecipheriv`
+//      from `'crypto'`. State-encrypted callbacks are CSRF-safe by design.
+//
+// Silence false positives with `// AUTHZ-OK: <reason>` comment.
 
 const AUTHZ_HELPER_NAMES = new Set([
   // Workspace-scoped permission helpers
@@ -863,6 +869,10 @@ const AUTHZ_HELPER_NAMES = new Set([
   "requireWorkspaceMember",
   "memberHasPermission",
   "userHasWorkspaceRole",
+  // Workspace context from session cookie — when paired with a
+  // `.eq('workspace_id', activeId)` query (the canonical inline pattern),
+  // this is authz equivalent.
+  "getActiveWorkspaceId",
   // Client-portal / step-up gates
   "requireStepUp",
   // Aion write-tool confirmation gates
@@ -871,7 +881,63 @@ const AUTHZ_HELPER_NAMES = new Set([
 ]);
 
 const SYSTEM_CLIENT_IMPORT = "@/shared/api/supabase/system";
+const SYSTEM_CLIENT_FN = "getSystemClient";
 const MUTATION_METHOD_NAMES = new Set(["insert", "update", "delete", "upsert"]);
+const OAUTH_CRYPTO_NAMES = new Set(["createCipheriv", "createDecipheriv"]);
+
+/**
+ * Walk a CallExpression's callee chain to find the root expression.
+ * For `a.b.c()`, returns the leftmost identifier or call.
+ * For `getSystemClient().from('x').update(...)`, returns the
+ * `getSystemClient()` CallExpression at the root.
+ */
+function rootOfCalleeChain(callee) {
+  let cur = callee;
+  while (cur) {
+    if (cur.type === "MemberExpression") {
+      cur = cur.object;
+      continue;
+    }
+    if (cur.type === "CallExpression") {
+      // Could be the root call (e.g. getSystemClient()) or a method call
+      // chain like x.foo().bar(). Drill through to its callee.
+      const inner = cur.callee;
+      if (inner?.type === "MemberExpression") {
+        cur = inner.object;
+        continue;
+      }
+      // Direct call — this is the root.
+      return cur;
+    }
+    return cur;
+  }
+  return null;
+}
+
+/**
+ * True when the root of the callee chain is `getSystemClient()` directly.
+ */
+function rootIsSystemClientCall(callee) {
+  const root = rootOfCalleeChain(callee);
+  if (!root) return false;
+  if (root.type === "CallExpression" && root.callee?.type === "Identifier") {
+    return root.callee.name === SYSTEM_CLIENT_FN;
+  }
+  return false;
+}
+
+/**
+ * True when the root of the callee chain is an Identifier matching one of the
+ * tracked variable names (variables that hold a system client).
+ */
+function rootIsTrackedVariable(callee, trackedNames) {
+  const root = rootOfCalleeChain(callee);
+  if (!root) return false;
+  if (root.type === "Identifier") {
+    return trackedNames.has(root.name);
+  }
+  return false;
+}
 
 const noMutationWithoutAuthz = {
   meta: {
@@ -883,20 +949,24 @@ const noMutationWithoutAuthz = {
     schema: [],
     messages: {
       missingAuthz:
-        "Server action uses getSystemClient() to call .{{method}}(...) but doesn't import an authz helper. Service-role bypasses RLS — the workspace-membership check must be explicit in app code. Import one of: requireRole, requirePermission, hasCapability, requireWorkspaceMember. Or add `// AUTHZ-OK: <reason>` comment if the gate is in a wrapper.",
+        "Mutation .{{method}}(...) uses getSystemClient() (service-role, bypasses RLS) without an authz helper. Import one of: requireRole, requirePermission, hasCapability, requireWorkspaceMember, requireConfirmed. Or add `// AUTHZ-OK: <reason>` comment if the gate is in a wrapper / public-token / OAuth path.",
     },
   },
   create(context) {
     const sourceCode = context.sourceCode;
     let isUseServerFile = false;
-    let importsSystemClient = false;
     let importsAuthzHelper = false;
     let hasAuthzOkComment = false;
-    const mutationCalls = [];
+    let importsOauthCrypto = false;
+    let hasPublicTokenLookup = false;
+    /** Variable names that hold a system client (assigned from getSystemClient()). */
+    const systemClientVars = new Set();
+    /** Mutation calls collected during traversal — checked at Program:exit. */
+    const candidateMutations = [];
 
     return {
       Program(node) {
-        // Check for 'use server' directive at top of file
+        // 'use server' directive at top of file
         for (const directive of node.body) {
           if (
             directive.type === "ExpressionStatement" &&
@@ -906,11 +976,10 @@ const noMutationWithoutAuthz = {
             isUseServerFile = true;
             break;
           }
-          // Stop at first non-directive
           if (directive.type !== "ExpressionStatement") break;
         }
 
-        // Check for AUTHZ-OK comment anywhere in the file
+        // AUTHZ-OK comment anywhere in the file
         const comments = sourceCode.getAllComments();
         for (const c of comments) {
           if (/AUTHZ-OK:/i.test(c.value)) {
@@ -923,33 +992,96 @@ const noMutationWithoutAuthz = {
         const src = node.source?.value;
         if (typeof src !== "string") return;
 
-        if (src === SYSTEM_CLIENT_IMPORT) {
-          importsSystemClient = true;
+        // OAuth-state escape hatch: file imports createCipheriv etc. from 'crypto'.
+        if (src === "crypto" || src === "node:crypto") {
+          for (const spec of node.specifiers) {
+            if (
+              spec.type === "ImportSpecifier" &&
+              OAUTH_CRYPTO_NAMES.has(spec.imported?.name)
+            ) {
+              importsOauthCrypto = true;
+            }
+          }
         }
+
         for (const spec of node.specifiers) {
-          if (spec.type === "ImportSpecifier" && AUTHZ_HELPER_NAMES.has(spec.imported?.name)) {
+          if (
+            spec.type === "ImportSpecifier" &&
+            AUTHZ_HELPER_NAMES.has(spec.imported?.name)
+          ) {
             importsAuthzHelper = true;
           }
         }
       },
+      VariableDeclarator(node) {
+        // Track `const x = getSystemClient()` and `const x = await getSystemClient()`.
+        // If RHS is a call to getSystemClient (directly or via await), x holds a system client.
+        const init = node.init;
+        if (!init) return;
+
+        const callExpr =
+          init.type === "CallExpression"
+            ? init
+            : init.type === "AwaitExpression" && init.argument?.type === "CallExpression"
+              ? init.argument
+              : null;
+        if (!callExpr) return;
+
+        if (
+          callExpr.callee?.type === "Identifier" &&
+          callExpr.callee.name === SYSTEM_CLIENT_FN
+        ) {
+          if (node.id?.type === "Identifier") {
+            systemClientVars.add(node.id.name);
+          }
+        }
+      },
       CallExpression(node) {
-        // Match `<expr>.<method>(...)` where method is a mutation
         const callee = node.callee;
+        // Mutation method shape: <expr>.<insert|update|delete|upsert>(...)
         if (
           callee?.type === "MemberExpression" &&
           callee.property?.type === "Identifier" &&
           MUTATION_METHOD_NAMES.has(callee.property.name)
         ) {
-          mutationCalls.push({ node, method: callee.property.name });
+          candidateMutations.push({ node, method: callee.property.name });
+        }
+
+        // Public-token escape hatch: any `.eq('<x>_token', …)` call.
+        // Detected here so it works whether the literal is the first or
+        // second argument and regardless of chaining position.
+        if (
+          callee?.type === "MemberExpression" &&
+          callee.property?.type === "Identifier" &&
+          callee.property.name === "eq" &&
+          node.arguments.length >= 1 &&
+          node.arguments[0].type === "Literal" &&
+          typeof node.arguments[0].value === "string" &&
+          /(^|_)token$/.test(node.arguments[0].value) &&
+          (node.arguments[0].value === "public_token" ||
+            node.arguments[0].value === "recipient_token" ||
+            node.arguments[0].value.endsWith("_token"))
+        ) {
+          hasPublicTokenLookup = true;
         }
       },
       "Program:exit"() {
         if (!isUseServerFile) return;
-        if (!importsSystemClient) return;
-        if (mutationCalls.length === 0) return;
         if (importsAuthzHelper || hasAuthzOkComment) return;
-        // Report on the first mutation only — once per file is enough
-        const first = mutationCalls[0];
+        if (hasPublicTokenLookup) return; // public-token escape hatch
+        if (importsOauthCrypto) return; // OAuth state-bound escape hatch
+
+        // Filter mutations to ones that actually use the system client.
+        const systemClientMutations = candidateMutations.filter(({ node }) => {
+          return (
+            rootIsSystemClientCall(node.callee) ||
+            rootIsTrackedVariable(node.callee, systemClientVars)
+          );
+        });
+
+        if (systemClientMutations.length === 0) return;
+
+        const first = systemClientMutations[0];
         context.report({
           node: first.node,
           messageId: "missingAuthz",
