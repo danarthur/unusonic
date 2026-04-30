@@ -76,11 +76,7 @@ export async function dispatchDwellSla(
 ): Promise<DwellSlaSummary> {
   const summary: DwellSlaSummary = { evaluated: 0, success: 0, failed: 0 };
 
-  // `evaluate_dwell_sla` RPC ships in migration 20260423000200; generated
-  // types are stale until `npm run db:types` runs post-deploy. Route through
-  // `any` — same pattern the custom-pipelines dispatcher already uses.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stale types
-  const { data, error } = await (db.schema('ops') as any).rpc('evaluate_dwell_sla', {
+  const { data, error } = await db.schema('ops').rpc('evaluate_dwell_sla', {
     p_batch_size: 100,
   });
   if (error) throw error;

@@ -225,3 +225,78 @@ export async function getStageSuggestionForDeal(
     targetTag: suggestedTag,
   };
 }
+
+export type StageSuggestion = {
+  insightId: string;
+  title: string;
+  suggestedAction: string | null;
+  targetTag: string | null;
+};
+
+/**
+ * Bulk fetch — resolve stage suggestions for many deals in one server-action
+ * round trip. Mirrors the `getUnseenPillCountsForDeals` pattern in
+ * pill-history-actions.ts.
+ *
+ * Returns a `Record<dealId, StageSuggestion | null>`. Deals with no actionable
+ * suggestion get `null`. Deals not in the workspace are silently dropped.
+ *
+ * Existed to fix the N+1 cascade where every stream-card mounted and fired
+ * its own `getStageSuggestionForDeal` independently — 10 visible cards =
+ * 10 server-action POSTs each carrying ~700ms of proxy.ts auth overhead in
+ * dev. With this batch the stream pays a single round-trip up front.
+ */
+export async function getStageSuggestionsForDeals(
+  dealIds: string[],
+): Promise<Record<string, StageSuggestion>> {
+  if (dealIds.length === 0) return {};
+
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return {};
+
+  const authed = await createClient();
+  const { data: membership } = await authed
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('workspace_id', workspaceId)
+    .limit(1)
+    .maybeSingle();
+  if (!membership) return {};
+
+  const system = getSystemClient();
+
+  // Fetch active insights for all deals in one query. Order by priority desc
+  // so the first row per deal is the top suggestion; we DISTINCT-ON in JS.
+  const { data } = await system
+    .schema('cortex')
+    .from('aion_insights')
+    .select('id, entity_id, title, context, priority')
+    .eq('workspace_id', workspaceId)
+    .in('entity_id', dealIds)
+    .in('status', ['pending', 'surfaced'])
+    .order('entity_id')
+    .order('priority', { ascending: false });
+
+  const out: Record<string, StageSuggestion> = {};
+  for (const row of (data ?? []) as Array<{
+    id: string;
+    entity_id: string;
+    title: string;
+    context: Record<string, unknown> | null;
+  }>) {
+    if (out[row.entity_id]) continue; // already took the highest-priority row
+    const ctx = (row.context ?? {}) as Record<string, unknown>;
+    const suggestedTag =
+      typeof ctx.suggested_stage_tag === 'string' ? ctx.suggested_stage_tag : null;
+    if (!suggestedTag) continue;
+    out[row.entity_id] = {
+      insightId: row.id,
+      title: row.title,
+      suggestedAction:
+        typeof ctx.suggestedAction === 'string' ? ctx.suggestedAction : null,
+      targetTag: suggestedTag,
+    };
+  }
+
+  return out;
+}

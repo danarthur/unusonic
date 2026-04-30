@@ -1,5 +1,27 @@
 'use client';
 
+/**
+ * SessionContext — chat session Provider + `useSession` hook.
+ *
+ * After the Phase 0.5 split this file owns ONLY:
+ *   - the React `Context` definition
+ *   - the `SessionProvider` component (state, effects, value wiring)
+ *   - the `useSession` consumer hook
+ *   - the `sendChatMessage` / `sendMessage` / `addMessage` / `editAndResend` /
+ *     `retryLastMessage` / `startNewChat` / `selectSession` / `hydrateSessions`
+ *     methods that are tightly coupled to the Provider's local React state
+ *
+ * Pure helpers and externalisable actions live in the sibling folder:
+ *   - `./SessionContext/types.ts`     — Message, SessionMeta, SessionContextType
+ *   - `./SessionContext/state.ts`     — buildGeneralSessionMeta, dbSessionToMeta, pruneLocalStorage
+ *   - `./SessionContext/streaming.ts` — playAudioBase64, consumeAionChatStream (SSE reader)
+ *   - `./SessionContext/actions.ts`   — make{Open,CreateNew,Pin,Unpin,Continue,Archive,Remove,Prefetch}Session factories
+ *
+ * Public surface (unchanged): `SessionProvider`, `useSession`, `Message`,
+ * `SessionMeta`. Many components consume `useSession` so the import path
+ * MUST stay at `@/shared/ui/providers/SessionContext`.
+ */
+
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, ReactNode } from 'react';
 import type { AionMessageContent, AionChatResponse, AionPageContext, AionModelMode } from '@/app/(dashboard)/(features)/aion/lib/aion-chat-types';
 import { usePageContextStore } from '@/shared/lib/page-context-store';
@@ -8,230 +30,26 @@ import {
   getSessionMessages,
   createSession,
   saveMessage,
-  resumeOrCreateSession,
-  archiveSession as archiveSessionAction,
-  createNewScopedSession as createNewScopedSessionAction,
-  pinSession as pinSessionAction,
-  unpinSession as unpinSessionAction,
-  continueSessionInNewChat as continueSessionInNewChatAction,
-  type DbSessionMeta,
 } from '@/app/(dashboard)/(features)/aion/actions/aion-session-actions';
+import type { Message, SessionMeta, SessionContextType } from './SessionContext/types';
+import { buildGeneralSessionMeta, dbSessionToMeta, pruneLocalStorage } from './SessionContext/state';
+import { playAudioBase64, consumeAionChatStream } from './SessionContext/streaming';
+import {
+  makeOpenScopedSession,
+  makeCreateNewScopedChat,
+  makePinSession,
+  makeUnpinSession,
+  makeContinueSessionInNewChat,
+  makeArchiveSession,
+  makeRemoveSession,
+  makePrefetchSession,
+} from './SessionContext/actions';
 
-// Define the shape of a message
-export type Message = {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  attachment?: string;
-  structured?: AionMessageContent[];
-  isError?: boolean;
-  modelTier?: 'fast' | 'standard' | 'heavy';
-  /**
-   * Optional "thinking" preamble — text the model emits BEFORE calling its
-   * first tool ("I'll search for that wedding deal"). Populated via the
-   * server's `preamble:` stream channel, frozen on `preamble-end:`. The
-   * renderer shows it as a muted collapsible header above `content`.
-   * Absent on turns where no tool was called (the whole response is content).
-   */
-  preamble?: string;
-};
-
-export type SessionMeta = {
-  id: string;
-  createdAt: number;
-  updatedAt: number;
-  preview: string;
-  /** Last-message timestamp (ms epoch). Drives sidebar sort within a scope
-   *  group. Bumped by save_aion_message alongside updated_at. */
-  lastMessageAt: number;
-  /** Thread title — auto-generated after the first assistant turn (3–6
-   *  words, Title Case) OR set by the user. Starts as the scope entity
-   *  name (e.g. deal title) until the title generator lands. */
-  title: string | null;
-  /** Session scope — drives sidebar grouping. */
-  scopeType: 'general' | 'deal' | 'event';
-  /** Scope subject id. NULL for general. */
-  scopeEntityId: string | null;
-  /** Display title of the scope entity (e.g. "Ally & Emily Wedding").
-   *  Server enrichment — joined live from public.deals on every list fetch
-   *  so a rename propagates immediately. NULL for general sessions. For
-   *  event-scoped sessions this carries the deal-title provenance ("the
-   *  thread started as this deal's chat"), matching the sidebar-subtitle
-   *  "deal-title → event-date" shape in aion-event-scope-header-design.md §4.1. */
-  scopeEntityTitle: string | null;
-  /** For event-scoped sessions: ISO date of the event's starts_at, used for
-   *  the sidebar subtitle formatted side. NULL for deal/general. */
-  scopeEntityEventDate: string | null;
-  /** True when the user has renamed — the title generator will never
-   *  overwrite. */
-  titleLocked: boolean;
-  /** Multi-thread pin: max 3 per scope bucket. Pinned threads float to the
-   *  top within each deal group. */
-  isPinned: boolean;
-  pinnedAt: number | null;
-  /** Legacy boolean pin column from 20260512000100. Kept for backward
-   *  compat with pre-multi-thread UI; new sort order uses `isPinned`. */
-  pinned: boolean;
-};
-
-interface SessionContextType {
-  messages: Message[];
-  sessions: SessionMeta[];
-  currentSessionId: string;
-  isLoading: boolean;
-  /**
-   * True while the post-`selectSession` DB fetch is in flight for a session
-   * that wasn't in localStorage. Drives the streaming-first sibling-switch
-   * pattern: ChatInterface renders a thread skeleton instead of the empty
-   * landing screen during this window so the user doesn't see the (briefly)
-   * empty `messages` array as a real "this session is empty" state.
-   * See docs/reference/code/perf-patterns.md §14 (planned) and
-   * docs/reference/load-time-strategy.md §8.
-   */
-  isLoadingSession: boolean;
-  /** ID of the message currently being streamed (null when not streaming) */
-  streamingMessageId: string | null;
-  /** Label of the tool currently being executed (null when idle) */
-  activeToolLabel: string | null;
-  setIsLoading: (loading: boolean) => void;
-  viewState: 'overview' | 'chat';
-  setViewState: (state: 'overview' | 'chat') => void;
-  sendMessage: (input: { text?: string; file?: File; audioBlob?: Blob }) => Promise<void>;
-  /** Send a text message through the Aion chat route (streaming SSE). */
-  sendChatMessage: (input: { text: string; workspaceId: string }) => Promise<void>;
-  /** Set the workspace ID for voice → chat routing. */
-  setWorkspaceId: (id: string) => void;
-  addMessage: (role: 'user' | 'assistant', content: string, structured?: AionMessageContent[]) => void;
-  startNewChat: () => void;
-  /** Open (resume if exists, else create) a scope-linked session. Used by
-   *  the deal card to attach chat to a specific deal, and by future event
-   *  surfaces. Returns the resolved session id, which is also set as the
-   *  current session. */
-  openScopedSession: (args: {
-    workspaceId: string;
-    scopeType: 'deal' | 'event';
-    scopeEntityId: string;
-    title?: string | null;
-  }) => Promise<string | null>;
-  /** Create a NEW scope-linked session — always creates, never resumes. Used
-   *  by the "+ New chat" button in the sidebar + scope header to spawn a
-   *  fresh thread under the same production. */
-  createNewScopedChat: (args: {
-    workspaceId: string;
-    scopeType: 'deal' | 'event';
-    scopeEntityId: string;
-    title?: string | null;
-  }) => Promise<string | null>;
-  selectSession: (sessionId: string) => void;
-  /**
-   * Hover prefetch — fires getSessionMessages and writes the result to
-   * localStorage so the next selectSession() resolves from cache instead of
-   * paying the DB round-trip. Idempotent + safe to call concurrently;
-   * silently no-ops if the session's messages are already cached.
-   */
-  prefetchSession: (sessionId: string) => void;
-  /** Hard-delete — permanent removal. Existing Trash2 affordance in the sidebar. */
-  removeSession: (sessionId: string) => void;
-  /** Soft-delete — stamps archived_at, preserves history, drops from sidebar. */
-  archiveSession: (sessionId: string) => Promise<void>;
-  /** Pin a session (max 3 per scope). Surfaces pin failures via a toast so
-   *  the caller doesn't need to inspect the promise resolve value. */
-  pinSession: (sessionId: string) => Promise<void>;
-  /** Unpin a session. */
-  unpinSession: (sessionId: string) => Promise<void>;
-  /** Spawn a fresh thread in the source session's scope, titled
-   *  "Continuing: <source title>". Field Expert's merge-escape-valve.
-   *  Returns the new session id (also selected as current) or null on error. */
-  continueSessionInNewChat: (sourceSessionId: string) => Promise<string | null>;
-  /** Edit a past user message and resend from that point */
-  editAndResend: (msgId: string, newContent: string, workspaceId: string) => void;
-  /** Retry the last failed assistant message */
-  retryLastMessage: (errorMsgId: string, workspaceId: string) => void;
-  /** Abort the current streaming request */
-  cancelStreaming: () => void;
-  hydrateSessions: (initial: SessionMeta[]) => void;
-  /** Model mode: auto (intent-based), fast (Haiku), thinking (Sonnet+ with extended thinking) */
-  modelMode: AionModelMode;
-  setModelMode: (mode: AionModelMode) => void;
-}
+// Re-export public types so existing import paths keep working:
+//   `import { useSession, type Message, type SessionMeta } from '.../SessionContext';`
+export type { Message, SessionMeta };
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
-
-const MAX_CACHED_SESSIONS = 5;
-
-/**
- * Factory for optimistic general-chat SessionMeta rows inserted before the
- * server authoritative row arrives. Used across the new-chat, resume, and
- * legacy-hydrate paths so the SessionMeta shape stays in one place.
- */
-function buildGeneralSessionMeta(id: string, now: number, preview = ''): SessionMeta {
-  return {
-    id,
-    createdAt: now,
-    updatedAt: now,
-    lastMessageAt: now,
-    preview,
-    title: null,
-    scopeType: 'general',
-    scopeEntityId: null,
-    scopeEntityTitle: null,
-    scopeEntityEventDate: null,
-    titleLocked: false,
-    isPinned: false,
-    pinnedAt: null,
-    pinned: false,
-  };
-}
-
-function dbSessionToMeta(db: DbSessionMeta): SessionMeta {
-  return {
-    id: db.id,
-    createdAt: new Date(db.created_at).getTime(),
-    updatedAt: new Date(db.updated_at).getTime(),
-    lastMessageAt: new Date(db.last_message_at).getTime(),
-    preview: db.preview ?? '',
-    title: db.title,
-    scopeType: db.scope_type,
-    scopeEntityId: db.scope_entity_id,
-    scopeEntityTitle: db.scope_entity_title,
-    scopeEntityEventDate: db.scope_entity_event_date,
-    titleLocked: db.title_locked,
-    isPinned: db.is_pinned,
-    pinnedAt: db.pinned_at ? new Date(db.pinned_at).getTime() : null,
-    pinned: db.pinned,
-  };
-}
-
-/** Prune localStorage to keep only the N most recent sessions' messages */
-function pruneLocalStorage(sessions: SessionMeta[], storageMessagesKey: (id: string) => string) {
-  if (sessions.length <= MAX_CACHED_SESSIONS) return;
-  const sorted = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt);
-  const toRemove = sorted.slice(MAX_CACHED_SESSIONS);
-  for (const s of toRemove) {
-    try { window.localStorage.removeItem(storageMessagesKey(s.id)); } catch { /* ignore */ }
-  }
-}
-
-function playAudioBase64(base64: string) {
-  try {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: 'audio/mpeg' });
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audio.onended = () => URL.revokeObjectURL(url);
-    audio.play().catch((err) => {
-      console.error('Audio playback failed:', err);
-      URL.revokeObjectURL(url);
-    });
-  } catch (err) {
-    console.error('Audio decode failed:', err);
-  }
-}
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const storage = useMemo(
@@ -300,7 +118,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore localStorage failures
     }
-  }, [sessions, storage.sessionsKey]);
+  }, [sessions, storage.sessionsKey, isHydrated]);
 
   // ── DB hydration (async, once workspace is known) ───────────────────────
 
@@ -427,7 +245,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // --- Streaming helpers ---
+  // --- Streaming helpers (closures over current sessionId for cache writes) ---
   const updateMessageContent = useCallback((msgId: string, content: string) => {
     setMessages(prev => {
       const next = prev.map(m => m.id === msgId ? { ...m, content } : m);
@@ -460,6 +278,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setActiveToolLabel(null);
   }, [sessionId, storage]);
 
+  const setMessageModelTier = useCallback((msgId: string, tier: Message['modelTier']) => {
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, modelTier: tier } : m));
+  }, []);
+
   const startNewChat = useCallback(() => {
     if (!isHydrated) return;
     const newSessionId = crypto.randomUUID();
@@ -483,287 +305,57 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSessionId(targetSessionId);
   };
 
-  /**
-   * Hover prefetch — warms the session's localStorage cache so the next
-   * selectSession() falls through the fast path at line ~316. Skipped when
-   * we already have the data (cache hit) or when the user is currently on
-   * the session being prefetched (would clobber in-progress streaming).
-   * perf-patterns.md §4.
-   */
+  // ── Action factories from ./SessionContext/actions.ts ───────────────────
+  // Each factory closes over the current setters/refs; we wrap in
+  // `useCallback` so the value object's identity is stable per dep change.
+
   const prefetchSession = useCallback(
     (targetSessionId: string) => {
       if (!isHydrated) return;
-      if (targetSessionId === sessionId) return; // already current
-      try {
-        if (window.localStorage.getItem(storage.messagesKey(targetSessionId))) {
-          return; // already cached
-        }
-      } catch { /* localStorage blocked — fall through to fetch anyway */ }
-
-      getSessionMessages(targetSessionId)
-        .then((result) => {
-          if (!result.success || result.messages.length === 0) return;
-          const loaded: Message[] = result.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            timestamp: new Date(m.created_at).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-            ...(m.structured_content ? { structured: m.structured_content } : {}),
-          }));
-          try {
-            window.localStorage.setItem(
-              storage.messagesKey(targetSessionId),
-              JSON.stringify(loaded),
-            );
-          } catch { /* ignore */ }
-        })
-        .catch(() => { /* DB unavailable — silent no-op */ });
+      makePrefetchSession({ storage, sessionId })(targetSessionId);
     },
     [isHydrated, sessionId, storage],
   );
 
-  /**
-   * Resume-or-create a scope-linked session. Routed through the
-   * cortex.resume_or_create_aion_session RPC so a user's existing deal-scoped
-   * session is reused rather than duplicated. Returns the resolved id (also
-   * set as the current session so ChatInterface picks it up).
-   *
-   * General-scope chats should continue to use startNewChat — that path
-   * generates a client-side UUID and avoids the server round-trip.
-   */
-  const openScopedSession = useCallback(async ({
-    workspaceId,
-    scopeType,
-    scopeEntityId,
-    title,
-  }: {
-    workspaceId: string;
-    scopeType: 'deal' | 'event';
-    scopeEntityId: string;
-    title?: string | null;
-  }): Promise<string | null> => {
-    const result = await resumeOrCreateSession(workspaceId, scopeType, scopeEntityId, title ?? null);
-    if (!result.success) {
-      console.error('[SessionContext] resumeOrCreateSession failed:', result.error);
-      return null;
-    }
-    const resolvedId = result.sessionId;
+  const openScopedSession = useCallback(
+    (args: Parameters<SessionContextType['openScopedSession']>[0]) =>
+      makeOpenScopedSession({ storage, setSessionId, setSessions })(args),
+    [storage],
+  );
 
-    // Select the session (lazy-load of messages happens via the existing
-    // effect that keys on sessionId).
-    window.localStorage.setItem(storage.currentSessionKey, resolvedId);
-    setSessionId(resolvedId);
+  const createNewScopedChat = useCallback(
+    (args: Parameters<SessionContextType['createNewScopedChat']>[0]) =>
+      makeCreateNewScopedChat({ storage, setSessionId, setSessions, setMessages })(args),
+    [storage],
+  );
 
-    // Inject into local sessions if not already present. We create a minimal
-    // SessionMeta with the known scope fields — the sidebar will re-hydrate
-    // with the authoritative row (including any stored title/preview) on the
-    // next getSessionList refetch.
-    setSessions(prev => {
-      if (prev.some(s => s.id === resolvedId)) return prev;
-      const now = Date.now();
-      return [...prev, {
-        id: resolvedId,
-        createdAt: now,
-        updatedAt: now,
-        lastMessageAt: now,
-        preview: '',
-        title: title ?? null,
-        scopeType,
-        scopeEntityId,
-        // Optimistic: use the caller-provided title as the scope entity
-        // title so the sidebar group header renders correctly before the
-        // next getSessionList refetch (the caller passes the live deal
-        // title from deal-lens). Server-side enrichment will overwrite on
-        // the next full hydrate if the deal is renamed.
-        scopeEntityTitle: title ?? null,
-        scopeEntityEventDate: null,
-        titleLocked: false,
-        isPinned: false,
-        pinnedAt: null,
-        pinned: false,
-      }];
-    });
-    return resolvedId;
-  }, [storage]);
+  const pinSession = useCallback(
+    (targetSessionId: string) => makePinSession({ setSessions })(targetSessionId),
+    [],
+  );
 
-  /**
-   * Create a FRESH scope-linked session — never resumes. Paired with
-   * openScopedSession: that one is for deal-card mount (resume-most-recent),
-   * this one is for the "+ New chat" button in the sidebar or scope header
-   * (explicit new thread about the same production).
-   *
-   * Matches ChatGPT / Claude Projects where a project holds many chats,
-   * each with its own topic and synopsis title.
-   */
-  const createNewScopedChat = useCallback(async ({
-    workspaceId,
-    scopeType,
-    scopeEntityId,
-    title,
-  }: {
-    workspaceId: string;
-    scopeType: 'deal' | 'event';
-    scopeEntityId: string;
-    title?: string | null;
-  }): Promise<string | null> => {
-    const result = await createNewScopedSessionAction(workspaceId, scopeType, scopeEntityId, title ?? null);
-    if (!result.success) {
-      console.error('[SessionContext] createNewScopedSession failed:', result.error);
-      return null;
-    }
-    const newId = result.sessionId;
-    window.localStorage.setItem(storage.currentSessionKey, newId);
-    setSessionId(newId);
-    setMessages([]);
-    setSessions(prev => {
-      if (prev.some(s => s.id === newId)) return prev;
-      const now = Date.now();
-      return [...prev, {
-        id: newId,
-        createdAt: now,
-        updatedAt: now,
-        lastMessageAt: now,
-        preview: '',
-        // Thread title starts null for brand-new sessions — the title
-        // generator will populate after the first assistant turn.
-        title: null,
-        scopeType,
-        scopeEntityId,
-        // Optimistic: caller-provided title becomes the scope entity title
-        // (deal title) for sidebar grouping. See openScopedSession for the
-        // same pattern + rationale.
-        scopeEntityTitle: title ?? null,
-        scopeEntityEventDate: null,
-        titleLocked: false,
-        isPinned: false,
-        pinnedAt: null,
-        pinned: false,
-      }];
-    });
-    return newId;
-  }, [storage]);
+  const unpinSession = useCallback(
+    (targetSessionId: string) => makeUnpinSession({ setSessions })(targetSessionId),
+    [],
+  );
 
-  const pinSession = useCallback(async (targetSessionId: string) => {
-    const result = await pinSessionAction(targetSessionId);
-    if (!result.success) {
-      if (result.atCap) {
-        // Dynamic import to avoid a hard dep on sonner in the provider.
-        const { toast } = await import('sonner');
-        toast.error('Pin cap reached — unpin an existing thread (max 3 per production).');
-      } else {
-        console.error('[SessionContext] pinSession failed:', result.error);
-      }
-      return;
-    }
-    // Optimistic: flip the local pin flag so the sidebar reflows without a
-    // full session-list refetch. Server authoritative on next hydrate.
-    setSessions(prev =>
-      prev.map(s => s.id === targetSessionId
-        ? { ...s, isPinned: true, pinnedAt: Date.now() }
-        : s,
-      ),
-    );
-  }, []);
+  const continueSessionInNewChat = useCallback(
+    (sourceSessionId: string) =>
+      makeContinueSessionInNewChat({ storage, sessions, setSessionId, setSessions, setMessages })(sourceSessionId),
+    [sessions, storage],
+  );
 
-  const unpinSession = useCallback(async (targetSessionId: string) => {
-    const result = await unpinSessionAction(targetSessionId);
-    if (!result.success) {
-      console.error('[SessionContext] unpinSession failed:', result.error);
-      return;
-    }
-    setSessions(prev =>
-      prev.map(s => s.id === targetSessionId
-        ? { ...s, isPinned: false, pinnedAt: null }
-        : s,
-      ),
-    );
-  }, []);
+  const archiveSession = useCallback(
+    (targetSessionId: string) =>
+      makeArchiveSession({ storage, sessionId, setSessionId, setSessions, setMessages })(targetSessionId),
+    [sessionId, storage],
+  );
 
-  const continueSessionInNewChat = useCallback(async (sourceSessionId: string): Promise<string | null> => {
-    const result = await continueSessionInNewChatAction(sourceSessionId);
-    if (!result.success) {
-      console.error('[SessionContext] continueSessionInNewChat failed:', result.error);
-      return null;
-    }
-    const newId = result.sessionId;
-
-    // Seed local sessions with an optimistic row for the new thread. Carry
-    // the source's scope entity title so the sidebar groups it correctly
-    // before the next getSessionList refetch.
-    const source = sessions.find(s => s.id === sourceSessionId) ?? null;
-    window.localStorage.setItem(storage.currentSessionKey, newId);
-    setSessionId(newId);
-    setMessages([]);
-    setSessions(prev => {
-      if (prev.some(s => s.id === newId)) return prev;
-      const now = Date.now();
-      return [...prev, {
-        id: newId,
-        createdAt: now,
-        updatedAt: now,
-        lastMessageAt: now,
-        preview: '',
-        title: source?.title ? `Continuing: ${source.title}` : 'Continuing thread',
-        scopeType: source?.scopeType ?? 'deal',
-        scopeEntityId: source?.scopeEntityId ?? null,
-        scopeEntityTitle: source?.scopeEntityTitle ?? null,
-        scopeEntityEventDate: source?.scopeEntityEventDate ?? null,
-        titleLocked: false,
-        isPinned: false,
-        pinnedAt: null,
-        pinned: false,
-      }];
-    });
-    return newId;
-  }, [sessions, storage]);
-
-  const archiveSession = useCallback(async (targetSessionId: string) => {
-    const result = await archiveSessionAction(targetSessionId);
-    if (!result.success) {
-      console.error('[SessionContext] archiveSession failed:', result.error);
-      return;
-    }
-
-    // Drop from the local sessions array so the sidebar updates immediately
-    // (the getSessionList query already filters archived_at IS NULL).
-    setSessions(prev => prev.filter(s => s.id !== targetSessionId));
-
-    // Leave localStorage messages in place — archival is reversible, unlike
-    // removeSession's permanent deletion.
-
-    // If archiving the active session, fall back to a new general chat so
-    // the user isn't staring at a ghost thread.
-    if (targetSessionId === sessionId) {
-      const newId = `chat-${crypto.randomUUID()}`;
-      window.localStorage.setItem(storage.currentSessionKey, newId);
-      setSessionId(newId);
-      setMessages([]);
-      const now = Date.now();
-      setSessions(prev => [...prev, buildGeneralSessionMeta(newId, now)]);
-    }
-  }, [sessionId, storage]);
-
-  const removeSession = useCallback((targetSessionId: string) => {
-    setSessions(prev => prev.filter(s => s.id !== targetSessionId));
-    // Clean up localStorage messages for this session
-    try { window.localStorage.removeItem(storage.messagesKey(targetSessionId)); } catch {}
-    // If deleting the current session, start a new one
-    if (targetSessionId === sessionId) {
-      const newId = `chat-${crypto.randomUUID()}`;
-      window.localStorage.setItem(storage.currentSessionKey, newId);
-      setSessionId(newId);
-      setMessages([]);
-      const now = Date.now();
-      setSessions(prev => [...prev, buildGeneralSessionMeta(newId, now)]);
-    }
-    // Fire-and-forget DB deletion
-    import('@/app/(dashboard)/(features)/aion/actions/aion-session-actions')
-      .then(mod => mod.deleteSession(targetSessionId))
-      .catch(() => {});
-  }, [sessionId, storage]);
+  const removeSession = useCallback(
+    (targetSessionId: string) =>
+      makeRemoveSession({ storage, sessionId, setSessionId, setSessions, setMessages })(targetSessionId),
+    [sessionId, storage],
+  );
 
   // Abort controller for streaming cancellation
   const abortRef = useRef<AbortController | null>(null);
@@ -867,74 +459,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       // Handle streaming SSE response
       if (contentType.includes('text/event-stream') && response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulated = '';
-        let preambleAccum = '';
-        let preambleFrozen = false;
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process complete lines
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? ''; // keep incomplete last line in buffer
-
-          for (const line of lines) {
-            if (line.startsWith('text:')) {
-              accumulated += line.slice(5);
-              setActiveToolLabel(null);
-              updateMessageContent(msgId, accumulated);
-            } else if (line.startsWith('preamble:')) {
-              // Pre-tool commentary ("I'll search for that wedding deal").
-              // Renders as a muted "thinking" header above the answer so
-              // it doesn't mash into the main content.
-              preambleAccum += line.slice('preamble:'.length);
-              updateMessagePreamble(msgId, preambleAccum);
-            } else if (line === 'preamble-end:') {
-              // First tool-call fired — preamble is frozen. Any further
-              // text goes to main content, not preamble.
-              preambleFrozen = true;
-            } else if (line.startsWith('thinking:')) {
-              // Extended thinking deltas — show as thinking indicator
-              setActiveToolLabel('reasoning');
-            } else if (line.startsWith('model:')) {
-              // Store model tier on the streaming message
-              const tier = line.slice(6) as Message['modelTier'];
-              setMessages(prev => prev.map(m => m.id === msgId ? { ...m, modelTier: tier } : m));
-            } else if (line.startsWith('tool:')) {
-              setActiveToolLabel(line.slice(5));
-            } else if (line.startsWith('structured:')) {
-              try {
-                const payload = JSON.parse(line.slice(11));
-                const blocks: AionMessageContent[] = payload.blocks ?? [];
-                // If no tool ever fired, "preamble" is actually the whole
-                // answer — promote it to main content so the user sees a
-                // response instead of an empty answer with preamble-only.
-                if (!preambleFrozen && !accumulated && preambleAccum) {
-                  accumulated = preambleAccum;
-                  updateMessagePreamble(msgId, '');
-                }
-                finalizeMessage(msgId, accumulated || 'I processed that.', blocks.length > 0 ? blocks : undefined);
-              } catch {
-                if (!preambleFrozen && !accumulated && preambleAccum) {
-                  accumulated = preambleAccum;
-                  updateMessagePreamble(msgId, '');
-                }
-                finalizeMessage(msgId, accumulated || 'I processed that.');
-              }
-            } else if (line.startsWith('error:')) {
-              finalizeMessage(msgId, line.slice(6) || 'Request failed. Try again.', undefined, true);
-            }
-          }
-        }
+        const { accumulated, structuredFinalized } = await consumeAionChatStream(response.body, msgId, {
+          updateMessageContent,
+          updateMessagePreamble,
+          finalizeMessage,
+          setActiveToolLabel,
+          setMessageModelTier,
+        });
 
         clearTimeout(timeoutId);
-        // If no structured event was sent, finalize with accumulated text
-        if (streamingMessageId === msgId) {
+        // If no structured event was sent, finalize with accumulated text.
+        // (Mirrors original `streamingMessageId === msgId` guard — when the
+        // stream ended without a `structured:` or `error:` line we still
+        // need to flip the streaming flag off and persist the text.)
+        if (!structuredFinalized) {
           finalizeMessage(msgId, accumulated || 'I processed that.');
         }
       } else {
@@ -958,7 +496,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [messages, sessionId, storage, updateMessageContent, finalizeMessage, streamingMessageId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `addMessage` is intentionally omitted; messages-change already re-creates this closure correctly. Matches the pre-split deps list.
+  }, [messages, sessionId, storage, modelMode, updateMessageContent, updateMessagePreamble, finalizeMessage, setMessageModelTier]);
 
   // --- Edit & resend from a past message ---
   const editAndResend = useCallback((msgId: string, newContent: string, wsId: string) => {
@@ -1012,7 +551,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       addMessage('user', displayContent);
     }
-    
+
     setIsLoading(true);
 
     try {

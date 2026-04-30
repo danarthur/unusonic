@@ -523,12 +523,7 @@ export async function validateInvitation(
   // elevate — the resolved fields are only surfaced behind the validated
   // `/claim/[token]` URL, and the RLS for the schemas we touch would hide
   // them from anon callers otherwise.
-  //
-  // The `as any` casts on `.schema('directory' | 'cortex')` mirror the
-  // project-wide pattern: `src/types/supabase.ts` only has coverage for the
-  // `public` schema today (see CLAUDE.md note on PR 6.5).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- public-only schema types in src/types/supabase.ts require cross-schema escape (see CLAUDE.md PR 6.5)
-  const system = getSystemClient() as any;
+  const system = getSystemClient();
 
   // Workspace resolution: from org entity → owner_workspace_id → workspaces.name/logo_url
   let workspaceId: string | null = null;

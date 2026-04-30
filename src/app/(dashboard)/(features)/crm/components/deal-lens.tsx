@@ -66,6 +66,8 @@ import { FollowUpCard } from './follow-up-card';
 import { getFollowUpForDeal, type FollowUpQueueItem } from '../actions/follow-up-actions';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { getDealTimeline, type DealTimelineEntry } from '../actions/get-deal-timeline';
+import { getDealLensBundle } from '../actions/get-deal-lens-bundle';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
 import { RepliesCard } from '@/features/comms/replies/ui/RepliesCard';
 
@@ -173,15 +175,26 @@ export function DealLens({
   // between Deal A and Deal B".)
   const [activity, setActivity] = useState<DealTimelineEntry[] | null>(null);
   const [activityExpanded, setActivityExpanded] = useState(false);
+
+  // Single bundled fetch for the 8 deal-scoped reads deal-lens used to fire
+  // as 8 separate server actions on mount. In Next.js dev each round-trip
+  // pays ~600ms of proxy.ts auth overhead, so the cascade was 4-7s before
+  // any card rendered. The bundle parallelizes server-side via Promise.all
+  // — total wall clock is now max(individual) instead of sum(individual).
+  // Mirrors into existing setStates below to keep call sites untouched.
+  const queryClient = useQueryClient();
+  const { data: dealLensBundle, error: dealLensBundleError } = useQuery({
+    queryKey: ['deal-lens-bundle', deal.id, deal.event_id ?? null],
+    queryFn: () => getDealLensBundle(deal.id, deal.event_id ?? null),
+    enabled: !!deal.id,
+    staleTime: 30_000,
+    retry: 0,
+  });
   useEffect(() => {
-    let cancelled = false;
-    getDealTimeline(deal.id).then((entries) => {
-      if (!cancelled) setActivity(entries);
-    }).catch(() => {
-      if (!cancelled) setActivity([]);
-    });
-    return () => { cancelled = true; };
-  }, [deal.id]);
+    if (dealLensBundleError) {
+      console.error('[DealLens] bundle fetch failed:', dealLensBundleError);
+    }
+  }, [dealLensBundleError]);
 
 
   // Scalar field local mirrors (for inline editing in DealHeaderStrip)
@@ -307,38 +320,23 @@ export function DealLens({
     };
   }, []);
 
-  // Proposal + history are always fetched together. Bundle them into a
-  // single Promise.all so the two server actions hit the network in
-  // parallel and we have one less effect race condition to reason about.
-  // (Server-action overhead is per-call, not per-Promise.all element, but
-  // this reduces the "two skeletons popping in over 200ms" wave to one.)
+  // Mirror bundle data into the existing useStates so call sites elsewhere
+  // in the file don't need to change. The cascading useEffects this replaces
+  // (proposal, proposalHistory, crew, follow-up, contract, eventDates,
+  // proposalPublicUrl, timeline) all flowed into these same setters.
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      getProposalForDeal(deal.id),
-      getProposalHistoryForDeal(deal.id),
-    ]).then(([p, h]) => {
-      if (cancelled) return;
-      setInitialProposal(p);
-      setProposalHistory(h);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [deal.id]);
+    if (!dealLensBundle) return;
+    setInitialProposal(dealLensBundle.proposal);
+    setProposalHistory(dealLensBundle.proposalHistory);
+    setCrewRows(dealLensBundle.crew);
+    setQueueItem(dealLensBundle.followUp);
+    setContract(dealLensBundle.contract);
+    setEventDates(dealLensBundle.eventDates);
+    setPublicProposalUrl(dealLensBundle.proposalPublicUrl);
+    setActivity(dealLensBundle.timeline);
+  }, [dealLensBundle]);
 
-  // Crew data for Next Actions card + timeline
-  useEffect(() => {
-    getDealCrew(deal.id).then(setCrewRows);
-  }, [deal.id]);
   const crewCount = crewRows.filter((r) => r.entity_id).length;
-
-  // Follow-up queue item
-  useEffect(() => {
-    if (deal?.id) {
-      getFollowUpForDeal(deal.id).then(setQueueItem);
-    }
-  }, [deal?.id]);
 
   // Fork C bundle — flag check + card data in one round-trip.
   //
@@ -380,38 +378,18 @@ export function DealLens({
     // leaves the card showing the previous stage's signals until reload.
   }, [deal?.id, deal?.status]);
 
-  useEffect(() => {
-    if (!deal.event_id) {
-      setContract(null);
-      setEventDates({ loadIn: null, loadOut: null });
-      return;
-    }
-    let cancelled = false;
-    getContractForEvent(deal.event_id).then((c) => {
-      if (!cancelled) setContract(c);
-    });
-    getEventLoadDates(deal.event_id).then((d) => {
-      if (!cancelled) setEventDates(d);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [deal.event_id]);
-
-  // Refetch proposal when user returns to this tab or navigates back from
-  // proposal builder. Both visibilitychange and focus would fire the same
-  // refetch — debounce so rapid alt-tab cycles don't kick off 2-3 parallel
-  // identical fetches. (Explore agent finding #6.)
+  // Refetch the bundle on tab return / window focus so a user coming back
+  // from the proposal builder sees the freshest signed status. Debounced so
+  // rapid alt-tab cycles don't kick off duplicate fetches.
   useEffect(() => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const refetch = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         debounceTimer = null;
-        getProposalForDeal(deal.id).then(setInitialProposal);
-        getProposalPublicUrl(deal.id).then(setPublicProposalUrl);
-        getProposalHistoryForDeal(deal.id).then(setProposalHistory);
-        getFollowUpForDeal(deal.id).then(setQueueItem);
+        queryClient.invalidateQueries({
+          queryKey: ['deal-lens-bundle', deal.id, deal.event_id ?? null],
+        });
       }, 250);
     };
     const onVisibility = () => {
@@ -425,23 +403,7 @@ export function DealLens({
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
-  }, [deal.id]);
-
-  // When proposal is sent or deal is handed over, fetch the public URL so "View signed proposal" works
-  useEffect(() => {
-    const sent = initialProposal?.status === 'sent' || initialProposal?.status === 'accepted' || initialProposal?.status === 'viewed';
-    if (!sent && !deal.event_id) {
-      setPublicProposalUrl(null);
-      return;
-    }
-    let cancelled = false;
-    getProposalPublicUrl(deal.id).then((url) => {
-      if (!cancelled) setPublicProposalUrl(url);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [deal.id, deal.event_id, initialProposal?.status]);
+  }, [deal.id, deal.event_id, queryClient]);
 
   const refetchProposal = useCallback(() => {
     getProposalForDeal(deal.id).then((p) => {

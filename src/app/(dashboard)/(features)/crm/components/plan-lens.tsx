@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -189,16 +190,19 @@ export function PlanLens({
   // JSONB snapshot that only ever gets populated at handoff via
   // syncGearFromProposalToEvent. Prior behavior: the ribbon's gear counts froze at
   // handoff and never reflected Gear Flight Check mutations.
-  const [gearItemsLive, setGearItemsLive] = useState<EventGearItem[]>([]);
-  const fetchGearItems = useCallback(async () => {
-    if (!eventId) {
-      setGearItemsLive([]);
-      return;
-    }
-    const items = await getEventGearItems(eventId);
-    setGearItemsLive(items);
-  }, [eventId]);
-  useEffect(() => { fetchGearItems(); }, [fetchGearItems]);
+  //
+  // useQuery with placeholderData: keepPreviousData so the OLD event's gear
+  // stays visible during an event swap until the new fetch lands — pairs with
+  // the outer prism DetailPaneTransition (sibling-switch pattern).
+  const { data: gearItemsLive = [], refetch: refetchGearItems } = useQuery<EventGearItem[]>({
+    queryKey: ['plan-lens', 'gear-items', eventId],
+    queryFn: () => (eventId ? getEventGearItems(eventId) : Promise.resolve([])),
+    enabled: !!eventId,
+    placeholderData: keepPreviousData,
+  });
+  const fetchGearItems = useCallback(() => {
+    void refetchGearItems();
+  }, [refetchGearItems]);
 
   const handleCrewUpdated = () => {
     fetchCrew();
@@ -221,12 +225,10 @@ export function PlanLens({
     firstViewedAt: string | null;
   };
   const [proposalData, setProposalData] = useState<ProposalSnapshot | null>(null);
-  const [eventDates, setEventDates] = useState<{ loadIn: string | null; loadOut: string | null }>({ loadIn: null, loadOut: null });
 
   // Full proposal for read-only receipt + contract reference
   const [initialProposal, setInitialProposal] = useState<ProposalWithItems | null | undefined>(undefined);
   const [publicProposalUrl, setPublicProposalUrl] = useState<string | null>(null);
-  const [contract, setContract] = useState<Awaited<ReturnType<typeof getContractForEvent>>>(null);
 
   useEffect(() => {
     if (!dealId) return;
@@ -259,31 +261,32 @@ export function PlanLens({
     return () => { cancelled = true; };
   }, [dealId]);
 
-  // Contract for event
-  useEffect(() => {
-    const eid = eventId ?? deal?.event_id;
-    if (!eid) { setContract(null); return; }
-    let cancelled = false;
-    getContractForEvent(eid).then((c) => { if (!cancelled) setContract(c); });
-    return () => { cancelled = true; };
-  }, [eventId, deal?.event_id]);
+  // Event-scoped reads — useQuery with keepPreviousData so the OLD event's
+  // contract / load dates / ledger stay visible while the new fetch resolves.
+  // Combined with the outer prism DetailPaneTransition this delivers the
+  // sibling-switch hold pattern called out in the load-time strategy doc.
+  const eventScopedId = eventId ?? deal?.event_id ?? null;
 
-  // Fetch load-in/load-out dates for timeline
-  useEffect(() => {
-    const eid = eventId ?? deal?.event_id;
-    if (!eid) return;
-    getEventLoadDates(eid).then(setEventDates);
-  }, [eventId, deal?.event_id]);
+  const { data: contract = null } = useQuery<Awaited<ReturnType<typeof getContractForEvent>>>({
+    queryKey: ['plan-lens', 'contract', eventScopedId],
+    queryFn: () => (eventScopedId ? getContractForEvent(eventScopedId) : Promise.resolve(null)),
+    enabled: !!eventScopedId,
+    placeholderData: keepPreviousData,
+  });
 
-  // Fetch ledger data for unified financial summary
-  const [ledger, setLedger] = useState<EventLedgerDTO | null>(null);
-  useEffect(() => {
-    const eid = eventId ?? deal?.event_id;
-    if (!eid) return;
-    let cancelled = false;
-    getEventLedger(eid).then((l) => { if (!cancelled) setLedger(l); });
-    return () => { cancelled = true; };
-  }, [eventId, deal?.event_id]);
+  const { data: eventDates = { loadIn: null, loadOut: null } } = useQuery<{ loadIn: string | null; loadOut: string | null }>({
+    queryKey: ['plan-lens', 'event-load-dates', eventScopedId],
+    queryFn: () => (eventScopedId ? getEventLoadDates(eventScopedId) : Promise.resolve({ loadIn: null, loadOut: null })),
+    enabled: !!eventScopedId,
+    placeholderData: keepPreviousData,
+  });
+
+  const { data: ledger = null } = useQuery<EventLedgerDTO | null>({
+    queryKey: ['plan-lens', 'ledger', eventScopedId],
+    queryFn: () => (eventScopedId ? getEventLedger(eventScopedId) : Promise.resolve(null)),
+    enabled: !!eventScopedId,
+    placeholderData: keepPreviousData,
+  });
 
   // Payment milestones for timeline
   const paymentMilestones = proposalData

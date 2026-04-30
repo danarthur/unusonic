@@ -540,12 +540,7 @@ export async function GET(req: Request) {
     //     stamps. Dismiss/snooze resets escalation_count + priority_score.
     //     See docs/reference/code/follow-up-engine.md and P0 plan §5.
     const scoredDealIds = new Set(scored.map((s) => s.dealId));
-    // Columns priority_ceiling/escalation_count/last_escalated_at/superseded_at
-    // were added in migration 20260423000000; generated types are stale until
-    // `npm run db:types` runs post-deploy. Route through `any` for these
-    // reads/writes — same pattern the ops.* code uses elsewhere.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stale types
-    const opsDb = db.schema('ops') as any;
+    const opsDb = db.schema('ops');
 
     const { data: pendingForEscalation } = await opsDb
       .from('follow_up_queue')

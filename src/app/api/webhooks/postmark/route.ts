@@ -521,8 +521,7 @@ async function maybeFireUrgentInsight(
     const title = `Client reply mentions "${keyword}"`;
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).schema('cortex').rpc('upsert_aion_insight', {
+    await supabase.schema('cortex').rpc('upsert_aion_insight', {
       p_workspace_id: workspaceId,
       p_trigger_type: 'inbound_reply_urgent',
       p_entity_type: 'deal',

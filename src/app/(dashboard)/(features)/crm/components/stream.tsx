@@ -25,6 +25,7 @@ import { filterByMode, type StreamMode } from './stream-filter';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import { getUnseenPillCountsForDeals } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
+import { getStageSuggestionsForDeals, type StageSuggestion } from '../actions/aion-suggestion-actions';
 
 export type { StreamMode };
 
@@ -82,15 +83,30 @@ export function Stream({
   );
   const dealIdsKey = useMemo(() => [...dealIds].sort().join(','), [dealIds]);
   const [unseenPillCounts, setUnseenPillCounts] = useState<Record<string, number>>({});
+  // Fixes the N+1 where every <AionSuggestionRow> in every <StreamCard> fired
+  // its own getStageSuggestionForDeal — single batch fetch for the visible set.
+  const [stageSuggestions, setStageSuggestions] = useState<Record<string, StageSuggestion>>({});
   useEffect(() => {
     if (dealIds.length === 0) {
       setUnseenPillCounts({});
+      setStageSuggestions({});
       return;
     }
     let cancelled = false;
-    getUnseenPillCountsForDeals(dealIds)
-      .then((counts) => { if (!cancelled) setUnseenPillCounts(counts); })
-      .catch(() => { if (!cancelled) setUnseenPillCounts({}); });
+    Promise.all([
+      getUnseenPillCountsForDeals(dealIds),
+      getStageSuggestionsForDeals(dealIds),
+    ])
+      .then(([counts, suggestions]) => {
+        if (cancelled) return;
+        setUnseenPillCounts(counts);
+        setStageSuggestions(suggestions);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUnseenPillCounts({});
+        setStageSuggestions({});
+      });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dealIdsKey collapses array identity into a stable string so the effect doesn't refire on every render that hands us a new but equivalent array.
   }, [dealIdsKey]);
@@ -292,6 +308,7 @@ export function Stream({
           mode={mode}
           pipelineStages={pipelineStages}
           unseenPillCounts={unseenPillCounts}
+          stageSuggestions={stageSuggestions}
         />
       </div>
 
@@ -334,6 +351,7 @@ function DateGroupedList({
   mode,
   pipelineStages,
   unseenPillCounts,
+  stageSuggestions,
 }: {
   items: StreamCardItem[];
   selectedId: string | null;
@@ -348,6 +366,9 @@ function DateGroupedList({
   /** Wk 10 D7 — deal_id → unseen Aion pill count, fetched in bulk by the
    *  parent. Only deal rows ever have a non-zero entry; events stay false. */
   unseenPillCounts: Record<string, number>;
+  /** Pre-resolved stage suggestions, deal_id → suggestion. Bulk-fetched by
+   *  parent stream so cards don't N+1 their own per-deal server action. */
+  stageSuggestions: Record<string, StageSuggestion>;
 }) {
   // Build date groups: { date: string | null, items: StreamCardItem[] }[]
   // Items are already sorted, so we preserve order and insert headers between date changes.
@@ -429,6 +450,9 @@ function DateGroupedList({
               pipelineStages={pipelineStages}
               hasUnseenPill={
                 item.source === 'deal' && (unseenPillCounts[item.id] ?? 0) > 0
+              }
+              stageSuggestion={
+                item.source === 'deal' ? stageSuggestions[item.id] ?? null : null
               }
             />
           ))}

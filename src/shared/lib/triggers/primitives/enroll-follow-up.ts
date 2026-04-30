@@ -155,8 +155,7 @@ export const enrollInFollowUpPrimitive: TriggerPrimitive<Config> = {
     // linked_insight_id is a historical breadcrumb so the unified deal card
     // reader can join insight → follow-up. Most-recent wins; NULL is fine.
     // See design doc §8.3.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stale types
-    const cortexDb = system.schema('cortex') as any;
+    const cortexDb = system.schema('cortex');
     const { data: insightRows } = await cortexDb
       .from('aion_insights')
       .select('id, trigger_type')
@@ -193,11 +192,7 @@ export const enrollInFollowUpPrimitive: TriggerPrimitive<Config> = {
       ?? insights.find((i) => i.trigger_type !== 'deal_stale')?.id
       ?? null;
 
-    // New columns (originating_transition_id, primitive_key, hide_from_portal)
-    // arrive with migration 20260423000000; linked_insight_id with 20260425.
-    // Generated Supabase types lag until `npm run db:types` runs post-deploy.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stale types
-    const opsDb = system.schema('ops') as any;
+    const opsDb = system.schema('ops');
 
     const { error } = await opsDb
       .from('follow_up_queue')

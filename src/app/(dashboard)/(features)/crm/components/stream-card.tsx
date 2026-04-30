@@ -130,6 +130,7 @@ export function StreamCard({
   onHover,
   pipelineStages,
   hasUnseenPill = false,
+  stageSuggestion = null,
   className,
 }: {
   item: StreamCardItem;
@@ -150,6 +151,9 @@ export function StreamCard({
    *  Resolved by the parent stream from a single bulk-fetch query so the
    *  badge doesn't N+1 a per-card read. Always false for event rows. */
   hasUnseenPill?: boolean;
+  /** Pre-resolved stage suggestion for this deal — bulk-fetched by the parent
+   *  stream so AionSuggestionRow doesn't N+1 its own per-card server action. */
+  stageSuggestion?: import('../actions/aion-suggestion-actions').StageSuggestion | null;
   className?: string;
 }) {
   // Pass 3 Phase 2 — route lifecycle_status reads through the canonical helper

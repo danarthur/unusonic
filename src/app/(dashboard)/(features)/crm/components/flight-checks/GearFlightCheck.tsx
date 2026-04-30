@@ -1,77 +1,54 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+/**
+ * GearFlightCheck — orchestrator panel for event gear lifecycle.
+ *
+ * Owns state, data-fetching effects (items / availability / crew matches /
+ * kit compliance), and the high-level header / sourcing-banner / department-
+ * grouped layout. Sub-components live alongside in `gear-flight-check/`:
+ *   - shared.tsx          — helpers, types, chip styles
+ *   - operator-picker.tsx — crew-member dropdown for operator assignment
+ *   - gear-item-row.tsx   — single-row UI: dots, source chip, status button
+ *   - department-section.tsx — collapsible per-department group
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import * as Sentry from '@sentry/nextjs';
-import {
-  ChevronDown,
-  ChevronRight,
-  Package,
-  MoreVertical,
-  Loader2,
-  RefreshCw,
-  Sparkles,
-  User,
-} from 'lucide-react';
-import { createPortal } from 'react-dom';
+import { Loader2, Package, RefreshCw } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { STAGE_LIGHT, STAGE_MEDIUM, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import {
-  getEventGearItems,
-  updateGearItemStatus,
   assignGearOperator,
   batchGetGearAvailability,
   getCrewEquipmentMatchesForEvent,
+  getEventGearItems,
   sourceGearFromCrew,
+  updateGearItemStatus,
+  type CrewGearMatch,
   type EventGearItem,
   type GearAvailability,
   type GearSource,
-  type CrewGearMatch,
 } from '../../actions/event-gear-items';
 import {
   GEAR_LIFECYCLE_ORDER,
-  GEAR_BRANCH_STATES,
-  GEAR_STATUS_LABELS,
   type GearStatus,
 } from './types';
-import { DEPARTMENT_ORDER, DEFAULT_DEPARTMENT } from '../../lib/department-mapping';
+import { DEFAULT_DEPARTMENT, DEPARTMENT_ORDER } from '../../lib/department-mapping';
 import type { DealCrewRow } from '../../actions/deal-crew';
 import {
   getKitComplianceForEntity,
   type KitComplianceResult,
 } from '@/features/talent-management/api/kit-template-actions';
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function getLifecycleIndex(status: GearStatus): number {
-  return GEAR_LIFECYCLE_ORDER.indexOf(status);
-}
-
-function isBranchState(status: GearStatus): boolean {
-  return GEAR_BRANCH_STATES.includes(status);
-}
-
-type DepartmentGearGroup = {
-  department: string;
-  items: EventGearItem[];
-};
-
-function getInitials(name: string | null): string {
-  if (!name) return '?';
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-}
-
-const SOURCE_CHIP_STYLES: Record<GearSource, { bg: string; text: string; label: string }> = {
-  company: { bg: 'bg-[oklch(1_0_0/0.06)]', text: 'text-[var(--stage-text-tertiary)]', label: 'Company' },
-  crew: { bg: 'bg-[oklch(0.75_0.15_240_/_0.15)]', text: 'text-[var(--color-unusonic-info)]', label: 'Crew' },
-  subrental: { bg: 'bg-[var(--color-unusonic-warning)]/15', text: 'text-[var(--color-unusonic-warning)]', label: 'Sub-rental' },
-};
+import { DepartmentSection } from './gear-flight-check/department-section';
+import { GearItemRow } from './gear-flight-check/gear-item-row';
+import { SourcingBanner } from './gear-flight-check/sourcing-banner';
+import {
+  SOURCE_CHIP_STYLES,
+  getLifecycleIndex,
+  isBranchState,
+  type DepartmentGearGroup,
+} from './gear-flight-check/shared';
 
 // =============================================================================
 // Props
@@ -101,8 +78,6 @@ export function GearFlightCheck({
   eventEndsAt,
   crewRows = [],
   onUpdated,
-  defaultCollapsed = false,
-  maxVisible = 5,
   userName = 'You',
   onOpenCrewDetail,
 }: GearFlightCheckProps) {
@@ -241,7 +216,7 @@ export function GearFlightCheck({
     } else {
       fetchItems(); // Revert
     }
-  }, [eventId, fetchItems, onUpdated]);
+  }, [fetchItems, onUpdated]);
 
   // ── Department grouping ─────────────────────────────────────────────────────
 
@@ -455,107 +430,21 @@ export function GearFlightCheck({
       </div>
 
       {/* Sourcing opportunities — Layer 2 gap-analysis recommender.
-       * When any company-sourced items have an owner among the assigned crew,
-       * surface the opportunity proactively instead of making the PM scan
-       * every row for the small "crew owns this" hint. */}
-      {crewSourceableCount > 0 && (
-        <div
-          className="mb-4 rounded-lg border overflow-hidden"
-          style={{
-            borderColor: 'color-mix(in oklch, var(--color-unusonic-info) 30%, transparent)',
-            background: 'color-mix(in oklch, var(--color-unusonic-info) 8%, transparent)',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setSourcingBannerOpen((v) => !v)}
-            className="w-full flex items-center gap-2 px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-          >
-            <Sparkles
-              size={14}
-              strokeWidth={1.5}
-              className="shrink-0 text-[var(--color-unusonic-info)]"
-            />
-            <span
-              className="text-sm font-medium text-[var(--stage-text-primary)] flex-1 text-left"
-            >
-              {crewSourceableCount} item{crewSourceableCount === 1 ? '' : 's'} could be sourced from crew
-            </span>
-            <span className="stage-badge-text text-[var(--stage-text-tertiary)] shrink-0">
-              {sourcingBannerOpen ? 'Hide' : 'Review'}
-            </span>
-            <motion.div
-              animate={{ rotate: sourcingBannerOpen ? 90 : 0 }}
-              transition={STAGE_LIGHT}
-              className="shrink-0"
-            >
-              <ChevronRight size={14} strokeWidth={1.5} className="text-[var(--stage-text-tertiary)]" />
-            </motion.div>
-          </button>
-          <AnimatePresence initial={false}>
-            {sourcingBannerOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={STAGE_LIGHT}
-                style={{ overflow: 'hidden' }}
-              >
-                <ul
-                  className="divide-y"
-                  style={{ borderColor: 'color-mix(in oklch, var(--color-unusonic-info) 20%, transparent)' }}
-                >
-                  {sourcingOpportunities.map(({ item, matches }) => {
-                    const owner = matches[0];
-                    const isSourcing = sourcing === item.id;
-                    return (
-                      <li
-                        key={item.id}
-                        className="flex items-center gap-2 px-3 py-2"
-                        style={{
-                          borderTopColor:
-                            'color-mix(in oklch, var(--color-unusonic-info) 18%, transparent)',
-                        }}
-                      >
-                        <span className="stage-readout truncate flex-1 min-w-0">{item.name}</span>
-                        <span className="stage-badge-text text-[var(--stage-text-secondary)] truncate shrink-0 max-w-[40%]">
-                          {owner.entityName}
-                          {matches.length > 1 ? ` +${matches.length - 1}` : ''} owns
-                        </span>
-                        <button
-                          type="button"
-                          disabled={isSourcing}
-                          onClick={() => handleSourceFromCrew(item.id, owner.entityId)}
-                          className="shrink-0 stage-badge-text tracking-tight px-2 py-1 rounded-md border transition-colors disabled:opacity-45"
-                          style={{
-                            color: 'var(--color-unusonic-info)',
-                            background:
-                              'color-mix(in oklch, var(--color-unusonic-info) 12%, transparent)',
-                            borderColor:
-                              'color-mix(in oklch, var(--color-unusonic-info) 30%, transparent)',
-                          }}
-                        >
-                          {isSourcing ? (
-                            <Loader2 className="size-3 animate-spin" />
-                          ) : (
-                            'Source from crew'
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+       * Surfaced via dedicated sub-component so the orchestrator stays focused
+       * on state + grouping. */}
+      <SourcingBanner
+        opportunities={sourcingOpportunities}
+        open={sourcingBannerOpen}
+        onToggle={() => setSourcingBannerOpen((v) => !v)}
+        sourcingItemId={sourcing}
+        onSourceFromCrew={handleSourceFromCrew}
+      />
 
       {/* Flat list (single department) */}
       {useFlatList && (
         <ul className="space-y-1">
           <AnimatePresence initial={false}>
-            {items.map((item, i) => (
+            {items.map((item) => (
               <motion.li
                 key={item.id}
                 layout
@@ -654,608 +543,5 @@ export function GearFlightCheck({
         </div>
       )}
     </StagePanel>
-  );
-}
-
-// =============================================================================
-// Department section (collapsible)
-// =============================================================================
-
-function DepartmentSection({
-  group,
-  collapsed,
-  onToggle,
-  deptCrew,
-  kitCompliance,
-  updating,
-  menuOpen,
-  availability,
-  operatorPickerOpen,
-  crewRows,
-  crewMatches,
-  sourcing,
-  onSourceFromCrew,
-  onAdvance,
-  onSetStatus,
-  onToggleMenu,
-  onCloseMenu,
-  onOpenOperatorPicker,
-  onAssignOperator,
-  onOpenCrewDetail,
-}: {
-  group: DepartmentGearGroup;
-  collapsed: boolean;
-  onToggle: () => void;
-  deptCrew: DealCrewRow[];
-  kitCompliance: Record<string, KitComplianceResult>;
-  updating: string | null;
-  menuOpen: string | null;
-  availability: Map<string, GearAvailability>;
-  operatorPickerOpen: string | null;
-  crewRows: DealCrewRow[];
-  crewMatches: Record<string, CrewGearMatch[]>;
-  sourcing: string | null;
-  onSourceFromCrew: (itemId: string, entityId: string) => void;
-  onAdvance: (id: string) => void;
-  onSetStatus: (id: string, s: GearStatus) => void;
-  onToggleMenu: (id: string) => void;
-  onCloseMenu: () => void;
-  onOpenOperatorPicker: (id: string) => void;
-  onAssignOperator: (itemId: string, entityId: string | null) => void;
-  onOpenCrewDetail?: (row: DealCrewRow) => void;
-}) {
-  const { department, items } = group;
-  const loadedCount = items.filter(
-    (i) => !isBranchState(i.status) && getLifecycleIndex(i.status) >= 3,
-  ).length;
-
-  // Aggregate kit compliance across everyone in this department who has a
-  // kit-template-backed role. Skipped entirely when nobody on this dept has
-  // kit expectations — avoids showing a 0/0 pill for untracked roles.
-  const kitAgg = deptCrew.reduce(
-    (acc, c) => {
-      const r = c.entity_id ? kitCompliance[c.entity_id] : undefined;
-      if (!r || r.total === 0) return acc;
-      return { matched: acc.matched + r.matched, total: acc.total + r.total };
-    },
-    { matched: 0, total: 0 },
-  );
-  const kitComplete = kitAgg.total > 0 && kitAgg.matched === kitAgg.total;
-
-  return (
-    <div className="border-b border-[oklch(1_0_0_/_0.06)] last:border-0">
-      {/* Department header */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-2 py-2.5 px-1 group focus:outline-none"
-      >
-        <motion.div
-          animate={{ rotate: collapsed ? -90 : 0 }}
-          transition={STAGE_LIGHT}
-          className="shrink-0"
-        >
-          <ChevronDown className="size-3 text-[var(--stage-text-tertiary)] group-hover:text-[var(--stage-text-secondary)] transition-colors" />
-        </motion.div>
-        <span className="stage-label tracking-tight">
-          {department}
-        </span>
-        <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">
-          {items.length}
-        </span>
-
-        {/* Crew avatars for this department */}
-        {deptCrew.length > 0 && (
-          <div className="flex items-center -space-x-1 ml-1">
-            {deptCrew.slice(0, 3).map((c) => (
-              <div
-                key={c.id}
-                className="size-5 rounded-full bg-[oklch(1_0_0_/_0.08)] border border-[oklch(1_0_0_/_0.12)] flex items-center justify-center"
-                title={c.entity_name ?? c.role_note ?? undefined}
-              >
-                <span className="text-micro font-medium text-[var(--stage-text-tertiary)]">
-                  {getInitials(c.entity_name)}
-                </span>
-              </div>
-            ))}
-            {deptCrew.length > 3 && (
-              <span className="text-micro text-[var(--stage-text-tertiary)] ml-1.5 tabular-nums">
-                +{deptCrew.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        <span className="flex-1" />
-        {kitAgg.total > 0 && (
-          <span
-            className="shrink-0 stage-badge-text tabular-nums tracking-tight px-1.5 py-0.5 rounded-md mr-2"
-            style={{
-              color: kitComplete
-                ? 'var(--color-unusonic-success)'
-                : 'var(--color-unusonic-warning)',
-              background: kitComplete
-                ? 'color-mix(in oklch, var(--color-unusonic-success) 12%, transparent)'
-                : 'color-mix(in oklch, var(--color-unusonic-warning) 12%, transparent)',
-            }}
-            title={
-              kitComplete
-                ? 'Crew kit complete for this department'
-                : `${kitAgg.total - kitAgg.matched} kit item(s) missing across ${department} crew`
-            }
-          >
-            {kitAgg.matched}/{kitAgg.total} kit
-          </span>
-        )}
-        <span className="text-label text-[var(--stage-text-tertiary)] tracking-tight tabular-nums">
-          {loadedCount}/{items.length} loaded
-        </span>
-      </button>
-
-      {/* Collapsible content */}
-      <AnimatePresence initial={false}>
-        {!collapsed && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={STAGE_LIGHT}
-            style={{ overflow: 'hidden' }}
-          >
-            <ul className="pb-2 pl-1 space-y-1">
-              <AnimatePresence initial={false}>
-                {items.map((item, i) => (
-                  <motion.li
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={STAGE_LIGHT}
-                    className="overflow-hidden"
-                  >
-                    <GearItemRow
-                      item={item}
-                      updating={updating === item.id}
-                      menuOpen={menuOpen === item.id}
-                      availability={item.catalog_package_id ? availability.get(item.catalog_package_id) : undefined}
-                      operatorPickerOpen={operatorPickerOpen === item.id}
-                      crewRows={crewRows}
-                      crewMatchesForItem={crewMatches[item.id]}
-                      sourcingItem={sourcing === item.id}
-                      onSourceFromCrew={(entityId) => onSourceFromCrew(item.id, entityId)}
-                      onAdvance={() => onAdvance(item.id)}
-                      onSetStatus={(s) => onSetStatus(item.id, s)}
-                      onToggleMenu={() => onToggleMenu(item.id)}
-                      onCloseMenu={onCloseMenu}
-                      onOpenOperatorPicker={() => onOpenOperatorPicker(item.id)}
-                      onAssignOperator={(entityId) => onAssignOperator(item.id, entityId)}
-                      onOpenCrewDetail={onOpenCrewDetail}
-                    />
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// =============================================================================
-// Per-item row
-// =============================================================================
-
-type GearItemRowProps = {
-  item: EventGearItem;
-  updating: boolean;
-  menuOpen: boolean;
-  availability?: GearAvailability;
-  operatorPickerOpen: boolean;
-  crewRows: DealCrewRow[];
-  crewMatchesForItem?: CrewGearMatch[];
-  sourcingItem: boolean;
-  onSourceFromCrew: (entityId: string) => void;
-  onAdvance: () => void;
-  onSetStatus: (s: GearStatus) => void;
-  onToggleMenu: () => void;
-  onCloseMenu: () => void;
-  onOpenOperatorPicker: () => void;
-  onAssignOperator: (entityId: string | null) => void;
-  onOpenCrewDetail?: (row: DealCrewRow) => void;
-};
-
-function GearItemRow({
-  item,
-  updating,
-  menuOpen,
-  availability,
-  operatorPickerOpen,
-  crewRows,
-  crewMatchesForItem,
-  sourcingItem,
-  onSourceFromCrew,
-  onAdvance,
-  onSetStatus,
-  onToggleMenu,
-  onCloseMenu,
-  onOpenOperatorPicker,
-  onAssignOperator,
-  onOpenCrewDetail,
-}: GearItemRowProps) {
-  const isBranch = isBranchState(item.status);
-  const lifecycleIdx = isBranch ? -1 : getLifecycleIndex(item.status);
-  const isTerminal = item.status === 'returned';
-  const menuRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
-
-  // Find the assigned operator name from crewRows
-  const operatorCrew = item.operator_entity_id
-    ? crewRows.find((c) => c.entity_id === item.operator_entity_id)
-    : null;
-
-  // Crew in same department for the operator picker
-  const deptCrew = crewRows.filter(
-    (c) => c.entity_id && (c.department === item.department || (!c.department && (item.department ?? DEFAULT_DEPARTMENT) === DEFAULT_DEPARTMENT)),
-  );
-
-  // Position menu when opened
-  useEffect(() => {
-    if (menuOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.right - 140 });
-    }
-  }, [menuOpen]);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(e.target as Node)
-      ) {
-        onCloseMenu();
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen, onCloseMenu]);
-
-  return (
-    <div>
-      <div
-        className={`flex items-center gap-3 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0 ${isBranch ? 'text-[var(--stage-text-secondary)]' : ''}`}
-      >
-        {/* Name + quantity */}
-        <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="stage-readout truncate">
-            {item.name}
-          </span>
-          {item.quantity > 1 && (
-            <span className="shrink-0 text-label tabular-nums text-[var(--stage-text-tertiary)] bg-[oklch(1_0_0_/_0.06)] px-1.5 py-0.5 rounded-full">
-              x{item.quantity}
-            </span>
-          )}
-        </div>
-
-        {/* Availability badge */}
-        {availability && availability.stockQuantity !== null && (
-          <span
-            className={`shrink-0 text-label tabular-nums px-1.5 py-0.5 rounded-full font-medium ${
-              availability.available > 0
-                ? 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]'
-                : 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]'
-            }`}
-          >
-            {availability.available}/{availability.stockQuantity} avail
-          </span>
-        )}
-
-        {/* Source chip — becomes a button when crew-sourced + rail wired */}
-        {item.source !== 'company' && (() => {
-          const chip = SOURCE_CHIP_STYLES[item.source];
-          const supplierRow = item.source === 'crew' && item.supplied_by_entity_id
-            ? crewRows.find((r) => r.entity_id === item.supplied_by_entity_id)
-            : null;
-          const clickable = !!(onOpenCrewDetail && supplierRow);
-          const content = (
-            <>
-              {chip.label}
-              {item.supplied_by_name && <span className="text-[var(--stage-text-secondary)] ml-0.5">· {item.supplied_by_name}</span>}
-            </>
-          );
-          if (clickable) {
-            return (
-              <button
-                type="button"
-                onClick={() => onOpenCrewDetail!(supplierRow!)}
-                className={`shrink-0 stage-badge-text tracking-tight px-2 py-0.5 rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] ${chip.bg} ${chip.text}`}
-                title={`Open ${item.supplied_by_name ?? 'supplier'} in Crew Hub`}
-              >
-                {content}
-              </button>
-            );
-          }
-          return (
-            <span
-              className={`shrink-0 stage-badge-text tracking-tight px-2 py-0.5 rounded-full ${chip.bg} ${chip.text}`}
-              title={item.supplied_by_name ? `Supplied by ${item.supplied_by_name}` : undefined}
-            >
-              {content}
-            </span>
-          );
-        })()}
-
-        {/* Crew match suggestion — only for company-sourced items with matches */}
-        {item.source === 'company' && crewMatchesForItem && crewMatchesForItem.length > 0 && (
-          <span className="shrink-0 flex items-center gap-1.5">
-            <span className="stage-badge-text tracking-tight text-[var(--color-unusonic-info)]">
-              {crewMatchesForItem[0].entityName}
-            </span>
-            <button
-              type="button"
-              disabled={sourcingItem}
-              onClick={() => onSourceFromCrew(crewMatchesForItem[0].entityId)}
-              className="px-2 py-0.5 rounded-full stage-badge-text tracking-tight font-medium bg-[oklch(0.75_0.15_240_/_0.15)] text-[var(--color-unusonic-info)] hover:bg-[oklch(0.75_0.15_240_/_0.25)] transition-colors disabled:opacity-45"
-            >
-              {sourcingItem ? '...' : 'Source'}
-            </button>
-          </span>
-        )}
-
-        {/* Step dots — lifecycle progress track */}
-        <div className="shrink-0 flex items-center gap-0">
-          {GEAR_LIFECYCLE_ORDER.map((step, idx) => {
-            const isCompleted = !isBranch && lifecycleIdx >= idx;
-            const isCurrent = !isBranch && lifecycleIdx === idx;
-            return (
-              <div key={step} className="flex items-center">
-                {idx > 0 && (
-                  <div
-                    className="w-2 h-[2px]"
-                    style={{
-                      background:
-                        !isBranch && lifecycleIdx >= idx
-                          ? 'var(--color-unusonic-success)'
-                          : 'var(--stage-edge-subtle)',
-                    }}
-                  />
-                )}
-                <div
-                  className="relative rounded-full"
-                  style={{
-                    width: 8,
-                    height: 8,
-                    background: isCompleted ? 'var(--color-unusonic-success)' : 'transparent',
-                    border: isCompleted ? 'none' : '1.5px solid var(--stage-edge-subtle)',
-                    boxShadow: isCurrent ? '0 0 0 2px oklch(1 0 0 / 0.15)' : 'none',
-                  }}
-                  title={GEAR_STATUS_LABELS[step]}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Operator avatar */}
-        <button
-          type="button"
-          onClick={onOpenOperatorPicker}
-          className="shrink-0 size-5 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-          style={{
-            background: item.operator_entity_id
-              ? 'oklch(1 0 0 / 0.10)'
-              : 'transparent',
-            border: item.operator_entity_id
-              ? '1px solid oklch(1 0 0 / 0.12)'
-              : '1px dashed oklch(1 0 0 / 0.20)',
-          }}
-          title={
-            operatorCrew?.entity_name
-              ? `Operator: ${operatorCrew.entity_name}`
-              : 'Assign operator'
-          }
-        >
-          {item.operator_entity_id && operatorCrew ? (
-            <span className="text-micro font-medium text-[var(--stage-text-secondary)]">
-              {getInitials(operatorCrew.entity_name)}
-            </span>
-          ) : (
-            <User size={10} strokeWidth={1.5} className="text-[var(--stage-text-tertiary)]" />
-          )}
-        </button>
-
-        {/* Status label / branch badge */}
-        <div className="shrink-0 flex items-center gap-1.5">
-          {item.status === 'quarantine' && (
-            <span className="px-2 py-0.5 rounded-full stage-badge-text tracking-tight bg-[var(--color-unusonic-error)]/20 text-[var(--color-unusonic-error)]">
-              Quarantine
-            </span>
-          )}
-          {item.status === 'sub_rented' && (
-            <span className="px-2 py-0.5 rounded-full stage-badge-text tracking-tight bg-[var(--color-unusonic-warning)]/20 text-[var(--color-unusonic-warning)]">
-              Sub-rented
-            </span>
-          )}
-          {!isBranch && (
-            <button
-              type="button"
-              onClick={onAdvance}
-              disabled={updating || isTerminal}
-              className={`
-                px-3 py-1 rounded-[22px] text-field-label font-medium tracking-tight
-                border transition-colors
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]
-                disabled:opacity-45 disabled:cursor-default
-                ${
-                  isTerminal
-                    ? 'bg-[var(--color-unusonic-success)]/20 text-[var(--stage-text-primary)] border-[var(--color-unusonic-success)]/40'
-                    : 'bg-[oklch(1_0_0_/_0.06)] text-[var(--stage-text-secondary)] border-[oklch(1_0_0_/_0.10)] stage-hover overflow-hidden hover:text-[var(--stage-text-primary)]'
-                }
-              `}
-            >
-              {updating ? '...' : GEAR_STATUS_LABELS[item.status]}
-            </button>
-          )}
-        </div>
-
-        {/* More menu for branch states */}
-        <div className="shrink-0 relative">
-          <button
-            ref={triggerRef}
-            type="button"
-            onClick={onToggleMenu}
-            disabled={updating}
-            className="p-1 rounded text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] disabled:opacity-45"
-            aria-label="More actions"
-          >
-            <MoreVertical size={14} strokeWidth={1.5} />
-          </button>
-          {menuOpen &&
-            menuPos &&
-            createPortal(
-              <div
-                ref={menuRef}
-                className="fixed z-50 min-w-[140px] py-1 rounded-lg border border-[oklch(1_0_0_/_0.10)] shadow-lg"
-                style={{
-                  top: menuPos.top,
-                  left: menuPos.left,
-                  background: 'var(--ctx-dropdown, var(--stage-surface-raised))',
-                }}
-              >
-                {isBranch ? (
-                  <button
-                    type="button"
-                    onClick={() => onSetStatus('allocated')}
-                    className="w-full text-left px-3 py-1.5 text-xs text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
-                  >
-                    Return to allocated
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus('quarantine')}
-                      className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-unusonic-error)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
-                    >
-                      Quarantine
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus('sub_rented')}
-                      className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-unusonic-warning)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
-                    >
-                      Sub-rented
-                    </button>
-                  </>
-                )}
-              </div>,
-              document.body,
-            )}
-        </div>
-      </div>
-
-      {/* Operator picker — inline dropdown */}
-      <AnimatePresence>
-        {operatorPickerOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={STAGE_LIGHT}
-            className="overflow-hidden"
-          >
-            <OperatorPicker
-              deptCrew={deptCrew}
-              department={item.department ?? DEFAULT_DEPARTMENT}
-              currentOperatorId={item.operator_entity_id}
-              onSelect={onAssignOperator}
-              onClose={onOpenOperatorPicker}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// =============================================================================
-// Operator picker
-// =============================================================================
-
-function OperatorPicker({
-  deptCrew,
-  department,
-  currentOperatorId,
-  onSelect,
-  onClose,
-}: {
-  deptCrew: DealCrewRow[];
-  department: string;
-  currentOperatorId: string | null;
-  onSelect: (entityId: string | null) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="mt-1 mb-2 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] overflow-hidden">
-      {deptCrew.length === 0 ? (
-        <p className="px-3 py-2.5 text-xs text-[var(--stage-text-tertiary)] tracking-tight">
-          No crew in {department}
-        </p>
-      ) : (
-        <div className="max-h-[160px] overflow-y-auto">
-          {/* Unassign option when currently assigned */}
-          {currentOperatorId && (
-            <button
-              type="button"
-              onClick={() => {
-                onSelect(null);
-                onClose();
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-[var(--stage-text-tertiary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors border-b border-[oklch(1_0_0_/_0.06)]"
-            >
-              Unassign operator
-            </button>
-          )}
-          {deptCrew.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                onSelect(c.entity_id);
-                onClose();
-              }}
-              className={`w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-[oklch(1_0_0_/_0.06)] transition-colors ${
-                c.entity_id === currentOperatorId ? 'bg-[oklch(1_0_0_/_0.04)]' : ''
-              }`}
-            >
-              <div className="size-5 rounded-full bg-[oklch(1_0_0_/_0.08)] border border-[oklch(1_0_0_/_0.12)] flex items-center justify-center shrink-0">
-                <span className="text-micro font-medium text-[var(--stage-text-tertiary)]">
-                  {getInitials(c.entity_name)}
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="stage-readout truncate">
-                  {c.entity_name ?? c.role_note ?? 'Unknown'}
-                </p>
-                {c.role_note && c.entity_name && (
-                  <p className="text-label text-[var(--stage-text-tertiary)] tracking-tight truncate">
-                    {c.role_note}
-                  </p>
-                )}
-              </div>
-              {c.entity_id === currentOperatorId && (
-                <span className="text-label text-[var(--stage-text-tertiary)]">current</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }

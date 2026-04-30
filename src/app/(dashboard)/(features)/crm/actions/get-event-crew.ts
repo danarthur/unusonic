@@ -15,7 +15,7 @@ export async function getEventCrew(eventId: string): Promise<AssignedCrewEntry[]
   // declined/dropped assignments so the cue-assignment dropdown in the
   // Run-of-Show editor cannot phantom-assign someone who said no.
   const { data: assignments, error } = await supabase
-    .schema('ops' as any)
+    .schema('ops')
     .from('crew_assignments')
     .select('entity_id, assignee_name, role, status')
     .eq('event_id', eventId)
@@ -32,7 +32,7 @@ export async function getEventCrew(eventId: string): Promise<AssignedCrewEntry[]
   let entityNames: Record<string, string> = {};
   if (entityIds.length > 0) {
     const { data: entities } = await supabase
-      .schema('directory' as any)
+      .schema('directory')
       .from('entities')
       .select('id, display_name')
       .in('id', entityIds);
