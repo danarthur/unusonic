@@ -33,12 +33,10 @@
 
 import * as React from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowRight, ChevronDown, ChevronUp, ExternalLink, History, MessageSquare, Mic, Plus, Sparkles } from 'lucide-react';
+import { ChevronUp, History } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { Button } from '@/shared/ui/button';
 import { AionMark } from '@/shared/ui/branding/aion-mark';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
@@ -50,32 +48,30 @@ import type {
   PipelineRow,
   PriorityBreakdown,
 } from '../actions/get-aion-card-for-deal';
-import { actOnFollowUp } from '../actions/follow-up-actions';
 import {
   SectionHeader,
   SignalsList,
   WhyThisDisclosure,
-  type SignalEntry,
 } from './aion-card-primitives';
 import { ProactiveLineContainer } from './proactive-line-pill';
 import type { ProactiveLine } from '../actions/proactive-line-actions';
-import { AionMarkdown } from '@/app/(dashboard)/(features)/aion/components/AionMarkdown';
 import { PillUnseenDot } from '@/app/(dashboard)/(features)/aion/components/PillUnseenDot';
 import {
   getActiveSignalDisablesForWorkspace,
   getUnseenPillCountsForDeals,
 } from '@/app/(dashboard)/(features)/aion/actions/pill-history-actions';
 import type { AionChatMessage, PrimaryRecommendation } from './aion-deal-card/types';
-import {
-  composeSignals,
-  daysSince,
-  formatRelativeDate,
-  humanizeStageTag,
-} from './aion-deal-card/signals';
+import { composeSignals } from './aion-deal-card/signals';
 import {
   ConversationThread,
   AionChatInput,
 } from './aion-deal-card/conversation-thread';
+import {
+  FooterActions,
+  PipelineCollapsedLine,
+  ArchiveOutboundRow,
+} from './aion-deal-card/footer-actions';
+import { NudgeComposer } from './aion-deal-card/nudge-composer';
 
 // Lazy-load the pill-history Sheet — keeps Prism mount budget unchanged
 // (design §4.1). Only fetches when the user actually opens History.
@@ -146,10 +142,10 @@ function useBreakpoint(): 'mobile' | 'tablet' | 'desktop' {
 // ---------------------------------------------------------------------------
 
 // React.memo wrapper at the bottom of the file — see end. AionDealCard is
-// the heaviest ambient panel (~1500 LOC) and re-rendering it on every
-// parent keystroke is wasted work. Default shallow equality is sufficient
-// here — props are scalar values + a small set of callbacks (which the
-// parent should be stabilizing via useCallback).
+// the heaviest ambient panel and re-rendering it on every parent keystroke
+// is wasted work. Default shallow equality is sufficient here — props are
+// scalar values + a small set of callbacks (which the parent should be
+// stabilizing via useCallback).
 function AionDealCardImpl({
   data,
   context = 'deal_lens',
@@ -834,469 +830,6 @@ function formatShortDate(iso: string): string {
   const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''));
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function FooterActions({
-  primary,
-  outboundRow,
-  pipelineRow,
-  onAcceptAdvance,
-  onDraftNudge,
-}: {
-  primary: PrimaryRecommendation;
-  outboundRow: OutboundRow | null;
-  pipelineRow: PipelineRow | null;
-  onAcceptAdvance: (row: PipelineRow) => void;
-  onDraftNudge: (row: OutboundRow) => void;
-}) {
-  // When both kinds of recommendation exist for this deal, render them as
-  // co-equal peers by intent (NBA research: two actions labeled by intent,
-  // not primary/alternative). Secondary gets variant="secondary" (matte);
-  // the primary action — picked by outbound-first bias — keeps
-  // variant="default" (bright accent).
-  const hasBoth = outboundRow != null && pipelineRow != null;
-
-  if (hasBoth) {
-    // Primary is outbound-first per composer bias. Secondary is the other.
-    const secondaryIsPipeline = primary.kind === 'outbound';
-
-    return (
-      <>
-        {secondaryIsPipeline && pipelineRow ? (
-          <PipelineButton
-            row={pipelineRow}
-            variant="secondary"
-            onClick={() => onAcceptAdvance(pipelineRow)}
-          />
-        ) : outboundRow ? (
-          <OutboundButton
-            row={outboundRow}
-            variant="secondary"
-            onClick={() => onDraftNudge(outboundRow)}
-          />
-        ) : null}
-        <PrimaryCta
-          primary={primary}
-          onAcceptAdvance={onAcceptAdvance}
-          onDraftNudge={onDraftNudge}
-        />
-      </>
-    );
-  }
-
-  return (
-    <PrimaryCta
-      primary={primary}
-      onAcceptAdvance={onAcceptAdvance}
-      onDraftNudge={onDraftNudge}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Button helpers — used by both PrimaryCta and the secondary footer slot
-// ---------------------------------------------------------------------------
-
-function OutboundButton({
-  row,
-  variant,
-  onClick,
-}: {
-  row: OutboundRow;
-  variant: 'default' | 'secondary';
-  onClick: () => void;
-}) {
-  const channel = row.suggestedChannel;
-  const ctaLabel =
-    channel === 'sms' ? 'Draft a text'
-      : channel === 'phone' ? 'Log a call'
-        : 'Draft nudge';
-  return (
-    <Button variant={variant} size="sm" onClick={onClick}>
-      <MessageSquare className="size-3.5" />
-      {ctaLabel}
-    </Button>
-  );
-}
-
-function PipelineButton({
-  row,
-  variant,
-  onClick,
-}: {
-  row: PipelineRow;
-  variant: 'default' | 'secondary';
-  onClick: () => void;
-}) {
-  const stageLabel = humanizeStageTag(row.suggestedStageTag ?? '') || 'next stage';
-  return (
-    <Button variant={variant} size="sm" onClick={onClick}>
-      Move to {stageLabel}
-      <ArrowRight className="size-3.5" />
-    </Button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Primary CTA — the bright accent action (always variant="default")
-// ---------------------------------------------------------------------------
-
-function PrimaryCta({
-  primary,
-  onAcceptAdvance,
-  onDraftNudge,
-}: {
-  primary: PrimaryRecommendation;
-  onAcceptAdvance: (row: PipelineRow) => void;
-  onDraftNudge: (row: OutboundRow) => void;
-}) {
-  if (primary.kind === 'outbound') {
-    return (
-      <OutboundButton
-        row={primary.row}
-        variant="default"
-        onClick={() => onDraftNudge(primary.row)}
-      />
-    );
-  }
-  return (
-    <PipelineButton
-      row={primary.row}
-      variant="default"
-      onClick={() => onAcceptAdvance(primary.row)}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Collapsed-line variant (Pipeline only, no stall)
-// ---------------------------------------------------------------------------
-
-function PipelineCollapsedLine({
-  row,
-  onAccept,
-  onDismiss,
-}: {
-  row: PipelineRow;
-  onAccept: () => void;
-  onDismiss: () => void;
-}) {
-  const stageLabel = humanizeStageTag(row.suggestedStageTag ?? '') || 'next stage';
-  const ctaLabel = `Move to ${stageLabel}`;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={STAGE_MEDIUM}
-      className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-3 py-2',
-        'bg-[var(--ctx-card)]',
-        'shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]',
-      )}
-    >
-      <span
-        className="truncate"
-        style={{
-          fontSize: 'var(--stage-text-body, 13px)',
-          color: 'var(--stage-text-secondary)',
-        }}
-      >
-        {row.title}
-      </span>
-      <div className="flex items-center gap-2 shrink-0">
-        <Button variant="secondary" size="sm" onClick={onAccept}>
-          {ctaLabel}
-        </Button>
-        <button
-          type="button"
-          aria-label="Not yet"
-          onClick={onDismiss}
-          className="text-xs text-[var(--stage-text-secondary)] hover:underline underline-offset-2 px-2"
-        >
-          Not yet
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Archive context row — compact outbound-only listing
-// ---------------------------------------------------------------------------
-
-function ArchiveOutboundRow({
-  row,
-  onDraft,
-  onDismiss,
-  onSnooze,
-}: {
-  row: OutboundRow;
-  onDraft: () => void;
-  onDismiss: () => void;
-  onSnooze: (days: number) => void;
-}) {
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const channel = row.suggestedChannel;
-  const ctaLabel = channel === 'sms' ? 'Draft a text'
-    : channel === 'phone' ? 'Log a call'
-      : 'Draft nudge';
-
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-3 py-2',
-        'bg-[var(--ctx-card)]',
-        'shadow-[inset_0_0_0_1px_var(--stage-edge-subtle)]',
-      )}
-    >
-      <span
-        className="truncate"
-        style={{ fontSize: 'var(--stage-text-body, 13px)' }}
-      >
-        {row.reasonLabel}
-      </span>
-
-      <div className="flex items-center gap-2 shrink-0">
-        <Button variant="secondary" size="sm" onClick={onDraft}>
-          <MessageSquare className="size-3.5" />
-          {ctaLabel}
-        </Button>
-
-        <div className="relative">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="More actions"
-            onClick={() => setMenuOpen((v) => !v)}
-            className="text-[var(--stage-text-secondary)]"
-          >
-            <span aria-hidden className="text-sm leading-none">⋯</span>
-          </Button>
-          {menuOpen && (
-            <ActionMenu
-              onDismiss={() => { setMenuOpen(false); onDismiss(); }}
-              onSnooze={(days) => { setMenuOpen(false); onSnooze(days); }}
-              onClose={() => setMenuOpen(false)}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ActionMenu({
-  onDismiss,
-  onSnooze,
-  onClose,
-}: {
-  onDismiss: () => void;
-  onSnooze: (days: number) => void;
-  onClose: () => void;
-}) {
-  const menuRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      ref={menuRef}
-      role="menu"
-      className={cn(
-        'absolute right-0 top-full mt-1 z-20 min-w-36 rounded-md p-1',
-        'bg-[var(--stage-surface-raised)] border border-[var(--stage-edge-subtle)]',
-        'shadow-lg text-xs',
-      )}
-    >
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => onSnooze(3)}
-        className="block w-full text-left px-2 py-1 rounded-sm hover:bg-[var(--stage-surface)]"
-      >
-        Snooze 3 days
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => onSnooze(7)}
-        className="block w-full text-left px-2 py-1 rounded-sm hover:bg-[var(--stage-surface)]"
-      >
-        Snooze 7 days
-      </button>
-      <hr className="my-1 border-[var(--stage-edge-subtle)]" />
-      <button
-        type="button"
-        role="menuitem"
-        onClick={onDismiss}
-        className="block w-full text-left px-2 py-1 rounded-sm hover:bg-[var(--stage-surface)] text-[var(--stage-text-secondary)]"
-      >
-        Dismiss
-      </button>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// NudgeComposer — inline composer that opens when the user clicks the Draft
-// CTA. Phase 1: logs the nudge as sent manually via actOnFollowUp (writes a
-// follow_up_log row + flips the queue item to 'acted'). Phase 2 will wire
-// email/SMS sending through Resend/Twilio so "Send" actually dispatches.
-// ---------------------------------------------------------------------------
-
-type NudgeChannel = 'email' | 'sms' | 'call';
-
-function resolveInitialChannel(row: OutboundRow): NudgeChannel {
-  const c = (row.suggestedChannel ?? '').toLowerCase();
-  if (c === 'phone' || c === 'call') return 'call';
-  if (c === 'sms' || c === 'text') return 'sms';
-  return 'email';
-}
-
-function NudgeComposer({
-  row,
-  onCancel,
-  onSubmitted,
-}: {
-  row: OutboundRow;
-  onCancel: () => void;
-  onSubmitted: () => void;
-}) {
-  const [channel, setChannel] = React.useState<NudgeChannel>(() => resolveInitialChannel(row));
-  const [message, setMessage] = React.useState('');
-  const [submitting, setSubmitting] = React.useState(false);
-  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
-
-  React.useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
-
-  const handleSubmit = async () => {
-    if (submitting) return;
-    if (!message.trim()) {
-      toast.error('Add a message or call summary first.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const actionType =
-        channel === 'email' ? 'email_sent' : channel === 'sms' ? 'sms_sent' : 'call_logged';
-      const res = await actOnFollowUp(
-        row.followUpId,
-        actionType,
-        channel === 'call' ? 'call' : channel,
-        undefined,
-        message.trim(),
-      );
-      if (!res.success) {
-        toast.error(res.error ?? 'Could not log nudge.');
-        return;
-      }
-      toast.success(channel === 'call' ? 'Call logged.' : 'Nudge logged.');
-      onSubmitted();
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const submitLabel =
-    channel === 'call' ? 'Log call' : channel === 'sms' ? 'Log text' : 'Log email';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={STAGE_MEDIUM}
-      className="overflow-hidden"
-    >
-      <div
-        className="mt-3 p-3 rounded-lg flex flex-col gap-2"
-        style={{
-          border: '1px solid var(--stage-edge-subtle)',
-          background: 'var(--ctx-well)',
-        }}
-        data-surface="well"
-      >
-        <div className="flex items-center gap-1">
-          {(['email', 'sms', 'call'] as const).map((ch) => (
-            <button
-              key={ch}
-              type="button"
-              onClick={() => setChannel(ch)}
-              disabled={submitting}
-              className={cn(
-                'px-2.5 py-1 rounded-md text-xs transition-colors',
-                channel === ch
-                  ? 'text-[var(--stage-text-primary)] bg-[oklch(1_0_0_/_0.10)]'
-                  : 'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
-              )}
-            >
-              {ch === 'email' ? 'Email' : ch === 'sms' ? 'Text' : 'Call'}
-            </button>
-          ))}
-        </div>
-
-        <textarea
-          ref={textareaRef}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder={
-            channel === 'call'
-              ? 'Summary of the call…'
-              : channel === 'sms'
-                ? 'What did you text?'
-                : 'What did you send?'
-          }
-          rows={3}
-          disabled={submitting}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          className="w-full bg-transparent text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] resize-none outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-md p-1"
-        />
-
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className="text-[11px]"
-            style={{ color: 'var(--stage-text-tertiary)' }}
-          >
-            Logs as sent manually. Sending via Resend/Twilio comes next.
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={submitting}
-              className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] px-2 py-1 transition-colors"
-            >
-              Cancel
-            </button>
-            <Button size="sm" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Logging…' : submitLabel}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
 }
 
 // Silence unused-type warning when PriorityBreakdown import is only used

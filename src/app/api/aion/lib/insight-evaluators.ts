@@ -7,6 +7,7 @@
  */
 
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { daysFrom as daysSince } from '@/shared/lib/days-since';
 import { evaluateQuoteExpiring } from './evaluators/quote-expiring';
 import { evaluateHotLeadMultiView } from './evaluators/hot-lead-multi-view';
 import { evaluateDepositGap } from './evaluators/deposit-gap';
@@ -133,10 +134,11 @@ export function daysUntil(date: string | Date): number {
   return Math.ceil((new Date(date).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
-/** Days since a past date. */
-export function daysSince(date: string | Date): number {
-  return Math.floor((Date.now() - new Date(date).getTime()) / (24 * 60 * 60 * 1000));
-}
+/** Days since a past date. Re-exported from `@/shared/lib/days-since` (which
+ *  exports it as `daysFrom`) so existing import paths keep working while the
+ *  underlying implementation is shared with the awaiting-signature widget and
+ *  the Aion deal-card signal helpers. */
+export { daysSince };
 
 /** Human-readable short date: "Apr 12" */
 export function shortDate(date: string | Date): string {

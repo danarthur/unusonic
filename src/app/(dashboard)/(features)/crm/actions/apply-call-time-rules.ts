@@ -88,7 +88,7 @@ function resolveRuleAction(
 
 /**
  * Applies call time rules to a single crew assignment after it's been assigned.
- * Called automatically from assignCrewMember. Silently no-ops if no matching rule.
+ * Silently no-ops if no matching rule.
  */
 export async function applyRuleToCrewMember(
   eventId: string,

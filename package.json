@@ -13,6 +13,8 @@
     "lint": "eslint",
     "lint:baseline:snapshot": "node scripts/eslint-baseline.mjs --snapshot",
     "lint:baseline:check": "node scripts/eslint-baseline.mjs --check",
+    "loc:baseline:snapshot": "node scripts/loc-baseline.mjs --snapshot",
+    "loc:baseline:check": "node scripts/loc-baseline.mjs --check",
     "backfill:gigs-to-events": "npx tsx src/scripts/backfill-gigs-to-events.ts",
     "db:types": "node scripts/gen-db-types.js",
     "test": "vitest run",

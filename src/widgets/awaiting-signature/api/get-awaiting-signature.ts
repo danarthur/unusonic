@@ -3,6 +3,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { daysSince } from '@/shared/lib/days-since';
 
 export type AwaitingItem = {
   id: string;
@@ -24,10 +25,6 @@ type DealRow = { id: string; title: string | null };
 
 function buildDealMap(deals: DealRow[]): Map<string, string> {
   return new Map(deals.map((d) => [d.id, d.title ?? 'Untitled deal']));
-}
-
-function daysSince(dateStr: string): number {
-  return Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000));
 }
 
 async function fetchUnsigned(
@@ -58,7 +55,7 @@ async function fetchUnsigned(
     dealTitle: dealMap.get(r.deal_id) ?? 'Untitled deal',
     clientName: null,
     amount: null,
-    daysWaiting: r.accepted_at ? daysSince(r.accepted_at) : 0,
+    daysWaiting: r.accepted_at ? (daysSince(r.accepted_at) ?? 0) : 0,
     dealHref: `/crm/deal/${r.deal_id}`,
   }));
 }

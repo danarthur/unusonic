@@ -7,42 +7,54 @@
 'use client';
 
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ChevronLeft, LayoutGrid, HelpCircle, Users, Search, X } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { getPackage, updatePackage, getCatalogPackagesWithTags } from '@/features/sales/api/package-actions';
-import { getCatalogItemAssignees, addCatalogItemAssignee, addCatalogRoleAssignee, removeCatalogItemAssignee, type CatalogAssigneeRow } from '@/features/sales/api/catalog-assignee-actions';
+import {
+  getPackage,
+  updatePackage,
+  getCatalogPackagesWithTags,
+} from '@/features/sales/api/package-actions';
+import {
+  getCatalogItemAssignees,
+  addCatalogItemAssignee,
+  addCatalogRoleAssignee,
+  removeCatalogItemAssignee,
+  type CatalogAssigneeRow,
+} from '@/features/sales/api/catalog-assignee-actions';
 import { listWorkspaceJobTitles } from '@/features/talent-management/api/job-title-actions';
 import { searchNetworkOrgs } from '@/features/network-data';
 import type { NetworkSearchOrg } from '@/features/network-data';
-import type { PackageWithTags, PackageCategory, IngredientMeta, PackageDefinition, PackageTag } from '@/features/sales/api/package-actions';
+import type {
+  PackageWithTags,
+  PackageCategory,
+  IngredientMeta,
+  PackageDefinition,
+  PackageTag,
+} from '@/features/sales/api/package-actions';
 import {
   getWorkspaceTags,
   createWorkspaceTag,
   type WorkspaceTag,
 } from '@/features/sales/api/workspace-tag-actions';
 import { SmartTagInput } from '@/shared/ui/smart-tag-input';
-import { CurrencyInput } from '@/shared/ui/currency-input';
 import { cn } from '@/shared/lib/utils';
 import { CatalogImageUpload } from '../../components/catalog-image-upload';
-
-const CATEGORIES: { value: PackageCategory; label: string }[] = [
-  { value: 'package', label: 'Package (The Bundle)' },
-  { value: 'service', label: 'Service (Labor/Time)' },
-  { value: 'rental', label: 'Rental (Inventory)' },
-  { value: 'talent', label: 'Talent (Performance)' },
-  { value: 'retail_sale', label: 'Retail (Consumables)' },
-  { value: 'fee', label: 'Fee (Digital/Admin)' },
-];
-
-
-const inputClass =
-  'w-full px-4 py-2.5 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)] text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]';
-const labelClass = 'block text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] mb-1';
+// Sub-components live under ./page-client/ — split out 2026-04-29.
+import { CATEGORIES, inputClass, labelClass } from './page-client/shared';
+import { PricingFields } from './page-client/pricing-fields';
+import {
+  ServiceTalentSection,
+  BillingTypeSection,
+  RentalInventorySection,
+  RentalAlternativesSection,
+  RetailSection,
+  BundleCTA,
+} from './page-client/category-sections';
+import { DefaultCrewSection } from './page-client/crew-section';
 
 export default function CatalogEditPageClient() {
   const params = useParams();
@@ -78,23 +90,13 @@ export default function CatalogEditPageClient() {
   const [unitType, setUnitType] = useState<'flat' | 'hour' | 'day'>('flat');
   const [unitMultiplier, setUnitMultiplier] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [showCostHelp, setShowCostHelp] = useState(false);
-  const [costHelpPosition, setCostHelpPosition] = useState<{ top: number; left: number } | null>(null);
-  const costHelpTriggerRef = useRef<HTMLButtonElement>(null);
-  const costHelpCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showPriceHelp, setShowPriceHelp] = useState(false);
-  const [priceHelpPosition, setPriceHelpPosition] = useState<{ top: number; left: number } | null>(null);
-  const priceHelpTriggerRef = useRef<HTMLButtonElement>(null);
-  const priceHelpCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showFloorHelp, setShowFloorHelp] = useState(false);
-  const [floorHelpPosition, setFloorHelpPosition] = useState<{ top: number; left: number } | null>(null);
-  const floorHelpTriggerRef = useRef<HTMLButtonElement>(null);
-  const floorHelpCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Default crew state
   const [jobTitles, setJobTitles] = useState<string[]>([]);
   const [assignees, setAssignees] = useState<CatalogAssigneeRow[]>([]);
-  const [inheritedAssignees, setInheritedAssignees] = useState<(CatalogAssigneeRow & { ingredient_name: string })[]>([]);
+  const [inheritedAssignees, setInheritedAssignees] = useState<
+    (CatalogAssigneeRow & { ingredient_name: string })[]
+  >([]);
   const [crewMode, setCrewMode] = useState<'person' | 'role'>('person');
   const [crewSearch, setCrewSearch] = useState('');
   const [crewResults, setCrewResults] = useState<NetworkSearchOrg[]>([]);
@@ -127,16 +129,24 @@ export default function CatalogEditPageClient() {
         setFloorPrice(p.floor_price != null ? String(Number(p.floor_price)) : '');
         setTargetCost(p.target_cost != null ? String(Number(p.target_cost)) : '');
         setSelectedTags(
-          (p.tags ?? []).map((t: PackageTag) => ({ ...t, workspace_id: p.workspace_id }))
+          (p.tags ?? []).map((t: PackageTag) => ({ ...t, workspace_id: p.workspace_id })),
         );
         const pkgAny = p as PackageWithTags & { unit_type?: string; unit_multiplier?: number };
-        setUnitType((pkgAny.unit_type === 'hour' || pkgAny.unit_type === 'day') ? pkgAny.unit_type : 'flat');
-        setUnitMultiplier(pkgAny.unit_multiplier != null && pkgAny.unit_multiplier > 1 ? String(pkgAny.unit_multiplier) : '');
+        setUnitType(
+          pkgAny.unit_type === 'hour' || pkgAny.unit_type === 'day' ? pkgAny.unit_type : 'flat',
+        );
+        setUnitMultiplier(
+          pkgAny.unit_multiplier != null && pkgAny.unit_multiplier > 1
+            ? String(pkgAny.unit_multiplier)
+            : '',
+        );
         setImageUrl((p as PackageWithTags & { image_url?: string | null }).image_url ?? null);
         const meta = (p.definition as { ingredient_meta?: IngredientMeta } | null)?.ingredient_meta;
         if (meta) {
           setDurationHours(meta.duration_hours != null ? String(meta.duration_hours) : '');
-          setPerformanceSetCount(meta.performance_set_count != null ? String(meta.performance_set_count) : '');
+          setPerformanceSetCount(
+            meta.performance_set_count != null ? String(meta.performance_set_count) : '',
+          );
           setStaffRole(meta.staff_role ?? '');
           setBufferPercent(meta.buffer_percent != null ? String(meta.buffer_percent) : '');
           setContactInfo(meta.contact_info ?? '');
@@ -150,17 +160,32 @@ export default function CatalogEditPageClient() {
         // Seed the "Required role" checkbox from the matching entry in
         // required_roles[] — the single staff_role is our one-role editor;
         // we look up its required flag by name (case-insensitive).
-        const existingRoles = (p.definition as { required_roles?: Array<{ role?: string; required?: boolean }> } | null)?.required_roles ?? [];
+        const existingRoles =
+          (p.definition as { required_roles?: Array<{ role?: string; required?: boolean }> } | null)
+            ?.required_roles ?? [];
         const staffRoleLower = (meta?.staff_role ?? '').toLowerCase().trim();
         const matchingRole = staffRoleLower
           ? existingRoles.find((r) => (r?.role ?? '').toLowerCase().trim() === staffRoleLower)
           : undefined;
         setRequiredRole(matchingRole?.required === true);
-        const pkgRow = p as PackageWithTags & { stock_quantity?: number; is_sub_rental?: boolean; replacement_cost?: number | null; buffer_days?: number };
+        const pkgRow = p as PackageWithTags & {
+          stock_quantity?: number;
+          is_sub_rental?: boolean;
+          replacement_cost?: number | null;
+          buffer_days?: number;
+        };
         if ((p.category as string) === 'rental') {
-          setStockQuantity(pkgRow.stock_quantity != null ? String(pkgRow.stock_quantity) : (meta?.stock_quantity != null ? String(meta.stock_quantity) : ''));
+          setStockQuantity(
+            pkgRow.stock_quantity != null
+              ? String(pkgRow.stock_quantity)
+              : meta?.stock_quantity != null
+                ? String(meta.stock_quantity)
+                : '',
+          );
           setIsSubRental(pkgRow.is_sub_rental === true);
-          setReplacementCost(pkgRow.replacement_cost != null ? String(Number(pkgRow.replacement_cost)) : '');
+          setReplacementCost(
+            pkgRow.replacement_cost != null ? String(Number(pkgRow.replacement_cost)) : '',
+          );
           setBufferDays(pkgRow.buffer_days != null ? String(pkgRow.buffer_days) : '');
         } else if ((p.category as string) === 'retail_sale' && meta) {
           setStockQuantity(meta.stock_quantity != null ? String(meta.stock_quantity) : '');
@@ -171,7 +196,9 @@ export default function CatalogEditPageClient() {
           setBufferDays('');
         }
         // Initialize alternatives
-        const existingAlts = (p.definition as Record<string, unknown> | null)?.alternatives as string[] | undefined;
+        const existingAlts = (p.definition as Record<string, unknown> | null)?.alternatives as
+          | string[]
+          | undefined;
         setAlternatives(existingAlts ?? []);
       }
     } catch (e) {
@@ -195,10 +222,13 @@ export default function CatalogEditPageClient() {
 
   // Load all rental packages for alternatives picker
   useEffect(() => {
-    if (!workspaceId || category !== 'rental') { setAllRentalPackages([]); return; }
+    if (!workspaceId || category !== 'rental') {
+      setAllRentalPackages([]);
+      return;
+    }
     getCatalogPackagesWithTags(workspaceId).then((result) => {
       const rentals = (result.packages ?? []).filter(
-        (p) => p.category === 'rental' && p.is_active && p.id !== id
+        (p) => p.category === 'rental' && p.is_active && p.id !== id,
       );
       setAllRentalPackages(rentals);
     });
@@ -206,40 +236,53 @@ export default function CatalogEditPageClient() {
 
   // For bundle packages: load crew inherited from ingredient items
   useEffect(() => {
-    if (!id || !pkg || pkg.category !== 'package') { setInheritedAssignees([]); return; }
-    const def = (pkg.definition as { blocks?: { type: string; catalogId?: string }[] } | null);
-    const ingredientIds = [...new Set(
-      (def?.blocks ?? []).filter((b) => b.type === 'line_item' && b.catalogId).map((b) => b.catalogId as string)
-    )];
-    if (!ingredientIds.length) { setInheritedAssignees([]); return; }
+    if (!id || !pkg || pkg.category !== 'package') {
+      setInheritedAssignees([]);
+      return;
+    }
+    const def = pkg.definition as { blocks?: { type: string; catalogId?: string }[] } | null;
+    const ingredientIds = [
+      ...new Set(
+        (def?.blocks ?? [])
+          .filter((b) => b.type === 'line_item' && b.catalogId)
+          .map((b) => b.catalogId as string),
+      ),
+    ];
+    if (!ingredientIds.length) {
+      setInheritedAssignees([]);
+      return;
+    }
 
     Promise.all(
       ingredientIds.map(async (ingId) => {
-        const [rows, ingPkg] = await Promise.all([
-          getCatalogItemAssignees(ingId),
-          getPackage(ingId),
-        ]);
+        const [rows, ingPkg] = await Promise.all([getCatalogItemAssignees(ingId), getPackage(ingId)]);
         const ingName = ingPkg.package?.name ?? 'Ingredient';
         return rows.map((r) => ({ ...r, ingredient_name: ingName }));
-      })
+      }),
     ).then((nested) => setInheritedAssignees(nested.flat()));
   }, [id, pkg]);
 
-  const handleCrewSearch = useCallback((q: string) => {
-    setCrewSearch(q);
-    if (crewDebounceRef.current) clearTimeout(crewDebounceRef.current);
-    if (q.trim().length < 1) { setCrewResults([]); return; }
-    // sourceOrgId for searchNetworkOrgs: use workspaceId as proxy (org root entity)
-    // This matches the pattern used elsewhere — workspaceId is passed, server resolves the entity
-    const orgId = workspaceId;
-    if (!orgId) return;
-    crewDebounceRef.current = setTimeout(async () => {
-      setCrewSearchLoading(true);
-      const r = await searchNetworkOrgs(orgId, q);
-      setCrewResults(r);
-      setCrewSearchLoading(false);
-    }, 250);
-  }, [workspaceId]);
+  const handleCrewSearch = useCallback(
+    (q: string) => {
+      setCrewSearch(q);
+      if (crewDebounceRef.current) clearTimeout(crewDebounceRef.current);
+      if (q.trim().length < 1) {
+        setCrewResults([]);
+        return;
+      }
+      // sourceOrgId for searchNetworkOrgs: use workspaceId as proxy (org root entity)
+      // This matches the pattern used elsewhere — workspaceId is passed, server resolves the entity
+      const orgId = workspaceId;
+      if (!orgId) return;
+      crewDebounceRef.current = setTimeout(async () => {
+        setCrewSearchLoading(true);
+        const r = await searchNetworkOrgs(orgId, q);
+        setCrewResults(r);
+        setCrewSearchLoading(false);
+      }, 250);
+    },
+    [workspaceId],
+  );
 
   const handleAddAssignee = async (org: NetworkSearchOrg) => {
     if (!id) return;
@@ -306,11 +349,19 @@ export default function CatalogEditPageClient() {
     const ingredient_meta: IngredientMeta | undefined = isBundle
       ? undefined
       : {
-          duration_hours: isServiceOrTalent && durationHours.trim() ? Number(durationHours) || null : null,
-          performance_set_count: isServiceOrTalent && performanceSetCount.trim() ? Number(performanceSetCount) || null : null,
+          duration_hours:
+            isServiceOrTalent && durationHours.trim() ? Number(durationHours) || null : null,
+          performance_set_count:
+            isServiceOrTalent && performanceSetCount.trim()
+              ? Number(performanceSetCount) || null
+              : null,
           staff_role: isServiceOrTalent && staffRole.trim() ? staffRole : null,
-          stock_quantity: category === 'retail_sale' && stockQuantity.trim() ? Number(stockQuantity) || null : null,
-          buffer_percent: category === 'retail_sale' && bufferPercent.trim() ? Number(bufferPercent) || null : null,
+          stock_quantity:
+            category === 'retail_sale' && stockQuantity.trim() ? Number(stockQuantity) || null : null,
+          buffer_percent:
+            category === 'retail_sale' && bufferPercent.trim()
+              ? Number(bufferPercent) || null
+              : null,
           contact_info: isServiceOrTalent && contactInfo.trim() ? contactInfo : null,
         };
     // Sync the Required checkbox into required_roles[]. For service/talent
@@ -319,7 +370,9 @@ export default function CatalogEditPageClient() {
     // for packages never touched by required_roles management), create a
     // minimal one so the flag has somewhere to live. Non-service/talent
     // categories and packages without a staff_role pass the array through.
-    const existingRequiredRoles = Array.isArray((existingDef as { required_roles?: unknown })?.required_roles)
+    const existingRequiredRoles = Array.isArray(
+      (existingDef as { required_roles?: unknown })?.required_roles,
+    )
       ? (existingDef as { required_roles: Array<Record<string, unknown>> }).required_roles
       : null;
     let nextRequiredRoles: Array<Record<string, unknown>> | null = existingRequiredRoles;
@@ -345,24 +398,34 @@ export default function CatalogEditPageClient() {
     }
 
     const definition = isBundle
-      ? (existingDef as unknown as PackageDefinition) ?? undefined
+      ? ((existingDef as unknown as PackageDefinition) ?? undefined)
       : ({
           layout: (existingDef as { layout?: string })?.layout,
-          blocks: Array.isArray((existingDef as { blocks?: unknown })?.blocks) ? (existingDef as { blocks: unknown[] }).blocks : [],
+          blocks: Array.isArray((existingDef as { blocks?: unknown })?.blocks)
+            ? (existingDef as { blocks: unknown[] }).blocks
+            : [],
           staffing: (existingDef as { staffing?: unknown })?.staffing ?? null,
           required_roles: nextRequiredRoles,
           ingredient_meta,
           ...(category === 'rental' && alternatives.length > 0 ? { alternatives } : {}),
         } as PackageDefinition);
 
-    const floorPriceValue = isBundle ? null : (floorPrice.trim() ? (Number(floorPrice) || null) : null);
-    const targetCostValue = isBundle ? null : (targetCost.trim() ? (Number(targetCost) || null) : null);
+    const floorPriceValue = isBundle
+      ? null
+      : floorPrice.trim()
+        ? Number(floorPrice) || null
+        : null;
+    const targetCostValue = isBundle
+      ? null
+      : targetCost.trim()
+        ? Number(targetCost) || null
+        : null;
     const rentalPayload =
       category === 'rental'
         ? {
             stock_quantity: Number(stockQuantity) || 0,
             is_sub_rental: isSubRental,
-            replacement_cost: replacementCost.trim() ? (Number(replacementCost) || null) : null,
+            replacement_cost: replacementCost.trim() ? Number(replacementCost) || null : null,
             buffer_days: bufferDays.trim() ? Math.max(0, Math.floor(Number(bufferDays) || 0)) : 0,
           }
         : {};
@@ -375,7 +438,7 @@ export default function CatalogEditPageClient() {
       floor_price: floorPriceValue,
       target_cost: targetCostValue,
       unit_type: isBundle ? 'flat' : unitType,
-      unit_multiplier: unitMultiplier.trim() ? (Number(unitMultiplier) || null) : null,
+      unit_multiplier: unitMultiplier.trim() ? Number(unitMultiplier) || null : null,
       tagIds: tagIds.length ? tagIds : null,
       definition: definition ?? null,
       image_url: imageUrl,
@@ -394,7 +457,10 @@ export default function CatalogEditPageClient() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Select a workspace to edit catalog items.</p>
-        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
+        <Link
+          href="/catalog"
+          className="mt-4 text-sm text-[var(--stage-accent)] hover:underline"
+        >
           Back to catalog
         </Link>
       </div>
@@ -405,7 +471,10 @@ export default function CatalogEditPageClient() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm">Missing item.</p>
-        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
+        <Link
+          href="/catalog"
+          className="mt-4 text-sm text-[var(--stage-accent)] hover:underline"
+        >
           Back to catalog
         </Link>
       </div>
@@ -424,7 +493,10 @@ export default function CatalogEditPageClient() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-[var(--stage-text-secondary)]">
         <p className="text-sm text-[var(--color-unusonic-error)]">{error ?? 'Item not found.'}</p>
-        <Link href="/catalog" className="mt-4 text-sm text-[var(--stage-accent)] hover:underline">
+        <Link
+          href="/catalog"
+          className="mt-4 text-sm text-[var(--stage-accent)] hover:underline"
+        >
           Back to catalog
         </Link>
       </div>
@@ -449,824 +521,201 @@ export default function CatalogEditPageClient() {
       </header>
 
       <StagePanel className="rounded-[var(--stage-radius-panel)] overflow-hidden flex flex-col flex-1 min-h-0 max-h-[calc(100vh-10rem)]">
-        <div className="overflow-y-auto overflow-x-hidden overscroll-contain flex-1 min-h-0 py-2" style={{ maxHeight: 'calc(100vh - 10rem)' }}>
+        <div
+          className="overflow-y-auto overflow-x-hidden overscroll-contain flex-1 min-h-0 py-2"
+          style={{ maxHeight: 'calc(100vh - 10rem)' }}
+        >
           <form onSubmit={handleSubmit} className="flex flex-col gap-5 pt-6 px-6 pb-6">
-          {formError && (
-            <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
-          )}
-          <div>
-            <label htmlFor="edit-name" className={labelClass}>Name</label>
-            <input
-              id="edit-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputClass}
-              placeholder={isBundle ? 'e.g. Gold Wedding Bundle' : 'e.g. One Hour of Photography'}
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="edit-desc" className={labelClass}>Description (optional)</label>
-            <textarea
-              id="edit-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className={cn(inputClass, 'resize-none')}
-              placeholder="Included items or notes"
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Image (optional)</label>
-            <CatalogImageUpload
-              packageId={id}
-              workspaceId={workspaceId}
-              currentImageUrl={imageUrl}
-              onImageChange={setImageUrl}
-            />
-          </div>
-          <div>
-            <label htmlFor="edit-category" className={labelClass}>Category</label>
-            <select
-              id="edit-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as PackageCategory)}
-              className={inputClass}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="edit-tags" className={labelClass}>Tags (optional)</label>
-            <SmartTagInput
-              id="edit-tags"
-              workspaceId={workspaceId ?? null}
-              value={selectedTags}
-              onChange={(tags) =>
-                setSelectedTags(
-                  tags.map((t) => ({
-                    ...t,
-                    workspace_id: t.workspace_id ?? workspaceId ?? '',
-                  }))
-                )
-              }
-              getWorkspaceTags={getWorkspaceTags}
-              createWorkspaceTag={createWorkspaceTag}
-              placeholder="Type to search or create…"
-            />
-          </div>
-            <div className="grid grid-cols-2 gap-4">
-            <div className={cn(category === 'package' && 'col-span-2')}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <label htmlFor="edit-price" className={cn(labelClass, '!mb-0')}>
-                  {unitType === 'hour' ? 'Rate per hour' : unitType === 'day' ? 'Rate per day' : category === 'package' ? 'Starting price' : category === 'service' ? 'Rate' : category === 'rental' ? 'Rental price' : 'Price'}
-                </label>
-                <button
-                  ref={priceHelpTriggerRef}
-                  type="button"
-                  onMouseEnter={() => {
-                    const el = priceHelpTriggerRef.current;
-                    if (el && typeof document !== 'undefined') {
-                      const r = el.getBoundingClientRect();
-                      const w = 260;
-                      const h = 72;
-                      const left = Math.max(8, Math.min(r.left - w, r.right - w));
-                      const top = r.top - h - 8 < 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8);
-                      setPriceHelpPosition({ top, left });
-                      setShowPriceHelp(true);
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    priceHelpCloseTimeoutRef.current = setTimeout(() => setShowPriceHelp(false), 120);
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (showPriceHelp) setShowPriceHelp(false);
-                    else {
-                      const el = priceHelpTriggerRef.current;
-                      if (el && typeof document !== 'undefined') {
-                        const r = el.getBoundingClientRect();
-                        const w = 260;
-                        const h = 72;
-                        const left = Math.max(8, Math.min(r.left - w, r.right - w));
-                        const top = r.top - h - 8 < 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8);
-                        setPriceHelpPosition({ top, left });
-                        setShowPriceHelp(true);
-                      }
-                    }
-                  }}
-                  className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
-                  aria-label="Price help"
-                  aria-expanded={showPriceHelp}
-                >
-                  <HelpCircle size={14} strokeWidth={1.5} />
-                </button>
-              </div>
-              {typeof document !== 'undefined' &&
-                showPriceHelp &&
-                priceHelpPosition &&
-                createPortal(
-                  <div
-                    className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
-                    style={{ top: priceHelpPosition.top, left: priceHelpPosition.left }}
-                    role="tooltip"
-                    onMouseEnter={() => {
-                      if (priceHelpCloseTimeoutRef.current) {
-                        clearTimeout(priceHelpCloseTimeoutRef.current);
-                        priceHelpCloseTimeoutRef.current = null;
-                      }
-                      setShowPriceHelp(true);
-                    }}
-                    onMouseLeave={() => setShowPriceHelp(false)}
-                  >
-                    {category === 'package'
-                      ? 'The starting price shown for this bundle. Proposal line items can override.'
-                      : category === 'service'
-                        ? 'What you charge the client per hour or flat rate. Default price used on proposals. Margin = Rate minus Target cost.'
-                        : category === 'rental'
-                          ? 'What you charge for this rental. Default price used on proposals.'
-                          : 'Default selling price for this item. Used on proposals.'}
-                  </div>,
-                  document.body
-                )}
-              <CurrencyInput
-                id="edit-price"
-                value={price}
-                onChange={setPrice}
-                placeholder="0.00"
+            {formError && (
+              <p className="text-sm text-[var(--color-unusonic-error)]">{formError}</p>
+            )}
+            <div>
+              <label htmlFor="edit-name" className={labelClass}>
+                Name
+              </label>
+              <input
+                id="edit-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={inputClass}
+                placeholder={isBundle ? 'e.g. Gold Wedding Bundle' : 'e.g. One Hour of Photography'}
                 required
               />
             </div>
-            {category !== 'package' && (
-              <>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <label htmlFor="edit-floor-price" className={cn(labelClass, '!mb-0')}>Floor price (optional)</label>
-                    <button
-                      ref={floorHelpTriggerRef}
-                      type="button"
-                      onMouseEnter={() => {
-                        const el = floorHelpTriggerRef.current;
-                        if (el && typeof document !== 'undefined') {
-                          const r = el.getBoundingClientRect();
-                          const w = 260;
-                          const h = 72;
-                          const left = Math.max(8, Math.min(r.left - w, r.right - w));
-                          const top = r.top - h - 8 < 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8);
-                          setFloorHelpPosition({ top, left });
-                          setShowFloorHelp(true);
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        floorHelpCloseTimeoutRef.current = setTimeout(() => setShowFloorHelp(false), 120);
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (showFloorHelp) setShowFloorHelp(false);
-                        else {
-                          const el = floorHelpTriggerRef.current;
-                          if (el && typeof document !== 'undefined') {
-                            const r = el.getBoundingClientRect();
-                            const w = 260;
-                            const h = 72;
-                            const left = Math.max(8, Math.min(r.left - w, r.right - w));
-                            const top = r.top - h - 8 < 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8);
-                            setFloorHelpPosition({ top, left });
-                            setShowFloorHelp(true);
-                          }
-                        }
-                      }}
-                      className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
-                      aria-label="Floor price help"
-                      aria-expanded={showFloorHelp}
-                    >
-                      <HelpCircle size={14} strokeWidth={1.5} />
-                    </button>
-                  </div>
-                  {typeof document !== 'undefined' &&
-                    showFloorHelp &&
-                    floorHelpPosition &&
-                    createPortal(
-                      <div
-                        className="fixed z-[9999] w-64 max-w-[calc(100vw-16px)] px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
-                        style={{ top: floorHelpPosition.top, left: floorHelpPosition.left }}
-                        role="tooltip"
-                        onMouseEnter={() => {
-                          if (floorHelpCloseTimeoutRef.current) {
-                            clearTimeout(floorHelpCloseTimeoutRef.current);
-                            floorHelpCloseTimeoutRef.current = null;
-                          }
-                          setShowFloorHelp(true);
-                        }}
-                        onMouseLeave={() => setShowFloorHelp(false)}
-                      >
-                        The lowest price you&apos;re willing to accept. The system can warn or block quotes below this so you don&apos;t sell at a loss. Should be at or above your Target cost.
-                      </div>,
-                      document.body
-                    )}
-                  <CurrencyInput
-                    id="edit-floor-price"
-                    value={floorPrice}
-                    onChange={setFloorPrice}
-                    placeholder="Lowest acceptable"
-                  />
-                  {/* Margin readout: current margin vs floor margin */}
-                  {price && targetCost && Number(price) > 0 && Number(targetCost) >= 0 && (
-                    <div className="mt-1.5 flex items-center gap-3 text-xs tabular-nums text-[var(--stage-text-secondary)]">
-                      <span>
-                        Current margin:{' '}
-                        <span className="text-[var(--stage-text-primary)] font-medium">
-                          {((Number(price) - Number(targetCost)) / Number(price) * 100).toFixed(0)}%
-                        </span>
-                      </span>
-                      {floorPrice && Number(floorPrice) > 0 && (
-                        <span>
-                          Floor margin:{' '}
-                          <span className="text-[var(--stage-text-primary)] font-medium">
-                            {((Number(floorPrice) - Number(targetCost)) / Number(floorPrice) * 100).toFixed(0)}%
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <label htmlFor="edit-target-cost" className={cn(labelClass, '!mb-0')}>
-                      {category === 'rental' && isSubRental ? 'Vendor Rental Cost' : 'Target cost'}
-                    </label>
-                    <button
-                      ref={costHelpTriggerRef}
-                      type="button"
-                      onMouseEnter={() => {
-                        const el = costHelpTriggerRef.current;
-                        if (el && typeof document !== 'undefined') {
-                          const r = el.getBoundingClientRect();
-                          const w = 224;
-                          const h = 72;
-                          const left = Math.max(8, Math.min(r.left - w, r.right - w));
-                          const top = r.top - h - 8 < 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8);
-                          setCostHelpPosition({ top, left });
-                          setShowCostHelp(true);
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        costHelpCloseTimeoutRef.current = setTimeout(() => setShowCostHelp(false), 120);
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (showCostHelp) {
-                          setShowCostHelp(false);
-                        } else {
-                          const el = costHelpTriggerRef.current;
-                          if (el && typeof document !== 'undefined') {
-                            const r = el.getBoundingClientRect();
-                            const w = 224;
-                            const h = 72;
-                            const left = Math.max(8, Math.min(r.left - w, r.right - w));
-                            const top = r.top - h - 8 < 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8);
-                            setCostHelpPosition({ top, left });
-                            setShowCostHelp(true);
-                          }
-                        }
-                      }}
-                      className="inline-flex text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-help rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] p-0.5"
-                      aria-label="Target cost help"
-                      aria-expanded={showCostHelp}
-                    >
-                      <HelpCircle size={14} strokeWidth={1.5} />
-                    </button>
-                  </div>
-                  {typeof document !== 'undefined' &&
-                    showCostHelp &&
-                    costHelpPosition &&
-                    createPortal(
-                      <div
-                        className="fixed z-[9999] w-56 px-3 py-2.5 text-xs font-normal text-[var(--stage-text-secondary)] leading-relaxed rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] shadow-[0_8px_32px_-8px_oklch(0_0_0/0.35)] bg-[var(--stage-surface-raised)]"
-                        style={{ top: costHelpPosition.top, left: costHelpPosition.left }}
-                        role="tooltip"
-                        onMouseEnter={() => {
-                          if (costHelpCloseTimeoutRef.current) {
-                            clearTimeout(costHelpCloseTimeoutRef.current);
-                            costHelpCloseTimeoutRef.current = null;
-                          }
-                          setShowCostHelp(true);
-                        }}
-                        onMouseLeave={() => setShowCostHelp(false)}
-                      >
-                        {category === 'service'
-                          ? 'Your internal cost per hour (or flat rate) to provide this service. Used for profit margin.'
-                          : category === 'rental'
-                            ? 'Replacement cost or sub-rental cost. Used for profit margin.'
-                            : category === 'talent'
-                              ? 'Payout to talent. Used for profit margin.'
-                              : 'Your internal cost to provide this item. Used for profit margin.'}
-                      </div>,
-                      document.body
-                    )}
-                    <CurrencyInput
-                      id="edit-target-cost"
-                      value={targetCost}
-                      onChange={setTargetCost}
-                      placeholder="0.00"
-                    />
-                </div>
-              </>
-            )}
-          </div>
-
-          {(category === 'service' || category === 'talent') && (
-            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">{category === 'talent' ? 'Talent' : 'Service'}</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="edit-duration" className={labelClass}>Duration (hours)</label>
-                  <input
-                    id="edit-duration"
-                    type="number"
-                    min={0}
-                    step={0.25}
-                    value={durationHours}
-                    onChange={(e) => setDurationHours(e.target.value)}
-                    className={inputClass}
-                    placeholder="e.g. 8"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="edit-staff-role" className={labelClass}>Staff role</label>
-                  <select
-                    id="edit-staff-role"
-                    value={staffRole}
-                    onChange={(e) => setStaffRole(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Select role…</option>
-                    {jobTitles.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                  {staffRole.trim() !== '' && (
-                    <label
-                      htmlFor="edit-required-role"
-                      className="mt-2 inline-flex items-center gap-2 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] cursor-pointer select-none"
-                    >
-                      <input
-                        id="edit-required-role"
-                        type="checkbox"
-                        checked={requiredRole}
-                        onChange={(e) => setRequiredRole(e.target.checked)}
-                        className="size-3.5 rounded-[3px] border border-[oklch(1_0_0_/_0.18)] bg-[var(--ctx-well)] accent-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                      />
-                      <span>Required role</span>
-                      <span className="text-[var(--stage-text-tertiary)] font-normal">
-                        — flags Send when unfilled
-                      </span>
-                    </label>
-                  )}
-                </div>
-              </div>
-              {(category === 'talent' || durationHours.trim()) && (
-                <div>
-                  <label htmlFor="edit-set-count" className={labelClass}>Sets</label>
-                  <input
-                    id="edit-set-count"
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={performanceSetCount}
-                    onChange={(e) => setPerformanceSetCount(e.target.value)}
-                    className={inputClass}
-                    placeholder="e.g. 2"
-                  />
-                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
-                    Number of sets (e.g. 2 × 45 min)
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {category !== 'package' && (
             <div>
-              <label className={cn(labelClass, 'mb-1.5')}>Billing type</label>
-              <div className="flex gap-1 p-1 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]">
-                {([['flat', 'Flat rate'], ['hour', 'Hourly'], ['day', 'Daily']] as const).map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => { setUnitType(val); if (val === 'flat') setUnitMultiplier(''); }}
-                    className={cn(
-                      'flex-1 px-3 py-1.5 rounded-[calc(var(--stage-radius-input)-2px)] text-xs font-medium tracking-tight transition-colors',
-                      unitType === val
-                        ? 'bg-[var(--stage-accent)] text-[var(--stage-void)]'
-                        : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)]'
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {unitType !== 'flat' && (
-                <div className="mt-3">
-                  <label htmlFor="edit-default-units" className={labelClass}>
-                    Default {unitType === 'hour' ? 'hours' : 'days'} (optional)
-                  </label>
-                  <input
-                    id="edit-default-units"
-                    type="number"
-                    min={0.25}
-                    step={0.25}
-                    value={unitMultiplier}
-                    onChange={(e) => setUnitMultiplier(e.target.value)}
-                    className={cn(inputClass, '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none')}
-                    placeholder={unitType === 'hour' ? 'e.g. 4 (minimum hours)' : 'e.g. 2'}
-                  />
-                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
-                    Pre-fills when added to proposals. Can be adjusted per event.
-                  </p>
-                </div>
-              )}
+              <label htmlFor="edit-desc" className={labelClass}>
+                Description (optional)
+              </label>
+              <textarea
+                id="edit-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                className={cn(inputClass, 'resize-none')}
+                placeholder="Included items or notes"
+              />
             </div>
-          )}
-
-          {category === 'rental' && (
-            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
-                Inventory & Fulfillment
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="edit-stock" className={labelClass}>
-                    Total stock quantity <span className="text-[var(--color-unusonic-error)]">*</span>
-                  </label>
-                  <input
-                    id="edit-stock"
-                    type="number"
-                    min={0}
-                    value={stockQuantity}
-                    onChange={(e) => setStockQuantity(e.target.value)}
-                    className={inputClass}
-                    placeholder="e.g. 100"
-                    required
-                  />
-                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
-                    How many units you own or can fulfill. Used to prevent overbooking.
-                  </p>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isSubRental}
-                      onChange={(e) => setIsSubRental(e.target.checked)}
-                      className="rounded border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] text-[var(--stage-accent)] focus-visible:ring-[var(--stage-accent)]"
-                    />
-                    <span className="text-sm text-[var(--stage-text-primary)]">We sub-rent this item from another vendor</span>
-                  </label>
-                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
-                    When checked, Target Cost becomes Vendor Rental Cost (what the vendor charges you).
-                  </p>
-                </div>
-                <div>
-                  <label htmlFor="edit-replacement-cost" className={labelClass}>Replacement cost</label>
-                  <CurrencyInput
-                    id="edit-replacement-cost"
-                    value={replacementCost}
-                    onChange={setReplacementCost}
-                    placeholder="0.00"
-                  />
-                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
-                    What you will charge the client if this item is destroyed or lost.
-                  </p>
-                </div>
-                <div>
-                  <label htmlFor="edit-buffer-days" className={labelClass}>Prep / buffer days</label>
-                  <select
-                    id="edit-buffer-days"
-                    value={bufferDays}
-                    onChange={(e) => setBufferDays(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">—</option>
-                    <option value="0">0 days</option>
-                    <option value="1">1 day</option>
-                    <option value="2">2 days</option>
-                    <option value="3">3 days</option>
-                  </select>
-                  <p className="text-xs text-[var(--stage-text-secondary)] mt-1">
-                    How many days this item needs for cleaning/prep before it can be rented again.
-                  </p>
-                </div>
-              </div>
+            <div>
+              <label className={labelClass}>Image (optional)</label>
+              <CatalogImageUpload
+                packageId={id}
+                workspaceId={workspaceId}
+                currentImageUrl={imageUrl}
+                onImageChange={setImageUrl}
+              />
             </div>
-          )}
-
-          {category === 'rental' && (
-            <div className="space-y-3 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">
-                  Alternative items
-                </p>
-                <p className="text-xs text-[var(--stage-text-secondary)]/60 mt-0.5 leading-relaxed">
-                  When this item is unavailable, these will be suggested as replacements
-                </p>
-              </div>
-
-              {/* Current alternatives list */}
-              {alternatives.length > 0 && (
-                <ul className="space-y-1.5">
-                  {alternatives.map((altId) => {
-                    const altPkg = allRentalPackages.find((p) => p.id === altId);
-                    return (
-                      <li
-                        key={altId}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--ctx-well)]"
-                      >
-                        <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">
-                          {altPkg?.name ?? altId}
-                        </span>
-                        {altPkg && (
-                          <span className="text-xs tabular-nums text-[var(--stage-text-secondary)] shrink-0">
-                            ${Number(altPkg.price).toLocaleString()}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setAlternatives((prev) => prev.filter((a) => a !== altId))}
-                          className="text-[var(--stage-text-secondary)]/30 hover:text-[var(--color-unusonic-error)]/70 transition-colors focus:outline-none"
-                          aria-label="Remove alternative"
-                        >
-                          <X size={14} strokeWidth={1.5} />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-
-              {/* Add alternative search */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setAltSearchOpen(!altSearchOpen)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--stage-radius-input)] border border-[oklch(1_0_0_/_0.08)] text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.04)] transition-colors focus:outline-none"
-                >
-                  <Search size={12} strokeWidth={1.5} />
-                  Add alternative
-                </button>
-                {altSearchOpen && (
-                  <div className="absolute left-0 top-full mt-1 z-20 w-full max-w-xs rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface-raised)] overflow-hidden shadow-lg">
-                    <div className="p-2 border-b border-[oklch(1_0_0_/_0.06)]">
-                      <input
-                        type="text"
-                        value={altSearchQuery}
-                        onChange={(e) => setAltSearchQuery(e.target.value)}
-                        placeholder="Search rental items..."
-                        className={cn(inputClass, 'text-xs py-1.5')}
-                        autoFocus
-                      />
-                    </div>
-                    <ul className="max-h-48 overflow-y-auto">
-                      {allRentalPackages
-                        .filter(
-                          (p) =>
-                            !alternatives.includes(p.id) &&
-                            p.name.toLowerCase().includes(altSearchQuery.toLowerCase())
-                        )
-                        .slice(0, 20)
-                        .map((p) => (
-                          <li key={p.id}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAlternatives((prev) => [...prev, p.id]);
-                                setAltSearchQuery('');
-                                setAltSearchOpen(false);
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] transition-colors flex items-center justify-between gap-2"
-                            >
-                              <span className="truncate">{p.name}</span>
-                              <span className="text-xs tabular-nums text-[var(--stage-text-secondary)]/50 shrink-0">
-                                ${Number(p.price).toLocaleString()}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      {allRentalPackages.filter(
-                        (p) =>
-                          !alternatives.includes(p.id) &&
-                          p.name.toLowerCase().includes(altSearchQuery.toLowerCase())
-                      ).length === 0 && (
-                        <li className="px-3 py-2 text-xs text-[var(--stage-text-secondary)]/50">
-                          No matching rental items
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {category === 'retail_sale' && (
-            <div className="space-y-4 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.08)] p-4 bg-[var(--ctx-well)]">
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)]">Retail</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="edit-stock-retail" className={labelClass}>Total stock quantity</label>
-                  <input
-                    id="edit-stock-retail"
-                    type="number"
-                    min={0}
-                    value={stockQuantity}
-                    onChange={(e) => setStockQuantity(e.target.value)}
-                    className={inputClass}
-                    placeholder="e.g. 50"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="edit-buffer" className={labelClass}>Buffer %</label>
-                  <input
-                    id="edit-buffer"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    value={bufferPercent}
-                    onChange={(e) => setBufferPercent(e.target.value)}
-                    className={inputClass}
-                    placeholder="e.g. 10"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isBundle && (
-            <div className="rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.12)] bg-[var(--ctx-well)] p-4">
-              <p className="text-sm text-[var(--stage-text-primary)] mb-2">Bundle (Package)</p>
-              <p className="text-xs text-[var(--stage-text-secondary)] mb-3">
-                Drag ingredients from your catalog into this package in the Builder.
-              </p>
-              <Link
-                href={`/catalog/${id}/builder`}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.14)] bg-[oklch(1_0_0_/_0.04)] text-[var(--stage-text-primary)] font-medium text-sm hover:bg-[oklch(1_0_0_/_0.08)] transition-colors"
+            <div>
+              <label htmlFor="edit-category" className={labelClass}>
+                Category
+              </label>
+              <select
+                id="edit-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as PackageCategory)}
+                className={inputClass}
               >
-                <LayoutGrid size={18} strokeWidth={1.5} aria-hidden />
-                Open in Builder
-              </Link>
-            </div>
-          )}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => router.push('/catalog')}
-              className="stage-hover overflow-hidden flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:bg-[oklch(1_0_0_/_0.08)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </form>
-
-        {/* Default crew section — outside the form so inputs don't trigger save */}
-        {id && (
-          <div className="border-t border-[oklch(1_0_0_/_0.06)] pt-5 mt-2 px-6 pb-12">
-            <div className="flex items-center gap-2 mb-3">
-              <Users size={14} strokeWidth={1.5} className="text-[var(--stage-text-secondary)]" />
-              <p className={labelClass + ' mb-0'}>Default crew</p>
-            </div>
-            <p className="text-xs text-[var(--stage-text-secondary)]/60 mb-3 leading-relaxed">
-              When this item is on a proposal, these people will be suggested as production crew on the deal.
-            </p>
-
-            {/* Inherited from ingredients (bundles only) — read-only */}
-            {inheritedAssignees.length > 0 && (
-              <div className="flex flex-col gap-1.5 mb-3">
-                <p className="stage-label text-[var(--stage-text-secondary)]/40 mb-1">From ingredients</p>
-                {inheritedAssignees.map((a) => (
-                  <div key={`${a.id}-inherited`} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.04)] bg-[var(--ctx-well)] opacity-60">
-                    {a.entity_id === null && (
-                      <span className="stage-label text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
-                    )}
-                    <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{a.entity_id ? (a.entity_name ?? a.entity_id) : (a.role_note ?? '—')}</span>
-                    <span className="text-label text-[var(--stage-text-secondary)]/40 shrink-0">{a.ingredient_name}</span>
-                  </div>
+                {CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
                 ))}
-              </div>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="edit-tags" className={labelClass}>
+                Tags (optional)
+              </label>
+              <SmartTagInput
+                id="edit-tags"
+                workspaceId={workspaceId ?? null}
+                value={selectedTags}
+                onChange={(tags) =>
+                  setSelectedTags(
+                    tags.map((t) => ({
+                      ...t,
+                      workspace_id: t.workspace_id ?? workspaceId ?? '',
+                    })),
+                  )
+                }
+                getWorkspaceTags={getWorkspaceTags}
+                createWorkspaceTag={createWorkspaceTag}
+                placeholder="Type to search or create…"
+              />
+            </div>
+
+            <PricingFields
+              category={category}
+              unitType={unitType}
+              price={price}
+              setPrice={setPrice}
+              floorPrice={floorPrice}
+              setFloorPrice={setFloorPrice}
+              targetCost={targetCost}
+              setTargetCost={setTargetCost}
+              isSubRental={isSubRental}
+            />
+
+            {(category === 'service' || category === 'talent') && (
+              <ServiceTalentSection
+                category={category}
+                durationHours={durationHours}
+                setDurationHours={setDurationHours}
+                staffRole={staffRole}
+                setStaffRole={setStaffRole}
+                jobTitles={jobTitles}
+                requiredRole={requiredRole}
+                setRequiredRole={setRequiredRole}
+                performanceSetCount={performanceSetCount}
+                setPerformanceSetCount={setPerformanceSetCount}
+              />
             )}
 
-            {/* Direct assignments on this package */}
-            {assignees.length > 0 && (
-              <div className="flex flex-col gap-1.5 mb-3">
-                {inheritedAssignees.length > 0 && (
-                  <p className="stage-label text-[var(--stage-text-secondary)]/40 mb-1">Added directly</p>
-                )}
-                {assignees.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.06)] bg-[var(--ctx-well)]">
-                    {a.entity_id === null && (
-                      <span className="stage-label text-[var(--stage-text-secondary)]/40 border border-[oklch(1_0_0_/_0.08)] rounded px-1.5 py-0.5 shrink-0">Role</span>
-                    )}
-                    <span className="flex-1 text-sm text-[var(--stage-text-primary)] truncate">{a.entity_id ? (a.entity_name ?? a.entity_id) : (a.role_note ?? '—')}</span>
-                    {a.entity_id && a.role_note && <span className="text-xs text-[var(--stage-text-secondary)]/50">{a.role_note}</span>}
-                    <button type="button" onClick={() => handleRemoveAssignee(a.id)} className="text-[var(--stage-text-secondary)]/30 hover:text-[var(--color-unusonic-error)]/70 transition-colors focus:outline-none" aria-label="Remove">
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+            {category !== 'package' && (
+              <BillingTypeSection
+                unitType={unitType}
+                setUnitType={setUnitType}
+                unitMultiplier={unitMultiplier}
+                setUnitMultiplier={setUnitMultiplier}
+              />
             )}
 
-            <div className="flex gap-1 mb-3 p-1 rounded-[var(--stage-radius-nested)] bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.06)] w-fit">
+            {category === 'rental' && (
+              <RentalInventorySection
+                stockQuantity={stockQuantity}
+                setStockQuantity={setStockQuantity}
+                isSubRental={isSubRental}
+                setIsSubRental={setIsSubRental}
+                replacementCost={replacementCost}
+                setReplacementCost={setReplacementCost}
+                bufferDays={bufferDays}
+                setBufferDays={setBufferDays}
+              />
+            )}
+
+            {category === 'rental' && (
+              <RentalAlternativesSection
+                alternatives={alternatives}
+                setAlternatives={setAlternatives}
+                allRentalPackages={allRentalPackages}
+                altSearchOpen={altSearchOpen}
+                setAltSearchOpen={setAltSearchOpen}
+                altSearchQuery={altSearchQuery}
+                setAltSearchQuery={setAltSearchQuery}
+              />
+            )}
+
+            {category === 'retail_sale' && (
+              <RetailSection
+                stockQuantity={stockQuantity}
+                setStockQuantity={setStockQuantity}
+                bufferPercent={bufferPercent}
+                setBufferPercent={setBufferPercent}
+              />
+            )}
+
+            {isBundle && <BundleCTA id={id} />}
+
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setCrewMode('person')}
-                className={cn(
-                  'px-3 py-1 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors focus:outline-none',
-                  crewMode === 'person' ? 'bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]/50 hover:text-[var(--stage-text-secondary)]'
-                )}
+                onClick={() => router.push('/catalog')}
+                className="stage-hover overflow-hidden flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)] font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
-                Named person
+                Cancel
               </button>
               <button
-                type="button"
-                onClick={() => setCrewMode('role')}
-                className={cn(
-                  'px-3 py-1 rounded-[var(--stage-radius-nested)] text-xs font-medium transition-colors focus:outline-none',
-                  crewMode === 'role' ? 'bg-[oklch(1_0_0_/_0.08)] text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]/50 hover:text-[var(--stage-text-secondary)]'
-                )}
+                type="submit"
+                disabled={saving}
+                className="flex-1 px-4 py-3 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.22)] bg-[var(--stage-accent)] text-[var(--stage-text-on-accent)] font-medium text-sm hover:bg-[oklch(1_0_0_/_0.08)] disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               >
-                Role type
+                {saving ? 'Saving…' : 'Save'}
               </button>
             </div>
+          </form>
 
-            {crewMode === 'person' && (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={crewSearch}
-                  onChange={(e) => { handleCrewSearch(e.target.value); setCrewPickerOpen(true); }}
-                  onFocus={() => setCrewPickerOpen(true)}
-                  placeholder="Search network to add crew…"
-                  className={inputClass}
-                />
-                {crewPickerOpen && (crewResults.length > 0 || crewSearchLoading) && (
-                  <div className="absolute left-0 top-full mt-1 z-20 w-full rounded-[var(--stage-radius-nested)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--stage-surface-raised)] overflow-hidden shadow-lg">
-                    {crewSearchLoading && (
-                      <div className="px-4 py-3 text-xs text-[var(--stage-text-secondary)]/40">Searching…</div>
-                    )}
-                    {crewResults.map((r) => (
-                      <button
-                        key={r.entity_uuid ?? r.id}
-                        type="button"
-                        onClick={() => handleAddAssignee(r)}
-                        className="w-full text-left px-4 py-2.5 text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] transition-colors"
-                      >
-                        {r.name}
-                        {r.entity_type && <span className="ml-1.5 text-label opacity-50 capitalize">{r.entity_type}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {crewMode === 'role' && (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={roleInput}
-                  onChange={(e) => setRoleInput(e.target.value)}
-                  placeholder="e.g. DJ, Photographer, Security…"
-                  className={inputClass}
-                  list="staff-roles-list"
-                />
-                <datalist id="staff-roles-list">
-                  {jobTitles.map((r) => <option key={r} value={r} />)}
-                </datalist>
-                <button
-                  type="button"
-                  disabled={!roleInput.trim() || roleAdding}
-                  onClick={handleAddRole}
-                  className="shrink-0 px-4 py-2.5 rounded-[var(--stage-radius-button)] border border-[oklch(1_0_0_/_0.08)] text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0_/_0.04)] hover:text-[var(--stage-text-primary)] disabled:opacity-45 transition-colors focus:outline-none"
-                >
-                  {roleAdding ? 'Adding…' : 'Add'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+          {/* Default crew section — outside the form so inputs don't trigger save */}
+          {id && (
+            <DefaultCrewSection
+              assignees={assignees}
+              inheritedAssignees={inheritedAssignees}
+              crewMode={crewMode}
+              setCrewMode={setCrewMode}
+              crewSearch={crewSearch}
+              crewResults={crewResults}
+              crewSearchLoading={crewSearchLoading}
+              crewPickerOpen={crewPickerOpen}
+              setCrewPickerOpen={setCrewPickerOpen}
+              onCrewSearch={handleCrewSearch}
+              onAddAssignee={handleAddAssignee}
+              onRemoveAssignee={handleRemoveAssignee}
+              roleInput={roleInput}
+              setRoleInput={setRoleInput}
+              roleAdding={roleAdding}
+              onAddRole={handleAddRole}
+              jobTitles={jobTitles}
+            />
+          )}
         </div>
       </StagePanel>
     </div>

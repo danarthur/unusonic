@@ -1,36 +1,40 @@
 'use client';
 
+/**
+ * CrewDetailRail — right-side drawer (desktop) / bottom sheet (mobile)
+ *
+ * Orchestrator shell. Owns:
+ *   - All row-scoped state (notes, calls, gear, schedule, waypoints, pay).
+ *   - All async handlers (confirm, remove, replace, dispatch, payment cycles).
+ *   - The portal/animation shell + slide-in chrome.
+ *
+ * Sub-components live under ./crew-detail-rail/:
+ *   - shared.tsx        constants, types, computePhase / computeCompliance,
+ *                       formatRelative, nextInCycle, WaypointPatch alias.
+ *   - header.tsx        RailHeader + ComplianceStrip.
+ *   - cells.tsx         CyclableTile (Live grid) + PayField (pay editor).
+ *   - times-stack.tsx   TimesStack — primary call + per-person waypoints.
+ *   - gear-section.tsx  GearSection — supplied gear + bring-from-kit picker.
+ *
+ * Public API: CrewDetailRail (re-exported below for backward compatibility
+ * with `import { CrewDetailRail } from './crew-detail-rail'` callers).
+ *
+ * Internal helpers (CyclableTile, PayField, TimesStack, computePhase,
+ * computeCompliance, formatRelative) are also re-exported so any future
+ * direct caller of those names continues to compile. They were not exported
+ * from this module before the split, so this is purely a future-safety net.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X,
-  Phone,
-  Mail,
-  MessageSquare,
-  Send,
   Loader2,
-  Clock,
-  Ghost,
-  Briefcase,
-  Wrench,
-  DollarSign,
-  Package,
-  Check,
-  Plus,
-  UserRoundX,
-  CheckCheck,
-  Trash2,
-  ChevronDown,
-  AlertTriangle,
-  Shield,
-  CalendarClock,
   Activity as ActivityIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { formatTime12h } from '@/shared/lib/parse-time';
-import { cn } from '@/shared/lib/utils';
 import type { DealCrewRow } from '../actions/deal-crew';
 import {
   confirmDealCrew,
@@ -59,63 +63,24 @@ import {
 } from '../actions/crew-hub';
 import { getKitComplianceForEntity, type KitComplianceResult } from '@/features/talent-management/api/kit-template-actions';
 import { checkCrewAvailability, type CrewAvailabilityResult } from '@/features/ops/actions/check-crew-availability';
-import { CrewPicker } from './crew-picker';
-import { TimePicker } from '@/shared/ui/time-picker';
-
-// =============================================================================
-// Event-type rendering table — keeps the activity feed copy in one place.
-// =============================================================================
-
-const EVENT_LABELS: Record<CrewCommsLogEntry['event_type'], string> = {
-  day_sheet_sent: 'Day sheet sent',
-  day_sheet_delivered: 'Day sheet delivered',
-  day_sheet_bounced: 'Day sheet bounced',
-  schedule_update_sent: 'Schedule update sent',
-  schedule_update_delivered: 'Schedule update delivered',
-  schedule_update_bounced: 'Schedule update bounced',
-  manual_nudge_sent: 'Nudge sent',
-  phone_call_logged: 'Phone call',
-  note_added: 'Note',
-  confirmation_received: 'Confirmed',
-  decline_received: 'Declined',
-  status_changed: 'Status changed',
-  rate_changed: 'Rate changed',
-};
-
-const STATUS_COLORS: Record<DealCrewRow['status'], string> = {
-  pending: 'oklch(1 0 0 / 0.06)',
-  offered: 'oklch(0.75 0.15 240 / 0.12)',
-  tentative: 'oklch(0.80 0.16 85 / 0.12)',
-  confirmed: 'oklch(0.75 0.18 145 / 0.14)',
-  declined: 'oklch(0.68 0.22 25 / 0.14)',
-  replaced: 'oklch(1 0 0 / 0.04)',
-};
-
-const DISPATCH_ORDER = ['standby', 'en_route', 'on_site', 'wrapped'] as const;
-type DispatchStatus = (typeof DISPATCH_ORDER)[number];
-const DISPATCH_LABELS: Record<DispatchStatus, string> = {
-  standby: 'Standby',
-  en_route: 'En route',
-  on_site: 'On site',
-  wrapped: 'Wrapped',
-};
-
-const PAYMENT_ORDER = ['pending', 'completed', 'submitted', 'approved', 'processing', 'paid'] as const;
-type PaymentStatus = (typeof PAYMENT_ORDER)[number];
-const PAYMENT_LABELS: Record<PaymentStatus, string> = {
-  pending: 'Pending',
-  completed: 'Completed',
-  submitted: 'Submitted',
-  approved: 'Approved',
-  processing: 'Processing',
-  paid: 'Paid',
-};
-
-function nextInCycle<T extends readonly string[]>(cycle: T, current: T[number] | null | undefined): T[number] {
-  if (!current) return cycle[0];
-  const idx = cycle.indexOf(current);
-  return idx === -1 || idx === cycle.length - 1 ? cycle[0] : cycle[idx + 1];
-}
+import {
+  DISPATCH_ORDER,
+  DISPATCH_LABELS,
+  PAYMENT_ORDER,
+  PAYMENT_LABELS,
+  computePhase,
+  computeCompliance,
+  nextInCycle,
+  type DispatchStatus,
+  type PaymentStatus,
+} from './crew-detail-rail/shared';
+import { RailHeader, ComplianceStrip } from './crew-detail-rail/header';
+import { CyclableTile } from './crew-detail-rail/cells';
+import { GearSection } from './crew-detail-rail/gear-section';
+import { AgreedSection } from './crew-detail-rail/agreed-section';
+import { TimelineSection } from './crew-detail-rail/timeline-section';
+import { QuickActions } from './crew-detail-rail/quick-actions';
+import { DangerZone } from './crew-detail-rail/danger-zone';
 
 // =============================================================================
 // CrewDetailRail — right-side drawer (desktop) / bottom sheet (mobile)
@@ -626,316 +591,48 @@ export function CrewDetailRail({
                 />
               </div>
             )}
-            {/* Header */}
-            <div
-              className="flex items-start justify-between gap-3 p-4 border-b"
-              style={{ borderColor: 'oklch(1 0 0 / 0.06)' }}
-            >
-              <div className="flex items-start gap-3 min-w-0">
-                <div
-                  className="shrink-0 size-10 rounded-full flex items-center justify-center"
-                  style={{
-                    background: 'oklch(1 0 0 / 0.06)',
-                    color: 'var(--stage-text-secondary)',
-                  }}
-                >
-                  {isGhost ? <Ghost className="size-4" /> : (
-                    <span className="text-sm font-medium tracking-tight">
-                      {(row.first_name?.[0] ?? name[0] ?? '?').toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="min-w-0 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-base font-medium tracking-tight text-[var(--stage-text-primary)]">
-                      {name}
-                    </span>
-                    <span
-                      className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md"
-                      style={{
-                        background: STATUS_COLORS[row.status] ?? STATUS_COLORS.pending,
-                        color: 'var(--stage-text-secondary)',
-                      }}
-                    >
-                      {row.status}
-                    </span>
-                    {isContractor && (
-                      <span
-                        className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                        style={{
-                          background: 'oklch(0.80 0.16 85 / 0.12)',
-                          color: 'var(--color-unusonic-warning)',
-                        }}
-                      >
-                        <Briefcase className="size-2.5" />
-                        Contractor
-                      </span>
-                    )}
-                    {isGhost && (
-                      <span
-                        className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md"
-                        style={{
-                          background: 'oklch(1 0 0 / 0.04)',
-                          color: 'var(--stage-text-tertiary)',
-                        }}
-                        title="Ghost — no user account yet"
-                      >
-                        Ghost
-                      </span>
-                    )}
-                  </div>
-                  {role && (
-                    <span className="text-sm tracking-tight text-[var(--stage-text-secondary)]">
-                      {role}
-                    </span>
-                  )}
-                  {row.call_time && (
-                    <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)] flex items-center gap-1 tabular-nums">
-                      <Clock className="size-2.5" />
-                      Call {formatTime12h(row.call_time)}
-                    </span>
-                  )}
-                  {/* Phase indicator — tells the PM whether they're planning
-                      ("T-3 days") or executing ("LIVE · Show day"). */}
-                  {phase && (
-                    <span
-                      className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md flex items-center gap-1 w-fit"
-                      style={{
-                        background:
-                          phase.tone === 'live'
-                            ? 'color-mix(in oklch, var(--color-unusonic-success) 18%, transparent)'
-                            : phase.tone === 'soon'
-                              ? 'color-mix(in oklch, var(--color-unusonic-warning) 14%, transparent)'
-                              : 'oklch(1 0 0 / 0.04)',
-                        color:
-                          phase.tone === 'live'
-                            ? 'var(--color-unusonic-success)'
-                            : phase.tone === 'soon'
-                              ? 'var(--color-unusonic-warning)'
-                              : 'var(--stage-text-tertiary)',
-                      }}
-                    >
-                      <CalendarClock className="size-2.5" />
-                      {phase.label}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="shrink-0 p-1 text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors focus:outline-none"
-                aria-label="Close"
-                style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
-              >
-                <X className="size-4" />
-              </button>
-            </div>
 
-            {/* Compliance strip — only renders when something needs attention
-                (conflict, missing W-9, expiring COI). Silent by design when
-                everything's in order. */}
-            {compliance.length > 0 && (
-              <div
-                className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b"
-                style={{
-                  background: 'color-mix(in oklch, var(--color-unusonic-warning) 4%, transparent)',
-                  borderColor: 'oklch(1 0 0 / 0.06)',
-                }}
-              >
-                {compliance.map((chip) => {
-                  const Icon = chip.icon === 'conflict'
-                    ? AlertTriangle
-                    : chip.icon === 'shield'
-                      ? Shield
-                      : CalendarClock;
-                  const color = chip.severity === 'error'
-                    ? 'var(--color-unusonic-error)'
-                    : 'var(--color-unusonic-warning)';
-                  return (
-                    <span
-                      key={chip.key}
-                      className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                      style={{
-                        color,
-                        background: `color-mix(in oklch, ${color === 'var(--color-unusonic-error)' ? 'var(--color-unusonic-error)' : 'var(--color-unusonic-warning)'} 12%, transparent)`,
-                      }}
-                      title={chip.title ?? chip.label}
-                    >
-                      <Icon className="size-2.5" />
-                      {chip.label}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
+            <RailHeader
+              row={row}
+              name={name}
+              role={role}
+              isGhost={isGhost}
+              isContractor={isContractor}
+              phase={phase}
+              onClose={onClose}
+            />
+
+            {/* Compliance strip — silent by design when nothing needs attention. */}
+            <ComplianceStrip compliance={compliance} />
 
             {/* Scrollable body */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
 
               {/* ── Quick actions ──────────────────────────────────── */}
-              <section className="flex flex-col gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {row.phone && (
-                    <a
-                      href={`tel:${row.phone}`}
-                      className="stage-btn stage-btn-secondary flex items-center gap-1.5 px-2.5 py-1 text-sm"
-                    >
-                      <Phone className="size-3" />
-                      Call
-                    </a>
-                  )}
-                  {row.email && (
-                    <a
-                      href={`mailto:${row.email}`}
-                      className="stage-btn stage-btn-secondary flex items-center gap-1.5 px-2.5 py-1 text-sm"
-                    >
-                      <Mail className="size-3" />
-                      Email
-                    </a>
-                  )}
-                  {row.phone && (
-                    <a
-                      href={`sms:${row.phone}`}
-                      className="stage-btn stage-btn-secondary flex items-center gap-1.5 px-2.5 py-1 text-sm"
-                    >
-                      <MessageSquare className="size-3" />
-                      Text
-                    </a>
-                  )}
-                  {!row.phone && !row.email && (
-                    <span className="stage-badge-text text-[var(--stage-text-tertiary)]">
-                      No contact info on file.
-                    </span>
-                  )}
-                  {/* Confirm override — only surfaces for assignees who haven't confirmed yet.
-                      Stays in the friendly top bar because it's a committing action, not a
-                      destructive one. */}
-                  {row.entity_id && !row.confirmed_at && row.status !== 'replaced' && row.status !== 'declined' && (
-                    <button
-                      type="button"
-                      onClick={handleConfirm}
-                      disabled={confirming}
-                      className="stage-btn stage-btn-secondary flex items-center gap-1.5 px-2.5 py-1 text-sm disabled:opacity-45 disabled:pointer-events-none"
-                      title="Manually confirm this crew member"
-                    >
-                      {confirming ? <Loader2 className="size-3 animate-spin" /> : <CheckCheck className="size-3" />}
-                      Confirm
-                    </button>
-                  )}
-                </div>
-
-              </section>
+              <QuickActions row={row} confirming={confirming} onConfirm={handleConfirm} />
 
               {/* ── Agreed ───────────────────────────────────────────
                   Planning surface — what's been committed between the PM and
                   this crew member. Call time, pay, (later) schedule and gear
                   summaries. This is what the crew sees via day sheet / portal
                   once sent. Stable, stable-looking. */}
-              <section className="flex flex-col gap-2">
-                <div className="flex items-baseline justify-between">
-                  <h3 className="stage-label">Agreed</h3>
-                  <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">
-                    What the crew sees
-                  </span>
-                </div>
-
-                {/* Times — primary call + per-person waypoints. The primary
-                    call (deal_crew.call_time) stays pinned first; waypoints
-                    augment with anything else the crew needs to hit today. */}
-                <TimesStack
-                  primaryCallTime={row.call_time ?? null}
-                  primaryCallSaving={callTimeSaving}
-                  onPrimaryCallChange={handleCallTimeChange}
-                  waypoints={waypoints}
-                  onAddWaypoint={handleAddWaypoint}
-                  onUpdateWaypoint={handleUpdateWaypoint}
-                  onRemoveWaypoint={handleRemoveWaypoint}
-                />
-
-                {/* Expandable pay editor. Collapsed state shows the total; clicking
-                    opens the per-field form. Auto-saves on blur via handleSavePay
-                    — rate changes flow through updateCrewDispatch which writes a
-                    rate_changed row to crew_comms_log. */}
-                <div
-                  className="flex flex-col rounded-lg"
-                  style={{
-                    background: 'oklch(1 0 0 / 0.03)',
-                    border: '1px solid oklch(1 0 0 / 0.06)',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setPayExpanded((v) => !v)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 focus:outline-none"
-                  >
-                    <DollarSign className="size-3 text-[var(--stage-text-tertiary)]" />
-                    <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">
-                      {payIsPaid ? 'Paid' : 'Owed'}
-                    </span>
-                    <span
-                      className="ml-auto text-sm tabular-nums tracking-tight"
-                      style={{
-                        color: payIsPaid
-                          ? 'var(--color-unusonic-success)'
-                          : 'var(--stage-text-primary)',
-                      }}
-                    >
-                      ${payTotal.toLocaleString()}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        'size-3 text-[var(--stage-text-tertiary)] transition-transform',
-                        payExpanded && 'rotate-180',
-                      )}
-                    />
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {payExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={STAGE_MEDIUM}
-                        style={{ overflow: 'hidden' }}
-                      >
-                        <div className="px-2.5 pb-2.5 pt-1 grid grid-cols-2 gap-2">
-                          <PayField
-                            label="Base"
-                            value={payDraft.base}
-                            onChange={(v) => setPayDraft((p) => ({ ...p, base: v }))}
-                            onBlur={handleSavePay}
-                          />
-                          <PayField
-                            label="Travel"
-                            value={payDraft.travel}
-                            onChange={(v) => setPayDraft((p) => ({ ...p, travel: v }))}
-                            onBlur={handleSavePay}
-                          />
-                          <PayField
-                            label="Per diem"
-                            value={payDraft.diem}
-                            onChange={(v) => setPayDraft((p) => ({ ...p, diem: v }))}
-                            onBlur={handleSavePay}
-                          />
-                          <PayField
-                            label="Kit fee"
-                            value={payDraft.kit}
-                            onChange={(v) => setPayDraft((p) => ({ ...p, kit: v }))}
-                            onBlur={handleSavePay}
-                          />
-                        </div>
-                        {paySaving && (
-                          <div className="px-2.5 pb-2 flex items-center gap-1 stage-badge-text text-[var(--stage-text-tertiary)]">
-                            <Loader2 className="size-3 animate-spin" />
-                            Saving...
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </section>
+              <AgreedSection
+                primaryCallTime={row.call_time ?? null}
+                primaryCallSaving={callTimeSaving}
+                onPrimaryCallChange={handleCallTimeChange}
+                waypoints={waypoints}
+                onAddWaypoint={handleAddWaypoint}
+                onUpdateWaypoint={handleUpdateWaypoint}
+                onRemoveWaypoint={handleRemoveWaypoint}
+                payTotal={payTotal}
+                payIsPaid={payIsPaid}
+                payExpanded={payExpanded}
+                setPayExpanded={setPayExpanded}
+                payDraft={payDraft}
+                setPayDraft={setPayDraft}
+                paySaving={paySaving}
+                onSavePay={handleSavePay}
+              />
 
               {/* ── Live ─────────────────────────────────────────────
                   Execution surface — dispatcher state the crew never sees.
@@ -971,215 +668,22 @@ export function CrewDetailRail({
 
               {/* ── Gear ───────────────────────────────────────────── */}
               {row.entity_id && (eventId || ownedKit.length > 0) && (
-                <section className="flex flex-col gap-2">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="stage-label">Gear</h3>
-                    {kitCompliance && kitCompliance.total > 0 && (
-                      <span
-                        className="stage-badge-text tracking-tight tabular-nums"
-                        style={{
-                          color:
-                            kitCompliance.matched === kitCompliance.total
-                              ? 'var(--color-unusonic-success)'
-                              : 'var(--stage-text-tertiary)',
-                        }}
-                        title={
-                          kitCompliance.matched === kitCompliance.total
-                            ? 'Role kit complete'
-                            : `Missing: ${kitCompliance.missing.map((i) => i.name).join(', ')}`
-                        }
-                      >
-                        {kitCompliance.matched}/{kitCompliance.total} kit items ready
-                      </span>
-                    )}
-                  </div>
-
-                  {loadingGear ? (
-                    <div className="text-sm text-[var(--stage-text-tertiary)] flex items-center gap-2">
-                      <Loader2 className="size-3 animate-spin" />
-                      Loading gear...
-                    </div>
-                  ) : (
-                    <>
-                      {/* Bringing to this show */}
-                      {eventId && suppliedGear.length > 0 && (
-                        <ul className="flex flex-col gap-1">
-                          {suppliedGear.map((item) => (
-                            <li
-                              key={item.id}
-                              className="flex items-center gap-2 py-1 text-sm"
-                            >
-                              <Package className="size-3 shrink-0 text-[var(--stage-text-tertiary)]" />
-                              <span className="text-[var(--stage-text-primary)] min-w-0 truncate">
-                                {item.name}
-                                {item.quantity > 1 && (
-                                  <span className="text-[var(--stage-text-tertiary)] tabular-nums">
-                                    {' '}× {item.quantity}
-                                  </span>
-                                )}
-                              </span>
-                              <span className="ml-auto flex items-center gap-2">
-                                {item.kit_fee != null && (
-                                  <span className="stage-badge-text tabular-nums text-[var(--stage-text-tertiary)]">
-                                    ${item.kit_fee.toLocaleString()}
-                                  </span>
-                                )}
-                                <span
-                                  className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md"
-                                  style={{
-                                    background: 'oklch(1 0 0 / 0.04)',
-                                    color: 'var(--stage-text-secondary)',
-                                  }}
-                                >
-                                  {item.status.replace('_', ' ')}
-                                </span>
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-
-                      {/* gear_notes freetext — from the row */}
-                      {row.gear_notes && (
-                        <p className="text-label leading-relaxed text-[var(--stage-text-tertiary)]">
-                          <Wrench className="size-2.5 inline mr-1" />
-                          {row.gear_notes}
-                        </p>
-                      )}
-
-                      {/* Empty state */}
-                      {eventId && suppliedGear.length === 0 && !row.gear_notes && (
-                        <p className="text-sm leading-relaxed text-[var(--stage-text-tertiary)]">
-                          Not bringing any gear to this show yet.
-                        </p>
-                      )}
-
-                      {/* Bring from kit — picker */}
-                      {eventId && ownedKit.length > 0 && (
-                        <div className="mt-1">
-                          {!kitPickerOpen ? (
-                            <button
-                              type="button"
-                              onClick={() => setKitPickerOpen(true)}
-                              className="stage-btn stage-btn-ghost flex items-center gap-1.5 px-2.5 py-1 text-sm"
-                            >
-                              <Plus className="size-3" />
-                              Bring from kit ({ownedKit.filter((k) => !k.alreadyOnEvent).length} available)
-                            </button>
-                          ) : (
-                            <div
-                              className="flex flex-col gap-2 p-3 rounded-lg"
-                              style={{
-                                background: 'oklch(1 0 0 / 0.03)',
-                                border: '1px solid oklch(1 0 0 / 0.06)',
-                              }}
-                            >
-                              <span className="stage-label">Choose from {name}&apos;s kit</span>
-                              <ul className="flex flex-col gap-1">
-                                {ownedKit.map((kit) => {
-                                  const selected = selectedKitIds.has(kit.equipmentId);
-                                  const disabled = kit.alreadyOnEvent;
-                                  return (
-                                    <li key={kit.equipmentId}>
-                                      <button
-                                        type="button"
-                                        disabled={disabled}
-                                        onClick={() => !disabled && toggleKitSelection(kit.equipmentId)}
-                                        className="w-full flex items-center gap-2 py-1 text-left text-sm transition-colors focus:outline-none disabled:opacity-45 disabled:cursor-not-allowed"
-                                        style={{
-                                          color: selected
-                                            ? 'var(--stage-text-primary)'
-                                            : 'var(--stage-text-secondary)',
-                                        }}
-                                      >
-                                        <span
-                                          className="size-4 rounded shrink-0 flex items-center justify-center"
-                                          style={{
-                                            background: selected
-                                              ? 'oklch(0.85 0 0)'
-                                              : 'oklch(1 0 0 / 0.04)',
-                                            border: '1px solid oklch(1 0 0 / 0.12)',
-                                          }}
-                                        >
-                                          {selected && <Check className="size-3 text-[oklch(0.15_0_0)]" />}
-                                        </span>
-                                        <span className="min-w-0 truncate">
-                                          {kit.name}
-                                          {kit.quantity > 1 && (
-                                            <span className="text-[var(--stage-text-tertiary)] tabular-nums">
-                                              {' '}× {kit.quantity}
-                                            </span>
-                                          )}
-                                        </span>
-                                        <span
-                                          className="ml-auto stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]"
-                                          title={kit.category}
-                                        >
-                                          {disabled ? 'Already on show' : kit.category}
-                                        </span>
-                                      </button>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                              <div className="flex justify-end gap-2 mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setKitPickerOpen(false);
-                                    setSelectedKitIds(new Set());
-                                  }}
-                                  className="stage-btn stage-btn-ghost text-sm px-2.5 py-1"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleBringFromKit}
-                                  disabled={selectedKitIds.size === 0 || bringingFromKit}
-                                  className="stage-btn stage-btn-primary flex items-center gap-1.5 px-2.5 py-1 text-sm disabled:opacity-45 disabled:pointer-events-none"
-                                >
-                                  {bringingFromKit ? (
-                                    <Loader2 className="size-3 animate-spin" />
-                                  ) : (
-                                    <Package className="size-3" />
-                                  )}
-                                  Bring {selectedKitIds.size > 0 ? `${selectedKitIds.size} item${selectedKitIds.size > 1 ? 's' : ''}` : 'selected'}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Kit compliance gaps (read-only display) */}
-                      {kitCompliance &&
-                        kitCompliance.missing.length > 0 &&
-                        kitCompliance.missing.length < kitCompliance.total && (
-                          <details className="mt-1">
-                            <summary className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)] cursor-pointer">
-                              {kitCompliance.missing.length} kit item{kitCompliance.missing.length > 1 ? 's' : ''} missing for this role
-                            </summary>
-                            <ul className="flex flex-col gap-0.5 mt-1 pl-4">
-                              {kitCompliance.missing.map((miss, i) => (
-                                <li key={`${miss.name}-${i}`} className="text-label leading-relaxed text-[var(--stage-text-secondary)]">
-                                  {miss.name}
-                                  {miss.quantity > 1 && (
-                                    <span className="text-[var(--stage-text-tertiary)] tabular-nums">
-                                      {' '}× {miss.quantity}
-                                    </span>
-                                  )}
-                                  {miss.optional && (
-                                    <span className="text-[var(--stage-text-tertiary)]"> (optional)</span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
-                    </>
-                  )}
-                </section>
+                <GearSection
+                  row={row}
+                  eventId={eventId}
+                  name={name}
+                  loadingGear={loadingGear}
+                  suppliedGear={suppliedGear}
+                  ownedKit={ownedKit}
+                  kitCompliance={kitCompliance}
+                  kitPickerOpen={kitPickerOpen}
+                  setKitPickerOpen={setKitPickerOpen}
+                  selectedKitIds={selectedKitIds}
+                  setSelectedKitIds={setSelectedKitIds}
+                  toggleKitSelection={toggleKitSelection}
+                  bringingFromKit={bringingFromKit}
+                  onBringFromKit={handleBringFromKit}
+                />
               )}
 
               {/* ── Schedule ───────────────────────────────────────── */}
@@ -1257,131 +761,32 @@ export function CrewDetailRail({
                   edits, phone calls, replacements. Ordered newest-first. The
                   inline "Log call" form sits at the top as the primary new-
                   entry affordance — eliminates the old Log-a-call section. */}
-              <section className="flex flex-col gap-2">
-                <h3 className="stage-label">Timeline</h3>
-
-                {/* Inline add — Log a call. Single most common manual entry;
-                    future passes can add a [+ Note] / [+ Send message] sibling. */}
-                <div
-                  className="flex flex-col gap-1.5 p-2 rounded-lg"
-                  style={{
-                    background: 'oklch(1 0 0 / 0.03)',
-                    border: '1px solid oklch(1 0 0 / 0.06)',
-                  }}
-                >
-                  <textarea
-                    value={callDraft}
-                    onChange={(e) => setCallDraft(e.target.value)}
-                    placeholder="Log a phone call — what you spoke about"
-                    rows={1}
-                    className="text-sm leading-relaxed px-2 py-1 outline-none focus-visible:border-[oklch(1_0_0/0.18)] resize-none"
-                    style={{
-                      background: 'var(--ctx-well)',
-                      border: '1px solid oklch(1 0 0 / 0.06)',
-                      borderRadius: 'var(--stage-radius-input, 6px)',
-                      color: 'var(--stage-text-primary)',
-                    }}
-                  />
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={handleLogCall}
-                      disabled={!callDraft.trim() || callSaving}
-                      className="stage-btn stage-btn-secondary flex items-center gap-1.5 px-2.5 py-1 text-sm disabled:opacity-45 disabled:pointer-events-none"
-                    >
-                      {callSaving ? <Loader2 className="size-3 animate-spin" /> : <Phone className="size-3" />}
-                      Log call
-                    </button>
-                  </div>
-                </div>
-
-                {loadingLog ? (
-                  <div className="text-sm text-[var(--stage-text-tertiary)] flex items-center gap-2">
-                    <Loader2 className="size-3 animate-spin" />
-                    Loading history...
-                  </div>
-                ) : log.length === 0 ? (
-                  <p className="text-sm leading-relaxed text-[var(--stage-text-tertiary)]">
-                    No comms yet. Day sheets, status changes, rate edits, and phone calls land here.
-                  </p>
-                ) : (
-                  <ul className="flex flex-col">
-                    {log.map((entry) => (
-                      <li
-                        key={entry.id}
-                        className="flex flex-col gap-0.5 py-1.5 border-b last:border-0"
-                        style={{ borderColor: 'oklch(1 0 0 / 0.04)' }}
-                      >
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-sm tracking-tight text-[var(--stage-text-primary)]">
-                            {EVENT_LABELS[entry.event_type] ?? entry.event_type}
-                          </span>
-                          <span className="stage-badge-text tabular-nums text-[var(--stage-text-tertiary)]">
-                            {formatRelative(entry.occurred_at)}
-                          </span>
-                        </div>
-                        {entry.summary && (
-                          <span className="text-label leading-relaxed text-[var(--stage-text-secondary)]">
-                            {entry.summary}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+              <TimelineSection
+                log={log}
+                loadingLog={loadingLog}
+                callDraft={callDraft}
+                setCallDraft={setCallDraft}
+                callSaving={callSaving}
+                onLogCall={handleLogCall}
+              />
 
               {/* ── Danger zone ─────────────────────────────────────
                   Replace + Remove separated from the friendly top bar so
                   destructive actions aren't one accidental tap from a call
                   or email. Muted visual weight; confirmation on Remove. */}
               {row.entity_id && (
-                <section
-                  className="flex flex-col gap-2 pt-3 border-t mt-2"
-                  style={{ borderColor: 'oklch(1 0 0 / 0.06)' }}
-                >
-                  <h3 className="stage-label text-[var(--stage-text-tertiary)]">Actions</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {sourceOrgId && row.status !== 'replaced' && (
-                      <button
-                        type="button"
-                        onClick={() => setReplacePickerOpen((v) => !v)}
-                        disabled={replacing}
-                        className="stage-btn stage-btn-ghost flex items-center gap-1.5 px-2.5 py-1 text-sm disabled:opacity-45 disabled:pointer-events-none"
-                        title="Swap this person for someone else — keeps history"
-                      >
-                        {replacing ? <Loader2 className="size-3 animate-spin" /> : <UserRoundX className="size-3" />}
-                        Replace
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleRemove}
-                      disabled={removing}
-                      className="stage-btn stage-btn-ghost flex items-center gap-1.5 px-2.5 py-1 text-sm disabled:opacity-45 disabled:pointer-events-none ml-auto"
-                      style={{ color: 'var(--color-unusonic-error)' }}
-                      title="Remove this person from the crew"
-                    >
-                      {removing ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-                      Remove
-                    </button>
-                  </div>
-
-                  {/* Replace picker — opens inline below the action row */}
-                  {replacePickerOpen && sourceOrgId && (
-                    <div className="relative mt-2">
-                      <CrewPicker
-                        sourceOrgId={sourceOrgId}
-                        onSelect={async (result) => handleReplacePick({ entity_id: result.entity_id })}
-                        onClose={() => setReplacePickerOpen(false)}
-                        placeholder={`Replace ${row.entity_name ?? 'this person'}\u2026`}
-                        roleHint={row.role_note ?? undefined}
-                        eventDate={eventDate}
-                        workspaceId={workspaceId}
-                      />
-                    </div>
-                  )}
-                </section>
+                <DangerZone
+                  row={row}
+                  sourceOrgId={sourceOrgId}
+                  workspaceId={workspaceId}
+                  eventDate={eventDate}
+                  replacing={replacing}
+                  removing={removing}
+                  replacePickerOpen={replacePickerOpen}
+                  setReplacePickerOpen={setReplacePickerOpen}
+                  onRemove={handleRemove}
+                  onReplacePick={handleReplacePick}
+                />
               )}
             </div>
           </motion.aside>
@@ -1392,465 +797,41 @@ export function CrewDetailRail({
   );
 }
 
-// Cyclable status tile for the Show-day grid. Tap to advance through the
-// cycle. Mirrors the pattern from the list row's dispatch button.
-function CyclableTile({
-  label,
-  value,
-  onClick,
-  hint,
-}: {
-  label: string;
-  value: string;
-  onClick: () => void;
-  hint?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex flex-col gap-0.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[oklch(1_0_0/0.05)] active:bg-[oklch(1_0_0/0.07)] focus:outline-none"
-      style={{
-        background: 'oklch(1 0 0 / 0.03)',
-        border: '1px solid oklch(1 0 0 / 0.06)',
-      }}
-      title={hint}
-    >
-      <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">
-        {label}
-      </span>
-      <span className="text-sm tabular-nums tracking-tight text-[var(--stage-text-primary)]">
-        {value}
-      </span>
-    </button>
-  );
-}
-
-// Small currency input for the expandable pay grid.
-function PayField({
-  label,
-  value,
-  onChange,
-  onBlur,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  onBlur: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <label className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">{label}</label>
-      <div className="flex items-center gap-1">
-        <span className="stage-badge-text text-[var(--stage-text-tertiary)]">$</span>
-        <input
-          type="number"
-          inputMode="decimal"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onBlur}
-          placeholder="0"
-          className="w-full text-sm tabular-nums px-2 py-1 outline-none focus-visible:border-[oklch(1_0_0/0.2)]"
-          style={{
-            background: 'var(--ctx-well)',
-            border: '1px solid oklch(1 0 0 / 0.06)',
-            borderRadius: 'var(--stage-radius-input, 6px)',
-            color: 'var(--stage-text-primary)',
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 // =============================================================================
-// TimesStack — primary call + per-person waypoints
+// Backward-compat re-exports
 //
-// Primary call pinned at the top (deal_crew.call_time). Waypoints render
-// below in sort_order. Adding or editing a waypoint uses a small inline
-// form — keeps the UI self-contained inside the Agreed section.
+// These were not exported from this module before the split, but re-exporting
+// from the orchestrator keeps any future direct-import callers working without
+// having to know about the sibling folder. Pure mechanical safety net.
 // =============================================================================
 
-const WAYPOINT_KIND_LABELS: Record<WaypointKind, string> = {
-  truck_pickup: 'Truck pickup',
-  gear_pickup: 'Gear pickup',
-  depart: 'Depart',
-  venue_arrival: 'Venue arrival',
-  setup: 'Setup',
-  set_by: 'Set by',
-  doors: 'Doors',
-  wrap: 'Wrap',
-  custom: 'Custom',
-};
-
-function TimesStack({
-  primaryCallTime,
-  primaryCallSaving,
-  onPrimaryCallChange,
-  waypoints,
-  onAddWaypoint,
-  onUpdateWaypoint,
-  onRemoveWaypoint,
-}: {
-  primaryCallTime: string | null;
-  primaryCallSaving: boolean;
-  onPrimaryCallChange: (value: string | null) => void;
-  waypoints: CrewWaypoint[];
-  onAddWaypoint: (input: {
-    kind: WaypointKind;
-    customLabel?: string | null;
-    time: string;
-    locationName?: string | null;
-    locationAddress?: string | null;
-    notes?: string | null;
-  }) => void;
-  onUpdateWaypoint: (id: string, patch: Parameters<typeof updateCrewWaypoint>[0]['patch']) => void;
-  onRemoveWaypoint: (id: string) => void;
-}) {
-  const [addOpen, setAddOpen] = useState(false);
-  const [draft, setDraft] = useState<{
-    kind: WaypointKind;
-    customLabel: string;
-    time: string;
-    locationName: string;
-  }>({ kind: 'venue_arrival', customLabel: '', time: '', locationName: '' });
-
-  const resetDraft = () => setDraft({ kind: 'venue_arrival', customLabel: '', time: '', locationName: '' });
-
-  const submitAdd = () => {
-    if (!draft.time) return;
-    if (draft.kind === 'custom' && !draft.customLabel.trim()) return;
-    onAddWaypoint({
-      kind: draft.kind,
-      customLabel: draft.kind === 'custom' ? draft.customLabel.trim() : null,
-      time: draft.time,
-      locationName: draft.locationName.trim() || null,
-    });
-    resetDraft();
-    setAddOpen(false);
-  };
-
-  return (
-    <div
-      className="flex flex-col rounded-lg"
-      style={{
-        background: 'oklch(1 0 0 / 0.03)',
-        border: '1px solid oklch(1 0 0 / 0.06)',
-      }}
-    >
-      {/* Primary call row */}
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
-        <Clock className="size-3 text-[var(--stage-text-tertiary)]" />
-        <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">
-          Primary call
-        </span>
-        {primaryCallSaving && (
-          <Loader2 className="size-3 animate-spin text-[var(--stage-text-tertiary)]" />
-        )}
-        <div className="ml-auto w-28">
-          <TimePicker
-            value={primaryCallTime}
-            onChange={onPrimaryCallChange}
-            placeholder="Set time"
-            variant="ghost"
-          />
-        </div>
-      </div>
-
-      {/* Waypoints */}
-      {waypoints.length > 0 && (
-        <div
-          className="border-t flex flex-col"
-          style={{ borderColor: 'oklch(1 0 0 / 0.05)' }}
-        >
-          {waypoints.map((wp) => (
-            <WaypointRow
-              key={wp.id}
-              waypoint={wp}
-              onUpdate={onUpdateWaypoint}
-              onRemove={onRemoveWaypoint}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Add waypoint */}
-      <div
-        className="border-t"
-        style={{ borderColor: 'oklch(1 0 0 / 0.05)' }}
-      >
-        {!addOpen ? (
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] transition-colors focus:outline-none"
-          >
-            <Plus className="size-3" />
-            Add waypoint
-          </button>
-        ) : (
-          <div className="flex flex-col gap-2 p-2.5">
-            <div className="flex items-center gap-2">
-              <select
-                value={draft.kind}
-                onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value as WaypointKind }))}
-                className="text-sm px-2 py-1 outline-none focus-visible:border-[oklch(1_0_0/0.2)]"
-                style={{
-                  background: 'var(--ctx-well)',
-                  border: '1px solid oklch(1 0 0 / 0.06)',
-                  borderRadius: 'var(--stage-radius-input, 6px)',
-                  color: 'var(--stage-text-primary)',
-                }}
-              >
-                {(Object.keys(WAYPOINT_KIND_LABELS) as WaypointKind[]).map((k) => (
-                  <option key={k} value={k}>{WAYPOINT_KIND_LABELS[k]}</option>
-                ))}
-              </select>
-              <div className="w-28">
-                <TimePicker
-                  value={draft.time || null}
-                  onChange={(v) => setDraft((d) => ({ ...d, time: v ?? '' }))}
-                  placeholder="Time"
-                  variant="ghost"
-                />
-              </div>
-            </div>
-            {draft.kind === 'custom' && (
-              <input
-                type="text"
-                value={draft.customLabel}
-                onChange={(e) => setDraft((d) => ({ ...d, customLabel: e.target.value }))}
-                placeholder="Label (e.g. Meet with client)"
-                className="text-sm px-2 py-1 outline-none focus-visible:border-[oklch(1_0_0/0.2)]"
-                style={{
-                  background: 'var(--ctx-well)',
-                  border: '1px solid oklch(1 0 0 / 0.06)',
-                  borderRadius: 'var(--stage-radius-input, 6px)',
-                  color: 'var(--stage-text-primary)',
-                }}
-              />
-            )}
-            <input
-              type="text"
-              value={draft.locationName}
-              onChange={(e) => setDraft((d) => ({ ...d, locationName: e.target.value }))}
-              placeholder="Location (optional)"
-              className="text-sm px-2 py-1 outline-none focus-visible:border-[oklch(1_0_0/0.2)]"
-              style={{
-                background: 'var(--ctx-well)',
-                border: '1px solid oklch(1 0 0 / 0.06)',
-                borderRadius: 'var(--stage-radius-input, 6px)',
-                color: 'var(--stage-text-primary)',
-              }}
-            />
-            <div className="flex items-center gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => { resetDraft(); setAddOpen(false); }}
-                className="stage-btn stage-btn-ghost text-sm px-2.5 py-1"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submitAdd}
-                disabled={!draft.time || (draft.kind === 'custom' && !draft.customLabel.trim())}
-                className="stage-btn stage-btn-primary text-sm px-2.5 py-1 disabled:opacity-45 disabled:pointer-events-none"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function WaypointRow({
-  waypoint,
-  onUpdate,
-  onRemove,
-}: {
-  waypoint: CrewWaypoint;
-  onUpdate: (id: string, patch: Parameters<typeof updateCrewWaypoint>[0]['patch']) => void;
-  onRemove: (id: string) => void;
-}) {
-  const label = waypoint.kind === 'custom' && waypoint.custom_label
-    ? waypoint.custom_label
-    : WAYPOINT_KIND_LABELS[waypoint.kind];
-
-  return (
-    <div className="flex items-center gap-2 px-2.5 py-1.5 group">
-      <span
-        className="stage-badge-text tracking-tight text-[var(--stage-text-secondary)] min-w-[6.5rem]"
-        title={waypoint.notes ?? undefined}
-      >
-        {label}
-      </span>
-      <div className="w-24">
-        <TimePicker
-          value={waypoint.time}
-          onChange={(v) => {
-            if (v) onUpdate(waypoint.id, { time: v });
-          }}
-          variant="ghost"
-        />
-      </div>
-      {waypoint.location_name && (
-        <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)] min-w-0 truncate">
-          {waypoint.location_name}
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={() => onRemove(waypoint.id)}
-        className="ml-auto p-1 text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 hover:text-[var(--color-unusonic-error)]/60 transition-opacity focus:opacity-100"
-        style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
-        aria-label="Remove waypoint"
-      >
-        <X className="size-3" />
-      </button>
-    </div>
-  );
-}
-
-// =============================================================================
-// Phase indicator — "how far out is this show from right now?"
-//
-// Pre-show (> 24h out): "T-3 days" / "Tomorrow"
-// Near show (call time today): "2h to call" / "30m to call"
-// Show day (past call time, before wrap): "LIVE"
-// Wrapped / past: "Wrapped"
-//
-// callTime is HH:MM (24h, no date). eventStartsAt is the event's starts_at
-// timestamp. We use eventStartsAt for the date portion and callTime to
-// override time-of-day when present.
-// =============================================================================
-
-type PhaseTone = 'idle' | 'soon' | 'live' | 'past';
-type Phase = { label: string; tone: PhaseTone };
-
-function computePhase(
-  callTime: string | null,
-  eventStartsAt: string | null,
-  nowTs: number,
-): Phase | null {
-  if (!eventStartsAt) return null;
-  const event = new Date(eventStartsAt);
-  if (Number.isNaN(event.getTime())) return null;
-
-  // If we have a per-person call time, override the event's time-of-day.
-  let callMoment = event;
-  if (callTime && /^\d{1,2}:\d{2}/.test(callTime)) {
-    const [hh, mm] = callTime.split(':').map((s) => parseInt(s, 10));
-    const base = new Date(event);
-    base.setHours(hh, mm, 0, 0);
-    callMoment = base;
-  }
-
-  const deltaMs = callMoment.getTime() - nowTs;
-  const deltaMin = Math.round(deltaMs / 60_000);
-  const deltaHr = Math.round(deltaMin / 60);
-  const deltaDay = Math.round(deltaHr / 24);
-
-  // Event ended >12h ago → wrapped
-  if (deltaMs < -12 * 3600_000) return { label: 'Wrapped', tone: 'past' };
-  // Within call-time window but past it → live
-  if (deltaMs <= 0) return { label: 'LIVE · Show day', tone: 'live' };
-  // Within 4 hours of call → soon
-  if (deltaMin < 60) return { label: `${deltaMin}m to call`, tone: 'soon' };
-  if (deltaHr < 4) return { label: `${deltaHr}h to call`, tone: 'soon' };
-  // Today
-  if (deltaHr < 24) return { label: 'Show day', tone: 'soon' };
-  // Tomorrow
-  if (deltaDay === 1) return { label: 'Tomorrow', tone: 'idle' };
-  // Further out
-  return { label: `T-${deltaDay} days`, tone: 'idle' };
-}
-
-// =============================================================================
-// Compliance strip — the header's "risk at a glance" summary.
-// Returns only the chips that actually matter (conflict, missing W-9, expiring
-// COI). Silence when everything checks out — don't decorate green.
-// =============================================================================
-
-type ComplianceChip = {
-  key: string;
-  label: string;
-  severity: 'warning' | 'error' | 'info';
-  icon: 'conflict' | 'shield' | 'calendar';
-  title?: string;
-};
-
-function computeCompliance(
-  row: DealCrewRow,
-  availability: CrewAvailabilityResult | null,
-): ComplianceChip[] {
-  const chips: ComplianceChip[] = [];
-
-  // Cross-show conflict — only for 'booked' or 'held' elsewhere on this date.
-  if (availability && availability.conflicts.length > 0 && availability.status !== 'available') {
-    const count = availability.conflicts.length;
-    chips.push({
-      key: 'conflict',
-      label: count === 1 ? `1 conflict · ${availability.conflicts[0].label}` : `${count} conflicts`,
-      severity: availability.status === 'booked' ? 'error' : 'warning',
-      icon: 'conflict',
-      title: availability.conflicts.map((c) => c.label).join(' · '),
-    });
-  }
-
-  // W-9 status — only flag when missing (freelancer/contractor context)
-  if (row.employment_status === 'external_contractor' && !row.w9_status) {
-    chips.push({
-      key: 'w9',
-      label: 'No W-9',
-      severity: 'warning',
-      icon: 'shield',
-      title: 'Contractor has no W-9 on file',
-    });
-  }
-
-  // COI expiry — warn at ≤ 30 days, error if expired.
-  if (row.coi_expiry) {
-    const expiry = new Date(row.coi_expiry);
-    if (!Number.isNaN(expiry.getTime())) {
-      const daysLeft = Math.round((expiry.getTime() - Date.now()) / 86_400_000);
-      if (daysLeft < 0) {
-        chips.push({
-          key: 'coi',
-          label: 'COI expired',
-          severity: 'error',
-          icon: 'calendar',
-          title: `COI expired ${Math.abs(daysLeft)} days ago`,
-        });
-      } else if (daysLeft <= 30) {
-        chips.push({
-          key: 'coi',
-          label: `COI ${daysLeft}d`,
-          severity: 'warning',
-          icon: 'calendar',
-          title: `COI expires in ${daysLeft} days (${row.coi_expiry})`,
-        });
-      }
-    }
-  }
-
-  return chips;
-}
-
-// Compact relative-time formatter for the activity feed.
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffSec = Math.round((now - then) / 1000);
-  if (diffSec < 60) return 'just now';
-  const diffMin = Math.round(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.round(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.round(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
+export { CyclableTile, PayField } from './crew-detail-rail/cells';
+export { TimesStack } from './crew-detail-rail/times-stack';
+export { GearSection } from './crew-detail-rail/gear-section';
+export { RailHeader, ComplianceStrip } from './crew-detail-rail/header';
+export { AgreedSection } from './crew-detail-rail/agreed-section';
+export { TimelineSection } from './crew-detail-rail/timeline-section';
+export { QuickActions } from './crew-detail-rail/quick-actions';
+export { DangerZone } from './crew-detail-rail/danger-zone';
+export {
+  computePhase,
+  computeCompliance,
+  formatRelative,
+  nextInCycle,
+  EVENT_LABELS,
+  STATUS_COLORS,
+  DISPATCH_ORDER,
+  DISPATCH_LABELS,
+  PAYMENT_ORDER,
+  PAYMENT_LABELS,
+  WAYPOINT_KIND_LABELS,
+} from './crew-detail-rail/shared';
+export type {
+  DispatchStatus,
+  PaymentStatus,
+  Phase,
+  PhaseTone,
+  ComplianceChip,
+  WaypointPatch,
+  AddWaypointInput,
+} from './crew-detail-rail/shared';

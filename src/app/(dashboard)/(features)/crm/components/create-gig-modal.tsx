@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback, useRef, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { Building2, User, MapPin, Plus, ChevronRight, ChevronDown, X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import { createDeal } from '../actions/deal-actions';
 import type { CreateDealInput, CreateDealResult, HostKind } from '../actions/deal-model';
 import { UpgradeInline } from '@/shared/ui/upgrade-prompt';
@@ -15,15 +14,10 @@ import { getWorkspaceLeadSources, type WorkspaceLeadSource } from '@/features/le
 import { checkDateFeasibility, type CheckDateFeasibilityResult } from '../actions/check-date-feasibility';
 import { searchOmni, getVenueSuggestions, type OmniResult, type VenueSuggestion } from '../actions/lookup';
 import { searchReferrerEntities, type ReferrerSearchResult } from '../actions/search-referrer';
-import { CalendarPanel, parseLocalDateString } from './ceramic-date-picker';
-import { cn } from '@/shared/lib/utils';
-import { TimePicker } from '@/shared/ui/time-picker';
-import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
+import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { useModalLayer } from '@/shared/lib/use-modal-layer';
-import { format } from 'date-fns';
-import { Calendar } from 'lucide-react';
 import type { OptimisticUpdate } from './crm-production-queue';
-import { DEAL_ARCHETYPES, DEAL_ARCHETYPE_LABELS } from '../actions/deal-model';
+import { DEAL_ARCHETYPE_LABELS } from '../actions/deal-model';
 import { FeasibilityChip } from './create-gig-modal/feasibility-chip';
 import { LeadSourceSelector } from './create-gig-modal/lead-source-selector';
 import {
@@ -38,8 +32,11 @@ import {
 import { CastSummary } from './create-gig-modal/cast-summary';
 import { humanizeSlug } from '@/shared/lib/event-archetype';
 import { DateStage, type DateKind } from './create-gig-modal/date-stage';
+import { PocSelector, type PocChoice, type PocOption } from './create-gig-modal/poc-selector';
+import { PlannerPicker } from './create-gig-modal/planner-picker';
+import { VenuePicker } from './create-gig-modal/venue-picker';
+import { AdditionalDetails } from './create-gig-modal/additional-details';
 import type { SeriesRule, SeriesArchetype } from '@/shared/lib/series-rule';
-import { CurrencyInput } from '@/shared/ui/currency-input';
 
 interface CreateGigModalProps {
   open: boolean;
@@ -47,13 +44,6 @@ interface CreateGigModalProps {
   addOptimisticGig: (update: OptimisticUpdate) => void;
   onRefetchList?: () => Promise<void>;
 }
-
-type PocChoice =
-  | { kind: 'host'; hostIndex: 1 | 2 }
-  | { kind: 'planner' }
-  | { kind: 'venue' }
-  | { kind: 'separate' }
-  | null;
 
 export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList }: CreateGigModalProps) {
   const router = useRouter();
@@ -131,10 +121,6 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
 
   const dateBlockRef = useRef<HTMLDivElement>(null);
   const modalContentRef = useRef<HTMLDivElement>(null);
-  const venueTriggerRef = useRef<HTMLInputElement>(null);
-  const plannerTriggerRef = useRef<HTMLInputElement>(null);
-  const pocTriggerRef = useRef<HTMLButtonElement>(null);
-  const [pocOpen, setPocOpen] = useState(false);
 
   useModalLayer({ open, onClose, containerRef: modalContentRef });
 
@@ -366,12 +352,6 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   };
 
   // POC options for the dropdown — grouped by role for the list, flat for lookup.
-  type PocOption = {
-    key: string;
-    label: string;
-    role: 'Host' | 'Planner' | 'Venue' | 'Other';
-    choice: PocChoice;
-  };
   const pocOptions: PocOption[] = (() => {
     const opts: PocOption[] = [];
     if (hostKind === 'couple') {
@@ -805,391 +785,77 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
                               transition={STAGE_LIGHT}
                               className="overflow-hidden"
                             >
-                              <label htmlFor="poc-trigger" className="block stage-label mb-1.5">Who is our day-of point of contact?</label>
-                              <div className="relative">
-                                <button
-                                  id="poc-trigger"
-                                  ref={pocTriggerRef}
-                                  type="button"
-                                  onClick={() => setPocOpen((o) => !o)}
-                                  onBlur={() => setTimeout(() => setPocOpen(false), 180)}
-                                  aria-expanded={pocOpen}
-                                  aria-haspopup="listbox"
-                                  className={cn(
-                                    'flex w-full min-w-0 items-center gap-2 rounded-[var(--stage-radius-input,6px)] border px-3 h-[var(--stage-input-height,34px)] text-[length:var(--stage-input-font-size,13px)] text-left transition-colors duration-75',
-                                    pocOpen
-                                      ? 'border-[var(--stage-accent)] bg-[var(--ctx-well)] ring-1 ring-[var(--stage-accent)]'
-                                      : 'border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-well)] hover:border-[oklch(1_0_0_/_0.20)]',
-                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]'
-                                  )}
-                                >
-                                  <User size={14} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} aria-hidden />
-                                  <span className={cn('flex-1 min-w-0 truncate tracking-tight', selectedPocOption ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-tertiary)]')}>
-                                    {selectedPocOption ? selectedPocOption.label : 'Choose point of contact'}
-                                  </span>
-                                  {selectedPocOption && (
-                                    <span className="shrink-0 text-[length:var(--stage-label-size,11px)] text-[var(--stage-text-tertiary)] uppercase tracking-wide">
-                                      {selectedPocOption.role}
-                                    </span>
-                                  )}
-                                  <ChevronDown size={14} className={cn('shrink-0 text-[var(--stage-text-tertiary)] transition-transform duration-[80ms]', pocOpen && 'rotate-180')} aria-hidden />
-                                </button>
-                                {pocOpen && createPortal(
-                                  <div
-                                    className="fixed inset-0 z-[60]"
-                                    onMouseDown={() => setPocOpen(false)}
-                                  >
-                                    <motion.div
-                                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                                      transition={STAGE_LIGHT}
-                                      role="listbox"
-                                      aria-label="Day-of point of contact"
-                                      data-surface="raised"
-                                      onMouseDown={(e) => e.stopPropagation()}
-                                      style={(() => {
-                                        const rect = pocTriggerRef.current?.getBoundingClientRect();
-                                        if (!rect) return {};
-                                        const spaceBelow = window.innerHeight - rect.bottom;
-                                        const dropUp = spaceBelow < 260;
-                                        return {
-                                          position: 'fixed' as const,
-                                          left: rect.left,
-                                          width: rect.width,
-                                          ...(dropUp
-                                            ? { bottom: window.innerHeight - rect.top + 4 }
-                                            : { top: rect.bottom + 4 }),
-                                        };
-                                      })()}
-                                      className="max-h-[280px] overflow-y-auto rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)] py-1"
-                                    >
-                                      {(['Host', 'Planner', 'Venue', 'Other'] as const).map((group) => {
-                                        const groupOpts = pocOptions.filter((o) => o.role === group);
-                                        if (groupOpts.length === 0) return null;
-                                        return (
-                                          <div key={group}>
-                                            <div className="px-3 pt-2 pb-1 stage-label text-[var(--stage-text-tertiary)]">{group}</div>
-                                            {groupOpts.map((opt) => {
-                                              const active = selectedPocOption?.key === opt.key;
-                                              return (
-                                                <button
-                                                  key={opt.key}
-                                                  type="button"
-                                                  role="option"
-                                                  aria-selected={active}
-                                                  onMouseDown={(e) => {
-                                                    e.stopPropagation();
-                                                    setPocChoice(opt.choice);
-                                                    setPocOpen(false);
-                                                  }}
-                                                  className={cn(
-                                                    'flex w-full items-center px-3 py-2 text-left text-[length:var(--stage-input-font-size,13px)] tracking-tight transition-colors min-w-0',
-                                                    active
-                                                      ? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-primary)] font-medium'
-                                                      : 'text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                                                  )}
-                                                >
-                                                  <span className="flex-1 min-w-0 truncate">{opt.label}</span>
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
-                                        );
-                                      })}
-                                    </motion.div>
-                                  </div>,
-                                  document.body
-                                )}
-                              </div>
-                              <AnimatePresence>
-                                {pocChoice?.kind === 'separate' && (
-                                  <motion.div
-                                    key="poc-separate"
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={STAGE_LIGHT}
-                                    className="overflow-hidden"
-                                  >
-                                    <div className="pt-3">
-                                      <IndividualHostForm form={pocSeparateForm} setForm={setPocSeparateForm} />
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
+                              <PocSelector
+                                pocChoice={pocChoice}
+                                setPocChoice={setPocChoice}
+                                pocOptions={pocOptions}
+                                selectedPocOption={selectedPocOption}
+                                pocSeparateForm={pocSeparateForm}
+                                setPocSeparateForm={setPocSeparateForm}
+                              />
                             </motion.div>
                           )}
                           </AnimatePresence>
 
                           {/* Planner — always visible, mirrors the Venue field's pattern */}
                           {(hostKind === 'individual' || hostKind === 'couple') && (
-                            <div className="min-w-0">
-                              <label htmlFor="create-gig-planner" className="block stage-label mb-1.5">Planner (optional)</label>
-                              {selectedPlanner ? (
-                                <div className="flex items-center gap-2 stage-input w-full min-w-0">
-                                  <User size={14} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-                                  <span className="text-sm text-[var(--stage-text-primary)] truncate flex-1">
-                                    {selectedPlanner.name}
-                                    {selectedPlanner.subtitle && (
-                                      <span className="text-xs text-[var(--stage-text-tertiary)] ml-1.5">{selectedPlanner.subtitle}</span>
-                                    )}
-                                  </span>
-                                  <button type="button" onClick={() => { setSelectedPlanner(null); setPlannerQuery(''); }} className="shrink-0 text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]">
-                                    <X size={14} strokeWidth={1.5} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <>
-                                  <input
-                                    id="create-gig-planner"
-                                    ref={plannerTriggerRef}
-                                    type="text"
-                                    value={plannerQuery}
-                                    onChange={(e) => setPlannerQuery(e.target.value)}
-                                    onFocus={() => setPlannerOpen(true)}
-                                    onBlur={() => setTimeout(() => setPlannerOpen(false), 200)}
-                                    placeholder="Search planner or type to add…"
-                                    className="stage-input w-full min-w-0 truncate"
-                                  />
-                                  {plannerOpen && plannerQuery.length >= 2 && createPortal(
-                                    <div
-                                      className="fixed inset-0 z-[60]"
-                                      onMouseDown={() => setPlannerOpen(false)}
-                                    >
-                                      <motion.div
-                                        initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        transition={STAGE_LIGHT}
-                                        data-surface="raised"
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        style={(() => {
-                                          const rect = plannerTriggerRef.current?.getBoundingClientRect();
-                                          if (!rect) return {};
-                                          const spaceBelow = window.innerHeight - rect.bottom;
-                                          const dropUp = spaceBelow < 220;
-                                          return {
-                                            position: 'fixed' as const,
-                                            left: rect.left,
-                                            width: rect.width,
-                                            ...(dropUp
-                                              ? { bottom: window.innerHeight - rect.top + 4 }
-                                              : { top: rect.bottom + 4 }),
-                                          };
-                                        })()}
-                                        className="max-h-[240px] overflow-y-auto overflow-hidden rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
-                                      >
-                                        {plannerResults.map((r) => (
-                                          <button
-                                            key={r.id}
-                                            type="button"
-                                            onMouseDown={(e) => {
-                                              e.stopPropagation();
-                                              setSelectedPlanner({ id: r.id, name: r.name, subtitle: r.subtitle });
-                                              setPlannerQuery('');
-                                              setPlannerResults([]);
-                                              setPlannerOpen(false);
-                                            }}
-                                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)] transition-colors min-w-0"
-                                          >
-                                            <User size={14} className="shrink-0" strokeWidth={1.5} />
-                                            <span className="truncate min-w-0 flex items-baseline gap-1.5">
-                                              <span>{r.name}</span>
-                                              {r.subtitle && <span className="text-xs text-[var(--stage-text-tertiary)]">{r.subtitle}</span>}
-                                            </span>
-                                          </button>
-                                        ))}
-                                        {!plannerSearching && (
-                                          <button
-                                            type="button"
-                                            onMouseDown={(e) => {
-                                              e.stopPropagation();
-                                              setSelectedPlanner({ id: '', name: plannerQuery.trim(), subtitle: null });
-                                              setPlannerQuery('');
-                                              setPlannerResults([]);
-                                              setPlannerOpen(false);
-                                            }}
-                                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)] min-w-0 border-t border-[oklch(1_0_0_/_0.04)]"
-                                          >
-                                            <Plus size={14} className="shrink-0" strokeWidth={1.5} />
-                                            <span className="truncate min-w-0">Add &quot;{plannerQuery.trim()}&quot; as planner</span>
-                                          </button>
-                                        )}
-                                      </motion.div>
-                                    </div>,
-                                    document.body
-                                  )}
-                                </>
-                              )}
-                            </div>
+                            <PlannerPicker
+                              selectedPlanner={selectedPlanner}
+                              setSelectedPlanner={setSelectedPlanner}
+                              plannerQuery={plannerQuery}
+                              setPlannerQuery={setPlannerQuery}
+                              plannerOpen={plannerOpen}
+                              setPlannerOpen={setPlannerOpen}
+                              plannerResults={plannerResults}
+                              setPlannerResults={setPlannerResults}
+                              plannerSearching={plannerSearching}
+                            />
                           )}
                         </div>
 
                         {/* Venue */}
-                        <div className="min-w-0">
-                          <label className="block stage-label mb-1.5">Venue</label>
-                          <input
-                            ref={venueTriggerRef}
-                            type="text"
-                            value={selectedVenue ? selectedVenue.name : venueQuery}
-                            onChange={(e) => {
-                              setSelectedVenue(null);
-                              setVenueQuery(e.target.value);
-                            }}
-                            onFocus={() => setVenueOpen(true)}
-                            onBlur={() => setTimeout(() => setVenueOpen(false), 200)}
-                            placeholder="Search venue or type to create…"
-                            className="stage-input w-full min-w-0 truncate"
-                          />
-                          {venueOpen && venueQuery.length >= 1 && venueResults.length > 0 && createPortal(
-                            <div
-                              className="fixed inset-0 z-[60]"
-                              onMouseDown={() => setVenueOpen(false)}
-                            >
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                transition={STAGE_LIGHT}
-                                data-surface="raised"
-                                onMouseDown={(e) => e.stopPropagation()}
-                                style={(() => {
-                                  const rect = venueTriggerRef.current?.getBoundingClientRect();
-                                  if (!rect) return {};
-                                  const spaceBelow = window.innerHeight - rect.bottom;
-                                  const dropUp = spaceBelow < 220;
-                                  return {
-                                    position: 'fixed' as const,
-                                    left: rect.left,
-                                    width: rect.width,
-                                    ...(dropUp
-                                      ? { bottom: window.innerHeight - rect.top + 4 }
-                                      : { top: rect.bottom + 4 }),
-                                  };
-                                })()}
-                                className="max-h-[180px] overflow-y-auto overflow-x-hidden rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
-                              >
-                                {venueResults.map((r, i) =>
-                                  r.type === 'venue' ? (
-                                    <button
-                                      key={r.id}
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedVenue({
-                                          id: r.id,
-                                          name: r.name,
-                                          address: r.address ?? undefined,
-                                        });
-                                        setVenueQuery('');
-                                        setVenueResults([]);
-                                        setVenueOpen(false);
-                                      }}
-                                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-[oklch(1_0_0/0.08)] min-w-0"
-                                    >
-                                      <MapPin size={16} className="shrink-0 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-                                      <span className="text-[var(--stage-text-primary)] truncate min-w-0">{r.name}</span>
-                                      {(r.address || r.city) && (
-                                        <span className="text-[var(--stage-text-secondary)] text-xs truncate shrink-0 max-w-[140px]">
-                                          {[r.address, r.city, r.state].filter(Boolean).join(', ')}
-                                        </span>
-                                      )}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      key={`create-${i}`}
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedVenue({ id: '', name: r.query, address: null });
-                                        setVenueQuery(r.query);
-                                        setVenueResults([]);
-                                        setVenueOpen(false);
-                                      }}
-                                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)] min-w-0"
-                                    >
-                                      <Plus size={16} className="shrink-0" strokeWidth={1.5} />
-                                      <span className="truncate min-w-0">Create venue &quot;{r.query}&quot;</span>
-                                    </button>
-                                  )
-                                )}
-                              </motion.div>
-                            </div>,
-                            document.body
-                          )}
-                        </div>
+                        <VenuePicker
+                          selectedVenue={selectedVenue}
+                          setSelectedVenue={setSelectedVenue}
+                          venueQuery={venueQuery}
+                          setVenueQuery={setVenueQuery}
+                          venueOpen={venueOpen}
+                          setVenueOpen={setVenueOpen}
+                          venueResults={venueResults}
+                          setVenueResults={setVenueResults}
+                        />
 
                         {/* Additional details — collapsed by default */}
-                        <div className="border-t border-[oklch(1_0_0_/_0.04)] pt-3">
-                          <button
-                            type="button"
-                            onClick={() => setAdditionalExpanded((v) => !v)}
-                            className="flex w-full items-center justify-between stage-label text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"
-                            aria-expanded={additionalExpanded}
-                          >
-                            <span>Additional details</span>
-                            <ChevronDown
-                              size={12}
-                              className={cn('transition-transform duration-[80ms]', additionalExpanded && 'rotate-180')}
-                              strokeWidth={1.5}
+                        <AdditionalDetails
+                          expanded={additionalExpanded}
+                          setExpanded={setAdditionalExpanded}
+                          budgetEstimatedDisplay={budgetEstimatedDisplay}
+                          setBudgetEstimated={setBudgetEstimated}
+                          notes={notes}
+                          setNotes={setNotes}
+                          leadSourceSelector={
+                            <LeadSourceSelector
+                              leadSources={leadSources}
+                              selectedLeadSourceId={selectedLeadSourceId}
+                              setSelectedLeadSourceId={setSelectedLeadSourceId}
+                              leadSource={leadSource}
+                              setLeadSource={setLeadSource}
+                              leadSourceDetail={leadSourceDetail}
+                              setLeadSourceDetail={setLeadSourceDetail}
+                              referrerEntityId={referrerEntityId}
+                              setReferrerEntityId={setReferrerEntityId}
+                              referrerName={referrerName}
+                              setReferrerName={setReferrerName}
+                              referrerQuery={referrerQuery}
+                              setReferrerQuery={setReferrerQuery}
+                              referrerResults={referrerResults}
+                              setReferrerResults={setReferrerResults}
+                              referrerSearching={referrerSearching}
+                              referrerCreating={referrerCreating}
+                              setReferrerCreating={setReferrerCreating}
                             />
-                          </button>
-                          <AnimatePresence initial={false}>
-                            {additionalExpanded && (
-                              <motion.div
-                                key="additional"
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                transition={STAGE_LIGHT}
-                                className="overflow-hidden"
-                              >
-                                <div className="pt-3 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
-                                  <div>
-                                    <label htmlFor="create-gig-budget" className="block stage-label mb-1.5">Rough budget</label>
-                                    <CurrencyInput
-                                      id="create-gig-budget"
-                                      value={budgetEstimatedDisplay}
-                                      onChange={(v) => setBudgetEstimated(v === '' ? undefined : Number(v))}
-                                      placeholder="25,000"
-                                      step={100}
-                                      align="left"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block stage-label mb-1.5">Notes</label>
-                                    <textarea
-                                      value={notes}
-                                      onChange={(e) => setNotes(e.target.value)}
-                                      placeholder="Internal notes…"
-                                      rows={2}
-                                      className="stage-input w-full min-w-0 py-2.5 min-h-[calc(var(--stage-input-height,34px)*2)] resize-none"
-                                    />
-                                  </div>
-                                  <LeadSourceSelector
-                                    leadSources={leadSources}
-                                    selectedLeadSourceId={selectedLeadSourceId}
-                                    setSelectedLeadSourceId={setSelectedLeadSourceId}
-                                    leadSource={leadSource}
-                                    setLeadSource={setLeadSource}
-                                    leadSourceDetail={leadSourceDetail}
-                                    setLeadSourceDetail={setLeadSourceDetail}
-                                    referrerEntityId={referrerEntityId}
-                                    setReferrerEntityId={setReferrerEntityId}
-                                    referrerName={referrerName}
-                                    setReferrerName={setReferrerName}
-                                    referrerQuery={referrerQuery}
-                                    setReferrerQuery={setReferrerQuery}
-                                    referrerResults={referrerResults}
-                                    setReferrerResults={setReferrerResults}
-                                    referrerSearching={referrerSearching}
-                                    referrerCreating={referrerCreating}
-                                    setReferrerCreating={setReferrerCreating}
-                                  />
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                          }
+                        />
                       </motion.div>
                     )}
                   </div>

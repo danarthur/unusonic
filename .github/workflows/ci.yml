@@ -30,6 +30,9 @@ jobs:
       - name: Lint baseline ratchet (warnings can't exceed snapshot)
         run: npm run lint:baseline:check
 
+      - name: LOC ratchet (over-limit files can't grow)
+        run: npm run loc:baseline:check
+
       - name: Typecheck
         run: npx tsc --noEmit
 

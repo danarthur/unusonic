@@ -12,6 +12,11 @@
 import type { AionCardData } from '../../actions/get-aion-card-for-deal';
 import type { SignalEntry } from '../aion-card-primitives';
 import type { PrimaryRecommendation } from './types';
+import { daysSince } from '@/shared/lib/days-since';
+
+// Re-export so existing callers of `aion-deal-card/signals` keep working;
+// the implementation now lives in @/shared/lib/days-since (audit, 2026-04-29).
+export { daysSince };
 
 export function composeSignals({
   data,
@@ -84,13 +89,6 @@ export function composeSignals({
   }
 
   return out.slice(0, 5);
-}
-
-export function daysSince(iso: string): number | null {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return null;
-  const now = Date.now();
-  return Math.max(0, Math.floor((now - then) / (24 * 60 * 60 * 1000)));
 }
 
 export function formatRelativeDate(iso: string, days: number): string {

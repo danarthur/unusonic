@@ -5,21 +5,19 @@
  * Deal lens and Plan lens. Renders the deal title, date/time, archetype,
  * client/venue/owner/planner stakeholders, and all associated inline
  * pickers. Heavy subcomponents (SlotPicker, scalar pickers, contact
- * sheet) live in sibling files.
+ * sheet, identity row, stakeholder chip, edit sheets) live in sibling
+ * files — see `deal-header-strip-*.tsx` for the breakdown.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Eye, Loader2, Plus, User } from 'lucide-react';
+import { Building2, Eye, Plus, User } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { TimePicker } from '@/shared/ui/time-picker';
-import { formatTime12h } from '@/shared/lib/parse-time';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { toast } from 'sonner';
-import { NetworkDetailSheet } from '@/widgets/network-detail';
 import type { NetworkSearchOrg, NodeDetail } from '@/features/network-data';
 import {
   addDealStakeholder,
@@ -28,7 +26,6 @@ import {
   setPrimaryHost,
   setDayOfPoc,
   setDealPoc,
-  type DealStakeholderDisplay,
   type OrgRosterContact,
 } from '../actions/deal-stakeholders';
 import {
@@ -49,70 +46,29 @@ import {
   type CoupleEntityForEdit,
   type IndividualEntityForEdit,
 } from '../actions/get-node-for-sheet';
-import { CoupleEditSheet } from './couple-edit-sheet';
-import { IndividualEditSheet } from './individual-edit-sheet';
-import type { DealDetail } from '../actions/get-deal';
-import type { DealClientContext } from '../actions/get-deal-client';
 import {
-  EntityIcon,
   SlotPicker,
   type SlotType,
 } from './deal-header-strip-slot-picker';
 import {
   ArchetypePickerPortal,
-  DatePickerPortal,
   OwnerPickerPortal,
 } from './deal-header-strip-scalar-pickers';
-import { ClientContactPickerSheet } from './deal-header-strip-client-sheet';
 import { PeopleStrip, DealHeaderLegend } from './people-strip';
 import { resolveDealHosts, type DealHost } from '../actions/resolve-deal-hosts';
+import {
+  EMPTY_VALUE_CLASS,
+  FIELD_BLOCK_CLASS,
+  FIELD_BLOCK_INTERACTIVE_CLASS,
+  FIELD_LABEL_CLASS,
+  type DealHeaderStripProps,
+} from './deal-header-strip-shared';
+import { StakeholderChip } from './deal-header-strip-stakeholder-chip';
+import { DealHeaderIdentityRow } from './deal-header-strip-identity-row';
+import { DealHeaderEditSheets } from './deal-header-strip-edit-sheets';
 
-// =============================================================================
-// Types
-// =============================================================================
-
-export type DealHeaderStripProps = {
-  // Scalars managed by DealLens
-  title: string | null;
-  proposedDate: string | null;
-  eventArchetype: string | null;
-  readOnly?: boolean;
-  saving?: boolean;
-  onTitleChange?: (value: string) => void;
-  /** Save a scalar field change (date, archetype, budget). Pickers are now owned by the header strip. */
-  onSaveScalar?: (patch: {
-    proposed_date?: string | null;
-    event_archetype?: string | null;
-    budget_estimated?: number | null;
-    event_start_time?: string | null;
-    event_end_time?: string | null;
-  }) => void;
-  // Stakeholders (client, venue, owner, planner)
-  deal: DealDetail;
-  stakeholders: DealStakeholderDisplay[];
-  client: DealClientContext | null;
-  sourceOrgId: string | null;
-  onStakeholdersChange: () => void;
-};
-
-// =============================================================================
-// Formatter
-// =============================================================================
-
-function formatDate(iso: string): string {
-  // Parse yyyy-MM-dd as local date — new Date('yyyy-MM-dd') is UTC midnight
-  // and shifts back a day in western timezones.
-  const parts = iso.split('-');
-  if (parts.length === 3) {
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+// Re-export for any callers that still import the props type from this file.
+export type { DealHeaderStripProps } from './deal-header-strip-shared';
 
 // =============================================================================
 // Component
@@ -132,7 +88,6 @@ export function DealHeaderStrip({
   sourceOrgId,
   onStakeholdersChange,
 }: DealHeaderStripProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const isEditable = !readOnly && !!onTitleChange;
 
@@ -573,156 +528,12 @@ export function DealHeaderStrip({
     return () => document.removeEventListener('mousedown', handler);
   }, [activeSlot, ownerPickerOpen, datePickerOpen, archetypePickerOpen]);
 
-  // ============================================================================
-  // Render helpers
-  // ============================================================================
-
-  const renderStakeholderChip = (
-    s: DealStakeholderDisplay,
-    extraBadge?: string,
-    pocActions?: {
-      dayOf?: { isActive: boolean; onToggle: () => void };
-      deal?: { isActive: boolean; onToggle: () => void };
-    },
-    onSwap?: () => void,
-  ) => {
-    // Navigate to the filled-chip's entity or the organization that owns the
-    // stakeholder row. This is what a body-click on the chip triggers —
-    // clicking the chip name goes to that person/org's network detail.
-    const navigateTargetId = s.entity_id ?? s.organization_id ?? null;
-    const goToEntity = (e?: React.MouseEvent) => {
-      e?.stopPropagation();
-      if (navigateTargetId) {
-        router.push(`/network?selected=${encodeURIComponent(navigateTargetId)}`);
-      }
-    };
-    const roleToggleButton = (
-      label: string,
-      isActive: boolean,
-      onToggle: () => void,
-      iconPath: React.ReactNode,
-    ) => (
-      <button
-        type="button"
-        onClick={(e) => {
-          // The outer fieldBlock div listens for clicks to open the
-          // SlotPicker. Swallow the event so toggling a role doesn't
-          // also pop the picker.
-          e.stopPropagation();
-          onToggle();
-        }}
-        className={cn(
-          'shrink-0 inline-flex items-center justify-center size-5 rounded-sm',
-          'opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity',
-          'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-          isActive && 'opacity-100 text-[var(--stage-text-primary)]',
-        )}
-        aria-label={label}
-        title={label}
-      >
-        <svg
-          width="11"
-          height="11"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={isActive ? 2 : 1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          {iconPath}
-        </svg>
-      </button>
-    );
-    // Body of the chip is a button that navigates to the entity when there
-    // IS an entity to navigate to. Falls back to a plain div when not
-    // clickable (missing entity reference).
-    const chipBody = (
-      <>
-        <EntityIcon
-          entityType={s.entity_type}
-          className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0"
-        />
-        <span className="stage-readout truncate">{s.name}</span>
-        {extraBadge && (
-          <span className="text-[length:var(--stage-label-size,11px)] text-[var(--stage-text-tertiary)] uppercase tracking-wide shrink-0">
-            {extraBadge}
-          </span>
-        )}
-      </>
-    );
-    const bodyClasses = 'inline-flex items-center gap-1.5 min-w-0 min-w-0 text-left';
-    return (
-      <div className="group flex items-center gap-1 min-w-0">
-        {navigateTargetId && !readOnly ? (
-          <button
-            type="button"
-            onClick={goToEntity}
-            className={cn(
-              bodyClasses,
-              'rounded-[var(--stage-radius-input,6px)] hover:text-[var(--stage-text-primary)] transition-colors',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-            )}
-            title="View in network"
-          >
-            {chipBody}
-          </button>
-        ) : (
-          <div className={bodyClasses}>{chipBody}</div>
-        )}
-        {pocActions?.deal &&
-          roleToggleButton(
-            pocActions.deal.isActive ? 'Clear deal contact' : 'Make deal contact',
-            pocActions.deal.isActive,
-            pocActions.deal.onToggle,
-            // lucide MessageSquare path
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
-          )}
-        {pocActions?.dayOf &&
-          roleToggleButton(
-            pocActions.dayOf.isActive ? 'Clear day-of contact' : 'Make day-of contact',
-            pocActions.dayOf.isActive,
-            pocActions.dayOf.onToggle,
-            // lucide Phone path
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />,
-          )}
-        {onSwap &&
-          roleToggleButton(
-            'Swap',
-            false,
-            onSwap,
-            // lucide Replace (two overlapping rounded squares with an arrow
-            // implied by the offset) — drawn as a simplified swap glyph.
-            <>
-              <path d="M14 4c0-1.1.9-2 2-2" />
-              <path d="M20 2c1.1 0 2 .9 2 2" />
-              <path d="M22 8c0 1.1-.9 2-2 2" />
-              <path d="M16 10c-1.1 0-2-.9-2-2" />
-              <path d="m3 7 3 3 3-3" />
-              <path d="M6 10V5c0-.55.45-1 1-1h6" />
-              <path d="m21 17-3-3-3 3" />
-              <path d="M18 14v5c0 .55-.45 1-1 1h-6" />
-            </>,
-          )}
-      </div>
-    );
-  };
-
   // Owner label resolves async via getEntityDisplayName. Returning null
   // during the resolve window (rather than a "Loading…" placeholder) avoids
   // a visible wave — the owner field stays empty for ~200ms then the name
   // appears, instead of "Loading…" flashing first. Same pattern used for
   // the activity timeline (User Advocate: "never show intermediate states").
   const ownerLabel = ownerEntityId && ownerName ? ownerName : null;
-
-  // Field-on-surface pattern: labels + values sit directly on the panel.
-  const fieldLabel =
-    'stage-label text-[var(--stage-text-tertiary)] mb-1 select-none leading-none';
-  const emptyValue = 'stage-field-label text-[var(--stage-text-tertiary)] flex items-center gap-1.5';
-  const fieldBlock = 'px-3 py-2.5 min-w-0';
-  const fieldBlockInteractive =
-    'cursor-pointer [border-radius:var(--stage-radius-input,6px)] hover:bg-[var(--stage-accent-muted)] transition-colors';
 
   // ============================================================================
   // Render
@@ -748,99 +559,21 @@ export function DealHeaderStrip({
 
           <div className="flex flex-col gap-2.5">
             {/* ── Row 0: Title + Date + Time ── */}
-            <div className="flex items-start gap-2 min-w-0">
-              {/* Title */}
-              <div className={cn(fieldBlock, 'flex-1 group', isEditable && fieldBlockInteractive)}>
-                <p className={fieldLabel}>Deal</p>
-                {isEditable ? (
-                  <input
-                    type="text"
-                    value={title ?? ''}
-                    onChange={(e) => onTitleChange!(e.target.value)}
-                    placeholder="Untitled deal"
-                    className="bg-transparent stage-readout focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] min-w-0 w-full placeholder:text-[var(--stage-text-secondary)]"
-                  />
-                ) : (
-                  <p className="stage-readout text-[var(--stage-text-secondary)] truncate">
-                    {title || 'Untitled deal'}
-                  </p>
-                )}
-                {saving && (
-                  <span className="text-micro text-[var(--stage-text-tertiary)] tracking-wide mt-1 block">
-                    Saving…
-                  </span>
-                )}
-              </div>
-
-              {/* Date */}
-              <div className="relative" data-header-picker>
-                <button
-                  ref={dateTriggerRef}
-                  type="button"
-                  onClick={!readOnly ? handleOpenDatePicker : undefined}
-                  disabled={readOnly}
-                  className={cn(fieldBlock, 'text-left shrink-0', !readOnly && fieldBlockInteractive)}
-                >
-                  <p className={fieldLabel}>Date</p>
-                  {proposedDate ? (
-                    <span className="stage-readout whitespace-nowrap">{formatDate(proposedDate)}</span>
-                  ) : (
-                    <span className={cn(emptyValue, 'whitespace-nowrap')}>
-                      {!readOnly ? (
-                        <>
-                          <Plus size={9} />
-                          add
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </span>
-                  )}
-                </button>
-                {datePickerOpen && (
-                  <DatePickerPortal
-                    position={scalarPickerPos}
-                    proposedDate={proposedDate}
-                    onChange={(val) => onSaveScalar?.({ proposed_date: val })}
-                    onClose={() => setDatePickerOpen(false)}
-                  />
-                )}
-              </div>
-
-              {/* Time */}
-              <div className={cn(fieldBlock, 'shrink-0')}>
-                <p className={fieldLabel}>Time</p>
-                {isEditable ? (
-                  <div className="flex items-center gap-2 min-w-0">
-                    <TimePicker
-                      value={deal.event_start_time ?? null}
-                      onChange={(v) => onSaveScalar?.({ event_start_time: v })}
-                      placeholder="Start"
-                      context="evening"
-                      variant="ghost"
-                      className="w-[90px]"
-                    />
-                    <span className="text-[var(--stage-text-tertiary)] text-xs select-none px-0.5">–</span>
-                    <TimePicker
-                      value={deal.event_end_time ?? null}
-                      onChange={(v) => onSaveScalar?.({ event_end_time: v })}
-                      placeholder="End"
-                      context="evening"
-                      variant="ghost"
-                      className="w-[90px]"
-                    />
-                  </div>
-                ) : (
-                  <span className="stage-readout text-[var(--stage-text-secondary)] whitespace-nowrap">
-                    {deal.event_start_time
-                      ? `${formatTime12h(deal.event_start_time)}${
-                          deal.event_end_time ? ` – ${formatTime12h(deal.event_end_time)}` : ''
-                        }`
-                      : '—'}
-                  </span>
-                )}
-              </div>
-            </div>
+            <DealHeaderIdentityRow
+              title={title}
+              proposedDate={proposedDate}
+              deal={deal}
+              readOnly={readOnly}
+              saving={saving}
+              isEditable={isEditable}
+              onTitleChange={onTitleChange}
+              onSaveScalar={onSaveScalar}
+              datePickerOpen={datePickerOpen}
+              scalarPickerPos={scalarPickerPos}
+              onOpenDatePicker={handleOpenDatePicker}
+              onCloseDatePicker={() => setDatePickerOpen(false)}
+              dateTriggerRef={dateTriggerRef}
+            />
 
             <div className="stage-divider" />
 
@@ -865,9 +598,9 @@ export function DealHeaderStrip({
               <div className="relative" data-header-picker ref={clientTriggerRef}>
                 <div
                   className={cn(
-                    fieldBlock,
+                    FIELD_BLOCK_CLASS,
                     'w-full',
-                    !readOnly && hosts.length === 0 && !hasLegacyClient && fieldBlockInteractive,
+                    !readOnly && hosts.length === 0 && !hasLegacyClient && FIELD_BLOCK_INTERACTIVE_CLASS,
                   )}
                   onClick={
                     !readOnly && hosts.length === 0 && !hasLegacyClient
@@ -875,7 +608,7 @@ export function DealHeaderStrip({
                       : undefined
                   }
                 >
-                  <p className={fieldLabel}>{hosts.length > 1 ? 'Hosts' : 'Client'}</p>
+                  <p className={FIELD_LABEL_CLASS}>{hosts.length > 1 ? 'Hosts' : 'Client'}</p>
                   {hosts.length > 0 ? (
                     <PeopleStrip
                       hosts={hosts}
@@ -900,14 +633,14 @@ export function DealHeaderStrip({
                       currentDealPocEntityId={currentDealPocEntityId}
                     />
                   ) : billTo ? (
-                    renderStakeholderChip(billTo)
+                    <StakeholderChip stakeholder={billTo} readOnly={readOnly} />
                   ) : hasLegacyClient ? (
                     <div className="flex items-center gap-1.5 min-w-0">
                       <Building2 className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
                       <span className="stage-readout truncate">{client!.organization.name}</span>
                     </div>
                   ) : (
-                    <span className={emptyValue}>
+                    <span className={EMPTY_VALUE_CLASS}>
                       {!readOnly ? (
                         <>
                           <Plus size={9} />
@@ -938,9 +671,9 @@ export function DealHeaderStrip({
               <div className="relative" data-header-picker ref={venueTriggerRef}>
                 <div
                   className={cn(
-                    fieldBlock,
+                    FIELD_BLOCK_CLASS,
                     'w-full',
-                    !readOnly && !venueSt && fieldBlockInteractive,
+                    !readOnly && !venueSt && FIELD_BLOCK_INTERACTIVE_CLASS,
                   )}
                   onClick={
                     !readOnly && !venueSt
@@ -948,16 +681,15 @@ export function DealHeaderStrip({
                       : undefined
                   }
                 >
-                  <p className={fieldLabel}>Venue</p>
+                  <p className={FIELD_LABEL_CLASS}>Venue</p>
                   {venueSt ? (
-                    renderStakeholderChip(
-                      venueSt,
-                      undefined,
-                      undefined,
-                      !readOnly ? () => handleOpenSlot('venue', venueTriggerRef) : undefined,
-                    )
+                    <StakeholderChip
+                      stakeholder={venueSt}
+                      readOnly={readOnly}
+                      onSwap={!readOnly ? () => handleOpenSlot('venue', venueTriggerRef) : undefined}
+                    />
                   ) : (
-                    <span className={emptyValue}>
+                    <span className={EMPTY_VALUE_CLASS}>
                       {!readOnly ? (
                         <>
                           <Plus size={9} />
@@ -987,10 +719,10 @@ export function DealHeaderStrip({
               {/* Owner */}
               <div className="relative" data-header-picker ref={ownerTriggerRef}>
                 <div
-                  className={cn(fieldBlock, 'w-full', !readOnly && fieldBlockInteractive)}
+                  className={cn(FIELD_BLOCK_CLASS, 'w-full', !readOnly && FIELD_BLOCK_INTERACTIVE_CLASS)}
                   onClick={!readOnly ? handleOpenOwnerPicker : undefined}
                 >
-                  <p className={fieldLabel}>Owner</p>
+                  <p className={FIELD_LABEL_CLASS}>Owner</p>
                   {ownerLabel ? (
                     <div className="flex items-center gap-1.5 min-w-0">
                       <User className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
@@ -1003,7 +735,7 @@ export function DealHeaderStrip({
                       <User className="size-3.5 text-[var(--stage-text-tertiary)] shrink-0" />
                     </div>
                   ) : (
-                    <span className={emptyValue}>
+                    <span className={EMPTY_VALUE_CLASS}>
                       {!readOnly ? (
                         <>
                           <Plus size={9} />
@@ -1033,9 +765,9 @@ export function DealHeaderStrip({
               <div className="relative" data-header-picker ref={plannerTriggerRef}>
                 <div
                   className={cn(
-                    fieldBlock,
+                    FIELD_BLOCK_CLASS,
                     'w-full',
-                    !readOnly && !plannerSt && fieldBlockInteractive,
+                    !readOnly && !plannerSt && FIELD_BLOCK_INTERACTIVE_CLASS,
                   )}
                   onClick={
                     !readOnly && !plannerSt
@@ -1043,39 +775,41 @@ export function DealHeaderStrip({
                       : undefined
                   }
                 >
-                  <p className={fieldLabel}>Planner</p>
+                  <p className={FIELD_LABEL_CLASS}>Planner</p>
                   {plannerSt ? (
-                    renderStakeholderChip(
-                      plannerSt,
+                    <StakeholderChip
+                      stakeholder={plannerSt}
+                      readOnly={readOnly}
                       // No text badge — the filled icon in the pocActions
                       // group below communicates which role the planner holds.
-                      undefined,
-                      !readOnly
-                        ? {
-                            deal: {
-                              isActive: dealPocIsPlanner,
-                              onToggle: () =>
-                                handleMakeDealPoc({
-                                  entityId: plannerSt.entity_id,
-                                  organizationId: plannerSt.organization_id,
-                                  currentlyPoc: dealPocIsPlanner,
-                                }),
-                            },
-                            dayOf: {
-                              isActive: pocIsPlanner,
-                              onToggle: () =>
-                                handleMakePoc({
-                                  entityId: plannerSt.entity_id,
-                                  organizationId: plannerSt.organization_id,
-                                  currentlyPoc: pocIsPlanner,
-                                }),
-                            },
-                          }
-                        : undefined,
-                      !readOnly ? () => handleOpenSlot('planner', plannerTriggerRef) : undefined,
-                    )
+                      pocActions={
+                        !readOnly
+                          ? {
+                              deal: {
+                                isActive: dealPocIsPlanner,
+                                onToggle: () =>
+                                  handleMakeDealPoc({
+                                    entityId: plannerSt.entity_id,
+                                    organizationId: plannerSt.organization_id,
+                                    currentlyPoc: dealPocIsPlanner,
+                                  }),
+                              },
+                              dayOf: {
+                                isActive: pocIsPlanner,
+                                onToggle: () =>
+                                  handleMakePoc({
+                                    entityId: plannerSt.entity_id,
+                                    organizationId: plannerSt.organization_id,
+                                    currentlyPoc: pocIsPlanner,
+                                  }),
+                              },
+                            }
+                          : undefined
+                      }
+                      onSwap={!readOnly ? () => handleOpenSlot('planner', plannerTriggerRef) : undefined}
+                    />
                   ) : (
-                    <span className={emptyValue}>
+                    <span className={EMPTY_VALUE_CLASS}>
                       {!readOnly ? (
                         <>
                           <Plus size={9} />
@@ -1108,7 +842,7 @@ export function DealHeaderStrip({
             {(!readOnly || eventArchetype) && <div className="stage-divider" />}
             {(!readOnly || eventArchetype) && (
               <div className="flex items-center gap-2 relative" data-header-picker ref={archetypeTriggerRef}>
-                <p className={cn(fieldLabel, 'mb-0 shrink-0')}>Type</p>
+                <p className={cn(FIELD_LABEL_CLASS, 'mb-0 shrink-0')}>Type</p>
                 {eventArchetype ? (
                   readOnly ? (
                     <span className="stage-readout text-[var(--stage-text-secondary)] capitalize">
@@ -1149,54 +883,24 @@ export function DealHeaderStrip({
         </StagePanel>
       </motion.div>
 
-      {/* Contact picker sheet (company bill_to) */}
-      <ClientContactPickerSheet
-        open={contactSheetOpen}
-        onOpenChange={setContactSheetOpen}
+      <DealHeaderEditSheets
+        contactSheetOpen={contactSheetOpen}
+        onContactSheetOpenChange={setContactSheetOpen}
         pendingClientOrg={pendingClientOrg}
         roster={roster}
         rosterLoading={rosterLoading}
         adding={adding}
-        onConfirm={handleConfirmBillTo}
+        onConfirmBillTo={handleConfirmBillTo}
+        sheetDetails={sheetDetails}
+        sourceOrgId={sourceOrgId}
+        crmReturnPath={crmReturnPath}
+        onSheetClose={() => setSheetDetails(null)}
+        coupleEdit={coupleEdit}
+        onCoupleEditClose={() => setCoupleEdit(null)}
+        individualEdit={individualEdit}
+        onIndividualEditClose={() => setIndividualEdit(null)}
+        onStakeholdersChange={onStakeholdersChange}
       />
-
-      {/* NetworkDetailSheet */}
-      {sheetDetails && sourceOrgId && (
-        <NetworkDetailSheet
-          details={sheetDetails}
-          sourceOrgId={sourceOrgId}
-          onClose={() => setSheetDetails(null)}
-          returnPath={crmReturnPath}
-        />
-      )}
-
-      {/* CoupleEditSheet */}
-      {coupleEdit && (
-        <CoupleEditSheet
-          open={coupleEdit.open}
-          onOpenChange={(v) => !v && setCoupleEdit(null)}
-          entityId={coupleEdit.entityId}
-          initialValues={coupleEdit.initialValues}
-          onSaved={() => {
-            setCoupleEdit(null);
-            onStakeholdersChange();
-          }}
-        />
-      )}
-
-      {/* IndividualEditSheet */}
-      {individualEdit && (
-        <IndividualEditSheet
-          open={individualEdit.open}
-          onOpenChange={(v) => !v && setIndividualEdit(null)}
-          entityId={individualEdit.entityId}
-          initialValues={individualEdit.initialValues}
-          onSaved={() => {
-            setIndividualEdit(null);
-            onStakeholdersChange();
-          }}
-        />
-      )}
     </>
   );
 }

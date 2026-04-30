@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
@@ -25,7 +25,19 @@ import {
 } from '../knowledge';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const KNOWLEDGE_SRC = readFileSync(resolve(__dirname, '../knowledge.ts'), 'utf8');
+
+// Read the whole `knowledge/` sibling folder (post-2026-04-29 split) plus the
+// `knowledge.ts` compositor as one string. The source-discipline regex
+// assertions below grep for SQL substrings that may live in any of the tool
+// factories (lookup-tools, deal-tools, etc.); concatenating keeps the test
+// robust against future re-grouping.
+const KNOWLEDGE_DIR = resolve(__dirname, '../knowledge');
+const KNOWLEDGE_SRC = [
+  readFileSync(resolve(__dirname, '../knowledge.ts'), 'utf8'),
+  ...readdirSync(KNOWLEDGE_DIR)
+    .filter((f) => f.endsWith('.ts'))
+    .map((f) => readFileSync(resolve(KNOWLEDGE_DIR, f), 'utf8')),
+].join('\n');
 
 function makeCandidate(partial: Partial<HistoricalDealCandidate> = {}): HistoricalDealCandidate {
   return {
