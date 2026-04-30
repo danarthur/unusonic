@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DollarSign, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import type { DealCrewRow } from '../actions/deal-crew';
+import type { GearVarianceResult } from '../actions/get-gear-variance';
 
 type FinancialSummaryCardProps = {
   crewRows: DealCrewRow[];
@@ -13,6 +14,12 @@ type FinancialSummaryCardProps = {
   ledgerActual: number | null;
   /** Total revenue collected from invoices. */
   ledgerCollected: number | null;
+  /**
+   * Phase 5c of the proposal→gear lineage plan. Sold (proposal rental
+   * subtotals) vs Planned (catalog target_cost × gear-card qty). Null while
+   * fetching or when no proposal exists.
+   */
+  gearVariance: GearVarianceResult | null;
 };
 
 const currencyFmt = new Intl.NumberFormat('en-US', {
@@ -34,6 +41,7 @@ export function FinancialSummaryCard({
   budgetEstimated,
   ledgerActual,
   ledgerCollected,
+  gearVariance,
 }: FinancialSummaryCardProps) {
   // ── Labor computation ──
   const assigned = crewRows.filter((r) => r.entity_id);
@@ -66,6 +74,16 @@ export function FinancialSummaryCard({
 
   if (assigned.length > 0) {
     tiers.push({ label: 'Labor', amount: totalLabor, sublabel: `${assigned.length} crew` });
+  }
+
+  // Phase 5c: gear margin (sold vs planned). Shown only when the variance
+  // action returned data — no proposal/no rental gear means no row.
+  if (gearVariance?.hasData) {
+    tiers.push({
+      label: 'Gear',
+      amount: gearVariance.sold,
+      sublabel: `${currencyFmt.format(gearVariance.planned)} planned · ${gearVariance.margin >= 0 ? '+' : ''}${currencyFmt.format(gearVariance.margin)} margin`,
+    });
   }
 
   if (ledgerActual != null) {

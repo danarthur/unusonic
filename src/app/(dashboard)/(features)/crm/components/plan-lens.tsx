@@ -28,6 +28,7 @@ import { ClientUpdateStrip } from './client-update-strip';
 import { ShowControlStrip } from './show-control-strip';
 import { PlanVitalsStrip } from './plan-vitals-strip';
 import { getEventLedger, type EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
+import { getGearVariance, type GearVarianceResult } from '../actions/get-gear-variance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
 import { RunOfShowIndexCard } from '@/widgets/run-of-show/ui/run-of-show-mini';
 import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
@@ -284,6 +285,15 @@ export function PlanLens({
   const { data: ledger = null } = useQuery<EventLedgerDTO | null>({
     queryKey: ['plan-lens', 'ledger', eventScopedId],
     queryFn: () => (eventScopedId ? getEventLedger(eventScopedId) : Promise.resolve(null)),
+    enabled: !!eventScopedId,
+    placeholderData: keepPreviousData,
+  });
+
+  // Phase 5c of the proposal→gear lineage plan: gear margin (sold vs planned)
+  // surfaced as a tier on FinancialSummaryCard.
+  const { data: gearVariance } = useQuery<GearVarianceResult | null>({
+    queryKey: ['plan-lens', 'gear-variance', eventScopedId],
+    queryFn: () => (eventScopedId ? getGearVariance(eventScopedId) : Promise.resolve(null)),
     enabled: !!eventScopedId,
     placeholderData: keepPreviousData,
   });
@@ -572,6 +582,7 @@ export function PlanLens({
                 budgetEstimated={deal?.budget_estimated ?? null}
                 ledgerActual={ledger?.totalCost ?? null}
                 ledgerCollected={ledger?.collected ?? null}
+                gearVariance={gearVariance ?? null}
               />
               {hasVitals && (
                 <PlanVitalsStrip
