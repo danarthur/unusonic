@@ -45,6 +45,11 @@ export interface CreateBlankInvoiceResult {
 // Action
 // ---------------------------------------------------------------------------
 
+// AUTHZ-OK: explicit workspace_members lookup at L61-66 verifies caller is
+// a member of input.workspaceId before any system-client write. RLS on
+// workspace_members guarantees the cookie-session `.eq('user_id', user.id)`
+// + `.eq('workspace_id', input.workspaceId)` returns null when the user
+// isn't a member.
 export async function createBlankInvoice(
   input: CreateBlankInvoiceInput,
 ): Promise<CreateBlankInvoiceResult> {

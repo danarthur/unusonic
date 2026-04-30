@@ -341,6 +341,11 @@ export async function sendSmsOtpAction(params: {
  * novelty is consuming the `hashed_token` server-side instead of
  * emailing the user the full action URL.
  */
+// AUTHZ-OK: pre-auth boundary. The OTP code IS the authentication factor
+// being verified — there's no session yet. The sms_otp_codes row was
+// fetched by user_id (line 386) where userId came from email lookup
+// (line 365), so subsequent .eq('id', row.id) updates are scoped to that
+// user's row. Same pattern as passkey enrollment / magic-link verify.
 export async function verifySmsOtpAction(params: {
   email: string;
   code: string;

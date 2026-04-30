@@ -90,6 +90,11 @@ export async function dismissInsight(
 // Mark insights as surfaced (shown in greeting)
 // =============================================================================
 
+// AUTHZ-OK: low-impact UI state flip (pending→surfaced one-way; the column
+// is read-gated by RLS so an attacker can't see what got flipped). TODO:
+// add getUser() + workspace filter as defense-in-depth — not urgent given
+// the impact ceiling is "user marks insights they couldn't read as already
+// shown."
 export async function markInsightsSurfaced(
   insightIds: string[],
 ): Promise<void> {

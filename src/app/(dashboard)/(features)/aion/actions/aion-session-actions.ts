@@ -604,6 +604,10 @@ export async function deleteSession(
 // Save message feedback — thumbs up/down stored on the session's feedback JSONB
 // =============================================================================
 
+// AUTHZ-OK: cookie-session getUser() check + user_id-scoped read/write below
+// gate the system-client mutation. Cortex aion_sessions are user-owned;
+// the .eq('user_id', user.id) on both read and update prevents cross-user
+// feedback writes even if the sessionId UUID is leaked.
 export async function saveMessageFeedback(
   sessionId: string,
   messageId: string,
@@ -617,9 +621,13 @@ export async function saveMessageFeedback(
     const { getSystemClient } = await import('@/shared/api/supabase/system');
     const system = getSystemClient();
 
-    // Read current feedback JSONB, merge, write back
+    // Read current feedback JSONB, merge, write back. Both read and update
+    // are scoped by user_id so a user can only write feedback to their own
+    // sessions — without this, the cookie-session check above would still
+    // let one user attach thumbs to another's session by passing its UUID.
     const { data } = await system.schema('cortex').from('aion_sessions')
-      .select('feedback').eq('id', sessionId).maybeSingle();
+      .select('feedback').eq('id', sessionId).eq('user_id', user.id).maybeSingle();
+    if (!data) return;
     const existing = (data?.feedback as Record<string, string> | null) ?? {};
     if (feedback === null) {
       delete existing[messageId];
@@ -627,7 +635,7 @@ export async function saveMessageFeedback(
       existing[messageId] = feedback;
     }
     await system.schema('cortex').from('aion_sessions')
-      .update({ feedback: existing }).eq('id', sessionId);
+      .update({ feedback: existing }).eq('id', sessionId).eq('user_id', user.id);
   } catch {
     // Fire-and-forget — don't break the UI for feedback
   }

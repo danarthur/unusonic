@@ -29,6 +29,10 @@ export interface SendInvoiceResult {
   error: string | null;
 }
 
+// AUTHZ-OK: RLS-gated session-client fetch at L41-55 proves invoice
+// ownership before any system-client mutation. If the caller doesn't have
+// access, RLS returns null and we exit before line 63. All subsequent
+// system-client writes are scoped to the verified `invoice.workspace_id`.
 export async function sendInvoice(
   invoiceId: string,
   eventId?: string,

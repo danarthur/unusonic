@@ -149,6 +149,11 @@ export async function getRoster(orgId: string): Promise<{ members: RosterMemberD
 }
 
 /** Create or update a ghost member (no email sent). Uses add_ghost_member RPC / cortex.relationships. */
+// AUTHZ-OK: explicit cortex.relationships edge check at L192-200 verifies
+// the caller has a ROSTER_MEMBER or MEMBER edge to the target org before
+// any mutation. Plus entity-claim check at L213-219 prevents editing
+// already-claimed members. RLS on directory.entities + cortex.relationships
+// is the read-side gate; these explicit checks are write-side authz.
 export async function upsertGhostMember(
   orgId: string,
   input: UpsertGhostMemberInput,

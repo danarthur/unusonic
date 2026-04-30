@@ -100,6 +100,10 @@ export async function estimateAiSummaryBackfillCost(
  * chunk a giant workspace over multiple invocations without timing out
  * the Vercel serverless function.
  */
+// AUTHZ-OK: cron-only entry point. Callers are /api/cron/* route handlers
+// gated by Vercel Cron secret + admin-only debug routes. The workspaceId
+// parameter is never threaded from a user-controlled surface — only from a
+// scheduler that iterates the full workspace list.
 export async function runAiSummaryBackfill(
   workspaceId: string,
   options: { cap?: number } = {},
