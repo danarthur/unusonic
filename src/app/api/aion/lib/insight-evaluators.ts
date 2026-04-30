@@ -15,6 +15,7 @@ import { evaluateGoneQuietWithValue } from './evaluators/gone-quiet-with-value';
 import { evaluateStageAdvanceSuggestion } from './evaluators/stage-advance-suggestion';
 import { evaluateStakeholderCountTrend } from './evaluators/stakeholder-count-trend';
 import { evaluateCalendarCollision } from './evaluators/calendar-collision';
+import { evaluateGearUnderDelivered } from './evaluators/gear-under-delivered';
 import { OPEN_DEAL_STATUSES } from '@/shared/lib/pipeline-stages/constants';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -54,6 +55,8 @@ export async function evaluateAllInsights(workspaceId: string): Promise<InsightC
     // Phase 7b Tier 2 — relational + temporal signals
     evaluateStakeholderCountTrend(workspaceId),
     evaluateCalendarCollision(workspaceId),
+    // Phase 5 of proposal-gear-lineage-plan — proposal moved after gear sync
+    evaluateGearUnderDelivered(workspaceId),
   ]);
 
   return results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
