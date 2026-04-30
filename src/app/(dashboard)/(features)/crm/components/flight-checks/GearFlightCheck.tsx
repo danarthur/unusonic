@@ -12,7 +12,7 @@
  *   - department-section.tsx — collapsible per-department group
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as Sentry from '@sentry/nextjs';
 import { Loader2, Package, RefreshCw } from 'lucide-react';
@@ -25,6 +25,7 @@ import {
   getCrewEquipmentMatchesForEvent,
   getEventGearItems,
   getGearLineageEnabled,
+  materializeKitFromCrew,
   sourceGearFromCrew,
   updateGearItemStatus,
   type CrewGearMatch,
@@ -44,6 +45,7 @@ import {
 } from '@/features/talent-management/api/kit-template-actions';
 import { DepartmentSection } from './gear-flight-check/department-section';
 import { GearItemRow } from './gear-flight-check/gear-item-row';
+import { KitSyncPicker } from './gear-flight-check/kit-sync-picker';
 import { PackageParentRow } from './gear-flight-check/package-parent-row';
 import { SourcingBanner } from './gear-flight-check/sourcing-banner';
 import {
@@ -80,6 +82,13 @@ type GearFlightCheckProps = {
    * to override (tests, storybook, parent-driven force).
    */
   lineageEnabled?: boolean;
+  /**
+   * When true, render without the StagePanel wrapper — for callers that
+   * already nest the gear card inside a panel (Plan tab's "Gear & dispatch"
+   * section). Default false preserves the standalone card look used in
+   * the event studio.
+   */
+  bare?: boolean;
 };
 
 // =============================================================================
@@ -95,6 +104,7 @@ export function GearFlightCheck({
   userName = 'You',
   onOpenCrewDetail,
   lineageEnabled: lineageOverride,
+  bare = false,
 }: GearFlightCheckProps) {
   const [items, setItems] = useState<EventGearItem[]>([]);
   const [resolvedLineageFlag, setResolvedLineageFlag] = useState<boolean | null>(null);
@@ -110,6 +120,8 @@ export function GearFlightCheck({
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [operatorPickerOpen, setOperatorPickerOpen] = useState<string | null>(null);
+  const [kitSyncOpen, setKitSyncOpen] = useState<string | null>(null);
+  const [kitSyncPending, setKitSyncPending] = useState(false);
   const [sourcingBannerOpen, setSourcingBannerOpen] = useState(false);
 
   // ── Fetch gear items ────────────────────────────────────────────────────────
@@ -408,18 +420,49 @@ export function GearFlightCheck({
     onUpdated?.();
   }, [fetchItems, onUpdated]);
 
+  const handleSyncKit = useCallback(async (serviceGearItemId: string, entityId: string) => {
+    setKitSyncPending(true);
+    const result = await materializeKitFromCrew({ serviceGearItemId, entityId });
+    setKitSyncPending(false);
+    setKitSyncOpen(null);
+    if (!result.success) {
+      console.error('[GearFlightCheck] materializeKitFromCrew:', result.error);
+      return;
+    }
+    fetchItems();
+    onUpdated?.();
+  }, [fetchItems, onUpdated]);
+
+  // When `bare` is on the gear card renders without any wrapper — no
+  // StagePanel, no border, no padding — so it can host inside an outer panel
+  // (dispatch-summary's "Gear & dispatch" section) without the "card inside a
+  // card" stack. StagePanel's `stage-panel` class always carries a border, so
+  // we drop the wrapper entirely rather than try to neutralize it.
+  const Wrap = ({ children }: { children: ReactNode }) =>
+    bare ? (
+      <>{children}</>
+    ) : (
+      <StagePanel
+        elevated
+        padding="md"
+        className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]"
+      >
+        {children}
+      </StagePanel>
+    );
+
   // ── Loading state ───────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
+      <Wrap>
         <div className="flex items-center gap-3">
           <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
           <h3 className="stage-label">Gear</h3>
           <span className="flex-1" />
           <Loader2 className="size-4 animate-spin text-[var(--stage-text-tertiary)]" />
         </div>
-      </StagePanel>
+      </Wrap>
     );
   }
 
@@ -427,7 +470,7 @@ export function GearFlightCheck({
 
   if (error) {
     return (
-      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
+      <Wrap>
         <div className="flex items-center gap-3">
           <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
           <div className="min-w-0 flex-1">
@@ -443,7 +486,7 @@ export function GearFlightCheck({
             <RefreshCw size={16} strokeWidth={1.5} />
           </button>
         </div>
-      </StagePanel>
+      </Wrap>
     );
   }
 
@@ -451,7 +494,7 @@ export function GearFlightCheck({
 
   if (items.length === 0) {
     return (
-      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
+      <Wrap>
         <div className="flex items-center gap-3">
           <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
           <div>
@@ -461,7 +504,7 @@ export function GearFlightCheck({
             </p>
           </div>
         </div>
-      </StagePanel>
+      </Wrap>
     );
   }
 
@@ -497,32 +540,43 @@ export function GearFlightCheck({
   );
 
   return (
-    <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
-          <h3 className="stage-label">Gear</h3>
-          <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">{items.length}</span>
-        </div>
-        <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">{summaryText}</span>
-      </div>
-
-      {/* Summary progress bar */}
-      <div className="h-1 rounded-full bg-[oklch(1_0_0_/_0.04)] mt-3 mb-4 overflow-hidden">
-        <motion.div
-          className="h-full rounded-full"
-          style={{
-            background:
-              summaryProgress >= 100
-                ? 'var(--color-unusonic-success)'
-                : 'var(--stage-text-secondary)',
-          }}
-          initial={{ width: 0 }}
-          animate={{ width: `${summaryProgress}%` }}
-          transition={STAGE_MEDIUM}
-        />
-      </div>
+    <Wrap>
+      {/* Header — hidden in bare mode (the host panel already has its own
+          "Gear & dispatch" title; rendering "Gear N · X of Y loaded" here
+          duplicates it and reads like a second card). Standalone callers
+          (event-studio) still get the header. */}
+      {!bare && (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Package size={20} strokeWidth={1.5} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+              <h3 className="stage-label">Gear</h3>
+              <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">{items.length}</span>
+            </div>
+            <span className="text-label text-[var(--stage-text-tertiary)] tabular-nums">{summaryText}</span>
+          </div>
+          <div className="h-1 rounded-full bg-[oklch(1_0_0_/_0.04)] mt-3 mb-4 overflow-hidden">
+            <motion.div
+              className="h-full rounded-full"
+              style={{
+                background:
+                  summaryProgress >= 100
+                    ? 'var(--color-unusonic-success)'
+                    : 'var(--stage-text-secondary)',
+              }}
+              initial={{ width: 0 }}
+              animate={{ width: `${summaryProgress}%` }}
+              transition={STAGE_MEDIUM}
+            />
+          </div>
+        </>
+      )}
+      {/* Bare-mode summary line — quiet count anchored to the host title. */}
+      {bare && items.length > 0 && (
+        <p className="text-label text-[var(--stage-text-tertiary)] tabular-nums mb-2">
+          {items.length} item{items.length === 1 ? '' : 's'} · {summaryText}
+        </p>
+      )}
 
       {/* Sourcing opportunities — Layer 2 gap-analysis recommender.
        * Surfaced via dedicated sub-component so the orchestrator stays focused
@@ -542,6 +596,8 @@ export function GearFlightCheck({
             {lineageNodes.map((node) => {
               if (node.kind === 'parent') {
                 const collapsed = collapsedParents.has(node.row.id);
+                const isService = (node.row.package_snapshot as { category?: string } | null)?.category === 'service';
+                const kitOpen = kitSyncOpen === node.row.id;
                 return (
                   <motion.li
                     key={node.row.id}
@@ -557,7 +613,26 @@ export function GearFlightCheck({
                       childItems={node.children}
                       collapsed={collapsed}
                       onToggle={() => toggleParent(node.row.id)}
+                      onSyncKit={isService ? () => setKitSyncOpen(kitOpen ? null : node.row.id) : undefined}
                     />
+                    <AnimatePresence>
+                      {kitOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={STAGE_LIGHT}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <KitSyncPicker
+                            crewRows={crewRows}
+                            onPick={(entityId) => handleSyncKit(node.row.id, entityId)}
+                            onClose={() => setKitSyncOpen(null)}
+                            pending={kitSyncPending}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                     <AnimatePresence initial={false}>
                       {!collapsed && (
                         <motion.div
@@ -679,6 +754,6 @@ export function GearFlightCheck({
           )}
         </div>
       )}
-    </StagePanel>
+    </Wrap>
   );
 }

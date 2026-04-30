@@ -11,8 +11,8 @@ import type { GearStatus, GearHistoryEntry } from '../../components/flight-check
 
 export type GearSource = 'company' | 'crew' | 'subrental';
 
-/** Provenance of a gear row (proposal-gear-lineage-plan §4.1). */
-export type GearLineageSource = 'proposal' | 'pm_added' | 'pm_swapped' | 'pm_detached';
+/** Provenance of a gear row (proposal-gear-lineage-plan §4.1, §5b). */
+export type GearLineageSource = 'proposal' | 'pm_added' | 'pm_swapped' | 'pm_detached' | 'kit_materialized';
 
 export type EventGearItem = {
   id: string;
@@ -66,3 +66,8 @@ export type CrewEquipmentRollupEntry = {
     items: { name: string; quantity: number }[];
   }[];
 };
+
+/** Phase 5b — return shape for materializeKitFromCrew. */
+export type MaterializeKitResult =
+  | { success: true; added: number; replaced: number; supplierName: string | null }
+  | { success: false; error: string };

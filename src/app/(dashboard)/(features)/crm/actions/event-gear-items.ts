@@ -26,6 +26,7 @@ export type {
   GearAvailability,
   CrewGearMatch,
   CrewEquipmentRollupEntry,
+  MaterializeKitResult,
 } from './event-gear-items/types';
 
 export {
@@ -49,6 +50,6 @@ export {
 
 export { getCrewSourcedEquipmentRollup } from './event-gear-items/rollup';
 
-export { detachGearFromPackage } from './event-gear-items/lineage';
+export { detachGearFromPackage, materializeKitFromCrew } from './event-gear-items/lineage';
 
 export { getGearLineageEnabled } from './event-gear-items/lineage-flag';

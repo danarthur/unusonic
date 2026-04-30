@@ -171,7 +171,7 @@ export function GearItemRow({
   return (
     <div>
       <div
-        className={`flex items-center gap-3 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0 ${isBranch ? 'text-[var(--stage-text-secondary)]' : ''} ${indented ? 'pl-6' : ''}`}
+        className={`flex items-center gap-3 py-2 px-2 -mx-2 rounded-[6px] border-b border-[oklch(1_0_0_/_0.05)] last:border-0 hover:bg-[oklch(1_0_0/0.03)] transition-colors ${isBranch ? 'text-[var(--stage-text-secondary)]' : ''} ${indented ? 'pl-6' : ''}`}
       >
         {/* Name + quantity */}
         <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -185,7 +185,8 @@ export function GearItemRow({
           )}
         </div>
 
-        {/* Availability badge */}
+        {/* Availability badge — drops " avail" suffix to claw back ~30px;
+            full text lives in the title on hover. */}
         {availability && availability.stockQuantity !== null && (
           <span
             className={`shrink-0 text-label tabular-nums px-1.5 py-0.5 rounded-full font-medium ${
@@ -193,22 +194,27 @@ export function GearItemRow({
                 ? 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]'
                 : 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]'
             }`}
+            title={`${availability.available} of ${availability.stockQuantity} available`}
           >
-            {availability.available}/{availability.stockQuantity} avail
+            {availability.available}/{availability.stockQuantity}
           </span>
         )}
 
-        {/* Source chip — becomes a button when crew-sourced + rail wired */}
+        {/* Source chip — becomes a button when crew-sourced + rail wired.
+            On indented rows the supplier-name suffix is dropped (parent
+            context already tells you who supplies — the supplied_by name
+            still lives in the chip's title). */}
         {item.source !== 'company' && (() => {
           const chip = SOURCE_CHIP_STYLES[item.source];
           const supplierRow = item.source === 'crew' && item.supplied_by_entity_id
             ? crewRows.find((r) => r.entity_id === item.supplied_by_entity_id)
             : null;
           const clickable = !!(onOpenCrewDetail && supplierRow);
+          const showSupplierInline = !indented && !!item.supplied_by_name;
           const content = (
             <>
               {chip.label}
-              {item.supplied_by_name && <span className="text-[var(--stage-text-secondary)] ml-0.5">· {item.supplied_by_name}</span>}
+              {showSupplierInline && <span className="text-[var(--stage-text-secondary)] ml-0.5">· {item.supplied_by_name}</span>}
             </>
           );
           if (clickable) {
@@ -260,8 +266,11 @@ export function GearItemRow({
           </span>
         )}
 
-        {/* Step dots — lifecycle progress track */}
-        <div className="shrink-0 flex items-center gap-0">
+        {/* Step dots — lifecycle progress track. Hidden on indented child
+            rows: the parent's rollup ("X of Y loaded") already conveys the
+            same information at the bundle level, and the dots take ~80px we
+            need for the name. */}
+        {!indented && <div className="shrink-0 flex items-center gap-0">
           {GEAR_LIFECYCLE_ORDER.map((step, idx) => {
             const isCompleted = !isBranch && lifecycleIdx >= idx;
             const isCurrent = !isBranch && lifecycleIdx === idx;
@@ -292,7 +301,7 @@ export function GearItemRow({
               </div>
             );
           })}
-        </div>
+        </div>}
 
         {/* Operator avatar */}
         <button

@@ -2,23 +2,23 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import type {
+  ProposalGearBundle,
+  ProposalGearChild,
+  ProposalGearPlan,
+  ProposalGearPlanItem,
+  ProposalGearService,
+  ProposalGearStandalone,
+} from './plan-gear-from-proposal-types';
 
 /**
  * Reads a deal's latest proposal and returns a structured plan describing the
  * gear that will land on the Plan tab. Phase 2 of the proposal→gear lineage
  * plan (docs/audits/proposal-gear-lineage-plan-2026-04-29.md §5).
  *
- * The plan distinguishes:
- *   - Bundles (a header proposal_item with shared package_instance_id), each
- *     resolved against `packages.decompose_on_gear_card` to decide whether
- *     the gear card materializes one row per ingredient (decomposed) or one
- *     row per bundle (whole).
- *   - Standalone rentals — non-header, non-bundle proposal_items whose catalog
- *     category is 'rental'.
- *
- * The writer (sync-gear-from-proposal.ts) walks this plan to insert
- * ops.event_gear_items with full lineage: proposal_item_id, parent_gear_item_id,
- * lineage_source='proposal', and a frozen package_snapshot.
+ * Public types live in `./plan-gear-from-proposal-types.ts` because Next.js
+ * 'use server' modules must export only async functions — type exports here
+ * would trigger a ReferenceError at request time.
  */
 
 type ProposalItemRow = {
@@ -42,47 +42,6 @@ type CatalogRow = {
 };
 
 type InventoryMeta = { is_sub_rental: boolean; department: string | null };
-
-export type ProposalGearChild = {
-  proposalItemId: string;
-  catalogPackageId: string;
-  name: string;
-  quantity: number;
-  isSubRental: boolean;
-  department: string | null;
-};
-
-export type ProposalGearBundle = {
-  kind: 'bundle';
-  headerProposalItemId: string;
-  packageInstanceId: string;
-  catalogPackageId: string;
-  packageName: string;
-  packageSnapshot: Record<string, unknown>;
-  decomposed: boolean;
-  headerQuantity: number;
-  /** Used when decomposed=false — the bundle becomes one gear row. */
-  wholeRowMeta: { isSubRental: boolean; department: string | null };
-  /** Populated when decomposed=true — one entry per rental ingredient. */
-  children: ProposalGearChild[];
-};
-
-export type ProposalGearStandalone = {
-  kind: 'standalone';
-  proposalItemId: string;
-  catalogPackageId: string;
-  name: string;
-  quantity: number;
-  isSubRental: boolean;
-  department: string | null;
-};
-
-export type ProposalGearPlanItem = ProposalGearBundle | ProposalGearStandalone;
-
-export type ProposalGearPlan = {
-  proposalId: string;
-  items: ProposalGearPlanItem[];
-};
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -271,6 +230,25 @@ function buildStandaloneItem(
   };
 }
 
+function buildServiceItem(
+  row: ProposalItemRow,
+  catalog: Map<string, CatalogRow>,
+): ProposalGearService | null {
+  const catalogId = catalogIdFor(row);
+  if (!catalogId) return null;
+  const pkg = catalog.get(catalogId);
+  if (!pkg || pkg.category !== 'service') return null;
+  return {
+    kind: 'service',
+    proposalItemId: row.id,
+    catalogPackageId: catalogId,
+    serviceName: row.name,
+    packageSnapshot: freezePackageSnapshot(pkg, true),
+    quantity: row.quantity ?? 1,
+    packageInstanceId: row.package_instance_id,
+  };
+}
+
 function collectCatalogIds(items: ProposalItemRow[]): string[] {
   const ids = new Set<string>();
   for (const row of items) {
@@ -289,12 +267,19 @@ function assembleInstanceItems(
     const bundle = buildBundleItem(bucket, catalog, instanceId);
     if (bundle) {
       out.push(bundle);
+      // Service children of the bundle are surfaced as top-level service
+      // parents (Phase 2e). Bundle.children stays restricted to rentals so
+      // the bundle's collapsed-state count stays meaningful.
+      for (const member of bucket.members) {
+        const service = buildServiceItem(member, catalog);
+        if (service) out.push(service);
+      }
       continue;
     }
-    // Orphan children (no header in their group) — treat each as standalone.
+    // Orphan children (no header in their group) — treat each independently.
     for (const member of bucket.members) {
-      const standalone = buildStandaloneItem(member, catalog);
-      if (standalone) out.push(standalone);
+      const item = buildStandaloneItem(member, catalog) ?? buildServiceItem(member, catalog);
+      if (item) out.push(item);
     }
   }
   return out;
@@ -307,8 +292,8 @@ function assembleLooseItems(
   const out: ProposalGearPlanItem[] = [];
   for (const row of loose) {
     if (row.is_package_header) continue;
-    const standalone = buildStandaloneItem(row, catalog);
-    if (standalone) out.push(standalone);
+    const item = buildStandaloneItem(row, catalog) ?? buildServiceItem(row, catalog);
+    if (item) out.push(item);
   }
   return out;
 }

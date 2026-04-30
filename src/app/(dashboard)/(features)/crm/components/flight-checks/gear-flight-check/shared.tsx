@@ -96,22 +96,24 @@ export function nodeDepartment(node: LineageNode): string | null {
 export type LineageChip = { label: string; bg: string; text: string; tooltip?: string };
 
 /**
- * Resolves the lineage chip shown on each non-parent row. Parents render
- * "From proposal" implicitly via their package label, so callers should
- * suppress the chip on parent rows.
+ * Resolves the lineage chip shown on a gear row. Returns null for
+ * `lineage_source='proposal'` — that's the default state for synced rows,
+ * and flagging it on every row crowds the layout without adding signal. The
+ * chip only appears when something noteworthy has happened (PM added, swapped,
+ * or detached). The parent row's package label already tells the user the
+ * row's package context.
+ *
+ * `kit_materialized` rows (Phase 5b) are also default-quiet — they sit under
+ * a service parent whose name + crew chip already names the source.
  */
 export function lineageChipFor(item: EventGearItem): LineageChip | null {
   switch (item.lineage_source) {
     case 'proposal':
-      return {
-        label: 'From proposal',
-        bg: 'bg-[oklch(1_0_0/0.04)]',
-        text: 'text-[var(--stage-text-tertiary)]',
-        tooltip: 'Materialized from the proposal at handoff.',
-      };
+    case 'kit_materialized':
+      return null;
     case 'pm_added':
       return {
-        label: 'Added by PM',
+        label: 'PM added',
         bg: 'bg-[oklch(1_0_0/0.04)]',
         text: 'text-[var(--stage-text-tertiary)]',
         tooltip: 'Added manually after handoff — not on the proposal.',

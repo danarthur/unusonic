@@ -2,13 +2,13 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import {
-  planGearFromProposal,
-  type ProposalGearBundle,
-  type ProposalGearPlan,
-  type ProposalGearPlanItem,
-  type ProposalGearStandalone,
-} from './plan-gear-from-proposal';
+import { planGearFromProposal } from './plan-gear-from-proposal';
+import type {
+  ProposalGearBundle,
+  ProposalGearPlanItem,
+  ProposalGearService,
+  ProposalGearStandalone,
+} from './plan-gear-from-proposal-types';
 
 export type SyncGearFromProposalResult =
   | { success: true; added: number }
@@ -117,6 +117,7 @@ async function loadInitialState(
 
 function isPlanItemLinked(item: ProposalGearPlanItem, linked: Set<string>): boolean {
   if (item.kind === 'standalone') return linked.has(item.proposalItemId);
+  if (item.kind === 'service') return linked.has(item.proposalItemId);
   return linked.has(item.headerProposalItemId);
 }
 
@@ -127,6 +128,15 @@ async function applyPlanItem(
 ): Promise<void> {
   if (item.kind === 'standalone') {
     const ok = await insertStandalone(ctx, item, state.nextSort);
+    if (!ok) return;
+    state.linkedProposalItemIds.add(item.proposalItemId);
+    state.nextSort += 1;
+    state.added += 1;
+    return;
+  }
+
+  if (item.kind === 'service') {
+    const ok = await insertServiceParent(ctx, item, state.nextSort);
     if (!ok) return;
     state.linkedProposalItemIds.add(item.proposalItemId);
     state.nextSort += 1;
@@ -166,6 +176,43 @@ async function insertStandalone(
     });
   if (error) {
     console.error('[CRM] syncGearFromProposalToEvent (standalone):', error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Service parent (Phase 2e). Lands as a top-level parent gear row with no
+ * children — kit children are materialized later by the PM via
+ * materializeKitFromCrew. The service stays connected to its bundle via
+ * `package_instance_id` even though it sits at the top level visually.
+ */
+async function insertServiceParent(
+  ctx: WriteContext,
+  item: ProposalGearService,
+  sortOrder: number,
+): Promise<boolean> {
+  const { error } = await ctx.supabase
+    .schema('ops')
+    .from('event_gear_items')
+    .insert({
+      event_id: ctx.eventId,
+      workspace_id: ctx.workspaceId,
+      name: item.serviceName,
+      quantity: item.quantity,
+      status: 'allocated',
+      catalog_package_id: item.catalogPackageId,
+      is_sub_rental: false,
+      department: null,
+      sort_order: sortOrder,
+      lineage_source: 'proposal',
+      proposal_item_id: item.proposalItemId,
+      package_instance_id: item.packageInstanceId,
+      package_snapshot: item.packageSnapshot,
+      is_package_parent: true,
+    });
+  if (error) {
+    console.error('[CRM] syncGearFromProposalToEvent (service parent):', error.message);
     return false;
   }
   return true;
@@ -295,6 +342,3 @@ async function insertBundleChildren(
   }
   return true;
 }
-
-// Re-export the plan type so callers can introspect (used by upcoming Phase 3 drift UI).
-export type { ProposalGearPlan };

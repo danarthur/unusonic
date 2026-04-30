@@ -620,7 +620,9 @@ export function DispatchSummary({
         </motion.div>
       )}
 
-      {/* Gear flight check (logistics toggles moved to AdvancingChecklist) */}
+      {/* Gear flight check (logistics toggles moved to AdvancingChecklist).
+          `bare` so the card renders flat inside the surrounding "Gear &
+          dispatch" StagePanel — no card-inside-a-card. */}
       <GearFlightCheck
         eventId={eventId}
         eventStartsAt={event.starts_at ?? null}
@@ -630,6 +632,7 @@ export function DispatchSummary({
         defaultCollapsed={false}
         maxVisible={5}
         onOpenCrewDetail={onOpenCrewDetail}
+        bare
       />
 
       </div>
