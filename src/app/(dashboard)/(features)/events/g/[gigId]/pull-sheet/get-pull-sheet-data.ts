@@ -47,6 +47,12 @@ export async function getPullSheetData(eventId: string): Promise<PullSheetData |
   const db = supabase;
 
   const [gearResult, crewResult, eventResult] = await Promise.all([
+    // Phase 2c (proposal-gear-lineage-plan §5): exclude `is_package_parent`
+    // rows from the pull sheet. Package + service parents are conceptual
+    // headers — not pickable, not loadable. Their pickable rental ingredients
+    // are independent rows already in this query (children with parent set
+    // and source='company'); kit children are excluded by source='company'
+    // since they're crew-supplied.
     db
       .schema('ops')
       .from('event_gear_items')
@@ -54,6 +60,7 @@ export async function getPullSheetData(eventId: string): Promise<PullSheetData |
       .eq('event_id', eventId)
       .eq('workspace_id', workspaceId)
       .eq('source', 'company')
+      .eq('is_package_parent', false)
       .order('sort_order', { ascending: true }),
 
     db
