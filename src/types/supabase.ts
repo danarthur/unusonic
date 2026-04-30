@@ -4146,10 +4146,16 @@ export type Database = {
           event_id: string
           history: Json | null
           id: string
+          is_package_parent: boolean
           is_sub_rental: boolean
           kit_fee: number | null
+          lineage_source: string
           name: string
           operator_entity_id: string | null
+          package_instance_id: string | null
+          package_snapshot: Json | null
+          parent_gear_item_id: string | null
+          proposal_item_id: string | null
           quantity: number
           sort_order: number
           source: string
@@ -4168,10 +4174,16 @@ export type Database = {
           event_id: string
           history?: Json | null
           id?: string
+          is_package_parent?: boolean
           is_sub_rental?: boolean
           kit_fee?: number | null
+          lineage_source?: string
           name: string
           operator_entity_id?: string | null
+          package_instance_id?: string | null
+          package_snapshot?: Json | null
+          parent_gear_item_id?: string | null
+          proposal_item_id?: string | null
           quantity?: number
           sort_order?: number
           source?: string
@@ -4190,10 +4202,16 @@ export type Database = {
           event_id?: string
           history?: Json | null
           id?: string
+          is_package_parent?: boolean
           is_sub_rental?: boolean
           kit_fee?: number | null
+          lineage_source?: string
           name?: string
           operator_entity_id?: string | null
+          package_instance_id?: string | null
+          package_snapshot?: Json | null
+          parent_gear_item_id?: string | null
+          proposal_item_id?: string | null
           quantity?: number
           sort_order?: number
           source?: string
@@ -4211,6 +4229,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_gear_items_parent_gear_item_id_fkey"
+            columns: ["parent_gear_item_id"]
+            isOneToOne: false
+            referencedRelation: "event_gear_items"
             referencedColumns: ["id"]
           },
         ]
@@ -4511,6 +4536,47 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: []
+      }
+      gear_drift_dismissals: {
+        Row: {
+          dismissed_at: string
+          dismissed_by: string | null
+          event_id: string
+          id: string
+          proposal_item_id: string
+          proposal_item_updated_at: string
+          reason: string | null
+          workspace_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          dismissed_by?: string | null
+          event_id: string
+          id?: string
+          proposal_item_id: string
+          proposal_item_updated_at: string
+          reason?: string | null
+          workspace_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          dismissed_by?: string | null
+          event_id?: string
+          id?: string
+          proposal_item_id?: string
+          proposal_item_updated_at?: string
+          reason?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gear_drift_dismissals_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       handoff_links: {
         Row: {
@@ -6744,6 +6810,7 @@ export type Database = {
           buffer_days: number
           category: Database["public"]["Enums"]["package_category"]
           created_at: string
+          decompose_on_gear_card: string
           definition: Json | null
           description: string | null
           floor_price: number | null
@@ -6767,6 +6834,7 @@ export type Database = {
           buffer_days?: number
           category?: Database["public"]["Enums"]["package_category"]
           created_at?: string
+          decompose_on_gear_card?: string
           definition?: Json | null
           description?: string | null
           floor_price?: number | null
@@ -6790,6 +6858,7 @@ export type Database = {
           buffer_days?: number
           category?: Database["public"]["Enums"]["package_category"]
           created_at?: string
+          decompose_on_gear_card?: string
           definition?: Json | null
           description?: string | null
           floor_price?: number | null
