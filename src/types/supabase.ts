@@ -7038,6 +7038,7 @@ export type Database = {
           unit_multiplier: number
           unit_price: number
           unit_type: string
+          updated_at: string
         }
         Insert: {
           actual_cost?: number | null
@@ -7065,6 +7066,7 @@ export type Database = {
           unit_multiplier?: number
           unit_price: number
           unit_type?: string
+          updated_at?: string
         }
         Update: {
           actual_cost?: number | null
@@ -7092,6 +7094,7 @@ export type Database = {
           unit_multiplier?: number
           unit_price?: number
           unit_type?: string
+          updated_at?: string
         }
         Relationships: [
           {

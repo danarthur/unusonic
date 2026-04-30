@@ -34,6 +34,14 @@ import {
   type GearSource,
 } from '../../actions/event-gear-items';
 import {
+  acceptGearDriftAdd,
+  acceptGearDriftQty,
+  acceptGearDriftRemove,
+  dismissGearDrift,
+  getGearDriftForEvent,
+} from '../../actions/gear-drift';
+import type { GearDriftReport } from '../../actions/gear-drift-types';
+import {
   GEAR_LIFECYCLE_ORDER,
   type GearStatus,
 } from './types';
@@ -44,6 +52,7 @@ import {
   type KitComplianceResult,
 } from '@/features/talent-management/api/kit-template-actions';
 import { DepartmentSection } from './gear-flight-check/department-section';
+import { GearDriftRibbon, type DriftAction } from './gear-flight-check/gear-drift-ribbon';
 import { GearItemRow } from './gear-flight-check/gear-item-row';
 import { KitSyncPicker } from './gear-flight-check/kit-sync-picker';
 import { PackageParentRow } from './gear-flight-check/package-parent-row';
@@ -123,6 +132,8 @@ export function GearFlightCheck({
   const [kitSyncOpen, setKitSyncOpen] = useState<string | null>(null);
   const [kitSyncPending, setKitSyncPending] = useState(false);
   const [sourcingBannerOpen, setSourcingBannerOpen] = useState(false);
+  const [driftReport, setDriftReport] = useState<GearDriftReport | null>(null);
+  const [driftPending, setDriftPending] = useState<string | null>(null);
 
   // ── Fetch gear items ────────────────────────────────────────────────────────
 
@@ -420,6 +431,58 @@ export function GearFlightCheck({
     onUpdated?.();
   }, [fetchItems, onUpdated]);
 
+  // Stable key per drift item so the ribbon can mark exactly the row whose
+  // action is in flight. Mirrors the ribbon's internal driftKey().
+  const driftActionKey = (action: DriftAction): string => {
+    if (action.kind === 'accept-add') return `add:${action.proposalItemId}`;
+    if (action.kind === 'accept-remove') return `remove:${action.gearItemId}`;
+    if (action.kind === 'accept-qty') return `qty:${action.gearItemId}`;
+    return `add:${action.proposalItemId}`;
+  };
+
+  const fetchDrift = useCallback(async () => {
+    if (!lineageEnabled) {
+      setDriftReport(null);
+      return;
+    }
+    try {
+      const report = await getGearDriftForEvent(eventId);
+      setDriftReport(report);
+    } catch (e) {
+      console.error('[GearFlightCheck] getGearDriftForEvent:', e);
+      setDriftReport(null);
+    }
+  }, [eventId, lineageEnabled]);
+
+  useEffect(() => {
+    fetchDrift();
+  }, [fetchDrift, items]);
+
+  const handleDriftAction = useCallback(async (action: DriftAction) => {
+    const key = driftActionKey(action);
+    setDriftPending(key);
+    try {
+      if (action.kind === 'accept-add') {
+        await acceptGearDriftAdd({ eventId, proposalItemId: action.proposalItemId });
+      } else if (action.kind === 'accept-remove') {
+        await acceptGearDriftRemove({ gearItemId: action.gearItemId });
+      } else if (action.kind === 'accept-qty') {
+        await acceptGearDriftQty({ gearItemId: action.gearItemId, newQuantity: action.newQuantity });
+      } else if (action.kind === 'dismiss') {
+        await dismissGearDrift({
+          eventId,
+          proposalItemId: action.proposalItemId,
+          proposalItemUpdatedAt: action.proposalItemUpdatedAt,
+        });
+      }
+    } finally {
+      setDriftPending(null);
+    }
+    fetchItems();
+    fetchDrift();
+    onUpdated?.();
+  }, [eventId, fetchItems, fetchDrift, onUpdated]);
+
   const handleSyncKit = useCallback(async (serviceGearItemId: string, entityId: string) => {
     setKitSyncPending(true);
     const result = await materializeKitFromCrew({ serviceGearItemId, entityId });
@@ -576,6 +639,18 @@ export function GearFlightCheck({
         <p className="text-label text-[var(--stage-text-tertiary)] tabular-nums mb-2">
           {items.length} item{items.length === 1 ? '' : 's'} · {summaryText}
         </p>
+      )}
+
+      {/* Drift ribbon — Phase 3. Surfaces proposal-changed-after-handoff
+       * diffs as a per-line accept/reject panel. Rendered above the row list
+       * so the PM sees it before they start working with the gear card. */}
+      {lineageEnabled && driftReport && (
+        <GearDriftRibbon
+          drifts={driftReport.drifts}
+          proposalLastChangedAt={driftReport.proposalLastChangedAt}
+          onAct={handleDriftAction}
+          pending={driftPending}
+        />
       )}
 
       {/* Sourcing opportunities — Layer 2 gap-analysis recommender.

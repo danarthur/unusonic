@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T19:56:19.229Z",
+  "generatedAt": "2026-04-30T20:20:17.136Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -51,7 +51,7 @@
     "src/app/(dashboard)/(features)/crm/components/deal-lens.tsx": 1191,
     "src/app/(dashboard)/(features)/crm/components/dispatch-summary.tsx": 642,
     "src/app/(dashboard)/(features)/crm/components/flight-checks/gear-flight-check/gear-item-row.tsx": 427,
-    "src/app/(dashboard)/(features)/crm/components/flight-checks/GearFlightCheck.tsx": 759,
+    "src/app/(dashboard)/(features)/crm/components/flight-checks/GearFlightCheck.tsx": 834,
     "src/app/(dashboard)/(features)/crm/components/follow-up-card.tsx": 856,
     "src/app/(dashboard)/(features)/crm/components/handoff-wizard.tsx": 511,
     "src/app/(dashboard)/(features)/crm/components/lead-source-sheet.tsx": 449,
