@@ -152,7 +152,7 @@ These tables live in `public` because they pre-date the five-schema split. They 
 
 **For the Five-Schema goal:** the grandfathered tables will migrate to `finance` / `ops` in a dedicated project. That migration is **not** part of any feature sprint. When doing feature work, assume they stay where they are.
 
-**Schema source of truth:** `src/types/supabase.ts` only has type coverage for the `public` schema today because the Supabase Dashboard "Exposed schemas" setting does not include `ops / directory / cortex / finance` (verified 2026-04-11). This is why most server actions that query non-public schemas use `(supabase as any).schema('ops')`. Fix tracked as PR 6.5 in `docs/audits/event-walkthrough-2026-04-11-fix-plan.md` §6.0 — do not invent ad-hoc workarounds.
+**Schema source of truth:** `src/types/supabase.ts` covers all six schemas (`public`, `ops`, `finance`, `directory`, `cortex`, `aion`) — PR 6.5 landed 2026-04-29 once the Supabase Dashboard "Exposed schemas" setting was extended to the non-public schemas. Use direct typed calls: `supabase.schema('ops').from('...')`. The historical `(supabase as any).schema(...)` casts have been removed. If you regenerate types after a migration, re-run `npm run db:types`.
 
 ---
 

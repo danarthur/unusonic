@@ -654,6 +654,16 @@ export function StreamCard({
             <div onClick={(e) => e.stopPropagation()}>
               <AionSuggestionRow
                 dealId={item.id}
+                initialSuggestion={
+                  stageSuggestion
+                    ? {
+                        insightId: stageSuggestion.insightId,
+                        title: stageSuggestion.title,
+                        suggestedAction: stageSuggestion.suggestedAction,
+                        targetTag: stageSuggestion.targetTag,
+                      }
+                    : null
+                }
                 onVisibilityChange={setAionSuggestionVisible}
               />
             </div>

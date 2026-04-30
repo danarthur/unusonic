@@ -64,24 +64,41 @@ function tagLabel(tag: string): string {
 
 export function AionSuggestionRow({
   dealId,
+  initialSuggestion = null,
   className,
   onVisibilityChange,
 }: {
   dealId: string;
+  /** Pre-resolved suggestion from a parent batch fetch. When provided the
+   *  component skips its own per-deal server-action call, preventing the
+   *  N+1 cascade where every selected stream-card refetched independently
+   *  through Next's RPC layer + proxy.ts auth overhead. */
+  initialSuggestion?: Suggestion | null;
   className?: string;
   /** Fires when the row's visibility changes — true when a suggestion is
    *  rendered, false when hidden or empty. Lets the host card suppress
    *  redundant follow-up signals above this row. */
   onVisibilityChange?: (visible: boolean) => void;
 }) {
-  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(initialSuggestion);
   const [hidden, setHidden] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState<DismissalReason | null>(null);
   const [rejectText, setRejectText] = useState('');
   const [isPending, startTransition] = useTransition();
 
+  // If the parent provides a pre-resolved suggestion, mirror it into local
+  // state so the row stays in sync if the parent batch refetches. Skip the
+  // self-fetch entirely in that case.
+  const hasInitial = initialSuggestion !== undefined && initialSuggestion !== null;
   useEffect(() => {
+    if (initialSuggestion !== undefined) {
+      setSuggestion(initialSuggestion);
+    }
+  }, [initialSuggestion]);
+
+  useEffect(() => {
+    if (hasInitial) return; // parent already resolved it
     let cancelled = false;
     (async () => {
       const next = await getStageSuggestionForDeal(dealId);
@@ -90,7 +107,7 @@ export function AionSuggestionRow({
     return () => {
       cancelled = true;
     };
-  }, [dealId]);
+  }, [dealId, hasInitial]);
 
   const visible = !!suggestion && !hidden && !!suggestion.targetTag;
 
