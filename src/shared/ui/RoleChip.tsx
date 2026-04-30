@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * RoleChip — Phase 2.4.
  *

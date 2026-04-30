@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * OwedIndicator — the single "what do I owe" line at the top of the card.
  *

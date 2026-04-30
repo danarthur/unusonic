@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * ParticipantAvatars — stacked avatar tile for the collapsed thread row.
  * Shows up to 3 avatars with "+N" overflow chip for any beyond that.
