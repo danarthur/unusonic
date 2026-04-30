@@ -34,12 +34,12 @@ import {
   type GearSource,
 } from '../../actions/event-gear-items';
 import {
-  acceptGearDriftAdd,
   acceptGearDriftQty,
   acceptGearDriftRemove,
   dismissGearDrift,
   getGearDriftForEvent,
 } from '../../actions/gear-drift';
+import { acceptGearDriftAdd } from '../../actions/gear-drift-accept-add';
 import type { GearDriftReport } from '../../actions/gear-drift-types';
 import {
   GEAR_LIFECYCLE_ORDER,

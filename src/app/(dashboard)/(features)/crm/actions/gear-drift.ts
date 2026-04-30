@@ -234,7 +234,7 @@ export async function acceptGearDriftRemove(
   return { success: true };
 }
 
-// Targeted "accept add" lives in ./gear-drift-accept-add.ts to keep this
-// module under the file-size cap. Re-exported via the import path used by
-// GearFlightCheck.tsx.
-export { acceptGearDriftAdd } from './gear-drift-accept-add';
+// Targeted "accept add" lives in ./gear-drift-accept-add.ts — Next.js
+// 'use server' modules cannot re-export from another module, so callers
+// import it directly:
+//   `import { acceptGearDriftAdd } from '.../gear-drift-accept-add'`
