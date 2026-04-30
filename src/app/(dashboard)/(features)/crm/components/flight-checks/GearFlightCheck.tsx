@@ -454,9 +454,17 @@ export function GearFlightCheck({
     }
   }, [eventId, lineageEnabled]);
 
+  // Drift fetches once on mount + when the flag flips. We deliberately do NOT
+  // depend on `items`: gear status clicks, swaps, and kit materialisation
+  // don't change the proposal-vs-gear comparison, and re-running the drift
+  // compute (5 queries internally) on every optimistic update was causing a
+  // cascade that delayed first paint of the Plan tab. The few mutations that
+  // DO need a fresh drift (acceptGearDriftAdd / acceptGearDriftQty /
+  // acceptGearDriftRemove / dismiss) call fetchDrift() explicitly via
+  // handleDriftAction.
   useEffect(() => {
     fetchDrift();
-  }, [fetchDrift, items]);
+  }, [fetchDrift]);
 
   const handleDriftAction = useCallback(async (action: DriftAction) => {
     const key = driftActionKey(action);
