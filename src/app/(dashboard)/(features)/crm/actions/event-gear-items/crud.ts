@@ -16,7 +16,7 @@ import type {
   GearStatus,
   GearHistoryEntry,
 } from '../../components/flight-checks/types';
-import type { EventGearItem, GearSource } from './types';
+import type { EventGearItem, GearLineageSource, GearSource } from './types';
 
 const VALID_GEAR_STATUSES: [string, ...string[]] = [
   'allocated',
@@ -54,7 +54,7 @@ export async function getEventGearItems(
     .schema('ops')
     .from('event_gear_items')
     .select(
-      'id, event_id, name, quantity, status, catalog_package_id, is_sub_rental, sub_rental_supplier_id, department, operator_entity_id, sort_order, history, created_at, source, supplied_by_entity_id, kit_fee',
+      'id, event_id, name, quantity, status, catalog_package_id, is_sub_rental, sub_rental_supplier_id, department, operator_entity_id, sort_order, history, created_at, source, supplied_by_entity_id, kit_fee, proposal_item_id, parent_gear_item_id, lineage_source, is_package_parent, package_instance_id, package_snapshot',
     )
     .eq('event_id', eventId)
     .eq('workspace_id', workspaceId)
@@ -107,6 +107,12 @@ export async function getEventGearItems(
       ? (supplierNameMap.get(row.supplied_by_entity_id as string) ?? null)
       : null,
     kit_fee: row.kit_fee != null ? Number(row.kit_fee) : null,
+    proposal_item_id: (row.proposal_item_id as string | null) ?? null,
+    parent_gear_item_id: (row.parent_gear_item_id as string | null) ?? null,
+    lineage_source: ((row.lineage_source as GearLineageSource | null) ?? 'pm_added') as GearLineageSource,
+    is_package_parent: (row.is_package_parent as boolean) ?? false,
+    package_instance_id: (row.package_instance_id as string | null) ?? null,
+    package_snapshot: (row.package_snapshot as Record<string, unknown> | null) ?? null,
   }));
 }
 

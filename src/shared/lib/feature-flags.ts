@@ -34,6 +34,16 @@ export const FEATURE_FLAGS = {
    * flag only gates Phase 3 UI for rollback safety.
    */
   CRM_UNIFIED_AION_CARD: 'crm.unified_aion_card',
+  /**
+   * Proposal→gear lineage UI (Phase 2b of proposal-gear-lineage-plan-2026-04-29).
+   * When true, GearFlightCheck groups items by `parent_gear_item_id`: bundles
+   * render as collapsible package parents with children indented underneath,
+   * each row carries a lineage chip, and per-row "Detach from package" is
+   * available. When false, the gear card renders the existing flat list.
+   * The handoff sync writer always populates lineage columns regardless —
+   * this flag only gates UI consumption.
+   */
+  CRM_GEAR_LINEAGE_V1: 'crm.gear_lineage_v1',
 } as const satisfies Record<string, FeatureFlagKey>;
 
 export type KnownFeatureFlag = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];

@@ -21,6 +21,7 @@
 
 export type {
   GearSource,
+  GearLineageSource,
   EventGearItem,
   GearAvailability,
   CrewGearMatch,
@@ -47,3 +48,7 @@ export {
 } from './event-gear-items/crew-source';
 
 export { getCrewSourcedEquipmentRollup } from './event-gear-items/rollup';
+
+export { detachGearFromPackage } from './event-gear-items/lineage';
+
+export { getGearLineageEnabled } from './event-gear-items/lineage-flag';

@@ -11,6 +11,9 @@ import type { GearStatus, GearHistoryEntry } from '../../components/flight-check
 
 export type GearSource = 'company' | 'crew' | 'subrental';
 
+/** Provenance of a gear row (proposal-gear-lineage-plan §4.1). */
+export type GearLineageSource = 'proposal' | 'pm_added' | 'pm_swapped' | 'pm_detached';
+
 export type EventGearItem = {
   id: string;
   event_id: string;
@@ -30,6 +33,13 @@ export type EventGearItem = {
   supplied_by_entity_id: string | null;
   supplied_by_name: string | null;
   kit_fee: number | null;
+  // Phase 2 of proposal-gear-lineage-plan: lineage columns
+  proposal_item_id: string | null;
+  parent_gear_item_id: string | null;
+  lineage_source: GearLineageSource;
+  is_package_parent: boolean;
+  package_instance_id: string | null;
+  package_snapshot: Record<string, unknown> | null;
 };
 
 export type GearAvailability = {

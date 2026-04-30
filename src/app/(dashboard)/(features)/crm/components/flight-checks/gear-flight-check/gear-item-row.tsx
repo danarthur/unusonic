@@ -23,7 +23,60 @@ import type { DealCrewRow } from '../../../actions/deal-crew';
 import { DEFAULT_DEPARTMENT } from '../../../lib/department-mapping';
 import { GEAR_LIFECYCLE_ORDER, GEAR_STATUS_LABELS, type GearStatus } from '../types';
 import { OperatorPicker } from './operator-picker';
-import { SOURCE_CHIP_STYLES, getInitials, getLifecycleIndex, isBranchState } from './shared';
+import { SOURCE_CHIP_STYLES, getInitials, getLifecycleIndex, isBranchState, lineageChipFor } from './shared';
+
+type RowMenuContentProps = {
+  isBranch: boolean;
+  canDetach: boolean;
+  onSetStatus: (s: GearStatus) => void;
+  onCloseMenu: () => void;
+  onDetach?: () => void;
+};
+
+function RowMenuContent({ isBranch, canDetach, onSetStatus, onCloseMenu, onDetach }: RowMenuContentProps) {
+  if (isBranch) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSetStatus('allocated')}
+        className="w-full text-left px-3 py-1.5 text-xs text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
+      >
+        Return to allocated
+      </button>
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onSetStatus('quarantine')}
+        className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-unusonic-error)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
+      >
+        Quarantine
+      </button>
+      <button
+        type="button"
+        onClick={() => onSetStatus('sub_rented')}
+        className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-unusonic-warning)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
+      >
+        Sub-rented
+      </button>
+      {canDetach && (
+        <button
+          type="button"
+          onClick={() => {
+            onCloseMenu();
+            onDetach?.();
+          }}
+          className="w-full text-left px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] border-t border-[oklch(1_0_0/0.06)] hover:bg-[oklch(1_0_0_/_0.06)] hover:text-[var(--stage-text-primary)] transition-colors"
+          title="Remove this row from its package on the gear card. Lineage to the proposal is preserved."
+        >
+          Detach from package
+        </button>
+      )}
+    </>
+  );
+}
 
 export type GearItemRowProps = {
   item: EventGearItem;
@@ -42,6 +95,12 @@ export type GearItemRowProps = {
   onOpenOperatorPicker: () => void;
   onAssignOperator: (entityId: string | null) => void;
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /** Phase 2b lineage view: render lineage chip + indent for children. */
+  lineageEnabled?: boolean;
+  /** Phase 2b lineage view: indent children under their package parent. */
+  indented?: boolean;
+  /** Phase 2b lineage view: handler for "Detach from package" — only shown when defined and the row has a parent. */
+  onDetach?: () => void;
 };
 
 export function GearItemRow({
@@ -61,8 +120,13 @@ export function GearItemRow({
   onOpenOperatorPicker,
   onAssignOperator,
   onOpenCrewDetail,
+  lineageEnabled = false,
+  indented = false,
+  onDetach,
 }: GearItemRowProps) {
   const isBranch = isBranchState(item.status);
+  const lineageChip = lineageEnabled ? lineageChipFor(item) : null;
+  const canDetach = lineageEnabled && !!onDetach && item.parent_gear_item_id !== null;
   const lifecycleIdx = isBranch ? -1 : getLifecycleIndex(item.status);
   const isTerminal = item.status === 'returned';
   const menuRef = useRef<HTMLDivElement>(null);
@@ -107,7 +171,7 @@ export function GearItemRow({
   return (
     <div>
       <div
-        className={`flex items-center gap-3 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0 ${isBranch ? 'text-[var(--stage-text-secondary)]' : ''}`}
+        className={`flex items-center gap-3 py-2 border-b border-[oklch(1_0_0_/_0.05)] last:border-0 ${isBranch ? 'text-[var(--stage-text-secondary)]' : ''} ${indented ? 'pl-6' : ''}`}
       >
         {/* Name + quantity */}
         <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -168,6 +232,16 @@ export function GearItemRow({
             </span>
           );
         })()}
+
+        {/* Lineage chip — Phase 2b. Shown only when the lineage view is on. */}
+        {lineageChip && (
+          <span
+            className={`shrink-0 stage-badge-text tracking-tight px-2 py-0.5 rounded-full ${lineageChip.bg} ${lineageChip.text}`}
+            title={lineageChip.tooltip}
+          >
+            {lineageChip.label}
+          </span>
+        )}
 
         {/* Crew match suggestion — only for company-sourced items with matches */}
         {item.source === 'company' && crewMatchesForItem && crewMatchesForItem.length > 0 && (
@@ -306,32 +380,13 @@ export function GearItemRow({
                   background: 'var(--ctx-dropdown, var(--stage-surface-raised))',
                 }}
               >
-                {isBranch ? (
-                  <button
-                    type="button"
-                    onClick={() => onSetStatus('allocated')}
-                    className="w-full text-left px-3 py-1.5 text-xs text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
-                  >
-                    Return to allocated
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus('quarantine')}
-                      className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-unusonic-error)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
-                    >
-                      Quarantine
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus('sub_rented')}
-                      className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-unusonic-warning)] hover:bg-[oklch(1_0_0_/_0.06)] transition-colors"
-                    >
-                      Sub-rented
-                    </button>
-                  </>
-                )}
+                <RowMenuContent
+                  isBranch={isBranch}
+                  canDetach={canDetach}
+                  onSetStatus={onSetStatus}
+                  onCloseMenu={onCloseMenu}
+                  onDetach={onDetach}
+                />
               </div>,
               document.body,
             )}

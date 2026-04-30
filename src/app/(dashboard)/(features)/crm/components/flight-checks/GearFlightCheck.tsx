@@ -21,8 +21,10 @@ import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import {
   assignGearOperator,
   batchGetGearAvailability,
+  detachGearFromPackage,
   getCrewEquipmentMatchesForEvent,
   getEventGearItems,
+  getGearLineageEnabled,
   sourceGearFromCrew,
   updateGearItemStatus,
   type CrewGearMatch,
@@ -42,12 +44,15 @@ import {
 } from '@/features/talent-management/api/kit-template-actions';
 import { DepartmentSection } from './gear-flight-check/department-section';
 import { GearItemRow } from './gear-flight-check/gear-item-row';
+import { PackageParentRow } from './gear-flight-check/package-parent-row';
 import { SourcingBanner } from './gear-flight-check/sourcing-banner';
 import {
   SOURCE_CHIP_STYLES,
+  buildLineageNodes,
   getLifecycleIndex,
   isBranchState,
   type DepartmentGearGroup,
+  type LineageNode,
 } from './gear-flight-check/shared';
 
 // =============================================================================
@@ -66,6 +71,15 @@ type GearFlightCheckProps = {
   /** Called when the supplier chip on a crew-sourced item is clicked.
    *  Plan-lens opens the Crew Hub detail rail in response. */
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /**
+   * Phase 2b: when true, render the proposal-gear lineage tree (collapsible
+   * package parents with children nested underneath, lineage chips, detach
+   * action). When false, render the existing department-grouped flat list.
+   * Gated by the `crm.gear_lineage_v1` workspace feature flag — left
+   * undefined to let the component resolve the flag itself, set to a boolean
+   * to override (tests, storybook, parent-driven force).
+   */
+  lineageEnabled?: boolean;
 };
 
 // =============================================================================
@@ -80,8 +94,11 @@ export function GearFlightCheck({
   onUpdated,
   userName = 'You',
   onOpenCrewDetail,
+  lineageEnabled: lineageOverride,
 }: GearFlightCheckProps) {
   const [items, setItems] = useState<EventGearItem[]>([]);
+  const [resolvedLineageFlag, setResolvedLineageFlag] = useState<boolean | null>(null);
+  const lineageEnabled = lineageOverride ?? resolvedLineageFlag ?? false;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<Map<string, GearAvailability>>(new Map());
@@ -91,6 +108,7 @@ export function GearFlightCheck({
   const [updating, setUpdating] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [operatorPickerOpen, setOperatorPickerOpen] = useState<string | null>(null);
   const [sourcingBannerOpen, setSourcingBannerOpen] = useState(false);
 
@@ -116,6 +134,23 @@ export function GearFlightCheck({
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  // Resolve the workspace's lineage flag once on mount. The prop overrides
+  // when defined (tests/storybook); otherwise the component asks the server.
+  useEffect(() => {
+    if (lineageOverride !== undefined) return;
+    let cancelled = false;
+    getGearLineageEnabled()
+      .then((enabled) => {
+        if (!cancelled) setResolvedLineageFlag(enabled);
+      })
+      .catch(() => {
+        if (!cancelled) setResolvedLineageFlag(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lineageOverride]);
 
   // ── Fetch availability after items load ─────────────────────────────────────
 
@@ -339,6 +374,40 @@ export function GearFlightCheck({
     });
   };
 
+  // Phase 2b lineage view ─────────────────────────────────────────────────────
+  // Tree assembled from flat items; only consumed when `lineageEnabled` is on.
+  const lineageNodes = useMemo<LineageNode[]>(
+    () => (lineageEnabled ? buildLineageNodes(items) : []),
+    [items, lineageEnabled],
+  );
+
+  const toggleParent = (parentId: string) => {
+    setCollapsedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  };
+
+  const handleDetach = useCallback(async (itemId: string) => {
+    // Optimistic: drop the parent link locally so the row pops out of its bundle.
+    setItems((prev) =>
+      prev.map((row) =>
+        row.id === itemId
+          ? { ...row, parent_gear_item_id: null, lineage_source: 'pm_detached' as const }
+          : row,
+      ),
+    );
+    const result = await detachGearFromPackage(itemId);
+    if (!result.success) {
+      // Revert on failure.
+      fetchItems();
+      return;
+    }
+    onUpdated?.();
+  }, [fetchItems, onUpdated]);
+
   // ── Loading state ───────────────────────────────────────────────────────────
 
   if (loading) {
@@ -398,8 +467,34 @@ export function GearFlightCheck({
 
   // ── Main render ─────────────────────────────────────────────────────────────
 
-  // If only one department, skip the collapsible grouping and show flat list
+  // If only one department, skip the collapsible grouping and show flat list.
+  // (Only consulted when lineageEnabled is off.)
   const useFlatList = departmentGroups.length === 1;
+
+  /** Renders one GearItemRow with all the parent's optimistic-update wiring. */
+  const renderItemRow = (item: EventGearItem, opts?: { indented?: boolean }) => (
+    <GearItemRow
+      item={item}
+      updating={updating === item.id}
+      menuOpen={menuOpen === item.id}
+      availability={item.catalog_package_id ? availability.get(item.catalog_package_id) : undefined}
+      operatorPickerOpen={operatorPickerOpen === item.id}
+      crewRows={crewRows}
+      crewMatchesForItem={crewMatches[item.id]}
+      sourcingItem={sourcing === item.id}
+      onSourceFromCrew={(entityId) => handleSourceFromCrew(item.id, entityId)}
+      onAdvance={() => advanceItem(item.id)}
+      onSetStatus={(s) => setItemStatus(item.id, s)}
+      onToggleMenu={() => setMenuOpen(menuOpen === item.id ? null : item.id)}
+      onCloseMenu={() => setMenuOpen(null)}
+      onOpenOperatorPicker={() => setOperatorPickerOpen(operatorPickerOpen === item.id ? null : item.id)}
+      onAssignOperator={(entityId) => handleAssignOperator(item.id, entityId)}
+      onOpenCrewDetail={onOpenCrewDetail}
+      lineageEnabled={lineageEnabled}
+      indented={opts?.indented ?? false}
+      onDetach={lineageEnabled ? () => handleDetach(item.id) : undefined}
+    />
+  );
 
   return (
     <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
@@ -440,8 +535,67 @@ export function GearFlightCheck({
         onSourceFromCrew={handleSourceFromCrew}
       />
 
+      {/* Lineage tree (Phase 2b) — flat parent/child structure, no department grouping */}
+      {lineageEnabled && (
+        <ul className="space-y-1">
+          <AnimatePresence initial={false}>
+            {lineageNodes.map((node) => {
+              if (node.kind === 'parent') {
+                const collapsed = collapsedParents.has(node.row.id);
+                return (
+                  <motion.li
+                    key={node.row.id}
+                    layout
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={STAGE_LIGHT}
+                    className="overflow-hidden"
+                  >
+                    <PackageParentRow
+                      parent={node.row}
+                      childItems={node.children}
+                      collapsed={collapsed}
+                      onToggle={() => toggleParent(node.row.id)}
+                    />
+                    <AnimatePresence initial={false}>
+                      {!collapsed && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={STAGE_LIGHT}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          {node.children.map((child) => (
+                            <div key={child.id}>{renderItemRow(child, { indented: true })}</div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.li>
+                );
+              }
+              return (
+                <motion.li
+                  key={node.row.id}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={STAGE_LIGHT}
+                  className="overflow-hidden"
+                >
+                  {renderItemRow(node.row)}
+                </motion.li>
+              );
+            })}
+          </AnimatePresence>
+        </ul>
+      )}
+
       {/* Flat list (single department) */}
-      {useFlatList && (
+      {!lineageEnabled && useFlatList && (
         <ul className="space-y-1">
           <AnimatePresence initial={false}>
             {items.map((item) => (
@@ -454,24 +608,7 @@ export function GearFlightCheck({
                 transition={STAGE_LIGHT}
                 className="overflow-hidden"
               >
-                <GearItemRow
-                  item={item}
-                  updating={updating === item.id}
-                  menuOpen={menuOpen === item.id}
-                  availability={item.catalog_package_id ? availability.get(item.catalog_package_id) : undefined}
-                  operatorPickerOpen={operatorPickerOpen === item.id}
-                  crewRows={crewRows}
-                  crewMatchesForItem={crewMatches[item.id]}
-                  sourcingItem={sourcing === item.id}
-                  onSourceFromCrew={(entityId) => handleSourceFromCrew(item.id, entityId)}
-                  onAdvance={() => advanceItem(item.id)}
-                  onSetStatus={(s) => setItemStatus(item.id, s)}
-                  onToggleMenu={() => setMenuOpen(menuOpen === item.id ? null : item.id)}
-                  onCloseMenu={() => setMenuOpen(null)}
-                  onOpenOperatorPicker={() => setOperatorPickerOpen(operatorPickerOpen === item.id ? null : item.id)}
-                  onAssignOperator={(entityId) => handleAssignOperator(item.id, entityId)}
-                  onOpenCrewDetail={onOpenCrewDetail}
-                />
+                {renderItemRow(item)}
               </motion.li>
             ))}
           </AnimatePresence>
@@ -479,7 +616,7 @@ export function GearFlightCheck({
       )}
 
       {/* Department-grouped list */}
-      {!useFlatList &&
+      {!lineageEnabled && !useFlatList &&
         departmentGroups.map((group) => {
           const isCollapsed = collapsedDepts.has(group.department);
           // Crew avatars for this department

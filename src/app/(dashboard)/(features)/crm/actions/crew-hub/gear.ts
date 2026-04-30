@@ -16,6 +16,48 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { addGearItem, type EventGearItem } from '../event-gear-items';
 import type { CrewOwnedKit } from './types';
 
+function coreFieldsFrom(r: Record<string, unknown>) {
+  return {
+    id: r.id as string,
+    event_id: r.event_id as string,
+    name: r.name as string,
+    quantity: r.quantity as number,
+    status: r.status as EventGearItem['status'],
+    catalog_package_id: (r.catalog_package_id as string | null) ?? null,
+    is_sub_rental: Boolean(r.is_sub_rental),
+    sub_rental_supplier_id: (r.sub_rental_supplier_id as string | null) ?? null,
+    department: (r.department as string | null) ?? null,
+    operator_entity_id: (r.operator_entity_id as string | null) ?? null,
+    sort_order: (r.sort_order as number) ?? 0,
+    history: (r.history as EventGearItem['history']) ?? [],
+    created_at: r.created_at as string,
+  };
+}
+
+function sourceFieldsFrom(r: Record<string, unknown>) {
+  return {
+    source: (r.source as EventGearItem['source']) ?? 'company',
+    supplied_by_entity_id: (r.supplied_by_entity_id as string | null) ?? null,
+    supplied_by_name: null,
+    kit_fee: r.kit_fee != null ? Number(r.kit_fee) : null,
+  };
+}
+
+function lineageFieldsFrom(r: Record<string, unknown>) {
+  return {
+    proposal_item_id: (r.proposal_item_id as string | null) ?? null,
+    parent_gear_item_id: (r.parent_gear_item_id as string | null) ?? null,
+    lineage_source: (r.lineage_source as EventGearItem['lineage_source']) ?? 'pm_added',
+    is_package_parent: Boolean(r.is_package_parent),
+    package_instance_id: (r.package_instance_id as string | null) ?? null,
+    package_snapshot: (r.package_snapshot as Record<string, unknown> | null) ?? null,
+  };
+}
+
+function rowToCrewSuppliedGear(r: Record<string, unknown>): EventGearItem {
+  return { ...coreFieldsFrom(r), ...sourceFieldsFrom(r), ...lineageFieldsFrom(r) };
+}
+
 // =============================================================================
 // getCrewSuppliedGear — items this crew member is bringing to this event
 //
@@ -41,7 +83,7 @@ export async function getCrewSuppliedGear(input: {
       .schema('ops')
       .from('event_gear_items')
       .select(
-        'id, event_id, name, quantity, status, catalog_package_id, is_sub_rental, sub_rental_supplier_id, department, operator_entity_id, sort_order, history, created_at, source, supplied_by_entity_id, kit_fee',
+        'id, event_id, name, quantity, status, catalog_package_id, is_sub_rental, sub_rental_supplier_id, department, operator_entity_id, sort_order, history, created_at, source, supplied_by_entity_id, kit_fee, proposal_item_id, parent_gear_item_id, lineage_source, is_package_parent, package_instance_id, package_snapshot',
       )
       .eq('event_id', parsed.data.eventId)
       .eq('workspace_id', workspaceId)
@@ -59,25 +101,7 @@ export async function getCrewSuppliedGear(input: {
 
     // supplied_by_name is enriched at the UI layer when needed — we already
     // know the name in the rail.
-    return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-      id: r.id as string,
-      event_id: r.event_id as string,
-      name: r.name as string,
-      quantity: r.quantity as number,
-      status: r.status as EventGearItem['status'],
-      catalog_package_id: (r.catalog_package_id as string | null) ?? null,
-      is_sub_rental: Boolean(r.is_sub_rental),
-      sub_rental_supplier_id: (r.sub_rental_supplier_id as string | null) ?? null,
-      department: (r.department as string | null) ?? null,
-      operator_entity_id: (r.operator_entity_id as string | null) ?? null,
-      sort_order: (r.sort_order as number) ?? 0,
-      history: (r.history as EventGearItem['history']) ?? [],
-      created_at: r.created_at as string,
-      source: (r.source as EventGearItem['source']) ?? 'company',
-      supplied_by_entity_id: (r.supplied_by_entity_id as string | null) ?? null,
-      supplied_by_name: null,
-      kit_fee: r.kit_fee != null ? Number(r.kit_fee) : null,
-    }));
+    return ((data ?? []) as Record<string, unknown>[]).map(rowToCrewSuppliedGear);
   } catch (err) {
     Sentry.captureException(err, { tags: { module: 'crm', action: 'getCrewSuppliedGear' } });
     return [];
