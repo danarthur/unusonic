@@ -30,8 +30,10 @@ import { getSystemClient } from '@/shared/api/supabase/system';
 import { logAccess, type ClientPortalAction } from './audit';
 import { checkRateLimit } from './rate-limit';
 import { requireStepUp, type StepUpDenial } from './step-up';
-import type { SpecialMomentLabel } from '@/features/ops/lib/dj-prep-schema';
-import type { ClientSongTier } from '@/features/client-portal/lib/client-songs';
+import type {
+  SpecialMomentLabel,
+  ClientSongTier,
+} from '@/shared/types/song-tiers';
 
 /* ── Result shape ────────────────────────────────────────────────── */
 

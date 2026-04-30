@@ -1,5 +1,8 @@
 /* ── V2 Types ───────────────────────────────────────────────────── */
 
+import type { SpecialMomentLabel } from '@/shared/types/song-tiers';
+export type { SpecialMomentLabel };
+
 /**
  * Tier of a song in the pool.
  *
@@ -21,35 +24,6 @@ export type SongTier =
   | 'play_if_possible'
   | 'do_not_play'
   | 'special_moment';
-
-/**
- * Structured label for program moments — used by BOTH the couple's
- * `special_moment` tier sub-label AND the DJ's acknowledgement moment
- * label (see `acknowledged_moment_label` below and §0 A2).
- *
- * **Unified on 2026-04-10** — the initial slice-5 migration used a
- * narrower 7-value list but the slice-6 DJ acknowledgement work required
- * the broader reception-program vocabulary (entrance, dinner, cake_cut,
- * dance_floor). Both RPCs now validate against this same 11-value set
- * so the two sides of the workflow can never drift.
- *
- * Fixed allow-list — every RPC that accepts a moment label validates
- * against this set. Any value outside is rejected with
- * `reason: 'invalid_special_moment_label'` (couple side) or
- * `reason: 'invalid_moment_label'` (DJ side).
- */
-export type SpecialMomentLabel =
-  | 'first_dance'
-  | 'parent_dance_1'
-  | 'parent_dance_2'
-  | 'processional'
-  | 'recessional'
-  | 'last_dance'
-  | 'entrance'
-  | 'dinner'
-  | 'cake_cut'
-  | 'dance_floor'
-  | 'other';
 
 /**
  * Who added a song to the pool.

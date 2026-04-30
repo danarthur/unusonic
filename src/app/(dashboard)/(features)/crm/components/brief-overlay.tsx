@@ -101,7 +101,7 @@ export function BriefOverlay({ eventId, open, onClose }: BriefOverlayProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={STAGE_MEDIUM}
-        className="fixed inset-0 z-50 bg-black/40"
+        className="fixed inset-0 z-50 bg-[var(--stage-scrim)]"
         onClick={onClose}
       />
       <motion.div

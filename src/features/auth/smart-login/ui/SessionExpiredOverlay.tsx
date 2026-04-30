@@ -24,7 +24,7 @@
  *   primitives. The hand-rolled `bg-[oklch(...)]` / `ring-ring/30` patterns
  *   called out in the 2026-04-18 design audit are gone.
  *
- * @module shared/ui/overlays/SessionExpiredOverlay
+ * @module features/auth/smart-login/ui/SessionExpiredOverlay
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -38,7 +38,7 @@ import {
   sendMagicLinkAction,
   sendOtpAction,
   verifyOtpAction,
-} from '@/features/auth/smart-login/api/actions';
+} from '../api/actions';
 import { createClient } from '@/shared/api/supabase/client';
 import { getQueryClient } from '@/shared/api/query-client';
 import { STAGE_HEAVY, STAGE_MEDIUM } from '@/shared/lib/motion-constants';

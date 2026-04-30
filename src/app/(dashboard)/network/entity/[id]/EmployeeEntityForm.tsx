@@ -43,7 +43,7 @@ import { AvatarUpload } from '@/features/team-invite/ui/AvatarUpload';
 import { deployInvites } from '@/features/team-invite/api/actions';
 import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
-import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
+import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { AccordionSection } from './entity-studio-panels';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import type { CrewSkillDTO, SkillLevel } from '@/entities/talent';

@@ -5,7 +5,7 @@
  * these types are consumed by three separate slices:
  *   - `/claim/[token]` surface (features/network + widgets/onboarding)
  *   - Login state machine (features/auth/smart-login) — wired in Phase 4
- *   - Session-expired overlay (shared/ui/overlays) — wired in Phase 4
+ *   - Session-expired overlay (features/auth/smart-login/ui) — wired in Phase 4
  *
  * Frozen spec: `docs/reference/login-redesign-implementation-plan.md`
  * §"Connector types" (2026-04-18).

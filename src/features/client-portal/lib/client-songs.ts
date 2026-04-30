@@ -25,23 +25,8 @@ import type {
   SpecialMomentLabel,
 } from '@/features/ops/lib/dj-prep-schema';
 import { normalizeSongEntry } from '@/features/ops/lib/dj-prep-schema';
-
-/**
- * Tier vocabulary the couple can use. `cued` is DJ-only and is NEVER
- * projected to the couple — entries with `tier='cued'` are filtered out
- * of the client-safe projection by `toClientSongRequests()`. The couple
- * sees the promoted entry's previous tier (or the acknowledgement
- * moment label) instead.
- *
- * `special_moment` is accepted on both sides — it's the structured
- * "first dance / parent dance / etc." entry point (B1). See
- * `SpecialMomentLabel` on the schema side for the fixed allow-list.
- */
-export type ClientSongTier =
-  | 'must_play'
-  | 'play_if_possible'
-  | 'do_not_play'
-  | 'special_moment';
+import type { ClientSongTier } from '@/shared/types/song-tiers';
+export type { ClientSongTier };
 
 /**
  * The only song fields the couple ever sees. Explicitly excluded from

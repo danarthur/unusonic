@@ -18,7 +18,7 @@ import { PreferencesProvider } from "@/shared/ui/providers/PreferencesContext";
 import { SystemHeartProvider } from "@/shared/ui/providers/SystemHeartContext";
 import { InactivityLogoutProvider } from "@/shared/ui/providers/InactivityLogoutProvider";
 import { AuthGuard } from "@/shared/ui/providers/AuthGuard";
-import { SessionExpiredOverlay } from "@/shared/ui/overlays/SessionExpiredOverlay";
+import { SessionExpiredOverlay } from "@/features/auth/smart-login/ui/SessionExpiredOverlay";
 import { DensitySync } from "@/shared/ui/layout/DensitySync";
 import { SoundProvider } from "@/shared/ui/providers/SoundProvider";
 import { PasskeyNudgeBanner } from "@/widgets/passkey-nudge-banner/PasskeyNudgeBanner";

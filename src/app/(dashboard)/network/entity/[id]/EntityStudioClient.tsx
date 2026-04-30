@@ -36,7 +36,7 @@ import { PersonEntityForm } from './PersonEntityForm';
 import { CoupleEntityForm } from './CoupleEntityForm';
 import { AccordionSection, AssignmentsPanel, DealsPanel, FinancePanel } from './entity-studio-panels';
 import { VenueSpecsEditor } from './VenueSpecsEditor';
-import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
+import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { ColorTuner } from '@/features/org-identity';
 import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';

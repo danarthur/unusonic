@@ -81,21 +81,22 @@ export function AionSuggestionRow({
   onVisibilityChange?: (visible: boolean) => void;
 }) {
   const [suggestion, setSuggestion] = useState<Suggestion | null>(initialSuggestion);
+  const [prevInitial, setPrevInitial] = useState(initialSuggestion);
   const [hidden, setHidden] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState<DismissalReason | null>(null);
   const [rejectText, setRejectText] = useState('');
   const [isPending, startTransition] = useTransition();
 
-  // If the parent provides a pre-resolved suggestion, mirror it into local
-  // state so the row stays in sync if the parent batch refetches. Skip the
-  // self-fetch entirely in that case.
+  // Mirror prop changes into local state at render time when the parent
+  // batch refetches. React's recommended "adjusting state during render"
+  // pattern — avoids the cascading-render cost of doing this in useEffect.
+  if (initialSuggestion !== prevInitial) {
+    setPrevInitial(initialSuggestion);
+    setSuggestion(initialSuggestion);
+  }
+
   const hasInitial = initialSuggestion !== undefined && initialSuggestion !== null;
-  useEffect(() => {
-    if (initialSuggestion !== undefined) {
-      setSuggestion(initialSuggestion);
-    }
-  }, [initialSuggestion]);
 
   useEffect(() => {
     if (hasInitial) return; // parent already resolved it

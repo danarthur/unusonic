@@ -632,6 +632,17 @@
   --text-label--line-height: 14px;
   --text-field-label: 11px;
   --text-field-label--line-height: 14px;
+
+  /* ── Modal scrim ── Canonical backdrop color for portaled modal/sheet
+     backdrops. One opacity, applied via inline style or var() — distinct
+     from the .stage-scrim utility which also positions the element. */
+  --stage-scrim: oklch(0.06 0 0 / 0.5);
+
+  /* ── Third-party brand colors ── Hex preserved (brand recognition).
+     Used for streaming-service Connect buttons and brand glyphs. */
+  --brand-spotify-green: #1DB954;
+  --brand-spotify-green-hover: #1ed760;
+  --brand-apple-music-red: #FC3C44;
 }
 
 /* ── DENSITY TIER: SPACIOUS ── Warm, generous, inviting. The first impression. */

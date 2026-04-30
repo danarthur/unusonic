@@ -147,7 +147,7 @@ export function SpotifyPlaylistSection({
   return (
     <div className="flex flex-col gap-3 p-4 rounded-xl bg-[var(--stage-surface-elevated)]" data-surface="elevated">
       <h4 className="text-xs font-medium uppercase tracking-wider text-[var(--stage-text-secondary)] flex items-center gap-2">
-        <SpotifyIcon className="size-3.5 text-[#1DB954]" />
+        <SpotifyIcon className="size-3.5 text-[var(--brand-spotify-green)]" />
         Spotify
       </h4>
 
@@ -160,7 +160,7 @@ export function SpotifyPlaylistSection({
           <button
             onClick={handleConnect}
             disabled={isPending}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-xs font-medium bg-[#1DB954] text-[oklch(1_0_0)] hover:bg-[#1ed760] transition-colors disabled:opacity-[0.45]"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-xs font-medium bg-[var(--brand-spotify-green)] text-[oklch(1_0_0)] hover:bg-[var(--brand-spotify-green-hover)] transition-colors disabled:opacity-[0.45]"
           >
             {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <SpotifyIcon className="size-3.5" />}
             Connect Spotify

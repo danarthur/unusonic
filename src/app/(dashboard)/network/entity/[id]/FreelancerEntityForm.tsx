@@ -10,7 +10,7 @@ import { Input } from '@/shared/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
-import { EntityDocumentsCard } from '@/entities/directory/ui/entity-documents-card';
+import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { AccordionSection } from './entity-studio-panels';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { softDeleteGhostRelationship } from '@/features/network-data';

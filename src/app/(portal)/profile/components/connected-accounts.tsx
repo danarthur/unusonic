@@ -87,7 +87,7 @@ export function ConnectedAccounts({
       {/* Spotify */}
       <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[var(--stage-surface-elevated)]">
         <div className="flex items-center gap-3 min-w-0">
-          <SpotifyIcon className="size-5 text-[#1DB954] shrink-0" />
+          <SpotifyIcon className="size-5 text-[var(--brand-spotify-green)] shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--stage-text-primary)]">Spotify</p>
             {spotifyUserId ? (
@@ -113,7 +113,7 @@ export function ConnectedAccounts({
           <button
             onClick={handleConnectSpotify}
             disabled={isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1DB954] text-[oklch(1_0_0)] hover:bg-[#1ed760] transition-colors disabled:opacity-[0.45]"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--brand-spotify-green)] text-[oklch(1_0_0)] hover:bg-[var(--brand-spotify-green-hover)] transition-colors disabled:opacity-[0.45]"
           >
             {isPending ? <Loader2 className="size-3 animate-spin" /> : <ExternalLink className="size-3" />}
             Connect
@@ -124,7 +124,7 @@ export function ConnectedAccounts({
       {/* Apple Music — placeholder for MusicKit JS integration */}
       <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[var(--stage-surface-elevated)]">
         <div className="flex items-center gap-3 min-w-0">
-          <Music className="size-5 text-[#FC3C44] shrink-0" />
+          <Music className="size-5 text-[var(--brand-apple-music-red)] shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--stage-text-primary)]">Apple Music</p>
             <p className="text-xs text-[var(--stage-text-tertiary)]">

@@ -14,7 +14,7 @@ import { WorkspaceProvider, type WorkspaceRole } from '@/shared/ui/providers/Wor
 import { PreferencesProvider } from '@/shared/ui/providers/PreferencesContext';
 import { PortalProfileProvider } from '@/shared/ui/providers/PortalProfileProvider';
 import { AuthGuard } from '@/shared/ui/providers/AuthGuard';
-import { SessionExpiredOverlay } from '@/shared/ui/overlays/SessionExpiredOverlay';
+import { SessionExpiredOverlay } from '@/features/auth/smart-login/ui/SessionExpiredOverlay';
 import { getAuthFlag } from '@/shared/lib/auth-flags';
 import { InactivityLogoutProvider } from '@/shared/ui/providers/InactivityLogoutProvider';
 import { DensitySync } from '@/shared/ui/layout/DensitySync';
