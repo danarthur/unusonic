@@ -56,6 +56,102 @@ async function resolveEventId(
   return { error: 'No event or deal context. Specify an eventId or dealId, or navigate to a deal/event page.' };
 }
 
+// ── Gear tree helpers (Phase 5a) ─────────────────────────────────────────────
+
+const LOADED_STATUSES = new Set(['loaded', 'on_site', 'returned']);
+
+type AionGearItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  status: string;
+  source: string;
+  supplied_by_name: string | null;
+  lineage_source: string;
+  is_package_parent: boolean;
+  parent_gear_item_id: string | null;
+  package_snapshot: Record<string, unknown> | null;
+};
+
+type AionGearChild = {
+  name: string;
+  quantity: number;
+  status: string;
+  source: string;
+  suppliedBy: string | null;
+  lineageSource: string;
+};
+
+type AionGearPackage = {
+  parentId: string;
+  name: string;
+  kind: 'package' | 'service' | 'unknown';
+  children: AionGearChild[];
+  loaded: number;
+  total: number;
+};
+
+function packageKind(snapshot: Record<string, unknown> | null): AionGearPackage['kind'] {
+  const cat = (snapshot as { category?: string } | null)?.category;
+  if (cat === 'service') return 'service';
+  if (cat === 'package') return 'package';
+  return 'unknown';
+}
+
+function rowToChild(item: AionGearItem): AionGearChild {
+  return {
+    name: item.name,
+    quantity: item.quantity,
+    status: item.status,
+    source: item.source,
+    suppliedBy: item.supplied_by_name,
+    lineageSource: item.lineage_source,
+  };
+}
+
+function buildGearTreeForAion(items: AionGearItem[]): {
+  packages: AionGearPackage[];
+  standalones: AionGearChild[];
+} {
+  const childrenByParent = new Map<string, AionGearItem[]>();
+  for (const item of items) {
+    if (!item.parent_gear_item_id) continue;
+    const list = childrenByParent.get(item.parent_gear_item_id) ?? [];
+    list.push(item);
+    childrenByParent.set(item.parent_gear_item_id, list);
+  }
+
+  const packages: AionGearPackage[] = [];
+  const standalones: AionGearChild[] = [];
+  for (const item of items) {
+    if (item.parent_gear_item_id) continue;
+    if (item.is_package_parent) {
+      const kids = childrenByParent.get(item.id) ?? [];
+      packages.push({
+        parentId: item.id,
+        name: item.name,
+        kind: packageKind(item.package_snapshot),
+        children: kids.map(rowToChild),
+        loaded: kids.filter((k) => LOADED_STATUSES.has(k.status)).length,
+        total: kids.length,
+      });
+    } else {
+      standalones.push(rowToChild(item));
+    }
+  }
+  return { packages, standalones };
+}
+
+function summariseGearTotals(items: AionGearItem[]) {
+  return {
+    totalItems: items.length,
+    loaded: items.filter((i) => LOADED_STATUSES.has(i.status)).length,
+    company: items.filter((i) => i.source === 'company').length,
+    crew: items.filter((i) => i.source === 'crew').length,
+    subrental: items.filter((i) => i.source === 'subrental').length,
+  };
+}
+
 // ── Tool factory ──────────────────────────────────────────────────────────────
 
 export function createProductionTools(ctx: AionToolContext) {
@@ -440,6 +536,77 @@ export function createProductionTools(ctx: AionToolContext) {
   });
 
   // ===========================================================================
+  // Group E2: Gear card visibility (Phase 5a of proposal-gear-lineage-plan)
+  //
+  // get_event_gear lets Aion answer "what gear is on this show?" with the
+  // lineage-aware tree (package parents + their children, services + their
+  // materialized kit, loose rentals). compare_proposal_to_gear surfaces the
+  // drift report — "we sold L1 but only loaded 6 of 8 movers" — that powers
+  // the gear_under_delivered evaluator and ad-hoc Aion queries.
+  // ===========================================================================
+
+  const get_event_gear = tool({
+    description: 'Read the gear card for an event — package parents, their decomposed children, service parents with materialized kit, and loose standalone rentals. Use when the user asks "what gear is on Bryan & Jessica" or "is the Lighting package fully loaded". Read-only.',
+    inputSchema: z.object({
+      eventId: z.string().optional().describe('Event ID (resolved from page context if omitted)'),
+      dealId: z.string().optional().describe('Deal ID — looked up to find event_id when no event context'),
+    }),
+    execute: async (params) => {
+      const resolution = await resolveEventId(ctx, params.eventId, params.dealId);
+      if ('error' in resolution) return { error: resolution.error };
+
+      const { getEventGearItems } = await import('@/app/(dashboard)/(features)/crm/actions/event-gear-items');
+      const items = await getEventGearItems(resolution.eventId);
+      const tree = buildGearTreeForAion(items);
+      const totals = summariseGearTotals(items);
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope({ eventId: resolution.eventId, ...tree, totals }, searched);
+    },
+  });
+
+  const compare_proposal_to_gear = tool({
+    description: 'Detect drift between the proposal and the gear card — additions, removals, or quantity changes that have not been materialized into gear yet. Use when the user asks "did the proposal change", "is the gear card up to date", or "we sold L1 but how many movers are loaded". Read-only.',
+    inputSchema: z.object({
+      eventId: z.string().optional().describe('Event ID (resolved from page context if omitted)'),
+      dealId: z.string().optional().describe('Deal ID — looked up to find event_id when no event context'),
+    }),
+    execute: async (params) => {
+      const resolution = await resolveEventId(ctx, params.eventId, params.dealId);
+      if ('error' in resolution) return { error: resolution.error };
+
+      const { getGearDriftForEvent } = await import('@/app/(dashboard)/(features)/crm/actions/gear-drift');
+      const report = await getGearDriftForEvent(resolution.eventId);
+
+      const adds = report.drifts.filter((d) => d.kind === 'add');
+      const removes = report.drifts.filter((d) => d.kind === 'remove');
+      const qty = report.drifts.filter((d) => d.kind === 'qty_change');
+
+      const formatted = report.drifts.map((d) => {
+        if (d.kind === 'add') return { kind: 'add', name: d.name, detail: `Add ${d.expectedQuantity} (${d.shape.replace('_', ' ')})` };
+        if (d.kind === 'remove') return { kind: 'remove', name: d.name, detail: `Remove ${d.quantity} — proposal line is gone` };
+        return { kind: 'qty_change', name: d.name, detail: `Quantity ${d.oldQuantity} → ${d.newQuantity}` };
+      });
+
+      const summaryParts: string[] = [];
+      if (adds.length) summaryParts.push(`${adds.length} add${adds.length === 1 ? '' : 's'}`);
+      if (removes.length) summaryParts.push(`${removes.length} remove${removes.length === 1 ? '' : 's'}`);
+      if (qty.length) summaryParts.push(`${qty.length} qty change${qty.length === 1 ? '' : 's'}`);
+      const summary = summaryParts.length === 0 ? 'in sync' : summaryParts.join(' · ');
+
+      const searched = await getSubstrateCounts(workspaceId);
+      return envelope(
+        {
+          eventId: resolution.eventId,
+          proposalLastChangedAt: report.proposalLastChangedAt,
+          drifts: formatted,
+          summary,
+        },
+        searched,
+      );
+    },
+  });
+
+  // ===========================================================================
   // Group F: Daily brief on demand (Phase 3 §3.9)
   //
   // Chat-callable complement to the lobby Daily Brief and the event-page
@@ -517,6 +684,8 @@ export function createProductionTools(ctx: AionToolContext) {
     record_payment,
     log_expense,
     search_crew_by_equipment,
+    get_event_gear,
+    compare_proposal_to_gear,
     daily_brief_on_demand,
   };
 }
