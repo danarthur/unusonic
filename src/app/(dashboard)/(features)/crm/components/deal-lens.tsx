@@ -536,7 +536,10 @@ export function DealLens({
           />
           {!(aionBundle.enabled && aionBundle.data) && (
             <div className="mt-4">
-              <AionSuggestionRow dealId={deal.id} />
+              <AionSuggestionRow
+                dealId={deal.id}
+                initialSuggestion={dealLensBundle?.stageSuggestion}
+              />
             </div>
           )}
         </StagePanel>

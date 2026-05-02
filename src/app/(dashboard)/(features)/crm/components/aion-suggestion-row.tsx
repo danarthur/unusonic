@@ -64,15 +64,21 @@ function tagLabel(tag: string): string {
 
 export function AionSuggestionRow({
   dealId,
-  initialSuggestion = null,
+  initialSuggestion,
   className,
   onVisibilityChange,
 }: {
   dealId: string;
-  /** Pre-resolved suggestion from a parent batch fetch. When provided the
-   *  component skips its own per-deal server-action call, preventing the
-   *  N+1 cascade where every selected stream-card refetched independently
-   *  through Next's RPC layer + proxy.ts auth overhead. */
+  /** Pre-resolved suggestion from a parent batch fetch. Three meanings:
+   *   - `undefined` (prop omitted) → parent didn't check; the component
+   *     fetches its own suggestion on mount.
+   *   - `null` → parent checked, deal has no actionable suggestion;
+   *     the component renders nothing and skips the per-deal fetch.
+   *   - `Suggestion` → parent checked and resolved one; render directly.
+   *
+   *  Treating `null` as "skip the fetch" is the fix to the per-card N+1
+   *  where the selected stream-card refetched even after the rail's batch
+   *  had already covered it. */
   initialSuggestion?: Suggestion | null;
   className?: string;
   /** Fires when the row's visibility changes — true when a suggestion is
@@ -80,7 +86,9 @@ export function AionSuggestionRow({
    *  redundant follow-up signals above this row. */
   onVisibilityChange?: (visible: boolean) => void;
 }) {
-  const [suggestion, setSuggestion] = useState<Suggestion | null>(initialSuggestion);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(
+    initialSuggestion ?? null,
+  );
   const [prevInitial, setPrevInitial] = useState(initialSuggestion);
   const [hidden, setHidden] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -93,10 +101,13 @@ export function AionSuggestionRow({
   // pattern — avoids the cascading-render cost of doing this in useEffect.
   if (initialSuggestion !== prevInitial) {
     setPrevInitial(initialSuggestion);
-    setSuggestion(initialSuggestion);
+    setSuggestion(initialSuggestion ?? null);
   }
 
-  const hasInitial = initialSuggestion !== undefined && initialSuggestion !== null;
+  // `undefined` means the parent didn't pre-resolve — fall back to a
+  // per-deal fetch. Both `null` and a real Suggestion mean "parent
+  // resolved" and we skip the round-trip.
+  const hasInitial = initialSuggestion !== undefined;
 
   useEffect(() => {
     if (hasInitial) return; // parent already resolved it

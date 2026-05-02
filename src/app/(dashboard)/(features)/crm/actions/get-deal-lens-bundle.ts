@@ -27,6 +27,10 @@ import { getFollowUpForDeal, type FollowUpQueueItem } from './follow-up-actions'
 import { getContractForEvent } from './get-contract-for-event';
 import { getEventLoadDates } from './get-event-summary';
 import {
+  getStageSuggestionForDeal,
+  type StageSuggestion,
+} from './aion-suggestion-actions';
+import {
   getProposalForDeal,
   getProposalHistoryForDeal,
   getProposalPublicUrl,
@@ -43,6 +47,10 @@ export type DealLensBundle = {
   followUp: FollowUpQueueItem | null;
   contract: Awaited<ReturnType<typeof getContractForEvent>>;
   eventDates: { loadIn: string | null; loadOut: string | null };
+  /** Active stage-move suggestion (or null if there isn't one). Folded into
+   *  the bundle so AionSuggestionRow can skip its own per-deal fetch when
+   *  DealLens passes this through as `initialSuggestion`. */
+  stageSuggestion: StageSuggestion | null;
 };
 
 /** Run a fetch with a per-call try/catch so one slow / failing dependency
@@ -71,6 +79,7 @@ export async function getDealLensBundle(
     followUp,
     contract,
     eventDates,
+    stageSuggestion,
   ] = await Promise.all([
     safe('timeline', getDealTimeline(dealId), [] as DealTimelineEntry[]),
     safe('proposal', getProposalForDeal(dealId), null),
@@ -91,6 +100,7 @@ export async function getDealLensBundle(
           loadOut: null,
         })
       : Promise.resolve({ loadIn: null, loadOut: null }),
+    safe('stageSuggestion', getStageSuggestionForDeal(dealId), null),
   ]);
 
   return {
@@ -102,5 +112,6 @@ export async function getDealLensBundle(
     followUp,
     contract,
     eventDates,
+    stageSuggestion,
   };
 }
