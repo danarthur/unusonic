@@ -9,6 +9,7 @@ import {
   getAdvancingChecklist,
   seedAdvancingChecklist,
   toggleAdvancingItem,
+  setAdvancingItemsAutoState,
   addAdvancingItem,
   removeAdvancingItem,
 } from '../actions/advancing-checklist';
@@ -142,36 +143,31 @@ export function AdvancingChecklist({
   const autoStates = computeAutoStates(crewRows, runOfShowData, contractStatus);
 
   const syncAutoStates = useCallback(async () => {
-    let changed = false;
+    // Compute the diff between current item state and the auto-states
+    // derived from crew / contract / logistics in a single pass.
+    const changes: Array<{ itemId: string; done: boolean }> = [];
+    const nowIso = new Date().toISOString();
     const updated = items.map((item) => {
       if (!item.auto_key) return item;
       const key = item.auto_key as AutoKey;
       const autoValue = autoStates[key];
-      if (autoValue !== undefined && autoValue !== item.done) {
-        changed = true;
-        return {
-          ...item,
-          done: autoValue,
-          done_by: autoValue ? 'System' : null,
-          done_at: autoValue ? new Date().toISOString() : null,
-        };
-      }
-      return item;
+      if (autoValue === undefined || autoValue === item.done) return item;
+      changes.push({ itemId: item.id, done: autoValue });
+      return {
+        ...item,
+        done: autoValue,
+        done_by: autoValue ? 'System' : null,
+        done_at: autoValue ? nowIso : null,
+      };
     });
 
-    if (changed) {
-      setItems(updated);
-      // Fire server updates in background
-      for (const item of updated) {
-        if (!item.auto_key) continue;
-        const key = item.auto_key as AutoKey;
-        const autoValue = autoStates[key];
-        const original = items.find((i) => i.id === item.id);
-        if (autoValue !== undefined && original && autoValue !== original.done) {
-          toggleAdvancingItem(eventId, item.id, autoValue, 'System');
-        }
-      }
-    }
+    if (changes.length === 0) return;
+    setItems(updated);
+    // Single read-modify-write on the JSONB column for all flips. Replaces
+    // the prior N parallel toggleAdvancingItem calls (each doing its own
+    // RMW) — fewer round-trips and no last-write-wins race when two auto
+    // toggles flip on the same render.
+    void setAdvancingItemsAutoState(eventId, changes, 'System');
   }, [items, autoStates, eventId]);
 
   useEffect(() => {

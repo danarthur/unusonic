@@ -139,6 +139,46 @@ export async function toggleAdvancingItem(
   return !writeErr;
 }
 
+/**
+ * Apply many auto-state toggles in a single read-modify-write pass. Used by
+ * the checklist's `syncAutoStates` effect when crew/contract/logistics state
+ * shifts cause multiple auto items to flip on the same render — sending a
+ * single batch instead of N parallel toggleAdvancingItem calls (each doing
+ * its own RMW) avoids both the round-trip count and the last-write-wins
+ * race when two toggles land out of order.
+ */
+export async function setAdvancingItemsAutoState(
+  eventId: string,
+  changes: ReadonlyArray<{ itemId: string; done: boolean }>,
+  userName: string,
+): Promise<boolean> {
+  if (!uuidSchema.safeParse(eventId).success) return false;
+  if (changes.length === 0) return true;
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return false;
+
+  const { items, error } = await readChecklist(eventId, workspaceId);
+  if (error) return false;
+
+  const wantById = new Map<string, boolean>();
+  for (const c of changes) wantById.set(c.itemId, c.done);
+  const nowIso = new Date().toISOString();
+
+  const next = items.map((it) => {
+    const want = wantById.get(it.id);
+    if (want === undefined || want === it.done) return it;
+    return {
+      ...it,
+      done: want,
+      done_by: want ? userName : null,
+      done_at: want ? nowIso : null,
+    };
+  });
+
+  const writeErr = await writeChecklist(eventId, workspaceId, next);
+  return !writeErr;
+}
+
 export async function addAdvancingItem(
   eventId: string,
   label: string,

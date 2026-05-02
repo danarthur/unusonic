@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -27,26 +27,35 @@ import { WrapReportCard } from './wrap-report-card';
 import { ClientUpdateStrip } from './client-update-strip';
 import { ShowControlStrip } from './show-control-strip';
 import { PlanVitalsStrip } from './plan-vitals-strip';
-import { getEventLedger, type EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
-import { getGearVariance, type GearVarianceResult } from '../actions/get-gear-variance';
+import type { EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
+import type { GearVarianceResult } from '../actions/get-gear-variance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
 import { RunOfShowIndexCard } from '@/widgets/run-of-show/ui/run-of-show-mini';
 import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
 import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-milestones';
 import { computeReadiness } from '../lib/compute-readiness';
-import { getProposalForDeal, getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
 import type { ProposalWithItems } from '@/features/sales/model/types';
-import { getDealCrew, getDealCrewForEvent, type DealCrewRow } from '../actions/deal-crew';
-import { getEventGearItems, type EventGearItem } from '../actions/event-gear-items';
-import { getEventLoadDates } from '../actions/get-event-summary';
-import { getContractForEvent } from '../actions/get-contract-for-event';
+import type { DealCrewRow } from '../actions/deal-crew';
+import type { EventGearItem } from '../actions/event-gear-items';
 import { updateDealScalars } from '../actions/update-deal-scalars';
+import { getPlanBundle, type PlanBundle } from '../actions/get-plan-bundle';
 import type { EventSummaryForPrism } from '../actions/get-event-summary';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
 import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
 import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
+import { markStart, markEnd, measureAsync } from '@/shared/lib/perf/measure';
+
+// Module-level stable empty references. Using a destructuring default like
+// `data: items = []` recreates the empty array on every render, which kills
+// referential equality for any useEffect/useMemo dep keyed on it.
+const EMPTY_GEAR_ITEMS: EventGearItem[] = [];
+const EMPTY_CREW_ROWS: DealCrewRow[] = [];
+const EMPTY_LOAD_DATES: { loadIn: string | null; loadOut: string | null } = {
+  loadIn: null,
+  loadOut: null,
+};
 
 type PlanLensProps = {
   eventId: string | null;
@@ -83,6 +92,20 @@ export function PlanLens({
   eventSignals = [],
 }: PlanLensProps) {
   const isPostHandoff = !!eventId && !!event;
+
+  // Cold-paint marker: starts when an event/deal id lands, ends once the two
+  // primary blocking fetches (crew + gear) have first resolved. Renders into
+  // <PerfOverlay> as `crm:plan-cold-paint`. Use it to compare branches before
+  // shipping perf-sensitive changes.
+  const coldPaintIdRef = useRef<string | null>(null);
+  const coldPaintEndedRef = useRef(false);
+  useEffect(() => {
+    const id = `${dealId ?? 'no-deal'}|${eventId ?? 'no-event'}`;
+    if (coldPaintIdRef.current === id) return;
+    coldPaintIdRef.current = id;
+    coldPaintEndedRef.current = false;
+    if (dealId || eventId) markStart('crm:plan-cold-paint');
+  }, [dealId, eventId]);
 
   const [handoffWizardOpen, setHandoffWizardOpen] = useState(false);
 
@@ -171,47 +194,73 @@ export function PlanLens({
     }, 800);
   };
 
-  // Crew — shared between pre and post handoff
-  const [crewRows, setCrewRows] = useState<DealCrewRow[]>([]);
-  const [crewLoading, setCrewLoading] = useState(true);
-  const fetchCrew = useCallback(async () => {
-    if (dealId) {
-      const rows = await getDealCrew(dealId);
-      setCrewRows(rows);
-    } else if (eventId) {
-      const rows = await getDealCrewForEvent(eventId);
-      setCrewRows(rows);
-    }
-    setCrewLoading(false);
-  }, [dealId, eventId]);
-  useEffect(() => { fetchCrew(); }, [fetchCrew]);
-
-  // Live gear items from ops.event_gear_items — feeds the readiness ribbon with
-  // the real source of truth instead of the stale event.run_of_show_data.gear_items
-  // JSONB snapshot that only ever gets populated at handoff via
-  // syncGearFromProposalToEvent. Prior behavior: the ribbon's gear counts froze at
-  // handoff and never reflected Gear Flight Check mutations.
-  //
-  // useQuery with placeholderData: keepPreviousData so the OLD event's gear
-  // stays visible during an event swap until the new fetch lands — pairs with
-  // the outer prism DetailPaneTransition (sibling-switch pattern).
-  const { data: gearItemsLive = [], refetch: refetchGearItems } = useQuery<EventGearItem[]>({
-    queryKey: ['plan-lens', 'gear-items', eventId],
-    queryFn: () => (eventId ? getEventGearItems(eventId) : Promise.resolve([])),
-    enabled: !!eventId,
+  // ── Plan tab data bundle ──────────────────────────────────────────────────
+  // Single server-action round-trip that returns gear items, crew, load
+  // dates, contract, ledger, gear variance, proposal, and proposal public
+  // URL. Replaces 8 separate `useQuery` calls that previously ran in
+  // parallel from the client. With the Stream rail also firing per-deal
+  // server actions, the cold-load total was hitting Vercel's serverless
+  // concurrency ceiling and producing ~40% HTTP 503s on production
+  // (network capture 2026-04-30). Bundling collapses the eight client
+  // round-trips into one; the server-side `Promise.all` keeps the same
+  // wall-clock latency. Pattern mirrors `getDealBundle`.
+  const queryClient = useQueryClient();
+  const eventScopedId = eventId ?? deal?.event_id ?? null;
+  const planBundleQueryKey = useMemo(
+    () => ['plan-lens', 'bundle', eventScopedId, dealId] as const,
+    [eventScopedId, dealId],
+  );
+  const {
+    data: bundleData,
+    isLoading: bundleLoading,
+    refetch: refetchBundle,
+  } = useQuery<PlanBundle>({
+    queryKey: planBundleQueryKey,
+    queryFn: () => measureAsync('crm:plan-bundle-fetch', () =>
+      getPlanBundle(eventScopedId, dealId),
+    ),
+    enabled: !!(eventScopedId || dealId),
     placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
-  const fetchGearItems = useCallback(() => {
-    void refetchGearItems();
-  }, [refetchGearItems]);
+
+  const bundle = bundleData;
+  const gearItemsLive = bundle?.gearItems ?? EMPTY_GEAR_ITEMS;
+  const crewRows = bundle?.crew ?? EMPTY_CREW_ROWS;
+  const eventDates = bundle?.loadDates ?? EMPTY_LOAD_DATES;
+  const contract = bundle?.contract ?? null;
+  const ledger: EventLedgerDTO | null = bundle?.ledger ?? null;
+  const gearVariance: GearVarianceResult | null = bundle?.gearVariance ?? null;
+  const initialProposal: ProposalWithItems | null | undefined = bundleLoading
+    ? undefined
+    : bundle?.proposal ?? null;
+  const publicProposalUrl = bundle?.proposalPublicUrl ?? null;
+
+  // Mutation refresh path — invalidates the bundle so the next read pulls a
+  // fresh snapshot. Replaces the prior `fetchCrew + fetchGearItems` fan-out.
+  const refreshBundle = useCallback(() => {
+    void refetchBundle();
+  }, [refetchBundle]);
+  const fetchCrew = refreshBundle;
+  const fetchGearItems = refreshBundle;
+
+  // Cold-paint end: bundle resolved → blocking data is in hand. Ambient
+  // panels (notes, captures, run-of-show index) continue loading silently.
+  useEffect(() => {
+    if (coldPaintEndedRef.current) return;
+    if (!coldPaintIdRef.current) return;
+    if (bundleLoading) return;
+    coldPaintEndedRef.current = true;
+    markEnd('crm:plan-cold-paint');
+  }, [bundleLoading]);
 
   const handleCrewUpdated = () => {
-    fetchCrew();
-    fetchGearItems();
+    refreshBundle();
     onEventUpdated?.();
   };
 
-  // Self-fetch proposal data for timeline + budget
+  // Derived proposal snapshot for the timeline / financial summary.
   type ProposalSnapshot = {
     total: number | null;
     signedAt: string | null;
@@ -225,86 +274,31 @@ export function PlanLens({
     updatedAt: string | null;
     firstViewedAt: string | null;
   };
-  const [proposalData, setProposalData] = useState<ProposalSnapshot | null>(null);
-
-  // Full proposal for read-only receipt + contract reference
-  const [initialProposal, setInitialProposal] = useState<ProposalWithItems | null | undefined>(undefined);
-  const [publicProposalUrl, setPublicProposalUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!dealId) return;
-    let cancelled = false;
-    getProposalForDeal(dealId).then((p) => {
-      if (cancelled) return;
-      setInitialProposal(p);
-      if (!p) { setProposalData(null); return; }
-      const total = (p.items ?? []).reduce((sum, item) => {
-        if ((item as { is_optional?: boolean }).is_optional) return sum;
-        const price = (item as { override_price?: number | null }).override_price ?? Number(item.unit_price ?? 0);
-        return sum + (item.quantity ?? 1) * price;
-      }, 0);
-      setProposalData({
-        total,
-        signedAt: p.signed_at ?? null,
-        acceptedAt: p.accepted_at ?? null,
-        depositPercent: p.deposit_percent ?? null,
-        depositPaidAt: p.deposit_paid_at ?? null,
-        depositDeadlineDays: (p as unknown as Record<string, unknown>).deposit_deadline_days as number | null ?? null,
-        paymentDueDays: p.payment_due_days ?? null,
-        hasItems: (p.items ?? []).length > 0,
-        status: p.status ?? null,
-        updatedAt: p.updated_at ?? null,
-        firstViewedAt: (p as unknown as Record<string, unknown>).first_viewed_at as string | null ?? null,
-      });
-    });
-    // Public proposal URL for "View signed proposal" link
-    getProposalPublicUrl(dealId).then((url) => { if (!cancelled) setPublicProposalUrl(url); });
-    return () => { cancelled = true; };
-  }, [dealId]);
-
-  // Event-scoped reads — useQuery with keepPreviousData so the OLD event's
-  // contract / load dates / ledger stay visible while the new fetch resolves.
-  // Combined with the outer prism DetailPaneTransition this delivers the
-  // sibling-switch hold pattern called out in the load-time strategy doc.
-  const eventScopedId = eventId ?? deal?.event_id ?? null;
-
-  const { data: contract = null } = useQuery<Awaited<ReturnType<typeof getContractForEvent>>>({
-    queryKey: ['plan-lens', 'contract', eventScopedId],
-    queryFn: () => (eventScopedId ? getContractForEvent(eventScopedId) : Promise.resolve(null)),
-    enabled: !!eventScopedId,
-    placeholderData: keepPreviousData,
-  });
-
-  const { data: eventDates = { loadIn: null, loadOut: null } } = useQuery<{ loadIn: string | null; loadOut: string | null }>({
-    queryKey: ['plan-lens', 'event-load-dates', eventScopedId],
-    queryFn: () => (eventScopedId ? getEventLoadDates(eventScopedId) : Promise.resolve({ loadIn: null, loadOut: null })),
-    enabled: !!eventScopedId,
-    placeholderData: keepPreviousData,
-  });
-
-  const { data: ledger = null } = useQuery<EventLedgerDTO | null>({
-    queryKey: ['plan-lens', 'ledger', eventScopedId],
-    queryFn: () => (eventScopedId ? getEventLedger(eventScopedId) : Promise.resolve(null)),
-    enabled: !!eventScopedId,
-    placeholderData: keepPreviousData,
-  });
-
-  // Phase 5c of the proposal→gear lineage plan: gear margin (sold vs planned)
-  // surfaced as a tier on FinancialSummaryCard.
-  //
-  // Caching tuned to avoid compounding the Plan tab's already-busy network
-  // (100+ parallel fetches in dev mode). Variance is a derived figure — it
-  // doesn't need to refetch every window focus or visibility change. Drift
-  // accept actions invalidate via the gear-card refetch path; for everything
-  // else, 5 min of staleness is fine.
-  const { data: gearVariance } = useQuery<GearVarianceResult | null>({
-    queryKey: ['plan-lens', 'gear-variance', eventScopedId],
-    queryFn: () => (eventScopedId ? getGearVariance(eventScopedId) : Promise.resolve(null)),
-    enabled: !!eventScopedId,
-    placeholderData: keepPreviousData,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+  const proposalData = useMemo<ProposalSnapshot | null>(() => {
+    const p = initialProposal;
+    if (!p) return null;
+    const total = (p.items ?? []).reduce((sum, item) => {
+      if ((item as { is_optional?: boolean }).is_optional) return sum;
+      const price = (item as { override_price?: number | null }).override_price ?? Number(item.unit_price ?? 0);
+      return sum + (item.quantity ?? 1) * price;
+    }, 0);
+    return {
+      total,
+      signedAt: p.signed_at ?? null,
+      acceptedAt: p.accepted_at ?? null,
+      depositPercent: p.deposit_percent ?? null,
+      depositPaidAt: p.deposit_paid_at ?? null,
+      depositDeadlineDays: (p as unknown as Record<string, unknown>).deposit_deadline_days as number | null ?? null,
+      paymentDueDays: p.payment_due_days ?? null,
+      hasItems: (p.items ?? []).length > 0,
+      status: p.status ?? null,
+      updatedAt: p.updated_at ?? null,
+      firstViewedAt: (p as unknown as Record<string, unknown>).first_viewed_at as string | null ?? null,
+    };
+  }, [initialProposal]);
+  // Suppress unused-var warning — queryClient may be needed for surgical
+  // setQueryData updates in future mutation handlers.
+  void queryClient;
 
   // Payment milestones for timeline
   const paymentMilestones = proposalData
@@ -490,7 +484,7 @@ export function PlanLens({
               dealId={dealId}
               event={event}
               crewRows={crewRows}
-              crewLoading={crewLoading}
+              crewLoading={bundleLoading}
               onFlightCheckUpdated={handleCrewUpdated}
               hideVitals
               sourceOrgId={sourceOrgId ?? null}

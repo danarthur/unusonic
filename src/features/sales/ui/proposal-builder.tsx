@@ -149,13 +149,19 @@ export function ProposalBuilder({
   // opposite direction (proposal → deal_crew).
   const refreshDealCrew = useCallback(() => {
     if (!dealId) return;
+    // The C6 "manual additions outside this proposal" banner is purely an
+    // edit-mode affordance — it tells the PM their plan-tab adds aren't on
+    // the client-facing proposal. In readOnly (Plan tab's "Agreed scope"
+    // viewer) the banner can't be acted on, so the fetch is dead weight on
+    // a tab that's already running ~3 crew fetches concurrently.
+    if (readOnly) return;
     getDealCrew(dealId)
       .then(setAllDealCrew)
       .catch(() => {
         // Non-fatal: worst case the banner doesn't show. The proposal is
         // still usable without the reverse-sync view.
       });
-  }, [dealId]);
+  }, [dealId, readOnly]);
   useEffect(() => {
     refreshDealCrew();
   }, [refreshDealCrew]);

@@ -48,7 +48,7 @@ import {
 import { DEFAULT_DEPARTMENT, DEPARTMENT_ORDER } from '../../lib/department-mapping';
 import type { DealCrewRow } from '../../actions/deal-crew';
 import {
-  getKitComplianceForEntity,
+  getKitComplianceBatch,
   type KitComplianceResult,
 } from '@/features/talent-management/api/kit-template-actions';
 import { DepartmentSection } from './gear-flight-check/department-section';
@@ -221,12 +221,17 @@ export function GearFlightCheck({
   // Produces a map keyed by entity_id so DepartmentBlock can aggregate matched/
   // total across the crew assigned to each department. Refetches whenever the
   // (entity_id, role_note) set changes.
+  //
+  // Uses getKitComplianceBatch (one round-trip + two SQL queries server-side)
+  // instead of the prior per-row Promise.all over getKitComplianceForEntity
+  // (N round-trips, each opening its own auth + Supabase pool acquisition).
+  // Matches the pattern already in ProductionTeamCard.
   useEffect(() => {
     const targets = crewRows
       .filter((r): r is DealCrewRow & { entity_id: string; role_note: string } =>
         !!r.entity_id && !!r.role_note,
       )
-      .map((r) => ({ entityId: r.entity_id, roleNote: r.role_note }));
+      .map((r) => ({ entityId: r.entity_id, roleTag: r.role_note }));
 
     if (targets.length === 0) {
       setKitCompliance({});
@@ -234,18 +239,12 @@ export function GearFlightCheck({
     }
 
     let cancelled = false;
-    Promise.all(
-      targets.map((t) =>
-        getKitComplianceForEntity(t.entityId, t.roleNote).then((result) => ({
-          entityId: t.entityId,
-          result,
-        })),
-      ),
-    ).then((entries) => {
+    getKitComplianceBatch(targets).then((batch) => {
       if (cancelled) return;
       const map: Record<string, KitComplianceResult> = {};
-      for (const e of entries) {
-        if (e.result) map[e.entityId] = e.result;
+      for (const { entityId, roleTag } of targets) {
+        const result = batch.get(`${entityId}::${roleTag}`);
+        if (result) map[entityId] = result;
       }
       setKitCompliance(map);
     });
