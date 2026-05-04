@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SurfaceProvider, SURFACE_LEVEL } from '@/shared/ui/surface-context';
 import { DetailPaneTransition } from '@/shared/ui/detail-pane-transition';
+import { LensCrossfade } from '@/shared/ui/lens-crossfade';
 import { ChevronLeft, ChevronDown, Check, FileText, ExternalLink, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { handoverDeal } from '../actions/handover-deal';
@@ -21,7 +22,7 @@ import type { LostReason } from '../actions/get-deal';
 import { DealLens } from './deal-lens';
 import { PlanLens } from './plan-lens';
 import { LedgerLens } from './ledger-lens';
-import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
+import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 import type { DealDetail } from '../actions/get-deal';
 import type { EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
@@ -805,119 +806,123 @@ export function Prism({
             selectedId={selectedId ?? '—'} | source={selectedItem?.source ?? '—'} | lens={lens} | fetching={String(bundleQuery.isFetching)} | deal={deal?.id ?? 'null'}
           </div>
         )}
-        {/* DetailPaneTransition wraps the full pane: dim-and-hold during sibling
-            switches, threshold-gated skeleton (250ms) for cold cache misses,
-            atomic swap on resolve. The previous bundle is held by
-            placeholderData: keepPreviousData on the bundleQuery. */}
-        <AnimatePresence mode="wait">
-            {lens === 'deal' && isDeal && (
-              <motion.div
-                key="deal"
-                initial={false}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={STAGE_MEDIUM}
-                className="min-h-[320px]"
-              >
-                {deal ? (
-                  <DealLens
-                    deal={deal}
-                    client={client}
-                    stakeholders={stakeholders}
-                    sourceOrgId={sourceOrgId}
-                    onClientLinked={refetchDealAndClient}
-                    pipelineStages={pipelineStages}
-                    signals={bundle?.signals ?? []}
-                  />
-                ) : (
-                  <div className="stage-panel-elevated p-6 flex flex-col items-center justify-center min-h-[280px] gap-4 text-center">
-                    <p className="text-[var(--stage-text-primary)] font-medium tracking-tight">Deal could not be loaded</p>
-                    <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
-                      The deal may have been removed or you may not have access. Try selecting another production from the stream.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => refetchDealAndClient()}
-                      className="px-4 py-2 rounded-full text-sm font-medium text-[var(--stage-text-primary)] bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--stage-surface-raised)] transition-colors duration-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            )}
-            {lens === 'deal' && !isDeal && (
-              <motion.div
-                key="deal-event"
-                initial={false}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={STAGE_MEDIUM}
-                className="min-h-[320px]"
-              >
-                <div className="stage-panel-elevated p-6 flex flex-col gap-6">
-                  <div>
-                    <p className="stage-label mb-1">
-                      Deal · event selected
-                    </p>
-                    {linkedDealLoading ? (
-                      <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2">
-                        Checking for linked deal…
+        {/* Lens swap — `<LensCrossfade>` primitive (CSS-only opacity, no
+         * AnimatePresence). The prior `<AnimatePresence mode="wait">` over
+         * five keyed motion.div siblings deadlocked on Plan auto-pick:
+         * framer-motion marked the exiting deal block isPresent=false but
+         * never scheduled the exit animation, so mode="wait" held Plan
+         * forever. Swapping to popLayout / single-keyed motion.div both
+         * reproduced the same hang on Bryan's deal cold load.
+         *
+         * The premium move: stop coordinating exit + enter through
+         * AnimatePresence at all. The lens panels do not need a layout
+         * transition — they are atomic content swaps inside an already-held
+         * pane (DetailPaneTransition handles the dim-and-hold during fetch
+         * upstream). LensCrossfade renders the active lens directly with a
+         * 120ms CSS opacity in via `key={lensKey}`. The pane height is
+         * preserved by `min-h-[320px]` on deal/deal-event branches, matching
+         * prior behaviour.
+         */}
+        <LensCrossfade lensKey={
+          lens === 'deal'
+            ? (isDeal ? 'deal' : 'deal-event')
+            : lens === 'plan'
+              ? 'plan'
+              : (isEvent || deal?.event_id) ? 'ledger' : 'ledger-locked'
+        }>
+          {(lensKey) => {
+            if (lensKey === 'deal') {
+              return (
+                <div className="min-h-[320px]">
+                  {deal ? (
+                    <DealLens
+                      deal={deal}
+                      client={client}
+                      stakeholders={stakeholders}
+                      sourceOrgId={sourceOrgId}
+                      onClientLinked={refetchDealAndClient}
+                      pipelineStages={pipelineStages}
+                      signals={bundle?.signals ?? []}
+                    />
+                  ) : (
+                    <div className="stage-panel-elevated p-6 flex flex-col items-center justify-center min-h-[280px] gap-4 text-center">
+                      <p className="text-[var(--stage-text-primary)] font-medium tracking-tight">Deal could not be loaded</p>
+                      <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
+                        The deal may have been removed or you may not have access. Try selecting another production from the stream.
                       </p>
-                    ) : linkedDeal ? (
-                      <>
-                        <h2 className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-tight mt-1">
-                          {linkedDeal.title ?? 'Untitled deal'}
-                        </h2>
-                        <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2 max-w-xl">
-                          This event was handed over from the deal above. View the signed proposal or open the deal in the stream for the full Deal lens (stakeholders, pipeline, contract).
+                      <button
+                        type="button"
+                        onClick={() => refetchDealAndClient()}
+                        className="px-4 py-2 rounded-full text-sm font-medium text-[var(--stage-text-primary)] bg-[var(--stage-surface-elevated)] border border-[oklch(1_0_0_/_0.10)] hover:bg-[var(--stage-surface-raised)] transition-colors duration-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            if (lensKey === 'deal-event') {
+              return (
+                <div className="min-h-[320px]">
+                  <div className="stage-panel-elevated p-6 flex flex-col gap-6">
+                    <div>
+                      <p className="stage-label mb-1">
+                        Deal · event selected
+                      </p>
+                      {linkedDealLoading ? (
+                        <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2">
+                          Checking for linked deal…
                         </p>
-                        <div className="mt-5 pt-5 border-t border-[oklch(1_0_0_/_0.10)] flex flex-wrap items-center gap-3">
-                          {linkedProposalUrl ? (
+                      ) : linkedDeal ? (
+                        <>
+                          <h2 className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-tight mt-1">
+                            {linkedDeal.title ?? 'Untitled deal'}
+                          </h2>
+                          <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2 max-w-xl">
+                            This event was handed over from the deal above. View the signed proposal or open the deal in the stream for the full Deal lens (stakeholders, pipeline, contract).
+                          </p>
+                          <div className="mt-5 pt-5 border-t border-[oklch(1_0_0_/_0.10)] flex flex-wrap items-center gap-3">
+                            {linkedProposalUrl ? (
+                              <a
+                                href={linkedProposalUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="stage-btn stage-btn-secondary inline-flex items-center gap-2"
+                              >
+                                <FileText size={18} aria-hidden />
+                                View signed proposal
+                              </a>
+                            ) : (
+                              <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">Loading proposal link…</p>
+                            )}
                             <a
-                              href={linkedProposalUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="stage-btn stage-btn-secondary inline-flex items-center gap-2"
+                              href={`/crm?stream=active&selected=${linkedDeal.id}`}
+                              className="inline-flex items-center gap-2 py-3 px-5 text-sm font-medium tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] bg-transparent hover:bg-[var(--stage-accent-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] transition-colors"
+                              style={{ borderRadius: 'var(--stage-radius-panel)' }}
                             >
-                              <FileText size={18} aria-hidden />
-                              View signed proposal
+                              <ExternalLink size={16} className="text-[var(--stage-text-secondary)]" aria-hidden />
+                              Open deal in stream
                             </a>
-                          ) : (
-                            <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">Loading proposal link…</p>
-                          )}
-                          <a
-                            href={`/crm?stream=active&selected=${linkedDeal.id}`}
-                            className="inline-flex items-center gap-2 py-3 px-5 text-sm font-medium tracking-tight text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.10)] bg-transparent hover:bg-[var(--stage-accent-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)] transition-colors"
-                            style={{ borderRadius: 'var(--stage-radius-panel)' }}
-                          >
-                            <ExternalLink size={16} className="text-[var(--stage-text-secondary)]" aria-hidden />
-                            Open deal in stream
-                          </a>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <h2 className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-tight mt-1">
-                          Event view
-                        </h2>
-                        <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2 max-w-xl">
-                          The Deal tab shows contract and signed proposal for deals. Select a deal from the stream (Inquiry or Active) to see its Deal lens.
-                        </p>
-                      </>
-                    )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h2 className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-tight mt-1">
+                            Event view
+                          </h2>
+                          <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2 max-w-xl">
+                            The Deal tab shows contract and signed proposal for deals. Select a deal from the stream (Inquiry or Active) to see its Deal lens.
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </motion.div>
-            )}
-            {lens === 'plan' && (
-              <motion.div
-                key="plan"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={STAGE_NAV_CROSSFADE}
-              >
+              );
+            }
+            if (lensKey === 'plan') {
+              return (
                 <PlanLens
                   eventId={isEvent ? selectedId : (deal?.event_id ?? null)}
                   dealId={deal?.id ?? eventSummary?.deal_id ?? null}
@@ -934,34 +939,23 @@ export function Prism({
                   onStakeholdersChange={refetchDealAndClient}
                   onDealUpdated={refetchDealAndClient}
                 />
-              </motion.div>
-            )}
-            {lens === 'ledger' && (isEvent || deal?.event_id) && (
-              <motion.div
-                key="ledger"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={STAGE_NAV_CROSSFADE}
-              >
+              );
+            }
+            if (lensKey === 'ledger') {
+              return (
                 <LedgerLens
                   eventId={isEvent ? selectedId : deal!.event_id!}
                   ledger={ledger}
                 />
-              </motion.div>
-            )}
-            {lens === 'ledger' && !isEvent && !deal?.event_id && (
-              <motion.div
-                key="ledger-locked"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={STAGE_NAV_CROSSFADE}
-                className="stage-panel-elevated p-6 text-[var(--stage-text-secondary)] text-sm leading-relaxed"
-              >
+              );
+            }
+            return (
+              <div className="stage-panel-elevated p-6 text-[var(--stage-text-secondary)] text-sm leading-relaxed">
                 Ledger available after handover.
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            );
+          }}
+        </LensCrossfade>
       </div>
       </SurfaceProvider>
       </DetailPaneTransition>
