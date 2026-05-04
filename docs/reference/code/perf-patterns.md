@@ -447,6 +447,7 @@ Reference: `src/app/(dashboard)/(features)/crm/actions/get-workspace-pipeline-st
 | Eagerly importing heavy components | Initial bundle bloat | `next/dynamic` for ambient or conditionally-rendered components |
 | Bare `auth.uid()` in RLS USING/CHECK | Re-evaluated per row | Wrap in `(SELECT auth.uid())` |
 | Multiple PERMISSIVE policies for same `{role, action}` | All evaluated per row | Drop the redundant one (usually old Dashboard-created) |
+| `<AnimatePresence mode="wait">` over multi-conditional sibling motion.divs with `initial={false}` | Exit animation never schedules; entering child held forever (Plan tab cold-load deadlock, fixed 2026-05-04) | Use `<LensCrossfade>` from `src/shared/ui/lens-crossfade.tsx` for keyed content swaps inside a held pane |
 
 ---
 
@@ -486,5 +487,6 @@ these in order:
   `removeDealStakeholder`)
 - **Lazy load**: `deal-lens.tsx` `AionDealCard` and `ProposalBuilder` imports
 - **Module-level cache**: `get-workspace-pipeline-stages.ts`
+- **Lens crossfade primitive**: `src/shared/ui/lens-crossfade.tsx` (used in `prism.tsx` for Deal/Plan/Ledger swap; replaces the multi-keyed AnimatePresence pattern that deadlocked on `initial={false}`)
 - **RLS migrations**: `20260427230125_rls_auth_uid_initplan_hot_tables.sql`,
   `20260427230409_drop_redundant_dashboard_policies.sql`
