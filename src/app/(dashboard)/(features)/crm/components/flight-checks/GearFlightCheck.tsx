@@ -20,11 +20,8 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import {
   assignGearOperator,
-  batchGetGearAvailability,
   detachGearFromPackage,
-  getCrewEquipmentMatchesForEvent,
   getEventGearItems,
-  getGearLineageEnabled,
   materializeKitFromCrew,
   sourceGearFromCrew,
   updateGearItemStatus,
@@ -40,6 +37,7 @@ import {
   getGearDriftForEvent,
 } from '../../actions/gear-drift';
 import { acceptGearDriftAdd } from '../../actions/gear-drift-accept-add';
+import { getGearFlightBundle } from '../../actions/get-gear-flight-bundle';
 import type { GearDriftReport } from '../../actions/gear-drift-types';
 import {
   GEAR_LIFECYCLE_ORDER,
@@ -135,87 +133,67 @@ export function GearFlightCheck({
   const [driftReport, setDriftReport] = useState<GearDriftReport | null>(null);
   const [driftPending, setDriftPending] = useState<string | null>(null);
 
-  // ── Fetch gear items ────────────────────────────────────────────────────────
-
-  const fetchItems = useCallback(async () => {
+  // ── Mount-time bundle fetch ─────────────────────────────────────────────────
+  // Replaces four prior `useEffect`s (items / lineage flag / availability /
+  // crew matches) plus the standalone drift mount-effect with a single
+  // server-action round-trip via `getGearFlightBundle`. Cuts ~5 sequential
+  // POSTs to one. Internal Promise.all preserves server-side parallelism.
+  // Pattern matches getPlanBundle / getDealLensBundle.
+  //
+  // Post-mutation refresh paths still use the granular actions: `fetchItems`
+  // (single-call) for status / source / operator changes, `fetchDrift` for
+  // explicit drift action follow-up. That's the perf playbook contract —
+  // bundle on cold load, single-call on warm refresh.
+  useEffect(() => {
+    if (!eventId) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    try {
-      const data = await getEventGearItems(eventId);
-      setItems(data);
-    } catch (e) {
-      setError('Failed to load gear items.');
-      Sentry.captureException(e, {
-        tags: { component: 'GearFlightCheck', action: 'fetchItems' },
-        extra: { eventId },
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [eventId]);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  // Resolve the workspace's lineage flag once on mount. The prop overrides
-  // when defined (tests/storybook); otherwise the component asks the server.
-  useEffect(() => {
-    if (lineageOverride !== undefined) return;
-    let cancelled = false;
-    getGearLineageEnabled()
-      .then((enabled) => {
-        if (!cancelled) setResolvedLineageFlag(enabled);
+    getGearFlightBundle(eventId, eventStartsAt ?? null, eventEndsAt ?? null)
+      .then((bundle) => {
+        if (cancelled) return;
+        setItems(bundle.items);
+        setAvailability(new Map(bundle.availability));
+        setCrewMatches(bundle.crewMatches);
+        if (lineageOverride === undefined) {
+          setResolvedLineageFlag(bundle.lineageEnabled);
+        }
+        setDriftReport(bundle.drift);
       })
-      .catch(() => {
-        if (!cancelled) setResolvedLineageFlag(false);
+      .catch((e) => {
+        if (cancelled) return;
+        setError('Failed to load gear items.');
+        Sentry.captureException(e, {
+          tags: { component: 'GearFlightCheck', action: 'getGearFlightBundle' },
+          extra: { eventId },
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [lineageOverride]);
+  }, [eventId, eventStartsAt, eventEndsAt, lineageOverride]);
 
-  // ── Fetch availability after items load ─────────────────────────────────────
-
-  useEffect(() => {
-    if (items.length === 0 || !eventStartsAt || !eventEndsAt) {
-      setAvailability(new Map());
-      return;
+  // Single-call refresh path for post-mutation reads (status flips, source
+  // changes, operator assigns). Doesn't refetch availability / crew matches
+  // / drift — those are unaffected by the mutations that call this. Drift is
+  // refreshed explicitly by handleDriftAction; availability / crew matches
+  // re-resolve on the next bundle fetch (deal navigation or window
+  // refocus).
+  const fetchItems = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const data = await getEventGearItems(eventId);
+      setItems(data);
+    } catch (e) {
+      Sentry.captureException(e, {
+        tags: { component: 'GearFlightCheck', action: 'fetchItems' },
+        extra: { eventId },
+      });
     }
-
-    const catalogItems = items.filter((i) => i.catalog_package_id);
-    if (catalogItems.length === 0) {
-      setAvailability(new Map());
-      return;
-    }
-
-    const batchInput = catalogItems.map((i) => ({
-      catalogPackageId: i.catalog_package_id!,
-      startDate: eventStartsAt,
-      endDate: eventEndsAt,
-    }));
-
-    batchGetGearAvailability(batchInput)
-      .then((result) => setAvailability(result))
-      .catch(() => setAvailability(new Map()));
-  }, [items, eventStartsAt, eventEndsAt]);
-
-  // ── Fetch crew equipment matches ───────────────────────────────────────────
-
-  useEffect(() => {
-    if (items.length === 0) {
-      setCrewMatches({});
-      return;
-    }
-    // Only fetch if any items have catalog_package_id (matchable)
-    if (!items.some((i) => i.catalog_package_id)) {
-      setCrewMatches({});
-      return;
-    }
-    getCrewEquipmentMatchesForEvent(eventId)
-      .then((result) => setCrewMatches(result))
-      .catch(() => setCrewMatches({}));
-  }, [items, eventId]);
+  }, [eventId]);
 
   // ── Fetch kit compliance per assigned crew member ──────────────────────────
   // Produces a map keyed by entity_id so DepartmentBlock can aggregate matched/
@@ -453,17 +431,12 @@ export function GearFlightCheck({
     }
   }, [eventId, lineageEnabled]);
 
-  // Drift fetches once on mount + when the flag flips. We deliberately do NOT
-  // depend on `items`: gear status clicks, swaps, and kit materialisation
-  // don't change the proposal-vs-gear comparison, and re-running the drift
-  // compute (5 queries internally) on every optimistic update was causing a
-  // cascade that delayed first paint of the Plan tab. The few mutations that
-  // DO need a fresh drift (acceptGearDriftAdd / acceptGearDriftQty /
-  // acceptGearDriftRemove / dismiss) call fetchDrift() explicitly via
-  // handleDriftAction.
-  useEffect(() => {
-    fetchDrift();
-  }, [fetchDrift]);
+  // Mount-time drift is fetched as part of the bundle effect above. This
+  // `fetchDrift` callback is the single-call refresh path for explicit drift
+  // mutations (accept-add / accept-remove / accept-qty / dismiss) that need a
+  // fresh proposal-vs-gear diff afterwards. Gear status clicks, swaps, and
+  // kit materialisation don't depend on it (re-running the 5-query drift
+  // compute on every optimistic update used to cascade and delay first paint).
 
   const handleDriftAction = useCallback(async (action: DriftAction) => {
     const key = driftActionKey(action);
