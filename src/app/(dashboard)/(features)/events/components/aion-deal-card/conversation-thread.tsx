@@ -119,8 +119,8 @@ export function ConversationThread({
             'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
             'hover:bg-[oklch(1_0_0_/_0.06)] transition-colors duration-[80ms]',
           )}
-          aria-label="New chat about this production"
-          title="New chat about this production"
+          aria-label="New chat about this event"
+          title="New chat about this event"
         >
           <Plus size={13} strokeWidth={1.5} />
         </button>

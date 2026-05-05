@@ -48,10 +48,10 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
       <div className="flex-1 min-h-[80vh] p-6 overflow-y-auto" data-surface="void">
         <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="stage-readout-lg mb-2">Production queue</h1>
+            <h1 className="stage-readout-lg mb-2">Events</h1>
             <p className="text-[var(--stage-text-secondary)]">
               {optimisticGigs.length === 0
-                ? 'No productions yet.'
+                ? 'No events yet.'
                 : 'Lead your pipeline from inquiry to wrap.'}
             </p>
           </div>
@@ -60,7 +60,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
             onClick={() => setCreateModalOpen(true)}
             className="stage-btn stage-btn-primary"
           >
-            <Plus size={18} /> New production
+            <Plus size={18} /> New event
           </button>
         </header>
 
@@ -108,7 +108,7 @@ export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
                   onClick={(e) => gig.isOptimistic && e.preventDefault()}
                 >
                   <h3 className="stage-readout-lg mb-1 transition-colors">
-                    {gig.title ?? 'Untitled production'}
+                    {gig.title ?? 'Untitled event'}
                   </h3>
                   <p className="stage-label mb-4">{gig.client_name ?? 'Client'}</p>
 

@@ -267,7 +267,7 @@ export function AionSidebar({
     for (const s of visible) {
       if (s.scopeType === 'deal' && s.scopeEntityId) {
         const bucket = dealBuckets.get(s.scopeEntityId) ?? {
-          title: s.scopeEntityTitle ?? 'Untitled production',
+          title: s.scopeEntityTitle ?? 'Untitled event',
           sessions: [],
         };
         // The live-fetched title wins if present on any session in the bucket.

@@ -224,8 +224,8 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
           <div className="bento-center flex-1 p-8 text-center">
             <p className="text-[var(--stage-text-secondary)] leading-relaxed text-sm max-w-sm">
               {optimisticGigs.length === 0
-                ? 'No productions yet. Create one to get started.'
-                : 'Select a production from the stream.'}
+                ? 'No events yet. Create one to get started.'
+                : 'Select an event from the stream.'}
             </p>
           </div>
         )}

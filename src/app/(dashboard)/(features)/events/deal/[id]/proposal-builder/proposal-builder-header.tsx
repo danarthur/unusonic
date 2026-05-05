@@ -33,7 +33,7 @@ export function ProposalBuilderHeader({ dealId, deal }: { dealId: string; deal: 
           Proposal builder
         </p>
         <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight truncate mt-0.5">
-          {deal.title ?? 'Untitled production'}
+          {deal.title ?? 'Untitled event'}
         </h1>
       </div>
 

@@ -422,7 +422,7 @@ export function ProposalBuilderStudio({
     deal.event_start_time
       ? `${formatTime12h(deal.event_start_time)}${deal.event_end_time ? ` – ${formatTime12h(deal.event_end_time)}` : ''}`
       : null;
-  const dealTitle = deal.title || 'Untitled production';
+  const dealTitle = deal.title || 'Untitled event';
 
   // The builder is the focus — client-facing preview mode is intentionally
   // out of scope. Layout: docked sidebar (catalog + inspector) on the left,

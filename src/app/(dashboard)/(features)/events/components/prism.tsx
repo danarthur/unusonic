@@ -465,7 +465,7 @@ export function Prism({
   if (!selectedId) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 min-h-[320px] text-[var(--stage-text-secondary)]">
-        <p className="stage-field-label leading-relaxed">Select a production from the stream.</p>
+        <p className="stage-field-label leading-relaxed">Select an event from the stream.</p>
       </div>
     );
   }
@@ -473,7 +473,7 @@ export function Prism({
     return (
       <div className="flex flex-col items-center justify-center flex-1 min-h-[320px] text-[var(--stage-text-secondary)] gap-3">
         <div className="h-8 w-8 bg-[oklch(1_0_0_/_0.05)] border border-[oklch(1_0_0_/_0.10)] stage-skeleton" style={{ borderRadius: 'var(--stage-radius-nested, 8px)' }} aria-hidden />
-        <p className="stage-field-label leading-relaxed">Loading production…</p>
+        <p className="stage-field-label leading-relaxed">Loading event…</p>
       </div>
     );
   }
@@ -496,7 +496,7 @@ export function Prism({
     bundle?.source === 'event'
       ? bundle.eventSummary?.starts_at?.slice(0, 10) ?? null
       : bundle?.deal?.proposed_date ?? null;
-  const title = bundleTitle ?? 'Untitled production';
+  const title = bundleTitle ?? 'Untitled event';
   const subtitle = [
     bundleClientName ?? 'Client',
     bundleDateIso ? new Date(bundleDateIso + 'T00:00:00').toLocaleDateString() : null,
@@ -833,7 +833,7 @@ export function Prism({
                   <div className="stage-panel-elevated p-6 flex flex-col items-center justify-center min-h-[280px] gap-4 text-center">
                     <p className="text-[var(--stage-text-primary)] font-medium tracking-tight">Deal could not be loaded</p>
                     <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed">
-                      The deal may have been removed or you may not have access. Try selecting another production from the stream.
+                      The deal may have been removed or you may not have access. Try selecting another event from the stream.
                     </p>
                     <button
                       type="button"

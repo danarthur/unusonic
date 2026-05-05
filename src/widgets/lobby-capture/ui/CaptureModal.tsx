@@ -832,7 +832,7 @@ function ReviewStage({
 
       {linkedProduction && (
         <div className="space-y-1">
-          <Label>Production</Label>
+          <Label>Event</Label>
           <div className="flex items-center gap-1.5">
             <span
               className={cn(

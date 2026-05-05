@@ -37,7 +37,7 @@ const STATIC_NAV = [
   { label: 'Overview', href: '/', icon: LayoutGrid },
   { label: 'Aion', href: '/aion', icon: MessageSquare },
   { label: 'Calendar', href: '/calendar', icon: CalendarDays },
-  { label: 'Production (CRM)', href: '/events', icon: FolderKanban },
+  { label: 'Events', href: '/events', icon: FolderKanban },
   { label: 'Finance', href: '/finance', icon: Wallet },
   { label: 'Catalog', href: '/catalog', icon: Package },
   { label: 'Network', href: '/network', icon: Network },

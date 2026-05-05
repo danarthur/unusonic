@@ -90,7 +90,7 @@ export function PersonProductionsPanel({
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
-        <h3 className="stage-label text-[var(--stage-text-secondary)]">Productions</h3>
+        <h3 className="stage-label text-[var(--stage-text-secondary)]">Events</h3>
         <span className="text-[11px] text-[var(--stage-text-tertiary)] tabular-nums">
           {productions.length}
         </span>

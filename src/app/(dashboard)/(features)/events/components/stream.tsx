@@ -173,11 +173,11 @@ export function Stream({
         <div className="flex items-end justify-between gap-4">
           <div>
             <h1 className="stage-readout-lg leading-none">
-              Productions
+              Events
             </h1>
             <p className="stage-label leading-relaxed mt-1">
               {items.length === 0
-                ? 'No productions yet.'
+                ? 'No events yet.'
                 : 'Inquiry to wrap.'}
             </p>
           </div>
@@ -186,7 +186,7 @@ export function Stream({
             onClick={() => setCreateModalOpen(true)}
             className="stage-btn stage-btn-primary"
           >
-            <Plus size={16} aria-hidden /> New production
+            <Plus size={16} aria-hidden /> New event
           </button>
         </div>
 
@@ -256,7 +256,7 @@ export function Stream({
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search productions…"
+                placeholder="Search events…"
                 className="w-full pl-8 pr-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] outline-none focus:border-[var(--stage-accent)] focus:shadow-[0_0_0_1px_oklch(0.90_0_0_/_0.15)] hover:border-[oklch(1_0_0_/_0.15)]"
                 style={{
                   background: 'var(--stage-surface-elevated)',

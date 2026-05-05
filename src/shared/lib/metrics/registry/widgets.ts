@@ -417,7 +417,7 @@ export const WIDGET_METRICS: Record<string, MetricDefinition> = {
     requiredCapabilities: ['planning:view'],
     refreshability: 'live',
     roles: ['owner', 'pm', 'touring_coordinator'],
-    title: 'Active production',
+    title: 'Active event',
     description: 'What is in production right now — crew on call, shows in motion.',
     emptyState: {
       title: 'Nothing in production',

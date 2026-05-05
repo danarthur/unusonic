@@ -64,7 +64,7 @@ export function ClientUpdateEmail({
           <Section style={section}>
             <Text style={brand}>{workspaceName}</Text>
 
-            <Text style={heading}>Production update</Text>
+            <Text style={heading}>Event update</Text>
             <Text style={subheading}>{eventTitle} &mdash; {eventDate}</Text>
 
             <Hr style={divider} />

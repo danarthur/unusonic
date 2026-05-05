@@ -14,8 +14,8 @@
 import { type DensityTier } from '@/shared/ui/layout/density-store';
 
 const LABELS: Record<string, Record<DensityTier, string>> = {
-  // ── CRM / Productions ──
-  productions:    { spacious: 'Your productions',     balanced: 'Productions',     dense: 'PRODUCTIONS' },
+  // ── CRM / Events ──
+  productions:    { spacious: 'Your events',          balanced: 'Events',          dense: 'EVENTS' },
   deal:           { spacious: 'Deal details',          balanced: 'Deal',            dense: 'DEAL' },
   pipeline:       { spacious: 'Deal pipeline',         balanced: 'Pipeline',        dense: 'PIPELINE' },
   signals:        { spacious: 'Deal signals',          balanced: 'Signals',         dense: 'SIGNALS' },

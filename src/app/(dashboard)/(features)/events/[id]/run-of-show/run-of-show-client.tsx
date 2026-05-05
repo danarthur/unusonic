@@ -323,7 +323,7 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
           </Link>
           <div>
             <h1 className="stage-readout-lg text-[var(--stage-text-primary)] tracking-tight">
-              {initialEvent.title ?? 'Untitled production'}
+              {initialEvent.title ?? 'Untitled event'}
             </h1>
             <div className="flex items-center gap-4 text-sm text-[var(--stage-text-secondary)] mt-1">
               <span className="flex items-center gap-1">

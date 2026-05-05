@@ -69,7 +69,7 @@ export function ActiveProductionWidget() {
     <div className="h-64">
       <StagePanel interactive className="h-full flex flex-col justify-between">
         <div className="flex justify-between items-start mb-4">
-          <h2 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">Active Production</h2>
+          <h2 className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-widest">Active Event</h2>
           <ArrowUpRight className="w-4 h-4 text-[var(--stage-text-secondary)]" />
         </div>
 
@@ -103,7 +103,7 @@ export function ActiveProductionWidget() {
                           <div className="h-2 w-2 rounded-full bg-[var(--color-unusonic-success)]" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-[var(--stage-text-primary)]">{gig.title ?? 'Untitled Production'}</span>
+                          <span className="text-sm font-medium text-[var(--stage-text-primary)]">{gig.title ?? 'Untitled event'}</span>
                           <span className="stage-label leading-relaxed">run of show</span>
                         </div>
                       </div>

@@ -174,7 +174,7 @@ export function makePinSession(deps: PinSessionDeps) {
       if (result.atCap) {
         // Dynamic import to avoid a hard dep on sonner in the provider.
         const { toast } = await import('sonner');
-        toast.error('Pin cap reached — unpin an existing thread (max 3 per production).');
+        toast.error('Pin cap reached — unpin an existing thread (max 3 per event).');
       } else {
         console.error('[SessionContext] pinSession failed:', result.error);
       }
