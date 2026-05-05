@@ -26,7 +26,6 @@ import { rescheduleEvent } from '../actions/reschedule-event';
 import { updateDealStatus } from '../actions/update-deal-status';
 import { readEventStatusFromLifecycle } from '@/shared/lib/event-status/read-event-status';
 import type { WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
-import { AionSuggestionRow } from './aion-suggestion-row';
 import { PillUnseenDot } from '@/app/(dashboard)/(features)/aion/components/PillUnseenDot';
 
 export type StreamCardItem = {
@@ -130,7 +129,6 @@ export function StreamCard({
   onHover,
   pipelineStages,
   hasUnseenPill = false,
-  stageSuggestion = null,
   className,
 }: {
   item: StreamCardItem;
@@ -151,9 +149,6 @@ export function StreamCard({
    *  Resolved by the parent stream from a single bulk-fetch query so the
    *  badge doesn't N+1 a per-card read. Always false for event rows. */
   hasUnseenPill?: boolean;
-  /** Pre-resolved stage suggestion for this deal — bulk-fetched by the parent
-   *  stream so AionSuggestionRow doesn't N+1 its own per-card server action. */
-  stageSuggestion?: import('../actions/aion-suggestion-actions').StageSuggestion | null;
   className?: string;
 }) {
   // Pass 3 Phase 2 — route lifecycle_status reads through the canonical helper
@@ -175,12 +170,6 @@ export function StreamCard({
   useEffect(() => () => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
   }, []);
-
-  // Tracks whether the Aion stage-suggestion row is rendering its own call-
-  // to-action. When true, the follow-up reason line above it is suppressed —
-  // Aion's concrete "Advance to X" is a strict upgrade over a generic
-  // "Nudge the client" when both happen to fire.
-  const [aionSuggestionVisible, setAionSuggestionVisible] = useState(false);
 
   // Reschedule inline input state
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -310,7 +299,6 @@ export function StreamCard({
   const showAttentionLine =
     item.followUpStatus === 'pending' &&
     !!item.followUpReason &&
-    !aionSuggestionVisible &&
     item.status !== 'won' &&
     item.status !== 'lost';
 
@@ -645,29 +633,6 @@ export function StreamCard({
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Aion stage-move suggestion — only renders on the selected card
-              so the pipeline view doesn't N+1-fetch insights across every
-              tile. The component self-fetches on mount and returns null
-              when there's nothing to surface. */}
-          {selected && item.source === 'deal' && (
-            <div onClick={(e) => e.stopPropagation()}>
-              <AionSuggestionRow
-                dealId={item.id}
-                initialSuggestion={
-                  stageSuggestion
-                    ? {
-                        insightId: stageSuggestion.insightId,
-                        title: stageSuggestion.title,
-                        suggestedAction: stageSuggestion.suggestedAction,
-                        targetTag: stageSuggestion.targetTag,
-                      }
-                    : null
-                }
-                onVisibilityChange={setAionSuggestionVisible}
-              />
-            </div>
-          )}
         </div>
       </div>
     </motion.div>
