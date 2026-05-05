@@ -57,7 +57,7 @@ export interface EventCommandRow {
   logistics_dock_info: string | null;
   logistics_power_info: string | null;
   client_entity_id: string | null;
-  /** Source deal that this event was handed off from. Lets surfaces route back to /productions?selected=<dealId>. */
+  /** Source deal that this event was handed off from. Lets surfaces route back to /events?selected=<dealId>. */
   deal_id: string | null;
   producer_id: string | null;
   pm_id: string | null;

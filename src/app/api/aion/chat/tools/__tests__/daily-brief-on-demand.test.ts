@@ -49,7 +49,7 @@ vi.mock('@/shared/api/supabase/system', () => ({
   getSystemClient: vi.fn().mockReturnValue({}),
 }));
 
-vi.mock('@/app/(dashboard)/(features)/productions/actions/get-deal', () => ({ getDeal: vi.fn() }));
+vi.mock('@/app/(dashboard)/(features)/events/actions/get-deal', () => ({ getDeal: vi.fn() }));
 
 import { createProductionTools } from '../production';
 
@@ -63,7 +63,7 @@ function makeInsight(triggerType: string, overrides: Partial<StubInsight> = {}):
     context: {},
     priority: 50,
     suggestedAction: null,
-    href: `/productions/deal/deal-1`,
+    href: `/events/deal/deal-1`,
     urgency: 'medium',
     status: 'pending',
     createdAt: '2026-04-23T10:00:00Z',

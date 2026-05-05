@@ -9,8 +9,8 @@ import { GripVertical, Mic, Sun, Video, Truck, ChevronDown, ChevronRight } from 
 /* Shared stroke width for all icons per iconography doc */
 const SW = 1.5;
 import { cn } from '@/shared/lib/utils';
-import type { Cue, CueType, Section } from '@/app/(dashboard)/(features)/productions/actions/run-of-show-types';
-import { fetchCues, updateCueOrder, fetchSections } from '@/app/(dashboard)/(features)/productions/actions/ros';
+import type { Cue, CueType, Section } from '@/app/(dashboard)/(features)/events/actions/run-of-show-types';
+import { fetchCues, updateCueOrder, fetchSections } from '@/app/(dashboard)/(features)/events/actions/ros';
 import { TimelineView } from './timeline-view';
 import type { RosViewMode } from './view-toggle';
 

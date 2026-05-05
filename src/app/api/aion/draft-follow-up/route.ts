@@ -13,7 +13,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { canExecuteAionAction, recordAionAction } from '@/features/intelligence/lib/aion-gate';
 import { getAionConfigForWorkspace } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 import { generateFollowUpDraft } from '../lib/generate-draft';
-import type { AionDealContext } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
+import type { AionDealContext } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;

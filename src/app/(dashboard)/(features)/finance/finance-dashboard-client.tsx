@@ -237,7 +237,7 @@ export function FinanceDashboardClient({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/productions')}
+              onClick={() => router.push('/events')}
               className="gap-2"
             >
               Go to deals

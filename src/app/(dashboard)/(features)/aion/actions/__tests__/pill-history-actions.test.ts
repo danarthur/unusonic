@@ -372,7 +372,7 @@ describe('pill-history cross-table isolation (Wk 10 D7)', () => {
 
   it('the AionDealCard pill-history wiring does not call the aion_insights API', () => {
     const src = stripComments(readFileSync(
-      resolve(__dirname, '../../../productions/components/aion-deal-card.tsx'),
+      resolve(__dirname, '../../../events/components/aion-deal-card.tsx'),
       'utf8',
     ));
     const hasSheet = src.includes('PillHistorySheet');

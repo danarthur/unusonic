@@ -85,7 +85,7 @@ function mapRow(
     snoozeCount: snoozeCountMap.get(r.id) ?? 0,
     isSnoozed: r.status === 'snoozed',
     snoozedUntil: r.snoozed_until,
-    dealHref: `/productions/deal/${r.deal_id}`,
+    dealHref: `/events/deal/${r.deal_id}`,
   };
 }
 

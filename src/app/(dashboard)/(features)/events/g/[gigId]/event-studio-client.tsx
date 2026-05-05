@@ -23,23 +23,23 @@ import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_HEAVY } from '@/shared/lib/motion-constants';
 import { StatusPill, updateEventCommand, InlineEditNumber } from '@/features/event-dashboard';
 import { useConflictDetection } from '@/features/ops/hooks/use-conflict-detection';
-import { PlanVitalsRow } from '@/app/(dashboard)/(features)/productions/components/plan-vitals-row';
-import { AssignCrewSheet } from '@/app/(dashboard)/(features)/productions/components/flight-checks/AssignCrewSheet';
+import { PlanVitalsRow } from '@/app/(dashboard)/(features)/events/components/plan-vitals-row';
+import { AssignCrewSheet } from '@/app/(dashboard)/(features)/events/components/flight-checks/AssignCrewSheet';
 import {
   CrewFlightCheck,
   GearFlightCheck,
   LogisticsFlightCheck,
-} from '@/app/(dashboard)/(features)/productions/components/flight-checks';
-import { assignOrAddCrewMember } from '@/app/(dashboard)/(features)/productions/actions/assign-or-add-crew-member';
-import { removeCrewItem } from '@/app/(dashboard)/(features)/productions/actions/remove-crew-item';
-import { getDealCrewForEvent, type DealCrewRow } from '@/app/(dashboard)/(features)/productions/actions/deal-crew';
+} from '@/app/(dashboard)/(features)/events/components/flight-checks';
+import { assignOrAddCrewMember } from '@/app/(dashboard)/(features)/events/actions/assign-or-add-crew-member';
+import { removeCrewItem } from '@/app/(dashboard)/(features)/events/actions/remove-crew-item';
+import { getDealCrewForEvent, type DealCrewRow } from '@/app/(dashboard)/(features)/events/actions/deal-crew';
 import {
   getCrewAssignmentsForEvent,
   type CrewAssignmentRow,
-} from '@/app/(dashboard)/(features)/productions/actions/get-crew-assignments-for-event';
-import type { InternalTeamMember } from '@/app/(dashboard)/(features)/productions/actions/get-internal-team-for-role';
+} from '@/app/(dashboard)/(features)/events/actions/get-crew-assignments-for-event';
+import type { InternalTeamMember } from '@/app/(dashboard)/(features)/events/actions/get-internal-team-for-role';
 import type { EventCommandDTO, EventLifecycleStatus } from '@/entities/event';
-import type { EventSummaryForPrism } from '@/app/(dashboard)/(features)/productions/actions/get-event-summary';
+import type { EventSummaryForPrism } from '@/app/(dashboard)/(features)/events/actions/get-event-summary';
 import { cn } from '@/shared/lib/utils';
 
 /** Lead roles always shown as named quick-slots at the top of the Team card. */
@@ -193,7 +193,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
       {/* Sticky header */}
       <header className="sticky top-0 z-20 flex items-center gap-3 px-6 py-3 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]">
         <Link
-          href="/productions"
+          href="/events"
           className="stage-hover overflow-hidden shrink-0 p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label="Back to CRM"
         >
@@ -397,7 +397,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
           transition={{ ...STAGE_HEAVY, delay: 0.08 }}
         >
           <Link
-            href={`/productions/${event.id}`}
+            href={`/events/${event.id}/run-of-show`}
             className="flex items-center justify-between min-h-[80px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] p-6 transition-colors hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] group"
           >
             <div>

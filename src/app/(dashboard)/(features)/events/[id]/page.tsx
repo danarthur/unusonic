@@ -74,7 +74,7 @@ async function EventContent({ id }: { id: string }) {
       <AionPageContextSetter type="event" entityId={id} label={event.title ?? event.internal_code ?? null} />
       <header className="shrink-0 flex items-center gap-4 p-4 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]">
         <Link
-          href={event.deal_id ? `/productions?selected=${event.deal_id}` : '/calendar'}
+          href={event.deal_id ? `/events?selected=${event.deal_id}` : '/calendar'}
           className="stage-hover overflow-hidden p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
           aria-label={event.deal_id ? 'Back to deal' : 'Back to Calendar'}
         >

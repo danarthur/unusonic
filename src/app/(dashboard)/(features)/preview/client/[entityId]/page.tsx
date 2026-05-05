@@ -98,8 +98,8 @@ export default async function PreviewClientHomePage({
   const data = await getClientHomeData(entityId);
 
   const exitHref = fromDealId
-    ? `/productions?stream=active&selected=${fromDealId}`
-    : '/productions';
+    ? `/events?stream=active&selected=${fromDealId}`
+    : '/events';
   const fromSuffix = fromDealId ? `?from=${fromDealId}` : '';
 
   if (!data) {

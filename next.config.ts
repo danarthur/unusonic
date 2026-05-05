@@ -52,9 +52,18 @@ const nextConfig: NextConfig = {
     ];
   },
   async redirects() {
+    // Customer vocabulary is "events" — the route was /crm, briefly /productions, now /events.
+    // Keep both legacy paths flowing forward so external bookmarks survive.
     return [
-      { source: '/crm', destination: '/productions', permanent: true },
-      { source: '/crm/:path*', destination: '/productions/:path*', permanent: true },
+      { source: '/crm', destination: '/events', permanent: true },
+      { source: '/crm/:path*', destination: '/events/:path*', permanent: true },
+      { source: '/productions', destination: '/events', permanent: true },
+      // Run-of-show used to live at /productions/[eventId]; it now nests under
+      // the event studio. The /deal/* and other sub-paths map directly.
+      { source: '/productions/deal/:path*', destination: '/events/deal/:path*', permanent: true },
+      { source: '/productions/archive', destination: '/events/archive', permanent: true },
+      { source: '/productions/unmatched-replies', destination: '/events/unmatched-replies', permanent: true },
+      { source: '/productions/:id', destination: '/events/:id/run-of-show', permanent: true },
     ];
   },
 };

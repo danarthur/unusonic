@@ -1,9 +1,9 @@
 import { queryKeys } from "@/shared/api/query-keys";
-import { getCrmGigs } from "@/app/(dashboard)/(features)/productions/actions/get-crm-gigs";
+import { getCrmGigs } from "@/app/(dashboard)/(features)/events/actions/get-crm-gigs";
 import {
   getPrismBundle,
   type PrismBundleSource,
-} from "@/app/(dashboard)/(features)/productions/actions/get-prism-bundle";
+} from "@/app/(dashboard)/(features)/events/actions/get-prism-bundle";
 
 export const crmQueries = {
   gigs: (wsId: string) => ({

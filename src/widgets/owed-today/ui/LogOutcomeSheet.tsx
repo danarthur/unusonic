@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Sheet, SheetContent } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
-import { logFollowUpAction } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
+import { logFollowUpAction } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 import type { OwedTodayItem } from '../api/get-owed-today';
 
 type Channel = 'call' | 'sms' | 'email' | 'in_person';

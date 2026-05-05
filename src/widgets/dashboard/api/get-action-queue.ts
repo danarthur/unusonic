@@ -142,7 +142,7 @@ async function fetchFollowUpItems(
       priority,
       title: r.reason,
       detail: dealMap.get(r.deal_id) ?? 'Untitled deal',
-      actionUrl: `/productions/deal/${r.deal_id}`,
+      actionUrl: `/events/deal/${r.deal_id}`,
       actionLabel: 'Follow up',
     };
   });
@@ -200,7 +200,7 @@ async function fetchUnsignedProposalItems(
       priority,
       title: `Proposal awaiting signature (${daysSinceSent}d)`,
       detail: dealMap.get(p.deal_id) ?? 'Untitled deal',
-      actionUrl: `/productions/deal/${p.deal_id}`,
+      actionUrl: `/events/deal/${p.deal_id}`,
       actionLabel: 'View proposal',
     };
   });
@@ -288,7 +288,7 @@ async function fetchOverdueInvoiceItems(
                 : 'this_week',
           title: `Deposit ${daysOverdue}d overdue`,
           detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/productions/deal/${p.deal_id}`,
+          actionUrl: `/events/deal/${p.deal_id}`,
           actionLabel: 'Send reminder',
         });
       }
@@ -313,7 +313,7 @@ async function fetchOverdueInvoiceItems(
                 : 'this_week',
           title: `Balance ${daysOverdue}d overdue`,
           detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/productions/deal/${p.deal_id}`,
+          actionUrl: `/events/deal/${p.deal_id}`,
           actionLabel: 'Send reminder',
         });
       }

@@ -215,7 +215,7 @@ export async function resurfaceMutedReason(
   if (error) return { success: false, error: error.message };
   if (data !== true) return { success: false, error: 'Resurface failed.' };
 
-  revalidatePath('/productions');
+  revalidatePath('/events');
   return { success: true };
 }
 

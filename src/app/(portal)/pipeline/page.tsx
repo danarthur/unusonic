@@ -8,7 +8,7 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/shared/api/supabase/server';
 import { resolvePortalProfile } from '@/shared/lib/portal-profiles';
-import { getWorkspacePipelineStages } from '@/app/(dashboard)/(features)/productions/actions/get-workspace-pipeline-stages';
+import { getWorkspacePipelineStages } from '@/app/(dashboard)/(features)/events/actions/get-workspace-pipeline-stages';
 import { PipelineView } from './pipeline-view';
 
 export const dynamic = 'force-dynamic';

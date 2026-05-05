@@ -10,7 +10,7 @@
 
 import { generateText } from 'ai';
 import { getModel } from './models';
-import type { AionDealContext } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
+import type { AionDealContext } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 import type { AionVoiceConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
 
 export type DraftResult = {

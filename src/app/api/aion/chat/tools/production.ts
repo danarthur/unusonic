@@ -9,7 +9,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { createClient } from '@/shared/api/supabase/server';
-import { getDeal } from '@/app/(dashboard)/(features)/productions/actions/get-deal';
+import { getDeal } from '@/app/(dashboard)/(features)/events/actions/get-deal';
 import { envelope } from '../../lib/retrieval-envelope';
 import { getSubstrateCounts } from '../../lib/substrate-counts';
 import { WRITE_DENIED, type AionToolContext } from './types';
@@ -175,7 +175,7 @@ export function createProductionTools(ctx: AionToolContext) {
         ?? (ctx.pageContext?.type === 'deal' ? ctx.pageContext.entityId : null);
       if (!dealId) return { error: 'No deal context. Specify a dealId or navigate to a deal page.' };
 
-      const { handoverDeal } = await import('@/app/(dashboard)/(features)/productions/actions/handover-deal');
+      const { handoverDeal } = await import('@/app/(dashboard)/(features)/events/actions/handover-deal');
 
       const payload = (params.startAt || params.endAt)
         ? {
@@ -324,7 +324,7 @@ export function createProductionTools(ctx: AionToolContext) {
       if (!dealId) return { error: 'Deal ID is required for day sheet compilation. Specify a dealId.' };
 
       const { compileAndSendDaySheet } = await import(
-        '@/app/(dashboard)/(features)/productions/actions/compile-and-send-day-sheet'
+        '@/app/(dashboard)/(features)/events/actions/compile-and-send-day-sheet'
       );
       const result = await compileAndSendDaySheet({
         eventId: resolved.eventId,
@@ -366,7 +366,7 @@ export function createProductionTools(ctx: AionToolContext) {
       if (!assignment) return { error: 'No crew assignment found for this person on this event.' };
 
       const { sendCrewReminderAction } = await import(
-        '@/app/(dashboard)/(features)/productions/actions/send-crew-reminder'
+        '@/app/(dashboard)/(features)/events/actions/send-crew-reminder'
       );
       const result = await sendCrewReminderAction(assignment.id);
       return result;
@@ -555,7 +555,7 @@ export function createProductionTools(ctx: AionToolContext) {
       const resolution = await resolveEventId(ctx, params.eventId, params.dealId);
       if ('error' in resolution) return { error: resolution.error };
 
-      const { getEventGearItems } = await import('@/app/(dashboard)/(features)/productions/actions/event-gear-items');
+      const { getEventGearItems } = await import('@/app/(dashboard)/(features)/events/actions/event-gear-items');
       const items = await getEventGearItems(resolution.eventId);
       const tree = buildGearTreeForAion(items);
       const totals = summariseGearTotals(items);
@@ -574,7 +574,7 @@ export function createProductionTools(ctx: AionToolContext) {
       const resolution = await resolveEventId(ctx, params.eventId, params.dealId);
       if ('error' in resolution) return { error: resolution.error };
 
-      const { getGearDriftForEvent } = await import('@/app/(dashboard)/(features)/productions/actions/gear-drift');
+      const { getGearDriftForEvent } = await import('@/app/(dashboard)/(features)/events/actions/gear-drift');
       const report = await getGearDriftForEvent(resolution.eventId);
 
       const adds = report.drifts.filter((d) => d.kind === 'add');

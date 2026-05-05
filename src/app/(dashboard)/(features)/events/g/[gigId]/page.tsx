@@ -19,7 +19,7 @@ export default async function EventByGigPage({
   const event = await getEventCommand(eventId);
 
   if (!event) {
-    redirect('/productions');
+    redirect('/events');
   }
 
   return (

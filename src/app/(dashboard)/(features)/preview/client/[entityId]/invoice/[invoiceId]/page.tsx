@@ -57,8 +57,8 @@ export default async function PreviewClientInvoicePage({
   const { from: fromDealId } = await searchParams;
   const entity = await verifyPreviewAccess(entityId);
   const exitHref = fromDealId
-    ? `/productions?stream=active&selected=${fromDealId}`
-    : '/productions';
+    ? `/events?stream=active&selected=${fromDealId}`
+    : '/events';
   const homeHref = fromDealId
     ? `/preview/client/${entityId}?from=${fromDealId}`
     : `/preview/client/${entityId}`;

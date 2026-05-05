@@ -365,7 +365,7 @@ export async function buildGreeting(
       // record, use its title and capability chips for that record.
       if (pageContext?.type === 'deal' && pageContext.entityId) {
         try {
-          const deal = await import('@/app/(dashboard)/(features)/productions/actions/get-deal').then(m => m.getDeal(pageContext.entityId!));
+          const deal = await import('@/app/(dashboard)/(features)/events/actions/get-deal').then(m => m.getDeal(pageContext.entityId!));
           if (deal) {
             const dealTitle = deal.title || 'this deal';
             responseMessages.push({ type: 'text', text: `Hey${name}. You're on ${dealTitle}.` });

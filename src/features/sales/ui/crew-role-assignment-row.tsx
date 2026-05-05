@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X, Lock } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { searchCrewMembers, type CrewSearchResult } from '@/app/(dashboard)/(features)/productions/actions/deal-crew';
+import { searchCrewMembers, type CrewSearchResult } from '@/app/(dashboard)/(features)/events/actions/deal-crew';
 import { checkCrewAvailability, type AvailabilityStatus } from '@/features/ops/actions/check-crew-availability';
 
 export interface CrewRoleAssignmentRowProps {

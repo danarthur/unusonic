@@ -134,7 +134,7 @@ export async function evaluateCalendarCollision(
         },
         priority: 55,
         suggestedAction: 'Flag this to the client before they lock the date.',
-        href: `/productions?selected=${encodeURIComponent(dealId)}`,
+        href: `/events?selected=${encodeURIComponent(dealId)}`,
         urgency: cluster.length >= 3 ? 'high' : 'medium',
       });
     }

@@ -41,7 +41,7 @@ export const navSections: NavSection[] = [
   {
     label: 'Production',
     items: [
-      { id: 'production', label: 'Productions', icon: Productions, iconFilled: ProductionsFilled, href: '/productions' },
+      { id: 'production', label: 'Events', icon: Productions, iconFilled: ProductionsFilled, href: '/events' },
       { id: 'catalog', label: 'Gear', icon: Catalog, iconFilled: CatalogFilled, href: '/catalog' },
       { id: 'finance', label: 'Finance', icon: Finance, iconFilled: FinanceFilled, href: '/finance' },
     ],
@@ -55,7 +55,7 @@ export const allNavItems: NavItem[] = navSections.flatMap((s) => s.items);
 export const dockItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: Lobby, iconFilled: LobbyFilled, href: '/lobby' },
   { id: 'aion', label: 'Aion', icon: Aion, iconFilled: AionFilled, href: '/aion' },
-  { id: 'production', label: 'Productions', icon: Productions, iconFilled: ProductionsFilled, href: '/productions' },
+  { id: 'production', label: 'Events', icon: Productions, iconFilled: ProductionsFilled, href: '/events' },
   { id: 'catalog', label: 'Gear', icon: Catalog, iconFilled: CatalogFilled, href: '/catalog' },
   { id: 'finance', label: 'Finance', icon: Finance, iconFilled: FinanceFilled, href: '/finance' },
 ];

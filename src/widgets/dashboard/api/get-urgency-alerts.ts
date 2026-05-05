@@ -217,7 +217,7 @@ async function fetchOverdueInvoiceAlerts(
           type: 'overdue_invoice',
           title: `Deposit ${daysOverdue}d overdue`,
           detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/productions/deal/${p.deal_id}`,
+          actionUrl: `/events/deal/${p.deal_id}`,
           severity: 'critical',
         });
       }
@@ -239,7 +239,7 @@ async function fetchOverdueInvoiceAlerts(
           type: 'overdue_invoice',
           title: `Balance ${daysOverdue}d overdue`,
           detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/productions/deal/${p.deal_id}`,
+          actionUrl: `/events/deal/${p.deal_id}`,
           severity: 'critical',
         });
       }
@@ -293,7 +293,7 @@ async function fetchExpiringProposalAlerts(
       type: 'expiring_proposal' as const,
       title: `Proposal expires in ${hoursLeft}h`,
       detail: dealMap.get(p.deal_id) ?? 'Untitled deal',
-      actionUrl: `/productions/deal/${p.deal_id}`,
+      actionUrl: `/events/deal/${p.deal_id}`,
       severity: hoursLeft <= 12 ? ('critical' as const) : ('warning' as const),
     };
   });

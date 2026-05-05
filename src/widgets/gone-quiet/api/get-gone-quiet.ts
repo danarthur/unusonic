@@ -46,7 +46,7 @@ async function fetchStalledDeals(
     lastDealValue: null,
     dealId: r.deal_id,
     entityId: null,
-    href: `/productions/deal/${r.deal_id}`,
+    href: `/events/deal/${r.deal_id}`,
   }));
 }
 

@@ -677,7 +677,7 @@ export async function updatePrivateNotes(
     ignoreDuplicates: false,
   });
   if (error) return { ok: false, error: error.message };
-  revalidatePath('/productions');
+  revalidatePath('/events');
   revalidatePath('/network');
   return { ok: true };
 }

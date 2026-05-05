@@ -28,11 +28,11 @@ import type { SessionMeta } from '@/shared/ui/providers/SessionContext';
 import {
   getDealHeaderForScope,
   type DealHeaderForScope,
-} from '@/app/(dashboard)/(features)/productions/actions/get-deal-header-for-scope';
+} from '@/app/(dashboard)/(features)/events/actions/get-deal-header-for-scope';
 import {
   getEventHeaderForScope,
   type EventHeaderForScope,
-} from '@/app/(dashboard)/(features)/productions/actions/get-event-header-for-scope';
+} from '@/app/(dashboard)/(features)/events/actions/get-event-header-for-scope';
 
 /** Header density.
  *  - `full`: sticky 4-field event row (default on /aion)
@@ -87,7 +87,7 @@ function DealScopeHeader({ session }: Props) {
   const title = header?.title ?? session.title ?? 'Deal';
   const stageLabel = header?.stageLabel ?? null;
   const stageKind = header?.stageKind ?? null;
-  const url = header?.url ?? `/productions?selected=${encodeURIComponent(dealId)}`;
+  const url = header?.url ?? `/events?selected=${encodeURIComponent(dealId)}`;
 
   return (
     <div

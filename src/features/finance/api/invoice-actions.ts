@@ -61,7 +61,7 @@ export async function spawnInvoicesFromProposal(
   }
 
   if (eventId) revalidatePath(`/events/${eventId}/finance`);
-  revalidatePath('/productions');
+  revalidatePath('/events');
 
   return {
     invoices: (data as Array<{ invoice_id: string; invoice_kind: string }>) ?? [],
@@ -194,7 +194,7 @@ async function callRecordPaymentRpc(
   }
 
   if (eventId) revalidatePath(`/events/${eventId}/finance`);
-  revalidatePath('/productions');
+  revalidatePath('/events');
   revalidatePath('/finance');
 
   return { paymentId: paymentId as string, error: null };

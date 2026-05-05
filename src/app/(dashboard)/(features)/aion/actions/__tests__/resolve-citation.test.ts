@@ -156,7 +156,7 @@ describe('resolveCitation — happy paths', () => {
     expect(result).not.toBeNull();
     expect(result!.kind).toBe('deal');
     expect(result!.label).toBe('Henderson Holiday');
-    expect(result!.href).toBe(`/productions?selected=${VALID_UUID}`);
+    expect(result!.href).toBe(`/events?selected=${VALID_UUID}`);
     // Snippet composes: "won · May 2025 · corporate_gala"
     expect(result!.snippet).toContain('won');
     expect(result!.snippet).toContain('May 2025');

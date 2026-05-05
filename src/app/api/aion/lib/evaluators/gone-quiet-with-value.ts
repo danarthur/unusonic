@@ -167,7 +167,7 @@ export async function evaluateGoneQuietWithValue(
       },
       priority,
       suggestedAction: 'Reach out — this one\u2019s worth the call',
-      href: `/productions/deal/${deal.id}`,
+      href: `/events/deal/${deal.id}`,
       urgency,
     };
   });

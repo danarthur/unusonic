@@ -272,7 +272,7 @@ async function handleSubmissionCompleted(payload: DocuSealSubmission): Promise<v
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
   const portalUrl = p.public_token ? `${baseUrl}/p/${p.public_token}` : baseUrl;
-  const crmUrl = p.deal_id ? `${baseUrl}/productions/deals/${p.deal_id}` : `${baseUrl}/productions`;
+  const crmUrl = p.deal_id ? `${baseUrl}/events/deals/${p.deal_id}` : `${baseUrl}/events`;
 
   const signerName = submitter.name?.trim() || submitter.email;
 

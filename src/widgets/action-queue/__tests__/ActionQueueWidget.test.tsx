@@ -20,7 +20,7 @@ const sampleAction: ActionItem = {
   priority: 'today',
   title: 'Follow up with Villa Azul',
   detail: 'Proposal sent 3 days ago',
-  actionUrl: '/productions/deal-1',
+  actionUrl: '/events/deal-1',
   actionLabel: 'Open',
 };
 

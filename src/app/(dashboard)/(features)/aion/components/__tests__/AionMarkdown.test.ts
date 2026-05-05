@@ -84,7 +84,7 @@ describe('parseCitationHref', () => {
 
   it('returns null for normal URLs', () => {
     expect(parseCitationHref('https://example.com')).toBeNull();
-    expect(parseCitationHref('/productions')).toBeNull();
+    expect(parseCitationHref('/events')).toBeNull();
     expect(parseCitationHref('mailto:a@b.c')).toBeNull();
   });
 

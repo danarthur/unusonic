@@ -67,6 +67,6 @@ export async function updateOrg(input: UpdateOrgInput): Promise<UpdateOrgResult>
   }
 
   revalidatePath('/network');
-  revalidatePath('/productions');
+  revalidatePath('/events');
   return { ok: true };
 }

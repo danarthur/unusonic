@@ -104,7 +104,7 @@ export async function createPipelineStage(input: CreateStageInput): Promise<Stag
   }
 
   revalidatePath('/settings/pipeline');
-  revalidatePath('/productions');
+  revalidatePath('/events');
   return { success: true, stageId: newId as unknown as string };
 }
 
@@ -143,7 +143,7 @@ export async function updatePipelineStage(
   if (error) return { success: false, error: error.message };
 
   revalidatePath('/settings/pipeline');
-  revalidatePath('/productions');
+  revalidatePath('/events');
   return { success: true, stageId };
 }
 
@@ -176,7 +176,7 @@ export async function archivePipelineStage(stageId: string): Promise<StageResult
   if (error) return { success: false, error: error.message };
 
   revalidatePath('/settings/pipeline');
-  revalidatePath('/productions');
+  revalidatePath('/events');
   return { success: true, stageId };
 }
 
@@ -201,7 +201,7 @@ export async function reorderPipelineStages(
   if (error) return { success: false, error: error.message };
 
   revalidatePath('/settings/pipeline');
-  revalidatePath('/productions');
+  revalidatePath('/events');
   return { success: true };
 }
 
@@ -271,6 +271,6 @@ export async function updatePipelineStageTriggers(
   if (error) return { success: false, error: error.message };
 
   revalidatePath('/settings/pipeline');
-  revalidatePath('/productions');
+  revalidatePath('/events');
   return { success: true, stageId };
 }

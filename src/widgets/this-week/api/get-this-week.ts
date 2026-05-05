@@ -67,7 +67,7 @@ function placeDeals(rows: DealRow[], dayIndex: Map<string, ThisWeekDay>) {
     if (!day) continue;
     day.entries.push({
       id: d.id, kind: 'tentative', title: d.title ?? 'Untitled deal',
-      venueName: null, startIso: `${d.proposed_date}T00:00:00`, href: `/productions/deal/${d.id}`, dealId: d.id,
+      venueName: null, startIso: `${d.proposed_date}T00:00:00`, href: `/events/deal/${d.id}`, dealId: d.id,
     });
   }
 }

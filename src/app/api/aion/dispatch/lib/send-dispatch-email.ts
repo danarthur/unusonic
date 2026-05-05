@@ -7,7 +7,7 @@
  * instead of falling through to the global EMAIL_FROM.
  */
 
-import { logFollowUpAction } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
+import { logFollowUpAction } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 import { recordAionAction } from '@/features/intelligence/lib/aion-gate';
 import { getResend, getWorkspaceFrom } from '@/shared/api/email/core';
 

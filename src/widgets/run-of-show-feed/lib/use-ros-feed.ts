@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchCues } from '@/app/(dashboard)/(features)/productions/actions/ros';
+import { fetchCues } from '@/app/(dashboard)/(features)/events/actions/ros';
 import { useNextGig } from '@/widgets/live-gig-monitor';
 
 export type CueRow = {

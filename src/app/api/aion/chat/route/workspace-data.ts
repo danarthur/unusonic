@@ -7,7 +7,7 @@
  */
 
 import { createClient } from '@/shared/api/supabase/server';
-import { getFollowUpQueue } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
+import { getFollowUpQueue } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 import { getDealPipeline } from '@/widgets/dashboard/api/get-deal-pipeline';
 import { getFinancialPulse } from '@/widgets/dashboard/api/get-financial-pulse';
 import type { WorkspaceSnapshot } from './prompts';

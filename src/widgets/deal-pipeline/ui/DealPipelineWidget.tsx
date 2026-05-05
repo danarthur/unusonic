@@ -68,7 +68,7 @@ export function DealPipelineWidget({ data, loading }: DealPipelineWidgetProps) {
     <WidgetShell
       icon={GitBranch}
       label={META.title}
-      href="/productions"
+      href="/events"
       hrefLabel="View all deals"
       loading={loading}
       empty={isEmpty && !loading}
@@ -114,7 +114,7 @@ export function DealPipelineWidget({ data, loading }: DealPipelineWidgetProps) {
                     }}
                     onMouseEnter={() => setHoveredIndex(i)}
                     onMouseLeave={() => setHoveredIndex(null)}
-                    onClick={() => router.push(`/productions?status=${stage.status}`)}
+                    onClick={() => router.push(`/events?status=${stage.status}`)}
                     aria-label={`${stage.label}: ${stage.count} deals, ${formatCompactCurrency(stage.totalValue)}`}
                   />
                 );
@@ -156,7 +156,7 @@ export function DealPipelineWidget({ data, loading }: DealPipelineWidgetProps) {
               <button
                 key={stage.status}
                 className="flex flex-col items-start gap-0.5 px-1.5 py-1 cursor-pointer border-0 outline-none bg-transparent rounded-[var(--stage-radius-input,6px)] hover:bg-[oklch(1_0_0/0.08)] transition-colors"
-                onClick={() => router.push(`/productions?status=${stage.status}`)}
+                onClick={() => router.push(`/events?status=${stage.status}`)}
               >
                 <span className="flex items-center gap-1.5">
                   <span

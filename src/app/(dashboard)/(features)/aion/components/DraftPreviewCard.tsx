@@ -7,7 +7,7 @@ import { cn } from '@/shared/lib/utils';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { normalizedEditDistance, classifyEdit } from '@/shared/lib/edit-distance';
-import { logFollowUpAction } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
+import { logFollowUpAction } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 
 export type DraftEditedData = {
   dealId: string;

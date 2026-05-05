@@ -15,7 +15,7 @@ const RunOfShow = dynamic(
   { ssr: false, loading: () => <div className="flex items-center justify-center p-8"><div className="h-8 w-8 stage-skeleton rounded-lg" /></div> },
 );
 
-import type { Cue, Section, AssignedCrewEntry } from '@/app/(dashboard)/(features)/productions/actions/run-of-show-types';
+import type { Cue, Section, AssignedCrewEntry } from '@/app/(dashboard)/(features)/events/actions/run-of-show-types';
 import {
   createCue, updateCue, deleteCue, duplicateCue, fetchCues,
   createSection, updateSection, deleteSection, fetchSections,
@@ -25,7 +25,7 @@ import {
   type RosExecutionState,
 } from '@/features/run-of-show/api/ros-execution';
 import { LiveMode } from '@/widgets/run-of-show/ui/live-mode';
-import { CueInspector } from '@/app/(dashboard)/(features)/productions/components/CueInspector';
+import { CueInspector } from '@/app/(dashboard)/(features)/events/components/CueInspector';
 
 interface RosEditorWorkspaceProps {
   eventId: string;

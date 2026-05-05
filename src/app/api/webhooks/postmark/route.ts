@@ -533,7 +533,7 @@ async function maybeFireUrgentInsight(
         from_address: fromAddress,
         preview,
         suggestedAction: 'Open the Replies card and respond',
-        href: `/productions?selected=${dealId}`,
+        href: `/events?selected=${dealId}`,
         urgency: 'high',
       },
       p_priority: 80,

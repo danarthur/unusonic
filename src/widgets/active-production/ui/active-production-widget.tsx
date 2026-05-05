@@ -118,7 +118,7 @@ export function ActiveProductionWidget() {
           )}
         </div>
 
-        <Link href="/productions" className="block w-full mt-4">
+        <Link href="/events" className="block w-full mt-4">
           <motion.button
             type="button"
             transition={M3_ENTER}

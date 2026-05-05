@@ -43,7 +43,7 @@ async function setExecutionState(eventId: string, state: RosExecutionState | nul
     .eq('id', eventId);
 
   if (error) throw new Error(error.message);
-  revalidatePath(`/productions/${eventId}`);
+  revalidatePath(`/events/${eventId}/run-of-show`);
 }
 
 /* ── Actions ──────────────────────────────────────────────────── */

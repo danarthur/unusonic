@@ -42,7 +42,7 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
     <WidgetShell
       icon={Radio}
       label="Live Gig Monitor"
-      href={gig ? `/productions/${gig.id}` : undefined}
+      href={gig ? `/events/${gig.id}/run-of-show` : undefined}
       hrefLabel="View gig"
       loading={loading}
       skeletonRows={2}
@@ -140,7 +140,7 @@ export function LiveGigMonitorWidget({ levitate: _levitate = false }: LiveGigMon
       {gig && (
         <div className="flex gap-2 mt-4">
           <Link
-            href={`/productions/${gig.id}`}
+            href={`/events/${gig.id}/run-of-show`}
             className={cn(
               'flex-1 inline-flex items-center justify-center w-full m3-btn-outlined stage-label',
               'transition-colors hover:bg-[oklch(1_0_0_/_0.08)]'

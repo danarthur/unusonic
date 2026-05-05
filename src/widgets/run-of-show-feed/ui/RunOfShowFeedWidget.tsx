@@ -23,7 +23,7 @@ export function RunOfShowFeedWidget() {
     <WidgetShell
       icon={RunOfShow}
       label={META.title}
-      href={eventId ? `/productions/${eventId}` : undefined}
+      href={eventId ? `/events/${eventId}/run-of-show` : undefined}
       hrefLabel="Full run of show"
       loading={loading}
       skeletonRows={3}

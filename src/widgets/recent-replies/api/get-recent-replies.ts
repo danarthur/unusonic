@@ -190,7 +190,7 @@ export async function getRecentReplies(limit = DEFAULT_LIMIT): Promise<RecentRep
         // Deep-link to the CRM page with the deal selected. Phase 2C may
         // add ?thread= and ?message= for scroll-into-view; Phase 1 just
         // opens the deal lens and the user scrolls to the Replies card.
-        dealHref: dealId ? `/productions?selected=${dealId}` : null,
+        dealHref: dealId ? `/events?selected=${dealId}` : null,
       };
     });
 

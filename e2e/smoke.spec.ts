@@ -21,14 +21,14 @@ test.describe('Smoke: login and dashboard', () => {
 
     // Should land on dashboard (lobby) or onboarding
     const url = page.url();
-    expect(url).toMatch(/\/(lobby|onboarding|crm|schedule)/);
+    expect(url).toMatch(/\/(lobby|onboarding|events|schedule)/);
   });
 
   test('unauthenticated user is redirected to login', async ({ page }) => {
     // Clear any cookies
     await page.context().clearCookies();
 
-    await page.goto('/productions');
+    await page.goto('/events');
     await expect(page).toHaveURL(/\/login/);
   });
 
@@ -64,8 +64,8 @@ test.describe('Smoke: CRM deal creation', () => {
   });
 
   test('can navigate to CRM page', async ({ page }) => {
-    await page.goto('/productions');
+    await page.goto('/events');
     // Should see the CRM page or be redirected to it
-    await expect(page).toHaveURL(/\/productions/);
+    await expect(page).toHaveURL(/\/events/);
   });
 });

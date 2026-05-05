@@ -101,7 +101,7 @@ export async function evaluateStageAdvanceSuggestion(
         },
         priority: 32,
         suggestedAction: 'Advance to Proposal',
-        href: `/productions/deal/${deal.id}`,
+        href: `/events/deal/${deal.id}`,
         urgency: 'medium',
       });
     }
@@ -137,7 +137,7 @@ export async function evaluateStageAdvanceSuggestion(
         },
         priority: 38,
         suggestedAction: 'Advance to Contract',
-        href: `/productions/deal/${deal.id}`,
+        href: `/events/deal/${deal.id}`,
         urgency: 'high',
       });
     }

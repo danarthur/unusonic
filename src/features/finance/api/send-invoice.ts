@@ -334,7 +334,7 @@ export async function sendInvoice(
 
   // ── Revalidate ─────────────────────────────────────────────────────────────
   if (eventId) revalidatePath(`/events/${eventId}/finance`);
-  revalidatePath('/productions');
+  revalidatePath('/events');
   revalidatePath('/finance');
 
   return { success: true, invoiceNumber: invoiceNumber as string, error: null };

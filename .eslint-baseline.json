@@ -210,50 +210,50 @@
       "react-hooks/exhaustive-deps": 4,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/[id]/run-of-show-client.tsx": {
+    "src/app/(dashboard)/(features)/events/[id]/run-of-show/run-of-show-client.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/__tests__/deal-mutations.test.ts": {
+    "src/app/(dashboard)/(features)/events/actions/__tests__/deal-mutations.test.ts": {
       "@typescript-eslint/no-explicit-any": 5
     },
-    "src/app/(dashboard)/(features)/productions/actions/__tests__/get-crew-roles-from-proposal.test.ts": {
+    "src/app/(dashboard)/(features)/events/actions/__tests__/get-crew-roles-from-proposal.test.ts": {
       "@typescript-eslint/no-explicit-any": 6
     },
-    "src/app/(dashboard)/(features)/productions/actions/__tests__/proactive-line-actions.test.ts": {
+    "src/app/(dashboard)/(features)/events/actions/__tests__/proactive-line-actions.test.ts": {
       "@typescript-eslint/no-unused-vars": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/add-show-to-series.ts": {
+    "src/app/(dashboard)/(features)/events/actions/add-show-to-series.ts": {
       "complexity": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/aion-card-actions.ts": {
+    "src/app/(dashboard)/(features)/events/actions/aion-card-actions.ts": {
       "_unknown": 2,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/aion-suggestion-actions.ts": {
+    "src/app/(dashboard)/(features)/events/actions/aion-suggestion-actions.ts": {
       "_unknown": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/apply-call-time-rules.ts": {
+    "src/app/(dashboard)/(features)/events/actions/apply-call-time-rules.ts": {
       "complexity": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/apply-crew-to-series.ts": {
+    "src/app/(dashboard)/(features)/events/actions/apply-crew-to-series.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/assign-or-add-crew-member.ts": {
+    "src/app/(dashboard)/(features)/events/actions/assign-or-add-crew-member.ts": {
       "max-lines-per-function": 1,
       "max-params": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/check-date-feasibility.ts": {
+    "src/app/(dashboard)/(features)/events/actions/check-date-feasibility.ts": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/compile-and-send-day-sheet.ts": {
+    "src/app/(dashboard)/(features)/events/actions/compile-and-send-day-sheet.ts": {
       "@eslint-community/eslint-comments/require-description": 1,
       "@typescript-eslint/no-unused-vars": 1,
       "_unknown": 1,
@@ -263,28 +263,28 @@
       "no-nested-ternary": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/compile-day-sheet-data.ts": {
+    "src/app/(dashboard)/(features)/events/actions/compile-day-sheet-data.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/conflict-resolution.ts": {
+    "src/app/(dashboard)/(features)/events/actions/conflict-resolution.ts": {
       "complexity": 1,
       "max-depth": 2,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/crew-hub/comms-log.ts": {
+    "src/app/(dashboard)/(features)/events/actions/crew-hub/comms-log.ts": {
       "@eslint-community/eslint-comments/require-description": 3,
       "_unknown": 3
     },
-    "src/app/(dashboard)/(features)/productions/actions/crew-hub/gear.ts": {
+    "src/app/(dashboard)/(features)/events/actions/crew-hub/gear.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/crew-hub/transitions.ts": {
+    "src/app/(dashboard)/(features)/events/actions/crew-hub/transitions.ts": {
       "@eslint-community/eslint-comments/require-description": 5,
       "_unknown": 5,
       "complexity": 1,
@@ -292,21 +292,21 @@
       "no-nested-ternary": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/crew-hub/waypoints.ts": {
+    "src/app/(dashboard)/(features)/events/actions/crew-hub/waypoints.ts": {
       "complexity": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/crystallize-deal.ts": {
+    "src/app/(dashboard)/(features)/events/actions/crystallize-deal.ts": {
       "complexity": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/deal-actions.ts": {
+    "src/app/(dashboard)/(features)/events/actions/deal-actions.ts": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/deal-crew/main.ts": {
+    "src/app/(dashboard)/(features)/events/actions/deal-crew/main.ts": {
       "@eslint-community/eslint-comments/require-description": 1,
       "_unknown": 1,
       "complexity": 5,
@@ -315,7 +315,7 @@
       "max-lines-per-function": 4,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/deal-crew/search.ts": {
+    "src/app/(dashboard)/(features)/events/actions/deal-crew/search.ts": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 2,
       "max-lines": 1,
@@ -323,58 +323,58 @@
       "no-restricted-syntax": 9,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/deal-crew/sync-from-proposal.ts": {
+    "src/app/(dashboard)/(features)/events/actions/deal-crew/sync-from-proposal.ts": {
       "complexity": 1,
       "max-depth": 3,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/deal-notes.ts": {
+    "src/app/(dashboard)/(features)/events/actions/deal-notes.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/deal-stakeholders.ts": {
+    "src/app/(dashboard)/(features)/events/actions/deal-stakeholders.ts": {
       "complexity": 6,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "no-restricted-syntax": 13,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/event-actions.ts": {
+    "src/app/(dashboard)/(features)/events/actions/event-actions.ts": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/event-gear-items/availability.ts": {
+    "src/app/(dashboard)/(features)/events/actions/event-gear-items/availability.ts": {
       "complexity": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/event-gear-items/crew-source.ts": {
+    "src/app/(dashboard)/(features)/events/actions/event-gear-items/crew-source.ts": {
       "complexity": 2,
       "max-lines-per-function": 2,
       "no-restricted-syntax": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/event-gear-items/crud.ts": {
+    "src/app/(dashboard)/(features)/events/actions/event-gear-items/crud.ts": {
       "complexity": 1,
       "no-restricted-syntax": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/event-gear-items/rollup.ts": {
+    "src/app/(dashboard)/(features)/events/actions/event-gear-items/rollup.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "no-restricted-syntax": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/follow-up-actions.ts": {
+    "src/app/(dashboard)/(features)/events/actions/follow-up-actions.ts": {
       "@typescript-eslint/no-explicit-any": 7,
       "complexity": 3,
       "max-lines": 1,
       "max-params": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/generate-day-sheet-tokens.ts": {
+    "src/app/(dashboard)/(features)/events/actions/generate-day-sheet-tokens.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-aion-card-for-deal.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-aion-card-for-deal.ts": {
       "_unknown": 10,
       "complexity": 1,
       "max-lines": 1,
@@ -382,136 +382,136 @@
       "max-params": 1,
       "no-restricted-syntax": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-crew-decision-data.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-crew-decision-data.ts": {
       "complexity": 1,
       "max-depth": 8,
       "max-lines-per-function": 1,
       "no-restricted-syntax": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-crew-roles-from-proposal.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-crew-roles-from-proposal.ts": {
       "complexity": 2,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-crm-gigs.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-crm-gigs.ts": {
       "complexity": 2,
       "max-depth": 2,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-day-resource-view.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-day-resource-view.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-deal-activity.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-deal-activity.ts": {
       "_unknown": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-deal-client.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-deal-client.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-deal-header-for-scope.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-deal-header-for-scope.ts": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-deal-shows.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-deal-shows.ts": {
       "complexity": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-deal-signals.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-deal-signals.ts": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-deal-timeline.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-deal-timeline.ts": {
       "_unknown": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-deal.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-deal.ts": {
       "complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-event-signals.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-event-signals.ts": {
       "complexity": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-gear-from-proposal.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-gear-from-proposal.ts": {
       "complexity": 1,
       "max-depth": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-venue-intel.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-venue-intel.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "no-restricted-syntax": 39
     },
-    "src/app/(dashboard)/(features)/productions/actions/get-workspace-members.ts": {
+    "src/app/(dashboard)/(features)/events/actions/get-workspace-members.ts": {
       "no-restricted-syntax": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/gig-actions.ts": {
+    "src/app/(dashboard)/(features)/events/actions/gig-actions.ts": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/handover-deal.ts": {
+    "src/app/(dashboard)/(features)/events/actions/handover-deal.ts": {
       "complexity": 2,
       "max-lines": 1,
       "max-lines-per-function": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/lookup.ts": {
+    "src/app/(dashboard)/(features)/events/actions/lookup.ts": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 2,
       "max-lines": 1,
       "no-restricted-syntax": 2
     },
-    "src/app/(dashboard)/(features)/productions/actions/reclassify-client-entity.ts": {
+    "src/app/(dashboard)/(features)/events/actions/reclassify-client-entity.ts": {
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/resolve-deal-hosts.ts": {
+    "src/app/(dashboard)/(features)/events/actions/resolve-deal-hosts.ts": {
       "complexity": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/search-referrer.ts": {
+    "src/app/(dashboard)/(features)/events/actions/search-referrer.ts": {
       "complexity": 1,
       "max-depth": 4,
       "max-lines-per-function": 1,
       "no-restricted-syntax": 4,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/seed-handoff-narrative.ts": {
+    "src/app/(dashboard)/(features)/events/actions/seed-handoff-narrative.ts": {
       "_unknown": 1,
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/send-client-update.ts": {
+    "src/app/(dashboard)/(features)/events/actions/send-client-update.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 3,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/sync-crew-rates-to-assignments.ts": {
+    "src/app/(dashboard)/(features)/events/actions/sync-crew-rates-to-assignments.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/update-deal-scalars.ts": {
+    "src/app/(dashboard)/(features)/events/actions/update-deal-scalars.ts": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/actions/update-deal-status.ts": {
+    "src/app/(dashboard)/(features)/events/actions/update-deal-status.ts": {
       "@typescript-eslint/no-explicit-any": 1,
       "complexity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/archive/page.tsx": {
+    "src/app/(dashboard)/(features)/events/archive/page.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/CueInspector.tsx": {
+    "src/app/(dashboard)/(features)/events/components/CueInspector.tsx": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/advancing-checklist.tsx": {
+    "src/app/(dashboard)/(features)/events/components/advancing-checklist.tsx": {
       "@eslint-community/eslint-comments/require-description": 2,
       "@typescript-eslint/no-unused-vars": 2,
       "complexity": 2,
@@ -520,61 +520,61 @@
       "no-nested-ternary": 7,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/aion-deal-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/aion-deal-card.tsx": {
       "complexity": 3,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 2,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/aion-deal-card/footer-actions.tsx": {
+    "src/app/(dashboard)/(features)/events/components/aion-deal-card/footer-actions.tsx": {
       "no-nested-ternary": 3
     },
-    "src/app/(dashboard)/(features)/productions/components/aion-deal-card/nudge-composer.tsx": {
+    "src/app/(dashboard)/(features)/events/components/aion-deal-card/nudge-composer.tsx": {
       "no-nested-ternary": 4
     },
-    "src/app/(dashboard)/(features)/productions/components/aion-deal-card/signals.ts": {
+    "src/app/(dashboard)/(features)/events/components/aion-deal-card/signals.ts": {
       "complexity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/aion-plan-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/aion-plan-card.tsx": {
       "max-lines": 1,
       "react-hooks/purity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/aion-suggestion-row.tsx": {
+    "src/app/(dashboard)/(features)/events/components/aion-suggestion-row.tsx": {
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/brief-overlay.tsx": {
+    "src/app/(dashboard)/(features)/events/components/brief-overlay.tsx": {
       "complexity": 1,
       "no-nested-ternary": 1,
       "react-hooks/set-state-in-effect": 2,
       "stage-engineering/no-raw-colors": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/call-times-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/call-times-card.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/ceramic-date-picker.tsx": {
+    "src/app/(dashboard)/(features)/events/components/ceramic-date-picker.tsx": {
       "@eslint-community/eslint-comments/require-description": 1,
       "complexity": 1,
       "max-lines": 1,
       "react-hooks/refs": 1,
       "react-hooks/set-state-in-effect": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/client-connector.tsx": {
+    "src/app/(dashboard)/(features)/events/components/client-connector.tsx": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/client-identity-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/client-identity-card.tsx": {
       "complexity": 3,
       "max-lines": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/completion-indicators.tsx": {
+    "src/app/(dashboard)/(features)/events/components/completion-indicators.tsx": {
       "complexity": 1,
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/confirmed-crew-row.tsx": {
+    "src/app/(dashboard)/(features)/events/components/confirmed-crew-row.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 2,
       "max-lines": 1,
@@ -582,25 +582,25 @@
       "react-hooks/set-state-in-effect": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/conflicts-panel.tsx": {
+    "src/app/(dashboard)/(features)/events/components/conflicts-panel.tsx": {
       "complexity": 1,
       "max-lines": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/couple-edit-sheet.tsx": {
+    "src/app/(dashboard)/(features)/events/components/couple-edit-sheet.tsx": {
       "react-hooks/exhaustive-deps": 1,
       "react-hooks/set-state-in-effect": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal.tsx": {
       "complexity": 3,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/cast-summary.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/cast-summary.tsx": {
       "complexity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/date-stage.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/date-stage.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 3,
       "max-lines": 1,
@@ -608,33 +608,33 @@
       "react-hooks/refs": 1,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/event-type-combobox.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/event-type-combobox.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1,
       "jsx-a11y/role-has-required-aria-props": 1,
       "no-nested-ternary": 1,
       "react-hooks/refs": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/feasibility-chip.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/feasibility-chip.tsx": {
       "complexity": 1,
       "max-lines": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/lead-source-selector.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/lead-source-selector.tsx": {
       "@typescript-eslint/no-unused-vars": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/planner-picker.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/planner-picker.tsx": {
       "react-hooks/refs": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/poc-selector.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/poc-selector.tsx": {
       "react-hooks/refs": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/tour-calendar.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/tour-calendar.tsx": {
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/create-gig-modal/venue-picker.tsx": {
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal/venue-picker.tsx": {
       "react-hooks/refs": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/crew-detail-rail.tsx": {
+    "src/app/(dashboard)/(features)/events/components/crew-detail-rail.tsx": {
       "complexity": 2,
       "max-lines": 1,
       "max-lines-per-function": 1,
@@ -642,25 +642,25 @@
       "react-hooks/set-state-in-effect": 3,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/crew-detail-rail/gear-section.tsx": {
+    "src/app/(dashboard)/(features)/events/components/crew-detail-rail/gear-section.tsx": {
       "complexity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/crew-detail-rail/header.tsx": {
+    "src/app/(dashboard)/(features)/events/components/crew-detail-rail/header.tsx": {
       "complexity": 1,
       "no-nested-ternary": 3
     },
-    "src/app/(dashboard)/(features)/productions/components/crew-detail-rail/timeline-section.tsx": {
+    "src/app/(dashboard)/(features)/events/components/crew-detail-rail/timeline-section.tsx": {
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/crew-identity-row.tsx": {
+    "src/app/(dashboard)/(features)/events/components/crew-identity-row.tsx": {
       "@next/next/no-img-element": 1,
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1,
       "no-nested-ternary": 2,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/crew-picker.tsx": {
+    "src/app/(dashboard)/(features)/events/components/crew-picker.tsx": {
       "complexity": 2,
       "max-lines": 1,
       "max-lines-per-function": 1,
@@ -670,22 +670,22 @@
       "sonarjs/cognitive-complexity": 1,
       "stage-engineering/no-forbidden-classnames": 3
     },
-    "src/app/(dashboard)/(features)/productions/components/crm-production-queue.tsx": {
+    "src/app/(dashboard)/(features)/events/components/crm-production-queue.tsx": {
       "complexity": 1,
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/cross-show-resource-modal.tsx": {
+    "src/app/(dashboard)/(features)/events/components/cross-show-resource-modal.tsx": {
       "@typescript-eslint/no-unused-vars": 7,
       "complexity": 2,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/day-sheet-preview.tsx": {
+    "src/app/(dashboard)/(features)/events/components/day-sheet-preview.tsx": {
       "complexity": 1,
       "max-lines": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/deal-details-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/deal-details-card.tsx": {
       "complexity": 2,
       "max-lines": 1,
       "max-lines-per-function": 1,
@@ -693,7 +693,7 @@
       "react-hooks/purity": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/deal-diary-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/deal-diary-card.tsx": {
       "@next/next/no-img-element": 2,
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 2,
@@ -702,13 +702,13 @@
       "react-hooks/set-state-in-effect": 1,
       "react-hooks/static-components": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/deal-header-strip-identity-row.tsx": {
+    "src/app/(dashboard)/(features)/events/components/deal-header-strip-identity-row.tsx": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/deal-header-strip-stakeholder-chip.tsx": {
+    "src/app/(dashboard)/(features)/events/components/deal-header-strip-stakeholder-chip.tsx": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/deal-header-strip.tsx": {
+    "src/app/(dashboard)/(features)/events/components/deal-header-strip.tsx": {
       "@eslint-community/eslint-comments/require-description": 4,
       "complexity": 1,
       "max-lines": 1,
@@ -716,7 +716,7 @@
       "no-nested-ternary": 7,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/deal-lens.tsx": {
+    "src/app/(dashboard)/(features)/events/components/deal-lens.tsx": {
       "@eslint-community/eslint-comments/require-description": 1,
       "@typescript-eslint/no-unused-vars": 7,
       "_unknown": 1,
@@ -728,11 +728,11 @@
       "react-hooks/purity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/deal-shows-list.tsx": {
+    "src/app/(dashboard)/(features)/events/components/deal-shows-list.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "react-hooks/refs": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/dispatch-summary.tsx": {
+    "src/app/(dashboard)/(features)/events/components/dispatch-summary.tsx": {
       "@typescript-eslint/no-unused-vars": 2,
       "complexity": 2,
       "max-lines": 1,
@@ -742,40 +742,40 @@
       "react-hooks/set-state-in-effect": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/dj-prep-summary-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/dj-prep-summary-card.tsx": {
       "@typescript-eslint/no-explicit-any": 6,
       "complexity": 1,
       "stage-engineering/no-forbidden-classnames": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/financial-summary-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/financial-summary-card.tsx": {
       "@typescript-eslint/no-unused-vars": 2,
       "complexity": 1,
       "no-nested-ternary": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/flight-checks/AssignCrewSheet.tsx": {
+    "src/app/(dashboard)/(features)/events/components/flight-checks/AssignCrewSheet.tsx": {
       "react-hooks/exhaustive-deps": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/flight-checks/CrewFlightCheck.tsx": {
+    "src/app/(dashboard)/(features)/events/components/flight-checks/CrewFlightCheck.tsx": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/flight-checks/GearFlightCheck.tsx": {
+    "src/app/(dashboard)/(features)/events/components/flight-checks/GearFlightCheck.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/flight-checks/gear-flight-check/gear-item-row.tsx": {
+    "src/app/(dashboard)/(features)/events/components/flight-checks/gear-flight-check/gear-item-row.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/follow-up-action-log.tsx": {
+    "src/app/(dashboard)/(features)/events/components/follow-up-action-log.tsx": {
       "complexity": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/follow-up-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/follow-up-card.tsx": {
       "@typescript-eslint/no-explicit-any": 1,
       "@typescript-eslint/no-unused-vars": 5,
       "complexity": 1,
@@ -783,59 +783,59 @@
       "max-lines-per-function": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/handoff-wizard.tsx": {
+    "src/app/(dashboard)/(features)/events/components/handoff-wizard.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/individual-edit-sheet.tsx": {
+    "src/app/(dashboard)/(features)/events/components/individual-edit-sheet.tsx": {
       "react-hooks/exhaustive-deps": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/lead-source-sheet.tsx": {
+    "src/app/(dashboard)/(features)/events/components/lead-source-sheet.tsx": {
       "@typescript-eslint/no-unused-vars": 2,
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "react-hooks/set-state-in-effect": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/ledger-lens.tsx": {
+    "src/app/(dashboard)/(features)/events/components/ledger-lens.tsx": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/next-actions-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/next-actions-card.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1,
       "max-params": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/ops-actions-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/ops-actions-card.tsx": {
       "@typescript-eslint/no-unused-vars": 3,
       "complexity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/people-strip.tsx": {
+    "src/app/(dashboard)/(features)/events/components/people-strip.tsx": {
       "complexity": 2,
       "max-lines": 1,
       "no-nested-ternary": 4,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/plan-lens.tsx": {
+    "src/app/(dashboard)/(features)/events/components/plan-lens.tsx": {
       "@typescript-eslint/no-unused-vars": 4,
       "complexity": 4,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "react-hooks/set-state-in-effect": 3
     },
-    "src/app/(dashboard)/(features)/productions/components/plan-vitals-row.tsx": {
+    "src/app/(dashboard)/(features)/events/components/plan-vitals-row.tsx": {
       "complexity": 2,
       "max-lines": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/plan-vitals-strip.tsx": {
+    "src/app/(dashboard)/(features)/events/components/plan-vitals-strip.tsx": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/prism.tsx": {
+    "src/app/(dashboard)/(features)/events/components/prism.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1,
       "max-lines": 1,
@@ -844,14 +844,14 @@
       "react-hooks/set-state-in-effect": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/production-team-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/production-team-card.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 4,
       "react-hooks/set-state-in-effect": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/proposal-builder-studio.tsx": {
+    "src/app/(dashboard)/(features)/events/components/proposal-builder-studio.tsx": {
       "@typescript-eslint/no-explicit-any": 1,
       "@typescript-eslint/no-unused-vars": 2,
       "complexity": 2,
@@ -860,7 +860,7 @@
       "no-nested-ternary": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/proposal-builder/catalog-picker.tsx": {
+    "src/app/(dashboard)/(features)/events/components/proposal-builder/catalog-picker.tsx": {
       "@typescript-eslint/no-explicit-any": 2,
       "complexity": 1,
       "max-lines": 1,
@@ -868,7 +868,7 @@
       "no-nested-ternary": 6,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/proposal-builder/document.tsx": {
+    "src/app/(dashboard)/(features)/events/components/proposal-builder/document.tsx": {
       "@typescript-eslint/no-unused-vars": 14,
       "complexity": 3,
       "max-lines": 1,
@@ -878,7 +878,7 @@
       "react-hooks/set-state-in-effect": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/proposal-builder/inspectors.tsx": {
+    "src/app/(dashboard)/(features)/events/components/proposal-builder/inspectors.tsx": {
       "complexity": 5,
       "max-lines": 1,
       "max-lines-per-function": 1,
@@ -888,12 +888,12 @@
       "react-hooks/set-state-in-effect": 2,
       "sonarjs/cognitive-complexity": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/proposal-builder/sidebar.tsx": {
+    "src/app/(dashboard)/(features)/events/components/proposal-builder/sidebar.tsx": {
       "max-lines": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/proposal-builder/team-picker.tsx": {
+    "src/app/(dashboard)/(features)/events/components/proposal-builder/team-picker.tsx": {
       "complexity": 2,
       "max-lines": 1,
       "max-lines-per-function": 1,
@@ -901,22 +901,22 @@
       "sonarjs/cognitive-complexity": 1,
       "stage-engineering/no-forbidden-classnames": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/readiness-ribbon.tsx": {
+    "src/app/(dashboard)/(features)/events/components/readiness-ribbon.tsx": {
       "@typescript-eslint/no-unused-vars": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/show-control-strip.tsx": {
+    "src/app/(dashboard)/(features)/events/components/show-control-strip.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1,
       "react-hooks/purity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/show-day-contacts-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/show-day-contacts-card.tsx": {
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/show-health-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/show-health-card.tsx": {
       "no-nested-ternary": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/stakeholder-grid.tsx": {
+    "src/app/(dashboard)/(features)/events/components/stakeholder-grid.tsx": {
       "@next/next/no-img-element": 1,
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 2,
@@ -925,76 +925,76 @@
       "no-nested-ternary": 2,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/stream-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/stream-card.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1,
       "no-nested-ternary": 4,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/stream-filter-chips.tsx": {
+    "src/app/(dashboard)/(features)/events/components/stream-filter-chips.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "react-hooks/set-state-in-effect": 2
     },
-    "src/app/(dashboard)/(features)/productions/components/stream-filter.ts": {
+    "src/app/(dashboard)/(features)/events/components/stream-filter.ts": {
       "complexity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/stream-sort-control.tsx": {
+    "src/app/(dashboard)/(features)/events/components/stream-sort-control.tsx": {
       "complexity": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/stream.tsx": {
+    "src/app/(dashboard)/(features)/events/components/stream.tsx": {
       "complexity": 1,
       "max-lines": 1,
       "max-lines-per-function": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/transport-logistics-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/transport-logistics-card.tsx": {
       "max-lines": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/venue-intel-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/venue-intel-card.tsx": {
       "complexity": 2,
       "max-lines": 1,
       "react-hooks/set-state-in-effect": 1
     },
-    "src/app/(dashboard)/(features)/productions/components/wrap-report-card.tsx": {
+    "src/app/(dashboard)/(features)/events/components/wrap-report-card.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 1,
       "max-lines": 1,
       "no-nested-ternary": 2,
       "react-hooks/purity": 1
     },
-    "src/app/(dashboard)/(features)/productions/deal/[id]/proposal-builder/page.tsx": {
+    "src/app/(dashboard)/(features)/events/deal/[id]/proposal-builder/page.tsx": {
       "complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/deal/[id]/proposal-builder/proposal-builder-header.tsx": {
+    "src/app/(dashboard)/(features)/events/deal/[id]/proposal-builder/proposal-builder-header.tsx": {
       "@typescript-eslint/no-unused-vars": 1
     },
-    "src/app/(dashboard)/(features)/productions/lib/__tests__/compute-readiness.test.ts": {
+    "src/app/(dashboard)/(features)/events/lib/__tests__/compute-readiness.test.ts": {
       "@typescript-eslint/no-unused-vars": 1
     },
-    "src/app/(dashboard)/(features)/productions/lib/compute-deal-signals.ts": {
+    "src/app/(dashboard)/(features)/events/lib/compute-deal-signals.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/lib/compute-event-signals.ts": {
+    "src/app/(dashboard)/(features)/events/lib/compute-event-signals.ts": {
       "complexity": 1,
       "max-lines-per-function": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/lib/compute-readiness.ts": {
+    "src/app/(dashboard)/(features)/events/lib/compute-readiness.ts": {
       "complexity": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/page.tsx": {
+    "src/app/(dashboard)/(features)/events/page.tsx": {
       "@typescript-eslint/no-unused-vars": 1,
       "complexity": 2,
       "max-lines": 1,
       "sonarjs/cognitive-complexity": 1
     },
-    "src/app/(dashboard)/(features)/productions/unmatched-replies/page.tsx": {
+    "src/app/(dashboard)/(features)/events/unmatched-replies/page.tsx": {
       "@eslint-community/eslint-comments/require-description": 1,
       "complexity": 1,
       "max-lines": 1

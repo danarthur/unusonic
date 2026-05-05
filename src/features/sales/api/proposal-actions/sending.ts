@@ -526,7 +526,7 @@ export async function sendForSignature(
 
   // 7. Create immediate follow-up queue item so the PM sees it on the Deal tab right away
   try {
-    const { createProposalSentFollowUp } = await import('@/app/(dashboard)/(features)/productions/actions/follow-up-actions');
+    const { createProposalSentFollowUp } = await import('@/app/(dashboard)/(features)/events/actions/follow-up-actions');
     await createProposalSentFollowUp(dealId);
   } catch { /* non-fatal */ }
 

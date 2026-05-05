@@ -96,7 +96,7 @@ export function GigCommandGrid({ gig }: GigCommandGridProps) {
               Deal room
             </Link>
             <Link
-              href={`/productions/${gig.id}`}
+              href={`/events/${gig.id}/run-of-show`}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0_/_0.05)] transition-colors"
             >
               <ListChecks className="size-4" />
