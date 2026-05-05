@@ -10,23 +10,12 @@
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { createClient } from '@/shared/api/supabase/server';
 import { VENUE_ATTR } from '@/entities/directory/model/attribute-keys';
+import { isValidIANA, getViewerTimezone } from './timezone-client';
 
-// ─── IANA validation ─────────────────────────────────────────────────────────
-
-const IANA_RE = /^[A-Za-z]+\/[A-Za-z0-9_+-]+(\/[A-Za-z0-9_+-]+)?$/;
-
-/** Returns true if the string is a valid IANA timezone identifier (or 'UTC'). */
-export function isValidIANA(tz: string): boolean {
-  if (tz === 'UTC') return true;
-  if (!IANA_RE.test(tz)) return false;
-  // Double-check against Intl — catches typos like "America/New_Yrok"
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Re-export client-safe helpers so existing server callers keep working without
+// pulling them out of this module (they live in timezone-client.ts to avoid
+// dragging the server Supabase client into client bundles).
+export { isValidIANA, getViewerTimezone };
 
 // ─── Server-side resolution ──────────────────────────────────────────────────
 
@@ -101,11 +90,4 @@ export function toVenueInstant(dateStr: string, timeStr: string, tz: string): st
  */
 export function formatInVenueTz(instant: string | Date, tz: string, pattern: string): string {
   return formatInTimeZone(instant, tz, pattern);
-}
-
-// ─── Client-side helper ──────────────────────────────────────────────────────
-
-/** Returns the viewer's IANA timezone from the browser. Client-only. */
-export function getViewerTimezone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
