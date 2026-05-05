@@ -110,7 +110,7 @@ export function PackageParentRow({ parent, childItems, collapsed, onToggle, onSy
           type="button"
           onClick={onSyncKit}
           className="shrink-0 mr-1 stage-badge-text tracking-tight px-2 py-1 rounded-full bg-[oklch(0.75_0.15_240_/_0.15)] text-[var(--color-unusonic-info)] hover:bg-[oklch(0.75_0.15_240_/_0.25)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-          title="Materialize the assigned crew member's verified kit as children of this service."
+          title="Pull this crew member's verified kit from Crew Hub and add each item as a line under this service. Re-running replaces the previously synced items."
         >
           Sync kit
         </button>

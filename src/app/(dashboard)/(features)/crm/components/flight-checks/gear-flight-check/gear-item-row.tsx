@@ -194,7 +194,11 @@ export function GearItemRow({
                 ? 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]'
                 : 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]'
             }`}
-            title={`${availability.available} of ${availability.stockQuantity} available`}
+            title={
+              availability.allocated > 0
+                ? `Stock: ${availability.available} of ${availability.stockQuantity} units free for this show (${availability.allocated} already allocated to overlapping shows)`
+                : `Stock: ${availability.available} of ${availability.stockQuantity} units owned and free for this show`
+            }
           >
             {availability.available}/{availability.stockQuantity}
           </span>
