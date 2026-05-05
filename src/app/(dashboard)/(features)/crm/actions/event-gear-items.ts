@@ -53,3 +53,5 @@ export { getCrewSourcedEquipmentRollup } from './event-gear-items/rollup';
 export { detachGearFromPackage, materializeKitFromCrew } from './event-gear-items/lineage';
 
 export { getGearLineageEnabled } from './event-gear-items/lineage-flag';
+
+export { markAllGearReturned, type MarkAllGearReturnedResult } from './event-gear-items/bulk-return';

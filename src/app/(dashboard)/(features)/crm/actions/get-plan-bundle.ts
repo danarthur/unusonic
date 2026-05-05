@@ -31,6 +31,7 @@ import { getEventLedger, type EventLedgerDTO } from '@/features/finance/api/get-
 import { getGearVariance, type GearVarianceResult } from './get-gear-variance';
 import { getProposalForDeal, getProposalPublicUrl } from '@/features/sales/api/proposal-actions';
 import type { ProposalWithItems } from '@/features/sales/model/types';
+import { getCloseOutBundle, type CloseOutBundle } from './get-close-out-bundle';
 
 export type PlanBundle = {
   gearItems: EventGearItem[];
@@ -41,9 +42,22 @@ export type PlanBundle = {
   gearVariance: GearVarianceResult | null;
   proposal: ProposalWithItems | null;
   proposalPublicUrl: string | null;
+  closeOut: CloseOutBundle;
 };
 
 const EMPTY_LOAD_DATES = { loadIn: null, loadOut: null } as const;
+
+const EMPTY_CLOSE_OUT: CloseOutBundle = {
+  finalInvoice: null,
+  allInvoices: [],
+  acceptedProposalId: null,
+  canSpawnInvoices: false,
+  crew: [],
+  crewTotalSlots: 0,
+  crewConfirmedNoRate: 0,
+  crewPayableCount: 0,
+  gear: { total: 0, returned: 0, outstanding: 0, allReturned: false },
+};
 
 const EMPTY_BUNDLE: PlanBundle = {
   gearItems: [],
@@ -54,6 +68,7 @@ const EMPTY_BUNDLE: PlanBundle = {
   gearVariance: null,
   proposal: null,
   proposalPublicUrl: null,
+  closeOut: EMPTY_CLOSE_OUT,
 };
 
 export async function getPlanBundle(
@@ -91,6 +106,13 @@ export async function getPlanBundle(
   const proposalPromise = dealId ? getProposalForDeal(dealId) : Promise.resolve(null);
   const proposalUrlPromise = dealId ? getProposalPublicUrl(dealId) : Promise.resolve(null);
 
+  // Close-out (post-event) bundle. Cheap to compute pre-event too — it just
+  // returns empty rows — so always fetch rather than gating here. The card
+  // itself gates rendering on event.starts_at < now.
+  const closeOutPromise = eventId
+    ? getCloseOutBundle(eventId, dealId)
+    : Promise.resolve(EMPTY_CLOSE_OUT);
+
   const [
     gearItems,
     crew,
@@ -100,6 +122,7 @@ export async function getPlanBundle(
     gearVariance,
     proposal,
     proposalPublicUrl,
+    closeOut,
   ] = await Promise.all([
     gearItemsPromise,
     crewPromise,
@@ -109,6 +132,7 @@ export async function getPlanBundle(
     gearVariancePromise,
     proposalPromise,
     proposalUrlPromise,
+    closeOutPromise,
   ]);
 
   return {
@@ -120,5 +144,6 @@ export async function getPlanBundle(
     gearVariance: gearVariance ?? null,
     proposal: proposal ?? null,
     proposalPublicUrl: proposalPublicUrl ?? null,
+    closeOut: closeOut ?? EMPTY_CLOSE_OUT,
   };
 }

@@ -24,6 +24,7 @@ import { ShowDayContactsCard } from './show-day-contacts-card';
 import { VenueIntelCard } from './venue-intel-card';
 import { DjPrepSummaryCard } from './dj-prep-summary-card';
 import { WrapReportCard } from './wrap-report-card';
+import { CloseOutCard } from './close-out-card';
 import { ClientUpdateStrip } from './client-update-strip';
 import { ShowControlStrip } from './show-control-strip';
 import { PlanVitalsStrip } from './plan-vitals-strip';
@@ -232,6 +233,7 @@ export function PlanLens({
   const contract = bundle?.contract ?? null;
   const ledger: EventLedgerDTO | null = bundle?.ledger ?? null;
   const gearVariance: GearVarianceResult | null = bundle?.gearVariance ?? null;
+  const closeOut = bundle?.closeOut ?? null;
   const initialProposal: ProposalWithItems | null | undefined = bundleLoading
     ? undefined
     : bundle?.proposal ?? null;
@@ -611,6 +613,16 @@ export function PlanLens({
             kind="event"
             productionId={eventId}
             predecessorDealId={dealId}
+          />
+        )}
+
+        {/* ── Tier 6c: Close-out tasks (full width, post-event only) ── */}
+        {event && eventId && closeOut && new Date(event.starts_at) < new Date() && (
+          <CloseOutCard
+            eventId={eventId}
+            eventStartsAt={event.starts_at}
+            bundle={closeOut}
+            onChange={handleCrewUpdated}
           />
         )}
 
