@@ -72,8 +72,71 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
-function groupItems(items: PublicProposalItem[]): { groupName: string; groupItems: PublicProposalItem[] }[] {
-  const groups = new Map<string, PublicProposalItem[]>();
+/**
+ * Bundles are stored as a header row (`is_package_header=true`, carries the
+ * bundle price) plus child rows (price=0, share `package_instance_id`). Render-
+ * ing every row as a sibling card surfaces zero-priced "DJ" / "12× Par" cards
+ * that read as freebies — confusing to clients. We collapse children onto the
+ * header and surface their names via `_bundleIncludes` for an "Includes:" line,
+ * mirroring the studio preview's `consolidateBundleRows` adapter.
+ *
+ * A la carte items (no `package_instance_id`) and single-item packages (a group
+ * with no header row) pass through untouched. Sort order is preserved.
+ */
+type DisplayItem = PublicProposalItem & { _bundleIncludes?: string[] };
+
+function consolidateBundleItems(items: PublicProposalItem[]): DisplayItem[] {
+  const byInstance = new Map<string, PublicProposalItem[]>();
+  const standalone: PublicProposalItem[] = [];
+
+  for (const item of items) {
+    const instanceId = (item as { package_instance_id?: string | null }).package_instance_id ?? null;
+    if (instanceId) {
+      if (!byInstance.has(instanceId)) byInstance.set(instanceId, []);
+      byInstance.get(instanceId)!.push(item);
+    } else {
+      standalone.push(item);
+    }
+  }
+
+  const result: DisplayItem[] = [...standalone];
+
+  for (const group of byInstance.values()) {
+    const header = group.find(
+      (i) => (i as { is_package_header?: boolean | null }).is_package_header === true,
+    );
+    if (!header) {
+      // Single-item package — no header row exists, so render children as-is.
+      result.push(...(group as DisplayItem[]));
+      continue;
+    }
+    const children = group.filter(
+      (i) => (i as { is_package_header?: boolean | null }).is_package_header !== true,
+    );
+    const includes = children
+      .map((c) => {
+        const qty = c.quantity ?? 1;
+        const name = c.name ?? '';
+        if (!name) return '';
+        return qty > 1 ? `${qty}× ${name}` : name;
+      })
+      .filter(Boolean);
+    result.push({
+      ...(header as DisplayItem),
+      _bundleIncludes: includes.length > 0 ? includes : undefined,
+    });
+  }
+
+  result.sort((a, b) => {
+    const aSort = (a as { sort_order?: number | null }).sort_order ?? 0;
+    const bSort = (b as { sort_order?: number | null }).sort_order ?? 0;
+    return aSort - bSort;
+  });
+  return result;
+}
+
+function groupItems(items: DisplayItem[]): { groupName: string; groupItems: DisplayItem[] }[] {
+  const groups = new Map<string, DisplayItem[]>();
   for (const item of items) {
     const groupName = (item as { display_group_name?: string | null }).display_group_name ?? 'Included';
     if (!groups.has(groupName)) groups.set(groupName, []);
@@ -136,7 +199,7 @@ function CardItem({
   eventStartTime,
   eventEndTime,
 }: {
-  item: PublicProposalItem;
+  item: DisplayItem;
   i: number;
   isSingle: boolean;
   disabled?: boolean;
@@ -196,6 +259,12 @@ function CardItem({
             {item.description}
           </p>
         ) : null}
+        {item._bundleIncludes && item._bundleIncludes.length > 0 && (
+          <p className="text-[13px] leading-snug" style={{ color: 'var(--portal-text-secondary)' }}>
+            <span style={{ opacity: 0.7 }}>Includes: </span>
+            {item._bundleIncludes.join(' · ')}
+          </p>
+        )}
         {(() => {
           const timeLabel = getTimeRangeLabel(item);
           if (!timeLabel) return null;
@@ -279,7 +348,7 @@ function RowItem({
   disabled,
   onSelectionChange,
 }: {
-  item: PublicProposalItem;
+  item: DisplayItem;
   i: number;
   disabled?: boolean;
   onSelectionChange?: (itemId: string, selected: boolean) => void;
@@ -316,6 +385,12 @@ function RowItem({
             {item.description}
           </p>
         )}
+        {item._bundleIncludes && item._bundleIncludes.length > 0 && (
+          <p className="text-xs truncate mt-0.5" style={{ color: 'var(--portal-text-secondary)' }}>
+            <span style={{ opacity: 0.7 }}>Includes: </span>
+            {item._bundleIncludes.join(' · ')}
+          </p>
+        )}
       </div>
       {/* Qty */}
       <p className="text-xs tabular-nums text-right whitespace-nowrap" style={{ color: 'var(--portal-text-secondary)' }}>
@@ -349,7 +424,7 @@ function MinimalItem({
   disabled,
   onSelectionChange,
 }: {
-  item: PublicProposalItem;
+  item: DisplayItem;
   i: number;
   disabled?: boolean;
   onSelectionChange?: (itemId: string, selected: boolean) => void;
@@ -371,12 +446,20 @@ function MinimalItem({
         borderBottom: '1px solid var(--portal-border-subtle)',
       }}
     >
-      <div className="flex items-center gap-3 min-w-0">
-        <p className="text-sm truncate" style={{ color: 'var(--portal-text)' }}>
-          {item.name}
-        </p>
-        {item.isOptional && (
-          <OptionalControls item={item} disabled={disabled} onSelectionChange={onSelectionChange} position="inline" />
+      <div className="flex flex-col min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <p className="text-sm truncate" style={{ color: 'var(--portal-text)' }}>
+            {item.name}
+          </p>
+          {item.isOptional && (
+            <OptionalControls item={item} disabled={disabled} onSelectionChange={onSelectionChange} position="inline" />
+          )}
+        </div>
+        {item._bundleIncludes && item._bundleIncludes.length > 0 && (
+          <p className="text-xs truncate mt-0.5" style={{ color: 'var(--portal-text-secondary)' }}>
+            <span style={{ opacity: 0.7 }}>Includes: </span>
+            {item._bundleIncludes.join(' · ')}
+          </p>
         )}
       </div>
       <p className="text-sm tabular-nums ml-4 shrink-0" style={{ color: 'var(--portal-text)' }}>
@@ -428,11 +511,17 @@ export function LineItemGrid({
 }: LineItemGridProps) {
   if (!items.length) return null;
 
-  const isSingle = items.length === 1;
-  const hasGroups = items.some((i) => (i as { display_group_name?: string | null }).display_group_name);
-  const grouped = groupItems(items);
+  // Collapse bundle children onto their headers as an "Includes:" line so
+  // clients don't see zero-priced "DJ"/"12× Par" cards next to the bundle they
+  // came from. Math is unaffected — children are unit_price=0.
+  const displayItems = consolidateBundleItems(items);
+  if (!displayItems.length) return null;
 
-  const renderItem = (item: PublicProposalItem, i: number) => {
+  const isSingle = displayItems.length === 1;
+  const hasGroups = displayItems.some((i) => (i as { display_group_name?: string | null }).display_group_name);
+  const grouped = groupItems(displayItems);
+
+  const renderItem = (item: DisplayItem, i: number) => {
     switch (layout) {
       case 'row':
         return <RowItem key={item.id} item={item} i={i} disabled={disabled} onSelectionChange={onSelectionChange} />;
@@ -456,7 +545,7 @@ export function LineItemGrid({
         style={style}
       >
         {layout === 'row' && <RowHeader />}
-        {items.map((item, i) => renderItem(item, i))}
+        {displayItems.map((item, i) => renderItem(item, i))}
       </div>
     );
   }
