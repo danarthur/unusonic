@@ -50,17 +50,27 @@ export async function getActionQueue(): Promise<ActionItem[]> {
       ...pendingCrew,
     ];
 
-    // Sort: overdue first, then today, then this_week. Within each group, by title asc.
+    // Sort: overdue first, then today, then this_week. Within each priority
+    // bucket: overdue invoices are pre-sorted by days-overdue desc; for
+    // everything else fall back to title asc for stability.
     const priorityOrder: Record<string, number> = {
       overdue: 0,
       today: 1,
       this_week: 2,
     };
-    all.sort(
-      (a, b) =>
-        (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9) ||
-        a.title.localeCompare(b.title),
-    );
+    const overdueDays = (item: ActionItem): number =>
+      item.type === 'overdue_invoice'
+        ? parseInt(item.title.match(/(\d+)d overdue/)?.[1] ?? '0', 10)
+        : -1;
+    all.sort((a, b) => {
+      const byPriority =
+        (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9);
+      if (byPriority !== 0) return byPriority;
+      // Within the same priority, push more-overdue invoices to the top.
+      const byDays = overdueDays(b) - overdueDays(a);
+      if (byDays !== 0) return byDays;
+      return a.title.localeCompare(b.title);
+    });
 
     return all;
   } catch (err) {
@@ -260,7 +270,26 @@ async function fetchOverdueInvoiceItems(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
   ).getTime();
 
-  const items: ActionItem[] = [];
+  // Dedup per (deal_id, kind): a single deal can have multiple proposals
+  // (revisions, re-sends) all in sent/viewed/accepted status, each producing
+  // its own deposit + balance overdue rows. Keep the most-overdue per kind.
+  type Candidate = {
+    proposalId: string;
+    dealId: string;
+    kind: 'deposit' | 'balance';
+    dueMs: number;
+    daysOverdue: number;
+    dealTitle: string;
+  };
+  const bestPerDealKind = new Map<string, Candidate>();
+
+  const consider = (c: Candidate) => {
+    const key = `${c.dealId}:${c.kind}`;
+    const prev = bestPerDealKind.get(key);
+    if (!prev || c.daysOverdue > prev.daysOverdue) {
+      bestPerDealKind.set(key, c);
+    }
+  };
 
   for (const p of proposals) {
     const deal = dealMap.get(p.deal_id);
@@ -270,6 +299,7 @@ async function fetchOverdueInvoiceItems(
     const depositPercent = p.deposit_percent ?? 0;
     const deadlineDays = p.deposit_deadline_days ?? wsDepositDeadline;
     const balanceDueDaysBefore = p.payment_due_days ?? wsBalanceDueBefore;
+    const dealTitle = deal.title ?? 'Untitled deal';
 
     // Deposit overdue
     if (depositPercent > 0 && !p.deposit_paid_at && signDate) {
@@ -277,19 +307,13 @@ async function fetchOverdueInvoiceItems(
         new Date(signDate).getTime() + deadlineDays * 86_400_000;
       if (nowMs > dueMs) {
         const daysOverdue = Math.floor((nowMs - dueMs) / 86_400_000);
-        items.push({
-          id: `overdue-dep-${p.id}`,
-          type: 'overdue_invoice',
-          priority:
-            daysOverdue >= 7
-              ? 'overdue'
-              : dueMs >= todayEndMs - 86_400_000
-                ? 'today'
-                : 'this_week',
-          title: `Deposit ${daysOverdue}d overdue`,
-          detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/events/deal/${p.deal_id}`,
-          actionLabel: 'Send reminder',
+        consider({
+          proposalId: p.id,
+          dealId: p.deal_id,
+          kind: 'deposit',
+          dueMs,
+          daysOverdue,
+          dealTitle,
         });
       }
     }
@@ -302,23 +326,47 @@ async function fetchOverdueInvoiceItems(
         eventDate.getTime() - balanceDueDaysBefore * 86_400_000;
       if (nowMs > dueMs) {
         const daysOverdue = Math.floor((nowMs - dueMs) / 86_400_000);
-        items.push({
-          id: `overdue-bal-${p.id}`,
-          type: 'overdue_invoice',
-          priority:
-            daysOverdue >= 7
-              ? 'overdue'
-              : dueMs >= todayEndMs - 86_400_000
-                ? 'today'
-                : 'this_week',
-          title: `Balance ${daysOverdue}d overdue`,
-          detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/events/deal/${p.deal_id}`,
-          actionLabel: 'Send reminder',
+        consider({
+          proposalId: p.id,
+          dealId: p.deal_id,
+          kind: 'balance',
+          dueMs,
+          daysOverdue,
+          dealTitle,
         });
       }
     }
   }
+
+  const items: ActionItem[] = [];
+  for (const c of bestPerDealKind.values()) {
+    const priority: ActionItem['priority'] =
+      c.daysOverdue >= 7
+        ? 'overdue'
+        : c.dueMs >= todayEndMs - 86_400_000
+          ? 'today'
+          : 'this_week';
+    const label = c.kind === 'deposit' ? 'Deposit' : 'Balance';
+    items.push({
+      // Stable per (deal, kind) so React keys + dedup signals upstream stay sane.
+      id: `overdue-${c.kind === 'deposit' ? 'dep' : 'bal'}-${c.dealId}`,
+      type: 'overdue_invoice',
+      priority,
+      title: `${label} ${c.daysOverdue}d overdue`,
+      detail: c.dealTitle,
+      actionUrl: `/events/deal/${c.dealId}`,
+      actionLabel: 'Send reminder',
+    });
+  }
+
+  // Most-overdue first within this batch. Final cross-type sort in
+  // getActionQueue is by priority bucket then title, but ties within the
+  // 'overdue' bucket should still surface the worst invoice first.
+  items.sort((a, b) => {
+    const da = parseInt(a.title.match(/(\d+)d overdue/)?.[1] ?? '0', 10);
+    const db = parseInt(b.title.match(/(\d+)d overdue/)?.[1] ?? '0', 10);
+    return db - da;
+  });
 
   return items;
 }
