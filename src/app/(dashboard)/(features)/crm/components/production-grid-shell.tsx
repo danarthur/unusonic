@@ -138,12 +138,33 @@ export function ProductionGridShell({ gigs, selectedId, streamMode, currentOrgId
    * from Stream cards on hover (debounced 150ms inside the card). Same shape
    * as Prism's bundleQuery so a click after a successful prefetch resolves
    * synchronously from cache — no fetch on switch.
+   *
+   * Chains a plan-bundle prefetch after prism resolves: prism gives us the
+   * deal_id (for event-source items), event_id (for deal-source items), and
+   * venue_entity_id needed for the plan bundle's venue intel slice. Without
+   * the prism result we'd be prefetching with null venueEntityId and missing
+   * the cache hit when plan-lens runs with the real id.
    */
   const prefetchBundle = useCallback(
     (id: string, source: 'deal' | 'event') => {
       if (!workspaceId) return;
-      const cfg = crmQueries.prismBundle(workspaceId, id, source, currentOrgId ?? null);
-      queryClient.prefetchQuery(cfg);
+      const prismCfg = crmQueries.prismBundle(workspaceId, id, source, currentOrgId ?? null);
+      void queryClient.prefetchQuery(prismCfg).then(() => {
+        const prism = queryClient.getQueryData<import('../actions/get-prism-bundle').PrismBundle>(
+          prismCfg.queryKey,
+        );
+        if (!prism) return;
+        const eventScopedId = source === 'event'
+          ? id
+          : (prism.deal?.event_id ?? null);
+        const dealId = source === 'deal'
+          ? id
+          : (prism.eventSummary?.deal_id ?? null);
+        const venueEntityId = prism.eventSummary?.venue_entity_id ?? null;
+        if (!eventScopedId && !dealId) return;
+        const planCfg = crmQueries.planBundle(eventScopedId, dealId, venueEntityId);
+        void queryClient.prefetchQuery(planCfg);
+      });
     },
     [queryClient, workspaceId, currentOrgId],
   );
