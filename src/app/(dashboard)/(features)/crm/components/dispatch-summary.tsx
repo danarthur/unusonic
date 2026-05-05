@@ -64,6 +64,10 @@ type DispatchSummaryProps = {
   sourceOrgId?: string | null;
   /** Lifted rail handler — click a crew-sourced gear chip to open the Crew Hub. */
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /** Pre-resolved conflicts from PlanBundle. Lets useConflictDetection
+   *  warm-start without firing its own mount fetch. Parent invalidates
+   *  the bundle when a mutation should refresh conflicts. */
+  initialConflicts?: import('@/features/ops/actions/get-event-conflicts').EventConflict[];
 };
 
 // getCallTime and googleMapsUrl imported from ../lib/day-sheet-utils
@@ -359,8 +363,13 @@ export function DispatchSummary({
   hideVitals,
   sourceOrgId,
   onOpenCrewDetail,
+  initialConflicts,
 }: DispatchSummaryProps) {
-  const { conflicts, refetch: refetchConflicts } = useConflictDetection({ eventId, enabled: !!eventId });
+  const { conflicts, refetch: refetchConflicts } = useConflictDetection({
+    eventId,
+    enabled: !!eventId,
+    initialConflicts,
+  });
 
   const runOfShowData = event.run_of_show_data ?? null;
   const logistics = normalizeLogistics(runOfShowData);

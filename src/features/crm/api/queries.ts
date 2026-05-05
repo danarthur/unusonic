@@ -4,6 +4,7 @@ import {
   getPrismBundle,
   type PrismBundleSource,
 } from "@/app/(dashboard)/(features)/crm/actions/get-prism-bundle";
+import { getPlanBundle } from "@/app/(dashboard)/(features)/crm/actions/get-plan-bundle";
 
 export const crmQueries = {
   gigs: (wsId: string) => ({
@@ -34,6 +35,29 @@ export const crmQueries = {
       sourceOrgId,
     ] as const,
     queryFn: () => getPrismBundle(selectedId, source, sourceOrgId),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+  }),
+
+  /**
+   * Plan tab bundle. Same key shape as plan-lens.tsx's inline `useQuery`,
+   * exposed here so production-grid-shell can warm-prefetch it on hover
+   * after the prism bundle resolves (chained prefetch — prism gives us
+   * the venue entity id needed for the plan bundle's venue intel slice).
+   */
+  planBundle: (
+    eventScopedId: string | null,
+    dealId: string | null,
+    venueEntityId: string | null,
+  ) => ({
+    queryKey: [
+      "plan-lens",
+      "bundle",
+      eventScopedId,
+      dealId,
+      venueEntityId,
+    ] as const,
+    queryFn: () => getPlanBundle(eventScopedId, dealId, venueEntityId),
     staleTime: 30_000,
     gcTime: 5 * 60_000,
   }),

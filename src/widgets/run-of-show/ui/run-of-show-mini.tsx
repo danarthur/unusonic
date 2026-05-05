@@ -15,6 +15,11 @@ interface RunOfShowIndexCardProps {
   /** Event start time — avoids refetch, PlanLens already has this */
   startsAt?: string | null;
   className?: string;
+  /** Pre-resolved cues + sections from a parent bundle (e.g. PlanBundle).
+   *  When both are provided the card warm-starts without firing mount
+   *  fetches. Subsequent eventId changes still refetch via useEffect. */
+  initialCues?: Cue[];
+  initialSections?: Section[];
 }
 
 function formatDuration(minutes: number): string {
@@ -52,13 +57,26 @@ const readinessDotColor: Record<Readiness, string> = {
   empty: 'oklch(0.45 0 0)',
 };
 
-export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIndexCardProps) {
-  const [cues, setCues] = useState<Cue[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+export function RunOfShowIndexCard({
+  eventId,
+  startsAt,
+  className,
+  initialCues,
+  initialSections,
+}: RunOfShowIndexCardProps) {
+  const hasInitial = initialCues !== undefined && initialSections !== undefined;
+  const [cues, setCues] = useState<Cue[]>(initialCues ?? []);
+  const [sections, setSections] = useState<Section[]>(initialSections ?? []);
+  const [loading, setLoading] = useState(!hasInitial);
 
   useEffect(() => {
     let active = true;
+    if (hasInitial) {
+      setCues(initialCues);
+      setSections(initialSections);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     Promise.all([fetchCues(eventId), fetchSections(eventId)])
       .then(([c, s]) => {
@@ -71,6 +89,9 @@ export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIn
         setLoading(false);
       });
     return () => { active = false; };
+    // initialCues / initialSections intentionally excluded — warm-start
+    // honoured only on first render per eventId.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
   const totalDuration = useMemo(() => cues.reduce((sum, c) => sum + (c.duration_minutes ?? 0), 0), [cues]);

@@ -10,15 +10,34 @@ import { getCoiStatus, type CoiStatus } from '@/features/network-data/api/entity
 
 type VenueIntelCardProps = {
   venueEntityId: string;
+  /** Pre-resolved intel from a parent bundle (e.g. PlanBundle). When both
+   *  initial props are non-null, the card skips the mount fetch and warm-
+   *  starts. Mutations and venueEntityId changes still trigger a refetch. */
+  initialIntel?: VenueIntel | null;
+  initialCoiStatus?: CoiStatus | null;
 };
 
-export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
-  const [intel, setIntel] = useState<VenueIntel | null>(null);
-  const [coiInfo, setCoiInfo] = useState<CoiStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+export function VenueIntelCard({
+  venueEntityId,
+  initialIntel = null,
+  initialCoiStatus = null,
+}: VenueIntelCardProps) {
+  const hasInitial = initialIntel !== null || initialCoiStatus !== null;
+  const [intel, setIntel] = useState<VenueIntel | null>(initialIntel);
+  const [coiInfo, setCoiInfo] = useState<CoiStatus | null>(initialCoiStatus);
+  const [loading, setLoading] = useState(!hasInitial);
 
   useEffect(() => {
     let cancelled = false;
+    // Warm-start path: if the parent provided initial data for this venue,
+    // skip the mount fetch. Subsequent venueEntityId changes still refetch
+    // because the dep array fires.
+    if (hasInitial) {
+      setIntel(initialIntel);
+      setCoiInfo(initialCoiStatus);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     Promise.all([
       getVenueIntel(venueEntityId),
@@ -31,6 +50,11 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
       }
     });
     return () => { cancelled = true; };
+    // hasInitial / initialIntel / initialCoiStatus intentionally excluded —
+    // we only honour the warm-start on the FIRST render for a given
+    // venueEntityId; once the user mutates the venue downstream we want
+    // the regular fetch path to take over.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venueEntityId]);
 
   if (loading) {

@@ -38,7 +38,8 @@ import type { ProposalWithItems } from '@/features/sales/model/types';
 import type { DealCrewRow } from '../actions/deal-crew';
 import type { EventGearItem } from '../actions/event-gear-items';
 import { updateDealScalars } from '../actions/update-deal-scalars';
-import { getPlanBundle, type PlanBundle } from '../actions/get-plan-bundle';
+import { type PlanBundle } from '../actions/get-plan-bundle';
+import { crmQueries } from '@/features/crm/api/queries';
 import type { EventSummaryForPrism } from '../actions/get-event-summary';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
@@ -206,22 +207,20 @@ export function PlanLens({
   // wall-clock latency. Pattern mirrors `getDealBundle`.
   const queryClient = useQueryClient();
   const eventScopedId = eventId ?? deal?.event_id ?? null;
-  const planBundleQueryKey = useMemo(
-    () => ['plan-lens', 'bundle', eventScopedId, dealId] as const,
-    [eventScopedId, dealId],
+  const venueScopedId = event?.venue_entity_id ?? null;
+  const planBundleConfig = useMemo(
+    () => crmQueries.planBundle(eventScopedId, dealId, venueScopedId),
+    [eventScopedId, dealId, venueScopedId],
   );
   const {
     data: bundleData,
     isLoading: bundleLoading,
     refetch: refetchBundle,
   } = useQuery<PlanBundle>({
-    queryKey: planBundleQueryKey,
-    queryFn: () => measureAsync('crm:plan-bundle-fetch', () =>
-      getPlanBundle(eventScopedId, dealId),
-    ),
+    ...planBundleConfig,
+    queryFn: () => measureAsync('crm:plan-bundle-fetch', planBundleConfig.queryFn),
     enabled: !!(eventScopedId || dealId),
     placeholderData: keepPreviousData,
-    staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
 
@@ -489,6 +488,7 @@ export function PlanLens({
               hideVitals
               sourceOrgId={sourceOrgId ?? null}
               onOpenCrewDetail={setSelectedCrewRow}
+              initialConflicts={bundle?.conflicts}
             />
 
             {/* Client comms — crew comms absorbed into Crew Hub header */}
@@ -546,7 +546,11 @@ export function PlanLens({
           {/* Right: Reference — pure look-up, no actions */}
           <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
             {event.venue_entity_id && (
-              <VenueIntelCard venueEntityId={event.venue_entity_id} />
+              <VenueIntelCard
+                venueEntityId={event.venue_entity_id}
+                initialIntel={bundle?.venueIntel ?? null}
+                initialCoiStatus={bundle?.coiStatus ?? null}
+              />
             )}
             <ShowDayContactsCard
               eventId={eventId}
@@ -557,7 +561,12 @@ export function PlanLens({
               <ProductionTimelineWidget eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null} eventTitle={deal?.title ?? event.title} paymentMilestones={paymentMilestones} dealMilestones={dealMilestones} />
             )}
             <DjPrepSummaryCard rosData={event.run_of_show_data as Record<string, unknown> | null} />
-            <RunOfShowIndexCard eventId={eventId} startsAt={event?.starts_at} />
+            <RunOfShowIndexCard
+              eventId={eventId}
+              startsAt={event?.starts_at}
+              initialCues={bundle?.runOfShow.cues}
+              initialSections={bundle?.runOfShow.sections}
+            />
           </div>
         </div>
 
