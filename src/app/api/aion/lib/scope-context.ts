@@ -23,7 +23,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import {
   getDealContextForAion,
   type FollowUpQueueItem,
-} from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
+} from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
 import { buildEventScopePrefix } from './build-event-scope-prefix';
 
 // ---------------------------------------------------------------------------

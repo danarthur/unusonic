@@ -76,7 +76,7 @@ export default async function PreviewDealRedirect({
 
   if (!deal?.event_id) {
     console.log('[Preview] Deal has no event_id — dealId:', dealId, 'deal:', deal);
-    redirect('/crm');
+    redirect('/productions');
   }
 
   const system = getSystemClient();
@@ -90,7 +90,7 @@ export default async function PreviewDealRedirect({
 
   if (!event?.client_entity_id) {
     console.log('[Preview] Event has no client_entity_id — eventId:', deal.event_id, 'event:', event, 'error:', eventError);
-    redirect('/crm');
+    redirect('/productions');
   }
 
   redirect(`/preview/client/${event.client_entity_id}?from=${dealId}`);

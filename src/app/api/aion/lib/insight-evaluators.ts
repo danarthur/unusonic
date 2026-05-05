@@ -286,7 +286,7 @@ async function evaluateProposalViewedUnsigned(workspaceId: string): Promise<Insi
       },
       priority: dynamicPriority,
       suggestedAction: 'Send a follow-up to the client',
-      href: `/crm/deal/${p.deal_id}/proposal-builder`,
+      href: `/productions/deal/${p.deal_id}/proposal-builder`,
       urgency,
     };
   });
@@ -339,7 +339,7 @@ async function evaluateCrewUnconfirmed(
       },
       priority: dynamicPriority,
       suggestedAction: 'Confirm crew assignments or send reminders',
-      href: show.dealId ? `/crm/deal/${show.dealId}` : `/events/${show.eventId}`,
+      href: show.dealId ? `/productions/deal/${show.dealId}` : `/events/${show.eventId}`,
       urgency: urg,
     });
   }
@@ -390,7 +390,7 @@ async function evaluateShowNoCrew(
       },
       priority: dynamicPriority,
       suggestedAction: 'Assign crew to this show',
-      href: show.dealId ? `/crm/deal/${show.dealId}` : `/events/${show.eventId}`,
+      href: show.dealId ? `/productions/deal/${show.dealId}` : `/events/${show.eventId}`,
       urgency: urg,
     });
   }
@@ -509,7 +509,7 @@ async function evaluateDealStale(workspaceId: string): Promise<InsightCandidate[
       },
       priority: dynamicPriority,
       suggestedAction: `Follow up — this ${stageLabel} has gone quiet`,
-      href: `/crm/deal/${deal.id}`,
+      href: `/productions/deal/${deal.id}`,
       urgency,
     });
   }

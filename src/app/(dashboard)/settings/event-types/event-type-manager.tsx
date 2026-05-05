@@ -11,7 +11,7 @@ import {
   mergeWorkspaceEventArchetypes,
   renameWorkspaceEventArchetype,
   unarchiveWorkspaceEventArchetype,
-} from '@/app/(dashboard)/(features)/crm/actions/event-archetype-actions';
+} from '@/app/(dashboard)/(features)/productions/actions/event-archetype-actions';
 
 /**
  * Admin screen for the event-archetype taxonomy. Shows active and archived

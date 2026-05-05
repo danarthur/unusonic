@@ -42,7 +42,7 @@ export async function searchNetworkOrgs(
     // CORTEX PATH: get my active connection target entity IDs
     // NOTE: ROSTER_MEMBER is intentionally excluded from this filter.
     // Crew-specific search (which surfaces internal team members) should use
-    // searchCrewMembers() from src/app/(dashboard)/(features)/crm/actions/deal-crew.ts instead.
+    // searchCrewMembers() from src/app/(dashboard)/(features)/productions/actions/deal-crew.ts instead.
     const { data: cortexRels } = await supabase
       .schema('cortex')
       .from('relationships')

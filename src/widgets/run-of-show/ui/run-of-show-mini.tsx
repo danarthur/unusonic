@@ -7,8 +7,8 @@ import { ChevronRight, ListMusic } from 'lucide-react';
 const SW = 1.5;
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
-import type { Cue, Section } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
-import { fetchCues, fetchSections } from '@/app/(dashboard)/(features)/crm/actions/ros';
+import type { Cue, Section } from '@/app/(dashboard)/(features)/productions/actions/run-of-show-types';
+import { fetchCues, fetchSections } from '@/app/(dashboard)/(features)/productions/actions/ros';
 
 interface RunOfShowIndexCardProps {
   eventId: string;
@@ -87,7 +87,7 @@ export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIn
   if (cues.length === 0) {
     return (
       <Link
-        href={`/crm/${eventId}`}
+        href={`/productions/${eventId}`}
         className={cn(
           'flex flex-col items-center justify-center min-h-[100px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] stage-panel-elevated p-6 text-center transition-colors hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[oklch(1_0_0_/_0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
           className,
@@ -126,7 +126,7 @@ export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIn
 
       {/* Footer row */}
       <Link
-        href={`/crm/${eventId}`}
+        href={`/productions/${eventId}`}
         className="flex items-center justify-between -mx-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-[oklch(1_0_0_/_0.05)]"
       >
         <span className="stage-readout">

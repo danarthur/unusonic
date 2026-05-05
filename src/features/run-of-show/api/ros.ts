@@ -92,7 +92,7 @@ export async function updateCue(eventId: string, cueId: string, updates: Partial
 
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/crm/${eventId}`);
+  revalidatePath(`/productions/${eventId}`);
   return data;
 }
 
@@ -115,7 +115,7 @@ export async function deleteCue(eventId: string, cueId: string): Promise<Cue[]> 
 
   if (fetchError) throw new Error(fetchError.message);
 
-  revalidatePath(`/crm/${eventId}`);
+  revalidatePath(`/productions/${eventId}`);
   return data ?? [];
 }
 
@@ -184,7 +184,7 @@ export async function duplicateCue(
 
   if (fetchError) throw new Error(fetchError.message);
 
-  revalidatePath(`/crm/${eventId}`);
+  revalidatePath(`/productions/${eventId}`);
   return { cues: data ?? [], newCueId: newCue.id };
 }
 
@@ -233,7 +233,7 @@ export async function createSection(eventId: string, section: Partial<Section>):
 
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/crm/${eventId}`);
+  revalidatePath(`/productions/${eventId}`);
   return data;
 }
 
@@ -254,7 +254,7 @@ export async function updateSection(
 
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/crm/${eventId}`);
+  revalidatePath(`/productions/${eventId}`);
   return data;
 }
 
@@ -270,7 +270,7 @@ export async function deleteSection(eventId: string, sectionId: string): Promise
 
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/crm/${eventId}`);
+  revalidatePath(`/productions/${eventId}`);
 }
 
 export async function updateSectionOrder(sections: Section[]): Promise<void> {
@@ -478,6 +478,6 @@ export async function applyRosTemplate(
     fetchSections(eventId),
   ]);
 
-  revalidatePath(`/crm/${eventId}`);
+  revalidatePath(`/productions/${eventId}`);
   return { cues, sections };
 }

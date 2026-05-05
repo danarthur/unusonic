@@ -92,7 +92,7 @@ export async function evaluateQuoteExpiring(
       },
       priority,
       suggestedAction: 'Reach out before the quote expires',
-      href: `/crm/deal/${p.deal_id}/proposal-builder`,
+      href: `/productions/deal/${p.deal_id}/proposal-builder`,
       urgency,
     };
   });

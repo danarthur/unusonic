@@ -165,7 +165,7 @@ export async function setLearnOwnerCadence(
     if (error) return { success: false, error: error.message };
 
     revalidatePath('/aion');
-    revalidatePath('/crm');
+    revalidatePath('/productions');
     return { success: true };
   } catch (err) {
     return {

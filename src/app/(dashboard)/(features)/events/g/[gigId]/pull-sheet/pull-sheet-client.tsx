@@ -7,12 +7,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Package, Users, ChevronDown, ChevronUp, Printer } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
-import { updateGearItemStatus } from '@/app/(dashboard)/(features)/crm/actions/update-gear-item-status';
+import { updateGearItemStatus } from '@/app/(dashboard)/(features)/productions/actions/update-gear-item-status';
 import {
   GEAR_LIFECYCLE_ORDER,
   GEAR_STATUS_LABELS,
   type GearStatus,
-} from '@/app/(dashboard)/(features)/crm/components/flight-checks/types';
+} from '@/app/(dashboard)/(features)/productions/components/flight-checks/types';
 import type { PullSheetGearItem, PullSheetCrewItem } from './get-pull-sheet-data';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────

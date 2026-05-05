@@ -30,8 +30,8 @@
  *   the `client_songs_*` RPCs. The ESLint rule allowlists event-lock.ts.
  *
  * Named exception — DO NOT swap reads in these files:
- *   - `src/app/(dashboard)/(features)/crm/actions/mark-show-state.ts`
- *   - `src/app/(dashboard)/(features)/crm/actions/delete-event.ts`
+ *   - `src/app/(dashboard)/(features)/productions/actions/mark-show-state.ts`
+ *   - `src/app/(dashboard)/(features)/productions/actions/delete-event.ts`
  *   These are the canonical writers and need to touch both columns in
  *   lock-step. Phase 0's trigger now makes that pair-write load-bearing
  *   rather than a band-aid — the writer stays, the comment is updated.

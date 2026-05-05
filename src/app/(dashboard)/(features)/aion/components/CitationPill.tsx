@@ -65,11 +65,11 @@ const KIND_LABEL: Record<CitationKind, string> = {
  * ancestor and mis-navigated).
  */
 const KIND_HREF: Record<CitationKind, (id: string) => string> = {
-  deal: (id) => `/crm?selected=${id}`,
+  deal: (id) => `/productions?selected=${id}`,
   entity: (id) => `/network/${id}`,
   catalog: (id) => `/settings/catalog?open=${id}`,
   // Message fallback href — resolveCitation upgrades this to the full
-  // /crm/deal/<id>/replies?message=<id> path once it returns the deal_id.
+  // /productions/deal/<id>/replies?message=<id> path once it returns the deal_id.
   // The raw /messages route does not exist today; in that gap the pill is
   // still a visual pill with a hover card, just not click-navigable.
   message: () => '#',
@@ -242,7 +242,7 @@ export const CitationPill = memo(function CitationPill({
 
   // Explicit navigation on click. We use `window.location.assign` rather than
   // router.push because when the pill is clicked while ON the same route
-  // (e.g. /crm?selected=A → /crm?selected=B), Next.js sometimes fails to
+  // (e.g. /productions?selected=A → /productions?selected=B), Next.js sometimes fails to
   // re-render the deal-card state that depends on server-fetched data keyed
   // on the query param — the URL changes but the old deal stays on screen.
   // A full page load forces the target route to render its server component

@@ -220,7 +220,7 @@ export async function acceptAionCardBeta(
       .eq('id', state.workspaceId);
   }
 
-  revalidatePath('/crm');
+  revalidatePath('/productions');
   revalidatePath('/settings/aion');
 
   return { success: true, consentId: consentId as string };
@@ -281,7 +281,7 @@ export async function disableAionCardBeta(): Promise<BaseResult> {
     p_expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
   });
 
-  revalidatePath('/crm');
+  revalidatePath('/productions');
   revalidatePath('/settings/aion');
 
   return { success: true };

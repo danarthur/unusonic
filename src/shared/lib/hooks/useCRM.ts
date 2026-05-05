@@ -4,7 +4,7 @@ import { useAuthStatusStore } from '@/shared/lib/auth/auth-status-store';
 
 /**
  * Client-only CRM queue with realtime subscription.
- * The main CRM page (/crm) uses server fetch; use this hook for client-only or realtime views.
+ * The main CRM page (/productions) uses server fetch; use this hook for client-only or realtime views.
  */
 
 /** Unified event row for CRM (lifecycle = lead/tentative/confirmed). */

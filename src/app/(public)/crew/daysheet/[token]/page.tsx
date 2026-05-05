@@ -11,7 +11,7 @@
 import { notFound } from 'next/navigation';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
-import { getCallTime, googleMapsUrl } from '@/app/(dashboard)/(features)/crm/lib/day-sheet-utils';
+import { getCallTime, googleMapsUrl } from '@/app/(dashboard)/(features)/productions/lib/day-sheet-utils';
 
 export const dynamic = 'force-dynamic';
 

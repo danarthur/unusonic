@@ -70,7 +70,7 @@ describe('proxy route classification', () => {
   describe('protected routes stay protected', () => {
     it.each([
       '/lobby',
-      '/crm',
+      '/productions',
       '/settings/email',
       '/onboarding',
       '/api/aion/chat',

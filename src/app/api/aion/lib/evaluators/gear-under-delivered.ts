@@ -219,7 +219,7 @@ function toCandidate(s: SuspectRow): InsightCandidate {
     },
     priority,
     suggestedAction: 'Review the gear-card drift ribbon — accept or reject each change.',
-    href: `/crm?stream=active&selected=${s.dealId}`,
+    href: `/productions?stream=active&selected=${s.dealId}`,
     urgency,
   };
 }

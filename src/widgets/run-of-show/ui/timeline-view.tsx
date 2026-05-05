@@ -5,7 +5,7 @@ import { Mic, Sun, Video, Truck } from 'lucide-react';
 
 const SW = 1.5;
 import { cn } from '@/shared/lib/utils';
-import type { Cue, CueType, Section } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
+import type { Cue, CueType, Section } from '@/app/(dashboard)/(features)/productions/actions/run-of-show-types';
 
 /* ── Constants ────────────────────────────────────────────────── */
 

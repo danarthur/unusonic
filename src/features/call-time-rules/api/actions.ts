@@ -2,7 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
-import type { WorkspaceCallTimeRule } from '@/app/(dashboard)/(features)/crm/actions/apply-call-time-rules';
+import type { WorkspaceCallTimeRule } from '@/app/(dashboard)/(features)/productions/actions/apply-call-time-rules';
 
 // NOTE: do NOT re-export `WorkspaceCallTimeRule` from this 'use server'
 // file. Next.js 16's server-action bundler produces a value-level

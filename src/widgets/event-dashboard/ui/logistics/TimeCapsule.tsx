@@ -4,7 +4,7 @@ import React, { useEffect, useMemo } from 'react';
 import { Controller, type Control, type Path, type UseFormWatch, type UseFormSetValue } from 'react-hook-form';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { StagePanel } from '@/shared/ui/stage-panel';
-import { CeramicDatePicker } from '@/app/(dashboard)/(features)/crm/components/ceramic-date-picker';
+import { CeramicDatePicker } from '@/app/(dashboard)/(features)/productions/components/ceramic-date-picker';
 import { CeramicSwitch } from '@/shared/ui/switch';
 import { usePreferences } from '@/shared/ui/providers/PreferencesContext';
 import { Calendar, Clock, Package, AlertCircle, HelpCircle } from 'lucide-react';

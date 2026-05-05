@@ -37,7 +37,7 @@ const STATIC_NAV = [
   { label: 'Overview', href: '/', icon: LayoutGrid },
   { label: 'Aion', href: '/aion', icon: MessageSquare },
   { label: 'Calendar', href: '/calendar', icon: CalendarDays },
-  { label: 'Production (CRM)', href: '/crm', icon: FolderKanban },
+  { label: 'Production (CRM)', href: '/productions', icon: FolderKanban },
   { label: 'Finance', href: '/finance', icon: Wallet },
   { label: 'Catalog', href: '/catalog', icon: Package },
   { label: 'Network', href: '/network', icon: Network },
@@ -52,10 +52,10 @@ function extractGigIdFromPath(pathname: string): string | null {
   const eventsMatch = pathname.match(/^\/events\/([a-zA-Z0-9_-]+)/);
   if (eventsMatch) return eventsMatch[1];
 
-  // /crm/[eventId]/... — Run of Show full page. Excludes /crm/deal/[dealId] sub-routes
+  // /productions/[eventId]/... — Run of Show full page. Excludes /productions/deal/[dealId] sub-routes
   // (proposal-builder etc.), which don't have a gig in context and would otherwise capture
   // "deal" as the gigId and break the "This Event" command-spine group.
-  const crmMatch = pathname.match(/^\/crm\/(?!deal\b)([a-zA-Z0-9_-]+)/);
+  const crmMatch = pathname.match(/^\/productions\/(?!deal\b)([a-zA-Z0-9_-]+)/);
   if (crmMatch) return crmMatch[1];
 
   return null;
@@ -260,12 +260,12 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
           </Command.Group>
         )}
 
-        {/* Context: This Event — when inside /crm/[id] or /events/[id] */}
+        {/* Context: This Event — when inside /productions/[id] or /events/[id] */}
         {gigId && (
           <Command.Group heading="This Event" forceMount className={groupHeadingClass}>
             <Command.Item
               value="Go to Run of Show"
-              onSelect={() => handleSelect(`/crm/${gigId}`)}
+              onSelect={() => handleSelect(`/productions/${gigId}`)}
               className={itemClass}
             >
               <LayoutList size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />
@@ -302,7 +302,7 @@ export function CommandSpine({ network }: CommandSpineProps = {}) {
                   <Command.Item
                     key={ev.id}
                     value={`${ev.title} ${ev.client_name ?? ''} event`}
-                    onSelect={() => handleSelect(`/crm/${ev.id}`)}
+                    onSelect={() => handleSelect(`/productions/${ev.id}`)}
                     className={itemClass}
                   >
                     <FolderKanban size={18} className="shrink-0 text-[var(--stage-text-secondary)] transition-colors" strokeWidth={1.5} />

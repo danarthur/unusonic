@@ -5,9 +5,9 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getDeal } from '@/app/(dashboard)/(features)/crm/actions/get-deal';
-import { getDealClientContext } from '@/app/(dashboard)/(features)/crm/actions/get-deal-client';
-import { getDealCrew } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import { getDeal } from '@/app/(dashboard)/(features)/productions/actions/get-deal';
+import { getDealClientContext } from '@/app/(dashboard)/(features)/productions/actions/get-deal-client';
+import { getDealCrew } from '@/app/(dashboard)/(features)/productions/actions/deal-crew';
 import { getProposalForDeal } from '@/features/sales/api/proposal-actions';
 import { checkCrewAvailability } from '@/features/ops/actions/check-crew-availability';
 import { getCalendarEvents } from '@/features/calendar/api/get-events';
@@ -81,7 +81,7 @@ export function createDealKnowledgeTools(ctx: AionToolContext, helpers: ResolveH
         const searched = await getSubstrateCounts(workspaceId);
         return envelope([], searched, { reason: 'deal_not_found', hint: 'No deal ID provided and no deal in view.' });
       }
-      const { getDealSignals } = await import('@/app/(dashboard)/(features)/crm/actions/get-deal-signals');
+      const { getDealSignals } = await import('@/app/(dashboard)/(features)/productions/actions/get-deal-signals');
       const signals = await getDealSignals(dealId);
       const searched = await getSubstrateCounts(workspaceId);
       return envelope(signals, searched, {

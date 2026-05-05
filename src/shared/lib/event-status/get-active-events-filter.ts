@@ -11,7 +11,7 @@
  * ALLOWLIST — who should call this:
  *
  *   Active-pile consumers (must filter archived events out of their view):
- *     - src/app/(dashboard)/(features)/crm/page.tsx — CRM Stream "active"
+ *     - src/app/(dashboard)/(features)/productions/page.tsx — CRM Stream "active"
  *       and "inquiry" tabs
  *     - src/widgets/global-pulse/lib/use-lobby-events.ts — Lobby widgets
  *     - src/widgets/dashboard/api/get-action-queue.ts — Dashboard action queue

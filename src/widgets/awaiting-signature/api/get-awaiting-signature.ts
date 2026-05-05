@@ -56,7 +56,7 @@ async function fetchUnsigned(
     clientName: null,
     amount: null,
     daysWaiting: r.accepted_at ? (daysSince(r.accepted_at) ?? 0) : 0,
-    dealHref: `/crm/deal/${r.deal_id}`,
+    dealHref: `/productions/deal/${r.deal_id}`,
   }));
 }
 
@@ -108,7 +108,7 @@ async function fetchDepositOverdue(
       clientName: null,
       amount: null,
       daysWaiting: Math.floor((now - dueMs) / 86_400_000),
-      dealHref: `/crm/deal/${r.deal_id}`,
+      dealHref: `/productions/deal/${r.deal_id}`,
     });
   }
   return items;

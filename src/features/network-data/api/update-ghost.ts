@@ -176,6 +176,6 @@ export async function updateGhostProfile(
   if (attrError) return { error: attrError.message };
 
   revalidatePath('/network');
-  revalidatePath('/crm');
+  revalidatePath('/productions');
   return { success: true };
 }

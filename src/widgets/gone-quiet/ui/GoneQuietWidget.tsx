@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { WidgetShell } from '@/widgets/shared/ui/WidgetShell';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { METRICS } from '@/shared/lib/metrics/registry';
-import { dismissFollowUp } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
+import { dismissFollowUp } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
 import { getGoneQuiet, type GoneQuietItem } from '../api/get-gone-quiet';
 import { LogOutcomeSheet } from '@/widgets/owed-today/ui/LogOutcomeSheet';
 

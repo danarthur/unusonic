@@ -83,7 +83,7 @@ export async function snoozeThread(input: {
     }
 
     // Invalidate the CRM surfaces that render the thread state.
-    revalidatePath('/crm', 'layout');
+    revalidatePath('/productions', 'layout');
 
     return { success: true, snoozedUntil: until ? until.toISOString() : null };
   } catch (err) {

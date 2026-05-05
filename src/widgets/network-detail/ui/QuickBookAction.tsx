@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { getActiveDealsForBooking, type BookableDeal } from './quick-book-actions';
-import { addManualDealCrew } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import { addManualDealCrew } from '@/app/(dashboard)/(features)/productions/actions/deal-crew';
 
 interface QuickBookActionProps {
   entityId: string;

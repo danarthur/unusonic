@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import type { EventSummary } from '@/entities/event';
 
 const RunOfShowClient = dynamic(
-  () => import('@/app/(dashboard)/(features)/crm/[id]/run-of-show-client').then((m) => m.RunOfShowClient),
+  () => import('@/app/(dashboard)/(features)/productions/[id]/run-of-show-client').then((m) => m.RunOfShowClient),
   { ssr: false, loading: () => <div className="flex items-center justify-center p-12"><div className="h-8 w-8 stage-skeleton rounded-lg" /></div> },
 );
 

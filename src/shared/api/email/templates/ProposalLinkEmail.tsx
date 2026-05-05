@@ -17,7 +17,7 @@ import {
 } from '@react-email/components';
 import * as React from 'react';
 import { formatCurrency, formatEventDate } from '@/shared/lib/format-currency';
-import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
+import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/productions/actions/deal-model';
 import { type EmailPalette, DEFAULT_EMAIL_PALETTE } from '@/shared/lib/email-palette';
 import { EmailBrandMark } from '../brand-header';
 

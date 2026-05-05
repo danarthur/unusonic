@@ -243,7 +243,7 @@ export async function getPersonProductions(
       band,
       role,
       amountEstimated: deal.budget_estimated ?? null,
-      href: event?.id ? `/crm?eventId=${event.id}` : `/crm?dealId=${deal.id}`,
+      href: event?.id ? `/productions?eventId=${event.id}` : `/productions?dealId=${deal.id}`,
     });
   }
 
@@ -259,7 +259,7 @@ export async function getPersonProductions(
       band: classifyBand(null, event.lifecycle_status ?? event.status ?? null, event.starts_at),
       role: 'Client',
       amountEstimated: null,
-      href: `/crm?eventId=${event.id}`,
+      href: `/productions?eventId=${event.id}`,
     });
   }
 

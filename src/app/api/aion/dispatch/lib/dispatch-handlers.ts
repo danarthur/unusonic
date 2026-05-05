@@ -6,14 +6,14 @@
  *   confirm → performs the real action and resolves the insight
  */
 
-import { getDealContextForAion } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
-import { getDealCrew, confirmDealCrew } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import { getDealContextForAion } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
+import { getDealCrew, confirmDealCrew } from '@/app/(dashboard)/(features)/productions/actions/deal-crew';
 import { generateFollowUpDraft } from '@/app/api/aion/lib/generate-draft';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { resolveInsight } from './resolve-insight';
 import { sendDispatchEmail } from './send-dispatch-email';
 import type { AionVoiceConfig } from '@/app/(dashboard)/(features)/aion/actions/aion-config-actions';
-import type { FollowUpQueueItem } from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
+import type { FollowUpQueueItem } from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -278,7 +278,7 @@ async function handleShowNoCrewExecute(insight: InsightRow): Promise<DispatchRes
       dealTitle,
       crew: [],
       message: 'No crew assigned yet. Open the deal to assign crew.',
-      href: `/crm/deal/${dealId}`,
+      href: `/productions/deal/${dealId}`,
     },
   };
 }

@@ -26,7 +26,7 @@ import {
   snoozeFollowUp,
   logFollowUpAction,
   type AionDealContext,
-} from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
+} from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
 import type { AionToolContext } from './types';
 
 // =============================================================================

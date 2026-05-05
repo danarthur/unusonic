@@ -28,7 +28,7 @@ export function PipelineVelocityWidget({ ionHint = false }: PipelineVelocityWidg
     <WidgetShell
       icon={TrendingUp}
       label="Pipeline Velocity"
-      href="/crm"
+      href="/productions"
       hrefLabel="View Production Queue"
       loading={loading}
       skeletonRows={5}
@@ -63,7 +63,7 @@ export function PipelineVelocityWidget({ ionHint = false }: PipelineVelocityWidg
       </div>
 
       <Link
-        href="/crm"
+        href="/productions"
         className="mt-4 flex w-full items-center justify-center rounded-xl border border-[oklch(1_0_0_/_0.12)] bg-transparent px-3 py-2.5 stage-label hover:bg-[oklch(1_0_0_/_0.08)] hover:text-[var(--stage-text-primary)] transition-[background-color,color]"
       >
         View Pipeline

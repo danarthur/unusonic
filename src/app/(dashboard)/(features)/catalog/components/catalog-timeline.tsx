@@ -188,9 +188,9 @@ export function CatalogTimeline({ packages, workspaceId }: CatalogTimelineProps)
   const handleCellClick = useCallback(
     (cell: CellAllocations) => {
       if (cell.deals.length === 1) {
-        // /crm/[id] expects an event UUID (getEventSummary), so pushing a deal UUID 404s.
+        // /productions/[id] expects an event UUID (getEventSummary), so pushing a deal UUID 404s.
         // Use the CRM stream's selected-deal query param instead — routes to the Prism Deal lens.
-        router.push(`/crm?selected=${cell.deals[0].dealId}`);
+        router.push(`/productions?selected=${cell.deals[0].dealId}`);
       }
       // For multiple deals, tooltip shows them — user can decide
     },

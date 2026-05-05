@@ -16,7 +16,7 @@ import { ProposalLineInspector } from './proposal-line-inspector';
 import { ProposalProductionTeam } from './proposal-production-team';
 import { ProposalSummaryCard } from './proposal-summary-card';
 import { getCurrentOrgId } from '@/features/network/api/actions';
-import { syncCrewFromProposal, getDealCrewEquipmentNames, getDealCrew, type DealCrewRow } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import { syncCrewFromProposal, getDealCrewEquipmentNames, getDealCrew, type DealCrewRow } from '@/app/(dashboard)/(features)/productions/actions/deal-crew';
 
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { computeHoursBetween } from '@/shared/lib/parse-time';

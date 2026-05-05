@@ -6,7 +6,7 @@ import { Play, Pause, SkipForward, Square, Mic, Sun, Video, Truck } from 'lucide
 const SW = 1.5;
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
-import type { Cue, CueType } from '@/app/(dashboard)/(features)/crm/actions/run-of-show-types';
+import type { Cue, CueType } from '@/app/(dashboard)/(features)/productions/actions/run-of-show-types';
 import type { RosExecutionState } from '@/features/run-of-show/api/ros-execution';
 
 /* ── Constants ────────────────────────────────────────────────── */

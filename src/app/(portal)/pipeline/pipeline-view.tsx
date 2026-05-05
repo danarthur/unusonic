@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { TrendingUp, Calendar, MapPin, DollarSign, Check } from 'lucide-react';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
-import type { WorkspacePipelineStage } from '@/app/(dashboard)/(features)/crm/actions/get-workspace-pipeline-stages';
+import type { WorkspacePipelineStage } from '@/app/(dashboard)/(features)/productions/actions/get-workspace-pipeline-stages';
 
 /* ── Types ───────────────────────────────────────────────────────── */
 

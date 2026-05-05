@@ -13,7 +13,7 @@ import { ProposalAcceptedEmail } from '../templates/ProposalAcceptedEmail';
 import { ProposalSignedEmail } from '../templates/ProposalSignedEmail';
 import { ProposalReminderEmail } from '../templates/ProposalReminderEmail';
 import { createClient } from '@/shared/api/supabase/server';
-import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/crm/actions/deal-model';
+import { DEAL_ARCHETYPE_LABELS } from '@/app/(dashboard)/(features)/productions/actions/deal-model';
 import { resolvePortalTheme, type PortalThemeConfig } from '@/shared/lib/portal-theme';
 import { portalThemeToEmailPalette } from '@/shared/lib/email-palette';
 import {

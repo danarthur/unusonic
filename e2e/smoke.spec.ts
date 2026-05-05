@@ -28,7 +28,7 @@ test.describe('Smoke: login and dashboard', () => {
     // Clear any cookies
     await page.context().clearCookies();
 
-    await page.goto('/crm');
+    await page.goto('/productions');
     await expect(page).toHaveURL(/\/login/);
   });
 
@@ -64,8 +64,8 @@ test.describe('Smoke: CRM deal creation', () => {
   });
 
   test('can navigate to CRM page', async ({ page }) => {
-    await page.goto('/crm');
+    await page.goto('/productions');
     // Should see the CRM page or be redirected to it
-    await expect(page).toHaveURL(/\/crm/);
+    await expect(page).toHaveURL(/\/productions/);
   });
 });

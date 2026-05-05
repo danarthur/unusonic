@@ -105,7 +105,7 @@ async function resolveDeal(id: string): Promise<CitationResolution | null> {
     id: row.id,
     label: row.title ?? 'Untitled deal',
     snippet,
-    href: `/crm?selected=${row.id}`,
+    href: `/productions?selected=${row.id}`,
   };
 }
 
@@ -203,7 +203,7 @@ async function resolveMessage(id: string): Promise<CitationResolution | null> {
   const paraphrase = row.ai_summary?.trim() || firstSentenceParaphrase(row.body_text);
 
   const dealId = row.thread?.deal_id ?? null;
-  const href = dealId ? `/crm/deal/${dealId}/replies?message=${row.id}` : null;
+  const href = dealId ? `/productions/deal/${dealId}/replies?message=${row.id}` : null;
 
   return {
     kind: 'message',

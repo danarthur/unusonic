@@ -58,8 +58,8 @@ export default async function PreviewClientEventPage({
   const { from: fromDealId } = await searchParams;
   const entity = await verifyPreviewAccess(entityId);
   const exitHref = fromDealId
-    ? `/crm?stream=active&selected=${fromDealId}`
-    : '/crm';
+    ? `/productions?stream=active&selected=${fromDealId}`
+    : '/productions';
   const homeHref = fromDealId
     ? `/preview/client/${entityId}?from=${fromDealId}`
     : `/preview/client/${entityId}`;

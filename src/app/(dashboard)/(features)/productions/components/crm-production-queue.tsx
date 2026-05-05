@@ -1,0 +1,162 @@
+'use client';
+
+import { useState, useOptimistic } from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { StagePanel } from '@/shared/ui/stage-panel';
+import { Sparkles, Plus, FileText, Wallet, Clock, MapPin } from 'lucide-react';
+import { CreateGigModal } from './create-gig-modal';
+import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+
+type Gig = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  event_date: string | null;
+  location: string | null;
+  client_name: string | null;
+  source?: 'deal' | 'event';
+  isOptimistic?: boolean;
+};
+
+export type OptimisticUpdate =
+  | { type: 'add'; gig: Gig }
+  | { type: 'revert'; tempId: string }
+  | { type: 'replaceId'; tempId: string; realId: string };
+
+function gigsReducer(current: Gig[], update: OptimisticUpdate): Gig[] {
+  if (update.type === 'add') {
+    return [...current, { ...update.gig, isOptimistic: true }];
+  }
+  if (update.type === 'revert') {
+    return current.filter((g) => g.id !== update.tempId);
+  }
+  if (update.type === 'replaceId') {
+    return current.map((g) =>
+      g.id === update.tempId ? { ...g, id: update.realId, isOptimistic: false } : g
+    );
+  }
+  return current;
+}
+
+export function CRMProductionQueue({ gigs }: { gigs: Gig[] }) {
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [optimisticGigs, addOptimisticGig] = useOptimistic(gigs, gigsReducer);
+
+  return (
+    <>
+      <div className="flex-1 min-h-[80vh] p-6 overflow-y-auto" data-surface="void">
+        <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="stage-readout-lg mb-2">Production queue</h1>
+            <p className="text-[var(--stage-text-secondary)]">
+              {optimisticGigs.length === 0
+                ? 'No productions yet.'
+                : 'Lead your pipeline from inquiry to wrap.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCreateModalOpen(true)}
+            className="stage-btn stage-btn-primary"
+          >
+            <Plus size={18} /> New production
+          </button>
+        </header>
+
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-3 gap-[var(--stage-gap)] auto-rows-[minmax(200px,auto)]"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            visible: { transition: {} },
+            hidden: {},
+          }}
+        >
+          {optimisticGigs.map((gig, index) => (
+            <motion.div
+              key={gig.id}
+              className={`h-full flex flex-col justify-between group ${index === 0 && optimisticGigs.length >= 1 ? 'md:col-span-2 md:row-span-2' : ''}`}
+              variants={{
+                visible: { opacity: 1, y: 0 },
+                hidden: { opacity: 0, y: 12 },
+              }}
+              transition={STAGE_MEDIUM}
+            >
+              <StagePanel
+                interactive={!gig.isOptimistic}
+                className={`h-full flex flex-col justify-between ${gig.isOptimistic ? 'opacity-45 stage-skeleton pointer-events-none' : ''}`}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-2 stage-panel stage-panel-nested !rounded-full text-2xl text-[var(--stage-text-primary)]">
+                    <Sparkles size={18} />
+                  </div>
+                  <span className="stage-panel stage-panel-nested !rounded-full !p-0 px-2 py-1 stage-badge-text text-[var(--stage-text-secondary)]">
+                    {gig.status ?? '—'}
+                  </span>
+                </div>
+
+                <Link
+                  href={
+                    gig.isOptimistic
+                      ? '#'
+                      : gig.source === 'event'
+                        ? `/events/g/${gig.id}`
+                        : `/productions/deal/${gig.id}`
+                  }
+                  className="flex flex-col flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-inset focus-visible:rounded-2xl"
+                  onClick={(e) => gig.isOptimistic && e.preventDefault()}
+                >
+                  <h3 className="stage-readout-lg mb-1 transition-colors">
+                    {gig.title ?? 'Untitled production'}
+                  </h3>
+                  <p className="stage-label mb-4">{gig.client_name ?? 'Client'}</p>
+
+                  <div className="flex items-center gap-4 stage-badge-text text-[var(--stage-text-secondary)] border-t border-[var(--stage-edge-subtle)] pt-4 mt-2">
+                    <span className="flex items-center gap-1.5">
+                      <Clock size={14} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+                      {gig.event_date
+                        ? new Date(gig.event_date + 'T00:00:00').toLocaleDateString()
+                        : 'TBD'}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <MapPin size={14} className="shrink-0 text-[var(--stage-text-secondary)]" aria-hidden />
+                      {gig.location?.split(',')[0] ?? 'TBD'}
+                    </span>
+                  </div>
+                </Link>
+
+                <div className="mt-4 pt-3 border-t border-[var(--stage-edge-subtle)] flex gap-2 flex-wrap">
+                  {!gig.isOptimistic && gig.source === 'event' && (
+                    <>
+                      <Link
+                        href={`/events/${gig.id}/deal`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
+                      >
+                        <FileText size={14} />
+                        Deal room
+                      </Link>
+                      <Link
+                        href={`/events/${gig.id}/finance`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
+                      >
+                        <Wallet size={14} />
+                        Finance
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </StagePanel>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+
+      <CreateGigModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        addOptimisticGig={addOptimisticGig}
+      />
+    </>
+  );
+}

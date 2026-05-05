@@ -7,7 +7,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/shared/ui/popover';
 import {
   snoozeFollowUp,
   dismissFollowUp,
-} from '@/app/(dashboard)/(features)/crm/actions/follow-up-actions';
+} from '@/app/(dashboard)/(features)/productions/actions/follow-up-actions';
 import type { OwedTodayItem } from '../api/get-owed-today';
 
 const PRESETS: { label: string; days: number }[] = [

@@ -59,7 +59,7 @@ export async function setOwedOverride(input: {
       return { success: false, error: error.message };
     }
 
-    revalidatePath('/crm', 'layout');
+    revalidatePath('/productions', 'layout');
 
     return { success: true, override };
   } catch (err) {

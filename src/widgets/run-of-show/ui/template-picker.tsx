@@ -14,7 +14,7 @@ import {
   saveRosTemplate,
   deleteRosTemplate,
   applyRosTemplate,
-} from '@/app/(dashboard)/(features)/crm/actions/ros';
+} from '@/app/(dashboard)/(features)/productions/actions/ros';
 
 interface TemplatePickerProps {
   open: boolean;

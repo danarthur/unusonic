@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * First-visit prompt — when an admin/owner visits /crm with the Aion card
+ * First-visit prompt — when an admin/owner visits /productions with the Aion card
  * beta OFF + no current-version consent recorded, surface the consent
  * modal once. Dismissal is soft — stores a timestamp in localStorage so
  * we don't re-prompt within 7 days; the full re-prompt cycle happens

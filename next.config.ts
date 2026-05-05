@@ -51,6 +51,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      { source: '/crm', destination: '/productions', permanent: true },
+      { source: '/crm/:path*', destination: '/productions/:path*', permanent: true },
+    ];
+  },
 };
 
 export default withSentryConfig(withBundleAnalyzer(nextConfig), {

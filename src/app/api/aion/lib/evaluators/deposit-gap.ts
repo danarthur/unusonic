@@ -122,7 +122,7 @@ export async function evaluateDepositGap(
       priority,
       suggestedAction: 'Nudge the client on the deposit',
       // Deep-link to the deal if we have one, otherwise the invoice page.
-      href: inv.deal_id ? `/crm/deal/${inv.deal_id}` : `/finance/invoices/${inv.id}`,
+      href: inv.deal_id ? `/productions/deal/${inv.deal_id}` : `/finance/invoices/${inv.id}`,
       urgency,
     };
   });

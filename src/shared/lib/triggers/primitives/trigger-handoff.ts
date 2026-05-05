@@ -10,7 +10,7 @@ type Config = z.infer<typeof configSchema>;
  * this primitive MUST check whether the deal has already been handed off
  * before opening/surfacing the wizard. Real implementation will query
  * `ops.events` for a row with `deal_id = ctx.dealId` (handoverDeal writes
- * this linkage in src/app/(dashboard)/(features)/crm/actions/handover-deal.ts)
+ * this linkage in src/app/(dashboard)/(features)/productions/actions/handover-deal.ts)
  * and short-circuit with ok:true if one exists. The stub has no side-effect
  * so is trivially idempotent today.
  */

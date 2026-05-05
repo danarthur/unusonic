@@ -7,7 +7,7 @@
 import { redirect } from 'next/navigation';
 import { Tag } from 'lucide-react';
 import { createClient } from '@/shared/api/supabase/server';
-import { listWorkspaceEventArchetypes } from '@/app/(dashboard)/(features)/crm/actions/event-archetype-actions';
+import { listWorkspaceEventArchetypes } from '@/app/(dashboard)/(features)/productions/actions/event-archetype-actions';
 import { EventTypeManager } from './event-type-manager';
 
 export const metadata = {

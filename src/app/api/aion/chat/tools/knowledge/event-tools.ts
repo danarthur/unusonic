@@ -5,7 +5,7 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getDeal } from '@/app/(dashboard)/(features)/crm/actions/get-deal';
+import { getDeal } from '@/app/(dashboard)/(features)/productions/actions/get-deal';
 import { searchMemory, type SourceType } from '../../../lib/embeddings';
 import { envelope } from '../../../lib/retrieval-envelope';
 import { getSubstrateCounts } from '../../../lib/substrate-counts';
@@ -229,7 +229,7 @@ export function createEventKnowledgeTools(ctx: AionToolContext) {
         return envelope([], searched, { reason: 'event_not_found', hint: 'No event in view. Provide eventId or dealId for a deal that has been handed over.' });
       }
 
-      const { getEventSignals } = await import('@/app/(dashboard)/(features)/crm/actions/get-event-signals');
+      const { getEventSignals } = await import('@/app/(dashboard)/(features)/productions/actions/get-event-signals');
       const signals = await getEventSignals(eventId);
       const searched = await getSubstrateCounts(workspaceId);
       return envelope(signals, searched, {

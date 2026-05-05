@@ -20,7 +20,7 @@ import {
 } from '../api/actions';
 // Type import goes directly to the lib module because api/actions is a
 // 'use server' file and Next 16 rejects type re-exports from those.
-import type { WorkspaceCallTimeRule } from '@/app/(dashboard)/(features)/crm/actions/apply-call-time-rules';
+import type { WorkspaceCallTimeRule } from '@/app/(dashboard)/(features)/productions/actions/apply-call-time-rules';
 
 const EVENT_ARCHETYPES = [
   'corporate',

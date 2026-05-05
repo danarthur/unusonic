@@ -5,7 +5,7 @@
  *
  * Shown from:
  *   - /settings/aion (when admin hasn't accepted current term version)
- *   - First /crm visit with flag=OFF + admin role + not yet accepted (future wiring)
+ *   - First /productions visit with flag=OFF + admin role + not yet accepted (future wiring)
  *
  * Shape C rules (design §21):
  *   - Owner/admin only. Members see a read-only "Request access" view.

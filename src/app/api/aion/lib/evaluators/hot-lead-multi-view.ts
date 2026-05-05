@@ -118,7 +118,7 @@ export async function evaluateHotLeadMultiView(
       },
       priority,
       suggestedAction: 'Reach out while they\u2019re actively looking',
-      href: `/crm/deal/${p.deal_id}/proposal-builder`,
+      href: `/productions/deal/${p.deal_id}/proposal-builder`,
       urgency,
     };
   });

@@ -101,7 +101,7 @@ export async function getActivityFeed(): Promise<ActivityItem[]> {
       type: 'deal_created',
       title: (d.title as string) ?? 'Untitled deal',
       timestamp: d.created_at,
-      linkUrl: `/crm/deal/${d.id}`,
+      linkUrl: `/productions/deal/${d.id}`,
     });
   }
 
@@ -113,7 +113,7 @@ export async function getActivityFeed(): Promise<ActivityItem[]> {
       type: 'proposal_sent',
       title: `Proposal sent for ${dealTitle}`,
       timestamp: p.updated_at,
-      linkUrl: `/crm/deal/${p.deal_id}`,
+      linkUrl: `/productions/deal/${p.deal_id}`,
     });
   }
 
@@ -125,7 +125,7 @@ export async function getActivityFeed(): Promise<ActivityItem[]> {
       type: 'proposal_signed',
       title: `Proposal signed for ${dealTitle}`,
       timestamp: p.signed_at ?? p.accepted_at ?? p.updated_at,
-      linkUrl: `/crm/deal/${p.deal_id}`,
+      linkUrl: `/productions/deal/${p.deal_id}`,
     });
   }
 
@@ -145,7 +145,7 @@ export async function getActivityFeed(): Promise<ActivityItem[]> {
       type: 'crew_confirmed',
       title: `Crew confirmed for ${dealTitle}`,
       timestamp: c.confirmed_at,
-      linkUrl: `/crm/deal/${c.deal_id}`,
+      linkUrl: `/productions/deal/${c.deal_id}`,
     });
   }
 

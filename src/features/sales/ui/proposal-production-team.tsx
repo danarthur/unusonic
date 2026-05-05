@@ -13,7 +13,7 @@ import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { estimatedRoleCost } from '../api/package-types';
 import type { ProposalBuilderLineItem } from '../model/types';
 import type { RequiredRole } from '../api/package-types';
-import type { DealCrewRow } from '@/app/(dashboard)/(features)/crm/actions/deal-crew';
+import type { DealCrewRow } from '@/app/(dashboard)/(features)/productions/actions/deal-crew';
 
 export interface ProposalProductionTeamProps {
   lineItems: ProposalBuilderLineItem[];

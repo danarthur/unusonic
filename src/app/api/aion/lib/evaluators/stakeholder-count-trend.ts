@@ -105,7 +105,7 @@ export async function evaluateStakeholderCountTrend(
       },
       priority: 45,
       suggestedAction: 'Check whether the thread needs a wider response.',
-      href: `/crm?selected=${encodeURIComponent(deal.id)}`,
+      href: `/productions?selected=${encodeURIComponent(deal.id)}`,
       urgency: delta >= 2 ? 'high' : 'medium',
     });
   }

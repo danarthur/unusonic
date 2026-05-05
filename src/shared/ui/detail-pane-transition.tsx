@@ -45,7 +45,7 @@
  *   - Pass `scrollContainerRef` if the pane has its own scroll region you
  *     want reset to top on a new selection.
  *
- * Reference impl: `src/app/(dashboard)/(features)/crm/components/prism.tsx`.
+ * Reference impl: `src/app/(dashboard)/(features)/productions/components/prism.tsx`.
  */
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
