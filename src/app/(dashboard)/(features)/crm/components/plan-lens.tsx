@@ -391,7 +391,31 @@ export function PlanLens({
 
   let content: React.ReactNode;
 
-  if (isPostHandoff) {
+  if (isPostHandoff && bundleLoading) {
+    // Cold-load skeleton. `bundleLoading` is true only on the first paint
+    // when there's no cached bundle (TanStack `isLoading` flips false once
+    // any data exists, so subsequent visits render the real layout against
+    // placeholderData instead of bouncing through the skeleton). Without
+    // this, the post-handoff branch rendered children against empty data
+    // and the user saw an unpainted black pane while gear+crew+ledger were
+    // in flight. Mirrors PrismSkeleton's three-block silhouette.
+    content = (
+      <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }} aria-hidden>
+        <div
+          className="h-32 w-full stage-skeleton"
+          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+        />
+        <div
+          className="h-24 w-full stage-skeleton"
+          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+        />
+        <div
+          className="h-48 w-full stage-skeleton"
+          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+        />
+      </div>
+    );
+  } else if (isPostHandoff) {
     content = (
       <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
         {/* Post-handoff save confirmation */}
@@ -403,8 +427,11 @@ export function PlanLens({
           </div>
         )}
 
-        {/* ── Tier 1: Identity + Show Status (full width) ── */}
-        {headerStrip}
+        {/* ── Tier 1: Show Status (full width) ──
+            Deal-identity header omitted on the post-handoff Plan surface.
+            Show Health + Readiness Ribbon are the production owner's
+            identity question here ("how is the show?"); pushing the
+            editable "Deal" panel above them confused the Plan/Deal split. */}
         <StagePanel elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
           {dealId && deal && (
             <ShowHealthCard dealId={dealId} health={deal.show_health} onSaved={() => onDealUpdated?.()} inline />
