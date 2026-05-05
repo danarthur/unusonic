@@ -127,23 +127,18 @@ export async function handoverDeal(
     return { success: true, eventId: eid };
   }
 
-  // Phase 3i: gate accepts legacy slugs during the rollout window AND the
-  // post-collapse kind ('won' covers contract_signed/deposit_received/won
-  // after the BEFORE trigger derives). A deal still in a pre-signing stage
-  // (status 'working' with a tagged stage other than the contract_signed
-  // chain) would also land here — operators expect the wizard to guard
-  // against that via UI gating anyway.
+  // The deals.status column is constrained to ('working','won','lost') at
+  // the DB level (deals_status_check), so 'won' is the only handover-eligible
+  // value — earlier code referenced 'contract_signed'/'deposit_received' as
+  // legacy rollout slugs, but those values can never appear in the column.
+  // The pipeline stage is the source of truth for sales progression; status
+  // 'won' is the post-collapse kind set by the BEFORE trigger when the deal
+  // enters a stage tagged contract_signed / deposit_received / won.
   const status = (r.status as string) ?? '';
-  const validHandoverStates = new Set([
-    // Post-collapse kinds:
-    'won',
-    // Legacy pre-collapse slugs still active during rollout:
-    'contract_signed', 'deposit_received',
-  ]);
-  if (!validHandoverStates.has(status)) {
+  if (status !== 'won') {
     return {
       success: false,
-      error: 'Deal must have a signed contract, received deposit, or be marked won before handover.',
+      error: 'Deal must be marked won before handover. Advance the deal through your pipeline first.',
     };
   }
 
