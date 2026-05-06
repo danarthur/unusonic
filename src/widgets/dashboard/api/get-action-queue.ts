@@ -207,120 +207,99 @@ async function fetchUnsignedProposalItems(
 }
 
 /**
- * Any overdue invoice (deposit or balance past due, any amount of overdue).
+ * Overdue invoices: rows in `finance.invoices` that are actually past their
+ * `due_date` with an outstanding balance. Pre-invoice deal/proposal expectations
+ * (deposits conceptually due, balance windows derived from event date) are
+ * sales follow-ups, not AR — they're surfaced via `fetchFollowUpItems`, not here.
  */
 async function fetchOverdueInvoiceItems(
   supabase: SupaClient,
   workspaceId: string,
   now: Date,
 ): Promise<ActionItem[]> {
-  const { data: proposals } = await supabase
-    .from('proposals')
+  type InvoiceRow = {
+    id: string;
+    invoice_kind: string | null;
+    status: string;
+    total_amount: number | string;
+    paid_amount: number | string;
+    due_date: string;
+    deal_id: string | null;
+    bill_to_snapshot: { display_name?: string | null } | null;
+  };
+
+  const { data: invoiceRows, error: invErr } = await supabase
+    .schema('finance')
+    .from('invoices')
     .select(
-      'id, deal_id, status, signed_at, accepted_at, deposit_percent, deposit_paid_at, deposit_deadline_days, payment_due_days',
+      'id, invoice_kind, status, total_amount, paid_amount, due_date, deal_id, bill_to_snapshot',
     )
     .eq('workspace_id', workspaceId)
-    .in('status', ['sent', 'viewed', 'accepted']);
+    .in('status', ['sent', 'overdue', 'partial'])
+    .not('due_date', 'is', null);
 
-  if (!proposals?.length) return [];
+  if (invErr || !invoiceRows?.length) return [];
 
+  // Today as YYYY-MM-DD (UTC). Compared lexicographically against `due_date`
+  // which is a Postgres `date` (YYYY-MM-DD). The `finance.invoice_balances`
+  // view computes `days_overdue` against `CURRENT_DATE` in DB session TZ; we
+  // stay consistent with that — rounding to a workspace TZ here would
+  // duplicate logic and drift from the view.
+  const today = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+
+  const overdueInvoices = (invoiceRows as InvoiceRow[]).filter((inv) => {
+    const balance = (Number(inv.total_amount) || 0) - (Number(inv.paid_amount) || 0);
+    return balance > 0 && inv.due_date < today;
+  });
+
+  if (overdueInvoices.length === 0) return [];
+
+  // Resolve deal titles for display (fall back to bill_to_snapshot.display_name).
   const dealIds = [
-    ...new Set(proposals.map((p) => p.deal_id).filter(Boolean) as string[]),
+    ...new Set(overdueInvoices.map((i) => i.deal_id).filter(Boolean) as string[]),
   ];
-
-  const { data: deals } = await supabase
-    .from('deals')
-    .select('id, title, proposed_date')
-    .in('id', dealIds)
-    .is('archived_at', null);
-
-  type DealRow = { id: string; title: string | null; proposed_date: string | null };
-  const dealMap = new Map<string, DealRow>(
-    (deals ?? []).map((d) => [d.id, d as DealRow]),
-  );
-
-  // Workspace defaults
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select(
-      'default_deposit_deadline_days, default_balance_due_days_before_event',
-    )
-    .eq('id', workspaceId)
-    .maybeSingle();
-
-  const wsDepositDeadline =
-    (ws as { default_deposit_deadline_days?: number } | null)
-      ?.default_deposit_deadline_days ?? 7;
-  const wsBalanceDueBefore =
-    (ws as { default_balance_due_days_before_event?: number } | null)
-      ?.default_balance_due_days_before_event ?? 14;
-
-  const nowMs = now.getTime();
-  const todayEndMs = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
-  ).getTime();
-
-  const items: ActionItem[] = [];
-
-  for (const p of proposals) {
-    const deal = dealMap.get(p.deal_id);
-    if (!deal) continue;
-
-    const signDate = p.signed_at ?? p.accepted_at;
-    const depositPercent = p.deposit_percent ?? 0;
-    const deadlineDays = p.deposit_deadline_days ?? wsDepositDeadline;
-    const balanceDueDaysBefore = p.payment_due_days ?? wsBalanceDueBefore;
-
-    // Deposit overdue
-    if (depositPercent > 0 && !p.deposit_paid_at && signDate) {
-      const dueMs =
-        new Date(signDate).getTime() + deadlineDays * 86_400_000;
-      if (nowMs > dueMs) {
-        const daysOverdue = Math.floor((nowMs - dueMs) / 86_400_000);
-        items.push({
-          id: `overdue-dep-${p.id}`,
-          type: 'overdue_invoice',
-          priority:
-            daysOverdue >= 7
-              ? 'overdue'
-              : dueMs >= todayEndMs - 86_400_000
-                ? 'today'
-                : 'this_week',
-          title: `Deposit ${daysOverdue}d overdue`,
-          detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/events/deal/${p.deal_id}`,
-          actionLabel: 'Send reminder',
-        });
-      }
-    }
-
-    // Balance overdue
-    const depositOk = depositPercent === 0 || !!p.deposit_paid_at;
-    if (depositOk && deal.proposed_date) {
-      const eventDate = new Date(deal.proposed_date);
-      const dueMs =
-        eventDate.getTime() - balanceDueDaysBefore * 86_400_000;
-      if (nowMs > dueMs) {
-        const daysOverdue = Math.floor((nowMs - dueMs) / 86_400_000);
-        items.push({
-          id: `overdue-bal-${p.id}`,
-          type: 'overdue_invoice',
-          priority:
-            daysOverdue >= 7
-              ? 'overdue'
-              : dueMs >= todayEndMs - 86_400_000
-                ? 'today'
-                : 'this_week',
-          title: `Balance ${daysOverdue}d overdue`,
-          detail: deal.title ?? 'Untitled deal',
-          actionUrl: `/events/deal/${p.deal_id}`,
-          actionLabel: 'Send reminder',
-        });
-      }
+  const dealTitleMap = new Map<string, string>();
+  if (dealIds.length > 0) {
+    const { data: deals } = await supabase
+      .from('deals')
+      .select('id, title')
+      .in('id', dealIds)
+      .is('archived_at', null);
+    for (const d of (deals ?? []) as { id: string; title: string | null }[]) {
+      if (d.title) dealTitleMap.set(d.id, d.title);
     }
   }
 
-  return items;
+  return overdueInvoices.map((inv) => {
+    // Days overdue computed from YYYY-MM-DD strings — matches the view's
+    // CURRENT_DATE - due_date semantics.
+    const dueParts = inv.due_date.split('-').map(Number);
+    const dueMs = Date.UTC(dueParts[0], dueParts[1] - 1, dueParts[2]);
+    const todayParts = today.split('-').map(Number);
+    const todayMs = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
+    const daysOverdue = Math.max(0, Math.floor((todayMs - dueMs) / 86_400_000));
+
+    const titleFromDeal = inv.deal_id ? dealTitleMap.get(inv.deal_id) : undefined;
+    const titleFromSnapshot = inv.bill_to_snapshot?.display_name ?? null;
+    const detail = titleFromDeal ?? titleFromSnapshot ?? 'Untitled invoice';
+
+    const kindLabel = inv.invoice_kind === 'deposit' ? 'Deposit' : 'Balance';
+    const actionUrl = inv.deal_id
+      ? `/events/deal/${inv.deal_id}`
+      : `/finance/invoices/${inv.id}`;
+
+    return {
+      id: `overdue-inv-${inv.id}`,
+      type: 'overdue_invoice' as const,
+      // Anything actually past due_date is "overdue" priority. Anything not
+      // past due_date didn't make it into this list.
+      priority: 'overdue' as const,
+      title: `${kindLabel} ${daysOverdue}d overdue`,
+      detail,
+      actionUrl,
+      actionLabel: 'Send reminder',
+    };
+  });
 }
 
 /**

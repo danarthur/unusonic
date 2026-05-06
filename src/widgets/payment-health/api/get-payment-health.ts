@@ -1,131 +1,148 @@
 'use server';
 
+/**
+ * Payment Health metrics — reads from `finance.invoices` only.
+ *
+ * "Overdue" / "at risk" means an actual issued invoice past its due_date with
+ * an outstanding balance. Pre-invoice deal/proposal payment expectations
+ * (deposits conceptually due, balance windows derived from event date) are
+ * NOT counted as overdue here — those are sales follow-ups, not AR.
+ *
+ * Definition of overdue (confirmed with product owner):
+ *   - status IN ('sent','overdue','partial')   // not draft/void/paid
+ *   - due_date IS NOT NULL AND due_date < CURRENT_DATE
+ *   - total_amount > paid_amount               // outstanding balance
+ *
+ * Outstanding amount = SUM(total_amount - paid_amount) over those rows.
+ * `total_amount` / `paid_amount` are stored as numeric(14,2) — dollars, not
+ * cents. The existing widget formats with `Intl.NumberFormat({style:'currency'})`
+ * which expects dollars, so no unit conversion is needed here.
+ */
+
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
 export type PaymentHealthMetrics = {
   overdueCount: number;
+  /** Sum of outstanding balance across overdue invoices. Dollars. */
   overdueAmount: number;
+  /** Soonest non-overdue invoice with an outstanding balance, if any. */
   nextPayment: {
     dealTitle: string;
-    dueDate: string;
-    amount: number | null;
+    dueDate: string; // YYYY-MM-DD (raw invoice due_date)
+    amount: number | null; // dollars
     type: 'deposit' | 'balance';
   } | null;
 };
 
-export async function getPaymentHealthMetrics(): Promise<PaymentHealthMetrics> {
-  const workspaceId = await getActiveWorkspaceId();
-  if (!workspaceId) return { overdueCount: 0, overdueAmount: 0, nextPayment: null };
+const EMPTY: PaymentHealthMetrics = {
+  overdueCount: 0,
+  overdueAmount: 0,
+  nextPayment: null,
+};
 
-  const supabase = await createClient();
-  const now = Date.now();
+const ACTIVE_STATUSES = ['sent', 'overdue', 'partial'] as const;
 
-  // Fetch signed proposals with deal data
-  const { data: proposals } = await supabase
-    .from('proposals')
-    .select(`
-      id, deal_id, status,
-      signed_at, accepted_at,
-      deposit_percent, deposit_paid_at, deposit_deadline_days,
-      payment_due_days
-    `)
+interface InvoiceRow {
+  id: string;
+  invoice_kind: string | null;
+  status: string;
+  total_amount: number | string;
+  paid_amount: number | string;
+  due_date: string | null;
+  deal_id: string | null;
+  bill_to_snapshot: { display_name?: string | null } | null;
+}
+
+type SupaClient = Awaited<ReturnType<typeof createClient>>;
+
+function todayYmd(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+async function fetchActiveInvoices(
+  supabase: SupaClient,
+  workspaceId: string,
+): Promise<InvoiceRow[]> {
+  const { data, error } = await supabase
+    .schema('finance')
+    .from('invoices')
+    .select(
+      'id, invoice_kind, status, total_amount, paid_amount, due_date, deal_id, bill_to_snapshot',
+    )
     .eq('workspace_id', workspaceId)
-    .in('status', ['sent', 'viewed', 'accepted']);
+    .in('status', ACTIVE_STATUSES as unknown as string[])
+    .not('due_date', 'is', null);
 
-  if (!proposals?.length) return { overdueCount: 0, overdueAmount: 0, nextPayment: null };
-
-  const proposalIds = proposals.map((p) => p.id);
-  const dealIds = [...new Set(proposals.map((p) => p.deal_id).filter(Boolean) as string[])];
-
-  // Fetch proposal items to compute real totals
-  const { data: items } = await supabase
-    .from('proposal_items')
-    .select('proposal_id, quantity, unit_price, override_price, is_optional')
-    .in('proposal_id', proposalIds);
-
-  const totalByProposal = new Map<string, number>();
-  for (const item of items ?? []) {
-    if (item.is_optional) continue; // optional items excluded from totals
-    const price = item.override_price ?? item.unit_price ?? 0;
-    const qty = item.quantity ?? 1;
-    totalByProposal.set(item.proposal_id, (totalByProposal.get(item.proposal_id) ?? 0) + price * qty);
+  if (error) {
+    console.error('[payment-health] invoice fetch error:', error.message);
+    return [];
   }
+  return (data ?? []) as InvoiceRow[];
+}
 
+async function fetchDealTitles(
+  supabase: SupaClient,
+  invoices: InvoiceRow[],
+): Promise<Map<string, string>> {
+  const dealIds = [...new Set(invoices.map((i) => i.deal_id).filter(Boolean) as string[])];
+  const map = new Map<string, string>();
+  if (dealIds.length === 0) return map;
   const { data: deals } = await supabase
     .from('deals')
-    .select('id, title, proposed_date')
+    .select('id, title')
     .in('id', dealIds)
     .is('archived_at', null);
+  for (const d of (deals ?? []) as { id: string; title: string | null }[]) {
+    if (d.title) map.set(d.id, d.title);
+  }
+  return map;
+}
 
-  const dealMap = new Map(
-    (deals ?? []).map((d) => [d.id, d as { id: string; title: string | null; proposed_date: string | null }]),
-  );
+function resolveTitle(inv: InvoiceRow, dealTitleMap: Map<string, string>): string {
+  const titleFromDeal = inv.deal_id ? dealTitleMap.get(inv.deal_id) : undefined;
+  return titleFromDeal ?? inv.bill_to_snapshot?.display_name ?? 'Untitled invoice';
+}
 
-  // Workspace defaults
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select('default_deposit_deadline_days, default_balance_due_days_before_event')
-    .eq('id', workspaceId)
-    .maybeSingle();
+function balanceOf(inv: InvoiceRow): number {
+  return (Number(inv.total_amount) || 0) - (Number(inv.paid_amount) || 0);
+}
 
-  const wsDepositDeadline = (ws as { default_deposit_deadline_days?: number } | null)?.default_deposit_deadline_days ?? 7;
-  const wsBalanceDueBefore = (ws as { default_balance_due_days_before_event?: number } | null)?.default_balance_due_days_before_event ?? 14;
+export async function getPaymentHealthMetrics(): Promise<PaymentHealthMetrics> {
+  const workspaceId = await getActiveWorkspaceId();
+  if (!workspaceId) return EMPTY;
+
+  const supabase = await createClient();
+  const invoices = await fetchActiveInvoices(supabase, workspaceId);
+  if (invoices.length === 0) return EMPTY;
+
+  const dealTitleMap = await fetchDealTitles(supabase, invoices);
+  const today = todayYmd();
 
   let overdueCount = 0;
   let overdueAmount = 0;
   let nextPayment: PaymentHealthMetrics['nextPayment'] = null;
-  let nextPaymentDate = Infinity;
+  let nextPaymentDate = '￿'; // any real YYYY-MM-DD sorts before this sentinel
 
-  for (const p of proposals) {
-    const deal = dealMap.get(p.deal_id);
-    if (!deal) continue;
+  for (const inv of invoices) {
+    const balance = balanceOf(inv);
+    if (balance <= 0 || !inv.due_date) continue;
 
-    const signDate = p.signed_at ?? p.accepted_at;
-    const depositPercent = p.deposit_percent ?? 0;
-    const deadlineDays = p.deposit_deadline_days ?? wsDepositDeadline;
-    const balanceDueDaysBefore = p.payment_due_days ?? wsBalanceDueBefore;
-
-    const total = totalByProposal.get(p.id) ?? 0;
-    if (total === 0) continue;
-
-    // Deposit check
-    if (depositPercent > 0 && !p.deposit_paid_at && signDate) {
-      const dueDate = new Date(new Date(signDate).getTime() + deadlineDays * 86400000);
-      const depositAmount = Math.round(total * depositPercent / 100);
-
-      if (now > dueDate.getTime()) {
-        overdueCount++;
-        overdueAmount += depositAmount;
-      } else if (dueDate.getTime() < nextPaymentDate) {
-        nextPaymentDate = dueDate.getTime();
-        nextPayment = {
-          dealTitle: deal.title ?? 'Untitled deal',
-          dueDate: dueDate.toISOString().slice(0, 10),
-          amount: depositAmount,
-          type: 'deposit',
-        };
-      }
+    if (inv.due_date < today) {
+      overdueCount += 1;
+      overdueAmount += balance;
+      continue;
     }
 
-    // Balance check
-    const depositOk = depositPercent === 0 || !!p.deposit_paid_at;
-    if (depositOk && deal.proposed_date) {
-      const eventDate = new Date(deal.proposed_date);
-      const dueDate = new Date(eventDate.getTime() - balanceDueDaysBefore * 86400000);
-
-      if (now > dueDate.getTime()) {
-        overdueCount++;
-        overdueAmount += total;
-      } else if (dueDate.getTime() < nextPaymentDate) {
-        nextPaymentDate = dueDate.getTime();
-        nextPayment = {
-          dealTitle: deal.title ?? 'Untitled deal',
-          dueDate: dueDate.toISOString().slice(0, 10),
-          amount: total,
-          type: 'balance',
-        };
-      }
+    if (inv.due_date < nextPaymentDate) {
+      nextPaymentDate = inv.due_date;
+      nextPayment = {
+        dealTitle: resolveTitle(inv, dealTitleMap),
+        dueDate: inv.due_date,
+        amount: balance,
+        type: inv.invoice_kind === 'deposit' ? 'deposit' : 'balance',
+      };
     }
   }
 
