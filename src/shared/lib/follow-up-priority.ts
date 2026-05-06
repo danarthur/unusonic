@@ -1,6 +1,6 @@
 import { differenceInDays, parseISO } from 'date-fns';
 import { computeStallSignalFromRaw, type StallSignal } from './stall-signal';
-import { STALL_STAGE_META, type StallableStatus } from './pipeline-stages/constants';
+import { stageOrdinalFromTags } from './stage-gate';
 
 export type FollowUpScoreInput = {
   deal: {
@@ -11,6 +11,13 @@ export type FollowUpScoreInput = {
     ownerUserId: string | null;
     /** Workspace-owned stall threshold on the deal's current stage. Phase 2c. */
     stageRottingDays?: number | null;
+    /** Tags on the deal's current pipeline stage — `initial_contact`,
+     *  `proposal_sent`, `contract_out`, `deposit_received`, `won`, `lost`.
+     *  Drives the stall-signal stage-ordinal lookup so a deal in Contract
+     *  Sent doesn't get evaluated as if it were still in Inquiry (audit
+     *  finding 2026-05-05). When null/unknown, falls back to ordinal 0
+     *  to preserve pre-fix behavior. */
+    stageTags?: readonly string[] | null;
   };
   proposal: {
     createdAt: string | null;
@@ -101,13 +108,20 @@ function apply(acc: { score: number; top: Signal }, add: number, sig: Signal | n
 
 function buildStallInput(input: FollowUpScoreInput): Parameters<typeof computeStallSignalFromRaw>[0] {
   const { deal, proposal, thresholdOverrides } = input;
+  // Derive stage ordinal from the deal's current pipeline stage tags. The
+  // pre-fix code indexed STALL_STAGE_META by deal.status, but post status-
+  // collapse `status` is `'working' | 'won' | 'lost'` — so every working
+  // deal fell back to ordinal 0 (Inquiry) regardless of actual stage. That
+  // produced "Deal has been in Inquiry for X days" on Contract-Sent deals
+  // (audit Round 3 finding, 2026-05-05).
+  const tagged = stageOrdinalFromTags(deal.stageTags);
   return {
     status: deal.status,
     createdAt: deal.createdAt,
     proposalCreatedAt: proposal?.createdAt ?? null,
     proposalUpdatedAt: proposal?.updatedAt ?? null,
     proposedDate: deal.proposedDate,
-    currentStage: STALL_STAGE_META[deal.status as StallableStatus]?.stageOrdinal ?? 0,
+    currentStage: tagged?.ordinal ?? 0,
     thresholdOverrides,
     stageRottingDaysOverride: deal.stageRottingDays ?? null,
   };

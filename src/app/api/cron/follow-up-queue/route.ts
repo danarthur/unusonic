@@ -141,21 +141,24 @@ export async function GET(req: Request) {
       return NextResponse.json({ queued: 0, removed: 0, skipped: 0, note: 'No open deals' });
     }
 
-    // 1b. Fetch per-stage rotting_days for every stage the current deal set
-    //     references. Phase 2c: lets workspaces tune stall thresholds via their
-    //     own ops.pipeline_stages.rotting_days column. Falls back to the
-    //     hardcoded STALL_STAGE_META values (via follow-up-priority) when a
-    //     stage or its rotting_days is missing.
+    // 1b. Fetch per-stage rotting_days + tags for every stage the current
+    //     deal set references. Tags drive the stall-signal stage-ordinal
+    //     lookup (audit fix 2026-05-05) and rotting_days lets workspaces
+    //     tune stall thresholds via their own ops.pipeline_stages.rotting_days
+    //     column (Phase 2c). Falls back to the hardcoded STALL_STAGE_META
+    //     values when a stage or its rotting_days is missing.
     const stageIds = [...new Set(deals.map((d) => (d as { stage_id: string | null }).stage_id).filter(Boolean) as string[])];
     const stageRottingMap = new Map<string, number | null>();
+    const stageTagsMap = new Map<string, string[]>();
     if (stageIds.length > 0) {
       const { data: stageRows } = await supabase
         .schema('ops')
         .from('pipeline_stages')
-        .select('id, rotting_days')
+        .select('id, rotting_days, tags')
         .in('id', stageIds);
-      for (const row of (stageRows ?? []) as Array<{ id: string; rotting_days: number | null }>) {
+      for (const row of (stageRows ?? []) as Array<{ id: string; rotting_days: number | null; tags: string[] | null }>) {
         stageRottingMap.set(row.id, row.rotting_days);
+        stageTagsMap.set(row.id, row.tags ?? []);
       }
     }
 
@@ -367,6 +370,7 @@ export async function GET(req: Request) {
 
       const dealStageId = (deal as { stage_id: string | null }).stage_id;
       const stageRottingDays = dealStageId ? (stageRottingMap.get(dealStageId) ?? null) : null;
+      const stageTags = dealStageId ? (stageTagsMap.get(dealStageId) ?? null) : null;
 
       const scoreResult = computeFollowUpPriority({
         deal: {
@@ -376,6 +380,7 @@ export async function GET(req: Request) {
           budgetEstimated: (deal as any).budget_estimated as number | null,
           ownerUserId: (deal as any).owner_user_id as string | null,
           stageRottingDays,
+          stageTags,
         },
         proposal: proposal
           ? {

@@ -44,6 +44,7 @@ import {
   isOwnerCadenceLearningEnabled,
   type OwnerCadenceProfile,
 } from '@/shared/lib/owner-cadence';
+import { isReasonTypeStaleForStage } from '@/shared/lib/stage-gate';
 
 // =============================================================================
 // Types
@@ -143,7 +144,25 @@ export async function resolveAionCardForDeal(dealId: string): Promise<AionCardDa
   });
 
   // 3. Active follow-ups + linked-insight join (§8.3a).
-  const followUps = await fetchActiveFollowUps(system, workspaceId, dealId);
+  const followUpsRaw = await fetchActiveFollowUps(system, workspaceId, dealId);
+
+  // 5. Stage label / tags / rotting_days for the deal's current stage.
+  //    Hoisted ahead of insight read so we can stage-gate both row sets
+  //    against the deal's current stage tags + status.
+  const stage = dealRow.stage_id
+    ? await fetchStage(system, dealRow.stage_id)
+    : null;
+
+  // Stage-gate: drop follow-up queue rows whose `reason_type` is stale for
+  // the deal's current stage. The cron rebuilds an accurate row on its
+  // next run; this is the read-time belt-and-suspenders so the UI never
+  // surfaces "Proposal sent — follow up if no response" on a Won deal,
+  // or a stall row authored at Inquiry on a Contract-Sent deal.
+  // Audit Round 3, 2026-05-05.
+  const followUps = followUpsRaw.filter(
+    (f) => !isReasonTypeStaleForStage(f.reason_type, dealRow.status, stage?.tags ?? null),
+  );
+
   const linkedInsightIds = new Set(
     followUps.map((f) => f.linked_insight_id).filter((id): id is string => !!id),
   );
@@ -156,13 +175,18 @@ export async function resolveAionCardForDeal(dealId: string): Promise<AionCardDa
     linkedInsightIds,
   );
 
-  // 5. Stage label / tags / rotting_days for the deal's current stage.
-  const stage = dealRow.stage_id
-    ? await fetchStage(system, dealRow.stage_id)
-    : null;
-
-  // 6. Stall snapshot from the current pipeline dwell.
-  const stall = await buildStallSnapshot(system, dealId, stage);
+  // 6. Stall snapshot from the current pipeline dwell. Won/lost deals
+  //    don't have a meaningful "dwell"; suppress the snapshot so the card
+  //    never renders "Stage dwell: 6d" against a Won label (audit Round 3,
+  //    2026-05-05). The compose-aion-voice stall clause already gates on
+  //    isStaleAgainstRotting (returns false when rotting_days is null on
+  //    won/lost stages), but the aion-deal-card SignalEntry composer pushes
+  //    "Stage dwell" purely on `daysInStage != null` — so we need to drop
+  //    the snapshot at the source.
+  const stall =
+    dealRow.status === 'won' || dealRow.status === 'lost'
+      ? null
+      : await buildStallSnapshot(system, dealId, stage);
 
   // 7. Proposal engagement (most recent active proposal).
   const proposal = await fetchProposalEngagement(system, workspaceId, dealId);
@@ -255,6 +279,15 @@ export async function resolveAionCardForDeal(dealId: string): Promise<AionCardDa
   };
   const composed = composeAionVoice(composeInput);
 
+  // Cadence tooltip is aspirational ("Typical check-in for weddings: 5
+  // days after sending a proposal."). Won/lost deals shouldn't carry that
+  // — there's no proposal to follow up on. Suppress so the deal card
+  // doesn't render a stale cadence line on terminal deals.
+  const isTerminal = dealRow.status === 'won' || dealRow.status === 'lost';
+  const cadenceTooltip = isTerminal
+    ? null
+    : composeCadenceTooltipLine(cadence, dealRow.event_archetype);
+
   return {
     dealId,
     variant,
@@ -264,8 +297,8 @@ export async function resolveAionCardForDeal(dealId: string): Promise<AionCardDa
     pipelineRows,
     urgency,
     stall,
-    cadenceTooltip: composeCadenceTooltipLine(cadence, dealRow.event_archetype),
-    cadence,
+    cadenceTooltip,
+    cadence: isTerminal ? null : cadence,
     suppress: urgency.suppress,
   };
 }
@@ -342,6 +375,7 @@ export async function getAionCardSummariesForDeals(
 type DealRow = {
   id: string;
   workspace_id: string;
+  status: string;
   stage_id: string | null;
   owner_user_id: string | null;
   main_contact_id: string | null;
@@ -357,7 +391,7 @@ async function fetchDealRow(
 ): Promise<DealRow | null> {
   const { data } = await system
     .from('deals')
-    .select('id, workspace_id, stage_id, owner_user_id, main_contact_id, event_archetype, proposed_date, compelling_event')
+    .select('id, workspace_id, status, stage_id, owner_user_id, main_contact_id, event_archetype, proposed_date, compelling_event')
     .eq('id', dealId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();

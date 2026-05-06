@@ -5,6 +5,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { applyActiveEventsFilter } from '@/shared/lib/event-status/get-active-events-filter';
 import { computePaymentStatus, paymentStatusLabel, paymentStatusColor } from '@/features/sales/lib/compute-payment-status';
 import { resolveCrewConfirmationForDeals } from '@/shared/lib/crew/resolve-crew-confirmation';
+import { isReasonTypeStaleForStage } from '@/shared/lib/stage-gate';
 import { computeReadiness } from '../lib/compute-readiness';
 import type { StreamCardItem } from '../components/stream-card';
 
@@ -269,9 +270,43 @@ export async function getCrmGigs(): Promise<StreamCardItem[]> {
       .eq('workspace_id', workspaceId)
       .in('status', ['pending', 'snoozed']);
 
+    // Stage-gate filter: drop queue rows whose `reason_type` is stale for
+    // the deal's current stage tags + status. Without this, a deal that
+    // advanced past Inquiry still shows "Deal has been in Inquiry for 21
+    // days" on its event card. Audit Round 3, 2026-05-05.
+    const stageIds = (dealsRes.data ?? [])
+      .map((d) => (d as Record<string, unknown>).stage_id as string | null)
+      .filter((id): id is string => !!id);
+    const stageTagsByStageId = new Map<string, string[]>();
+    if (stageIds.length > 0) {
+      const { data: stageRows } = await supabase
+        .schema('ops')
+        .from('pipeline_stages')
+        .select('id, tags')
+        .in('id', [...new Set(stageIds)]);
+      for (const row of (stageRows ?? []) as Array<{ id: string; tags: string[] | null }>) {
+        stageTagsByStageId.set(row.id, row.tags ?? []);
+      }
+    }
+    const stageContextByDealId = new Map<string, { status: string | null; tags: string[] }>();
+    for (const d of (dealsRes.data ?? []) as Array<Record<string, unknown>>) {
+      const stageId = d.stage_id as string | null;
+      stageContextByDealId.set(d.id as string, {
+        status: (d.status as string | null) ?? null,
+        tags: stageId ? (stageTagsByStageId.get(stageId) ?? []) : [],
+      });
+    }
+
     if (queueItems && queueItems.length > 0) {
       const followUpMap = new Map<string, { reason: string; reason_type: string; priority_score: number; status: string; follow_up_category: string }>();
       for (const q of queueItems as { deal_id: string; reason: string; reason_type: string; priority_score: number; status: string; follow_up_category: string }[]) {
+        // Skip queue rows that don't belong to a deal we're rendering — e.g.
+        // event-only gigs and rows for archived deals. (Cards-without-tags
+        // also fall through here without a stage gate; that's intentional
+        // since we have nothing to compare against.)
+        const ctx = stageContextByDealId.get(q.deal_id);
+        if (ctx && isReasonTypeStaleForStage(q.reason_type, ctx.status, ctx.tags)) continue;
+
         // Keep highest priority entry per deal
         const existing = followUpMap.get(q.deal_id);
         if (!existing || q.priority_score > existing.priority_score) {
