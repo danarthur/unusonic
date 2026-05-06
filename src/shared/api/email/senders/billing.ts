@@ -62,7 +62,7 @@ export async function sendPaymentReminderEmail(opts: {
   reminderType: 'deposit' | 'balance';
   tone: PaymentReminderTone;
   paymentUrl: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true; messageId?: string } | { ok: false; error: string }> {
   const resend = getResend();
   if (!resend) return { ok: false, error: 'Email not configured.' };
   const element = PaymentReminderEmail({
@@ -86,7 +86,7 @@ export async function sendPaymentReminderEmail(opts: {
     ? `${typeLabel} past due — ${opts.eventTitle}`
     : `${typeLabel} reminder — ${opts.eventTitle}`;
 
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: fromAddress,
     to: [opts.to],
     subject,
@@ -94,5 +94,5 @@ export async function sendPaymentReminderEmail(opts: {
     text,
   });
   if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  return { ok: true, messageId: data?.id ?? undefined };
 }

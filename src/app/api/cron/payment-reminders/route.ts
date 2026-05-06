@@ -1,10 +1,31 @@
 /**
- * Cron: Payment reminder engine
- * Runs daily (Vercel Cron). Checks all signed proposals across all workspaces,
- * computes which cadence steps are due, and sends emails.
+ * Cron: Payment reminder engine (v2 — invoice-as-source-of-truth)
  *
- * Uses system client (service role) — cross-workspace by design.
- * Idempotent via UNIQUE(proposal_id, reminder_type, cadence_step) on finance.payment_reminder_log.
+ * Runs hourly (Vercel Cron). The hourly cadence exists because the eligibility
+ * RPC self-gates on workspace-local 9 AM Mon-Fri — i.e. each workspace gets
+ * served when 9 AM in its IANA timezone passes through UTC. A daily 09:00 UTC
+ * schedule would silently only ever fire for Etc/UTC workspaces. Most hourly
+ * runs return zero rows, which is cheap.
+ *
+ * Pipeline:
+ *   1. Auth via Bearer CRON_SECRET.
+ *   2. Call finance.invoices_needing_reminder(p_now) — returns one row per
+ *      (invoice, cadence_step) ready to send right now. The RPC has *all*
+ *      the eligibility logic: status, kind→cadence mapping, dispute/pause/
+ *      operator-action gates, opt-out hierarchy (invoice > deal > workspace),
+ *      pre-due step "issued early enough" guard, workspace-tz 9 AM weekday
+ *      gate, already-sent guard, and 5-business-day inbound-reply pause.
+ *   3. Hydrate workspace + deal + invoice + bill_to entity for the email.
+ *   4. Send via sendPaymentReminderEmail(); URL points at /i/{public_token}
+ *      (PayNowButton lives on that page).
+ *   5. On success, INSERT into finance.payment_reminder_log with the Resend
+ *      message id. UNIQUE(invoice_id, cadence_step) is the idempotency guard.
+ *   6. If the cadence step is the final one (deposit_t_plus_7 or
+ *      balance_t_plus_1), set finance.invoices.requires_operator_action = true
+ *      so the lobby Action surfaces and the next run skips this invoice.
+ *
+ * Uses system client (service role) — cross-workspace by design, RLS bypass
+ * is fine because the RPC's WHERE clause is the workspace-isolation gate.
  */
 
 import { NextResponse } from 'next/server';
@@ -12,6 +33,25 @@ import { getSystemClient } from '@/shared/api/supabase/system';
 import { sendPaymentReminderEmail } from '@/shared/api/email/send';
 import type { PaymentReminderTone } from '@/shared/api/email/templates/PaymentReminderEmail';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+// ---------------------------------------------------------------------------
+// Cadence step text values
+// ---------------------------------------------------------------------------
+// These strings are the contract between the RPC's emitted cadence_step,
+// the payment_reminder_log.cadence_step CHECK constraint, and the cron's
+// final-step detection below. Keep all three in sync.
+
+const FINAL_DEPOSIT_STEP = 'deposit_t_plus_7';
+const FINAL_BALANCE_STEP = 'balance_t_plus_1';
+
+const FINAL_STEPS = new Set<string>([FINAL_DEPOSIT_STEP, FINAL_BALANCE_STEP]);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function resolveEntityEmail(
   type: string | null | undefined,
@@ -28,38 +68,16 @@ function resolveEntityEmail(
     const coupleAttrs = readEntityAttrs(rawAttrs, 'couple');
     return coupleAttrs.partner_a_email ?? coupleAttrs.partner_b_email ?? null;
   }
-  // Default: treat as person
   return readEntityAttrs(rawAttrs, 'person').email ?? null;
 }
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
-type CadenceStep = 'upcoming_7d' | 'gentle_3d' | 'due_today' | 'overdue_3d' | 'overdue_7d' | 'final_14d';
-
-type CadenceRule = {
-  step: CadenceStep;
-  /** Days relative to due date. Negative = before due, positive = after due. */
-  daysFromDue: number;
-  tone: PaymentReminderTone;
-};
-
-const CADENCE: CadenceRule[] = [
-  { step: 'upcoming_7d', daysFromDue: -7, tone: 'informational' },
-  { step: 'gentle_3d', daysFromDue: -3, tone: 'warm' },
-  { step: 'due_today', daysFromDue: 0, tone: 'direct' },
-  { step: 'overdue_3d', daysFromDue: 3, tone: 'firm' },
-  { step: 'overdue_7d', daysFromDue: 7, tone: 'firm' },
-  { step: 'final_14d', daysFromDue: 14, tone: 'formal' },
-];
-
-function formatCurrency(cents: number): string {
+function formatCurrency(amountDollars: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(cents);
+  }).format(amountDollars);
 }
 
 function formatDate(iso: string): string {
@@ -70,6 +88,10 @@ function formatDate(iso: string): string {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Route
+// ---------------------------------------------------------------------------
+
 export async function GET(req: Request) {
   // Verify cron secret (Vercel sets this header for cron jobs)
   const authHeader = req.headers.get('authorization');
@@ -79,262 +101,236 @@ export async function GET(req: Request) {
   }
 
   const supabase = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // The new RPC + table + columns ship in this PR's migration but won't
+  // appear in src/types/supabase.ts until `npm run db:types` is re-run after
+  // the migration is applied. Cast the system client to any at the boundaries
+  // that touch the new shape; rest of the cron uses typed access.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- post-migration types not regenerated yet
   const db = supabase as any;
-  const now = Date.now();
   let sent = 0;
   let skipped = 0;
   let errors = 0;
+  let escalated = 0;
 
   try {
-    // Fetch all signed/accepted proposals with associated deal + workspace data
-    const { data: proposals, error: fetchErr } = await supabase
-      .from('proposals')
-      .select(`
-        id, deal_id, workspace_id, status, public_token,
-        signed_at, accepted_at,
-        deposit_percent, deposit_paid_at, deposit_deadline_days,
-        payment_due_days
-      `)
-      .in('status', ['sent', 'viewed', 'accepted']);
+    // ── 1. Ask the RPC which (invoice, cadence_step) pairs are due now ──
+    const nowIso = new Date().toISOString();
+    const { data: candidates, error: rpcErr } = await db
+      .schema('finance')
+      .rpc('invoices_needing_reminder', { p_now: nowIso });
 
-    if (fetchErr || !proposals?.length) {
-      return NextResponse.json({ sent: 0, skipped: 0, errors: 0, note: 'No proposals to process' });
+    if (rpcErr) {
+      console.error('[cron/payment-reminders] RPC error:', rpcErr);
+      return NextResponse.json({ error: 'RPC failed', detail: rpcErr.message }, { status: 500 });
     }
 
-    // Batch-fetch deals for proposed_date + title
-    const dealIds = [...new Set(proposals.map((p) => p.deal_id).filter(Boolean) as string[])];
-    const { data: deals } = await supabase
-      .from('deals')
-      .select('id, title, proposed_date, organization_id')
-      .in('id', dealIds)
-      .is('archived_at', null);
+    type Candidate = {
+      invoice_id: string;
+      cadence_step: string;
+      cadence_kind: 'deposit' | 'balance';
+      tone: PaymentReminderTone;
+    };
+    const rows = (candidates ?? []) as unknown as Candidate[];
 
-    const dealMap = new Map(
-      (deals ?? []).map((d) => [d.id, d as { id: string; title: string | null; proposed_date: string | null; organization_id: string | null }]),
+    if (rows.length === 0) {
+      return NextResponse.json({ sent: 0, skipped: 0, errors: 0, escalated: 0, note: 'No reminders due' });
+    }
+
+    // ── 2. Batch-hydrate the data we need to render the email ──
+    const invoiceIds = [...new Set(rows.map((r) => r.invoice_id))];
+
+    const { data: invoices, error: invErr } = await supabase
+      .schema('finance')
+      .from('invoices')
+      .select(
+        'id, workspace_id, deal_id, total_amount, paid_amount, due_date, public_token, billing_email, bill_to_entity_id, invoice_number',
+      )
+      .in('id', invoiceIds);
+
+    if (invErr || !invoices) {
+      console.error('[cron/payment-reminders] Invoice hydration error:', invErr);
+      return NextResponse.json({ error: 'Invoice hydration failed' }, { status: 500 });
+    }
+
+    const invoiceMap = new Map(
+      invoices.map((i) => [
+        i.id,
+        i as {
+          id: string;
+          workspace_id: string;
+          deal_id: string | null;
+          total_amount: number;
+          paid_amount: number;
+          due_date: string;
+          public_token: string;
+          billing_email: string | null;
+          bill_to_entity_id: string;
+          invoice_number: string;
+        },
+      ]),
     );
 
-    // Batch-fetch workspace names
-    const wsIds = [...new Set(proposals.map((p) => p.workspace_id).filter(Boolean) as string[])];
+    const workspaceIds = [...new Set(invoices.map((i) => i.workspace_id))];
     const { data: workspaces } = await supabase
       .from('workspaces')
-      .select('id, name, default_deposit_deadline_days, default_balance_due_days_before_event')
-      .in('id', wsIds);
-
-    const wsMap = new Map(
-      (workspaces ?? []).map((w) => [w.id, w as { id: string; name: string; default_deposit_deadline_days: number; default_balance_due_days_before_event: number }]),
+      .select('id, name, timezone')
+      .in('id', workspaceIds);
+    const workspaceMap = new Map(
+      (workspaces ?? []).map((w) => [w.id, w as { id: string; name: string; timezone: string }]),
     );
 
-    // Batch-fetch existing reminder log entries to skip already-sent
-    const proposalIds = proposals.map((p) => p.id);
-    const { data: existingLogs } = await db
-      .schema('finance')
-      .from('payment_reminder_log')
-      .select('proposal_id, reminder_type, cadence_step')
-      .in('proposal_id', proposalIds);
-
-    const sentSet = new Set(
-      (existingLogs ?? []).map(
-        (l: { proposal_id: string; reminder_type: string; cadence_step: string }) =>
-          `${l.proposal_id}:${l.reminder_type}:${l.cadence_step}`,
-      ),
+    const dealIds = [
+      ...new Set(invoices.map((i) => i.deal_id).filter((x): x is string => x != null)),
+    ];
+    const { data: deals } = dealIds.length
+      ? await supabase
+          .from('deals')
+          .select('id, title, owner_user_id, owner_entity_id')
+          .in('id', dealIds)
+      : { data: [] as Array<{ id: string; title: string | null; owner_user_id: string | null; owner_entity_id: string | null }> };
+    const dealMap = new Map(
+      (deals ?? []).map((d) => [
+        d.id,
+        d as { id: string; title: string | null; owner_user_id: string | null; owner_entity_id: string | null },
+      ]),
     );
 
-    // Resolve client emails: org_id → stakeholder entity → email
-    // For now, use the deal's main_contact or bill_to stakeholder email
-    // (simplified: look up from deal_stakeholders or directly from entity attributes)
+    const entityIds = [...new Set(invoices.map((i) => i.bill_to_entity_id))];
+    const { data: entities } = await supabase
+      .schema('directory')
+      .from('entities')
+      .select('id, display_name, type, attributes')
+      .in('id', entityIds);
+    const entityMap = new Map(
+      ((entities ?? []) as Array<{
+        id: string;
+        display_name: string | null;
+        type: string | null;
+        attributes: unknown;
+      }>).map((e) => [e.id, e]),
+    );
 
-    for (const proposal of proposals) {
-      const deal = dealMap.get(proposal.deal_id);
-      if (!deal?.proposed_date) continue;
+    const publicBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
 
-      const ws = wsMap.get(proposal.workspace_id);
-      if (!ws) continue;
-
-      const signDate = proposal.signed_at ?? proposal.accepted_at;
-      const depositPercent = proposal.deposit_percent ?? 0;
-      const depositDeadlineDays = proposal.deposit_deadline_days ?? ws.default_deposit_deadline_days ?? 7;
-      const balanceDueDaysBefore = proposal.payment_due_days ?? ws.default_balance_due_days_before_event ?? 14;
-
-      // Compute proposal total from items
-      const { data: items } = await supabase
-        .from('proposal_items')
-        .select('quantity, unit_price, override_price, is_optional')
-        .eq('proposal_id', proposal.id);
-
-      const total = (items ?? []).reduce((sum, item) => {
-        if (item.is_optional) return sum; // skip optional items client hasn't selected
-        const price = item.override_price != null ? Number(item.override_price) : Number(item.unit_price ?? 0);
-        return sum + (item.quantity ?? 1) * price;
-      }, 0);
-
-      // Resolve client email from deal stakeholders
-      const { data: stakeholders } = await db
-        .schema('ops')
-        .from('deal_stakeholders')
-        .select('entity_id')
-        .eq('deal_id', deal.id)
-        .eq('role', 'bill_to')
-        .limit(1);
-
-      let clientEmail: string | null = null;
-      let clientName: string | null = null;
-      const billToEntityId = (stakeholders?.[0] as { entity_id?: string } | undefined)?.entity_id;
-
-      if (billToEntityId) {
-        const { data: entity } = await supabase
-          .schema('directory')
-          .from('entities')
-          .select('display_name, type, attributes')
-          .eq('id', billToEntityId)
-          .maybeSingle() as {
-            data: {
-              display_name: string | null;
-              type: string | null;
-              attributes: Record<string, unknown> | null;
-            } | null;
-          };
-
-        if (entity) {
-          clientName = entity.display_name ?? null;
-          clientEmail = resolveEntityEmail(entity.type, entity.attributes);
-        }
-      }
-
-      // Fallback: try organization entity
-      if (!clientEmail && deal.organization_id) {
-        const { data: orgEntity } = await supabase
-          .schema('directory')
-          .from('entities')
-          .select('display_name, type, attributes')
-          .eq('id', deal.organization_id)
-          .maybeSingle() as {
-            data: {
-              display_name: string | null;
-              type: string | null;
-              attributes: Record<string, unknown> | null;
-            } | null;
-          };
-
-        if (orgEntity) {
-          if (!clientName) clientName = orgEntity.display_name ?? null;
-          clientEmail = resolveEntityEmail(orgEntity.type, orgEntity.attributes);
-        }
-      }
-
-      if (!clientEmail) {
+    // ── 3. Send each reminder, log idempotently ──
+    for (const row of rows) {
+      const invoice = invoiceMap.get(row.invoice_id);
+      if (!invoice) {
         skipped++;
         continue;
       }
 
-      const publicBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
-      const paymentUrl = proposal.public_token
-        ? `${publicBaseUrl}/p/${proposal.public_token}`
-        : publicBaseUrl;
-
-      // ── Deposit reminders ──
-      if (depositPercent > 0 && !proposal.deposit_paid_at && signDate) {
-        const depositDueDate = new Date(new Date(signDate).getTime() + depositDeadlineDays * 86400000);
-        const depositAmount = formatCurrency(Math.round(total * depositPercent / 100));
-        const depositDueDateStr = formatDate(depositDueDate.toISOString());
-
-        for (const rule of CADENCE) {
-          const triggerDate = new Date(depositDueDate.getTime() + rule.daysFromDue * 86400000);
-          if (now < triggerDate.getTime()) continue; // not yet time
-
-          const key = `${proposal.id}:deposit:${rule.step}`;
-          if (sentSet.has(key)) continue; // already sent
-
-          const result = await sendPaymentReminderEmail({
-            to: clientEmail,
-            recipientName: clientName,
-            eventTitle: deal.title ?? 'your event',
-            workspaceId: ws.id,
-            workspaceName: ws.name,
-            amount: depositAmount,
-            dueDate: depositDueDateStr,
-            reminderType: 'deposit',
-            tone: rule.tone,
-            paymentUrl,
-          });
-
-          if (result.ok) {
-            // Log to prevent re-send
-            // supabase-js 2.103 moved `ignoreDuplicates` off `.insert()` options
-            // and onto `.upsert()`. The partial unique constraint
-            // `(proposal_id, reminder_type, cadence_step)` is the conflict key.
-            await db
-              .schema('finance')
-              .from('payment_reminder_log')
-              .upsert({
-                workspace_id: ws.id,
-                proposal_id: proposal.id,
-                deal_id: deal.id,
-                reminder_type: 'deposit',
-                cadence_step: rule.step,
-                email_to: clientEmail,
-              }, { onConflict: 'proposal_id,reminder_type,cadence_step', ignoreDuplicates: true });
-            sentSet.add(key);
-            sent++;
-          } else {
-            errors++;
-          }
-        }
+      const workspace = workspaceMap.get(invoice.workspace_id);
+      if (!workspace) {
+        skipped++;
+        continue;
       }
 
-      // ── Balance reminders ──
-      const depositOk = depositPercent === 0 || !!proposal.deposit_paid_at;
-      if (depositOk) {
-        const eventDate = new Date(deal.proposed_date);
-        const balanceDueDate = new Date(eventDate.getTime() - balanceDueDaysBefore * 86400000);
-        const balanceAmount = formatCurrency(
-          proposal.deposit_paid_at ? Math.round(total * (1 - depositPercent / 100)) : total,
+      const deal = invoice.deal_id ? dealMap.get(invoice.deal_id) : null;
+      const eventTitle = deal?.title ?? 'your event';
+
+      const entity = entityMap.get(invoice.bill_to_entity_id);
+      const recipientEmail =
+        invoice.billing_email
+        ?? (entity ? resolveEntityEmail(entity.type, entity.attributes) : null);
+
+      if (!recipientEmail) {
+        // No email to send to — skip but log so the cron remains idempotent
+        // for subsequent runs once an email is wired in.
+        skipped++;
+        continue;
+      }
+
+      const recipientName = entity?.display_name ?? null;
+      const balanceDue = Number(invoice.total_amount) - Number(invoice.paid_amount);
+      const amount = formatCurrency(balanceDue);
+      const dueDateStr = formatDate(invoice.due_date);
+      const paymentUrl = invoice.public_token
+        ? `${publicBaseUrl}/i/${invoice.public_token}`
+        : publicBaseUrl;
+
+      // The PaymentReminderEmail template still uses the legacy
+      // 'deposit'|'balance' literal; cadence_kind from the RPC matches.
+      const reminderType: 'deposit' | 'balance' = row.cadence_kind;
+
+      const result = await sendPaymentReminderEmail({
+        to: recipientEmail,
+        recipientName,
+        eventTitle,
+        workspaceId: workspace.id,
+        workspaceName: workspace.name,
+        amount,
+        dueDate: dueDateStr,
+        reminderType,
+        tone: row.tone,
+        paymentUrl,
+      });
+
+      if (!result.ok) {
+        errors++;
+        console.error(
+          `[cron/payment-reminders] Send failed for invoice ${invoice.id} step ${row.cadence_step}:`,
+          result.error,
         );
-        const balanceDueDateStr = formatDate(balanceDueDate.toISOString());
+        continue;
+      }
 
-        for (const rule of CADENCE) {
-          const triggerDate = new Date(balanceDueDate.getTime() + rule.daysFromDue * 86400000);
-          if (now < triggerDate.getTime()) continue;
+      // Log the send. The UNIQUE(invoice_id, cadence_step) constraint is
+      // the idempotency guard if the cron retries before the row commits.
+      // payment_reminder_log not in generated types until db:types re-runs.
+      const { error: logErr } = await db
+        .schema('finance')
+        .from('payment_reminder_log')
+        .insert({
+          workspace_id: workspace.id,
+          invoice_id: invoice.id,
+          cadence_step: row.cadence_step,
+          email_to: recipientEmail,
+          resend_message_id: result.messageId ?? null,
+        });
 
-          const key = `${proposal.id}:balance:${rule.step}`;
-          if (sentSet.has(key)) continue;
+      if (logErr) {
+        // If this is a duplicate-key, treat as already-sent and move on;
+        // otherwise it's a real error and we keep going.
+        if (logErr.code === '23505') {
+          skipped++;
+          continue;
+        }
+        errors++;
+        console.error(
+          `[cron/payment-reminders] Log insert failed for invoice ${invoice.id} step ${row.cadence_step}:`,
+          logErr,
+        );
+        continue;
+      }
 
-          const result = await sendPaymentReminderEmail({
-            to: clientEmail,
-            recipientName: clientName,
-            eventTitle: deal.title ?? 'your event',
-            workspaceId: ws.id,
-            workspaceName: ws.name,
-            amount: balanceAmount,
-            dueDate: balanceDueDateStr,
-            reminderType: 'balance',
-            tone: rule.tone,
-            paymentUrl,
+      sent++;
+
+      // ── 4. Final-step handoff: flip requires_operator_action ──
+      // After this, the RPC excludes this invoice from future runs.
+      // The lobby Actions widget surfaces a pin: "Next move is yours."
+      if (FINAL_STEPS.has(row.cadence_step)) {
+        // requires_operator_action column not in generated types yet.
+        const { error: flagErr } = await db
+          .schema('finance')
+          .from('invoices')
+          .update({ requires_operator_action: true })
+          .eq('id', invoice.id);
+        if (flagErr) {
+          console.error(
+            `[cron/payment-reminders] Failed to set requires_operator_action on ${invoice.id}:`,
+            flagErr,
+          );
+        } else {
+          escalated++;
+        }
+
+        // Fire-and-forget PM notification on final step (replaces the
+        // legacy overdue_7d trigger). Workspace-deal owner gets a heads-up.
+        if (deal) {
+          notifyDealOwner(supabase, deal, reminderType, amount, workspace.name).catch((err) => {
+            console.error('[cron/payment-reminders] notifyDealOwner failed:', err);
           });
-
-          if (result.ok) {
-            await db
-              .schema('finance')
-              .from('payment_reminder_log')
-              .upsert({
-                workspace_id: ws.id,
-                proposal_id: proposal.id,
-                deal_id: deal.id,
-                reminder_type: 'balance',
-                cadence_step: rule.step,
-                email_to: clientEmail,
-              }, { onConflict: 'proposal_id,reminder_type,cadence_step', ignoreDuplicates: true });
-            sentSet.add(key);
-            sent++;
-
-            // PM escalation at overdue_7d: notify deal owner
-            if (rule.step === 'overdue_7d') {
-              // Fire-and-forget PM notification (non-blocking)
-              notifyDealOwner(supabase, deal.id, deal.title, 'balance', balanceAmount, ws.name).catch(() => {});
-            }
-          } else {
-            errors++;
-          }
         }
       }
     }
@@ -343,40 +339,39 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 
-  return NextResponse.json({ sent, skipped, errors });
+  return NextResponse.json({ sent, skipped, errors, escalated });
 }
 
-/** Send internal email to deal owner when payment is 7+ days overdue. */
+// ---------------------------------------------------------------------------
+// PM escalation
+// ---------------------------------------------------------------------------
+// Fires once per invoice when the final cadence step lands. Sends an internal
+// email to the deal owner so they know the automated path has stopped and the
+// next move is theirs. Resolves owner email from the deal's owner_entity_id
+// attributes (existing pattern from the legacy cron).
+
 async function notifyDealOwner(
   supabase: ReturnType<typeof getSystemClient>,
-  dealId: string,
-  dealTitle: string | null,
-  reminderType: string,
+  deal: { id: string; title: string | null; owner_entity_id: string | null },
+  reminderType: 'deposit' | 'balance',
   amount: string,
   workspaceName: string,
 ) {
-  const { data: deal } = await supabase
-    .from('deals')
-    .select('owner_entity_id')
-    .eq('id', dealId)
-    .maybeSingle();
-
-  const ownerEntityId = (deal as { owner_entity_id?: string | null } | null)?.owner_entity_id;
+  const ownerEntityId = deal.owner_entity_id;
   if (!ownerEntityId) return;
 
-  // Resolve email from the owner entity's attributes
   const { data: entity } = await supabase
     .schema('directory')
     .from('entities')
     .select('attributes')
     .eq('id', ownerEntityId)
-    .maybeSingle() as { data: { attributes: Record<string, unknown> | null } | null };
+    .maybeSingle();
 
-  const attrs = (entity?.attributes as Record<string, unknown>) ?? {};
-  const ownerEmail = (attrs.email as string) ?? null;
+  const attrs = ((entity as { attributes?: Record<string, unknown> } | null)?.attributes
+    ?? {}) as Record<string, unknown>;
+  const ownerEmail = typeof attrs.email === 'string' ? attrs.email : null;
   if (!ownerEmail) return;
 
-  // Use Resend directly for internal notification (not workspace-branded)
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const from = process.env.EMAIL_FROM ?? 'Unusonic <noreply@unusonic.com>';
@@ -384,7 +379,11 @@ async function notifyDealOwner(
   await resend.emails.send({
     from,
     to: [ownerEmail],
-    subject: `Payment overdue 7 days — ${dealTitle ?? 'a deal'}`,
-    text: `The ${reminderType} payment of ${amount} for "${dealTitle}" is now 7 days overdue.\n\nThe client has been notified. You may want to follow up directly.\n\n— ${workspaceName} via Unusonic`,
+    subject: `Final reminder sent — ${deal.title ?? 'a deal'}`,
+    text:
+      `The final automated ${reminderType} reminder of ${amount} for "${deal.title ?? 'a deal'}" has been sent.\n\n`
+      + `No further automated emails will go out for this invoice. The next move is yours — `
+      + `mark paid, mark disputed, or re-arm the cadence in Unusonic.\n\n`
+      + `— ${workspaceName} via Unusonic`,
   });
 }
