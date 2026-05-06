@@ -86,22 +86,41 @@ export async function getDealPipeline(): Promise<DealPipelineDTO> {
 
   if (pipelineDeals.length === 0) return EMPTY;
 
-  // 3. Fetch proposal item totals for these deals
+  // 3. Pick ONE canonical proposal per deal — the accepted one if present
+  //    (Won deals), otherwise the latest non-draft. Matches the convention
+  //    used in src/features/sales/api/get-deal-room.ts (latest proposal drives
+  //    "Quoted") and prevents double-counting when a deal has many historic
+  //    drafts/sends.
   const dealIds = pipelineDeals.map((d) => d.id);
 
   const { data: proposals } = await supabase
     .from('proposals')
-    .select('id, deal_id')
+    .select('id, deal_id, status, created_at')
     .in('deal_id', dealIds)
-    .neq('status', 'draft');
+    .neq('status', 'draft')
+    .order('created_at', { ascending: false });
 
-  const proposalDealMap = new Map<string, string>();
+  // Pick one proposal per deal: prefer status='accepted', otherwise the latest
+  // non-draft (proposals are already ordered created_at desc above).
+  const chosenByDeal = new Map<string, { id: string; status: string }>();
   for (const p of proposals ?? []) {
-    if (!proposalDealMap.has(p.id)) proposalDealMap.set(p.id, p.deal_id);
+    const incumbent = chosenByDeal.get(p.deal_id);
+    if (!incumbent) {
+      chosenByDeal.set(p.deal_id, { id: p.id, status: p.status });
+      continue;
+    }
+    if (p.status === 'accepted' && incumbent.status !== 'accepted') {
+      chosenByDeal.set(p.deal_id, { id: p.id, status: p.status });
+    }
   }
 
-  const proposalIds = [...proposalDealMap.keys()];
-  const dealValueMap = new Map<string, number>();
+  const proposalIdToDealId = new Map<string, string>();
+  for (const [dealId, chosen] of chosenByDeal) {
+    proposalIdToDealId.set(chosen.id, dealId);
+  }
+  const proposalIds = [...proposalIdToDealId.keys()];
+  // Per-deal value, in DOLLARS (proposal_items.unit_price is numeric, not cents).
+  const dealValueDollars = new Map<string, number>();
 
   if (proposalIds.length > 0) {
     const { data: items } = await supabase
@@ -111,17 +130,21 @@ export async function getDealPipeline(): Promise<DealPipelineDTO> {
 
     for (const item of items ?? []) {
       if (item.is_optional) continue;
-      const dealId = proposalDealMap.get(item.proposal_id);
+      const dealId = proposalIdToDealId.get(item.proposal_id);
       if (!dealId) continue;
-      const price = item.override_price ?? item.unit_price ?? 0;
-      const qty = item.quantity ?? 1;
-      const multiplier = item.unit_multiplier ?? 1;
+      const price = Number(item.override_price ?? item.unit_price ?? 0);
+      const qty = Number(item.quantity ?? 1);
+      const multiplier = Number(item.unit_multiplier ?? 1);
       const lineTotal = price * qty * multiplier;
-      dealValueMap.set(dealId, (dealValueMap.get(dealId) ?? 0) + lineTotal);
+      dealValueDollars.set(dealId, (dealValueDollars.get(dealId) ?? 0) + lineTotal);
     }
   }
 
   // 4. Aggregate by stage_id (fallback: match status to stage slug)
+  //    Per-deal value comes from the canonical proposal in dollars; convert
+  //    to cents at this boundary so DealPipelineDTO.totalValue keeps the
+  //    cents convention shared with get-financial-pulse, get-revenue-trend, etc.
+  //    Falls back to deals.budget_estimated (also dollars) when no proposal exists.
   const stageBuckets = new Map<string, { count: number; totalValue: number }>();
 
   for (const deal of pipelineDeals) {
@@ -134,8 +157,10 @@ export async function getDealPipeline(): Promise<DealPipelineDTO> {
 
     const bucket = stageBuckets.get(stageId) ?? { count: 0, totalValue: 0 };
     bucket.count += 1;
-    const value = dealValueMap.get(deal.id) ?? deal.budget_estimated ?? 0;
-    bucket.totalValue += value;
+    const dollars =
+      dealValueDollars.get(deal.id) ?? Number(deal.budget_estimated ?? 0) ?? 0;
+    const cents = Math.round(dollars * 100);
+    bucket.totalValue += cents;
     stageBuckets.set(stageId, bucket);
   }
 
