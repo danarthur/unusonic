@@ -313,10 +313,15 @@ async function CRMDataShell({ selectedId, streamMode }: { selectedId: string | n
     Sentry.captureException(err);
   }
 
-  const effectiveSelectedId =
-    selectedId && (gigs.some((g) => g.id === selectedId) || gigs.length === 0)
-      ? selectedId
-      : null;
+  // Pass `?selected=` straight through to the client shell. We previously
+  // gated this on `gigs.some(g => g.id === selectedId)` to "sanitize" stale
+  // URLs, but that filter was load-bearing in the wrong direction: when the
+  // deal hadn't yet hydrated into the gigs list (or any edge in load order
+  // dropped it), the URL-driven selection was silently turned into null and
+  // the right pane fell back to the empty state, even though clicking the
+  // same row in the left rail worked. Trust the URL on first paint — Prism
+  // handles a missing selectedItem with its own "Loading event…" fallback.
+  const effectiveSelectedId = selectedId;
 
   // First-visit consent prompt: only when admin/owner lands on /events with the
   // Aion card beta still OFF and no current-version consent recorded.

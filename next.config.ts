@@ -64,6 +64,11 @@ const nextConfig: NextConfig = {
       { source: '/productions/archive', destination: '/events/archive', permanent: true },
       { source: '/productions/unmatched-replies', destination: '/events/unmatched-replies', permanent: true },
       { source: '/productions/:id', destination: '/events/:id/run-of-show', permanent: true },
+      // Sidebar labels "Gear" and "Contacts" point at /catalog and /network, but users
+      // (and Aion-generated text/emails) sometimes type the legacy nouns directly.
+      // Forward both so the URL bar settles on the real route instead of a bare 404.
+      { source: '/gear', destination: '/catalog', permanent: true },
+      { source: '/contacts', destination: '/network', permanent: true },
     ];
   },
 };
