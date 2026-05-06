@@ -117,8 +117,8 @@ export function buildResponseFromResult(
             metrics: [
               { label: 'Revenue this month', value: fmt(data.revenueThisMonth ?? 0), detail: `${delta >= 0 ? '+' : ''}${Math.round(delta)}% vs last month`, trend: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat' },
               { label: 'Revenue last month', value: fmt(data.revenueLastMonth ?? 0) },
-              { label: 'Outstanding', value: fmt(data.outstandingTotal ?? 0), detail: `${data.outstandingCount ?? 0} proposals` },
-              { label: 'Overdue', value: fmt(data.overdueTotal ?? 0), detail: `${data.overdueCount ?? 0} proposals`, trend: (data.overdueCount ?? 0) > 0 ? 'down' : 'flat' },
+              { label: 'Outstanding', value: fmt(data.outstandingTotal ?? 0), detail: `${data.outstandingCount ?? 0} invoices` },
+              { label: 'Overdue', value: fmt(data.overdueTotal ?? 0), detail: `${data.overdueCount ?? 0} invoices`, trend: (data.overdueCount ?? 0) > 0 ? 'down' : 'flat' },
             ],
           });
           break;

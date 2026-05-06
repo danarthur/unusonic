@@ -159,7 +159,7 @@ export function FinancialPulseWidget({ data, loading }: FinancialPulseWidgetProp
             {/* No outstanding or overdue — show clean state */}
             {data.outstandingCount === 0 && data.overdueCount === 0 && (
               <p className="text-xs" style={{ color: 'var(--stage-text-secondary)' }}>
-                All proposals resolved.
+                All invoices paid.
               </p>
             )}
           </div>
