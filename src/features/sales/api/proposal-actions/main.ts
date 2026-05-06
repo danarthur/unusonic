@@ -393,6 +393,19 @@ export async function getExpandedPackageLineItems(
 
 // =============================================================================
 // addPackageToProposal(eventId, packageId): Append expanded package items to draft (deep copy)
+//
+// DUPLICATE-DRAFT BUG GUARD (Round 3 audit, 2026-05-06):
+//   Historical bug: this function only checked `status = 'draft'`, so when a
+//   deal already had a sent/viewed/accepted proposal but no draft, it
+//   silently INSERTED a new draft alongside the active proposal. The
+//   migration `20260505212544_proposal_supersede.sql` adds a partial UNIQUE
+//   index that makes a second open draft impossible at the schema level —
+//   but we also fail loudly here so callers get a clear error rather than a
+//   constraint violation buried in a Postgres detail string.
+//
+//   To replace an accepted proposal, use `sendProposalRevision` instead — it
+//   runs the supersede transaction and creates a fresh draft cloning the
+//   prior line items.
 // =============================================================================
 
 export interface AddPackageToProposalResult {
@@ -430,14 +443,30 @@ export async function addPackageToProposal(
 
   const packageInstanceId = crypto.randomUUID();
 
-  const { data: existing } = await supabase
+  // Duplicate-draft guard — see header comment. Look up ALL live (non-superseded)
+  // proposals for the deal so we can distinguish three cases:
+  //   1. Live draft exists           → reuse it.
+  //   2. Live sent/viewed/accepted   → fail loudly; caller must revise.
+  //   3. Nothing live                → create a fresh draft.
+  const { data: livePropRows } = await supabase
     .from('proposals')
-    .select('id')
+    .select('id, status, superseded_at')
     .eq('deal_id', dealId)
-    .eq('status', 'draft')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .is('superseded_at', null)
+    .order('created_at', { ascending: false });
+
+  const liveRows = (livePropRows ?? []) as { id: string; status: string; superseded_at: string | null }[];
+  const liveDraft = liveRows.find((r) => r.status === 'draft') ?? null;
+  const liveActive = liveRows.find((r) => r.status !== 'draft') ?? null;
+
+  if (!liveDraft && liveActive) {
+    return {
+      success: false,
+      error: `Deal already has a ${liveActive.status} proposal. Use sendProposalRevision to start a new draft.`,
+    };
+  }
+
+  const existing = liveDraft ? { id: liveDraft.id } : null;
 
   let proposalId: string;
   let nextSortOrder: number;
@@ -682,6 +711,21 @@ export async function unpackPackageInstance(
 
 // =============================================================================
 // upsertProposal(dealId, items): Create or update draft proposal and line items (Liquid phase)
+//
+// DUPLICATE-DRAFT BUG GUARD (Round 3 audit, 2026-05-06):
+//   Historical bug: this function only checked `status = 'draft'`, so when a
+//   deal already had a sent/viewed/accepted proposal but no draft, it
+//   silently INSERTED a new draft alongside the active proposal. The
+//   migration `20260505212544_proposal_supersede.sql` adds a partial UNIQUE
+//   index that makes a second open draft impossible at the schema level —
+//   we also fail loudly here so callers see a clear error.
+//
+//   The new builder studio (proposal-builder-studio.tsx + its sidebar) does
+//   NOT call this function — it uses per-id updateProposalItem /
+//   deleteProposalItem instead. This entry point survives because the legacy
+//   `ProposalBuilder` (src/features/sales/ui/proposal-builder.tsx) is still
+//   mounted writeable on the alternate `/events/[id]/deal/page.tsx` route.
+//   To replace an accepted proposal, use `sendProposalRevision`.
 // =============================================================================
 
 export async function upsertProposal(
@@ -694,15 +738,28 @@ export async function upsertProposal(
     return { proposalId: null, total: 0, error: 'Deal not found or workspace could not be resolved.' };
   }
 
-  // 2. Find existing draft proposal for this deal, or create one
-  const { data: existing } = await supabase
+  // 2. Find existing draft for this deal, or create one — but reject if a
+  //    live (non-superseded) sent/viewed/accepted proposal blocks a new draft.
+  const { data: livePropRows } = await supabase
     .from('proposals')
-    .select('id')
+    .select('id, status, superseded_at')
     .eq('deal_id', dealId)
-    .eq('status', 'draft')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .is('superseded_at', null)
+    .order('created_at', { ascending: false });
+
+  const liveRows = (livePropRows ?? []) as { id: string; status: string; superseded_at: string | null }[];
+  const liveDraft = liveRows.find((r) => r.status === 'draft') ?? null;
+  const liveActive = liveRows.find((r) => r.status !== 'draft') ?? null;
+
+  if (!liveDraft && liveActive) {
+    return {
+      proposalId: null,
+      total: 0,
+      error: `Deal already has a ${liveActive.status} proposal. Use sendProposalRevision to start a new draft.`,
+    };
+  }
+
+  const existing = liveDraft ? { id: liveDraft.id } : null;
 
   let proposalId: string;
 

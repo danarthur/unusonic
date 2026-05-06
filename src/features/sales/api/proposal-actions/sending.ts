@@ -171,6 +171,14 @@ export async function sendProposalLinkToRecipients(
 
 export type RevertProposalResult = { success: true } | { success: false; error: string };
 
+/**
+ * @deprecated Round 3 audit (2026-05-06). Use `sendProposalRevision` from
+ * `@/features/sales/api/proposal-actions` for editing accepted proposals —
+ * that flow keeps the prior row as audit (marked superseded) and clones it
+ * into a new draft, instead of mutating the accepted record in place. This
+ * function remains for legacy admin/testing paths and any callers that
+ * rely on the in-place flip; do not add new callers.
+ */
 export async function revertProposalToDraft(proposalId: string): Promise<RevertProposalResult> {
   const supabase = await createClient();
   const { data, error } = await supabase

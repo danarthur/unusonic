@@ -44,6 +44,16 @@ export const FEATURE_FLAGS = {
    * this flag only gates UI consumption.
    */
   CRM_GEAR_LINEAGE_V1: 'crm.gear_lineage_v1',
+  /**
+   * Contract-amendment flow for accepted proposals (Round 3 audit, 2026-05-06).
+   * When true, the `sendProposalRevision` server action is callable and the
+   * builder studio renders a "Send revision" affordance on accepted
+   * proposals. When false, the action returns an "not enabled" error and
+   * the UI hides the button. Default OFF until a design-ready button
+   * lands. See src/features/sales/api/proposal-actions/revisions.ts and
+   * 20260505212544_proposal_supersede.sql.
+   */
+  CRM_PROPOSAL_REVISIONS: 'crm.proposal_revisions',
 } as const satisfies Record<string, FeatureFlagKey>;
 
 export type KnownFeatureFlag = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
