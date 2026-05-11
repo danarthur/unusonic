@@ -14,6 +14,7 @@ import { getSystemClient } from '@/shared/api/supabase/system';
 import { revalidatePath } from 'next/cache';
 import type { UserPersona, SubscriptionTier } from '../model/subscription-types';
 import { getModulesForTier } from '../lib/get-modules-for-tier';
+import { resolveWorkspaceTimezone } from '@/shared/lib/timezone';
 
 function slugify(name: string): string {
   return name
@@ -32,6 +33,18 @@ export interface InitializeOrganizationInput {
   subscriptionTier: SubscriptionTier;
   pmsIntegrationEnabled?: boolean;
   unusonicPayEnabled?: boolean;
+  /**
+   * IANA timezone reported by the browser at workspace creation
+   * (Intl.DateTimeFormat().resolvedOptions().timeZone). Stamped onto
+   * workspaces.timezone so downstream event/timezone resolution doesn't fall
+   * through to the 'UTC' column default. Owners can override later in
+   * settings; this is the best signal we have at create time.
+   *
+   * Falls back to SAFE_FALLBACK_TZ ('America/Los_Angeles') server-side when
+   * the value is missing, malformed, or explicitly 'UTC' (the column-default
+   * sentinel). See Guardian PR #1 risk 3.
+   */
+  timezone?: string | null;
 }
 
 export interface InitializeOrganizationResult {
@@ -89,6 +102,14 @@ export async function initializeOrganization(
       finalSlug = `${slug}-${Math.random().toString(36).slice(2, 8)}`;
     }
 
+    // Browser's IANA timezone is the best available signal at workspace
+    // creation. Owners can override later in settings; for now we just write
+    // what the browser reports. resolveWorkspaceTimezone falls back to
+    // SAFE_FALLBACK_TZ ('America/Los_Angeles') when the value is missing,
+    // malformed, or 'UTC' (column-default sentinel) — keeping fresh workspaces
+    // out of the 'UTC' state that broke Bryan & Jessica's event row.
+    const workspaceTimezone = resolveWorkspaceTimezone(input.timezone);
+
     const { data: workspace, error: wsError } = await db
       .from('workspaces')
       .insert({
@@ -96,6 +117,7 @@ export async function initializeOrganization(
         slug: finalSlug,
         subscription_tier: input.subscriptionTier,
         signalpay_enabled: input.unusonicPayEnabled ?? false,
+        timezone: workspaceTimezone,
       })
       .select('id')
       .single();

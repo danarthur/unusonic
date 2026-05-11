@@ -62,10 +62,21 @@ export function GenesisCreateCard({ slug, onboardingContext, prefill }: GenesisC
           return { ok: false, error: `Unknown tier "${rawTier}"` };
         }
         const tierId = rawTier as GenesisTierId;
+        // Browser's IANA timezone is the best available signal at workspace
+        // creation. Read it here (client component) and ship it through the
+        // server action so workspaces.timezone never lands on the 'UTC'
+        // default. Owners can override in settings. Server-side
+        // resolveWorkspaceTimezone() falls back to SAFE_FALLBACK_TZ if the
+        // browser reports something malformed or 'UTC'.
+        const browserTimezone =
+          typeof Intl !== 'undefined'
+            ? Intl.DateTimeFormat().resolvedOptions().timeZone
+            : null;
         const result = await initializeOrganization({
           name: (formData.get('name') as string)?.trim() ?? '',
           type: orgType,
           subscriptionTier: GENESIS_TO_SUBSCRIPTION[tierId],
+          timezone: browserTimezone,
         });
         if (result.success) {
           router.push(result.redirectPath ?? '/');

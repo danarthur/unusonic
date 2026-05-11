@@ -22,13 +22,21 @@ export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
   | { success: false; error: string };
 
-/** Vitals from the handoff wizard: date/time, venue, client. */
+/** Vitals from the handoff wizard: date/time, venue, client, optional explicit timezone. */
 export type HandoverVitals = {
   start_at: string;
   end_at: string;
   venue_entity_id?: string | null;
   /** Set on ops.projects.client_entity_id for the project used by the new event. */
   client_entity_id?: string | null;
+  /**
+   * Explicit IANA timezone override. The wizard does not surface this field
+   * today, but the resolution chain in handoverDeal accepts it as the highest-
+   * priority source (see resolveEventTimezone) so future wizard work can wire
+   * a tz picker without re-plumbing the action. 'UTC' is treated as a column-
+   * default sentinel and skipped by resolveEventTimezone.
+   */
+  timezone?: string | null;
 };
 
 /** Gear/logistics data saved into ops.events.run_of_show_data (crew managed via deal_crew table). */
@@ -230,24 +238,63 @@ export async function handoverDeal(
     eventName = title;
   }
 
+  // PR #1 (handover-pipeline data-bug, 2026-05-07): the legacy path
+  // (prism.tsx:445 banner button) calls handoverDeal(dealId) with no payload,
+  // leaving venueEntityId + clientEntityId null and writing all-null context
+  // columns onto ops.events. That breaks the crew portal (no venue entity to
+  // dereference) and the client portal (.eq('client_entity_id', ...) filter
+  // returns nothing). Fix: when no payload, resolve both IDs from
+  // ops.deal_stakeholders the same way get-event-summary.ts does on the
+  // fallback path. Audit: docs/audits/handover-pipeline-data-bug-investigation-2026-05-07.md §5a.
+  if (!payload?.vitals) {
+    const resolved = await resolveContextFromStakeholders(supabase, dealId, workspaceId);
+    venueEntityId = resolved.venueEntityId;
+    clientEntityId = resolved.clientEntityId;
+  }
+
   // §3.2: resolve IANA timezone for the event record. Used for the ops.events.timezone
   // column AND (in the legacy path) to convert local times to proper UTC instants.
-  // Resolution: venue attrs → workspace → 'UTC'. Before this fix, the legacy path
-  // hardcoded T08:00:00.000Z, making "8am" mean 8:00 UTC regardless of venue location.
-  // resolveEventTimezone reads the venue entity via venue_entity_id — new standard.
-  const eventTimezone = await resolveEventTimezone({ venueId: venueEntityId, workspaceId });
+  // Resolution chain (see src/shared/lib/timezone.ts): payload → venue attrs →
+  // workspace → SAFE_FALLBACK_TZ. 'UTC' is treated as a sentinel at every step
+  // because both ops.events.timezone and workspaces.timezone default to 'UTC'.
+  // The wizard doesn't surface a tz picker today, so payload?.vitals?.timezone
+  // is effectively always undefined at runtime; the field exists on
+  // HandoverVitals to give a future wizard tz picker a wired path through the
+  // server contract. PR #2 followup F3 (Guardian §122-133 + §218-223) replaced
+  // the prior `as { timezone?: string | null }` cast with the typed field.
+  const eventTimezone = await resolveEventTimezone({
+    payload: payload?.vitals?.timezone ?? null,
+    venueId: venueEntityId,
+    workspaceId,
+  });
 
-  // Denormalize venue display_name onto ops.events.location_name so event detail
-  // surfaces keep working if the venue entity is later soft-deleted / renamed.
+  // Denormalize venue display_name AND attributes.address onto ops.events.
+  // - location_name keeps the event detail surfaces working if the venue
+  //   entity is later soft-deleted or renamed.
+  // - location_address feeds the crew portal map link, the daysheet PDF, and
+  //   the dispatch summary "where" line. Neither path wrote this before
+  //   PR #1, so 100% of historical rows had location_address NULL.
+  //
+  // Format mirrors update-event-venue.ts: prefer the pre-formatted
+  // attributes.formatted_address (written by Google Places autocomplete),
+  // fall through to [street, city, state, postal_code].join(', ').
   let locationName: string | null = null;
+  let locationAddress: string | null = null;
   if (venueEntityId) {
     const { data: venueEntity } = await supabase
       .schema('directory')
       .from('entities')
-      .select('display_name')
+      .select('display_name, attributes')
       .eq('id', venueEntityId)
       .maybeSingle();
-    locationName = (venueEntity as { display_name?: string | null } | null)?.display_name ?? null;
+    if (venueEntity) {
+      locationName = (venueEntity as { display_name?: string | null }).display_name ?? null;
+      const venueAttrs = readEntityAttrs((venueEntity as { attributes?: unknown }).attributes, 'venue');
+      const composed = [venueAttrs.street, venueAttrs.city, venueAttrs.state, venueAttrs.postal_code]
+        .filter(Boolean)
+        .join(', ') || null;
+      locationAddress = venueAttrs.formatted_address ?? composed;
+    }
   }
 
   // Build the list of (starts_at, ends_at) pairs we'll materialize. One of three shapes:
@@ -317,6 +364,7 @@ export async function handoverDeal(
     venue_entity_id: venueEntityId,
     client_entity_id: clientEntityId,
     location_name: locationName,
+    location_address: locationAddress,
     event_archetype: archetypeForEvents,
     run_of_show_data: runOfShowData,
   }));
@@ -584,6 +632,80 @@ export async function handoverDeal(
   revalidatePath(`/events/${eventId}`, 'layout');
   return { success: true, eventId, warnings: warnings.length > 0 ? warnings : undefined };
   });
+}
+
+/**
+ * Resolve the venue + client entity IDs for a deal from ops.deal_stakeholders.
+ *
+ * Mirrors the COALESCE order used by handoff-wizard.tsx (where the wizard
+ * pre-fills its pickers from stakeholders) and get-event-summary.ts (where the
+ * event reader uses stakeholders as a fallback chain when the column is
+ * NULL). Keeping these three call sites aligned matters — a divergent COALESCE
+ * order here would write the *opposite* node of the dual-node pattern into
+ * the column.
+ *
+ * Dual-node refresher:
+ *   - bill_to       — entity_id is the billing-contact person, organization_id
+ *                     is the company (when client is a company; NULL when it's
+ *                     an individual). We prefer entity_id so the client portal
+ *                     scopes to the person who signed in.
+ *   - venue_contact — organization_id is the venue (an org/venue entity),
+ *                     entity_id is typically NULL. We prefer organization_id.
+ *
+ * Uses the session client (RLS-enforced): the deal-ownership gate in
+ * handoverDeal at the top of the action already proved workspace ownership,
+ * and ops.deal_stakeholders_select gates on the same workspace check via
+ * deal_id → public.deals.workspace_id. This matches the 5 other call sites
+ * that read ops.deal_stakeholders with the session client (get-event-summary,
+ * events/page, resolve-deal-hosts, deal-stakeholders, etc.). PR #2 followup F1
+ * from docs/audits/handover-pipeline-pr1-guardian-2026-05-07.md.
+ */
+async function resolveContextFromStakeholders(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  dealId: string,
+  workspaceId: string,
+): Promise<{ venueEntityId: string | null; clientEntityId: string | null }> {
+  const { data: stakeholders, error: stakeholdersErr } = await supabase
+    .schema('ops')
+    .from('deal_stakeholders')
+    .select('role, entity_id, organization_id, is_primary')
+    .eq('deal_id', dealId)
+    .in('role', ['bill_to', 'venue_contact']);
+
+  if (stakeholdersErr) {
+    // PR #2 followup F4 (Guardian risk 11): a silent error here looks
+    // identical to "deal has no stakeholders" and re-introduces the very bug
+    // PR #1 fixed. Surface to Sentry; return nulls so handover still
+    // proceeds — the column-NULL state is recoverable via the existing
+    // reader-side fallback chains in get-event-summary.ts and
+    // build-event-scope-prefix.ts. Throwing would block handoff on an Aion-
+    // adjacent failure, which is exactly the kind of coupling R6 forbids.
+    Sentry.logger.error('crm.handoverDeal.stakeholderLookupFailed', {
+      dealId,
+      workspaceId,
+      error: stakeholdersErr.message,
+    });
+    return { venueEntityId: null, clientEntityId: null };
+  }
+
+  const rows = (stakeholders ?? []) as Array<{
+    role: string;
+    entity_id: string | null;
+    organization_id: string | null;
+    is_primary: boolean;
+  }>;
+  // Prefer is_primary=true when multiple rows share the same role. Same sort
+  // as get-event-summary.ts so we never disagree about which stakeholder is
+  // canonical.
+  const sorted = rows.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+
+  const billTo = sorted.find((s) => s.role === 'bill_to');
+  const venueContact = sorted.find((s) => s.role === 'venue_contact');
+
+  return {
+    clientEntityId: billTo?.entity_id ?? billTo?.organization_id ?? null,
+    venueEntityId: venueContact?.organization_id ?? venueContact?.entity_id ?? null,
+  };
 }
 
 /**

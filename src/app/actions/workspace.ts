@@ -21,6 +21,7 @@ import {
   type OffboardTeamMemberPayload,
 } from '@/app/actions/offboard-team-member-schema';
 import { canAddSeat } from '@/shared/lib/seat-limits';
+import { resolveWorkspaceTimezone } from '@/shared/lib/timezone';
 
 // ============================================================================
 // Types
@@ -70,34 +71,43 @@ export interface SetupWorkspaceResult {
 
 /**
  * Sets up a complete workspace with default location and owner membership
- * 
+ *
  * This is the primary action for workspace creation - it:
  * 1. Creates a new Workspace
  * 2. Creates a default 'Main Office' location
  * 3. Assigns the creator as 'owner' with all permissions
- * 
+ *
  * @param name - The workspace name
  * @param locationName - Optional custom name for the primary location (defaults to 'Main Office')
  * @param department - Optional department for the owner (e.g., 'Executive', 'Operations')
+ * @param timezone - Optional IANA timezone (e.g. 'America/Los_Angeles'). Browser's
+ *   IANA timezone is the best available signal at workspace creation. Owners can
+ *   override later in settings; for now we just write what the browser reports.
+ *   Falls back to SAFE_FALLBACK_TZ when missing, malformed, or 'UTC' — keeping
+ *   the column out of the 'UTC' default state that causes downstream tz bugs
+ *   (Guardian PR #1 risk 3, audit docs/audits/handover-pipeline-pr1-guardian-2026-05-07.md).
  */
 export async function setupInitialWorkspace(
   name: string,
   locationName: string = 'Main Office',
-  department?: string
+  department?: string,
+  timezone?: string | null
 ): Promise<SetupWorkspaceResult> {
   const supabase = await createClient();
-  
+
   // Get authenticated user
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { success: false, error: 'Not authenticated' };
   }
-  
+
   // Validate input
   if (!name.trim()) {
     return { success: false, error: 'Workspace name is required' };
   }
-  
+
+  const workspaceTimezone = resolveWorkspaceTimezone(timezone);
+
   try {
     // Step 1: Create the workspace
     const { data: workspace, error: workspaceError } = await supabase
@@ -105,6 +115,7 @@ export async function setupInitialWorkspace(
       .insert({
         name: name.trim(),
         created_by: user.id,
+        timezone: workspaceTimezone,
       })
       .select()
       .single();
