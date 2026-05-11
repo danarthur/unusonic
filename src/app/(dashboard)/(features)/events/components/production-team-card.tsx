@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, RefreshCw, Bell, CalendarDays, Send, Package, X } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { formatTime12h } from '@/shared/lib/parse-time';
-import { motion } from 'framer-motion';
+import { normalizeHumanName } from '@/shared/lib/normalize-human-name';
 import {
   getDealCrew,
   addManualDealCrew,
@@ -50,13 +48,116 @@ export type ProductionTeamCardProps = {
   /** Lifted rail handler — when set, row clicks open the Crew Hub detail rail
    *  at the plan-lens level. When not set (Deal tab), rows stay non-clickable. */
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /**
+   * Crew rows from the parent's Plan bundle. Phase 1 cold-paint collapse
+   * (2026-05-07): the Plan tab passes the bundle's `crew` field directly,
+   * deduplicating the previous `getDealCrew(dealId)` round-trip. Optional
+   * because the Deal lens still mounts this card without a bundle — when
+   * undefined, the component fetches its own crew on mount (legacy
+   * Deal-tab path).
+   */
+  crew?: DealCrewRow[];
+  /** Whether the parent's bundle is still loading. Drives the spinner only — rows render against placeholder/keepPreviousData when available. */
+  crewLoading?: boolean;
+  /**
+   * Kit-compliance results keyed by `${entityId}::${roleTag}` (matching
+   * `getKitComplianceBatch` convention). Computed server-side inside the
+   * Plan bundle so cold paint no longer fans out a client-side batch.
+   * Optional for the same reason as `crew`.
+   */
+  kitComplianceByKey?: Record<string, KitComplianceResult | null>;
+  /** Called after a successful crew mutation; parent invalidates the bundle. */
+  onCrewChanged?: () => void;
 };
+
+const EMPTY_KIT_COMPLIANCE: Record<string, KitComplianceResult | null> = {};
 
 type CrewFilter = 'all' | 'pending' | 'declined' | 'no_phone';
 
-export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId, isLocked = false, eventId = null, onOpenCrewDetail }: ProductionTeamCardProps) {
-  const [crew, setCrew] = useState<DealCrewRow[]>([]);
-  const [loading, setLoading] = useState(true);
+// Empty Map fallback so the legacy `Map`-based prop in `DepartmentSection`
+// receives a stable reference. Built once per render from the Record passed
+// by the parent — small allocation, scoped to crew sizes (typically <30).
+function recordToMap(rec: Record<string, KitComplianceResult | null>): Map<string, KitComplianceResult | null> {
+  return new Map(Object.entries(rec));
+}
+
+export function ProductionTeamCard({
+  dealId,
+  sourceOrgId,
+  eventDate,
+  workspaceId,
+  isLocked = false,
+  eventId = null,
+  onOpenCrewDetail,
+  crew: crewProp,
+  crewLoading = false,
+  kitComplianceByKey: kitComplianceByKeyProp,
+  onCrewChanged,
+}: ProductionTeamCardProps) {
+  // Two consumption modes:
+  //   1. Plan lens — passes `crew` + `kitComplianceByKey` from the Plan
+  //      bundle. Mutations call `onCrewChanged` to invalidate the bundle.
+  //   2. Deal lens — does not pass props; this component falls back to
+  //      fetching its own crew + kit compliance on mount (legacy path).
+  //
+  // Using `crewProp !== undefined` rather than truthy check so an empty
+  // array from the parent is honored as "bundle returned, no crew" and
+  // doesn't trigger the legacy fetch.
+  const usingBundle = crewProp !== undefined;
+  const [localCrew, setLocalCrew] = useState<DealCrewRow[]>([]);
+  const [localLoading, setLocalLoading] = useState(!usingBundle);
+  const [localKitCompliance, setLocalKitCompliance] = useState<Record<string, KitComplianceResult | null>>(EMPTY_KIT_COMPLIANCE);
+
+  const crew = usingBundle ? (crewProp as DealCrewRow[]) : localCrew;
+  const kitComplianceByKey = usingBundle
+    ? (kitComplianceByKeyProp ?? EMPTY_KIT_COMPLIANCE)
+    : localKitCompliance;
+  const loading = usingBundle ? crewLoading : localLoading;
+
+  const fetchCrewLegacy = useCallback(async () => {
+    const rows = await getDealCrew(dealId);
+    setLocalCrew(rows);
+    setLocalLoading(false);
+  }, [dealId]);
+
+  // Legacy mount fetch — Deal lens path only. When `crewProp` is set we
+  // never fire this; the Plan bundle is the source of truth.
+  useEffect(() => {
+    if (usingBundle) return;
+    fetchCrewLegacy();
+  }, [usingBundle, fetchCrewLegacy]);
+
+  // Legacy kit-compliance batch — Deal lens path only.
+  useEffect(() => {
+    if (usingBundle) return;
+    const pairs = localCrew
+      .filter((r): r is DealCrewRow & { entity_id: string; role_note: string } =>
+        !!r.entity_id && !!r.role_note,
+      )
+      .map((r) => ({ entityId: r.entity_id, roleTag: r.role_note }));
+    if (pairs.length === 0) {
+      setLocalKitCompliance(EMPTY_KIT_COMPLIANCE);
+      return;
+    }
+    let cancelled = false;
+    getKitComplianceBatch(pairs).then((map) => {
+      if (!cancelled) setLocalKitCompliance(Object.fromEntries(map));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [usingBundle, localCrew]);
+
+  // Unified mutation refresher: bundle path bubbles to parent; legacy
+  // path refetches locally. Mutation handlers below call this.
+  const refreshCrew = useCallback(() => {
+    if (usingBundle) {
+      onCrewChanged?.();
+    } else {
+      void fetchCrewLegacy();
+    }
+  }, [usingBundle, onCrewChanged, fetchCrewLegacy]);
+
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const [roleInput, setRoleInput] = useState('');
@@ -65,12 +166,21 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   const [reminding, setReminding] = useState(false);
   const [sendingDaySheet, setSendingDaySheet] = useState(false);
   const [daySheetPreviewOpen, setDaySheetPreviewOpen] = useState(false);
+  // CSS-driven mount/slide for the day-sheet preview modal. Plan tab cold-paint
+  // can stall the JS thread for several seconds (26+ server actions); framer-
+  // motion's rAF-driven springs crawl when the thread is starved, leaving the
+  // modal off-screen even though the state flipped. Same fix as
+  // crew-detail-rail.tsx and cross-show-resource-modal.tsx (batch C precedent).
+  const [daySheetMounted, setDaySheetMounted] = useState(false);
+  const [daySheetSlideIn, setDaySheetSlideIn] = useState(false);
+  const daySheetExitTimeoutRef = useRef<number | null>(null);
   const [filter, setFilter] = useState<CrewFilter>('all');
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [dayViewOpen, setDayViewOpen] = useState(false);
-  const [kitComplianceByKey, setKitComplianceByKey] = useState<Map<string, KitComplianceResult | null>>(
-    new Map(),
-  );
+  // DepartmentSection still consumes a Map; materialize from the Record
+  // prop. Memoized on the prop reference — bundle invalidation produces
+  // a fresh Record only when the underlying compliance actually changes.
+  const kitComplianceMap = useMemo(() => recordToMap(kitComplianceByKey), [kitComplianceByKey]);
 
   // ── Computed aggregates ─────────────────────────────────────────────────────
 
@@ -84,9 +194,8 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   // ── Crew Hub coverage metrics ───────────────────────────────────────────────
   // "Positions" = all deal_crew rows (filled + holes). A hole is a row without
   // an entity_id. "Reachable" = has an entity + email (eligible for day sheet).
-  // "No phone" = has an entity but no phone number on file.
+  // "Missing phone" = has an entity but no phone number on file.
   const positionsTotal = crew.length;
-  const positionsFilled = crew.filter((r) => r.entity_id).length;
   const holeLabels = openSlots
     .map((r) => (r.role_note ?? '').trim())
     .filter((s) => s.length > 0);
@@ -134,35 +243,60 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   }, [filteredCrew]);
 
   // ── Data fetching ───────────────────────────────────────────────────────────
+  // `crew` and `kitComplianceByKey` are now props from the parent's Plan
+  // bundle (Phase 1 cold-paint collapse, 2026-05-07). The local fetch +
+  // kit-compliance effect that lived here previously fired two extra
+  // round-trips per cold paint on top of the bundle. Mutations call
+  // `onCrewChanged` → parent `refreshBundle` → invalidation → re-render
+  // with the updated `crew` prop.
 
-  const fetchCrew = useCallback(async () => {
-    const rows = await getDealCrew(dealId);
-    setCrew(rows);
-    setLoading(false);
-  }, [dealId]);
-
+  // ── Day-sheet preview mount/slide ───────────────────────────────────────────
+  // Mount on open, then on the next animation frame flip slideIn = true so a
+  // CSS transition runs. On close, flip slideIn = false and unmount after the
+  // transition completes. CSS transforms are GPU-composited and animate
+  // independently of JS pressure, so the modal still appears immediately
+  // even during a cold Plan-tab paint.
   useEffect(() => {
-    fetchCrew();
-  }, [fetchCrew]);
-
-  // Batch-fetch kit compliance for every (entity, role_note) pair in one pass
-  // instead of N parallel per-row fetches. Keyed by \`${entityId}::${roleTag}\`.
-  useEffect(() => {
-    const pairs = crew
-      .filter((r): r is DealCrewRow & { entity_id: string; role_note: string } =>
-        !!r.entity_id && !!r.role_note,
-      )
-      .map((r) => ({ entityId: r.entity_id, roleTag: r.role_note }));
-    if (pairs.length === 0) {
-      setKitComplianceByKey(new Map());
-      return;
+    if (daySheetPreviewOpen) {
+      if (daySheetExitTimeoutRef.current !== null) {
+        window.clearTimeout(daySheetExitTimeoutRef.current);
+        daySheetExitTimeoutRef.current = null;
+      }
+      setDaySheetMounted(true);
+      let id2: number | null = null;
+      const id1 = window.requestAnimationFrame(() => {
+        id2 = window.requestAnimationFrame(() => setDaySheetSlideIn(true));
+      });
+      return () => {
+        window.cancelAnimationFrame(id1);
+        if (id2 !== null) window.cancelAnimationFrame(id2);
+      };
     }
-    let cancelled = false;
-    getKitComplianceBatch(pairs).then((map) => {
-      if (!cancelled) setKitComplianceByKey(map);
-    });
-    return () => { cancelled = true; };
-  }, [crew]);
+    setDaySheetSlideIn(false);
+    daySheetExitTimeoutRef.current = window.setTimeout(() => {
+      setDaySheetMounted(false);
+      daySheetExitTimeoutRef.current = null;
+    }, 240);
+    return undefined;
+  }, [daySheetPreviewOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (daySheetExitTimeoutRef.current !== null) {
+        window.clearTimeout(daySheetExitTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Escape closes the preview modal — standard modal expectation.
+  useEffect(() => {
+    if (!daySheetMounted) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDaySheetPreviewOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [daySheetMounted]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -171,7 +305,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     const res = await addManualDealCrew(dealId, result.entity_id);
     if (res.success) {
       if (res.conflict) toast.warning(res.conflict);
-      await fetchCrew();
+      refreshCrew();
     } else {
       toast.error(res.error);
     }
@@ -180,7 +314,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   const handleConfirm = async (rowId: string) => {
     const result = await confirmDealCrew(rowId);
     if (result.success) {
-      await fetchCrew();
+      refreshCrew();
     } else {
       toast.error(result.error);
     }
@@ -189,7 +323,10 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   const handleRemove = async (rowId: string) => {
     const result = await removeDealCrew(rowId);
     if (result.success) {
-      setCrew((prev) => prev.filter((r) => r.id !== rowId));
+      // Remote write succeeded — invalidate the bundle so the row drops
+      // from the next render. Used to splice locally with setCrew; now the
+      // single source of truth is the parent bundle.
+      refreshCrew();
     } else {
       toast.error(result.error);
     }
@@ -197,7 +334,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
 
   const handleSync = async () => {
     setSyncing(true);
-    await fetchCrew();
+    refreshCrew();
     setSyncing(false);
   };
 
@@ -210,7 +347,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     if (result.success) {
       setRoleInput('');
       setAddRoleOpen(false);
-      await fetchCrew();
+      refreshCrew();
     } else {
       toast.error(result.error);
     }
@@ -220,7 +357,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     const res = await assignDealCrewEntity(rowId, result.entity_id);
     if (res.success) {
       if (res.conflict) toast.warning(res.conflict);
-      await fetchCrew();
+      refreshCrew();
     } else {
       toast.error(res.error);
     }
@@ -262,7 +399,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     if (result.skippedCount > 0) parts.push(`${result.skippedCount} skipped (no email)`);
     if (result.failedCount > 0) parts.push(`${result.failedCount} failed`);
     toast(parts.join(' \u2014 '));
-    await fetchCrew();
+    refreshCrew();
   };
 
   const toggleDept = (dept: string) => {
@@ -315,34 +452,36 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
       </div>
 
       {/* ── Coverage summary ────────────────────────────────────────────
-          The "am I covered?" first glance: how many positions filled, which
-          are holes. Separate from the confirmation funnel below which shows
-          the confirm/pending/decline state of the filled positions. */}
-      {!loading && positionsTotal > 0 && (
+          The "am I covered?" first glance. Single source of truth — the
+          ConfirmationFunnel bar below shows confirmed/pending/declined/
+          unassigned segments that always sum to `positionsTotal`, so we
+          don't repeat the "X of Y filled" headline here. This row carries
+          two things the bar can't: which roles are unassigned (specific
+          labels) and operational chips (missing phone, bringing gear). */}
+      {!loading && positionsTotal > 0 && (holeLabels.length > 0 || noPhoneCount > 0 || bringingGearCount > 0) && (
         <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-sm tabular-nums tracking-tight text-[var(--stage-text-primary)]">
-            {positionsFilled} of {positionsTotal} positions filled
-          </span>
           {holeLabels.length > 0 && (
             <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">
-              · {holeLabels.length === 1 ? '1 hole' : `${holeLabels.length} holes`}: {holeLabels.slice(0, 3).join(', ')}{holeLabels.length > 3 ? '…' : ''}
+              {holeLabels.length === 1 ? '1 unassigned' : `${holeLabels.length} unassigned`}: {holeLabels.slice(0, 3).join(', ')}{holeLabels.length > 3 ? '…' : ''}
             </span>
           )}
           {noPhoneCount > 0 && (
-            <span
-              className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md"
+            <button
+              type="button"
+              onClick={() => setFilter((f) => (f === 'no_phone' ? 'all' : 'no_phone'))}
+              className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
               style={{
                 color: 'var(--color-unusonic-warning)',
                 background: 'color-mix(in oklch, var(--color-unusonic-warning) 12%, transparent)',
               }}
-              title="Crew without a phone number on file"
+              title="Filter to crew without a phone number on file"
             >
-              ⚠ {noPhoneCount} no phone
-            </span>
+              {noPhoneCount} missing phone
+            </button>
           )}
           {bringingGearCount > 0 && (
             <span
-              className="stage-badge-text tracking-tight px-1.5 py-0.5 rounded-md flex items-center gap-1"
+              className="stage-badge-text tracking-tight px-1.5 py-0.0 rounded-md flex items-center gap-1"
               style={{
                 color: 'var(--stage-text-secondary)',
                 background: 'oklch(1 0 0 / 0.04)',
@@ -356,12 +495,17 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
         </div>
       )}
 
-      {/* ── Confirmation funnel ────────────────────────────────────────── */}
+      {/* ── Confirmation funnel ──────────────────────────────────────────
+          Four-segment bar: confirmed / pending / declined / unassigned.
+          The four counts always reconcile to crew.length, so there's a
+          single internally-consistent readout of where every position
+          stands. */}
       {!loading && crew.length > 0 && (
         <ConfirmationFunnel
           confirmed={confirmed.length}
           pending={pending.length}
           declined={declined.length}
+          unassigned={openSlots.length}
           total={crew.length}
         />
       )}
@@ -414,7 +558,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
               f === 'all' ? 'All' :
               f === 'pending' ? 'Pending' :
               f === 'declined' ? 'Declined' :
-              'No phone';
+              'Missing phone';
             const active = filter === f;
             return (
               <button
@@ -471,7 +615,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
               workspaceId={workspaceId}
               dealId={dealId}
               rateReadOnly={false}
-              kitComplianceByKey={kitComplianceByKey}
+              kitComplianceByKey={kitComplianceMap}
               onOpenDetail={onOpenCrewDetail}
             />
           ))}
@@ -560,48 +704,51 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
       </div>
       )}
 
-      {/* CrossShowResourceModal — portaled to body */}
+      {/* CrossShowResourceModal — portaled to body. Always mounted so the
+          modal can manage its own enter/exit transitions internally (CSS-
+          driven, resilient to Plan-tab cold-paint thread starvation). */}
       {eventDate && (
-        <AnimatePresence>
-          {dayViewOpen && (
-            <CrossShowResourceModal
-              open={dayViewOpen}
-              onClose={() => setDayViewOpen(false)}
-              date={eventDate}
-              sourceOrgId={sourceOrgId}
-            />
-          )}
-        </AnimatePresence>
+        <CrossShowResourceModal
+          open={dayViewOpen}
+          onClose={() => setDayViewOpen(false)}
+          date={eventDate}
+          sourceOrgId={sourceOrgId}
+        />
       )}
 
       {/* Day sheet send — personalization preview modal. Portaled so the
-          overlay can escape StagePanel's stacking context. */}
-      <AnimatePresence>
-        {daySheetPreviewOpen && createPortal(
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] bg-[var(--stage-scrim)]"
-              onClick={() => setDaySheetPreviewOpen(false)}
-              aria-hidden
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              transition={STAGE_MEDIUM}
-              role="dialog"
-              aria-label="Preview day sheet recipients"
-              className="fixed z-[61] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-md max-h-[80vh] flex flex-col rounded-2xl"
-              style={{
-                background: 'var(--stage-surface-raised, oklch(0.18 0 0))',
-                border: '1px solid oklch(1 0 0 / 0.08)',
-                boxShadow: '0 24px 64px oklch(0 0 0 / 0.45)',
-              }}
-              data-surface="raised"
-            >
+          overlay can escape StagePanel's stacking context. CSS-driven
+          mount/slide for main-thread-resilience (see useEffect block above). */}
+      {daySheetMounted && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-[var(--stage-scrim)]"
+            style={{
+              opacity: daySheetSlideIn ? 1 : 0,
+              transition: 'opacity 200ms ease-out',
+            }}
+            onClick={() => setDaySheetPreviewOpen(false)}
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-label="Preview day sheet recipients"
+            aria-modal="true"
+            className="fixed z-[61] left-1/2 top-1/2 w-[92vw] max-w-md max-h-[80vh] flex flex-col rounded-2xl"
+            style={{
+              background: 'var(--stage-surface-raised, oklch(0.18 0 0))',
+              border: '1px solid oklch(1 0 0 / 0.08)',
+              boxShadow: '0 24px 64px oklch(0 0 0 / 0.45)',
+              transform: daySheetSlideIn
+                ? 'translate3d(-50%, -50%, 0) scale(1)'
+                : 'translate3d(-50%, calc(-50% + 8px), 0) scale(0.98)',
+              opacity: daySheetSlideIn ? 1 : 0,
+              transition:
+                'transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 220ms ease-out',
+              willChange: 'transform, opacity',
+            }}
+            data-surface="raised"
+          >
               <div
                 className="flex items-center justify-between p-4 border-b"
                 style={{ borderColor: 'oklch(1 0 0 / 0.06)' }}
@@ -631,7 +778,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
                       .map((r) => (
                         <li key={r.id} className="flex items-center gap-2 py-1 text-sm">
                           <span className="text-[var(--stage-text-primary)] min-w-0 truncate">
-                            {r.entity_name ?? 'Unnamed'}
+                            {r.entity_name ? normalizeHumanName(r.entity_name) : 'Unnamed'}
                           </span>
                           {r.role_note && (
                             <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">
@@ -661,7 +808,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
                             key={r.id}
                             className="flex items-center gap-2 py-1 text-sm text-[var(--stage-text-tertiary)]"
                           >
-                            <span className="min-w-0 truncate">{r.entity_name ?? 'Unnamed'}</span>
+                            <span className="min-w-0 truncate">{r.entity_name ? normalizeHumanName(r.entity_name) : 'Unnamed'}</span>
                             {r.role_note && (
                               <span className="stage-badge-text tracking-tight">{r.role_note}</span>
                             )}
@@ -692,11 +839,10 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
                   Send to {reachableCount}
                 </button>
               </div>
-            </motion.div>
-          </>,
-          document.body,
-        )}
-      </AnimatePresence>
+          </div>
+        </>,
+        document.body,
+      )}
     </StagePanel>
   );
 }

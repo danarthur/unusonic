@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Users, Package, MapPin, Truck, UserCheck } from 'lucide-react';
-import { STAGE_LIGHT, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
+import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type { ReadinessData, ReadinessSignal, ReadinessStatus } from '../lib/compute-readiness';
 
 // ── Color mapping ──
@@ -13,15 +13,6 @@ const STATUS_COLOR: Record<ReadinessStatus, string> = {
   red: 'var(--color-unusonic-error)',
   grey: 'var(--stage-text-tertiary)',
 };
-
-const STATUS_BG: Record<ReadinessStatus, string> = {
-  green: 'color-mix(in oklch, var(--color-unusonic-success) 5%, transparent)',
-  amber: 'color-mix(in oklch, var(--color-unusonic-warning) 12%, transparent)',
-  red: 'color-mix(in oklch, var(--color-unusonic-error) 12%, transparent)',
-  grey: 'oklch(1 0 0 / 0.04)',
-};
-
-// Borders removed — fill alone provides sufficient containment on dark backgrounds (container-weight-budget.md)
 
 // ── Signal icons ──
 
@@ -35,22 +26,23 @@ const SIGNAL_ICON: Record<string, typeof Users> = {
 
 const SIGNAL_ORDER: (keyof ReadinessData)[] = ['crew', 'gear', 'venue', 'transport', 'client'];
 
-// ── Full pill ──
+// ── Full readout ──
+// Per Plan-tab walkthrough audit (2026-05-06): these are glance-only readouts,
+// not filter chips. Drop the chip background/border so they don't read as
+// interactive. Status color carries through the icon only; label + fraction
+// stay in the standard secondary/tertiary text grammar used by other inline
+// readouts on the page.
 
 function ReadinessPill({ signal, signalKey }: { signal: ReadinessSignal; signalKey: string }) {
   const Icon = SIGNAL_ICON[signalKey];
   const color = STATUS_COLOR[signal.status];
-  const bg = STATUS_BG[signal.status];
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={STAGE_LIGHT}
-      className="flex items-center gap-1.5 px-2 py-1 rounded-full"
-      style={{
-        backgroundColor: bg,
-      }}
+      className="inline-flex items-center gap-1.5"
     >
       {Icon && <Icon size={13} style={{ color }} aria-hidden />}
       <span
@@ -115,7 +107,7 @@ export function ReadinessRibbon({ readiness, mini }: ReadinessRibbonProps) {
         visible: { transition: { staggerChildren: 0 } },
       }}
       className="flex flex-wrap items-center"
-      style={{ gap: '8px' }}
+      style={{ columnGap: '20px', rowGap: '8px' }}
     >
       {SIGNAL_ORDER.map((key) => (
         <ReadinessPill key={key} signal={readiness[key]} signalKey={key} />

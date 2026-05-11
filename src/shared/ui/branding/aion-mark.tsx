@@ -390,6 +390,10 @@ export function AionMark({
             stroke={fill}
             strokeWidth={shouldBreathe ? ringStroke : RING_STROKE_BASE}
             strokeLinecap="round"
+            // SVG <circle> has no computed `opacity` style for motion to read,
+            // so every mount fired "animating opacity from undefined to N".
+            // Seed `initial` to the same value as `animate` for a quiet first paint.
+            initial={{ opacity: baseOpacity * successBrighten }}
             animate={{ opacity: baseOpacity * successBrighten }}
             transition={SETTLE_SPRING}
           />
@@ -629,6 +633,9 @@ export function AionMark({
           cy={CY}
           r={shouldBreathe ? dotRadius : DOT_R_REST}
           fill={shouldPrism ? prismColor : fill}
+          // SVG <circle> has no computed `opacity` for motion to read; seed
+          // `initial` so the first frame doesn't tween from "undefined".
+          initial={{ opacity: 1 }}
           animate={{
             opacity: isError ? [1, 0.4, 1] : 1,
           }}

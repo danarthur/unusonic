@@ -12,7 +12,7 @@
  *   - department-section.tsx — collapsible per-department group
  */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as Sentry from '@sentry/nextjs';
 import { Loader2, Package, RefreshCw } from 'lucide-react';
@@ -52,7 +52,7 @@ import {
   type KitComplianceResult,
 } from '@/features/talent-management/api/kit-template-actions';
 import { DepartmentSection } from './gear-flight-check/department-section';
-import { GearDriftRibbon, type DriftAction } from './gear-flight-check/gear-drift-ribbon';
+import { GearDriftRibbon, type DriftAction, type GearDriftRibbonHandle } from './gear-flight-check/gear-drift-ribbon';
 import { GearItemRow } from './gear-flight-check/gear-item-row';
 import { KitSyncPicker } from './gear-flight-check/kit-sync-picker';
 import { PackageParentRow } from './gear-flight-check/package-parent-row';
@@ -134,6 +134,26 @@ export function GearFlightCheck({
   const [sourcingBannerOpen, setSourcingBannerOpen] = useState(false);
   const [driftReport, setDriftReport] = useState<GearDriftReport | null>(null);
   const [driftPending, setDriftPending] = useState<string | null>(null);
+  const driftRibbonRef = useRef<GearDriftRibbonHandle>(null);
+
+  /**
+   * Map of gear-item id → proposal qty for items with a pending qty drift.
+   * Powers the inline AlertCircle indicator on each gear row so a user who
+   * collapses the drift banner still sees that the row is contested.
+   */
+  const qtyDriftByItemId = useMemo<Map<string, { newQuantity: number }>>(() => {
+    const map = new Map<string, { newQuantity: number }>();
+    for (const drift of driftReport?.drifts ?? []) {
+      if (drift.kind === 'qty_change') {
+        map.set(drift.gearItemId, { newQuantity: drift.newQuantity });
+      }
+    }
+    return map;
+  }, [driftReport]);
+
+  const handleShowDrift = useCallback(() => {
+    driftRibbonRef.current?.expandAndScroll();
+  }, []);
 
   // ── Fetch gear items ────────────────────────────────────────────────────────
 
@@ -606,6 +626,8 @@ export function GearFlightCheck({
       lineageEnabled={lineageEnabled}
       indented={opts?.indented ?? false}
       onDetach={lineageEnabled ? () => handleDetach(item.id) : undefined}
+      qtyDrift={qtyDriftByItemId.get(item.id)}
+      onShowDrift={handleShowDrift}
     />
   );
 
@@ -653,6 +675,7 @@ export function GearFlightCheck({
        * so the PM sees it before they start working with the gear card. */}
       {lineageEnabled && driftReport && (
         <GearDriftRibbon
+          ref={driftRibbonRef}
           drifts={driftReport.drifts}
           proposalLastChangedAt={driftReport.proposalLastChangedAt}
           onAct={handleDriftAction}
@@ -804,6 +827,8 @@ export function GearFlightCheck({
               onOpenOperatorPicker={(id) => setOperatorPickerOpen(operatorPickerOpen === id ? null : id)}
               onAssignOperator={handleAssignOperator}
               onOpenCrewDetail={onOpenCrewDetail}
+              qtyDriftByItemId={qtyDriftByItemId}
+              onShowDrift={handleShowDrift}
             />
           );
         })}

@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Clock, MapPin, Users, Plus, Timer, CalendarClock, FolderPlus, Pencil, Trash2, Check, X, Radio, BookTemplate } from 'lucide-react';
 
 const SW = 1.5;
@@ -78,13 +79,33 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
     return () => { active = false; };
   }, [eventId]);
 
+  // Preserve the parent /events stream context when the user hits the back
+  // arrow. ROS pages only exist for post-handoff deals, which always live
+  // in the Active stream — so when no `stream` param is on the ROS URL (e.g.
+  // direct nav from a bookmark), default to `active` rather than letting the
+  // parent fall through to its 'inquiry' default and bounce the user into
+  // the wrong tab.
+  const searchParams = useSearchParams();
+  const incomingStream = searchParams.get('stream');
+  const backStream =
+    incomingStream === 'active' || incomingStream === 'past' || incomingStream === 'inquiry'
+      ? incomingStream
+      : 'active';
+  const backHref = initialEvent.deal_id
+    ? `/events?selected=${initialEvent.deal_id}&stream=${backStream}`
+    : `/events?stream=${backStream}`;
+
   const displayDate = initialEvent.starts_at
     ? formatDate(new Date(initialEvent.starts_at), 'MMM d, yyyy')
     : 'TBD';
+  // Prefer the directory-resolved venue label over the snapshot strings so the
+  // header matches the Plan/lobby/stream views. If `venue_entity_id` was set
+  // during handoff, `venue_name` is the canonical display name.
   const displayLocation =
+    initialEvent.venue_name ??
     initialEvent.location_name ??
     initialEvent.location_address ??
-    '—';
+    null;
 
   const selectedCue = useMemo(
     () => cues.find((cue) => cue.id === selectedCueId) ?? null,
@@ -329,9 +350,9 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
       <header className="flex items-center justify-between mb-8 shrink-0">
         <div className="flex items-center gap-4">
           <Link
-            href={`/events/g/${eventId}`}
+            href={backHref}
             className="p-3 rounded-full hover:bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-surface)]"
-            aria-label="Back to Stream"
+            aria-label="Back to deal"
           >
             <ArrowLeft size={20} strokeWidth={SW} />
           </Link>
@@ -340,15 +361,19 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
               {initialEvent.title ?? 'Untitled event'}
             </h1>
             <div className="flex items-center gap-4 text-sm text-[var(--stage-text-secondary)] mt-1">
-              <span className="flex items-center gap-1">
-                <Users size={14} strokeWidth={SW} /> {initialEvent.client_name ?? '—'}
-              </span>
+              {initialEvent.client_name && (
+                <span className="flex items-center gap-1">
+                  <Users size={14} strokeWidth={SW} /> {initialEvent.client_name}
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <Clock size={14} strokeWidth={SW} /> {displayDate}
               </span>
-              <span className="flex items-center gap-1">
-                <MapPin size={14} strokeWidth={SW} /> {displayLocation}
-              </span>
+              {displayLocation && (
+                <span className="flex items-center gap-1">
+                  <MapPin size={14} strokeWidth={SW} /> {displayLocation}
+                </span>
+              )}
             </div>
           </div>
         </div>

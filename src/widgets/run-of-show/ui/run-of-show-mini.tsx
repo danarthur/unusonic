@@ -87,12 +87,22 @@ export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIn
   if (cues.length === 0) {
     return (
       <Link
-        href={`/events/${eventId}/run-of-show`}
+        href={`/events/${eventId}/run-of-show?stream=active`}
         className={cn(
-          'flex flex-col items-center justify-center min-h-[100px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] stage-panel-elevated p-6 text-center transition-colors hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[oklch(1_0_0_/_0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
+          'group relative flex flex-col items-center justify-center min-h-[100px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] stage-panel-elevated p-6 text-center transition-colors hover:border-[oklch(1_0_0_/_0.15)] hover:bg-[oklch(1_0_0_/_0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
           className,
         )}
       >
+        {/* Visible affordance — matches the right-rail pattern (e.g. "Add" on
+            ShowDayContactsCard). The whole card is clickable; this chip is
+            visual confirmation so the empty state doesn't read as decorative. */}
+        <span
+          className="absolute top-3 right-3 inline-flex items-center gap-1 stage-badge-text text-[var(--stage-text-secondary)] group-hover:text-[var(--stage-text-primary)] transition-colors"
+          aria-hidden
+        >
+          Start
+          <ChevronRight size={12} strokeWidth={SW} />
+        </span>
         <ListMusic size={20} strokeWidth={SW} className="text-[var(--stage-text-secondary)] mb-2" />
         <p className="text-[var(--stage-text-primary)] font-medium tracking-tight leading-none">Build run of show</p>
         <p className="text-sm text-[var(--stage-text-secondary)] leading-relaxed mt-2">Create your show timeline with sections and cues</p>
@@ -126,7 +136,7 @@ export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIn
 
       {/* Footer row */}
       <Link
-        href={`/events/${eventId}/run-of-show`}
+        href={`/events/${eventId}/run-of-show?stream=active`}
         className="flex items-center justify-between -mx-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-[oklch(1_0_0_/_0.05)]"
       >
         <span className="stage-readout">

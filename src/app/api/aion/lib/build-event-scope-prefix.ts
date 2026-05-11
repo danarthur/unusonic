@@ -14,7 +14,22 @@
  */
 
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { isValidIANA } from '@/shared/lib/timezone-client';
 import { wrapUntrusted } from './wrap-untrusted';
+
+/**
+ * Last-resort fallback when no source upstream supplies a timezone.
+ *
+ * Why not 'UTC'? Because `ops.events.timezone` and `public.workspaces.timezone`
+ * both default to 'UTC' at the column level (see migration 20260412030000),
+ * and stale handoffs leave production rows stamped with that default. Showing
+ * "Show is May 23rd, 4 to 10 p.m. UTC" to a user in LA is wrong; falling back
+ * to a sane US wall-clock zone is the least-surprising behaviour. Owners with
+ * non-US shows always have an explicit venue or workspace tz, so this fallback
+ * only fires for the misconfigured-default case.
+ */
+const SAFE_FALLBACK_TZ = 'America/Los_Angeles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -151,6 +166,9 @@ type RawEventRow = {
   timezone: string | null;
   location_name: string | null;
   venue_name: string | null;
+  venue_entity_id: string | null;
+  workspace_id: string | null;
+  project_id: string | null;
   dates_load_in: string | null;
   client_entity_id: string | null;
   archived_at: string | null;
@@ -190,7 +208,7 @@ export async function buildEventScopePrefix(eventId: string): Promise<EventScope
     .schema('ops')
     .from('events')
     .select(
-      'id, deal_id, title, starts_at, ends_at, timezone, location_name, venue_name, dates_load_in, client_entity_id, archived_at, updated_at',
+      'id, deal_id, title, starts_at, ends_at, timezone, location_name, venue_name, venue_entity_id, workspace_id, project_id, dates_load_in, client_entity_id, archived_at, updated_at',
     )
     .eq('id', eventId)
     .maybeSingle();
@@ -200,8 +218,11 @@ export async function buildEventScopePrefix(eventId: string): Promise<EventScope
     return { prompt: '', ui: null, contextFingerprint: '' };
   }
 
-  // ── 2. Parallel fetches: client name, crew, last invoice ────────────────
-  const [clientEntity, crewRows, invoiceRows] = await Promise.all([
+  // ── 2. Parallel fetches: client name, crew, last invoice, venue attrs,
+  //      workspace timezone (the last two power the timezone fallback chain).
+  //      All fired in one Promise.all so the prefix stays a single round-trip
+  //      from the caller's perspective.
+  const [clientEntity, crewRows, invoiceRows, venueRow, workspaceTz] = await Promise.all([
     event.client_entity_id
       ? system
           .schema('directory')
@@ -227,11 +248,37 @@ export async function buildEventScopePrefix(eventId: string): Promise<EventScope
           .eq('deal_id', event.deal_id)
           .then((r) => ((r.data ?? []) as InvoiceRow[]))
       : Promise.resolve([] as InvoiceRow[]),
+    event.venue_entity_id
+      ? system
+          .schema('directory')
+          .from('entities')
+          .select('attributes')
+          .eq('id', event.venue_entity_id)
+          .maybeSingle()
+          .then((r) => (r.data as { attributes: unknown } | null))
+      : Promise.resolve(null),
+    resolveWorkspaceTimezone(system, event.workspace_id, event.project_id),
   ]);
 
   const clientName = clientEntity?.display_name ?? '';
   const venueName = event.location_name ?? event.venue_name ?? '';
-  const timezone = event.timezone ?? 'UTC';
+
+  // Timezone fallback chain (audit P0):
+  //   1. event.timezone          — but treat 'UTC' as sentinel (column default
+  //                                 from pre-baseline migration 20260412030000),
+  //                                 not a deliberate user choice. Production
+  //                                 rows stamped during handoff before tz
+  //                                 resolution wired up still carry 'UTC'.
+  //   2. venue.attributes.timezone — typed accessor, never raw bracket.
+  //   3. workspace.timezone        — same UTC-sentinel rule applies.
+  //   4. 'America/Los_Angeles'     — last resort. Never UTC; that's the bug.
+  const eventTz = event.timezone && event.timezone !== 'UTC' && isValidIANA(event.timezone)
+    ? event.timezone
+    : null;
+  const venueAttrs = venueRow ? readEntityAttrs(venueRow.attributes, 'venue') : null;
+  const venueTzRaw = venueAttrs?.timezone ?? null;
+  const venueTz = typeof venueTzRaw === 'string' && isValidIANA(venueTzRaw) ? venueTzRaw : null;
+  const timezone = eventTz ?? venueTz ?? workspaceTz ?? SAFE_FALLBACK_TZ;
 
   // ── 3. Derived aggregates ───────────────────────────────────────────────
   const crewTotal = crewRows.length;
@@ -317,6 +364,7 @@ export async function buildEventScopePrefix(eventId: string): Promise<EventScope
   // ── 6. 7-field prompt XML block ─────────────────────────────────────────
   const prompt = buildPromptBlock({
     event,
+    timezone,
     clientName,
     venueName,
     crewTotal,
@@ -335,6 +383,10 @@ export async function buildEventScopePrefix(eventId: string): Promise<EventScope
 
 function buildPromptBlock(input: {
   event: RawEventRow;
+  /** Resolved IANA timezone — already passed through the fallback chain.
+   *  Use this instead of event.timezone so the LLM never sees the raw 'UTC'
+   *  column default for an event that should display in the venue's local. */
+  timezone: string;
   clientName: string;
   venueName: string;
   crewTotal: number;
@@ -343,13 +395,13 @@ function buildPromptBlock(input: {
   paid: number;
   callTimeFormatted: string | null;
 }): string {
-  const { event, clientName, venueName, crewTotal, crewConfirmed, outstanding, paid, callTimeFormatted } = input;
+  const { event, timezone, clientName, venueName, crewTotal, crewConfirmed, outstanding, paid, callTimeFormatted } = input;
 
   const parts: string[] = ['<current_event>'];
   if (event.title) parts.push(`  <title>${escapeXml(event.title)}</title>`);
   if (event.starts_at) parts.push(`  <starts_at>${escapeXml(event.starts_at)}</starts_at>`);
   if (event.ends_at) parts.push(`  <ends_at>${escapeXml(event.ends_at)}</ends_at>`);
-  if (event.timezone) parts.push(`  <timezone>${escapeXml(event.timezone)}</timezone>`);
+  parts.push(`  <timezone>${escapeXml(timezone)}</timezone>`);
   if (clientName) parts.push(`  <client>${escapeXml(clientName)}</client>`);
   if (venueName) parts.push(`  <venue>${escapeXml(venueName)}</venue>`);
   if (event.dates_load_in) parts.push(`  <load_in>${escapeXml(event.dates_load_in)}</load_in>`);
@@ -389,6 +441,45 @@ function escapeXml(value: string): string {
 function formatUsd(amount: number): string {
   if (amount >= 1000) return `$${(amount / 1000).toFixed(1).replace(/\.0$/, '')}k`;
   return `$${Math.round(amount)}`;
+}
+
+/**
+ * Resolve the workspace's IANA timezone. Prefers the event's direct
+ * workspace_id; falls back to the project's workspace_id when the event row
+ * is project-scoped (workspace_id NULL — see ops.events column comment).
+ *
+ * Returns null when no usable IANA tz is found, including the 'UTC' sentinel
+ * default — callers fall through to SAFE_FALLBACK_TZ.
+ */
+async function resolveWorkspaceTimezone(
+  system: ReturnType<typeof getSystemClient>,
+  workspaceId: string | null,
+  projectId: string | null,
+): Promise<string | null> {
+  let wsId = workspaceId;
+
+  if (!wsId && projectId) {
+    const { data } = await system
+      .schema('ops')
+      .from('projects')
+      .select('workspace_id')
+      .eq('id', projectId)
+      .maybeSingle();
+    wsId = (data as { workspace_id: string | null } | null)?.workspace_id ?? null;
+  }
+
+  if (!wsId) return null;
+
+  const { data } = await system
+    .from('workspaces')
+    .select('timezone')
+    .eq('id', wsId)
+    .maybeSingle();
+
+  const tz = (data as { timezone?: string | null } | null)?.timezone;
+  if (typeof tz !== 'string') return null;
+  if (tz === 'UTC') return null; // column default, treat as unset
+  return isValidIANA(tz) ? tz : null;
 }
 
 /**

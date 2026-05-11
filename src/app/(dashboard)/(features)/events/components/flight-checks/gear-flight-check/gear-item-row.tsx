@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { MoreVertical, User } from 'lucide-react';
+import { AlertCircle, MoreVertical, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import type {
@@ -101,6 +101,13 @@ export type GearItemRowProps = {
   indented?: boolean;
   /** Phase 2b lineage view: handler for "Detach from package" — only shown when defined and the row has a parent. */
   onDetach?: () => void;
+  /** Quantity drift against the proposal — when present, the row renders a
+   *  warning indicator next to the qty badge. The tooltip surfaces the
+   *  proposed quantity and the click target jumps to the drift banner. */
+  qtyDrift?: { newQuantity: number };
+  /** Click handler for the drift indicator — typically expands the
+   *  GearDriftRibbon and scrolls it into view. */
+  onShowDrift?: () => void;
 };
 
 export function GearItemRow({
@@ -123,6 +130,8 @@ export function GearItemRow({
   lineageEnabled = false,
   indented = false,
   onDetach,
+  qtyDrift,
+  onShowDrift,
 }: GearItemRowProps) {
   const isBranch = isBranchState(item.status);
   const lineageChip = lineageEnabled ? lineageChipFor(item) : null;
@@ -182,6 +191,23 @@ export function GearItemRow({
             <span className="shrink-0 text-label tabular-nums text-[var(--stage-text-tertiary)] bg-[oklch(1_0_0_/_0.06)] px-1.5 py-0.5 rounded-full">
               x{item.quantity}
             </span>
+          )}
+          {/* Drift indicator — surfaces unresolved proposal-vs-gear qty
+              variance inline. A user who collapses the banner can still see
+              that this row is contested; click jumps back to the banner. */}
+          {qtyDrift && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onShowDrift?.();
+              }}
+              className="shrink-0 inline-flex items-center justify-center text-[var(--color-unusonic-warning)] hover:text-[var(--color-unusonic-warning)] transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-unusonic-warning)] rounded-full"
+              title={`Proposal updated to ${qtyDrift.newQuantity} — review change`}
+              aria-label={`Proposal updated to ${qtyDrift.newQuantity} — review change`}
+            >
+              <AlertCircle size={13} strokeWidth={2} aria-hidden />
+            </button>
           )}
         </div>
 

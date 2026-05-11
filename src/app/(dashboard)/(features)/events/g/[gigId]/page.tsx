@@ -1,51 +1,39 @@
-/**
- * Studio alias: /events/g/[id] → same as /events/[id] (unified events).
- * [id] is the event id. Renders EventCommandGrid.
- */
-
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import { getEventCommand } from '@/entities/event';
-import { EventCommandGrid } from '@/widgets/event-dashboard';
+import { createClient } from '@/shared/api/supabase/server';
 
-export default async function EventByGigPage({
+/**
+ * Legacy Gig Studio route.
+ *
+ * `/events/g/<eventId>` used to render the standalone Event Studio (the same
+ * `EventCommandGrid` that `/events/[id]` renders). After the Plan-tab consolidation
+ * the canonical surface for an event is the deal's Plan view at
+ * `/events?selected=<dealId>`. Bare `[id]` is a trap because the Plan tab,
+ * Prism lenses, Production Team Card and handoff button all live on the deal.
+ *
+ * Redirect to the deal's Plan view (resolved from `ops.events.deal_id`). When
+ * the event has no deal_id (rare — direct event creation predates the
+ * deal-first flow), fall back to `/events` so the user lands somewhere
+ * recognizable instead of a half-rendered legacy Studio.
+ *
+ * Sub-routes under `/events/g/<gigId>/...` (e.g. `/pull-sheet`) keep working
+ * because they own their own `page.tsx` files and Next.js does not propagate
+ * this redirect to them.
+ */
+export default async function LegacyGigStudioPage({
   params,
 }: {
   params: Promise<{ gigId: string }>;
 }) {
   const { gigId: eventId } = await params;
 
-  const event = await getEventCommand(eventId);
+  const supabase = await createClient();
+  const { data: event } = await supabase
+    .schema('ops')
+    .from('events')
+    .select('deal_id')
+    .eq('id', eventId)
+    .maybeSingle();
 
-  if (!event) {
-    redirect('/events');
-  }
-
-  return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <header className="shrink-0 flex items-center gap-4 p-4 border-b border-[oklch(1_0_0_/_0.08)] bg-[var(--stage-surface)]">
-        <Link
-          href="/calendar"
-          className="stage-hover overflow-hidden p-2 rounded-xl text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
-          aria-label="Back to Calendar"
-        >
-          <ArrowLeft size={20} />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
-            Event studio
-          </p>
-          <p className="text-sm text-[var(--stage-text-primary)] truncate">{event.title ?? eventId}</p>
-        </div>
-      </header>
-
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="grain-overlay pointer-events-none fixed inset-0 z-0" aria-hidden />
-        <div className="relative z-10">
-          <EventCommandGrid event={event} />
-        </div>
-      </div>
-    </div>
-  );
+  const dealId = event?.deal_id ?? null;
+  redirect(dealId ? `/events?selected=${dealId}` : '/events');
 }

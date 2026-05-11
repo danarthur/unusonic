@@ -70,6 +70,23 @@ export function BriefOverlay({ eventId, open, onClose }: BriefOverlayProps) {
     }
   }, [open]);
 
+  // Escape-to-dismiss. Mirrors the click-on-scrim behaviour so keyboard users
+  // get the same exit affordance — the audit's P1 finding flagged this as a
+  // missing accessibility primitive on the brief sheet.
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [open, onClose]);
+
   const togglePlayback = useCallback(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     if (state.status !== 'ready') return;

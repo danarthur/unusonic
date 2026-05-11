@@ -39,6 +39,7 @@ export function AgreedSection({
   onRemoveWaypoint,
   payTotal,
   payIsPaid,
+  rateUnset,
   payExpanded,
   setPayExpanded,
   payDraft,
@@ -55,6 +56,9 @@ export function AgreedSection({
   onRemoveWaypoint: (id: string) => void;
   payTotal: number;
   payIsPaid: boolean;
+  /** True when every rate field on the row is null (no rate agreed yet).
+   *  Distinct from "rate is 0" which represents a deliberate comp. */
+  rateUnset: boolean;
   payExpanded: boolean;
   setPayExpanded: Dispatch<SetStateAction<boolean>>;
   payDraft: PayDraft;
@@ -99,24 +103,49 @@ export function AgreedSection({
           type="button"
           onClick={() => setPayExpanded((v) => !v)}
           className="flex items-center gap-2 px-2.5 py-1.5 focus:outline-none"
+          // When no rate is set we surface "Rate not set" in amber to
+          // match the Financials card's "X of Y crew rates missing"
+          // warning. Click still expands the editor so a PM can set
+          // the rate inline. A genuine $0 (every field set to zero, or
+          // any single field set, including 0) is treated as a deliberate
+          // comp and renders as $0 — see `rateUnset` derivation in the
+          // orchestrator.
+          title={rateUnset ? 'No rate agreed yet — click to set' : undefined}
         >
-          <DollarSign className="size-3 text-[var(--stage-text-tertiary)]" />
-          <span className="stage-badge-text tracking-tight text-[var(--stage-text-tertiary)]">
-            {payIsPaid ? 'Paid' : 'Owed'}
-          </span>
-          <span
-            className="ml-auto text-sm tabular-nums tracking-tight"
+          <DollarSign
+            className="size-3"
             style={{
-              color: payIsPaid
-                ? 'var(--color-unusonic-success)'
-                : 'var(--stage-text-primary)',
+              color: rateUnset
+                ? 'var(--color-unusonic-warning)'
+                : 'var(--stage-text-tertiary)',
+            }}
+          />
+          <span
+            className="stage-badge-text tracking-tight"
+            style={{
+              color: rateUnset
+                ? 'var(--color-unusonic-warning)'
+                : 'var(--stage-text-tertiary)',
             }}
           >
-            ${payTotal.toLocaleString()}
+            {rateUnset ? 'Rate not set' : payIsPaid ? 'Paid' : 'Owed'}
           </span>
+          {!rateUnset && (
+            <span
+              className="ml-auto text-sm tabular-nums tracking-tight"
+              style={{
+                color: payIsPaid
+                  ? 'var(--color-unusonic-success)'
+                  : 'var(--stage-text-primary)',
+              }}
+            >
+              ${payTotal.toLocaleString()}
+            </span>
+          )}
           <ChevronDown
             className={cn(
               'size-3 text-[var(--stage-text-tertiary)] transition-transform',
+              !rateUnset ? '' : 'ml-auto',
               payExpanded && 'rotate-180',
             )}
           />

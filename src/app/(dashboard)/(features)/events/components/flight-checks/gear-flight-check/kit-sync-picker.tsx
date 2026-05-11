@@ -28,7 +28,7 @@ export function KitSyncPicker({ crewRows, onPick, onClose, pending = false }: Ki
     <div className="mt-1 mb-2 ml-6 rounded-[var(--stage-radius-input,6px)] border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well,oklch(1_0_0_/_0.04))] overflow-hidden">
       <div className="px-3 py-2 border-b border-[oklch(1_0_0_/_0.06)] flex items-center justify-between">
         <span className="stage-label tracking-tight text-[var(--stage-text-secondary)]">
-          Sync from a crew member's kit
+          Sync from a crew member&apos;s kit
         </span>
         <button
           type="button"

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useTransition, useCallback, useEffect } from 'react';
+import { useState, useTransition, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Package, AlertTriangle, ArrowLeftRight, Search, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { STAGE_HEAVY, STAGE_MEDIUM, STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
+import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
+import { normalizeHumanName } from '@/shared/lib/normalize-human-name';
 import {
   getDayResourceView,
   type DayResourceView,
@@ -76,6 +77,59 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
   const [swapResults, setSwapResults] = useState<AlternativeCrewResult[]>([]);
   const [isSearching, startSearch] = useTransition();
   const [isSwapping, startSwap] = useTransition();
+
+  // ── Mount + slide state ────────────────────────────────────────────────────
+  // CSS-driven entrance/exit. We mount as soon as `open` flips true, then on
+  // the next animation frame flip `slideIn = true` so a CSS transition runs.
+  // Rationale: the parent Plan tab cold-paint fires 26+ server actions and
+  // blocks the JS thread for several seconds. Framer Motion springs/tweens
+  // are rAF-driven and crawl when the thread is starved; CSS transforms are
+  // GPU-composited and animate independently of JS pressure.
+  const [mounted, setMounted] = useState(false);
+  const [slideIn, setSlideIn] = useState(false);
+  const exitTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      if (exitTimeoutRef.current !== null) {
+        window.clearTimeout(exitTimeoutRef.current);
+        exitTimeoutRef.current = null;
+      }
+      setMounted(true);
+      let id2: number | null = null;
+      const id1 = window.requestAnimationFrame(() => {
+        id2 = window.requestAnimationFrame(() => setSlideIn(true));
+      });
+      return () => {
+        window.cancelAnimationFrame(id1);
+        if (id2 !== null) window.cancelAnimationFrame(id2);
+      };
+    }
+    setSlideIn(false);
+    exitTimeoutRef.current = window.setTimeout(() => {
+      setMounted(false);
+      exitTimeoutRef.current = null;
+    }, 320);
+    return undefined;
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (exitTimeoutRef.current !== null) {
+        window.clearTimeout(exitTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Escape-to-close — wasn't wired previously; standard modal expectation.
+  useEffect(() => {
+    if (!mounted) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mounted, onClose]);
 
   // Fetch on open / reset on close. Previously this was done inline in the
   // render phase which triggered "Cannot call startTransition while rendering"
@@ -238,7 +292,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
     });
   };
 
-  if (!open || typeof window === 'undefined') return null;
+  if (!mounted || typeof window === 'undefined') return null;
 
   const totalCrew = crewList.length;
   const totalGear = gearList.length;
@@ -246,25 +300,29 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
 
   return createPortal(
     <>
-      {/* Backdrop */}
-      <motion.div
+      {/* Backdrop — CSS-driven for main-thread-resilience (see mount/slide
+          comment above). Uses the var(--stage-scrim) tint via .stage-scrim. */}
+      <div
         className="stage-scrim z-[60]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={STAGE_NAV_CROSSFADE}
+        style={{
+          opacity: slideIn ? 1 : 0,
+          transition: 'opacity 200ms ease-out',
+        }}
         onClick={onClose}
       />
 
-      {/* Drawer — slides from right */}
-      <motion.aside
+      {/* Drawer — slides from right via GPU-composited CSS transform. */}
+      <aside
         className="fixed inset-y-0 right-0 z-[61] flex w-full max-w-lg flex-col overflow-hidden"
         data-surface="raised"
-        style={{ backgroundColor: 'var(--stage-surface-raised)' }}
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={STAGE_HEAVY}
+        style={{
+          backgroundColor: 'var(--stage-surface-raised)',
+          transform: slideIn
+            ? 'translate3d(0, 0, 0)'
+            : 'translate3d(100%, 0, 0)',
+          transition: 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)',
+          willChange: 'transform',
+        }}
       >
         {/* Header */}
         <div
@@ -383,7 +441,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                               </p>
                             ) : (
                               <p className="stage-readout truncate">
-                                {member.entityName ?? member.role ?? 'Open slot'}
+                                {member.entityName ? normalizeHumanName(member.entityName) : (member.role ?? 'Open slot')}
                               </p>
                             )}
                             {member.role && (
@@ -519,7 +577,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                                           style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
                                         >
                                           <span className="flex-1 truncate" style={{ color: 'var(--stage-text-primary)' }}>
-                                            {alt.name}
+                                            {normalizeHumanName(alt.name)}
                                           </span>
                                           {alt.jobTitle && (
                                             <span className="text-label shrink-0" style={{ color: 'var(--stage-text-tertiary)' }}>
@@ -635,7 +693,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
             </div>
           )}
         </div>
-      </motion.aside>
+      </aside>
     </>,
     document.body,
   );

@@ -41,6 +41,10 @@ type DepartmentSectionProps = {
   onOpenOperatorPicker: (id: string) => void;
   onAssignOperator: (itemId: string, entityId: string | null) => void;
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /** Map of gear-item id → proposal qty for items with a pending qty drift.
+   *  When present on a row, the row renders an inline drift indicator. */
+  qtyDriftByItemId?: Map<string, { newQuantity: number }>;
+  onShowDrift?: () => void;
 };
 
 export function DepartmentSection({
@@ -64,6 +68,8 @@ export function DepartmentSection({
   onOpenOperatorPicker,
   onAssignOperator,
   onOpenCrewDetail,
+  qtyDriftByItemId,
+  onShowDrift,
 }: DepartmentSectionProps) {
   const { department, items } = group;
   const loadedCount = items.filter(
@@ -192,6 +198,8 @@ export function DepartmentSection({
                       onOpenOperatorPicker={() => onOpenOperatorPicker(item.id)}
                       onAssignOperator={(entityId) => onAssignOperator(item.id, entityId)}
                       onOpenCrewDetail={onOpenCrewDetail}
+                      qtyDrift={qtyDriftByItemId?.get(item.id)}
+                      onShowDrift={onShowDrift}
                     />
                   </motion.li>
                 ))}

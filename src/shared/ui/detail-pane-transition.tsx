@@ -132,6 +132,11 @@ export function DetailPaneTransition({
 
   return (
     <motion.div
+      // Set `initial` so framer-motion has an origin keyframe to tween from.
+      // Without this, every dim/refetch cycle triggers the warning
+      // "You are trying to animate opacity from \"undefined\" to \"1\""
+      // because the `<motion.div>` has no inline `opacity` style for motion to read.
+      initial={{ opacity: 1 }}
       animate={{ opacity: dimmed ? 0.7 : 1 }}
       transition={{ duration: dimmed ? 0.08 : 0, ease: 'easeOut' }}
       className={className}

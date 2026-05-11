@@ -14,7 +14,7 @@
  * into the orchestrator which runs the server actions and re-fetches.
  */
 
-import { useState } from 'react';
+import { forwardRef, useImperativeHandle, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, ChevronRight, FileWarning, Plus, Minus, ArrowRight, Check, X } from 'lucide-react';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
@@ -25,6 +25,13 @@ export type DriftAction =
   | { kind: 'accept-remove'; gearItemId: string }
   | { kind: 'accept-qty'; gearItemId: string; newQuantity: number }
   | { kind: 'dismiss'; proposalItemId: string; proposalItemUpdatedAt: string };
+
+export type GearDriftRibbonHandle = {
+  /** Force the ribbon open and scroll it into view. Called from inline
+   *  drift indicators on gear rows so a user clicking the warning chip on
+   *  a gear row lands on the matching banner without hunting for it. */
+  expandAndScroll: () => void;
+};
 
 export type GearDriftRibbonProps = {
   drifts: GearDrift[];
@@ -56,12 +63,31 @@ function summary(drifts: GearDrift[]): string {
   return parts.join(' · ');
 }
 
-export function GearDriftRibbon({ drifts, proposalLastChangedAt, onAct, pending }: GearDriftRibbonProps) {
+export const GearDriftRibbon = forwardRef<GearDriftRibbonHandle, GearDriftRibbonProps>(
+  function GearDriftRibbon({ drifts, proposalLastChangedAt, onAct, pending }, ref) {
   const [open, setOpen] = useState(false);
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      expandAndScroll: () => {
+        setOpen(true);
+        // Wait one frame so the expansion has started before scrolling, so
+        // scrollIntoView lands the banner header (not its mid-expand height)
+        // at the top of the viewport.
+        window.requestAnimationFrame(() => {
+          containerEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      },
+    }),
+    [containerEl],
+  );
+
   if (drifts.length === 0) return null;
 
   return (
-    <div className="mb-3 rounded-[var(--stage-radius-input,6px)] border border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/8 overflow-hidden">
+    <div ref={setContainerEl} className="mb-3 rounded-[var(--stage-radius-input,6px)] border border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/8 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -107,7 +133,7 @@ export function GearDriftRibbon({ drifts, proposalLastChangedAt, onAct, pending 
       </AnimatePresence>
     </div>
   );
-}
+});
 
 function driftKey(d: GearDrift): string {
   if (d.kind === 'add') return `add:${d.proposalItemId}`;
@@ -139,6 +165,7 @@ function DriftRow({
         disabled={isPending}
         onClick={() => onAct(acceptActionFor(drift))}
         className="shrink-0 px-2.5 py-1 rounded-full stage-badge-text tracking-tight font-medium bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)] hover:bg-[var(--color-unusonic-success)]/25 transition-colors disabled:opacity-45 disabled:cursor-default flex items-center gap-1"
+        title={acceptTooltip(drift)}
       >
         <Check size={11} strokeWidth={2} aria-hidden />
         Accept
@@ -151,7 +178,7 @@ function DriftRow({
           if (action) onAct(action);
         }}
         className="shrink-0 px-2.5 py-1 rounded-full stage-badge-text tracking-tight bg-[oklch(1_0_0/0.06)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.10)] hover:text-[var(--stage-text-primary)] transition-colors disabled:opacity-45 disabled:cursor-default flex items-center gap-1"
-        title={canDismiss(drift) ? 'Reject this change. It will reappear if the proposal line is later edited again.' : 'This change has no proposal version to pin a dismissal to.'}
+        title={canDismiss(drift) ? rejectTooltip(drift) : 'This change has no proposal version to pin a dismissal to.'}
       >
         <X size={11} strokeWidth={2} aria-hidden />
         Reject
@@ -178,6 +205,37 @@ function driftLabel(drift: GearDrift): string {
     return `Remove ${drift.quantity} (proposal line is gone)`;
   }
   return `Quantity ${drift.oldQuantity} → ${drift.newQuantity}`;
+}
+
+function acceptTooltip(drift: GearDrift): string {
+  if (drift.kind === 'add') {
+    const noun = drift.expectedQuantity === 1 ? 'unit' : 'units';
+    return `Update gear roster to match proposal — pulls ${drift.expectedQuantity} ${noun} to allocate`;
+  }
+  if (drift.kind === 'remove') {
+    return `Update gear roster to match proposal — removes ${drift.quantity} from allocation`;
+  }
+  // qty_change
+  const delta = drift.newQuantity - drift.oldQuantity;
+  const abs = Math.abs(delta);
+  const noun = abs === 1 ? 'unit' : 'units';
+  if (delta > 0) {
+    return `Update gear roster to match proposal — pulls ${abs} more ${noun} to allocate`;
+  }
+  if (delta < 0) {
+    return `Update gear roster to match proposal — releases ${abs} ${noun} from allocation`;
+  }
+  return 'Update gear roster to match proposal';
+}
+
+function rejectTooltip(drift: GearDrift): string {
+  if (drift.kind === 'add') {
+    return `Dismiss — proposal stays at ${drift.expectedQuantity}`;
+  }
+  if (drift.kind === 'remove') {
+    return `Dismiss — proposal stays at 0`;
+  }
+  return `Dismiss — proposal stays at ${drift.newQuantity}`;
 }
 
 function acceptActionFor(drift: GearDrift): DriftAction {

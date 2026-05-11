@@ -11,6 +11,7 @@ import { User, Building2, MapPin, Phone, Wrench } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { crewCompleteness, coiStatus, proficiencyAbbr } from '@/shared/lib/crew-profile';
+import { normalizeHumanName } from '@/shared/lib/normalize-human-name';
 import { checkCrewAvailability } from '@/features/ops/actions/check-crew-availability';
 import type { DealCrewRow } from '../actions/deal-crew';
 
@@ -151,7 +152,7 @@ export function CrewIdentityRow({
               />
             )}
             <p className="stage-readout truncate">
-              {row.entity_name ?? '—'}
+              {row.entity_name ? normalizeHumanName(row.entity_name) : '—'}
             </p>
             {row.role_note && (
               <span className="shrink-0 stage-badge-text rounded-md px-1.5 py-0.5 leading-none" style={{ color: 'var(--stage-text-secondary)', background: 'var(--ctx-card, var(--stage-surface-elevated))', border: '1px solid var(--stage-edge-subtle)' }}>

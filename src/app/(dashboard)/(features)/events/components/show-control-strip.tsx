@@ -236,6 +236,7 @@ export function ShowControlStrip({
                   background: 'var(--color-unusonic-error)',
                   color: 'var(--stage-accent)',
                 }}
+                initial={{ opacity: 1 }}
                 animate={{ opacity: [1, 0.7, 1] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               >

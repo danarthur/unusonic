@@ -55,6 +55,7 @@ export function AionThinkingSteps({ activeToolLabel }: AionThinkingStepsProps) {
               {isActive ? (
                 <motion.span
                   className="block w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--stage-accent)]"
+                  initial={{ opacity: 1 }}
                   animate={{ opacity: [1, 0.3, 1] }}
                   transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                 />

@@ -116,7 +116,7 @@ export function ShowHealthCard({ dealId, health, onSaved, inline }: ShowHealthCa
               placeholder="Brief status update..."
               maxLength={500}
               rows={2}
-              className="w-full bg-[var(--ctx-well,var(--stage-surface))] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)] resize-none tracking-tight"
+              className="w-full bg-[var(--ctx-well)] border border-[oklch(1_0_0_/_0.08)] px-3 py-2 text-sm text-[var(--stage-text-primary)] placeholder:text-[var(--stage-text-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:border-[var(--stage-accent)] resize-none tracking-tight"
               style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
             />
 

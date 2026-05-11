@@ -47,6 +47,17 @@ export type AionPlanCardProps = {
   startsAt: string | null;
   /** Signal stack from the Prism bundle. Empty array = "nothing drifting". */
   signals: EventSignal[];
+  /**
+   * When false, the card still renders (it has no blocking data of its own),
+   * but the `resumeOrCreateSession` chat-warmup call is skipped until this
+   * flips true. Plan tab uses `useIdleAfter(!bundleLoading)` to push this
+   * past cold-paint. Defaults to `true` to preserve existing call sites.
+   *
+   * Deferring this has zero user-visible impact when the user doesn't click
+   * the chat input — and when they do, `openScopedSession` is idempotent so
+   * the warm-up runs lazily on focus.
+   */
+  enabled?: boolean;
 };
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -85,7 +96,7 @@ function toSignalEntries(signals: EventSignal[]): SignalEntry[] {
   }));
 }
 
-export function AionPlanCard({ eventId, eventTitle, startsAt, signals }: AionPlanCardProps) {
+export function AionPlanCard({ eventId, eventTitle, startsAt, signals, enabled = true }: AionPlanCardProps) {
   const [briefOpen, setBriefOpen] = useState(false);
   const subhead = formatSubhead(startsAt, Date.now());
   const hasConcerns = signals.length > 0;
@@ -105,7 +116,11 @@ export function AionPlanCard({ eventId, eventTitle, startsAt, signals }: AionPla
 
   // Resume or create the event-scoped session when the eventId changes.
   // openScopedSession is idempotent server-side, so re-mounts are cheap.
+  // Phase 2 cold-paint defer: gated on `enabled` so the Plan tab can push
+  // this past the bundle-resolved + idle threshold. When `enabled=false`,
+  // the chat thread renders empty (collapsed by default anyway).
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     openScopedSession({
       workspaceId,
@@ -118,10 +133,18 @@ export function AionPlanCard({ eventId, eventTitle, startsAt, signals }: AionPla
     return () => {
       cancelled = true;
     };
-  }, [eventId, workspaceId, eventTitle, openScopedSession]);
+  }, [enabled, eventId, workspaceId, eventTitle, openScopedSession]);
 
-  const messages: SessionMessage[] =
-    eventSessionId && currentSessionId === eventSessionId ? sessionMessages : [];
+  // Filter out system messages (scope-handoff markers seeded by
+  // cortex.migrate_session_scope, e.g. "[Handoff — deal won, moved to event
+  // scope. Previous context preserved.]" and merge-pointer notices). They're
+  // provenance bookkeeping inside the thread row, not user-visible turns.
+  // Both the bubble list and the "N messages" count read from this filtered
+  // array so they stay in sync.
+  const messages: SessionMessage[] = useMemo(() => {
+    if (!(eventSessionId && currentSessionId === eventSessionId)) return [];
+    return sessionMessages.filter((m) => m.role !== 'system');
+  }, [eventSessionId, currentSessionId, sessionMessages]);
 
   // Collapsed-by-default for Plan v1. Mirrors the Deal card's persisted
   // pattern but flips the default — when an owner opens a Plan tab fresh,

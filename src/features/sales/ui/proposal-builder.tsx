@@ -748,32 +748,59 @@ export function ProposalBuilder({
   }, [lineItems]);
 
   if (readOnly) {
+    // Plan-tab "Agreed scope" Audit P2 (2026-05-06): a $3,400 package with $0
+    // sub-lines (DJ, Chauvet Freedom Par) reads as comped/free instead of
+    // bundled. When at least one line carries a non-zero price, treat any
+    // remaining $0 lines as "Included" with quieter tertiary styling. Total
+    // math is unchanged — $0 lines correctly contribute $0.
+    const hasAnyNonZeroLine = lineItems.some((it) => effectiveUnitPrice(it) > 0);
     return (
       <div className={cn('flex flex-col gap-4', className)}>
         <StagePanel elevated className="p-6 rounded-[var(--stage-radius-panel)] border border-[var(--stage-edge-subtle)]">
-          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--stage-text-secondary)] mb-4">
-            Proposal (locked)
+          <h2 className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)] mb-4">
+            Locked proposal
           </h2>
           {lineItems.length === 0 ? (
             <p className="text-sm text-[var(--stage-text-secondary)]">No line items.</p>
           ) : (
             <ul className="space-y-2">
-              {lineItems.map((item, i) => (
-                <li
-                  key={item.id ?? i}
-                  className="flex items-center justify-between gap-4 py-2 border-b border-[var(--stage-edge-subtle)] last:border-0 text-sm"
-                >
-                  <span className="text-[var(--stage-text-primary)] truncate">{item.name}</span>
-                  <span className="text-[var(--stage-text-secondary)] tabular-nums shrink-0">
-                    {item.quantity} × ${effectiveUnitPrice(item).toLocaleString()} = $
-                    {(item.quantity * effectiveUnitPrice(item)).toLocaleString()}
-                  </span>
-                </li>
-              ))}
+              {lineItems.map((item, i) => {
+                const unitPrice = effectiveUnitPrice(item);
+                const isIncluded = hasAnyNonZeroLine && unitPrice === 0;
+                return (
+                  <li
+                    key={item.id ?? i}
+                    className="flex items-center justify-between gap-4 py-2 border-b border-[var(--stage-edge-subtle)] last:border-0 text-sm"
+                  >
+                    <span
+                      className="truncate"
+                      style={{
+                        color: isIncluded
+                          ? 'var(--stage-text-tertiary)'
+                          : 'var(--stage-text-primary)',
+                      }}
+                    >
+                      {item.name}
+                    </span>
+                    <span
+                      className="tabular-nums shrink-0"
+                      style={{
+                        color: isIncluded
+                          ? 'var(--stage-text-tertiary)'
+                          : 'var(--stage-text-secondary)',
+                      }}
+                    >
+                      {isIncluded
+                        ? 'Included'
+                        : `${item.quantity} × $${unitPrice.toLocaleString()} = $${(item.quantity * unitPrice).toLocaleString()}`}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-[var(--stage-edge-subtle)]">
-            <span className="text-sm font-medium uppercase tracking-wide text-[var(--stage-text-secondary)]">Total</span>
+            <span className="text-sm font-medium tracking-tight text-[var(--stage-text-secondary)]">Total</span>
             <span className="text-xl font-semibold text-[var(--stage-text-primary)] tabular-nums">${total.toLocaleString()}</span>
           </div>
         </StagePanel>

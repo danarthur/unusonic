@@ -7,7 +7,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { SurfaceProvider, SURFACE_LEVEL } from '@/shared/ui/surface-context';
 import { DetailPaneTransition } from '@/shared/ui/detail-pane-transition';
 import { LensCrossfade } from '@/shared/ui/lens-crossfade';
-import { ChevronLeft, ChevronDown, Check, FileText, ExternalLink, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Check, FileText, ExternalLink, ArrowRight, CheckCircle2, Users, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { handoverDeal } from '../actions/handover-deal';
 import { updateDealStatus, type DealStatus } from '../actions/update-deal-status';
@@ -489,21 +489,42 @@ export function Prism({
     bundle?.source === 'event'
       ? bundle.eventSummary?.title ?? bundle.deal?.title ?? null
       : bundle?.deal?.title ?? null;
+  // Client name resolution chain — mirrors the run-of-show editor header
+  // (shipped in batch G via getEventSummary's stakeholder fallback). Both
+  // surfaces should surface the bill-to identity when the per-source
+  // shortcut (event.client_entity_id / deal.organization_id) is null.
+  //   1. event-source: eventSummary.client_name (already includes G's
+  //      directory + bill-to stakeholder fallback).
+  //   2. deal-source: client.organization.name (getDealClientContext also
+  //      already prefers bill_to over deal.organization_id).
+  //   3. Either path: walk the stakeholders array — getDealStakeholders
+  //      resolves the displayable `name` for the bill_to row directly,
+  //      catching cases where the dedicated client lookups returned null
+  //      (e.g. entity-only bill_to that didn't materialize a client context).
+  //   4. Otherwise drop the segment — no literal "Client" placeholder.
+  const billToStakeholderName =
+    stakeholders.find((s) => s.role === 'bill_to')?.name ?? null;
   const bundleClientName =
-    bundle?.source === 'event'
+    (bundle?.source === 'event'
       ? bundle.eventSummary?.client_name ?? null
-      : bundle?.client?.organization?.name ?? null;
+      : bundle?.client?.organization?.name ?? null) ?? billToStakeholderName;
   const bundleDateIso =
     bundle?.source === 'event'
       ? bundle.eventSummary?.starts_at?.slice(0, 10) ?? null
       : bundle?.deal?.proposed_date ?? null;
   const title = bundleTitle ?? 'Untitled event';
-  const subtitle = [
-    bundleClientName ?? 'Client',
-    bundleDateIso ? new Date(bundleDateIso + 'T00:00:00').toLocaleDateString() : null,
-  ]
-    .filter(Boolean)
-    .join(' • ');
+  // Date format matches the deal stream list (`stream-card.tsx#formatEventDate`)
+  // — e.g. "May 23, 2026". When no client/bill_to is linked we drop the
+  // "Client" placeholder entirely rather than rendering a literal role label
+  // that reads as a real client name. Silence is the right tone here.
+  const subtitleDate = bundleDateIso
+    ? new Date(bundleDateIso + 'T00:00:00').toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+  const showSubtitle = Boolean(bundleClientName) || Boolean(subtitleDate);
   const showHandover = isDeal && dealSignedOrDeposit && !deal?.event_id;
   const isFirstLoad = bundleQuery.isPending && !bundle;
   const linkedDealLoading = isEvent && bundleQuery.isFetching && !bundle?.deal;
@@ -554,7 +575,22 @@ export function Prism({
             <h2 className="stage-readout-lg leading-none truncate">
               {title}
             </h2>
-            <p className="stage-label leading-relaxed truncate mt-1">{subtitle}</p>
+            {showSubtitle && (
+              <div className="stage-label leading-relaxed mt-1 flex items-center gap-3 text-[var(--stage-text-secondary)] min-w-0">
+                {bundleClientName && (
+                  <span className="flex items-center gap-1 min-w-0">
+                    <Users size={12} strokeWidth={1.5} className="shrink-0" aria-hidden />
+                    <span className="truncate">{bundleClientName}</span>
+                  </span>
+                )}
+                {subtitleDate && (
+                  <span className="flex items-center gap-1 shrink-0">
+                    <Clock size={12} strokeWidth={1.5} className="shrink-0" aria-hidden />
+                    <span className="tabular-nums">{subtitleDate}</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           {/* Status indicator — clickable pill for deals, health dot for events */}
           {isDeal && deal?.status ? (

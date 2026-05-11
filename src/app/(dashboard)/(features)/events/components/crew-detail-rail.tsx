@@ -25,16 +25,15 @@
  * from this module before the split, so this is purely a future-safety net.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2,
   Activity as ActivityIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { formatTime12h } from '@/shared/lib/parse-time';
+import { normalizeHumanName } from '@/shared/lib/normalize-human-name';
 import type { DealCrewRow } from '../actions/deal-crew';
 import {
   confirmDealCrew,
@@ -116,6 +115,55 @@ export function CrewDetailRail({
   onRowChanged: () => void;
 }) {
   const open = row !== null;
+
+  // ── Mount + slide state ────────────────────────────────────────────────────
+  // CSS-driven entrance/exit. We mount the panel as soon as a row is selected,
+  // then on the next animation frame flip `slideIn = true` so a CSS transition
+  // animates `translateX(100%) → 0`. On close, we flip `slideIn = false` and
+  // unmount after the 300ms transition finishes.
+  //
+  // Rationale: Framer Motion's spring/tween runs on the main thread via rAF
+  // and stalls when the Plan-tab cold-paint blocks the thread for several
+  // seconds — visible as the rail crawling in from off-screen. CSS transforms
+  // are GPU-composited and animate independently of JS thread pressure.
+  const [mounted, setMounted] = useState(false);
+  const [slideIn, setSlideIn] = useState(false);
+  const exitTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      if (exitTimeoutRef.current !== null) {
+        window.clearTimeout(exitTimeoutRef.current);
+        exitTimeoutRef.current = null;
+      }
+      setMounted(true);
+      // Two rAF ticks ensure the initial off-screen state is committed before
+      // we flip the class — so the transition actually runs rather than the
+      // browser collapsing both states into the same paint.
+      let id2: number | null = null;
+      const id1 = window.requestAnimationFrame(() => {
+        id2 = window.requestAnimationFrame(() => setSlideIn(true));
+      });
+      return () => {
+        window.cancelAnimationFrame(id1);
+        if (id2 !== null) window.cancelAnimationFrame(id2);
+      };
+    }
+    setSlideIn(false);
+    exitTimeoutRef.current = window.setTimeout(() => {
+      setMounted(false);
+      exitTimeoutRef.current = null;
+    }, 320);
+    return undefined;
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (exitTimeoutRef.current !== null) {
+        window.clearTimeout(exitTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const [log, setLog] = useState<CrewCommsLogEntry[]>([]);
   const [schedule, setSchedule] = useState<CueAssignment[]>([]);
@@ -517,7 +565,10 @@ export function CrewDetailRail({
     refreshLog();
   };
 
-  const name = row?.entity_name ?? 'Unnamed';
+  // Render-time normalisation only — fixes user-entered casing slips
+  // ("Mike SIncere" → "Mike Sincere") without touching the underlying
+  // entity record. See `src/shared/lib/normalize-human-name.ts`.
+  const name = row?.entity_name ? normalizeHumanName(row.entity_name) : 'Unnamed';
   const role = row?.role_note ?? row?.job_title ?? null;
   const isGhost = row?.is_ghost ?? false;
   const isContractor = row?.employment_status === 'external_contractor';
@@ -534,53 +585,68 @@ export function CrewDetailRail({
   const compliance = row ? computeCompliance(row, availability) : [];
 
   // ── Pay split (owed vs paid) ───────────────────────────────────────────────
+  // payTotal sums the four rate components. `rateUnset` is the distinct
+  // "no rate agreed yet" signal — every component is null (NOT zero).
+  // A genuine `0` in any field is a deliberate comp / waiver and stays a
+  // first-class value; it shows as $0. The Financials card flags the
+  // same condition with `1 of N crew rates missing`.
   const payTotal = row
     ? (row.day_rate ?? 0) + (row.travel_stipend ?? 0) + (row.per_diem ?? 0) + (row.kit_fee ?? 0)
     : 0;
+  const rateUnset = row
+    ? row.day_rate == null && row.travel_stipend == null && row.per_diem == null && row.kit_fee == null
+    : false;
   const payIsPaid = row?.payment_status === 'paid';
 
-  // AnimatePresence needs to wrap the render path even when closed so the
-  // exit animation plays. createPortal always mounts; AnimatePresence gates
-  // the children on `open && row`.
+  // CSS-driven mount + slide. createPortal always mounts; we conditionally
+  // render the rail based on `mounted` (set true on open, false ~320ms after
+  // close so the slide-out transition can play).
+  if (!mounted || !row) {
+    return createPortal(<></>, document.body);
+  }
   return createPortal(
-    <AnimatePresence>
-      {open && row && (
-        <>
-          {/* Invisible dismiss backdrop — no tint so the Plan tab stays readable */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40"
-            onClick={onClose}
-            aria-hidden
-          />
+    <>
+      {/* Invisible dismiss backdrop — no tint so the Plan tab stays readable.
+       *  Opacity is CSS-driven for the same main-thread-resilience reason as
+       *  the rail itself: GPU-composited transitions don't stall when the
+       *  Plan tab cold-paint blocks the JS thread. */}
+      <div
+        className="fixed inset-0 z-40"
+        onClick={onClose}
+        aria-hidden
+        style={{
+          opacity: slideIn ? 1 : 0,
+          transition: 'opacity 200ms ease-out',
+        }}
+      />
 
-          {/* Rail — right drawer on md+, bottom sheet on mobile */}
-          <motion.aside
-            key={row.id}
-            initial={isMobile ? { y: '100%' } : { x: '100%' }}
-            animate={isMobile ? { y: 0 } : { x: 0 }}
-            exit={isMobile ? { y: '100%' } : { x: '100%' }}
-            transition={STAGE_MEDIUM}
-            className={
-              isMobile
-                ? 'fixed z-50 bottom-0 left-0 right-0 flex flex-col rounded-t-2xl'
-                : 'fixed z-50 top-0 right-0 h-full w-full max-w-[460px] flex flex-col'
-            }
-            style={{
-              background: 'var(--stage-surface-raised, oklch(0.18 0 0))',
-              borderLeft: isMobile ? undefined : '1px solid oklch(1 0 0 / 0.08)',
-              borderTop: isMobile ? '1px solid oklch(1 0 0 / 0.08)' : undefined,
-              boxShadow: isMobile
-                ? '0 -12px 48px oklch(0 0 0 / 0.45)'
-                : '-12px 0 48px oklch(0 0 0 / 0.35)',
-              maxHeight: isMobile ? '85vh' : undefined,
-            }}
-            data-surface="raised"
-            role="dialog"
-            aria-label={`${name} detail`}
-          >
+      {/* Rail — right drawer on md+, bottom sheet on mobile */}
+      <aside
+        className={
+          isMobile
+            ? 'fixed z-50 bottom-0 left-0 right-0 flex flex-col rounded-t-2xl'
+            : 'fixed z-50 top-0 right-0 h-full w-full max-w-[460px] flex flex-col'
+        }
+        style={{
+          background: 'var(--stage-surface-raised, oklch(0.18 0 0))',
+          borderLeft: isMobile ? undefined : '1px solid oklch(1 0 0 / 0.08)',
+          borderTop: isMobile ? '1px solid oklch(1 0 0 / 0.08)' : undefined,
+          boxShadow: isMobile
+            ? '0 -12px 48px oklch(0 0 0 / 0.45)'
+            : '-12px 0 48px oklch(0 0 0 / 0.35)',
+          maxHeight: isMobile ? '85vh' : undefined,
+          transform: slideIn
+            ? 'translate3d(0, 0, 0)'
+            : isMobile
+              ? 'translate3d(0, 100%, 0)'
+              : 'translate3d(100%, 0, 0)',
+          transition: 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)',
+          willChange: 'transform',
+        }}
+        data-surface="raised"
+        role="dialog"
+        aria-label={`${name} detail`}
+      >
             {/* Mobile grab handle */}
             {isMobile && (
               <div className="flex justify-center pt-2 pb-1">
@@ -626,6 +692,7 @@ export function CrewDetailRail({
                 onRemoveWaypoint={handleRemoveWaypoint}
                 payTotal={payTotal}
                 payIsPaid={payIsPaid}
+                rateUnset={rateUnset}
                 payExpanded={payExpanded}
                 setPayExpanded={setPayExpanded}
                 payDraft={payDraft}
@@ -789,10 +856,8 @@ export function CrewDetailRail({
                 />
               )}
             </div>
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>,
+      </aside>
+    </>,
     document.body,
   );
 }

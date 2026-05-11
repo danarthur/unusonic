@@ -397,7 +397,7 @@ export function EventStudioClient({ event, summary }: EventStudioClientProps) {
           transition={{ ...STAGE_HEAVY, delay: 0.08 }}
         >
           <Link
-            href={`/events/${event.id}/run-of-show`}
+            href={`/events/${event.id}/run-of-show?stream=active`}
             className="flex items-center justify-between min-h-[80px] rounded-[var(--stage-radius-panel)] border-2 border-dashed border-[oklch(1_0_0_/_0.08)] p-6 transition-colors hover:border-[var(--stage-accent)]/40 hover:bg-[var(--stage-accent)]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] group"
           >
             <div>

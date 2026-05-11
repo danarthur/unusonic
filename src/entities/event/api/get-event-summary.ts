@@ -58,6 +58,8 @@ export type EventSummary = {
   location_name: string | null;
   location_address: string | null;
   venue_entity_id: string | null;
+  /** Resolved venue display name from `directory.entities.display_name` when `venue_entity_id` is set. Falls back through `location_name` → `location_address` for headers. */
+  venue_name: string | null;
   deal_id: string | null;
   run_of_show_data: RunOfShowData | null;
   show_day_contacts: { role: string; name: string; phone: string | null; email: string | null }[] | null;
@@ -116,18 +118,51 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
 
   const r = row;
 
-  // Resolve client name from directory.entities if client_entity_id is set
-  let clientName: string | null = null;
-  const clientEntityId = r.client_entity_id as string | null;
-  if (clientEntityId) {
-    const { data: dirEnt } = await supabase
+  // Resolve client + venue display names from directory.entities. Same pattern
+  // as the events stream and Aion event-scope prefix — header callers want the
+  // human label, not the UUID.
+  //
+  // Fallback through ops.deal_stakeholders: pre-handoff events created before
+  // venue/client columns were wired up still have a deal_id with stakeholder
+  // rows. The events listing already does this for the same reason
+  // (events/page.tsx:171-172). bill_to → client, venue_contact → venue.
+  const dealId = (r.deal_id as string) ?? null;
+  let clientEntityId = r.client_entity_id as string | null;
+  let venueEntityId = r.venue_entity_id as string | null;
+
+  if ((!clientEntityId || !venueEntityId) && dealId) {
+    const { data: stakeholders } = await supabase
+      .schema('ops')
+      .from('deal_stakeholders')
+      .select('role, entity_id, organization_id, is_primary')
+      .eq('deal_id', dealId)
+      .in('role', ['bill_to', 'venue_contact']);
+    const rows = (stakeholders ?? []) as { role: string; entity_id: string | null; organization_id: string | null; is_primary: boolean }[];
+    const sorted = rows.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+    if (!clientEntityId) {
+      const billTo = sorted.find((s) => s.role === 'bill_to');
+      clientEntityId = billTo?.entity_id ?? billTo?.organization_id ?? null;
+    }
+    if (!venueEntityId) {
+      const venueContact = sorted.find((s) => s.role === 'venue_contact');
+      venueEntityId = venueContact?.organization_id ?? venueContact?.entity_id ?? null;
+    }
+  }
+
+  const entityIds = [clientEntityId, venueEntityId].filter((id): id is string => Boolean(id));
+  const entityNames = new Map<string, string>();
+  if (entityIds.length > 0) {
+    const { data: ents } = await supabase
       .schema('directory')
       .from('entities')
-      .select('display_name')
-      .eq('id', clientEntityId)
-      .maybeSingle();
-    clientName = dirEnt?.display_name ?? null;
+      .select('id, display_name')
+      .in('id', entityIds);
+    for (const e of ents ?? []) {
+      entityNames.set(e.id as string, (e.display_name as string) ?? '');
+    }
   }
+  const clientName = clientEntityId ? entityNames.get(clientEntityId) ?? null : null;
+  const venueName = venueEntityId ? entityNames.get(venueEntityId) ?? null : null;
 
   return {
     title: (r.title as string) ?? null,
@@ -136,8 +171,9 @@ export async function getEventSummary(eventId: string): Promise<EventSummary | n
     ends_at: (r.ends_at as string) ?? null,
     location_name: (r.location_name as string) ?? null,
     location_address: (r.location_address as string) ?? null,
-    venue_entity_id: (r.venue_entity_id as string) ?? null,
-    deal_id: (r.deal_id as string) ?? null,
+    venue_entity_id: venueEntityId,
+    venue_name: venueName,
+    deal_id: dealId,
     run_of_show_data: (r.run_of_show_data as RunOfShowData) ?? null,
     show_day_contacts: (r.show_day_contacts as EventSummary['show_day_contacts']) ?? null,
     guest_count_expected: (r.guest_count_expected as number) ?? null,
