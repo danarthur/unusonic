@@ -10,7 +10,6 @@ import type { EventConflict } from '@/features/ops/actions/get-event-conflicts';
 import { GearFlightCheck } from './flight-checks';
 import { normalizeLogistics } from './flight-checks/types';
 import { getCallTime, googleMapsUrl } from '../lib/day-sheet-utils';
-import { getEventLoadDates } from '../actions/get-event-summary';
 import { updateEventLoadDates } from '../actions/update-event-dates';
 import { swapCrewMember, searchAvailableAlternatives, acceptGearConflict, type AlternativeCrewResult } from '../actions/conflict-resolution';
 import { toast } from 'sonner';
@@ -64,6 +63,26 @@ type DispatchSummaryProps = {
   sourceOrgId?: string | null;
   /** Lifted rail handler — click a crew-sourced gear chip to open the Crew Hub. */
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /**
+   * Load-in / load-out timestamps from the parent's Plan bundle. Phase 1
+   * cold-paint collapse (2026-05-07): these used to be fetched here via
+   * `getEventLoadDates(eventId)`, duplicating the bundle's `loadDates`
+   * field. Now passed as props; saves trigger `onLoadDatesChanged` so the
+   * parent invalidates the bundle.
+   */
+  loadIn?: string | null;
+  loadOut?: string | null;
+  /** True once the parent's bundle has resolved. Drives the "Not set" placeholder. */
+  loadDatesLoaded?: boolean;
+  /** Called after a successful save; parent invalidates the bundle. */
+  onLoadDatesChanged?: () => void;
+  /**
+   * When false, the conflict-detection fetch (`getEventConflicts`) is
+   * suppressed. The conflicts banner is ambient (empty in 99% of cases),
+   * so the Plan tab defers it past cold-paint via `useIdleAfter`. Defaults
+   * to `true` to preserve existing call sites.
+   */
+  conflictsEnabled?: boolean;
 };
 
 // getCallTime and googleMapsUrl imported from ../lib/day-sheet-utils
@@ -359,8 +378,16 @@ export function DispatchSummary({
   hideVitals,
   sourceOrgId,
   onOpenCrewDetail,
+  loadIn: loadInProp,
+  loadOut: loadOutProp,
+  loadDatesLoaded: loadDatesLoadedProp,
+  onLoadDatesChanged,
+  conflictsEnabled = true,
 }: DispatchSummaryProps) {
-  const { conflicts, refetch: refetchConflicts } = useConflictDetection({ eventId, enabled: !!eventId });
+  const { conflicts, refetch: refetchConflicts } = useConflictDetection({
+    eventId,
+    enabled: !!eventId && conflictsEnabled,
+  });
 
   const runOfShowData = event.run_of_show_data ?? null;
   const logistics = normalizeLogistics(runOfShowData);
@@ -393,20 +420,26 @@ export function DispatchSummary({
   const venueRestrictions = runOfShowData?.venue_restrictions ?? null;
   const hasVenueRestrictions = typeof venueRestrictions === 'string' && venueRestrictions.trim().length > 0;
 
-  // Load-in / Load-out dates
-  const [loadIn, setLoadIn] = useState<string | null>(null);
-  const [loadOut, setLoadOut] = useState<string | null>(null);
-  const [loadDatesLoaded, setLoadDatesLoaded] = useState(false);
-  const [savingLoadDates, setSavingLoadDates] = useState(false);
+  // Load-in / Load-out dates — sourced from the parent's Plan bundle
+  // (Phase 1 cold-paint collapse, 2026-05-07). Local state mirrors the
+  // props for optimistic edits; `onLoadDatesChanged` invalidates the
+  // bundle so the next response flows back through the props.
+  const [loadIn, setLoadIn] = useState<string | null>(loadInProp ?? null);
+  const [loadOut, setLoadOut] = useState<string | null>(loadOutProp ?? null);
+  const loadDatesLoaded = loadDatesLoadedProp ?? true;
+  // `savingLoadDates` is set but unread (was never wired to a spinner in
+  // the original). Kept around so refactors preserve behaviour; the
+  // setter no-op flags any future regression if a spinner gets added.
+  const [, setSavingLoadDates] = useState(false);
 
-  const fetchLoadDates = useCallback(async () => {
-    const result = await getEventLoadDates(eventId);
-    setLoadIn(result.loadIn);
-    setLoadOut(result.loadOut);
-    setLoadDatesLoaded(true);
-  }, [eventId]);
-
-  useEffect(() => { fetchLoadDates(); }, [fetchLoadDates]);
+  // Sync local state when the parent passes new values (e.g. after a
+  // bundle refetch from a sibling mutation).
+  useEffect(() => {
+    setLoadIn(loadInProp ?? null);
+  }, [loadInProp]);
+  useEffect(() => {
+    setLoadOut(loadOutProp ?? null);
+  }, [loadOutProp]);
 
   const handleLoadDateChange = async (field: 'loadIn' | 'loadOut', value: string) => {
     if (!value) {
@@ -419,6 +452,10 @@ export function DispatchSummary({
       const result = await updateEventLoadDates(eventId, newLoadIn, newLoadOut);
       setSavingLoadDates(false);
       if (!result.success) toast.error(result.error);
+      else {
+        onLoadDatesChanged?.();
+        onFlightCheckUpdated?.();
+      }
       return;
     }
     const iso = new Date(value).toISOString();
@@ -430,7 +467,10 @@ export function DispatchSummary({
     const result = await updateEventLoadDates(eventId, newLoadIn, newLoadOut);
     setSavingLoadDates(false);
     if (!result.success) toast.error(result.error);
-    else onFlightCheckUpdated?.();
+    else {
+      onLoadDatesChanged?.();
+      onFlightCheckUpdated?.();
+    }
   };
 
   /** Convert ISO to datetime-local input value */

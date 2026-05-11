@@ -39,6 +39,13 @@ export interface ProductionCapturesPanelProps {
    * this event. Lets pre-handover sales notes continue to surface.
    */
   predecessorDealId?: string | null;
+  /**
+   * When false, the panel renders its skeleton but does not fire the
+   * captures query. Used by the Plan tab to defer this ambient fetch
+   * past cold-paint via `useIdleAfter`. Defaults to `true` to preserve
+   * existing call-site behaviour.
+   */
+  enabled?: boolean;
 }
 
 export function ProductionCapturesPanel({
@@ -47,6 +54,7 @@ export function ProductionCapturesPanel({
   productionId,
   heading = 'Captures',
   predecessorDealId = null,
+  enabled = true,
 }: ProductionCapturesPanelProps) {
   const [visibleCount, setVisibleCount] = React.useState(5);
 
@@ -63,12 +71,15 @@ export function ProductionCapturesPanel({
         includePredecessorDealId: predecessorDealId,
       }),
     staleTime: 30_000,
-    enabled: Boolean(workspaceId && productionId),
+    enabled: enabled && Boolean(workspaceId && productionId),
   });
 
   const captures = data && 'ok' in data && data.ok ? data.captures : [];
 
-  if (isLoading && captures.length === 0) {
+  // Show skeleton while loading OR while deferred (enabled=false) — covers
+  // the Plan-tab idle-after wait so the slot doesn't pop in/out as the
+  // query flips from disabled to fetching.
+  if ((!enabled || isLoading) && captures.length === 0) {
     return (
       <div
         className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"

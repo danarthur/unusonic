@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -32,7 +33,37 @@ import type { EventLedgerDTO } from '@/features/finance/api/get-event-ledger';
 import type { GearVarianceResult } from '../actions/get-gear-variance';
 import { ProductionTimelineWidget } from '@/widgets/production-timeline';
 import { RunOfShowIndexCard } from '@/widgets/run-of-show/ui/run-of-show-mini';
-import { ProposalBuilder } from '@/features/sales/ui/proposal-builder';
+// Phase 3 of cold-paint fix (2026-05-07): ProposalBuilder is heavy (palette,
+// items list, totals, framer-motion, drag-kit) but only paints inside the
+// "Agreed scope" panel of the post-handoff Plan branch. Strip it from the
+// initial bundle with next/dynamic so Plan cold-paint doesn't pay its cost.
+// See `docs/audits/plan-tab-cold-paint-investigation-2026-05-07.md` §3 and
+// `docs/reference/code/perf-patterns.md` §7.
+function ProposalBuilderSkeleton() {
+  return (
+    <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }} aria-hidden>
+      <div
+        className="h-10 w-full stage-skeleton"
+        style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
+      />
+      <div
+        className="h-32 w-full stage-skeleton"
+        style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+      />
+      <div
+        className="h-8 w-1/3 ml-auto stage-skeleton"
+        style={{ borderRadius: 'var(--stage-radius-input, 6px)' }}
+      />
+    </div>
+  );
+}
+const ProposalBuilder = dynamic(
+  () => import('@/features/sales/ui/proposal-builder').then((m) => m.ProposalBuilder),
+  {
+    ssr: false,
+    loading: () => <ProposalBuilderSkeleton />,
+  },
+);
 import { computePaymentMilestones } from '@/features/sales/lib/compute-payment-milestones';
 import { computeReadiness } from '../lib/compute-readiness';
 import type { ProposalWithItems } from '@/features/sales/model/types';
@@ -44,9 +75,11 @@ import type { EventSummaryForPrism } from '../actions/get-event-summary';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
 import type { DealStakeholderDisplay } from '../actions/deal-stakeholders';
-import { getWorkspacePipelineStages, type WorkspacePipelineStage } from '../actions/get-workspace-pipeline-stages';
+import type { AdvancingChecklistItem } from '../lib/advancing-checklist-types';
+import type { KitComplianceResult } from '@/features/talent-management/api/kit-template-actions';
 import { ProductionCapturesPanel } from '@/widgets/network-detail/ui/ProductionCapturesPanel';
 import { markStart, markEnd, measureAsync } from '@/shared/lib/perf/measure';
+import { useIdleAfter } from '@/shared/lib/use-idle-after';
 
 // Module-level stable empty references. Using a destructuring default like
 // `data: items = []` recreates the empty array on every render, which kills
@@ -57,6 +90,8 @@ const EMPTY_LOAD_DATES: { loadIn: string | null; loadOut: string | null } = {
   loadIn: null,
   loadOut: null,
 };
+const EMPTY_CHECKLIST: AdvancingChecklistItem[] = [];
+const EMPTY_KIT_COMPLIANCE: Record<string, KitComplianceResult | null> = {};
 
 type PlanLensProps = {
   eventId: string | null;
@@ -125,21 +160,9 @@ export function PlanLens({
     setLoadTimedOut(false);
   }, [eventId, event]);
 
-  // Phase 3i: resolve the deal's current stage for tag-driven checklist /
-  // handoff eligibility. null during load.
-  const [pipelineStages, setPipelineStages] = useState<WorkspacePipelineStage[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    getWorkspacePipelineStages().then((result) => {
-      if (!cancelled) setPipelineStages(result?.stages ?? []);
-    }).catch(() => {
-      if (!cancelled) setPipelineStages([]);
-    });
-    return () => { cancelled = true; };
-  }, []);
-  const currentStage = deal?.stage_id
-    ? (pipelineStages?.find((s) => s.id === deal.stage_id) ?? null)
-    : null;
+  // Pipeline stages — sourced from the Plan bundle (Phase 1 cold-paint
+  // collapse, 2026-05-07). The bundle reads from the cached server-side
+  // helper, so this no longer fires its own round-trip on mount.
 
   // ── Scalar editing (same pattern as DealLens, with confirmation for post-handoff) ──
   const [localTitle, setLocalTitle] = useState(deal?.title ?? '');
@@ -207,9 +230,17 @@ export function PlanLens({
   // wall-clock latency. Pattern mirrors `getDealBundle`.
   const queryClient = useQueryClient();
   const eventScopedId = eventId ?? deal?.event_id ?? null;
+  // Bundle options — passed through to the server so it can gate the
+  // close-out fetch (post-event only) and seed the advancing checklist
+  // when empty. Keying the query on these too keeps TanStack's cache
+  // stable per-event but invalidates if the underlying event metadata
+  // (start time, archetype, transport mode) changes.
+  const eventStartsAt = event?.starts_at ?? null;
+  const archetype = deal?.event_archetype ?? null;
+  const transportMode = event?.run_of_show_data?.transport_mode ?? null;
   const planBundleQueryKey = useMemo(
-    () => ['plan-lens', 'bundle', eventScopedId, dealId] as const,
-    [eventScopedId, dealId],
+    () => ['plan-lens', 'bundle', eventScopedId, dealId, eventStartsAt, archetype, transportMode] as const,
+    [eventScopedId, dealId, eventStartsAt, archetype, transportMode],
   );
   const {
     data: bundleData,
@@ -218,7 +249,11 @@ export function PlanLens({
   } = useQuery<PlanBundle>({
     queryKey: planBundleQueryKey,
     queryFn: () => measureAsync('crm:plan-bundle-fetch', () =>
-      getPlanBundle(eventScopedId, dealId),
+      getPlanBundle(eventScopedId, dealId, {
+        eventStartsAt,
+        archetype,
+        transportMode,
+      }),
     ),
     enabled: !!(eventScopedId || dealId),
     placeholderData: keepPreviousData,
@@ -227,6 +262,14 @@ export function PlanLens({
   });
 
   const bundle = bundleData;
+  // Phase 2 cold-paint defer: ambient panels (venue, run-of-show index,
+  // diary, captures, conflicts, Aion chat warm-up) wait for the primary
+  // bundle to resolve AND the browser to be idle before mounting / firing
+  // their fetches. Skeletons render immediately, then the cards stream in
+  // over the next few idle frames instead of competing with blocking
+  // content for network slots on cold paint.
+  // See docs/audits/plan-tab-cold-paint-investigation-2026-05-07.md §3.
+  const idleReady = useIdleAfter(!bundleLoading);
   const gearItemsLive = bundle?.gearItems ?? EMPTY_GEAR_ITEMS;
   const crewRows = bundle?.crew ?? EMPTY_CREW_ROWS;
   const eventDates = bundle?.loadDates ?? EMPTY_LOAD_DATES;
@@ -234,6 +277,12 @@ export function PlanLens({
   const ledger: EventLedgerDTO | null = bundle?.ledger ?? null;
   const gearVariance: GearVarianceResult | null = bundle?.gearVariance ?? null;
   const closeOut = bundle?.closeOut ?? null;
+  const pipelineStages = bundle?.pipelineStages ?? null;
+  const advancingChecklistItems = bundle?.advancingChecklist ?? EMPTY_CHECKLIST;
+  const kitComplianceByKey = bundle?.kitComplianceByKey ?? EMPTY_KIT_COMPLIANCE;
+  const currentStage = deal?.stage_id
+    ? (pipelineStages?.find((s) => s.id === deal.stage_id) ?? null)
+    : null;
   const initialProposal: ProposalWithItems | null | undefined = bundleLoading
     ? undefined
     : bundle?.proposal ?? null;
@@ -455,6 +504,7 @@ export function PlanLens({
             eventTitle={event.title ?? deal?.title ?? null}
             startsAt={event.starts_at}
             signals={eventSignals}
+            enabled={idleReady}
           />
         )}
 
@@ -484,6 +534,8 @@ export function PlanLens({
           archetype={deal?.event_archetype ?? null}
           eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null}
           transportMode={event.run_of_show_data?.transport_mode ?? null}
+          initialItems={advancingChecklistItems}
+          onItemsChanged={refreshBundle}
         />
 
         {/* ── Tier 3: Production team (promoted, full width) ──
@@ -499,6 +551,10 @@ export function PlanLens({
             isLocked={isPostHandoff}
             eventId={eventId}
             onOpenCrewDetail={setSelectedCrewRow}
+            crew={crewRows}
+            crewLoading={bundleLoading}
+            kitComplianceByKey={kitComplianceByKey}
+            onCrewChanged={refreshBundle}
           />
         )}
 
@@ -518,6 +574,11 @@ export function PlanLens({
               hideVitals
               sourceOrgId={sourceOrgId ?? null}
               onOpenCrewDetail={setSelectedCrewRow}
+              loadIn={eventDates.loadIn}
+              loadOut={eventDates.loadOut}
+              loadDatesLoaded={!bundleLoading}
+              onLoadDatesChanged={refreshBundle}
+              conflictsEnabled={idleReady}
             />
 
             {/* Client comms — crew comms absorbed into Crew Hub header */}
@@ -574,8 +635,17 @@ export function PlanLens({
 
           {/* Right: Reference — pure look-up, no actions */}
           <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
+            {/* VenueIntelCard — deferred to first idle frame past bundle. */}
             {event.venue_entity_id && (
-              <VenueIntelCard venueEntityId={event.venue_entity_id} />
+              idleReady ? (
+                <VenueIntelCard venueEntityId={event.venue_entity_id} />
+              ) : (
+                <div
+                  className="h-32 w-full stage-skeleton"
+                  style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+                  aria-hidden
+                />
+              )
             )}
             <ShowDayContactsCard
               eventId={eventId}
@@ -586,7 +656,16 @@ export function PlanLens({
               <ProductionTimelineWidget eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null} eventTitle={deal?.title ?? event.title} paymentMilestones={paymentMilestones} dealMilestones={dealMilestones} />
             )}
             <DjPrepSummaryCard rosData={event.run_of_show_data as Record<string, unknown> | null} />
-            <RunOfShowIndexCard eventId={eventId} startsAt={event?.starts_at} />
+            {/* RunOfShowIndexCard — deferred. Mirrors the card's own internal skeleton. */}
+            {idleReady ? (
+              <RunOfShowIndexCard eventId={eventId} startsAt={event?.starts_at} />
+            ) : (
+              <div
+                className="h-20 w-full stage-skeleton"
+                style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+                aria-hidden
+              />
+            )}
           </div>
         </div>
 
@@ -628,18 +707,33 @@ export function PlanLens({
           );
         })()}
 
-        {/* ── Tier 6: Journal (full width) ── */}
+        {/* ── Tier 6: Journal (full width) ──
+            Deferred to idle past cold-paint. The diary's `getDealNotes`
+            fetch is ambient (browse-only surface); the card renders its
+            own skeleton internally, but we hold the mount entirely so the
+            fetch doesn't compete with blocking content for network slots. */}
         {dealId && deal?.workspace_id && (
-          <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
+          idleReady ? (
+            <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
+          ) : (
+            <div
+              className="h-24 w-full stage-skeleton"
+              style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+              aria-hidden
+            />
+          )
         )}
 
-        {/* ── Tier 6b: Captures linked to this event (inc. predecessor deal) ── */}
+        {/* ── Tier 6b: Captures linked to this event (inc. predecessor deal) ──
+            ProductionCapturesPanel accepts `enabled` so we keep its mount
+            (its internal skeleton renders) but defer the actual query. */}
         {eventId && deal?.workspace_id && (
           <ProductionCapturesPanel
             workspaceId={deal.workspace_id}
             kind="event"
             productionId={eventId}
             predecessorDealId={dealId}
+            enabled={idleReady}
           />
         )}
 
@@ -712,7 +806,17 @@ export function PlanLens({
                 stage={currentStage}
               />
             )}
-            {deal.workspace_id && <DealDiaryCard dealId={deal.id} workspaceId={deal.workspace_id} phaseTag="plan" />}
+            {deal.workspace_id && (
+              idleReady ? (
+                <DealDiaryCard dealId={deal.id} workspaceId={deal.workspace_id} phaseTag="plan" />
+              ) : (
+                <div
+                  className="h-24 w-full stage-skeleton"
+                  style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+                  aria-hidden
+                />
+              )
+            )}
           </div>
 
           <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col lg:sticky lg:top-0 lg:self-start" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>

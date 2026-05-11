@@ -6,8 +6,6 @@ import { Check, Lock, Plus, Trash2, Loader2 } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_LIGHT, STAGE_MEDIUM, STAGE_STAGGER_CHILDREN } from '@/shared/lib/motion-constants';
 import {
-  getAdvancingChecklist,
-  seedAdvancingChecklist,
   toggleAdvancingItem,
   setAdvancingItemsAutoState,
   addAdvancingItem,
@@ -29,6 +27,17 @@ type AdvancingChecklistProps = {
   eventDate?: string | null;
   /** Transport mode — when 'none' or 'personal_vehicle', truck items are excluded. */
   transportMode?: string | null;
+  /**
+   * Seeded items from the parent's bundle fetch (Phase 1 cold-paint
+   * collapse, 2026-05-07). The bundle is responsible for seeding when
+   * the read returns empty, so this list is always ready-to-render when
+   * the parent has resolved its bundle. Local mutations still update
+   * local state optimistically — `onItemsChanged` lets the parent
+   * invalidate the bundle when a mutation succeeds.
+   */
+  initialItems: AdvancingChecklistItem[];
+  /** Called after a mutation (toggle/add/remove) — parent invalidates bundle. */
+  onItemsChanged?: () => void;
 };
 
 function computeAutoStates(
@@ -94,50 +103,36 @@ export function AdvancingChecklist({
   crewRows,
   runOfShowData,
   contractStatus,
-  archetype,
+  archetype: _archetype,
   eventDate,
-  transportMode,
+  transportMode: _transportMode,
+  initialItems,
+  onItemsChanged,
 }: AdvancingChecklistProps) {
-  const [items, setItems] = useState<AdvancingChecklistItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Items mirror `initialItems` from the bundle. Local mutations apply
+  // optimistically; the parent invalidates the bundle via `onItemsChanged`
+  // when a mutation lands, and the next bundle response flows back through
+  // initialItems and the sync effect below.
+  const [items, setItems] = useState<AdvancingChecklistItem[]>(initialItems);
   const [addOpen, setAddOpen] = useState(false);
   const [addLabel, setAddLabel] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ── Fetch / seed on mount ──
+  // Sync local items when the parent passes a new array reference (after
+  // a bundle refetch). TanStack's `placeholderData: keepPreviousData`
+  // keeps the previous reference stable until the new data lands, so this
+  // only fires when the data actually changed.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        let list = await getAdvancingChecklist(eventId);
-        if (!cancelled && list.length === 0) {
-          // Seed failures (e.g. unknown archetype on a grandfathered deal) used
-          // to bubble out of the effect and leave the checklist spinning forever.
-          // Fall back to an empty list so the UI settles; the seeder captures
-          // its own errors to Sentry.
-          try {
-            list = await seedAdvancingChecklist(eventId, archetype, transportMode);
-          } catch (seedErr) {
-            console.error('[advancing-checklist] seed failed:', seedErr);
-            list = [];
-          }
-        }
-        if (!cancelled) {
-          setItems(list);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('[advancing-checklist] fetch failed:', err);
-        if (!cancelled) {
-          setItems([]);
-          setLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+    setItems(initialItems);
+  }, [initialItems]);
+
+  // `archetype` and `transportMode` are now consumed server-side by the
+  // bundle's seed call (Phase 1 cold-paint collapse, 2026-05-07). They
+  // stay in the props contract so callers don't have to change, but the
+  // values are intentionally unused here.
+  void _archetype;
+  void _transportMode;
 
   // ── Auto-state sync ──
   const autoStates = computeAutoStates(crewRows, runOfShowData, contractStatus);
@@ -202,6 +197,7 @@ export function AdvancingChecklist({
     } else if (item.auto_key === 'crew_gear_confirmed') {
       updateFlightCheckStatus(eventId, { logistics: { crew_gear_confirmed: newDone } as RunOfShowData['logistics'] });
     }
+    onItemsChanged?.();
   };
 
   // ── Add manual item ──
@@ -216,6 +212,7 @@ export function AdvancingChecklist({
     setAddLabel('');
     setAddSaving(false);
     setAddOpen(false);
+    onItemsChanged?.();
   };
 
   // ── Remove manual item ──
@@ -224,6 +221,7 @@ export function AdvancingChecklist({
     // Optimistic
     setItems((prev) => prev.filter((i) => i.id !== item.id));
     await removeAdvancingItem(eventId, item.id);
+    onItemsChanged?.();
   };
 
   // Focus input when add opens
@@ -249,15 +247,10 @@ export function AdvancingChecklist({
   const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
   const allDone = totalCount > 0 && doneCount === totalCount;
 
-  if (loading) {
-    return (
-      <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">
-        <div className="flex items-center justify-center py-6">
-          <Loader2 className="size-5 animate-spin text-[var(--stage-text-tertiary)]" />
-        </div>
-      </StagePanel>
-    );
-  }
+  // `loading` skeleton is no longer needed — the parent (PlanLens) renders
+  // a bundle-wide skeleton while the bundle is in flight, and the bundle
+  // now carries the checklist items directly. By the time this component
+  // mounts, `initialItems` is already populated.
 
   return (
     <StagePanel elevated className="p-5 rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)]">

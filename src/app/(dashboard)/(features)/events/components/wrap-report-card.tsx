@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { StagePanel } from '@/shared/ui/stage-panel';
+import { useInView } from '@/shared/lib/use-in-view';
 import { toast } from 'sonner';
 import { ClipboardCheck, ChevronDown, Pencil } from 'lucide-react';
 import type { DealCrewRow } from '../actions/deal-crew';
@@ -72,8 +73,16 @@ function WrapReportInner({
   const [report, setReport] = useState<WrapReport | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Load existing wrap report on mount
+  // Phase 3 of cold-paint fix: defer the wrap-report fetch until the panel
+  // scrolls into view (or within 200px of it). Most post-event Plan visits
+  // never scroll to the bottom of the page; we don't pay for `getWrapReport`
+  // until the user gets close. See
+  // `docs/audits/plan-tab-cold-paint-investigation-2026-05-07.md` §3.
+  const [containerRef, inView] = useInView<HTMLDivElement>({ rootMargin: '200px' });
+
+  // Load existing wrap report once the card is in view.
   useEffect(() => {
+    if (!inView) return;
     let cancelled = false;
     getWrapReport(eventId).then((r) => {
       if (cancelled) return;
@@ -85,7 +94,7 @@ function WrapReportInner({
       }
     });
     return () => { cancelled = true; };
-  }, [eventId]);
+  }, [eventId, inView]);
 
   const handleStart = async () => {
     const prefilled = prefillWrapReport(
@@ -162,9 +171,25 @@ function WrapReportInner({
     return Date.now() - ms < 72 * 60 * 60 * 1000;
   })();
 
-  if (mode === 'loading') return null;
+  // Reserve the slot regardless of mode/inView so the page doesn't reflow
+  // once the data lands. The ref's wrapper is the IntersectionObserver target;
+  // children below choose between skeleton and real content.
+  if (!inView || mode === 'loading') {
+    return (
+      <div ref={containerRef}>
+        <StagePanel id="wrap-report" elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
+          <div
+            className="h-48 w-full stage-skeleton"
+            style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+            aria-hidden
+          />
+        </StagePanel>
+      </div>
+    );
+  }
 
   return (
+    <div ref={containerRef}>
     <StagePanel id="wrap-report" elevated style={{ padding: 'var(--stage-padding, 16px)' }}>
       <AnimatePresence mode="wait" initial={false}>
         {mode === 'empty' && (
@@ -243,6 +268,7 @@ function WrapReportInner({
         </div>
       )}
     </StagePanel>
+    </div>
   );
 }
 
