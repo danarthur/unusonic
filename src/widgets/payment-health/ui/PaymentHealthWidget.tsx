@@ -25,8 +25,17 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+/**
+ * Format a YYYY-MM-DD calendar date (from the server) without UTC drift.
+ *
+ * `new Date('2026-05-08')` parses as UTC midnight, which renders as May 7 in
+ * any negative-offset timezone. The dueDate we get is already a server-resolved
+ * calendar date, so build it in the local tz to keep the day intact.
+ */
+function formatShortDate(ymd: string): string {
+  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return ymd;
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function PaymentHealthWidget() {

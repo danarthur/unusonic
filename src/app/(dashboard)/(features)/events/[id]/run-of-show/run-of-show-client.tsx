@@ -154,12 +154,26 @@ export function RunOfShowClient({ eventId, initialEvent }: RunOfShowClientProps)
 
   const handleCreateCue = async (sectionId?: string | null) => {
     if (!eventId) return;
+    // First cue on a blank run-of-show should anchor at the event's start time,
+    // not fall through to the widget's hardcoded DEFAULT_START_TIME ('18:00').
+    // Once cues exist, leave start_time null so the cumulative cascade
+    // (prior cue end → next cue start) takes over.
+    let initialStartTime: string | null = null;
+    if (cues.length === 0 && initialEvent.starts_at) {
+      const startsAt = new Date(initialEvent.starts_at);
+      if (!Number.isNaN(startsAt.getTime())) {
+        const hh = String(startsAt.getHours()).padStart(2, '0');
+        const mm = String(startsAt.getMinutes()).padStart(2, '0');
+        initialStartTime = `${hh}:${mm}`;
+      }
+    }
     try {
       await createCue(eventId, {
         title: 'New cue',
         duration_minutes: 10,
         type: 'stage',
         section_id: sectionId ?? null,
+        start_time: initialStartTime,
       });
       const refreshed = await fetchCues(eventId);
       setCues(refreshed);

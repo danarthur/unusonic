@@ -801,14 +801,25 @@ function TermsEditor({
   const [scopeNotes, setScopeNotes] = useState(serverScopeNotes ?? '');
   const [saving, setSaving] = useState<keyof typeof saverMap | null>(null);
 
-  // Re-seed local state when the proposal id changes OR when the server values
-  // change (after a save completes and onRefetchProposal propagates new data).
+  // Re-seed local state per-field when its OWN server value changes. A single
+  // useEffect that watches all four would clobber in-flight typing in other
+  // fields whenever any one save resolves: e.g. blurring Deposit (50) while
+  // Balance had unsaved "14" used to reset Balance back to '' the moment the
+  // refetch landed, since the deposit-only change still re-ran the combined
+  // effect. Splitting per-field keeps the cross-field commit boundaries
+  // independent.
   useEffect(() => {
     setDepositPct(serverDepositPct != null ? String(serverDepositPct) : '');
+  }, [proposal.id, serverDepositPct]);
+  useEffect(() => {
     setPaymentDueDays(serverPaymentDueDays != null ? String(serverPaymentDueDays) : '');
+  }, [proposal.id, serverPaymentDueDays]);
+  useEffect(() => {
     setPaymentNotes(serverPaymentNotes ?? '');
+  }, [proposal.id, serverPaymentNotes]);
+  useEffect(() => {
     setScopeNotes(serverScopeNotes ?? '');
-  }, [proposal.id, serverDepositPct, serverPaymentDueDays, serverPaymentNotes, serverScopeNotes]);
+  }, [proposal.id, serverScopeNotes]);
 
   // Shared save path — computes the patch for a given field and commits.
   // Declared as a const map so the `saving` state key type stays correct.

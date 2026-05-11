@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { formatInTimeZone } from 'date-fns-tz';
 import { ArrowUpRight } from 'lucide-react';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { createClient } from '@/shared/api/supabase/client';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
+import { getViewerTimezone, isValidIANA } from '@/shared/lib/timezone-client';
 import { M3_DURATION_S, M3_EASING_ENTER } from '@/shared/lib/motion-constants';
 import { METRICS } from '@/shared/lib/metrics/registry';
 
@@ -17,8 +19,29 @@ const M3_ENTER = { duration: M3_DURATION_S, ease: M3_EASING_ENTER };
 type ActiveGig = {
   id: string;
   title: string | null;
-  event_date: string | null;
+  /** Raw TIMESTAMPTZ ISO string from ops.events.starts_at (UTC instant). */
+  starts_at: string | null;
+  /** IANA timezone for the show, used to render the local calendar date. */
+  timezone: string | null;
 };
+
+/**
+ * Format an event's starts_at UTC instant in the show's local timezone so the
+ * calendar date matches what the producer sees on the ground. Falls back to
+ * the viewer's browser timezone, then UTC, if no event timezone is set.
+ *
+ * Without this, a 2026-07-18 PDT event stored as 2026-07-18T03:00:00Z renders
+ * as 7/17 in PDT (Classic UTC-midnight-rolls-back-a-day bug).
+ */
+function formatLocalDate(starts_at: string | null, tz: string | null): string {
+  if (!starts_at) return 'TBD';
+  const zone = tz && isValidIANA(tz) ? tz : getViewerTimezone();
+  try {
+    return formatInTimeZone(starts_at, zone, 'M/d/yyyy');
+  } catch {
+    return new Date(starts_at).toLocaleDateString();
+  }
+}
 
 export function ActiveProductionWidget() {
   const { workspaceId } = useWorkspace();
@@ -33,7 +56,7 @@ export function ActiveProductionWidget() {
     let query = supabase
       .schema('ops')
       .from('events')
-      .select('id, title, starts_at')
+      .select('id, title, starts_at, timezone')
       .or('lifecycle_status.in.(confirmed,production,live),and(lifecycle_status.is.null,status.eq.confirmed)')
       .order('starts_at', { ascending: true })
       .limit(3);
@@ -49,8 +72,8 @@ export function ActiveProductionWidget() {
           console.warn('[ActiveProduction] events query error:', error.message);
           setGigs([]);
         } else {
-          const rows = (data ?? []) as Array<{ id: string; title: string | null; starts_at: string }>;
-          setGigs(rows.map((e) => ({ id: e.id, title: e.title, event_date: e.starts_at?.slice(0, 10) ?? null })));
+          const rows = (data ?? []) as Array<{ id: string; title: string | null; starts_at: string; timezone: string | null }>;
+          setGigs(rows.map((e) => ({ id: e.id, title: e.title, starts_at: e.starts_at ?? null, timezone: e.timezone ?? null })));
         }
       })
       .finally(() => {
@@ -108,7 +131,7 @@ export function ActiveProductionWidget() {
                         </div>
                       </div>
                       <span className="text-label text-[var(--stage-text-secondary)]">
-                        {gig.event_date ? new Date(gig.event_date).toLocaleDateString() : 'TBD'}
+                        {formatLocalDate(gig.starts_at, gig.timezone)}
                       </span>
                     </StagePanel>
                   </Link>

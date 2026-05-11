@@ -37,7 +37,17 @@ const AION_LABELS: Record<string, string> = {
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
-function getRecommendedTier(persona: UserPersona | null): SubscriptionTier {
+function tierFitsUsage(tier: TierSlug, usage: WorkspaceUsage | null): boolean {
+  if (!usage) return true;
+  const config = TIER_CONFIG[tier];
+  if (config.includedSeats < usage.seatUsage) return false;
+  if (config.maxActiveShows !== null && config.maxActiveShows < usage.showUsage) {
+    return false;
+  }
+  return true;
+}
+
+function getPersonaTier(persona: UserPersona | null): SubscriptionTier {
   if (!persona) return 'foundation';
   for (const tier of TIER_ORDER) {
     if (SUBSCRIPTION_TIERS[tier].suggestedPersonas.includes(persona)) {
@@ -45,6 +55,36 @@ function getRecommendedTier(persona: UserPersona | null): SubscriptionTier {
     }
   }
   return 'foundation';
+}
+
+/**
+ * Picks the recommended tier. Starts from the persona-based pick, then walks
+ * up the tier ladder until it finds one with headroom for the workspace's
+ * current seat + active-show usage. Recommending a downgrade that would force
+ * the customer to lose work is broken — see ITE bug 2026-05-04.
+ *
+ * Returns `{ tier, fits: false }` when usage exceeds every standard plan, so
+ * the UI can swap in a "talk to us about Studio+" message instead of a
+ * Switch-now button that would do harm.
+ */
+function getRecommendedTier(
+  persona: UserPersona | null,
+  usage: WorkspaceUsage | null,
+): { tier: SubscriptionTier; fits: boolean } {
+  const personaPick = getPersonaTier(persona);
+  const personaRank = TIER_RANK[personaPick];
+
+  // Walk the ladder from the persona pick upward looking for a tier that fits.
+  for (let rank = personaRank; rank < TIER_ORDER.length; rank++) {
+    const candidate = TIER_ORDER[rank];
+    if (tierFitsUsage(candidate, usage)) {
+      return { tier: candidate, fits: true };
+    }
+  }
+
+  // Nothing in the catalog fits — recommend the highest tier and let the UI
+  // signal that the customer needs a custom (Studio+) conversation.
+  return { tier: TIER_ORDER[TIER_ORDER.length - 1], fits: false };
 }
 
 function formatPrice(cents: number): string {
@@ -76,7 +116,10 @@ export function PlanPageClient({
   const [error, setError] = useState<string | null>(null);
   const [confirmDowngrade, setConfirmDowngrade] = useState<TierSlug | null>(null);
   const [isPending, startTransition] = useTransition();
-  const recommendedTier = getRecommendedTier(persona);
+  const { tier: recommendedTier, fits: recommendedFits } = getRecommendedTier(
+    persona,
+    usage,
+  );
 
   const handleSwitch = useCallback(
     (tier: SubscriptionTier) => {
@@ -165,19 +208,34 @@ export function PlanPageClient({
             strokeWidth={1.5}
           />
           <p className="text-sm text-[var(--stage-text-primary)]/80">
-            Aion recommends{' '}
-            <span className="text-[var(--stage-text-primary)] font-medium">
-              {SUBSCRIPTION_TIERS[recommendedTier].label}
-            </span>{' '}
-            based on your workspace profile.{' '}
-            {isOwner && (
-              <button
-                type="button"
-                onClick={() => handleSwitch(recommendedTier)}
-                className="text-[var(--stage-accent)] hover:underline transition-colors"
-              >
-                Switch now
-              </button>
+            {recommendedFits ? (
+              <>
+                Aion recommends{' '}
+                <span className="text-[var(--stage-text-primary)] font-medium">
+                  {SUBSCRIPTION_TIERS[recommendedTier].label}
+                </span>{' '}
+                based on your workspace profile.{' '}
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => handleSwitch(recommendedTier)}
+                    className="text-[var(--stage-accent)] hover:underline transition-colors"
+                  >
+                    Switch now
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                Your usage exceeds all standard plans —{' '}
+                <a
+                  href="mailto:hello@unusonic.com?subject=Studio%2B%20inquiry"
+                  className="text-[var(--stage-accent)] hover:underline transition-colors"
+                >
+                  talk to us about Studio+
+                </a>
+                .
+              </>
             )}
           </p>
         </motion.div>

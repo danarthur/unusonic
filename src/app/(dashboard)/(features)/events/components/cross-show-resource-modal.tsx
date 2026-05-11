@@ -125,7 +125,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
   // Build unified crew list: entity → events they appear in
   const crewMap = new Map<string, {
     entityId: string | null;
-    entityName: string;
+    entityName: string | null;
     role: string | null;
     department: string | null;
     confirmed: boolean;
@@ -137,7 +137,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
       const key = slot.entityId ?? `role-${slot.role}-${ev.eventId}`;
       const entry = crewMap.get(key) ?? {
         entityId: slot.entityId,
-        entityName: slot.entityName ?? slot.role ?? 'Open slot',
+        entityName: slot.entityName,
         role: slot.role,
         department: slot.department,
         confirmed: slot.confirmed,
@@ -158,7 +158,12 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
     const bConflict = b.entityId && conflictEntityIds.has(b.entityId);
     if (aConflict && !bConflict) return -1;
     if (!aConflict && bConflict) return 1;
-    return a.entityName.localeCompare(b.entityName);
+    // Unassigned slots sort to bottom of their conflict bucket
+    const aUnassigned = !a.entityId;
+    const bUnassigned = !b.entityId;
+    if (aUnassigned && !bUnassigned) return 1;
+    if (!aUnassigned && bUnassigned) return -1;
+    return (a.entityName ?? a.role ?? '').localeCompare(b.entityName ?? b.role ?? '');
   });
 
   // Build unified gear list
@@ -350,6 +355,7 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                   {crewList.map((member, idx) => {
                     const isConflict = member.entityId && conflictEntityIds.has(member.entityId);
                     const isSwapActive = swapTarget?.entityId === member.entityId;
+                    const isUnassigned = !member.entityId;
 
                     return (
                       <motion.li
@@ -368,9 +374,18 @@ export function CrossShowResourceModal({ open, onClose, date, sourceOrgId }: Cro
                         >
                           {/* Name + role */}
                           <div className="flex-1 min-w-0">
-                            <p className="stage-readout truncate">
-                              {member.entityName}
-                            </p>
+                            {isUnassigned ? (
+                              <p
+                                className="stage-readout truncate italic"
+                                style={{ color: 'var(--stage-text-tertiary)' }}
+                              >
+                                Unassigned
+                              </p>
+                            ) : (
+                              <p className="stage-readout truncate">
+                                {member.entityName ?? member.role ?? 'Open slot'}
+                              </p>
+                            )}
                             {member.role && (
                               <p className="text-field-label truncate" style={{ color: 'var(--stage-text-tertiary)' }}>
                                 {member.role}
