@@ -58,22 +58,6 @@ export const selectTierSchema = z.object({
 /** Organization type for commercial_organizations / initializeOrganization (maps 1:1 from persona). */
 export const organizationTypeSchema = z.enum(['solo', 'agency', 'venue']);
 
-/**
- * Cortex Extraction Schema – Hybrid Onboarding
- * AI outputs this shape; Bouncer validates and calls initializeOrganization.
- * Matches InitializeOrganizationInput plus profile fields and onboarding_summary.
- */
-export const cortexExtractionSchema = z.object({
-  fullName: z.string().min(1, 'Full name is required').max(200),
-  organizationName: z.string().min(1, 'Organization name is required').max(200),
-  organizationType: organizationTypeSchema,
-  subscriptionTier: subscriptionTierSchema,
-  persona: userPersonaSchema,
-  onboarding_summary: z.string().max(2000).optional(),
-});
-
-export type CortexExtraction = z.infer<typeof cortexExtractionSchema>;
-
 export type CreateGhostOrganizationInput = z.infer<typeof createGhostOrganizationSchema>;
 export type ClaimOrganizationInput = z.infer<typeof claimOrganizationSchema>;
 export type CreateGenesisOrganizationInput = z.infer<typeof createGenesisOrganizationSchema>;

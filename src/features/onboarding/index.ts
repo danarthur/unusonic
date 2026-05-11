@@ -15,8 +15,6 @@ export { scoutCompanyForOnboarding } from './actions/scout-for-onboarding';
 export type { ScoutForOnboardingResult } from './actions/scout-for-onboarding';
 export { initializeOrganization } from './actions/complete-setup';
 export type { InitializeOrganizationInput, InitializeOrganizationResult, OrganizationType } from './actions/complete-setup';
-export { processCortexCompletion, getInitialOnboardingContext } from './actions/process-cortex-completion';
-export type { ProcessCortexCompletionResult, InitialOnboardingContext } from './actions/process-cortex-completion';
 export type { NexusResult, GhostOrgPreview, OnboardingGenesisContext } from './model/types';
 export * from './model/subscription-types';
 export * from './model/schema';
