@@ -10,14 +10,33 @@ import { getCoiStatus, type CoiStatus } from '@/features/network-data/api/entity
 
 type VenueIntelCardProps = {
   venueEntityId: string;
+  /**
+   * When provided, the card uses these instead of firing its own
+   * `getVenueIntel + getCoiStatus` round-trips on mount. Plan-lens passes
+   * the pre-fetched values from `getPlanLensExtras`; the Network detail
+   * sheet and any other caller leaves them undefined so the card falls back
+   * to the internal fetch.
+   */
+  initialIntel?: VenueIntel | null;
+  initialCoi?: CoiStatus | null;
+  loadingInitial?: boolean;
 };
 
-export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
-  const [intel, setIntel] = useState<VenueIntel | null>(null);
-  const [coiInfo, setCoiInfo] = useState<CoiStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+export function VenueIntelCard({ venueEntityId, initialIntel, initialCoi, loadingInitial }: VenueIntelCardProps) {
+  const hasParentData = initialIntel !== undefined || initialCoi !== undefined;
+  const [intel, setIntel] = useState<VenueIntel | null>(initialIntel ?? null);
+  const [coiInfo, setCoiInfo] = useState<CoiStatus | null>(initialCoi ?? null);
+  const [loading, setLoading] = useState(hasParentData ? (loadingInitial ?? false) : true);
 
   useEffect(() => {
+    if (!hasParentData) return;
+    if (initialIntel !== undefined) setIntel(initialIntel);
+    if (initialCoi !== undefined) setCoiInfo(initialCoi);
+    setLoading(loadingInitial ?? false);
+  }, [hasParentData, initialIntel, initialCoi, loadingInitial]);
+
+  useEffect(() => {
+    if (hasParentData) return;
     let cancelled = false;
     setLoading(true);
     Promise.all([
@@ -31,7 +50,7 @@ export function VenueIntelCard({ venueEntityId }: VenueIntelCardProps) {
       }
     });
     return () => { cancelled = true; };
-  }, [venueEntityId]);
+  }, [venueEntityId, hasParentData]);
 
   if (loading) {
     return (

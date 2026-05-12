@@ -39,6 +39,14 @@ export interface ProductionCapturesPanelProps {
    * this event. Lets pre-handover sales notes continue to surface.
    */
   predecessorDealId?: string | null;
+  /**
+   * When provided, the panel uses these instead of firing its own
+   * `getProductionCaptures` round-trip on mount. Plan-lens passes the
+   * pre-fetched result from `getPlanLensExtras`; callers outside the Plan
+   * tab leave this undefined so the panel falls back to the internal query.
+   */
+  initialCaptures?: ProductionCapture[];
+  loadingInitial?: boolean;
 }
 
 export function ProductionCapturesPanel({
@@ -47,10 +55,13 @@ export function ProductionCapturesPanel({
   productionId,
   heading = 'Captures',
   predecessorDealId = null,
+  initialCaptures,
+  loadingInitial,
 }: ProductionCapturesPanelProps) {
   const [visibleCount, setVisibleCount] = React.useState(5);
+  const hasParentData = initialCaptures !== undefined;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading: queryLoading } = useQuery({
     queryKey: [
       'production-captures',
       workspaceId,
@@ -63,10 +74,15 @@ export function ProductionCapturesPanel({
         includePredecessorDealId: predecessorDealId,
       }),
     staleTime: 30_000,
-    enabled: Boolean(workspaceId && productionId),
+    enabled: !hasParentData && Boolean(workspaceId && productionId),
   });
 
-  const captures = data && 'ok' in data && data.ok ? data.captures : [];
+  const captures = hasParentData
+    ? initialCaptures ?? []
+    : data && 'ok' in data && data.ok
+      ? data.captures
+      : [];
+  const isLoading = hasParentData ? loadingInitial ?? false : queryLoading;
 
   if (isLoading && captures.length === 0) {
     return (

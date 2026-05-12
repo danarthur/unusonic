@@ -539,13 +539,29 @@ export type DealDiaryCardProps = {
   workspaceId: string;
   /** Filter notes to a specific phase. Null/undefined = show all. */
   phaseTag?: 'deal' | 'plan' | 'ledger' | 'general' | null;
+  /**
+   * When provided, the card mirrors these notes instead of firing its own
+   * `getDealNotes` on mount. Plan-lens passes the pre-fetched list from
+   * `getPlanLensExtras`; callers outside the Plan tab leave this undefined
+   * so the card falls back to the internal fetch. Mutations refetch
+   * canonically via the bundle's invalidator.
+   */
+  initialNotes?: DealNoteEntry[];
+  loadingInitial?: boolean;
+  /**
+   * Called after a mutation that needs fresh notes. When set, the card
+   * delegates refetching to the parent bundle (single source of truth);
+   * when not set the card falls back to its internal `fetchNotes`.
+   */
+  onNotesChanged?: () => void;
 };
 
 const COMPACT_LIMIT = 3;
 
-export function DealDiaryCard({ dealId, workspaceId, phaseTag }: DealDiaryCardProps) {
-  const [notes, setNotes] = useState<DealNoteEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+export function DealDiaryCard({ dealId, workspaceId, phaseTag, initialNotes, loadingInitial, onNotesChanged }: DealDiaryCardProps) {
+  const hasParentNotes = initialNotes !== undefined;
+  const [notes, setNotes] = useState<DealNoteEntry[]>(initialNotes ?? []);
+  const [loading, setLoading] = useState(hasParentNotes ? (loadingInitial ?? false) : true);
   const [expanded, setExpanded] = useState(false);
   const [composing, setComposing] = useState(false);
   const [cardDragOver, setCardDragOver] = useState(false);
@@ -558,7 +574,29 @@ export function DealDiaryCard({ dealId, workspaceId, phaseTag }: DealDiaryCardPr
     setLoading(false);
   }, [dealId, phaseTag]);
 
-  useEffect(() => { fetchNotes(); }, [fetchNotes]);
+  // Mirror parent-supplied notes. The bundle is the source of truth on the
+  // Plan tab; mutations call onNotesChanged below to invalidate it.
+  useEffect(() => {
+    if (!hasParentNotes) return;
+    setNotes(initialNotes ?? []);
+    setLoading(loadingInitial ?? false);
+  }, [hasParentNotes, initialNotes, loadingInitial]);
+
+  useEffect(() => {
+    if (hasParentNotes) return;
+    fetchNotes();
+  }, [hasParentNotes, fetchNotes]);
+
+  // Single refresh entry point — parent invalidator wins when supplied,
+  // otherwise re-run the internal fetch. Mirrors the production-team-card
+  // pattern from the Phase 1 PR.
+  const refreshNotes = useCallback(async () => {
+    if (onNotesChanged) {
+      onNotesChanged();
+      return;
+    }
+    await fetchNotes();
+  }, [onNotesChanged, fetchNotes]);
 
   const handleAdd = async (content: string, attachments: DealNoteAttachment[]) => {
     const optimisticNote: DealNoteEntry = {
@@ -574,20 +612,20 @@ export function DealDiaryCard({ dealId, workspaceId, phaseTag }: DealDiaryCardPr
     };
     setNotes((prev) => [optimisticNote, ...prev]);
     const result = await addDealNote(dealId, content, attachments.length > 0 ? attachments : undefined, phaseTag ?? undefined);
-    if (result.success) { await fetchNotes(); }
+    if (result.success) { await refreshNotes(); }
     else { setNotes((prev) => prev.filter((n) => n.id !== optimisticNote.id)); toast.error(result.error); }
   };
 
   const handleDelete = async (noteId: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== noteId));
     const result = await deleteDealNote(noteId);
-    if (!result.success) { await fetchNotes(); toast.error(result.error); }
+    if (!result.success) { await refreshNotes(); toast.error(result.error); }
   };
 
   const handleEdit = async (noteId: string, content: string) => {
     setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, content } : n));
     const result = await editDealNote(noteId, content);
-    if (!result.success) { await fetchNotes(); toast.error(result.error); }
+    if (!result.success) { await refreshNotes(); toast.error(result.error); }
   };
 
   const handleTogglePin = async (noteId: string, pin: boolean) => {
@@ -602,7 +640,7 @@ export function DealDiaryCard({ dealId, workspaceId, phaseTag }: DealDiaryCardPr
       return updated;
     });
     const result = await togglePinNote(noteId, pin);
-    if (!result.success) { await fetchNotes(); toast.error(result.error); }
+    if (!result.success) { await refreshNotes(); toast.error(result.error); }
   };
 
   const displayNotes = expanded ? notes : notes.slice(0, COMPACT_LIMIT);

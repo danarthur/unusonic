@@ -98,6 +98,19 @@ type GearFlightCheckProps = {
    * the event studio.
    */
   bare?: boolean;
+  /**
+   * Parent-supplied data from the Plan tab's bundles. When provided, the
+   * card skips the corresponding internal fetches on mount. `initialItems`
+   * comes from `getPlanBundle.gearItems`; the rest come from
+   * `getPlanLensExtras`. Callers outside the Plan tab (event studio,
+   * storybook) leave these undefined so the card self-fetches.
+   */
+  initialItems?: EventGearItem[];
+  initialCrewMatches?: Record<string, CrewGearMatch[]>;
+  initialDriftReport?: GearDriftReport | null;
+  loadingInitial?: boolean;
+  /** Single refresh hook the parent uses to invalidate its bundles. */
+  onInitialDataChanged?: () => void;
 };
 
 // =============================================================================
@@ -114,14 +127,22 @@ export function GearFlightCheck({
   onOpenCrewDetail,
   lineageEnabled: lineageOverride,
   bare = false,
+  initialItems,
+  initialCrewMatches,
+  initialDriftReport,
+  loadingInitial,
+  onInitialDataChanged,
 }: GearFlightCheckProps) {
-  const [items, setItems] = useState<EventGearItem[]>([]);
+  const hasParentItems = initialItems !== undefined;
+  const hasParentCrewMatches = initialCrewMatches !== undefined;
+  const hasParentDrift = initialDriftReport !== undefined;
+  const [items, setItems] = useState<EventGearItem[]>(initialItems ?? []);
   const [resolvedLineageFlag, setResolvedLineageFlag] = useState<boolean | null>(null);
   const lineageEnabled = lineageOverride ?? resolvedLineageFlag ?? false;
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasParentItems ? (loadingInitial ?? false) : true);
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<Map<string, GearAvailability>>(new Map());
-  const [crewMatches, setCrewMatches] = useState<Record<string, CrewGearMatch[]>>({});
+  const [crewMatches, setCrewMatches] = useState<Record<string, CrewGearMatch[]>>(initialCrewMatches ?? {});
   const [kitCompliance, setKitCompliance] = useState<Record<string, KitComplianceResult>>({});
   const [sourcing, setSourcing] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -132,7 +153,7 @@ export function GearFlightCheck({
   const [kitSyncOpen, setKitSyncOpen] = useState<string | null>(null);
   const [kitSyncPending, setKitSyncPending] = useState(false);
   const [sourcingBannerOpen, setSourcingBannerOpen] = useState(false);
-  const [driftReport, setDriftReport] = useState<GearDriftReport | null>(null);
+  const [driftReport, setDriftReport] = useState<GearDriftReport | null>(initialDriftReport ?? null);
   const [driftPending, setDriftPending] = useState<string | null>(null);
 
   // ── Fetch gear items ────────────────────────────────────────────────────────
@@ -154,9 +175,33 @@ export function GearFlightCheck({
     }
   }, [eventId]);
 
+  // Mirror parent gear items when provided; the bundle is the source of truth
+  // on the Plan tab. Mutations route through `refreshItems` below which prefers
+  // `onInitialDataChanged` (invalidates the parent bundle).
   useEffect(() => {
+    if (!hasParentItems) return;
+    setItems(initialItems ?? []);
+    setLoading(loadingInitial ?? false);
+  }, [hasParentItems, initialItems, loadingInitial]);
+
+  useEffect(() => {
+    if (hasParentItems) return;
     fetchItems();
-  }, [fetchItems]);
+  }, [hasParentItems, fetchItems]);
+
+  // Single refresh entry point — same pattern as ProductionTeamCard. Optimistic
+  // updates still call setItems directly; this only fires after a confirmed
+  // mutation when fresh canonical data is needed. In parent-fed mode, this
+  // also refreshes the drift report and crew matches via the parent's extras
+  // bundle (one invalidation, fan-out by the parent), so we deliberately skip
+  // local `fetchDrift()` calls when the parent owns the data.
+  const refreshItems = useCallback(async () => {
+    if (onInitialDataChanged) {
+      onInitialDataChanged();
+      return;
+    }
+    await fetchItems();
+  }, [onInitialDataChanged, fetchItems]);
 
   // Resolve the workspace's lineage flag once on mount. The prop overrides
   // when defined (tests/storybook); otherwise the component asks the server.
@@ -200,9 +245,16 @@ export function GearFlightCheck({
       .catch(() => setAvailability(new Map()));
   }, [items, eventStartsAt, eventEndsAt]);
 
-  // ── Fetch crew equipment matches ───────────────────────────────────────────
+  // Mirror parent-supplied crew matches when present (Plan tab path).
+  useEffect(() => {
+    if (!hasParentCrewMatches) return;
+    setCrewMatches(initialCrewMatches ?? {});
+  }, [hasParentCrewMatches, initialCrewMatches]);
+
+  // ── Fetch crew equipment matches (standalone mode only) ────────────────────
 
   useEffect(() => {
+    if (hasParentCrewMatches) return;
     if (items.length === 0) {
       setCrewMatches({});
       return;
@@ -215,7 +267,7 @@ export function GearFlightCheck({
     getCrewEquipmentMatchesForEvent(eventId)
       .then((result) => setCrewMatches(result))
       .catch(() => setCrewMatches({}));
-  }, [items, eventId]);
+  }, [hasParentCrewMatches, items, eventId]);
 
   // ── Fetch kit compliance per assigned crew member ──────────────────────────
   // Produces a map keyed by entity_id so DepartmentBlock can aggregate matched/
@@ -268,12 +320,12 @@ export function GearFlightCheck({
     const result = await sourceGearFromCrew({ eventGearItemId: itemId, suppliedByEntityId: entityId });
     setSourcing(null);
     if (result.success) {
-      fetchItems(); // Re-fetch to get resolved supplier name
+      refreshItems(); // Re-fetch (parent bundle or local) to get resolved supplier name
       onUpdated?.();
     } else {
-      fetchItems(); // Revert
+      refreshItems(); // Revert
     }
-  }, [fetchItems, onUpdated]);
+  }, [refreshItems, onUpdated]);
 
   // ── Department grouping ─────────────────────────────────────────────────────
 
@@ -366,7 +418,7 @@ export function GearFlightCheck({
       onUpdated?.();
     } else {
       // Revert on failure
-      fetchItems();
+      refreshItems();
     }
   };
 
@@ -381,7 +433,7 @@ export function GearFlightCheck({
 
     const result = await assignGearOperator(itemId, entityId);
     if (!result.success) {
-      fetchItems();
+      refreshItems();
     } else {
       onUpdated?.();
     }
@@ -424,11 +476,11 @@ export function GearFlightCheck({
     const result = await detachGearFromPackage(itemId);
     if (!result.success) {
       // Revert on failure.
-      fetchItems();
+      refreshItems();
       return;
     }
     onUpdated?.();
-  }, [fetchItems, onUpdated]);
+  }, [refreshItems, onUpdated]);
 
   // Stable key per drift item so the ribbon can mark exactly the row whose
   // action is in flight. Mirrors the ribbon's internal driftKey().
@@ -453,17 +505,24 @@ export function GearFlightCheck({
     }
   }, [eventId, lineageEnabled]);
 
-  // Drift fetches once on mount + when the flag flips. We deliberately do NOT
-  // depend on `items`: gear status clicks, swaps, and kit materialisation
-  // don't change the proposal-vs-gear comparison, and re-running the drift
-  // compute (5 queries internally) on every optimistic update was causing a
-  // cascade that delayed first paint of the Plan tab. The few mutations that
-  // DO need a fresh drift (acceptGearDriftAdd / acceptGearDriftQty /
-  // acceptGearDriftRemove / dismiss) call fetchDrift() explicitly via
-  // handleDriftAction.
+  // Mirror parent-supplied drift (Plan tab passes the bundled value).
   useEffect(() => {
+    if (!hasParentDrift) return;
+    setDriftReport(initialDriftReport ?? null);
+  }, [hasParentDrift, initialDriftReport]);
+
+  // Drift fetches once on mount + when the flag flips (standalone mode).
+  // We deliberately do NOT depend on `items`: gear status clicks, swaps, and
+  // kit materialisation don't change the proposal-vs-gear comparison, and
+  // re-running the drift compute (5 queries internally) on every optimistic
+  // update was causing a cascade that delayed first paint of the Plan tab.
+  // The few mutations that DO need a fresh drift
+  // (acceptGearDriftAdd / acceptGearDriftQty / acceptGearDriftRemove /
+  // dismiss) call fetchDrift() explicitly via handleDriftAction.
+  useEffect(() => {
+    if (hasParentDrift) return;
     fetchDrift();
-  }, [fetchDrift]);
+  }, [hasParentDrift, fetchDrift]);
 
   const handleDriftAction = useCallback(async (action: DriftAction) => {
     const key = driftActionKey(action);
@@ -485,10 +544,16 @@ export function GearFlightCheck({
     } finally {
       setDriftPending(null);
     }
-    fetchItems();
-    fetchDrift();
+    // Parent-fed mode: one invalidation refreshes items + drift via the
+    // bundles. Standalone mode: call both internal fetches.
+    if (onInitialDataChanged) {
+      onInitialDataChanged();
+    } else {
+      fetchItems();
+      fetchDrift();
+    }
     onUpdated?.();
-  }, [eventId, fetchItems, fetchDrift, onUpdated]);
+  }, [eventId, onInitialDataChanged, fetchItems, fetchDrift, onUpdated]);
 
   const handleSyncKit = useCallback(async (serviceGearItemId: string, entityId: string) => {
     setKitSyncPending(true);
@@ -499,9 +564,9 @@ export function GearFlightCheck({
       console.error('[GearFlightCheck] materializeKitFromCrew:', result.error);
       return;
     }
-    fetchItems();
+    refreshItems();
     onUpdated?.();
-  }, [fetchItems, onUpdated]);
+  }, [refreshItems, onUpdated]);
 
   // When `bare` is on the gear card renders without any wrapper — no
   // StagePanel, no border, no padding — so it can host inside an outer panel

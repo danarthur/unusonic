@@ -15,6 +15,15 @@ interface RunOfShowIndexCardProps {
   /** Event start time — avoids refetch, PlanLens already has this */
   startsAt?: string | null;
   className?: string;
+  /**
+   * When provided, the card mirrors these values instead of firing its own
+   * `fetchCues + fetchSections` round-trip on mount. Plan-lens passes the
+   * pre-fetched ROS data from `getPlanLensExtras`; callers outside the Plan
+   * tab leave these unset so the card falls back to the internal fetch.
+   */
+  initialCues?: Cue[];
+  initialSections?: Section[];
+  loadingInitial?: boolean;
 }
 
 function formatDuration(minutes: number): string {
@@ -52,12 +61,23 @@ const readinessDotColor: Record<Readiness, string> = {
   empty: 'oklch(0.45 0 0)',
 };
 
-export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIndexCardProps) {
-  const [cues, setCues] = useState<Cue[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+export function RunOfShowIndexCard({ eventId, startsAt, className, initialCues, initialSections, loadingInitial }: RunOfShowIndexCardProps) {
+  const hasParentData = initialCues !== undefined || initialSections !== undefined;
+  const [cues, setCues] = useState<Cue[]>(initialCues ?? []);
+  const [sections, setSections] = useState<Section[]>(initialSections ?? []);
+  const [loading, setLoading] = useState(hasParentData ? (loadingInitial ?? false) : true);
+
+  // Mirror parent-supplied data when present (Plan tab path). Identity-keyed
+  // so a bundle refetch upstream propagates without re-firing fetchCues here.
+  useEffect(() => {
+    if (!hasParentData) return;
+    if (initialCues !== undefined) setCues(initialCues);
+    if (initialSections !== undefined) setSections(initialSections);
+    setLoading(loadingInitial ?? false);
+  }, [hasParentData, initialCues, initialSections, loadingInitial]);
 
   useEffect(() => {
+    if (hasParentData) return;
     let active = true;
     setLoading(true);
     Promise.all([fetchCues(eventId), fetchSections(eventId)])
@@ -71,7 +91,7 @@ export function RunOfShowIndexCard({ eventId, startsAt, className }: RunOfShowIn
         setLoading(false);
       });
     return () => { active = false; };
-  }, [eventId]);
+  }, [eventId, hasParentData]);
 
   const totalDuration = useMemo(() => cues.reduce((sum, c) => sum + (c.duration_minutes ?? 0), 0), [cues]);
   const readiness = useMemo(() => getReadiness(cues), [cues]);
