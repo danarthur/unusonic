@@ -499,6 +499,9 @@ export function PlanLens({
             isLocked={isPostHandoff}
             eventId={eventId}
             onOpenCrewDetail={setSelectedCrewRow}
+            initialCrew={crewRows}
+            loadingCrew={bundleLoading}
+            onCrewChanged={refreshBundle}
           />
         )}
 

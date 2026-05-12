@@ -18,6 +18,21 @@ function isAuthError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * Detects server-overload responses we should NOT retry. Retrying 5xx into an
+ * already-saturated server (Next.js dev mode under load, or Vercel concurrency
+ * ceiling) compounds the problem — each retry queues another Server Action
+ * behind the work that's already in flight, creating a retry storm. Better to
+ * surface the error and let the user retry deliberately.
+ */
+function isServerOverload(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as Record<string, unknown>;
+  if (e.status === 503 || e.status === 502 || e.status === 504 || e.status === 429) return true;
+  if (typeof e.message === 'string' && /\b(503|502|504|429)\b|service unavailable|too many requests/i.test(e.message)) return true;
+  return false;
+}
+
 function makeQueryClient() {
   return new QueryClient({
     queryCache: new QueryCache({
@@ -41,6 +56,11 @@ function makeQueryClient() {
         retry: (failureCount, error) => {
           // Never retry auth errors — surface the overlay immediately
           if (isAuthError(error)) return false;
+          // Never retry server-overload errors — retrying into a saturated
+          // server queues more work behind the requests that are already
+          // failing, multiplying the load (observed in dev: 503s from the
+          // Plan tab fan-out turned into a 30+ second retry storm).
+          if (isServerOverload(error)) return false;
           return failureCount < 3;
         },
       },

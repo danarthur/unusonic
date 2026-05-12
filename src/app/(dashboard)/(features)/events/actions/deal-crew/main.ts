@@ -8,11 +8,20 @@ import * as Sentry from '@sentry/nextjs';
 import { instrument } from '@/shared/lib/instrumentation';
 import { resolveCrewConfirmationBatch } from '@/shared/lib/crew/resolve-crew-confirmation';
 import { DealIds, EntityIds, DealCrewIds, WorkspaceIds, type DealId, type EntityId, type DealCrewId, type WorkspaceId } from '@/shared/types/branded-ids';
-import { syncDealCrewFromProposalImpl } from './sync-from-proposal';
 import type { DealCrewRow } from './types';
 
 // =============================================================================
-// getDealCrew — public action; runs sync then returns full crew list
+// getDealCrew — public action; returns the deal's full crew list.
+//
+// This is a READ. The proposal→crew sync (`syncDealCrewFromProposalImpl`) is
+// NOT invoked here. Sync is owned by the WRITE paths: `upsertProposal` calls
+// `syncCrewFromProposal` after saving, and CrewFlightCheck calls
+// `syncCrewFromProposalToEvent` after handoff. Running the sync on every
+// read was costing 5-10 seconds of cold-load time on the Plan tab — the
+// sync issues a write storm (N+1 catalog RPC fan-out + N+1 INSERTs) and
+// `getDealCrew` is called once per Plan-tab mount, often concurrently with
+// itself. If you need to re-sync without saving a proposal, call
+// `syncCrewFromProposal(dealId)` directly.
 // =============================================================================
 
 export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
@@ -25,15 +34,6 @@ export async function getDealCrew(dealId: string): Promise<DealCrewRow[]> {
 
   try {
     const supabase = await createClient();
-
-    // Sync suggestions from proposal before fetching
-    try {
-      await syncDealCrewFromProposalImpl(supabase, dealId, workspaceId);
-    } catch (syncErr) {
-      // Log sync errors but don't block the fetch
-      console.error('[getDealCrew] sync error:', syncErr instanceof Error ? syncErr.message : syncErr);
-      Sentry.captureException(syncErr, { tags: { module: 'crm', action: 'getDealCrew.sync' } });
-    }
 
     const { data, error } = await supabase.rpc('get_deal_crew_enriched', {
       p_deal_id: dealId,

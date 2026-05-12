@@ -99,8 +99,10 @@ export function LineInspector({
 
   // Crew rows tied to this block. deal_crew is the source of truth — every
   // required-role on the catalog (for both the header package and bundle
-  // ingredients) already has an unconfirmed row here, created by
-  // syncDealCrewFromProposal at load time.
+  // ingredients) has an unconfirmed row here, created by
+  // `syncCrewFromProposal` whenever the builder writes (the studio's
+  // `refetchCrew` wraps the sync, so any mutation that triggers a refetch
+  // also reconciles).
   //
   // For bundles, crew_meta lives on the child rows (e.g. Gold Package header
   // has none; its DJ ingredient carries the DJ role). So we match deal_crew
@@ -263,10 +265,10 @@ export function LineInspector({
     toast.success('Removed');
     onClearSelection();
     onRefetchProposal();
-    // deal_crew has a partial unique index on role_note; orphaned rows (now
-    // without a live catalog_item_id) get culled by syncDealCrewFromProposal
-    // on the next getDealCrew call — trigger it so the inspector reflects
-    // "DJ slot gone" the moment the DJ line was deleted.
+    // `onRefetchCrew` (studio's `refetchCrew`) runs `syncCrewFromProposal`
+    // before reading, which culls orphaned deal_crew rows (those without a
+    // live catalog_item_id). That keeps the inspector showing "DJ slot
+    // gone" the moment the DJ line is deleted.
     onRefetchCrew();
   }, [block, proposalId, onClearSelection, onRefetchProposal, onRefetchCrew]);
 
