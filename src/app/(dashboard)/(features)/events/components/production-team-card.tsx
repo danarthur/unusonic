@@ -50,13 +50,32 @@ export type ProductionTeamCardProps = {
   /** Lifted rail handler — when set, row clicks open the Crew Hub detail rail
    *  at the plan-lens level. When not set (Deal tab), rows stay non-clickable. */
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /**
+   * Crew rows from the parent's bundle. When provided, the card uses these
+   * instead of firing its own `getDealCrew` on mount — `getDealCrew` runs the
+   * `syncDealCrewFromProposal` side-effect, so duplicating it doubles the
+   * work on every Plan-tab cold load (deal-crew sync N+1 contention on the
+   * same workspace's rows). The Plan tab passes `bundle.crew`; the Deal tab
+   * still falls back to the internal fetch when this prop is undefined.
+   */
+  initialCrew?: DealCrewRow[];
+  /** Mirrors the bundle's loading state so the skeleton/spinner agrees with parent. */
+  loadingCrew?: boolean;
+  /**
+   * Called after a mutation that needs fresh crew data. When set, the card
+   * delegates refetching to the parent's bundle so a single source of truth
+   * stays canonical; when not set the card falls back to its internal
+   * `fetchCrew`.
+   */
+  onCrewChanged?: () => void;
 };
 
 type CrewFilter = 'all' | 'pending' | 'declined' | 'no_phone';
 
-export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId, isLocked = false, eventId = null, onOpenCrewDetail }: ProductionTeamCardProps) {
-  const [crew, setCrew] = useState<DealCrewRow[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId, isLocked = false, eventId = null, onOpenCrewDetail, initialCrew, loadingCrew, onCrewChanged }: ProductionTeamCardProps) {
+  const hasParentCrew = initialCrew !== undefined;
+  const [crew, setCrew] = useState<DealCrewRow[]>(initialCrew ?? []);
+  const [loading, setLoading] = useState(hasParentCrew ? (loadingCrew ?? false) : true);
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const [roleInput, setRoleInput] = useState('');
@@ -134,6 +153,19 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   }, [filteredCrew]);
 
   // ── Data fetching ───────────────────────────────────────────────────────────
+  //
+  // Two modes:
+  // 1. Parent-fed (Plan tab): `initialCrew` is provided by `plan-lens` from
+  //    its bundled `getPlanBundle` result. The card mirrors that array via
+  //    `useEffect` below and never fires `getDealCrew` itself. Refetches go
+  //    through `onCrewChanged` which invalidates the bundle.
+  // 2. Self-fetching (Deal tab): no `initialCrew`. The card hits `getDealCrew`
+  //    on mount and after mutations, same as before. This branch will be
+  //    removed once Deal tab also bundles its data.
+  //
+  // The duplicate call was costing ~30% of Plan-tab cold-load time —
+  // `getDealCrew` runs `syncDealCrewFromProposalImpl` (N+1 catalog RPCs +
+  // N+1 INSERTs) and was being invoked twice concurrently on every paint.
 
   const fetchCrew = useCallback(async () => {
     const rows = await getDealCrew(dealId);
@@ -141,9 +173,29 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     setLoading(false);
   }, [dealId]);
 
+  // Mirror parent crew into local state. Use Array as the change signal —
+  // identity changes when the bundle refetches, and the cost of a shallow
+  // copy is negligible compared to the avoided round-trip.
   useEffect(() => {
+    if (!hasParentCrew) return;
+    setCrew(initialCrew ?? []);
+    setLoading(loadingCrew ?? false);
+  }, [hasParentCrew, initialCrew, loadingCrew]);
+
+  useEffect(() => {
+    if (hasParentCrew) return;
     fetchCrew();
-  }, [fetchCrew]);
+  }, [hasParentCrew, fetchCrew]);
+
+  // Single refresh entry point — call the parent's invalidator when in
+  // parent-fed mode, otherwise re-run the internal fetch.
+  const refreshCrew = useCallback(async () => {
+    if (onCrewChanged) {
+      onCrewChanged();
+      return;
+    }
+    await fetchCrew();
+  }, [onCrewChanged, fetchCrew]);
 
   // Batch-fetch kit compliance for every (entity, role_note) pair in one pass
   // instead of N parallel per-row fetches. Keyed by \`${entityId}::${roleTag}\`.
@@ -171,7 +223,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     const res = await addManualDealCrew(dealId, result.entity_id);
     if (res.success) {
       if (res.conflict) toast.warning(res.conflict);
-      await fetchCrew();
+      await refreshCrew();
     } else {
       toast.error(res.error);
     }
@@ -180,7 +232,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   const handleConfirm = async (rowId: string) => {
     const result = await confirmDealCrew(rowId);
     if (result.success) {
-      await fetchCrew();
+      await refreshCrew();
     } else {
       toast.error(result.error);
     }
@@ -189,7 +241,10 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
   const handleRemove = async (rowId: string) => {
     const result = await removeDealCrew(rowId);
     if (result.success) {
+      // Optimistic local removal; parent-fed mode also refreshes the bundle
+      // so the canonical list catches up on the next paint.
       setCrew((prev) => prev.filter((r) => r.id !== rowId));
+      if (onCrewChanged) onCrewChanged();
     } else {
       toast.error(result.error);
     }
@@ -197,7 +252,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
 
   const handleSync = async () => {
     setSyncing(true);
-    await fetchCrew();
+    await refreshCrew();
     setSyncing(false);
   };
 
@@ -210,7 +265,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     if (result.success) {
       setRoleInput('');
       setAddRoleOpen(false);
-      await fetchCrew();
+      await refreshCrew();
     } else {
       toast.error(result.error);
     }
@@ -220,7 +275,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     const res = await assignDealCrewEntity(rowId, result.entity_id);
     if (res.success) {
       if (res.conflict) toast.warning(res.conflict);
-      await fetchCrew();
+      await refreshCrew();
     } else {
       toast.error(res.error);
     }
@@ -262,7 +317,7 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     if (result.skippedCount > 0) parts.push(`${result.skippedCount} skipped (no email)`);
     if (result.failedCount > 0) parts.push(`${result.failedCount} failed`);
     toast(parts.join(' \u2014 '));
-    await fetchCrew();
+    await refreshCrew();
   };
 
   const toggleDept = (dept: string) => {

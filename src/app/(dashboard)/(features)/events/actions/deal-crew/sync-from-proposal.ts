@@ -5,16 +5,20 @@
  *
  * Extracted from deal-crew.ts (Phase 0.5-style split, 2026-04-29).
  *
- * `syncDealCrewFromProposalImpl` is the workhorse: diffs proposal line-item
- * assignees against existing `ops.deal_crew` rows, inserts new unconfirmed
- * suggestions, and culls stale unconfirmed proposal rows whose package is
- * no longer in the proposal. Confirmed rows are never touched.
+ * **Single-RPC pipeline (2026-05-11).** The body of the sync now lives in the
+ * `public.sync_deal_crew_from_proposal(p_deal_id, p_workspace_id)` SECURITY
+ * DEFINER function. The previous TypeScript implementation issued one RPC
+ * per package (catalog assignees), one INSERT per row, and a separate DELETE
+ * for stale rows — a 10–15 round-trip fan-out per call that dominated Plan
+ * tab cold-load time. The new RPC does the entire diff/insert/delete in a
+ * single round-trip against the partial unique indexes on `ops.deal_crew`.
  *
- * `syncCrewFromProposal` is the public wrapper used after saving a proposal
- * to keep `deal_crew` in sync without paying for a full crew refetch.
+ * `syncCrewFromProposal` is the public wrapper called after writes:
+ * upsertProposal (proposal save), proposal-builder mutations (refetchCrew),
+ * and `syncCrewFromProposalToEvent` (post-handoff).
  *
- * `getDealCrew` (in the parent file) calls the impl directly via this
- * module's internal export so the sync runs inline before the read.
+ * `getDealCrew` no longer calls this on the read path — see
+ * deal-crew/main.ts for the contract.
  */
 
 import { z } from 'zod/v4';
@@ -23,7 +27,39 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { instrument } from '@/shared/lib/instrumentation';
 
+/**
+ * Internal helper kept on the same client surface as before for any callers
+ * that already have a supabase client and workspace id in hand. Delegates to
+ * the new single-RPC pipeline. Returns void to preserve the prior contract.
+ */
 export async function syncDealCrewFromProposalImpl(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  dealId: string,
+  workspaceId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('sync_deal_crew_from_proposal', {
+    p_deal_id: dealId,
+    p_workspace_id: workspaceId,
+  });
+  if (error) {
+    // Match the prior contract — log but don't throw, so callers (mostly
+    // post-mutation refresh paths) keep working when the sync misfires.
+    console.error('[syncDealCrewFromProposal] RPC error:', error.message);
+    Sentry.captureException(error, {
+      tags: { module: 'crm', action: 'syncDealCrewFromProposal.rpc' },
+    });
+  }
+}
+
+/**
+ * Legacy TypeScript pipeline — preserved as a fallback while the new RPC
+ * bakes. Not exported; only the impl above is used in production. Kept here
+ * so the diff is reviewable and the prior logic is documentable.
+ *
+ * @deprecated Use `public.sync_deal_crew_from_proposal` RPC instead.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function syncDealCrewFromProposalLegacy(
   supabase: Awaited<ReturnType<typeof createClient>>,
   dealId: string,
   workspaceId: string,

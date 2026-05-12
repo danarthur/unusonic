@@ -28,6 +28,7 @@ import {
 import {
   getDealCrew,
   listDealRoster,
+  syncCrewFromProposal,
   type DealCrewRow,
   type CrewSearchResult,
 } from '../actions/deal-crew';
@@ -201,15 +202,27 @@ export function ProposalBuilderStudio({
   }, [refetchProposal]);
 
   // Crew data — deal_crew rows (assigned + open slots) and the workspace roster
-  // (staff + network preferred). `getDealCrew` also runs syncDealCrewFromProposal
-  // internally, so this is the merge-on-load point that catches Production Team
-  // Card manual assignments the builder wouldn't otherwise see.
+  // (staff + network preferred). `getDealCrew` is a pure read (post-2026-05);
+  // the proposal→crew sync now runs on save, not on load, so manual PTC
+  // additions land in deal_crew immediately and are visible on the next read
+  // without an inline sync.
   const [dealCrew, setDealCrew] = useState<DealCrewRow[]>([]);
   const [roster, setRoster] = useState<CrewSearchResult[]>([]);
 
-  const refetchCrew = useCallback(() => {
+  // Builder mutations (add package, assign role, delete line) all run through
+  // this — and they're exactly the moments we want the proposal→crew sync to
+  // fire (e.g. a new package surfaces an open DJ slot; a deleted line orphans
+  // a slot that needs culling). The sync used to ride on every `getDealCrew`
+  // read; now it lives here, on the builder's write path.
+  const refetchCrew = useCallback(async () => {
     if (forceDemo) return;
-    getDealCrew(deal.id).then(setDealCrew);
+    try {
+      await syncCrewFromProposal(deal.id);
+    } catch {
+      /* sync failure shouldn't block the read; next save will reconcile */
+    }
+    const rows = await getDealCrew(deal.id);
+    setDealCrew(rows);
   }, [deal.id, forceDemo]);
 
   const refetchRoster = useCallback(() => {
@@ -453,9 +466,10 @@ export function ProposalBuilderStudio({
         }
         onItemAdded={() => {
           refetchProposal();
-          // getDealCrew runs syncDealCrewFromProposal internally, so refetching
-          // crew after a package is added picks up the new required-role open
-          // slots (e.g. adding a DJ package surfaces an open "DJ" slot).
+          // `refetchCrew` runs the proposal→crew sync before reading, so
+          // adding a package surfaces its required-role open slots (e.g.
+          // adding a DJ package surfaces an open "DJ" slot) on the next
+          // paint without an extra explicit sync call here.
           refetchCrew();
         }}
         onRefetchProposal={refetchProposal}

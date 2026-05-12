@@ -8339,6 +8339,10 @@ export type Database = {
         Args: { p_tag: string; p_workspace_id: string }
         Returns: undefined
       }
+      sync_deal_crew_from_proposal: {
+        Args: { p_deal_id: string; p_workspace_id: string }
+        Returns: Json
+      }
       unusonic_current_entity_email: { Args: never; Returns: string }
       unusonic_current_entity_id: { Args: never; Returns: string }
       unusonic_org_ids_can_affiliate: { Args: never; Returns: string[] }
