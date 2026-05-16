@@ -19,6 +19,14 @@ const nextConfig: NextConfig = {
   },
   transpilePackages: ["lucide-react"],
   serverExternalPackages: ["@react-email/render", "@react-email/components", "resend"],
+  typescript: {
+    // TEMPORARY UNBLOCK — Vercel's build-time TS validation step hung past
+    // 45 min on commit b917828 even though local `tsc --noEmit` returns clean
+    // in <5s. Local CI still type-checks via `npm run lint` + pre-commit.
+    // Revert this once Vercel's TS step is debugged. See docs/audits/
+    // plan-tab-walkthrough-2026-05-06.md handoff notes.
+    ignoreBuildErrors: true,
+  },
   experimental: {
     // isolatedDevBuild (Next.js 16 default: true) moves dev output to .next/dev/
     // but webpack's cache strategy fails to create the nested subdirectories on macOS.
