@@ -138,10 +138,15 @@ export function ProposalBuilder({
     setProposalId(initialProposal?.id ?? null);
   }, [initialProposal, dealEventStartTime, dealEventEndTime]);
 
-  // Fetch crew equipment names for internal source annotations
+  // Fetch crew equipment names for internal source annotations.
+  // The annotation is an edit-mode affordance ("which crew member's kit
+  // provides this gear?"); the readOnly mount (Plan tab's "Agreed scope"
+  // viewer) doesn't surface it, so the fetch is dead weight on a tab that's
+  // already running ~3 crew fetches concurrently.
   useEffect(() => {
+    if (readOnly) return;
     getDealCrewEquipmentNames(dealId).then(setCrewEquipmentNames);
-  }, [dealId]);
+  }, [dealId, readOnly]);
 
   // Rescan fix C6: fetch full deal_crew so we can detect manual Plan-tab
   // additions that the proposal builder wouldn't otherwise see. This is the
@@ -233,10 +238,13 @@ export function ProposalBuilder({
     isInitialLoad.current = true;
   }, [initialProposal]);
 
-  // Fetch workspace org id for crew search in production team card
+  // Fetch workspace org id for crew search in production team card.
+  // The readOnly viewer doesn't expose the crew picker, so the lookup is
+  // unused on the Plan tab path.
   useEffect(() => {
+    if (readOnly) return;
     getCurrentOrgId().then((id) => setSourceOrgId(id));
-  }, []);
+  }, [readOnly]);
 
   // Derive a stable key from the set of rental package IDs so the availability
   // check doesn't re-fire on every lineItems edit (name/price/qty keystrokes).

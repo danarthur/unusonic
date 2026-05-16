@@ -40,6 +40,7 @@ import type { DealCrewRow } from '../actions/deal-crew';
 import type { EventGearItem } from '../actions/event-gear-items';
 import { updateDealScalars } from '../actions/update-deal-scalars';
 import { getPlanBundle, type PlanBundle } from '../actions/get-plan-bundle';
+import { getPlanLensExtras, type PlanLensExtras } from '../actions/get-plan-lens-extras';
 import type { EventSummaryForPrism } from '../actions/get-event-summary';
 import type { DealDetail } from '../actions/get-deal';
 import type { DealClientContext } from '../actions/get-deal-client';
@@ -239,13 +240,50 @@ export function PlanLens({
     : bundle?.proposal ?? null;
   const publicProposalUrl = bundle?.proposalPublicUrl ?? null;
 
-  // Mutation refresh path — invalidates the bundle so the next read pulls a
-  // fresh snapshot. Replaces the prior `fetchCrew + fetchGearItems` fan-out.
+  // ── Plan tab "extras" bundle ───────────────────────────────────────────────
+  // The primary `getPlanBundle` carries the data that gates the skeleton
+  // (crew, gear, ledger, proposal). Sibling cards on the Plan tab — Advancing
+  // checklist, Venue intel, Run-of-show index, Deal diary, Production
+  // captures, conflict detection, gear lineage flag, gear drift, crew-gear
+  // matches — used to each fire their own server action on mount, so a
+  // post-handoff Plan tab paint cost 1 primary + ~9 ambient round-trips.
+  // Bundling the ambient set into a single parallel query collapses that to
+  // 1 + 1; each card accepts the bundled slice as an optional prop and falls
+  // back to its own fetch when used outside the Plan tab.
+  const planExtrasQueryKey = useMemo(
+    () => ['plan-lens', 'extras', eventScopedId, dealId, event?.venue_entity_id ?? null] as const,
+    [eventScopedId, dealId, event?.venue_entity_id],
+  );
+  const {
+    data: extrasData,
+    isLoading: extrasLoading,
+    refetch: refetchExtras,
+  } = useQuery<PlanLensExtras>({
+    queryKey: planExtrasQueryKey,
+    queryFn: () => measureAsync('crm:plan-extras-fetch', () =>
+      getPlanLensExtras({
+        eventId: eventScopedId,
+        dealId,
+        workspaceId: deal?.workspace_id ?? null,
+        venueEntityId: event?.venue_entity_id ?? null,
+        diaryPhaseTag: 'plan',
+      }),
+    ),
+    enabled: !!(eventScopedId || dealId),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const extras = extrasData;
+
+  // Mutation refresh path — invalidates BOTH bundles so the next read pulls
+  // a fresh snapshot of primary + ambient data. Replaces the prior
+  // `fetchCrew + fetchGearItems` fan-out plus the per-card refetch hooks.
   const refreshBundle = useCallback(() => {
     void refetchBundle();
-  }, [refetchBundle]);
-  const fetchCrew = refreshBundle;
-  const fetchGearItems = refreshBundle;
+    void refetchExtras();
+  }, [refetchBundle, refetchExtras]);
 
   // Cold-paint end: bundle resolved → blocking data is in hand. Ambient
   // panels (notes, captures, run-of-show index) continue loading silently.
@@ -484,6 +522,8 @@ export function PlanLens({
           archetype={deal?.event_archetype ?? null}
           eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null}
           transportMode={event.run_of_show_data?.transport_mode ?? null}
+          initialItems={extras?.advancingChecklist}
+          loadingInitial={extrasLoading}
         />
 
         {/* ── Tier 3: Production team (promoted, full width) ──
@@ -521,6 +561,13 @@ export function PlanLens({
               hideVitals
               sourceOrgId={sourceOrgId ?? null}
               onOpenCrewDetail={setSelectedCrewRow}
+              initialLoadDates={eventDates}
+              initialGearItems={gearItemsLive}
+              initialConflicts={extras?.eventConflicts}
+              initialCrewMatches={extras?.crewEquipmentMatches}
+              initialDriftReport={extras?.gearDrift}
+              loadingInitial={bundleLoading || extrasLoading}
+              onBundleChanged={refreshBundle}
             />
 
             {/* Client comms — crew comms absorbed into Crew Hub header */}
@@ -578,7 +625,12 @@ export function PlanLens({
           {/* Right: Reference — pure look-up, no actions */}
           <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }}>
             {event.venue_entity_id && (
-              <VenueIntelCard venueEntityId={event.venue_entity_id} />
+              <VenueIntelCard
+                venueEntityId={event.venue_entity_id}
+                initialIntel={extras?.venue?.intel ?? null}
+                initialCoi={extras?.venue?.coi ?? null}
+                loadingInitial={extrasLoading}
+              />
             )}
             <ShowDayContactsCard
               eventId={eventId}
@@ -589,7 +641,13 @@ export function PlanLens({
               <ProductionTimelineWidget eventDate={deal?.proposed_date ?? event.starts_at?.slice(0, 10) ?? null} eventTitle={deal?.title ?? event.title} paymentMilestones={paymentMilestones} dealMilestones={dealMilestones} />
             )}
             <DjPrepSummaryCard rosData={event.run_of_show_data as Record<string, unknown> | null} />
-            <RunOfShowIndexCard eventId={eventId} startsAt={event?.starts_at} />
+            <RunOfShowIndexCard
+              eventId={eventId}
+              startsAt={event?.starts_at}
+              initialCues={extras?.runOfShow.cues}
+              initialSections={extras?.runOfShow.sections}
+              loadingInitial={extrasLoading}
+            />
           </div>
         </div>
 
@@ -633,7 +691,14 @@ export function PlanLens({
 
         {/* ── Tier 6: Journal (full width) ── */}
         {dealId && deal?.workspace_id && (
-          <DealDiaryCard dealId={dealId} workspaceId={deal.workspace_id} phaseTag="plan" />
+          <DealDiaryCard
+            dealId={dealId}
+            workspaceId={deal.workspace_id}
+            phaseTag="plan"
+            initialNotes={extras?.dealNotes}
+            loadingInitial={extrasLoading}
+            onNotesChanged={refreshBundle}
+          />
         )}
 
         {/* ── Tier 6b: Captures linked to this event (inc. predecessor deal) ── */}
@@ -643,6 +708,12 @@ export function PlanLens({
             kind="event"
             productionId={eventId}
             predecessorDealId={dealId}
+            initialCaptures={
+              extras?.productionCaptures && 'ok' in extras.productionCaptures && extras.productionCaptures.ok
+                ? extras.productionCaptures.captures
+                : undefined
+            }
+            loadingInitial={extrasLoading}
           />
         )}
 

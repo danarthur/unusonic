@@ -29,6 +29,15 @@ type AdvancingChecklistProps = {
   eventDate?: string | null;
   /** Transport mode — when 'none' or 'personal_vehicle', truck items are excluded. */
   transportMode?: string | null;
+  /**
+   * When provided, the checklist mirrors these items instead of firing its
+   * own `getAdvancingChecklist` (+ optional `seedAdvancingChecklist`) on
+   * mount. Plan-lens passes the pre-fetched list from `getPlanLensExtras`;
+   * other callers leave undefined so the component falls back to the
+   * internal fetch + seed.
+   */
+  initialItems?: AdvancingChecklistItem[];
+  loadingInitial?: boolean;
 };
 
 function computeAutoStates(
@@ -97,16 +106,43 @@ export function AdvancingChecklist({
   archetype,
   eventDate,
   transportMode,
+  initialItems,
+  loadingInitial,
 }: AdvancingChecklistProps) {
-  const [items, setItems] = useState<AdvancingChecklistItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const hasParentItems = initialItems !== undefined;
+  const [items, setItems] = useState<AdvancingChecklistItem[]>(initialItems ?? []);
+  const [loading, setLoading] = useState(hasParentItems ? (loadingInitial ?? false) : true);
   const [addOpen, setAddOpen] = useState(false);
   const [addLabel, setAddLabel] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ── Fetch / seed on mount ──
+  // Mirror parent-supplied items + run the seed branch if the bundle came
+  // back empty. The seed is a write — keeping it client-side here avoids
+  // hiding write semantics inside the read bundle.
   useEffect(() => {
+    if (!hasParentItems) return;
+    let cancelled = false;
+    setItems(initialItems ?? []);
+    setLoading(loadingInitial ?? false);
+    if (!loadingInitial && (initialItems?.length ?? 0) === 0) {
+      // Empty parent payload — try to seed (idempotent server-side).
+      (async () => {
+        try {
+          const seeded = await seedAdvancingChecklist(eventId, archetype, transportMode);
+          if (!cancelled) setItems(seeded);
+        } catch (seedErr) {
+          console.error('[advancing-checklist] seed failed:', seedErr);
+        }
+      })();
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasParentItems, initialItems, loadingInitial, eventId]);
+
+  // ── Fetch / seed on mount (standalone mode only) ──
+  useEffect(() => {
+    if (hasParentItems) return;
     let cancelled = false;
     (async () => {
       try {
@@ -137,7 +173,7 @@ export function AdvancingChecklist({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  }, [hasParentItems, eventId]);
 
   // ── Auto-state sync ──
   const autoStates = computeAutoStates(crewRows, runOfShowData, contractStatus);

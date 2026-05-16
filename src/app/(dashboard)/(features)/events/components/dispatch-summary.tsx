@@ -16,6 +16,8 @@ import { swapCrewMember, searchAvailableAlternatives, acceptGearConflict, type A
 import { toast } from 'sonner';
 import type { DealCrewRow } from '../actions/deal-crew';
 import type { EventSummaryForPrism } from '../actions/get-event-summary';
+import type { EventGearItem, CrewGearMatch } from '../actions/event-gear-items';
+import type { GearDriftReport } from '../actions/gear-drift-types';
 
 // Transport mode display labels
 const TRANSPORT_MODE_LABELS: Record<string, string> = {
@@ -64,6 +66,26 @@ type DispatchSummaryProps = {
   sourceOrgId?: string | null;
   /** Lifted rail handler — click a crew-sourced gear chip to open the Crew Hub. */
   onOpenCrewDetail?: (row: DealCrewRow) => void;
+  /**
+   * Plan-lens bundle data threaded down to skip duplicate fetches inside the
+   * dispatch + gear cluster:
+   *   - `initialLoadDates` from `getPlanBundle.loadDates` (skips `getEventLoadDates`)
+   *   - `initialGearItems` from `getPlanBundle.gearItems` (skips GFC's own fetch)
+   *   - `initialConflicts` from `getPlanLensExtras.eventConflicts` (skips
+   *      `useConflictDetection`'s `getEventConflicts` on mount)
+   *   - `initialCrewMatches` / `initialDriftReport` from `getPlanLensExtras`
+   *     (passed through to GearFlightCheck)
+   * Each is optional — when undefined the underlying component falls back to
+   * its standalone fetch so DispatchSummary stays usable outside the Plan tab.
+   */
+  initialLoadDates?: { loadIn: string | null; loadOut: string | null };
+  initialGearItems?: EventGearItem[];
+  initialConflicts?: EventConflict[];
+  initialCrewMatches?: Record<string, CrewGearMatch[]>;
+  initialDriftReport?: GearDriftReport | null;
+  loadingInitial?: boolean;
+  /** Parent invalidator — fires after a mutation so the bundles refetch. */
+  onBundleChanged?: () => void;
 };
 
 // getCallTime and googleMapsUrl imported from ../lib/day-sheet-utils
@@ -359,8 +381,24 @@ export function DispatchSummary({
   hideVitals,
   sourceOrgId,
   onOpenCrewDetail,
+  initialLoadDates,
+  initialGearItems,
+  initialConflicts,
+  initialCrewMatches,
+  initialDriftReport,
+  loadingInitial,
+  onBundleChanged,
 }: DispatchSummaryProps) {
-  const { conflicts, refetch: refetchConflicts } = useConflictDetection({ eventId, enabled: !!eventId });
+  // Skip the `useConflictDetection` hook's mount fetch when the parent
+  // supplies pre-bundled conflicts. The hook also offers a `refetch` we no
+  // longer need here — the parent's `onBundleChanged` invalidates the extras
+  // bundle which re-resolves conflicts canonically.
+  const hasParentConflicts = initialConflicts !== undefined;
+  const { conflicts: liveConflicts, refetch: refetchConflicts } = useConflictDetection({
+    eventId,
+    enabled: !!eventId && !hasParentConflicts,
+  });
+  const conflicts: EventConflict[] = hasParentConflicts ? (initialConflicts ?? []) : liveConflicts;
 
   const runOfShowData = event.run_of_show_data ?? null;
   const logistics = normalizeLogistics(runOfShowData);
@@ -393,10 +431,13 @@ export function DispatchSummary({
   const venueRestrictions = runOfShowData?.venue_restrictions ?? null;
   const hasVenueRestrictions = typeof venueRestrictions === 'string' && venueRestrictions.trim().length > 0;
 
-  // Load-in / Load-out dates
-  const [loadIn, setLoadIn] = useState<string | null>(null);
-  const [loadOut, setLoadOut] = useState<string | null>(null);
-  const [loadDatesLoaded, setLoadDatesLoaded] = useState(false);
+  // Load-in / Load-out dates — bundle-fed on the Plan tab, self-fetched
+  // elsewhere. Avoids a duplicate `getEventLoadDates` round-trip when the
+  // parent already has the values in `getPlanBundle.loadDates`.
+  const hasParentLoadDates = initialLoadDates !== undefined;
+  const [loadIn, setLoadIn] = useState<string | null>(initialLoadDates?.loadIn ?? null);
+  const [loadOut, setLoadOut] = useState<string | null>(initialLoadDates?.loadOut ?? null);
+  const [loadDatesLoaded, setLoadDatesLoaded] = useState(hasParentLoadDates);
   const [savingLoadDates, setSavingLoadDates] = useState(false);
 
   const fetchLoadDates = useCallback(async () => {
@@ -406,7 +447,18 @@ export function DispatchSummary({
     setLoadDatesLoaded(true);
   }, [eventId]);
 
-  useEffect(() => { fetchLoadDates(); }, [fetchLoadDates]);
+  // Mirror parent-supplied load dates when present (Plan tab path).
+  useEffect(() => {
+    if (!hasParentLoadDates) return;
+    setLoadIn(initialLoadDates?.loadIn ?? null);
+    setLoadOut(initialLoadDates?.loadOut ?? null);
+    setLoadDatesLoaded(true);
+  }, [hasParentLoadDates, initialLoadDates]);
+
+  useEffect(() => {
+    if (hasParentLoadDates) return;
+    fetchLoadDates();
+  }, [hasParentLoadDates, fetchLoadDates]);
 
   const handleLoadDateChange = async (field: 'loadIn' | 'loadOut', value: string) => {
     if (!value) {
@@ -419,6 +471,7 @@ export function DispatchSummary({
       const result = await updateEventLoadDates(eventId, newLoadIn, newLoadOut);
       setSavingLoadDates(false);
       if (!result.success) toast.error(result.error);
+      else onBundleChanged?.();
       return;
     }
     const iso = new Date(value).toISOString();
@@ -430,7 +483,10 @@ export function DispatchSummary({
     const result = await updateEventLoadDates(eventId, newLoadIn, newLoadOut);
     setSavingLoadDates(false);
     if (!result.success) toast.error(result.error);
-    else onFlightCheckUpdated?.();
+    else {
+      onFlightCheckUpdated?.();
+      onBundleChanged?.();
+    }
   };
 
   /** Convert ISO to datetime-local input value */
@@ -633,6 +689,11 @@ export function DispatchSummary({
         maxVisible={5}
         onOpenCrewDetail={onOpenCrewDetail}
         bare
+        initialItems={initialGearItems}
+        initialCrewMatches={initialCrewMatches}
+        initialDriftReport={initialDriftReport}
+        loadingInitial={loadingInitial}
+        onInitialDataChanged={onBundleChanged}
       />
 
       </div>
