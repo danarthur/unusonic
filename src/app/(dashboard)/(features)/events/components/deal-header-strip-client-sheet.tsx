@@ -8,6 +8,7 @@
 
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle } from '@/shared/ui/sheet';
 import type { NetworkSearchOrg } from '@/features/network-data';
 import type { OrgRosterContact } from '../actions/deal-stakeholders';
@@ -53,7 +54,7 @@ export function ClientContactPickerSheet({
                   style={{ borderRadius: 'var(--stage-radius-panel)' }}
                 >
                   <span className="stage-readout">{c.display_name}</span>
-                  {c.email && (
+                  {displayableEmail(c.email) && (
                     <p className="text-xs text-[var(--stage-text-secondary)] mt-0.5">{c.email}</p>
                   )}
                 </button>

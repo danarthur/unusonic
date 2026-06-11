@@ -6,6 +6,7 @@ import { Phone, Mail, Pencil, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { StagePanel } from '@/shared/ui/stage-panel';
 import { STAGE_MEDIUM, STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 import { updateEventContacts, type ShowDayContact } from '../actions/update-event-contacts';
 
 type ShowDayContactsCardProps = {
@@ -223,7 +224,7 @@ export function ShowDayContactsCard({ eventId, initialContacts, onSaved }: ShowD
                       {c.phone}
                     </a>
                   )}
-                  {c.email && (
+                  {displayableEmail(c.email) && (
                     <a
                       href={`mailto:${c.email}`}
                       className="stage-label inline-flex items-center gap-1 transition-colors hover:text-[var(--stage-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded"

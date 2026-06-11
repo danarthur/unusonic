@@ -17,6 +17,7 @@ import {
 import { respondToCrewAssignment } from '@/features/ops/actions/respond-to-crew-assignment';
 import { format } from 'date-fns';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 
 /* ── Types ───────────────────────────────────────────────────────── */
 
@@ -220,7 +221,7 @@ export function OverviewTab({
                 {clientInfo.contactPhone}
               </a>
             )}
-            {clientInfo.contactEmail && (
+            {displayableEmail(clientInfo.contactEmail) && (
               <a
                 href={`mailto:${clientInfo.contactEmail}`}
                 className="text-sm text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors duration-[80ms] w-fit"

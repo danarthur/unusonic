@@ -1121,6 +1121,14 @@ export type Database = {
         }
         Returns: number
       }
+      resume_aion_session: {
+        Args: {
+          p_scope_entity_id?: string
+          p_scope_type: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       resume_or_create_aion_session: {
         Args: {
           p_scope_entity_id?: string
@@ -1700,6 +1708,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          auto_reminders_enabled: boolean | null
           bill_to_entity_id: string
           bill_to_snapshot: Json
           billing_email: string | null
@@ -1738,6 +1747,9 @@ export type Database = {
           qbo_last_sync_at: string | null
           qbo_sync_status: string
           qbo_sync_token: string | null
+          reminders_paused_reason: string | null
+          reminders_paused_until: string | null
+          requires_operator_action: boolean
           sent_at: string | null
           sent_by_user_id: string | null
           status: string
@@ -1753,6 +1765,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          auto_reminders_enabled?: boolean | null
           bill_to_entity_id: string
           bill_to_snapshot?: Json
           billing_email?: string | null
@@ -1791,6 +1804,9 @@ export type Database = {
           qbo_last_sync_at?: string | null
           qbo_sync_status?: string
           qbo_sync_token?: string | null
+          reminders_paused_reason?: string | null
+          reminders_paused_until?: string | null
+          requires_operator_action?: boolean
           sent_at?: string | null
           sent_by_user_id?: string | null
           status?: string
@@ -1806,6 +1822,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          auto_reminders_enabled?: boolean | null
           bill_to_entity_id?: string
           bill_to_snapshot?: Json
           billing_email?: string | null
@@ -1844,6 +1861,9 @@ export type Database = {
           qbo_last_sync_at?: string | null
           qbo_sync_status?: string
           qbo_sync_token?: string | null
+          reminders_paused_reason?: string | null
+          reminders_paused_until?: string | null
+          requires_operator_action?: boolean
           sent_at?: string | null
           sent_by_user_id?: string | null
           status?: string
@@ -1869,6 +1889,51 @@ export type Database = {
           {
             foreignKeyName: "invoices_parent_invoice_id_fkey"
             columns: ["parent_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_reminder_log: {
+        Row: {
+          cadence_step: string
+          email_to: string
+          id: string
+          invoice_id: string
+          resend_message_id: string | null
+          sent_at: string
+          workspace_id: string
+        }
+        Insert: {
+          cadence_step: string
+          email_to: string
+          id?: string
+          invoice_id: string
+          resend_message_id?: string | null
+          sent_at?: string
+          workspace_id: string
+        }
+        Update: {
+          cadence_step?: string
+          email_to?: string
+          id?: string
+          invoice_id?: string
+          resend_message_id?: string | null
+          sent_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reminder_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_balances"
+            referencedColumns: ["invoice_id"]
+          },
+          {
+            foreignKeyName: "payment_reminder_log_invoice_id_fkey"
+            columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
             referencedColumns: ["id"]
@@ -2388,6 +2453,15 @@ export type Database = {
           tax_amount: number
           terms: string
           total_amount: number
+        }[]
+      }
+      invoices_needing_reminder: {
+        Args: { p_now: string }
+        Returns: {
+          cadence_kind: string
+          cadence_step: string
+          invoice_id: string
+          tone: string
         }[]
       }
       log_referral: {
@@ -6509,6 +6583,7 @@ export type Database = {
         Row: {
           aion_proactive_enabled: boolean
           archived_at: string | null
+          auto_reminders_enabled: boolean | null
           budget_estimated: number | null
           compelling_event: string | null
           created_at: string
@@ -6548,6 +6623,7 @@ export type Database = {
         Insert: {
           aion_proactive_enabled?: boolean
           archived_at?: string | null
+          auto_reminders_enabled?: boolean | null
           budget_estimated?: number | null
           compelling_event?: string | null
           created_at?: string
@@ -6587,6 +6663,7 @@ export type Database = {
         Update: {
           aion_proactive_enabled?: boolean
           archived_at?: string | null
+          auto_reminders_enabled?: boolean | null
           budget_estimated?: number | null
           compelling_event?: string | null
           created_at?: string
@@ -7135,6 +7212,7 @@ export type Database = {
           public_token: string
           reminder_sent_at: string | null
           resend_message_id: string | null
+          revision_note: string | null
           scope_notes: string | null
           signed_at: string | null
           signed_ip: string | null
@@ -7142,6 +7220,8 @@ export type Database = {
           signer_name: string | null
           status: Database["public"]["Enums"]["proposal_status"]
           stripe_payment_intent_id: string | null
+          superseded_at: string | null
+          superseded_by_proposal_id: string | null
           terms_and_conditions: string | null
           updated_at: string
           view_count: number
@@ -7168,6 +7248,7 @@ export type Database = {
           public_token?: string
           reminder_sent_at?: string | null
           resend_message_id?: string | null
+          revision_note?: string | null
           scope_notes?: string | null
           signed_at?: string | null
           signed_ip?: string | null
@@ -7175,6 +7256,8 @@ export type Database = {
           signer_name?: string | null
           status?: Database["public"]["Enums"]["proposal_status"]
           stripe_payment_intent_id?: string | null
+          superseded_at?: string | null
+          superseded_by_proposal_id?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
           view_count?: number
@@ -7201,6 +7284,7 @@ export type Database = {
           public_token?: string
           reminder_sent_at?: string | null
           resend_message_id?: string | null
+          revision_note?: string | null
           scope_notes?: string | null
           signed_at?: string | null
           signed_ip?: string | null
@@ -7208,6 +7292,8 @@ export type Database = {
           signer_name?: string | null
           status?: Database["public"]["Enums"]["proposal_status"]
           stripe_payment_intent_id?: string | null
+          superseded_at?: string | null
+          superseded_by_proposal_id?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
           view_count?: number
@@ -7219,6 +7305,13 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_superseded_by_proposal_id_fkey"
+            columns: ["superseded_by_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
           {
@@ -7687,6 +7780,7 @@ export type Database = {
           aion_actions_reset_at: string | null
           aion_actions_used: number
           aion_config: Json
+          auto_reminders_enabled: boolean
           autonomous_addon_enabled: boolean
           autonomous_resolution_count: number | null
           billing_status: string
@@ -7729,6 +7823,7 @@ export type Database = {
           aion_actions_reset_at?: string | null
           aion_actions_used?: number
           aion_config?: Json
+          auto_reminders_enabled?: boolean
           autonomous_addon_enabled?: boolean
           autonomous_resolution_count?: number | null
           billing_status?: string
@@ -7771,6 +7866,7 @@ export type Database = {
           aion_actions_reset_at?: string | null
           aion_actions_used?: number
           aion_config?: Json
+          auto_reminders_enabled?: boolean
           autonomous_addon_enabled?: boolean
           autonomous_resolution_count?: number | null
           billing_status?: string
@@ -8335,9 +8431,17 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      send_proposal_revision: {
+        Args: { p_prev_proposal_id: string; p_revision_note?: string }
+        Returns: string
+      }
       strip_industry_tag: {
         Args: { p_tag: string; p_workspace_id: string }
         Returns: undefined
+      }
+      sync_deal_crew_from_proposal: {
+        Args: { p_deal_id: string; p_workspace_id: string }
+        Returns: Json
       }
       unusonic_current_entity_email: { Args: never; Returns: string }
       unusonic_current_entity_id: { Args: never; Returns: string }

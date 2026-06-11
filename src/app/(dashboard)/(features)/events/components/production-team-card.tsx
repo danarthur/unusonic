@@ -190,6 +190,14 @@ export function ProductionTeamCard({ dealId, sourceOrgId, eventDate, workspaceId
     const result = await removeDealCrew(rowId);
     if (result.success) {
       setCrew((prev) => prev.filter((r) => r.id !== rowId));
+      if (result.revertedGearCount === 0) {
+        toast('Removed');
+      } else {
+        const itemLabel = result.revertedGearCount === 1
+          ? '1 crew-sourced gear item'
+          : `${result.revertedGearCount} crew-sourced gear items`;
+        toast(`Removed. ${itemLabel} reverted to company.`);
+      }
     } else {
       toast.error(result.error);
     }

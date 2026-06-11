@@ -133,9 +133,6 @@ async function fetchInvoice(token: string): Promise<PublicInvoiceData | null> {
   if (!data) return null;
 
   // RPC returns a single row or an array with one element.
-  // TODO(finance): get_public_invoice RPC currently doesn't return
-  // workspace_id or accept_online_payments; PublicInvoiceData declares them
-  // for downstream callers. Cast at the boundary until the RPC is updated.
   const rawRow = Array.isArray(data) ? data[0] : data;
   if (!rawRow) return null;
   return {

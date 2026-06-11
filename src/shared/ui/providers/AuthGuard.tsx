@@ -12,7 +12,7 @@ import { decodeJwtExp } from '@/shared/lib/auth/decode-jwt-exp';
  *
  * Instead of polling every 2 minutes, this guard checks session validity:
  *   1. On `visibilitychange` (tab becomes visible again)
- *   2. On first user interaction after 5+ minutes of idle
+ *   2. On first user interaction after 2+ minutes of idle
  *   3. Via `onAuthStateChange` for real-time Supabase events
  *
  * When the session is gone, sets `sessionExpired = true` in the auth status

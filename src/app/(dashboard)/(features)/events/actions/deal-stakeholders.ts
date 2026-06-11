@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { DealStakeholderRole } from '../lib/stakeholder-roles';
 
 // NOTE: do NOT re-export `DealStakeholderRole` from this file.
@@ -596,7 +597,7 @@ export async function getOrgRosterForStakeholder(orgId: string): Promise<OrgRost
         const attrs = (de.attributes as Record<string, unknown>) ?? {};
         const rawEmail = (attrs.email as string | null) ?? emailByLegacyId.get(de.legacy_entity_id ?? '') ?? null;
         // Never expose ghost placeholder emails in the UI
-        const email = rawEmail && !rawEmail.startsWith('ghost-') && !rawEmail.endsWith('.local') ? rawEmail : null;
+        const email = displayableEmail(rawEmail);
         const ctx = rosterCtxByDirId.get(de.id) ?? {};
         const display =
           [(ctx.first_name as string) ?? '', (ctx.last_name as string) ?? ''].filter(Boolean).join(' ').trim() ||

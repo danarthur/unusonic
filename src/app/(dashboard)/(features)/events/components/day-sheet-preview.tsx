@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { STAGE_HEAVY, STAGE_LIGHT } from '@/shared/lib/motion-constants';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 import { compileDaySheetData, type DaySheetData } from '../actions/compile-day-sheet-data';
 import { compileAndSendDaySheet } from '../actions/compile-and-send-day-sheet';
 
@@ -297,7 +298,7 @@ function DaySheetContent({ data }: { data: DaySheetData }) {
                       {contact.phone}
                     </span>
                   )}
-                  {contact.email && (
+                  {displayableEmail(contact.email) && (
                     <span className="text-xs" style={{ color: 'var(--stage-text-tertiary)' }}>
                       {contact.email}
                     </span>

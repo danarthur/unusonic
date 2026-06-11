@@ -13,6 +13,7 @@ import {
 } from '@/shared/ui/sheet';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { updateClientAddress } from '../actions/update-client-address';
 import { updateIndividualEntity } from '../actions/update-individual-entity';
@@ -98,7 +99,7 @@ export function ClientSummaryCard({ client, compact }: ClientSummaryCardProps) {
           </div>
           <ChevronRight className="size-4 text-[var(--stage-text-secondary)] shrink-0" strokeWidth={1.5} aria-hidden />
         </div>
-        {!compact && (mainContact?.phone || mainContact?.email) && (
+        {!compact && mainContact && (mainContact.phone || displayableEmail(mainContact.email)) && (
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[var(--stage-edge-subtle)]">
             {mainContact.phone && (
               <a
@@ -110,7 +111,7 @@ export function ClientSummaryCard({ client, compact }: ClientSummaryCardProps) {
                 {mainContact.phone}
               </a>
             )}
-            {mainContact.email && (
+            {displayableEmail(mainContact.email) && (
               <a
                 href={`mailto:${mainContact.email}`}
                 onClick={(e) => e.stopPropagation()}
@@ -274,7 +275,7 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
                   </div>
                 </>
               )}
-              {organization.support_email && !mainContact?.email && (
+              {displayableEmail(organization.support_email) && !mainContact?.email && (
                 <a
                   href={`mailto:${organization.support_email}`}
                   className="flex items-center gap-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
