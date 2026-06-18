@@ -179,6 +179,7 @@ async function handleFollowUpConfirm(
     body: draft,
     dealId,
     workspaceId,
+    dealTitle,
   });
 
   if (!result.sent) {

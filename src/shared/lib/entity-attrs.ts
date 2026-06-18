@@ -327,6 +327,19 @@ export type VenueAttrs = z.infer<typeof VenueAttrsSchema>;
 export type IndividualAttrs = z.infer<typeof IndividualAttrsSchema>;
 export type CoupleAttrs = z.infer<typeof CoupleAttrsSchema>;
 
+// ─── displayableEmail — ghost sentinel guard ─────────────────────────────────
+
+/**
+ * Returns the email only if it is a real, displayable contact address.
+ * Ghost sentinels (`ghost-<uuid>@unusonic.local`) are internal bookkeeping
+ * and must never reach a human-readable UI. See directory-schema.md §5.3.
+ */
+export function displayableEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  if (email.startsWith('ghost-') || email.endsWith('.local')) return null;
+  return email;
+}
+
 // ─── readEntityAttrs — typed overloads ───────────────────────────────────────
 
 /**

@@ -11,15 +11,16 @@
  * `'use server'`, so the actions remain server actions when imported here.
  *
  * Splits:
- *   - sending.ts — proposal email + DocuSeal flow (publishProposal,
- *                  sendProposalLinkToRecipients, revertProposalToDraft,
- *                  sendForSignature, sendProposalReminder)
- *   - main.ts    — proposal reads, package operations, line-item mutations
- *                  (getProposalForDeal/Event, getExpandedPackageLineItems,
- *                  addPackageToProposal, getPackages, getCatalogPackages,
- *                  deleteProposalItemsByPackageInstanceId, unpackPackageInstance,
- *                  upsertProposal, updateProposalItem, deleteProposalItem,
- *                  updateProposal)
+ *   - sending.ts   — proposal email + DocuSeal flow (publishProposal,
+ *                    sendProposalLinkToRecipients, revertProposalToDraft
+ *                    [@deprecated], sendForSignature, sendProposalReminder)
+ *   - main.ts      — proposal reads, package operations, line-item mutations
+ *                    (getProposalForDeal/Event, getExpandedPackageLineItems,
+ *                    addPackageToProposal, getPackages, getCatalogPackages,
+ *                    deleteProposalItemsByPackageInstanceId, unpackPackageInstance,
+ *                    upsertProposal, updateProposalItem, deleteProposalItem,
+ *                    updateProposal)
+ *   - revisions.ts — contract-amendment flow (sendProposalRevision)
  */
 
 // ── sending / signature flow ────────────────────────────────────────────────
@@ -67,3 +68,7 @@ export type {
   ProposalItemPatch,
   ProposalPatch,
 } from './proposal-actions/main';
+
+// ── revision flow (contract amendment) ──────────────────────────────────────
+export { sendProposalRevision } from './proposal-actions/revisions';
+export type { SendProposalRevisionResult } from './proposal-actions/revisions';

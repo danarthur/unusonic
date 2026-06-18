@@ -29,6 +29,7 @@ import {
   addScoutRosterToGhostOrg,
   softDeleteGhostRelationship,
 } from '@/features/network-data';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
 import { EmployeeEntityForm } from './EmployeeEntityForm';
 import { FreelancerEntityForm } from './FreelancerEntityForm';
@@ -832,7 +833,7 @@ function RosterSection({
             <div className="min-w-0 flex-1">
               <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{m.name}</p>
               {(() => {
-                const visibleEmail = m.email && !m.email.startsWith('ghost-') && !m.email.endsWith('.local') ? m.email : null;
+                const visibleEmail = displayableEmail(m.email);
                 const subtitle = [m.jobTitle, visibleEmail].filter(Boolean).join(' · ');
                 return subtitle ? (
                   <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] truncate">{subtitle}</p>

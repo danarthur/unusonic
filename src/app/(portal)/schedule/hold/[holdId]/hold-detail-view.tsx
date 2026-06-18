@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, Clock, MapPin, DollarSign, Briefcase, Check, X, Loader2, FileText, UserCircle, Phone } from 'lucide-react';
 import { respondToDealCrewHold } from '@/features/ops/actions/respond-to-deal-crew-hold';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { DealHoldDetail } from '@/features/ops/actions/get-deal-hold-detail';
 
 const ARCHETYPE_LABELS: Record<string, string> = {
@@ -202,7 +203,7 @@ export function HoldDetailView({ hold, personEntityId }: HoldDetailViewProps) {
                     {hold.contactPhone}
                   </a>
                 )}
-                {hold.contactEmail && (
+                {displayableEmail(hold.contactEmail) && (
                   <a href={`mailto:${hold.contactEmail}`} className="text-xs text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors">
                     {hold.contactEmail}
                   </a>

@@ -2,14 +2,20 @@
  * Send an email via Resend and log the follow-up action.
  * Used by dispatch handlers after the user confirms a draft.
  *
+ * Uses the canonical render() + toPlainText() pattern (see
+ * docs/reference/code/email-sending.md §2) via the FollowUpConfirmEmail
+ * template — never raw HTML string interpolation.
+ *
  * Uses getWorkspaceFrom so Aion-initiated messages honour the workspace's
  * verified custom sending domain — matching the proposal/reminder path —
  * instead of falling through to the global EMAIL_FROM.
  */
 
+import { render, toPlainText } from '@react-email/render';
 import { logFollowUpAction } from '@/app/(dashboard)/(features)/events/actions/follow-up-actions';
 import { recordAionAction } from '@/features/intelligence/lib/aion-gate';
-import { getResend, getWorkspaceFrom } from '@/shared/api/email/core';
+import { getResend, getWorkspaceFrom, resolveWorkspaceEmailPalette } from '@/shared/api/email/core';
+import { FollowUpConfirmEmail } from '@/shared/api/email/templates/FollowUpConfirmEmail';
 
 export async function sendDispatchEmail(opts: {
   to: string;
@@ -17,8 +23,11 @@ export async function sendDispatchEmail(opts: {
   body: string;
   dealId: string;
   workspaceId: string;
+  dealTitle?: string | null;
+  senderName?: string | null;
+  workspaceName?: string | null;
 }): Promise<{ sent: boolean; error?: string }> {
-  const { to, subject, body, dealId, workspaceId } = opts;
+  const { to, subject, body, dealId, workspaceId, dealTitle, senderName, workspaceName } = opts;
 
   try {
     const resend = getResend();
@@ -26,13 +35,24 @@ export async function sendDispatchEmail(opts: {
       return { sent: false, error: 'Email not configured (RESEND_API_KEY missing).' };
     }
     const from = await getWorkspaceFrom(workspaceId);
+    const theme = await resolveWorkspaceEmailPalette(workspaceId);
+
+    const element = FollowUpConfirmEmail({
+      body,
+      dealTitle: dealTitle ?? null,
+      senderName: senderName ?? null,
+      workspaceName: workspaceName ?? null,
+      theme,
+    });
+    const html = await render(element);
+    const text = toPlainText(html);
 
     const { error } = await resend.emails.send({
       from,
       to,
       subject,
-      html: `<p>${body.replace(/\n/g, '<br>')}</p>`,
-      text: body,
+      html,
+      text,
     });
 
     if (error) {
