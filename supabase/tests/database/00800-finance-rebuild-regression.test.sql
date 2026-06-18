@@ -250,17 +250,17 @@ SELECT ok(
 );
 
 -- ==========================================================================
--- Test 10: finance.payments direct SELECT is denied (RPC-only access)
+-- Test 10: finance.payments direct SELECT is allowed (grant + workspace RLS)
 -- ==========================================================================
--- Same posture as finance.invoices / stripe_webhook_events: authenticated has
--- no grant on finance.payments. Cross-workspace isolation is enforced inside
--- the SECURITY DEFINER RPCs that wrap payment reads.
+-- Updated for migration 20260504000100_finance_authenticated_grants:
+-- authenticated has a SELECT grant on finance.payments, with workspace-scoped
+-- RLS as the access decision point (writes still go through record_payment /
+-- service-role webhooks). The query runs without a grant-level denial; RLS
+-- filters to the caller's workspace.
 SELECT test_authenticate_as('f2222222-2222-4222-a222-222222222222'::uuid);
-SELECT throws_ok(
+SELECT lives_ok(
   $$SELECT count(*) FROM finance.payments WHERE invoice_id = 'f4000000-0000-4000-a000-000000000004'::uuid$$,
-  '42501',
-  'permission denied for table payments',
-  'Authenticated user cannot read finance.payments directly (RPC-only access)'
+  'Authenticated user can read finance.payments (SELECT grant + workspace RLS)'
 );
 SELECT test_reset_role();
 

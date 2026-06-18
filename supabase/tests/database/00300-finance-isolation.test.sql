@@ -1,15 +1,18 @@
--- Phase 4: finance.invoices isolation — current posture verification.
+-- Phase 4: finance.* access posture verification.
 --
--- Per CLAUDE.md Finance Schema: authenticated role has NO direct grants on
--- finance.invoices. All reads + writes go through SECURITY DEFINER RPCs
--- (finance.spawn_invoices_from_proposal, finance.record_payment,
--- finance.get_public_invoice, finance.metric_* family, etc.). Direct SELECT/
--- INSERT/UPDATE/DELETE from authenticated returns "permission denied" at the
--- grant check, strictly tighter than the RLS policy would provide.
+-- Access model (updated 2026-05-04, migration 20260504000100_finance_
+-- authenticated_grants): the authenticated role has direct table GRANTs on
+-- finance.invoices / invoice_line_items (full CRUD) and finance.payments
+-- (SELECT), with workspace-scoped RLS (`workspace_id IN get_my_workspace_ids()`)
+-- as the sole access decision point. The earlier "RPC-only, no grant" posture
+-- was abandoned because the missing GRANT made /finance return "permission
+-- denied for table invoices" for every authenticated user before RLS even
+-- evaluated. anon still has no direct grant — public access is only via the
+-- SECURITY DEFINER finance.get_public_invoice RPC.
 --
--- This file asserts that posture holds. Richer isolation coverage (per-RPC,
--- per-workspace) should be added by calling the RPCs directly — pre-pilot
--- follow-up, not CI-repair scope.
+-- This file asserts that posture: authenticated can read each table (grant +
+-- RLS), anon cannot. Richer per-workspace isolation coverage should be added
+-- by seeding cross-workspace rows — pre-pilot follow-up, not CI-repair scope.
 BEGIN;
 SELECT plan(4);
 
@@ -40,48 +43,41 @@ SELECT test_create_user_in_workspace(
   'b1111111-1111-4111-a111-111111111111'::uuid
 );
 
--- ── Tests — each asserts "permission denied at grant level" ──
+-- ── Tests — authenticated reads succeed (grant + RLS); anon has no grant ──
 
--- 1. SELECT on finance.invoices is denied.
+-- 1. Authenticated workspace member can SELECT finance.invoices. The grant
+--    lets the query run; RLS scopes the result to their workspace (0 rows here
+--    since none seeded — the point is no "permission denied" at the grant gate).
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-SELECT throws_ok(
+SELECT lives_ok(
   $$SELECT count(*) FROM finance.invoices$$,
-  '42501',
-  'permission denied for table invoices',
-  'Direct SELECT on finance.invoices denied (RPC-only access)'
+  'Authenticated can SELECT finance.invoices (grant + workspace RLS)'
 );
 SELECT test_reset_role();
 
--- 2. INSERT on finance.invoices is denied.
+-- 2. Authenticated workspace member can SELECT finance.payments (SELECT grant).
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-SELECT throws_ok(
-  $$INSERT INTO finance.invoices (workspace_id, invoice_number, total_amount)
-    VALUES ('b1111111-1111-4111-a111-111111111111'::uuid, 'INV-X', 100)$$,
-  '42501',
-  'permission denied for table invoices',
-  'Direct INSERT on finance.invoices denied (RPC-only access)'
-);
-SELECT test_reset_role();
-
--- 3. SELECT on finance.payments is denied.
-SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-SELECT throws_ok(
+SELECT lives_ok(
   $$SELECT count(*) FROM finance.payments$$,
-  '42501',
-  'permission denied for table payments',
-  'Direct SELECT on finance.payments denied (RPC-only access)'
+  'Authenticated can SELECT finance.payments (grant + workspace RLS)'
 );
 SELECT test_reset_role();
 
--- 4. SELECT on finance.invoice_line_items is denied.
+-- 3. Authenticated workspace member can SELECT finance.invoice_line_items.
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-SELECT throws_ok(
+SELECT lives_ok(
   $$SELECT count(*) FROM finance.invoice_line_items$$,
-  '42501',
-  'permission denied for table invoice_line_items',
-  'Direct SELECT on finance.invoice_line_items denied (RPC-only access)'
+  'Authenticated can SELECT finance.invoice_line_items (grant + workspace RLS)'
 );
 SELECT test_reset_role();
+
+-- 4. anon has NO direct grant on finance.invoices — public access is only via
+--    the SECURITY DEFINER get_public_invoice RPC. Checked structurally so the
+--    assertion doesn't depend on anon being able to call pgTAP helpers.
+SELECT ok(
+  NOT has_table_privilege('anon', 'finance.invoices', 'SELECT'),
+  'anon has no direct SELECT grant on finance.invoices'
+);
 
 SELECT * FROM finish();
 ROLLBACK;

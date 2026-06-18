@@ -15,13 +15,28 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const KNOWLEDGE_SRC = readFileSync(resolve(__dirname, '../knowledge.ts'), 'utf8');
-const WRITES_SRC    = readFileSync(resolve(__dirname, '../writes.ts'), 'utf8');
+// knowledge.ts was refactored from a monolith into a barrel that re-exports
+// the lookup_* / search_* tools from the ./knowledge/ subdirectory
+// (lookup-tools.ts, event-tools.ts, helpers.ts, …). Concatenate the barrel
+// plus every subfile so the source-discipline assertions below still cover
+// each tool definition and its workspace_id clamp in their new home — and so
+// the canary keeps firing if a future refactor drops a clamp anywhere in the
+// knowledge toolset.
+const KNOWLEDGE_DIR = resolve(__dirname, '../knowledge');
+const KNOWLEDGE_SRC = [
+  resolve(__dirname, '../knowledge.ts'),
+  ...readdirSync(KNOWLEDGE_DIR)
+    .filter((f) => f.endsWith('.ts'))
+    .map((f) => resolve(KNOWLEDGE_DIR, f)),
+]
+  .map((p) => readFileSync(p, 'utf8'))
+  .join('\n');
+const WRITES_SRC = readFileSync(resolve(__dirname, '../writes.ts'), 'utf8');
 
 // ─── Plan §3.11 tools — presence sanity ────────────────────────────────────
 //
