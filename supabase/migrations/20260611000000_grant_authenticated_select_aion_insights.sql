@@ -1,0 +1,22 @@
+-- Grant SELECT on cortex.aion_insights to the authenticated role.
+--
+-- Bug: cortex.aion_insights has a workspace-scoped SELECT RLS policy
+-- (`insights_select`: workspace_id IN get_my_workspace_ids()) but was missing
+-- the table-level GRANT for authenticated — unlike its siblings
+-- cortex.aion_sessions / aion_messages / aion_proactive_lines, which all carry
+-- the SELECT grant. Same failure mode as the finance.* tables fixed in
+-- 20260504000100_finance_authenticated_grants: PostgREST denies with
+-- "permission denied for table aion_insights" before RLS ever evaluates.
+--
+-- User-facing impact: getPendingInsights() in
+-- src/app/(dashboard)/(features)/aion/actions/aion-insight-actions.ts reads
+-- cortex.aion_insights via the cookie-authenticated client and swallows the
+-- error (`if (error || !data) return []`), so the lobby Daily Brief silently
+-- shows zero pending insights for every workspace. Writes already route through
+-- service-role RPCs (dismiss_aion_insight, upsert_aion_insight), so only SELECT
+-- is needed here; RLS remains the access decision point.
+--
+-- Caught by supabase/tests/database/01100-aion-cross-workspace-rls.test.sql
+-- test 4 (cross-workspace SELECT must return 0 rows, not raise).
+
+GRANT SELECT ON cortex.aion_insights TO authenticated;
