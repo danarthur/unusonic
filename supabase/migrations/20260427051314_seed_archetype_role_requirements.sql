@@ -154,19 +154,29 @@ DECLARE
   v_total_rows int;
   v_workspace_count int;
   v_min_per_workspace int;
+  v_existing_workspaces int;
 BEGIN
+  SELECT COUNT(*) INTO v_existing_workspaces FROM public.workspaces;
+
   SELECT COUNT(*) INTO v_total_rows FROM ops.archetype_role_requirements;
   SELECT COUNT(DISTINCT workspace_id) INTO v_workspace_count FROM ops.archetype_role_requirements;
   SELECT MIN(c) INTO v_min_per_workspace FROM (
     SELECT COUNT(*) AS c FROM ops.archetype_role_requirements GROUP BY workspace_id
   ) sub;
 
-  IF v_total_rows = 0 THEN
-    RAISE EXCEPTION 'Safety audit: archetype_role_requirements empty after seed';
-  END IF;
-  IF v_min_per_workspace < 41 THEN
-    RAISE EXCEPTION 'Safety audit: workspace seeded with only % rows (expected ≥41)', v_min_per_workspace;
+  -- On a fresh database with no workspaces yet (e.g. CI `supabase start`, or a
+  -- clean `supabase db reset` before seed.sql runs), the backfill correctly
+  -- seeds zero rows — the AFTER INSERT trigger seeds each future workspace on
+  -- creation. Only enforce the non-empty / ≥41-per-workspace invariants when
+  -- workspaces already exist, so the audit can't false-fail on an empty DB.
+  IF v_existing_workspaces > 0 THEN
+    IF v_total_rows = 0 THEN
+      RAISE EXCEPTION 'Safety audit: archetype_role_requirements empty after seed';
+    END IF;
+    IF v_min_per_workspace < 41 THEN
+      RAISE EXCEPTION 'Safety audit: workspace seeded with only % rows (expected ≥41)', v_min_per_workspace;
+    END IF;
   END IF;
   RAISE NOTICE 'Audit: % rows across % workspaces (min % per workspace)',
-    v_total_rows, v_workspace_count, v_min_per_workspace;
+    v_total_rows, v_workspace_count, COALESCE(v_min_per_workspace, 0);
 END $$;
