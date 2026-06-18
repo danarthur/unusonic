@@ -176,21 +176,28 @@ SELECT ok(
 );
 SELECT test_reset_role();
 
--- 6. cortex.aion_user_signal_mutes: RLS-on-no-policy — authenticated
---    SELECT returns 0 even for own rows. All access must go through the
---    SECURITY DEFINER RPCs.
+-- 6. cortex.aion_user_signal_mutes: RPC-only. authenticated has no direct
+--    table grant — all access goes through the SECURITY DEFINER RPCs
+--    (is_user_signal_muted etc.), so a direct SELECT is denied at the grant
+--    gate. (App never reads this table directly; only via RPC.)
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-SELECT ok(
-  (SELECT count(*) FROM cortex.aion_user_signal_mutes) = 0,
-  'cortex.aion_user_signal_mutes: authenticated SELECT returns 0 (RLS-no-policy)'
+SELECT throws_ok(
+  $$SELECT count(*) FROM cortex.aion_user_signal_mutes$$,
+  '42501',
+  'permission denied for table aion_user_signal_mutes',
+  'cortex.aion_user_signal_mutes: authenticated has no direct grant (RPC-only)'
 );
 SELECT test_reset_role();
 
--- 7. cortex.aion_workspace_signal_disables: same RLS-no-policy posture.
+-- 7. cortex.aion_workspace_signal_disables: same RPC/service-role-only posture
+--    (read via getSystemClient in pill-history-actions + the cron evaluator;
+--    no client RLS policy, no authenticated grant).
 SELECT test_authenticate_as('a1111111-1111-4111-a111-111111111111'::uuid);
-SELECT ok(
-  (SELECT count(*) FROM cortex.aion_workspace_signal_disables) = 0,
-  'cortex.aion_workspace_signal_disables: authenticated SELECT returns 0 (RLS-no-policy)'
+SELECT throws_ok(
+  $$SELECT count(*) FROM cortex.aion_workspace_signal_disables$$,
+  '42501',
+  'permission denied for table aion_workspace_signal_disables',
+  'cortex.aion_workspace_signal_disables: authenticated has no direct grant (service-role only)'
 );
 SELECT test_reset_role();
 
