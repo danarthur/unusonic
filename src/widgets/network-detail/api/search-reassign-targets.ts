@@ -20,17 +20,25 @@ export type ReassignTarget = {
 export async function searchReassignTargets(
   workspaceId: string,
   query: string,
+  /**
+   * Restrict to certain entity types. The employer picker passes ['company']
+   * so a planner cannot be recorded as working for a person or a venue.
+   * Omitted, the search stays broad for the capture reassign dialog.
+   */
+  types?: ('person' | 'company' | 'venue' | 'couple')[],
 ): Promise<ReassignTarget[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const base = supabase
     .schema('directory')
     .from('entities')
     .select('id, display_name, type')
     .eq('owner_workspace_id', workspaceId)
-    .ilike('display_name', `%${q}%`)
+    .ilike('display_name', `%${q}%`);
+
+  const { data } = await (types?.length ? base.in('type', types) : base)
     .not('display_name', 'is', null)
     .order('updated_at', { ascending: false })
     .limit(20);

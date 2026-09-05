@@ -11,6 +11,7 @@
  * Renders (conditional on entity type):
  *   • PromotedMetricsRow — two inline metrics
  *   • EntitySummaryCard  — AI Brief
+ *   • EmploymentCard     — person/couple only
  *   • WorkingNotesCard   — person/couple only
  *   • TeamCard           — company/venue only
  *   • CaptureTimelinePanel — all types
@@ -24,6 +25,7 @@ import { cn } from '@/shared/lib/utils';
 import { EntitySummaryCard } from './EntitySummaryCard';
 import { CaptureTimelinePanel } from './CaptureTimelinePanel';
 import { WorkingNotesCard } from './WorkingNotesCard';
+import { EmploymentCard } from './EmploymentCard';
 import { TeamCard } from './TeamCard';
 import { PersonProductionsPanel } from './PersonProductionsPanel';
 import { ReferralsCard } from './ReferralsCard';
@@ -84,6 +86,11 @@ export function EntityOverviewCards({
           Sits above the team card so the building-first info lands first. */}
       {isVenue && (
         <VenueSpecsCompactCard workspaceId={workspaceId} entityId={entityId} />
+      )}
+      {/* Employment sits above working notes: "who do they work for" is the
+          first thing you need when a name you half-recognise calls. */}
+      {isPersonOrCouple && (
+        <EmploymentCard workspaceId={workspaceId} entityId={entityId} />
       )}
       {isPersonOrCouple && (
         <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
