@@ -15,7 +15,7 @@
 import * as React from 'react';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { TradeLedger } from '../TradeLedger';
-import { UpcomingAssignments } from '../UpcomingAssignments';
+import { EntityAssignments } from '../EntityAssignments';
 import { CrewKitSection } from '../CrewKitSection';
 import { QuickBookAction } from '../QuickBookAction';
 import { DealHistoryPanel } from '../DealHistoryPanel';
@@ -167,7 +167,7 @@ export function TransmissionPanel({
 
       {/* ── Employee: Upcoming assignments card ── */}
       {!isPartner && details.subjectEntityId && (
-        <UpcomingAssignments entityId={details.subjectEntityId} />
+        <EntityAssignments entityId={details.subjectEntityId} variant="summary" />
       )}
 
       {/* ── Employee: Kit (equipment profile) ── */}

@@ -15,7 +15,8 @@
  * @module app/network/entity/EntityRecordsAside
  */
 
-import { AssignmentsPanel, DealsPanel, FinancePanel } from './entity-studio-panels';
+import { DealsPanel, FinancePanel } from './entity-studio-panels';
+import { EntityAssignments } from '@/widgets/network-detail/ui/EntityAssignments';
 import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 
 export interface EntityRecordsAsideProps {
@@ -29,7 +30,7 @@ export function EntityRecordsAside({ entityId, entityType, workspaceId }: Entity
 
   return (
     <aside className="min-w-0 space-y-3">
-      <AssignmentsPanel entityId={entityId} />
+      <EntityAssignments entityId={entityId} variant="full" />
       <DealsPanel entityId={entityId} />
       <FinancePanel entityId={entityId} />
       {workspaceId && (

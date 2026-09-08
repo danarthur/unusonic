@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Calendar, Briefcase, Receipt } from 'lucide-react';
+import { ChevronDown, Briefcase, Receipt } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import {
@@ -11,7 +11,6 @@ import {
   type EntityDeal,
   type EntityInvoiceSummary,
 } from '@/features/network-data/api/entity-context-actions';
-import { getEntityCrewSchedule, getEntityCrewHistory, type CrewScheduleEntry } from '@/features/ops/actions/get-entity-crew-schedule';
 
 export function AccordionSection({
   label,
@@ -54,103 +53,6 @@ export function AccordionSection({
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-function AssignmentRow({ entry, muted = false }: { entry: CrewScheduleEntry; muted?: boolean }) {
-  return (
-    <li className="flex items-start gap-3 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] px-3 py-2.5">
-      <div className="min-w-0 flex-1">
-        <p className={cn('text-[length:var(--stage-data-size)] font-medium truncate', muted ? 'text-[var(--stage-text-secondary)]' : 'text-[var(--stage-text-primary)]')}>
-          {entry.event_title ?? 'Untitled show'}
-        </p>
-        <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
-          {entry.role}
-          {entry.starts_at ? ` · ${new Date(entry.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
-          {entry.venue_name ? ` · ${entry.venue_name}` : ''}
-        </p>
-      </div>
-      <span className={cn(
-        'shrink-0 rounded-full px-2 py-0.5 stage-badge-text uppercase tracking-wide',
-        muted
-          ? 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-tertiary)]'
-          : entry.status === 'confirmed'
-            ? 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]'
-            : entry.status === 'dispatched'
-              ? 'bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]'
-              : 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-      )}>
-        {entry.status}
-      </span>
-    </li>
-  );
-}
-
-export function AssignmentsPanel({ entityId }: { entityId: string }) {
-  const [upcoming, setUpcoming] = React.useState<CrewScheduleEntry[] | null>(null);
-  const [history, setHistory] = React.useState<CrewScheduleEntry[] | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [showPast, setShowPast] = React.useState(false);
-
-  React.useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      getEntityCrewSchedule(entityId),
-      getEntityCrewHistory(entityId),
-    ]).then(([upcomingData, historyData]) => {
-      setUpcoming(upcomingData);
-      setHistory(historyData);
-      setLoading(false);
-    });
-  }, [entityId]);
-
-  if (loading) return (
-    <AccordionSection label="Assignments" icon={Calendar}>
-      <div className="space-y-2">
-        <div className="h-8 rounded-lg bg-[oklch(1_0_0/0.08)] stage-skeleton" />
-        <div className="h-8 rounded-lg bg-[oklch(1_0_0/0.08)] stage-skeleton" />
-      </div>
-    </AccordionSection>
-  );
-  if ((!upcoming || upcoming.length === 0) && (!history || history.length === 0)) return null;
-
-  return (
-    <AccordionSection label="Assignments" icon={Calendar}>
-      <div className="space-y-4">
-        {upcoming && upcoming.length > 0 && (
-          <div>
-            <p className="mb-2 stage-label">
-              Upcoming
-            </p>
-            <ul className="space-y-2">
-              {upcoming.map((entry) => (
-                <AssignmentRow key={entry.assignment_id} entry={entry} />
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {history && history.length > 0 && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowPast((p) => !p)}
-              className="mb-2 flex items-center gap-1.5 stage-label hover:text-[var(--stage-text-primary)] transition-colors duration-[80ms]"
-            >
-              <ChevronDown className={cn('size-3 transition-transform', showPast && 'rotate-180')} strokeWidth={1.5} />
-              {showPast ? 'Hide history' : `Show history (${history.length})`}
-            </button>
-            {showPast && (
-              <ul className="space-y-2">
-                {history.map((entry) => (
-                  <AssignmentRow key={entry.assignment_id} entry={entry} muted />
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-    </AccordionSection>
   );
 }
 
