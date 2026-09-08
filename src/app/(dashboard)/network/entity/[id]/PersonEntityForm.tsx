@@ -10,7 +10,8 @@ import { updateIndividualEntity } from '@/app/(dashboard)/(features)/events/acti
 import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/actions/reclassify-client-entity';
 import type { IndividualAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
-import { DealsPanel, FinancePanel } from './entity-studio-panels';
+import { FinancePanel } from './entity-studio-panels';
+import { EntityProductions } from '@/widgets/network-detail/ui/EntityProductions';
 import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -172,7 +173,13 @@ export function PersonEntityForm({
 
         {details.subjectEntityId && (
           <>
-            <DealsPanel entityId={details.subjectEntityId} />
+            {workspaceId && (
+              <EntityProductions
+                workspaceId={workspaceId}
+                entityId={details.subjectEntityId}
+                variant="full"
+              />
+            )}
             <FinancePanel entityId={details.subjectEntityId} />
           </>
         )}

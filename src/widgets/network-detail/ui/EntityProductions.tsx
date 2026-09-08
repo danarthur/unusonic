@@ -1,7 +1,13 @@
 'use client';
 
 /**
- * PersonProductionsPanel — three-band productions list for a person entity.
+ * EntityProductions — three-band productions list for any entity.
+ *
+ * One component for what used to be three: this for people in the panel,
+ * DealHistoryPanel for companies in the panel, and DealsPanel on the page.
+ * They read from two different server actions with different coverage, so a
+ * company's history was shorter on one surface than another. There is one
+ * reader now, and these bands everywhere.
  *
  * Bands match the production-company owner's mental model:
  *   • In play — pre-contract (what am I waiting on)
@@ -10,6 +16,9 @@
  *
  * Each row shows: title, date, role, status badge, optional amount, deep-link
  * to the production in the CRM with `?from=` smart-back encoding.
+ *
+ * summary caps the past band for the panel; full opens it on the page, where
+ * depth is the point.
  *
  * Design: docs/reference/network-page-ia-redesign.md §4.2.
  */
@@ -24,15 +33,14 @@ import { STAGE_LIGHT, STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { queryKeys } from '@/shared/api/query-keys';
 import { withFrom } from '@/shared/lib/smart-back';
 import { useCurrentHref } from '@/shared/lib/smart-back-client';
-import {
-  getPersonProductions,
-  type PersonProduction,
-  type ProductionBand,
-} from '../api/get-person-productions';
+import { getEntityProductions } from '../api/get-entity-productions';
+import type { EntityProduction, ProductionBand } from '../api/entity-productions-shape';
 
-export interface PersonProductionsPanelProps {
+export interface EntityProductionsProps {
   workspaceId: string;
   entityId: string;
+  /** summary = the panel's capped peek; full = the page's complete list. */
+  variant?: 'summary' | 'full';
 }
 
 const BAND_LABEL: Record<ProductionBand, string> = {
@@ -47,15 +55,22 @@ const BAND_ICON: Record<ProductionBand, typeof Briefcase> = {
   past: Clock,
 };
 
-export function PersonProductionsPanel({
+function groupByBand(productions: EntityProduction[]): Record<ProductionBand, EntityProduction[]> {
+  const byBand: Record<ProductionBand, EntityProduction[]> = { in_play: [], booked: [], past: [] };
+  for (const p of productions) byBand[p.band].push(p);
+  return byBand;
+}
+
+export function EntityProductions({
   workspaceId,
   entityId,
-}: PersonProductionsPanelProps) {
+  variant = 'summary',
+}: EntityProductionsProps) {
   const origin = useCurrentHref();
 
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.entities.productions(workspaceId, entityId),
-    queryFn: () => getPersonProductions(workspaceId, entityId),
+    queryFn: () => getEntityProductions(workspaceId, entityId),
     staleTime: 60_000,
     enabled: Boolean(workspaceId && entityId),
   });
@@ -76,21 +91,20 @@ export function PersonProductionsPanel({
   if (!result || result.productions.length === 0) return null;
 
   const { productions, bands } = result;
-
-  const byBand: Record<ProductionBand, PersonProduction[]> = {
-    in_play: [],
-    booked: [],
-    past: [],
-  };
-  for (const p of productions) byBand[p.band].push(p);
+  const byBand = groupByBand(productions);
 
   return (
     <div
-      className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-3"
-      data-surface="elevated"
+      className={cn(
+        'space-y-3',
+        variant === 'full'
+          ? 'stage-panel rounded-2xl px-5 py-4'
+          : 'border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]',
+      )}
+      data-surface={variant === 'full' ? 'surface' : 'elevated'}
     >
       <div className="flex items-center justify-between">
-        <h3 className="stage-label text-[var(--stage-text-secondary)]">Events</h3>
+        <h3 className="stage-label text-[var(--stage-text-secondary)]">Productions</h3>
         <span className="text-[11px] text-[var(--stage-text-tertiary)] tabular-nums">
           {productions.length}
         </span>
@@ -113,6 +127,7 @@ export function PersonProductionsPanel({
             productions={byBand.past}
             count={bands.past}
             fromPath={origin}
+            defaultOpen={variant === 'full'}
           />
         )}
       </div>
@@ -127,7 +142,7 @@ function BandSection({
   fromPath,
 }: {
   band: ProductionBand;
-  productions: PersonProduction[];
+  productions: EntityProduction[];
   count: number;
   fromPath: string;
 }) {
@@ -156,12 +171,14 @@ function CollapsedPastSection({
   productions,
   count,
   fromPath,
+  defaultOpen = false,
 }: {
-  productions: PersonProduction[];
+  productions: EntityProduction[];
   count: number;
   fromPath: string;
+  defaultOpen?: boolean;
 }) {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(defaultOpen);
   const Icon = BAND_ICON.past;
 
   return (
@@ -212,7 +229,7 @@ function ProductionRow({
   production,
   fromPath,
 }: {
-  production: PersonProduction;
+  production: EntityProduction;
   fromPath: string;
 }) {
   const href = withFrom(production.href, fromPath);

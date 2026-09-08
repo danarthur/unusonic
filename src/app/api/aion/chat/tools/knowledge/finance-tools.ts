@@ -4,7 +4,8 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getEntityDeals, getEntityFinancialSummary } from '@/features/network-data/api/entity-context-actions';
+import { getEntityFinancialSummary } from '@/features/network-data/api/entity-context-actions';
+import { getEntityProductions } from '@/widgets/network-detail/api/get-entity-productions';
 import { getDealPipeline } from '@/widgets/dashboard/api/get-deal-pipeline';
 import { getFinancialPulse } from '@/widgets/dashboard/api/get-financial-pulse';
 import { getClientConcentration } from '@/widgets/dashboard/api/get-client-concentration';
@@ -84,9 +85,18 @@ export function createFinanceKnowledgeTools(ctx: AionToolContext, helpers: Resol
         const searched = await getSubstrateCounts(workspaceId);
         return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
       }
-      const [deals, invoices] = await Promise.all([getEntityDeals(entityId), getEntityFinancialSummary(entityId)]);
-      const wonDeals = deals.filter((d) => d.status === 'won');
-      const totalBudget = deals.reduce((sum, d) => sum + (d.budget_estimated ?? 0), 0);
+      const [productionsResult, invoices] = await Promise.all([
+        getEntityProductions(workspaceId, entityId),
+        getEntityFinancialSummary(entityId),
+      ]);
+      // Same reader the panel and the page use, so the totals agree with what
+      // is on screen. It used to use a shorter one that missed the deals a
+      // company reaches through its own people.
+      const deals = productionsResult.ok ? productionsResult.productions : [];
+      // dealStatus, not status: after handover `status` is the event's, and
+      // filtering that for 'won' drops every deal that became a real show.
+      const wonDeals = deals.filter((d) => d.dealStatus === 'won');
+      const totalBudget = deals.reduce((sum, d) => sum + (d.amountEstimated ?? 0), 0);
       const outstandingBalance = invoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
       const searched = await getSubstrateCounts(workspaceId);
       return envelope({
@@ -94,7 +104,7 @@ export function createFinanceKnowledgeTools(ctx: AionToolContext, helpers: Resol
         winRate: deals.length > 0 ? Math.round((wonDeals.length / deals.length) * 100) : 0,
         avgDealSize: deals.length > 0 ? Math.round(totalBudget / deals.length) : 0,
         outstandingBalance, openInvoiceCount: invoices.length,
-        preferredEventTypes: [...new Set(deals.map((d) => d.event_archetype).filter(Boolean))],
+        preferredEventTypes: [...new Set(deals.map((d) => d.archetype).filter(Boolean))],
         recentDeals: deals.slice(0, 5),
       }, searched, {
         reason: deals.length === 0 ? 'no_deals_for_client' : 'has_data',

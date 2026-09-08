@@ -18,7 +18,6 @@ import { TradeLedger } from '../TradeLedger';
 import { EntityAssignments } from '../EntityAssignments';
 import { CrewKitSection } from '../CrewKitSection';
 import { QuickBookAction } from '../QuickBookAction';
-import { DealHistoryPanel } from '../DealHistoryPanel';
 import { EntityOverviewCards } from '../EntityOverviewCards';
 import {
   InternalMemberRoleCard,
@@ -181,17 +180,6 @@ export function TransmissionPanel({
           entityId={details.subjectEntityId}
           entityName={details.identity.name}
         />
-      )}
-
-      {/* ── Partner: Deal history ──
-          Companies and venues only. A person's deals are covered in richer form
-          by PersonProductionsPanel inside EntityOverviewCards below (In play /
-          Booked / Past, with deep links), and rendering both put two deal
-          sections on one sheet. */}
-      {isPartner && details.subjectEntityId
-        && details.entityDirectoryType !== 'person'
-        && details.entityDirectoryType !== 'couple' && (
-        <DealHistoryPanel entityId={details.subjectEntityId} />
       )}
 
       {/* ── AI Brief + Working notes / Team + Timeline + Productions ── */}

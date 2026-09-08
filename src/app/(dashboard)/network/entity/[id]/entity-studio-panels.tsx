@@ -2,13 +2,11 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Briefcase, Receipt } from 'lucide-react';
+import { ChevronDown, Receipt } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import {
-  getEntityDeals,
   getEntityFinancialSummary,
-  type EntityDeal,
   type EntityInvoiceSummary,
 } from '@/features/network-data/api/entity-context-actions';
 
@@ -53,52 +51,6 @@ export function AccordionSection({
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-export function DealsPanel({ entityId }: { entityId: string }) {
-  const [data, setData] = React.useState<EntityDeal[] | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    setLoading(true);
-    getEntityDeals(entityId).then((d) => { setData(d); setLoading(false); });
-  }, [entityId]);
-
-  if (loading) return (
-    <AccordionSection label="Related deals" icon={Briefcase}>
-      <div className="h-8 rounded-lg bg-[oklch(1_0_0/0.08)] stage-skeleton" />
-    </AccordionSection>
-  );
-  if (!data || data.length === 0) return null;
-
-  return (
-    <AccordionSection label="Related deals" icon={Briefcase}>
-      <ul className="space-y-2">
-        {data.map((deal) => (
-          <li key={deal.id} className="flex items-center gap-3 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)] capitalize">
-                {deal.event_archetype?.replace(/_/g, ' ') ?? 'Deal'}
-              </p>
-              <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
-                {new Date(deal.proposed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                {deal.budget_estimated ? <span className="tabular-nums">{` · $${deal.budget_estimated.toLocaleString()}`}</span> : ''}
-              </p>
-            </div>
-            <span className={cn(
-              'shrink-0 rounded-full px-2 py-0.5 stage-badge-text uppercase tracking-wide',
-              deal.status === 'confirmed' && 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]',
-              deal.status === 'signed' && 'bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]',
-              deal.status === 'prospect' && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-              !['confirmed','signed','prospect'].includes(deal.status) && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-            )}>
-              {deal.status}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </AccordionSection>
   );
 }
 

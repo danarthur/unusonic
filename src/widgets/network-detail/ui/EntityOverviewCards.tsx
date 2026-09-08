@@ -35,7 +35,7 @@ import { CaptureTimelinePanel } from './CaptureTimelinePanel';
 import { WorkingNotesCard } from './WorkingNotesCard';
 import { EmploymentCard } from './EmploymentCard';
 import { TeamCard } from './TeamCard';
-import { PersonProductionsPanel } from './PersonProductionsPanel';
+import { EntityProductions } from './EntityProductions';
 import { ReferralsCard } from './ReferralsCard';
 import { PromotedMetricsRow } from './PromotedMetricsRow';
 import { VenueSpecsCompactCard } from './VenueSpecsCompactCard';
@@ -119,9 +119,9 @@ export function EntityOverviewCards({
       </Zone>
 
       <Zone label="What we've done together">
-        {isPersonOrCouple && (
-          <PersonProductionsPanel workspaceId={workspaceId} entityId={entityId} />
-        )}
+        {/* Every entity type, now that one reader answers for all of them. A
+            company used to be routed to a different, shorter component. */}
+        <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="summary" />
         {/* Reciprocity runs at both levels: who feeds us, who we feed. */}
         <ReferralsCard workspaceId={workspaceId} entityId={entityId} />
       </Zone>

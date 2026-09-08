@@ -7,7 +7,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { createClient } from '@/shared/api/supabase/server';
 import { getEntityCrewSchedule } from '@/features/ops/actions/get-entity-crew-schedule';
-import { getEntityDeals, getEntityFinancialSummary } from '@/features/network-data/api/entity-context-actions';
+import { getEntityFinancialSummary } from '@/features/network-data/api/entity-context-actions';
+import { getEntityProductions } from '@/widgets/network-detail/api/get-entity-productions';
 import { toIONContext } from '@/shared/lib/entity-attrs';
 import { envelope } from '../../../lib/retrieval-envelope';
 import { getSubstrateCounts } from '../../../lib/substrate-counts';
@@ -95,7 +96,8 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         }
       }
 
-      const deals = await getEntityDeals(entityId);
+      const productionsResult = await getEntityProductions(workspaceId, entityId);
+      const deals = productionsResult.ok ? productionsResult.productions : [];
       const invoices = await getEntityFinancialSummary(entityId);
       const searched = await getSubstrateCounts(workspaceId);
 
@@ -139,12 +141,16 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         const searched = await getSubstrateCounts(workspaceId);
         return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
       }
-      const [invoices, deals] = await Promise.all([getEntityFinancialSummary(entityId), getEntityDeals(entityId)]);
+      const [invoices, productionsResult] = await Promise.all([
+        getEntityFinancialSummary(entityId),
+        getEntityProductions(workspaceId, entityId),
+      ]);
+      const deals = productionsResult.ok ? productionsResult.productions : [];
       const searched = await getSubstrateCounts(workspaceId);
       const hasData = invoices.length > 0 || deals.length > 0;
       return envelope({
         openInvoices: invoices, totalOutstanding: invoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0),
-        deals: deals.slice(0, 10).map((d) => ({ id: d.id, eventType: d.event_archetype, status: d.status, date: d.proposed_date, budget: d.budget_estimated })),
+        deals: deals.slice(0, 10).map((d) => ({ id: d.id, eventType: d.archetype, status: d.status, date: d.date, budget: d.amountEstimated })),
       }, searched, {
         reason: !hasData ? 'no_open_invoices' : 'has_data',
       });
