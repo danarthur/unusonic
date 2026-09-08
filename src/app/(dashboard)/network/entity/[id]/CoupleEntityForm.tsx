@@ -10,8 +10,8 @@ import { updateCoupleEntity } from '@/app/(dashboard)/(features)/events/actions/
 import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/actions/reclassify-client-entity';
 import type { CoupleAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
-import { FinancePanel } from './entity-studio-panels';
 import { EntityProductions } from '@/widgets/network-detail/ui/EntityProductions';
+import { EntityMoney } from '@/widgets/network-detail/ui/EntityMoney';
 import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -215,7 +215,7 @@ export function CoupleEntityForm({
                 variant="full"
               />
             )}
-            <FinancePanel entityId={details.subjectEntityId} />
+            <EntityMoney entityId={details.subjectEntityId} variant="full" />
           </>
         )}
 

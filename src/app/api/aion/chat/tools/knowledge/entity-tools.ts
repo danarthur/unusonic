@@ -7,7 +7,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { createClient } from '@/shared/api/supabase/server';
 import { getEntityCrewSchedule } from '@/features/ops/actions/get-entity-crew-schedule';
-import { getEntityFinancialSummary } from '@/features/network-data/api/entity-context-actions';
+import { getEntityMoney } from '@/features/network-data/api/get-entity-money';
 import { getEntityProductions } from '@/widgets/network-detail/api/get-entity-productions';
 import { toIONContext } from '@/shared/lib/entity-attrs';
 import { envelope } from '../../../lib/retrieval-envelope';
@@ -98,7 +98,7 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
 
       const productionsResult = await getEntityProductions(workspaceId, entityId);
       const deals = productionsResult.ok ? productionsResult.productions : [];
-      const invoices = await getEntityFinancialSummary(entityId);
+      const money = await getEntityMoney(entityId);
       const searched = await getSubstrateCounts(workspaceId);
 
       return envelope({
@@ -109,7 +109,7 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         type: entityType,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         isGhost: !(entity as any).claimed_by_user_id, attributes: attrs,
-        relationships, deals: deals.slice(0, 5), openInvoices: invoices,
+        relationships, deals: deals.slice(0, 5), openInvoices: money.openInvoices,
       }, searched);
     },
   });
@@ -141,15 +141,15 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         const searched = await getSubstrateCounts(workspaceId);
         return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
       }
-      const [invoices, productionsResult] = await Promise.all([
-        getEntityFinancialSummary(entityId),
+      const [money, productionsResult] = await Promise.all([
+        getEntityMoney(entityId),
         getEntityProductions(workspaceId, entityId),
       ]);
       const deals = productionsResult.ok ? productionsResult.productions : [];
       const searched = await getSubstrateCounts(workspaceId);
-      const hasData = invoices.length > 0 || deals.length > 0;
+      const hasData = money.invoices.length > 0 || deals.length > 0;
       return envelope({
-        openInvoices: invoices, totalOutstanding: invoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0),
+        openInvoices: money.openInvoices, totalOutstanding: money.theyOweUs, weOweThem: money.weOweThem,
         deals: deals.slice(0, 10).map((d) => ({ id: d.id, eventType: d.archetype, status: d.status, date: d.date, budget: d.amountEstimated })),
       }, searched, {
         reason: !hasData ? 'no_open_invoices' : 'has_data',

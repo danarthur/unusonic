@@ -14,7 +14,7 @@
 
 import * as React from 'react';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
-import { TradeLedger } from '../TradeLedger';
+import { EntityMoney } from '../EntityMoney';
 import { EntityAssignments } from '../EntityAssignments';
 import { CrewKitSection } from '../CrewKitSection';
 import { QuickBookAction } from '../QuickBookAction';
@@ -67,7 +67,7 @@ export function TransmissionPanel({
       {/* ── Partner: Ledger card ── */}
       {isPartner && (
         <div className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)]" data-surface="elevated">
-          <TradeLedger details={details} />
+          {details.subjectEntityId && <EntityMoney entityId={details.subjectEntityId} variant="summary" />}
         </div>
       )}
 

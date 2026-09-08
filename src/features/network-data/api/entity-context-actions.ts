@@ -4,38 +4,6 @@ import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import { VENUE_ATTR } from '@/features/network-data/model/attribute-keys';
 
-// ─── Financial summary ────────────────────────────────────────────────────────
-
-export type EntityInvoiceSummary = {
-  id: string;
-  status: string | null;
-  total_amount: number;
-  due_date: string | null;
-};
-
-/**
- * Returns open invoices for this entity from finance.invoices.
- * Scoped by bill_to_entity_id. RLS handles workspace isolation.
- */
-export async function getEntityFinancialSummary(entityId: string): Promise<EntityInvoiceSummary[]> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .schema('finance')
-    .from('invoices')
-    .select('id, status, total_amount, due_date')
-    .eq('bill_to_entity_id', entityId)
-    .order('due_date', { ascending: true })
-    .limit(10);
-
-  if (error) {
-    console.error('[finance] getEntityFinancialSummary:', error.message);
-    return [];
-  }
-
-  return (data ?? []) as EntityInvoiceSummary[];
-}
-
 // ─── Venue technical specs ────────────────────────────────────────────────────
 
 export type VenueTechSpecsResult = { ok: true } | { ok: false; error: string };

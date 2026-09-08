@@ -118,16 +118,24 @@ function formatUpcoming(show: ShowDate, now: Date): string {
 type SlotProducer = (node: NetworkNode, now: Date) => CardSlot | null;
 
 /**
- * Money is one direction only for now: these are invoices we issued, so the
- * counterparty owes us. When payables land the sibling reads "You owe $800" --
- * two positive numbers with second-person labels, never one signed number and
- * never netted, which is what every accounting vendor ships and what
- * QuickBooks' inability to hold both forced its users to work around.
+ * Money runs both ways and is never netted into one signed figure.
+ *
+ * The same component would otherwise mean opposite things for a client and for
+ * a freelancer, with nothing on the card to say which. Two positive numbers
+ * with second-person labels is what Xero, Business Central and Zoho Books all
+ * ship; QuickBooks cannot hold both, which is why it tells people to enter the
+ * same counterparty twice under slightly different names.
  */
 const owes: SlotProducer = (node) => {
   const amount = node.meta.outstanding_balance ?? 0;
   if (amount <= 0) return null;
   return { key: 'owes', text: `Owes ${formatUsd(amount)}`, numeric: true, tone: 'warning' };
+};
+
+const weOwe: SlotProducer = (node) => {
+  const amount = node.meta.payable_balance ?? 0;
+  if (amount <= 0) return null;
+  return { key: 'we-owe', text: `You owe ${formatUsd(amount)}`, numeric: true, tone: 'warning' };
 };
 
 /**
@@ -185,9 +193,9 @@ const affiliates: SlotProducer = (node) => {
  * decision, so place outranks everything.
  */
 const BY_SHAPE: Record<'person' | 'company' | 'venue', SlotProducer[]> = {
-  person: [owes, nextBooked, lastShow, employer, region],
-  company: [owes, affiliates, lastShow, region],
-  venue: [region, owes, lastShow, affiliates],
+  person: [owes, weOwe, nextBooked, lastShow, employer, region],
+  company: [owes, weOwe, affiliates, lastShow, region],
+  venue: [region, owes, weOwe, lastShow, affiliates],
 };
 
 function shapeOf(node: NetworkNode): 'person' | 'company' | 'venue' {

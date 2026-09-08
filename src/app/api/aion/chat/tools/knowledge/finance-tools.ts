@@ -4,7 +4,7 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getEntityFinancialSummary } from '@/features/network-data/api/entity-context-actions';
+import { getEntityMoney } from '@/features/network-data/api/get-entity-money';
 import { getEntityProductions } from '@/widgets/network-detail/api/get-entity-productions';
 import { getDealPipeline } from '@/widgets/dashboard/api/get-deal-pipeline';
 import { getFinancialPulse } from '@/widgets/dashboard/api/get-financial-pulse';
@@ -85,9 +85,9 @@ export function createFinanceKnowledgeTools(ctx: AionToolContext, helpers: Resol
         const searched = await getSubstrateCounts(workspaceId);
         return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
       }
-      const [productionsResult, invoices] = await Promise.all([
+      const [productionsResult, money] = await Promise.all([
         getEntityProductions(workspaceId, entityId),
-        getEntityFinancialSummary(entityId),
+        getEntityMoney(entityId),
       ]);
       // Same reader the panel and the page use, so the totals agree with what
       // is on screen. It used to use a shorter one that missed the deals a
@@ -97,13 +97,15 @@ export function createFinanceKnowledgeTools(ctx: AionToolContext, helpers: Resol
       // filtering that for 'won' drops every deal that became a real show.
       const wonDeals = deals.filter((d) => d.dealStatus === 'won');
       const totalBudget = deals.reduce((sum, d) => sum + (d.amountEstimated ?? 0), 0);
-      const outstandingBalance = invoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
+      // theyOweUs, not a sum of every invoice: the old reader returned paid and
+      // void rows too, and capped at ten, so this figure was wrong twice over.
+      const outstandingBalance = money.theyOweUs;
       const searched = await getSubstrateCounts(workspaceId);
       return envelope({
         totalDeals: deals.length, wonDeals: wonDeals.length,
         winRate: deals.length > 0 ? Math.round((wonDeals.length / deals.length) * 100) : 0,
         avgDealSize: deals.length > 0 ? Math.round(totalBudget / deals.length) : 0,
-        outstandingBalance, openInvoiceCount: invoices.length,
+        outstandingBalance, weOweThem: money.weOweThem, openInvoiceCount: money.openInvoices.length,
         preferredEventTypes: [...new Set(deals.map((d) => d.archetype).filter(Boolean))],
         recentDeals: deals.slice(0, 5),
       }, searched, {

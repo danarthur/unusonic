@@ -89,7 +89,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   // All entity IDs for referral count lookup (roster + partners)
   const allEntityIds = [...new Set([...personEntityIds, ...allPartnerEntityIds])];
 
-  const [personEntRes, partnerEntRes, invoicesRes, crewSkillsRes, referralCountRes, capabilitiesRes] = await Promise.all([
+  const [personEntRes, partnerEntRes, invoicesRes, expensesRes, crewSkillsRes, referralCountRes, capabilitiesRes] = await Promise.all([
     personEntityIds.length > 0
       ? supabase.schema('directory').from('entities')
           .select('id, display_name, avatar_url, type, attributes')
@@ -107,6 +107,15 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
           .in('bill_to_entity_id', allPartnerEntityIds)
           .not('status', 'in', '(paid,void)')
       : { data: [] as { bill_to_entity_id: string; total_amount: number }[] },
+    // The other direction: expenses recorded against them that we have not
+    // paid. Kept separate from the receivable, never netted against it.
+    allPartnerEntityIds.length > 0
+      ? supabase.schema('ops').from('event_expenses')
+          .select('vendor_entity_id, amount')
+          .in('vendor_entity_id', allPartnerEntityIds)
+          .eq('workspace_id', orgId)
+          .is('paid_at', null)
+      : { data: [] as { vendor_entity_id: string; amount: number }[] },
     // Crew skills from ops.crew_skills (source of truth)
     allPersonEntityIds.length > 0
       ? supabase.schema('ops').from('crew_skills')
@@ -134,6 +143,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const { crewSkillsByEntityId, crewRolesByEntityId } = indexCrewSkills(crewSkillsRes.data);
   const capabilitiesByEntityId = indexByEntity(capabilitiesRes.data, 'capability');
   const balanceMap = sumBy(invoicesRes.data, 'bill_to_entity_id', 'total_amount');
+  const payableMap = sumBy(expensesRes.data, 'vendor_entity_id', 'amount');
   const referralCountMap = countBy(referralCountRes.data, 'referrer_entity_id');
 
   const personMap = new Map((personEntRes.data ?? []).map((p) => [p.id, p]));
@@ -220,6 +230,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const partner = partnerMap.get(edge.target_entity_id);
     const ctx = (edge.context_data as Record<string, unknown>) ?? {};
     const balance = balanceMap.get(edge.target_entity_id) ?? 0;
+    const payable = payableMap.get(edge.target_entity_id) ?? 0;
     const refCount = referralCountMap.get(edge.target_entity_id) ?? 0;
     const entityType = (partner?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
@@ -258,6 +269,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
           ? (capabilitiesByEntityId.get(edge.target_entity_id) ?? [])
           : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        ...(payable > 0 ? { payable_balance: payable } : {}),
         ...(refCount > 0 ? { referral_count: refCount } : {}),
         region: readEntityRegion(entityType, attrs),
         connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
@@ -269,6 +281,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const ctx = (rel.context_data as Record<string, unknown>) ?? {};
     const partnerEnt = partnerEntMap.get(rel.target_entity_id);
     const balance = balanceMap.get(rel.target_entity_id) ?? 0;
+    const payable = payableMap.get(rel.target_entity_id) ?? 0;
     const refCount = referralCountMap.get(rel.target_entity_id) ?? 0;
 
     // Use the edge column as the canonical type source — context_data.relationship_type
@@ -294,6 +307,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         email,
         tags: Array.isArray(ctx.industry_tags) ? (ctx.industry_tags as string[]) : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        ...(payable > 0 ? { payable_balance: payable } : {}),
         ...(refCount > 0 ? { referral_count: refCount } : {}),
         region: readEntityRegion(entityType, attrs),
         connectedSince: (rel as { created_at?: string }).created_at ?? undefined,

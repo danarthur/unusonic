@@ -146,3 +146,23 @@ describe('isFlagged', () => {
     expect(isFlagged(node())).toBe(false);
   });
 });
+
+describe('money runs both ways', () => {
+  function n(meta: Partial<NetworkNode['meta']>): NetworkNode {
+    return node({}, meta);
+  }
+
+  it('says who owes whom rather than printing a bare amount', () => {
+    expect(resolveCardSlots(n({ outstanding_balance: 2400 }), NOW).map((s) => s.text))
+      .toEqual(['Owes $2,400']);
+    expect(resolveCardSlots(n({ payable_balance: 800 }), NOW).map((s) => s.text))
+      .toEqual(['You owe $800']);
+  });
+
+  // Netting these would report $1,600 in one direction and lose the fact that
+  // there are two live obligations.
+  it('never nets the two directions together', () => {
+    expect(resolveCardSlots(n({ outstanding_balance: 2400, payable_balance: 800 }), NOW).map((s) => s.text))
+      .toEqual(['Owes $2,400', 'You owe $800']);
+  });
+});

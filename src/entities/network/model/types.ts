@@ -78,8 +78,16 @@ export type NetworkNode = {
     tags?: string[];
     doNotRebook?: boolean;
     archived?: boolean;
-    /** Outstanding invoice balance for external_partner nodes. Only set when > 0. */
+    /**
+     * What they owe us: unsettled invoices billed to them. Only set when > 0.
+     *
+     * Never netted against `payable_balance`. One signed number would mean
+     * opposite things for a client and for a freelancer with nothing on screen
+     * to say which, which is the mistake the panel's old ledger made.
+     */
     outstanding_balance?: number;
+    /** What we owe them: expenses recorded against them and not yet paid. */
+    payable_balance?: number;
     /** ISO date string from cortex.relationships.created_at — when this connection was established. */
     connectedSince?: string;
     /** W-9 on file — populated for person (roster member) nodes. */

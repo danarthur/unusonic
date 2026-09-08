@@ -15,9 +15,9 @@
  * @module app/network/entity/EntityRecordsAside
  */
 
-import { FinancePanel } from './entity-studio-panels';
 import { EntityAssignments } from '@/widgets/network-detail/ui/EntityAssignments';
 import { EntityProductions } from '@/widgets/network-detail/ui/EntityProductions';
+import { EntityMoney } from '@/widgets/network-detail/ui/EntityMoney';
 import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 
 export interface EntityRecordsAsideProps {
@@ -35,7 +35,7 @@ export function EntityRecordsAside({ entityId, entityType, workspaceId }: Entity
       {workspaceId && (
         <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="full" />
       )}
-      <FinancePanel entityId={entityId} />
+      <EntityMoney entityId={entityId} variant="full" />
       {workspaceId && (
         <EntityDocumentsCard
           entityId={entityId}

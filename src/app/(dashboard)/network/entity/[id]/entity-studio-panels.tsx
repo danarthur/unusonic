@@ -2,13 +2,8 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Receipt } from 'lucide-react';
-import { cn } from '@/shared/lib/utils';
+import { ChevronDown } from 'lucide-react';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
-import {
-  getEntityFinancialSummary,
-  type EntityInvoiceSummary,
-} from '@/features/network-data/api/entity-context-actions';
 
 export function AccordionSection({
   label,
@@ -51,64 +46,5 @@ export function AccordionSection({
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-export function FinancePanel({ entityId }: { entityId: string }) {
-  const [data, setData] = React.useState<EntityInvoiceSummary[] | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    setLoading(true);
-    getEntityFinancialSummary(entityId).then((d) => { setData(d); setLoading(false); });
-  }, [entityId]);
-
-  if (loading) return (
-    <AccordionSection label="Financial obligations" icon={Receipt}>
-      <div className="h-8 rounded-lg bg-[oklch(1_0_0/0.08)] stage-skeleton" />
-    </AccordionSection>
-  );
-  if (!data || data.length === 0) return null;
-
-  const totalOutstanding = data
-    .filter((inv) => inv.status !== 'paid' && inv.status !== 'void')
-    .reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0);
-
-  return (
-    <AccordionSection label="Financial obligations" icon={Receipt}>
-      {totalOutstanding > 0 && (
-        <div className="rounded-lg border-l-[3px] border-l-[var(--color-unusonic-warning)] bg-[var(--stage-surface)] px-3 py-2 mb-3">
-          <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Outstanding</p>
-          <p className="stage-readout-lg text-[var(--color-unusonic-warning)]">
-            ${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-      )}
-      <ul className="space-y-2">
-        {data.map((inv) => (
-          <li key={inv.id} className="flex items-center gap-3 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="stage-readout-sm text-[var(--stage-text-primary)]">
-                ${(inv.total_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-              {inv.due_date && (
-                <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] mt-0.5">
-                  Due {new Date(inv.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </p>
-              )}
-            </div>
-            <span className={cn(
-              'shrink-0 rounded-full px-2 py-0.5 stage-badge-text uppercase tracking-wide',
-              inv.status === 'paid' && 'bg-[var(--color-unusonic-success)]/15 text-[var(--color-unusonic-success)]',
-              inv.status === 'overdue' && 'bg-[var(--color-unusonic-error)]/15 text-[var(--color-unusonic-error)]',
-              inv.status === 'sent' && 'bg-[oklch(1_0_0/0.10)] text-[var(--stage-text-primary)]',
-              !['paid','overdue','sent'].includes(inv.status ?? '') && 'bg-[oklch(1_0_0_/_0.10)] text-[var(--stage-text-secondary)]',
-            )}>
-              {inv.status ?? 'draft'}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </AccordionSection>
   );
 }
