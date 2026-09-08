@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-07T01:17:29.956Z",
+  "generatedAt": "2026-09-08T23:53:11.628Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -85,7 +85,7 @@
     "src/app/(dashboard)/lobby/LobbyBentoGrid.tsx": 441,
     "src/app/(dashboard)/lobby/stage-prototype/page-client.tsx": 501,
     "src/app/(dashboard)/network/entity/[id]/EmployeeEntityForm.tsx": 903,
-    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 871,
+    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 870,
     "src/app/(dashboard)/network/entity/[id]/FreelancerEntityForm.tsx": 513,
     "src/app/(dashboard)/network/entity/[id]/page.tsx": 201,
     "src/app/(dashboard)/network/entity/[id]/VenueSpecsEditor.tsx": 647,
@@ -128,7 +128,6 @@
     "src/app/bridge/install/page.tsx": 296,
     "src/app/i/[token]/page.tsx": 526,
     "src/app/landing-content.tsx": 946,
-    "src/entities/network/ui/NetworkCard.tsx": 311,
     "src/features/ai/ui/rider-parser-modal.tsx": 625,
     "src/features/auth/diagnostic-login/ui/diagnostic-login-form.tsx": 387,
     "src/features/auth/smart-login/ui/SessionExpiredOverlay.tsx": 413,
@@ -143,7 +142,7 @@
     "src/features/identity-hydration/ui/ProfileAvatarUpload.tsx": 353,
     "src/features/intelligence/api/scout/roster-hunter.ts": 354,
     "src/features/lead-sources/ui/LeadSourceManager.tsx": 348,
-    "src/features/network-data/api/network-read-actions/node-details.ts": 440,
+    "src/features/network-data/api/network-read-actions/node-details.ts": 444,
     "src/features/network-data/ui/entity-documents-card.tsx": 573,
     "src/features/network-data/ui/GhostForgeSheet.tsx": 681,
     "src/features/network/api/actions.ts": 684,

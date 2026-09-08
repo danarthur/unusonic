@@ -281,6 +281,10 @@ export async function getNetworkNodeDetails(
       .select('id, source_entity_id, context_data')
       .eq('target_entity_id', targetEntityIdForCrew)
       .eq('relationship_type', 'ROSTER_MEMBER')
+      // A set ended_at means they left; the row is kept as history. Without this
+      // a departed employee stayed on their old employer's crew list forever --
+      // and TeamCard already filtered it, so the panel disagreed with itself.
+      .is('ended_at', null)
       .limit(500) as { data: { id: string; source_entity_id: string; context_data: unknown }[] | null };
 
     if (crewRels?.length) {

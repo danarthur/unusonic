@@ -1,14 +1,22 @@
 /**
- * getVenueSpecs — read the load-bearing venue attributes for the compact spec
- * card. Existing venue fields live in `directory.entities.attributes` (see
- * VenueAttrsSchema + VENUE_ATTR); we just surface the ones that matter when
- * you're prepping a show.
+ * getVenueSpecs — the load-bearing venue attributes, for the compact spec card.
+ *
+ * Reads through `readEntityAttrs` rather than reaching into the raw JSONB. The
+ * editor on the full page already validates through the same schema, and this
+ * used to index the blob with hand-written string keys -- so the two surfaces
+ * agreed only for as long as nobody renamed a key or changed a coercion. That
+ * is also the house rule: never raw dot access on entity.attributes.
+ *
+ * Editing stays on VenueSpecsEditor. This is deliberately not the same
+ * component: a 200-line read summary and a 600-line form are the panel-reads,
+ * page-edits split working, not one thing built twice.
  */
 
 'use server';
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 
 export type VenueSpecs = {
   capacity: number | string | null;
@@ -57,25 +65,28 @@ export async function getVenueSpecs(
     };
   }
 
-  const attrs = ((data as { attributes: Record<string, unknown> | null }).attributes ?? {}) as Record<string, unknown>;
+  const attrs = readEntityAttrs(
+    (data as { attributes: unknown }).attributes,
+    'venue',
+  );
 
   return {
     ok: true,
     specs: {
-      capacity: (attrs.capacity as number | string | null) ?? null,
-      loadIn: (attrs.load_in_notes as string | null) ?? null,
-      loadInWindow: (attrs.load_in_window as string | null) ?? null,
-      loadOutWindow: (attrs.load_out_window as string | null) ?? null,
-      power: (attrs.power_notes as string | null) ?? null,
-      stage: (attrs.stage_notes as string | null) ?? null,
-      parking: (attrs.parking_notes as string | null) ?? null,
-      curfew: (attrs.curfew as string | null) ?? null,
-      unionLocal: (attrs.union_local as string | null) ?? null,
-      accessNotes: (attrs.access_notes as string | null) ?? null,
-      housePowerAmps: (attrs.house_power_amps as number | string | null) ?? null,
-      dockAddress: (attrs.dock_address as string | null) ?? null,
-      dockHours: (attrs.dock_hours as string | null) ?? null,
-      formattedAddress: (attrs.formatted_address as string | null) ?? null,
+      capacity: attrs.capacity ?? null,
+      loadIn: attrs.load_in_notes ?? null,
+      loadInWindow: attrs.load_in_window ?? null,
+      loadOutWindow: attrs.load_out_window ?? null,
+      power: attrs.power_notes ?? null,
+      stage: attrs.stage_notes ?? null,
+      parking: attrs.parking_notes ?? null,
+      curfew: attrs.curfew ?? null,
+      unionLocal: attrs.union_local ?? null,
+      accessNotes: attrs.access_notes ?? null,
+      housePowerAmps: attrs.house_power_amps ?? null,
+      dockAddress: attrs.dock_address ?? null,
+      dockHours: attrs.dock_hours ?? null,
+      formattedAddress: attrs.formatted_address ?? null,
     },
   };
 }
