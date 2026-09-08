@@ -94,6 +94,21 @@ export type NetworkNode = {
     referral_count?: number;
     /** Business function capabilities from ops.entity_capabilities. */
     capabilities?: string[];
+    /**
+     * Most recent show already worked with this entity, ISO date.
+     *
+     * The standing signal the contacts page is actually opened for. Distinct
+     * from `connectedSince`, which is when the row was created and never
+     * changes -- tenure is a profile fact, recency is a scanning fact.
+     */
+    lastWorked?: string | null;
+    /** Next show ahead, ISO date. Null when nothing is on the books. */
+    nextBooked?: string | null;
+    /**
+     * Whether `nextBooked` is a scheduled event rather than a proposed deal
+     * date. A proposal is not a booking and the card must not imply it is.
+     */
+    nextConfirmed?: boolean;
   };
 };
 

@@ -23,6 +23,7 @@ import {
   attachAffiliations,
   fetchWorkedWithNodes,
 } from './stream-helpers';
+import { attachShowDates } from './show-dates';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
 /**
@@ -319,9 +320,13 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const merged = withCrewRoles(crewRolesByEntityId, withStars(starredIds,
     mergeNodesByEntity([...edgeNodes, ...workedWith])));
 
+  // Last worked / next booked, on the final merged set so a person reached
+  // through their company gets dates too.
+  const dated = await attachShowDates(supabase, orgId, merged);
+
   // Last, so it sees the final merged node set and can attach an employer to a
   // person node and the matching people to the company node in one pass.
-  return attachAffiliations(supabase, merged);
+  return attachAffiliations(supabase, dated);
 }
 
 /** Entity ids the signed-in user has starred in this workspace. */
