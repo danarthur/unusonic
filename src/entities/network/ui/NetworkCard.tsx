@@ -21,9 +21,10 @@
 import * as React from 'react';
 
 import { motion } from 'framer-motion';
-import { User, Star, MapPin } from 'lucide-react';
+import { Star, MapPin } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { EntityAvatar } from './EntityAvatar';
 import { resolveCardSlots, isFlagged, CARD_SLOT_COUNT, type CardSlot } from '../model/card-slots';
 import type { NetworkNode } from '../model/types';
 
@@ -35,44 +36,6 @@ interface NetworkCardProps {
   onTogglePreferred?: (relationshipId: string) => void;
   className?: string;
   layoutId?: string;
-}
-
-/** First letter of the name — a deliberate mark where there is no photo. */
-function monogram(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || '?';
-}
-
-/**
- * Nearly every entity here is a ghost with no photo, so the fallback has to look
- * intentional rather than broken.
- *
- * Faces are load-bearing for people: this is a business where you book someone
- * you stood next to at load-in, and the face is the recognition token. For a
- * company the same is not true -- a Building2 icon repeated forty times down a
- * column is visual static -- so companies and venues get a monogram instead.
- */
-function Avatar({ node }: { node: NetworkNode }) {
-  const type = node.identity.entityType;
-  const isPersonal = type === 'person' || type === 'couple';
-
-  return (
-    <div
-      className={cn(
-        'flex size-10 shrink-0 items-center justify-center overflow-hidden bg-[var(--stage-surface-nested)] mt-0.5',
-        isPersonal ? 'rounded-full' : 'rounded-[var(--stage-radius-nested)]',
-      )}
-    >
-      {node.identity.avatarUrl ? (
-        <img src={node.identity.avatarUrl} alt="" className="size-full object-cover" />
-      ) : isPersonal ? (
-        <User className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-      ) : (
-        <span className="stage-label text-[var(--stage-text-secondary)]">
-          {monogram(node.identity.name)}
-        </span>
-      )}
-    </div>
-  );
 }
 
 /** One detail line. Empty renders as reserved space so rows stay aligned. */
@@ -191,7 +154,11 @@ export function NetworkCard({
       )}
 
       <div className="flex min-w-0 items-start gap-3">
-        <Avatar node={node} />
+        <EntityAvatar
+          name={node.identity.name}
+          avatarUrl={node.identity.avatarUrl}
+          entityType={node.identity.entityType}
+        />
 
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium tracking-tight text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">

@@ -35,12 +35,12 @@ import { EmployeeEntityForm } from './EmployeeEntityForm';
 import { FreelancerEntityForm } from './FreelancerEntityForm';
 import { PersonEntityForm } from './PersonEntityForm';
 import { CoupleEntityForm } from './CoupleEntityForm';
-import { AccordionSection, AssignmentsPanel, DealsPanel, FinancePanel } from './entity-studio-panels';
+import { AccordionSection } from './entity-studio-panels';
 import { VenueSpecsEditor } from './VenueSpecsEditor';
-import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
+import { EntityRecordsAside } from './EntityRecordsAside';
 import { ColorTuner } from '@/features/org-identity';
 import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
-import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
+import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import type { ScoutResult } from '@/features/intelligence';
@@ -384,13 +384,25 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
           <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
             <ArrowLeft className="size-5" strokeWidth={1.5} />
           </Button>
-          <div>
-            <p className="stage-label">
-              Profile
-            </p>
-            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
-              {name || 'Untitled Entity'}
-            </h1>
+          {/*
+            Identity, rendered the same way it is on the card and in the panel.
+            It is the one thing meant to repeat across the three surfaces --
+            seeing the same mark is how you know a click kept you on the same
+            person. The eyebrow used to read "Profile", which named the page
+            rather than the entity, and so said nothing.
+          */}
+          <div className="flex items-center gap-3">
+            <EntityAvatar
+              name={name || details.identity.name || ''}
+              avatarUrl={details.identity.avatarUrl}
+              entityType={details.entityDirectoryType as 'person' | 'company' | 'venue' | 'couple' | undefined}
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
+                {name || 'Untitled Entity'}
+              </h1>
+              <p className="truncate stage-label">{details.identity.label}</p>
+            </div>
           </div>
         </div>
         <AnimatePresence>
@@ -416,21 +428,16 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
         </AnimatePresence>
       </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-8 space-y-3">
-          {/* Overview cards — Brief, Team, Captures */}
-          {workspaceId && details.subjectEntityId && (() => {
-            const t = details.entityDirectoryType === 'venue' ? 'venue' : 'company';
-            return (
-              <EntityOverviewCards
-                workspaceId={workspaceId}
-                entityId={details.subjectEntityId}
-                entityType={t}
-                entityName={name || details.identity.name || null}
-                density="page"
-              />
-            );
-          })()}
-
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        {/*
+          Two columns, because width is the whole reason this page exists
+          alongside the panel. A drawer stacks; a page juxtaposes -- you change
+          a fact on the left while the history that justifies it stays in view
+          on the right. One column below lg, where the page has no width
+          advantage to offer and the panel is already full-screen anyway.
+        */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+          <div className="min-w-0 space-y-3">
           <AccordionSection label="Identity" icon={Building2} defaultOpen>
             <div className="space-y-3">
               <div className="flex items-center gap-4">
@@ -691,22 +698,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             />
           </AccordionSection>
 
-          {details.subjectEntityId && (
-            <>
-              <AssignmentsPanel entityId={details.subjectEntityId} />
-              <DealsPanel entityId={details.subjectEntityId} />
-              <FinancePanel entityId={details.subjectEntityId} />
-            </>
-          )}
-
-          {details.subjectEntityId && workspaceId && (
-            <EntityDocumentsCard
-              entityId={details.subjectEntityId}
-              entityType={(details.entityDirectoryType as 'person' | 'company' | 'venue') ?? 'company'}
-              workspaceId={workspaceId}
-            />
-          )}
-
           <section className="stage-panel rounded-2xl overflow-hidden" data-surface="surface">
             <div className="px-5 py-4 border-b border-[var(--stage-edge-subtle)]">
               <h3 className="stage-label">
@@ -736,6 +727,14 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
               </Button>
             </div>
           </section>
+          </div>
+
+          <EntityRecordsAside
+            entityId={details.subjectEntityId ?? null}
+            entityType={(details.entityDirectoryType as 'person' | 'company' | 'venue' | null) ?? null}
+            workspaceId={workspaceId ?? null}
+          />
+        </div>
       </div>
 
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
