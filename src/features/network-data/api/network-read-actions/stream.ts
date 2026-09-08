@@ -23,6 +23,7 @@ import {
   attachAffiliations,
   fetchWorkedWithNodes,
 } from './stream-helpers';
+import { readEntityRegion } from '@/entities/directory/model/read-region';
 import { attachShowDates } from './show-dates';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
@@ -176,6 +177,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         w9_status: w9Status,
         coi_expiry: coiExpiry,
         market,
+        region: market,
         union_status: unionStatus,
       },
     };
@@ -241,7 +243,9 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       roleGroup: personJobTitle,
       identity: {
         name: partner?.display_name ?? 'Unknown',
-        avatarUrl: null,
+        // Was hard-coded null, so a preferred partner -- the people most likely
+        // to have a photo on file -- was the one group that never showed one.
+        avatarUrl: partner?.avatar_url ?? null,
         label,
         entityType,
       },
@@ -255,6 +259,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
           : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
         ...(refCount > 0 ? { referral_count: refCount } : {}),
+        region: readEntityRegion(entityType, attrs),
         connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
       },
     };
@@ -290,6 +295,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         tags: Array.isArray(ctx.industry_tags) ? (ctx.industry_tags as string[]) : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
         ...(refCount > 0 ? { referral_count: refCount } : {}),
+        region: readEntityRegion(entityType, attrs),
         connectedSince: (rel as { created_at?: string }).created_at ?? undefined,
       },
     };

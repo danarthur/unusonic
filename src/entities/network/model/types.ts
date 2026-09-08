@@ -109,6 +109,14 @@ export type NetworkNode = {
      * date. A proposal is not a booking and the card must not imply it is.
      */
     nextConfirmed?: boolean;
+    /**
+     * Where this entity is, as "Napa, CA" or "Nashville".
+     *
+     * Load-bearing for venues above almost everything else -- a venue card used
+     * to render a MapPin icon, a picture of the concept of location, exactly
+     * where the location belonged.
+     */
+    region?: string | null;
   };
 };
 

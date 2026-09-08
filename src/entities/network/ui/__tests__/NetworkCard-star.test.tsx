@@ -38,19 +38,21 @@ describe('<NetworkCard /> star vs preferred', () => {
     expect(onToggle).toHaveBeenCalledWith('edge-1');
   });
 
-  it('shows Preferred as a badge, not as the star', () => {
-    // A preferred relationship the user has NOT starred: badge present, star
-    // still unpressed. These must not track each other.
+  it('names the shared Preferred judgement without tying it to the star', () => {
+    // A preferred relationship the user has NOT starred. The badge became a
+    // quiet edge treatment -- brightness is the accent -- so the word itself is
+    // left to assistive tech rather than spending a corner of the card. What
+    // must not change is that the two remain independent.
     render(
       <NetworkCard node={node({ gravity: 'inner_circle', starred: false })} onTogglePreferred={vi.fn()} />,
     );
-    expect(screen.getByText('Preferred')).toBeTruthy();
+    expect(screen.getByText(/Preferred/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Star for quick access' }).getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('shows no Preferred badge on a standard relationship', () => {
+  it('says nothing about Preferred on a standard relationship', () => {
     render(<NetworkCard node={node({ starred: true })} onTogglePreferred={vi.fn()} />);
-    expect(screen.queryByText('Preferred')).toBeNull();
+    expect(screen.queryByText(/Preferred/)).toBeNull();
   });
 
   it('offers the star on any node, not just partners', () => {
