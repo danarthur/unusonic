@@ -8023,15 +8023,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_books_for_edge: {
-        Args: {
-          p_company_id: string
-          p_person_id: string
-          p_since?: string
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
       add_catalog_item_assignee: {
         Args: {
           p_entity_id: string
@@ -8087,16 +8078,6 @@ export type Database = {
           p_last_name: string
           p_org_id: string
           p_role: string
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
-      add_represents_edge: {
-        Args: {
-          p_principal_id: string
-          p_representative_id: string
-          p_scope?: string
-          p_since?: string
           p_workspace_id: string
         }
         Returns: Json
