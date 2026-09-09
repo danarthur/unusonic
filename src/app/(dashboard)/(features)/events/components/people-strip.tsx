@@ -382,8 +382,8 @@ function Chip({
             actionButtonClass,
             'opacity-100 text-[var(--stage-text-primary)] cursor-default',
           )}
-          aria-label="Primary host"
-          title="Primary host"
+          aria-label="Primary host — listed first on this deal"
+          title="Primary host. Listed first wherever this deal names its hosts. Who gets billed is a separate role."
         >
           <Star size={11} strokeWidth={2} fill="currentColor" />
         </span>

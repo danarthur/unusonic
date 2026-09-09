@@ -411,7 +411,15 @@ export function DealHeaderStrip({
       );
       const result = await setPrimaryHost(deal.id, stakeholderId);
       if (result.success) {
-        toast.success('Primary host updated.');
+        // Say what moved and what did not. Primary host and bill-to are
+        // separate roles on purpose -- a parent often pays for a wedding they
+        // are not hosting -- so promoting a host must not quietly redirect the
+        // money, and must not let anyone assume it did.
+        toast.success(
+          result.billToUnchangedFor
+            ? `Primary host updated. Invoices still bill ${result.billToUnchangedFor}.`
+            : 'Primary host updated.',
+        );
         onStakeholdersChange();
       } else {
         setHosts(snapshot);
