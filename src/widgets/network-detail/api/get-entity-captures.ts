@@ -57,6 +57,18 @@ export type EntityCapture = {
    * confidence and match_candidates length. Design §11.3.
    */
   uncertain: boolean;
+  /**
+   * Where this note belongs.
+   *
+   *   'about' | null — renders on the profile. Null means the classifier was
+   *                    unsure, and unsure lands on the profile on purpose.
+   *   'show'         — true for that one production only, demoted to a
+   *                    collapsed section. Demoted, never hidden: a note that
+   *                    cannot be found is worse than a note in the wrong place.
+   */
+  noteScope: 'about' | 'show' | null;
+  /** A human placed this note. The classifier must not move it back. */
+  noteScopePinned: boolean;
 };
 
 export type GetEntityCapturesResult =
@@ -77,6 +89,8 @@ type RawCaptureRow = {
   resolved_entity_id: string | null;
   linked_deal_id: string | null;
   linked_event_id: string | null;
+  note_scope: 'about' | 'show' | null;
+  note_scope_pinned: boolean;
   confidence?: number | null;
 };
 
@@ -158,7 +172,7 @@ export async function getEntityCaptures(
     .schema('cortex')
     .from('capture_events')
     .select(
-      'id, created_at, user_id, transcript, parsed_note, parsed_follow_up, parsed_entity, visibility, resolved_entity_id, linked_deal_id, linked_event_id',
+      'id, created_at, user_id, transcript, parsed_note, parsed_follow_up, parsed_entity, visibility, resolved_entity_id, linked_deal_id, linked_event_id, note_scope, note_scope_pinned',
     )
     .eq('workspace_id', workspaceId)
     .in('resolved_entity_id', resolvedIdFilter)
@@ -293,6 +307,11 @@ export async function getEntityCaptures(
       aboutEntity,
       linkedProduction,
       uncertain: isUncertain(r),
+      // A dangling 'show' with no production attached would demote a note on
+      // the strength of a label that cannot be true. The RPC drops those on
+      // write; this covers rows written before it did.
+      noteScope: linkedProduction ? r.note_scope : null,
+      noteScopePinned: r.note_scope_pinned === true,
     };
   });
 

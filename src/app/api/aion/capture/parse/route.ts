@@ -86,7 +86,14 @@ const CaptureParseSchema = z.object({
     .string()
     .nullable()
     .describe(
-      'A short durable fact about the entity (role, context, preference, quirk, or a production-specific detail). Null if none. Do NOT restate information already captured by the entity identity (the name, the organization the entity belongs to, or the role the entity already has) — that would be redundant with the Who field. Focus on what this capture adds beyond identity.',
+      'A short fact about the entity (role, context, preference, quirk, or a detail about one production). Null if none. Do NOT restate information already captured by the entity identity (the name, the organization the entity belongs to, or the role the entity already has) — that would be redundant with the Who field. Focus on what this capture adds beyond identity. Use note_scope to say which kind of fact it is.',
+    ),
+
+  note_scope: z
+    .enum(['about', 'show'])
+    .nullable()
+    .describe(
+      'Where this note belongs. "show" ONLY when the note is true for one production and nothing else — times, running order, song requests or bans, room layout, headcounts, name pronunciations, meal counts. "about" when it would change how you work with this entity next time, including things that happened on one show ("showed up two hours late", "stayed late when the cake was delayed"). Null when unsure. Null and "about" both render on the profile, so an unsure guess costs nothing; a wrong "show" hides something the user needed.',
     ),
 
   linked_production: z
@@ -426,6 +433,26 @@ function buildSystemPrompt(
     '  provided lists. Do not invent ids.',
     '- linked_production is independent of the entity — a capture can be about a',
     '  person AND reference the production they are working on. Both get linked.',
+    '',
+    'NOTE SCOPE — where the note gets filed:',
+    '- The question is NOT "does it mention a show". It is "would this change',
+    '  how I work with them next time?"',
+    '- "show": true for that one show and nothing else. Times, running order,',
+    '  song requests and bans, room layout, headcounts, pronunciations, meals.',
+    '    "ceremony is at five now, not four thirty"        -> show',
+    '    "they want no country, even the line dance stuff" -> show',
+    '- "about": would change how you work with them next time — INCLUDING when',
+    '  it happened on one specific show.',
+    '    "rolled in at four for a three o clock call"      -> about',
+    '    "stayed an extra hour when the cake was late"     -> about',
+    '    "call her, she never answers a text"              -> about',
+    '- Both of those examples name a show. The show is where it happened, not',
+    '  what the note is for.',
+    '- Only use "show" when linked_production is set. A note with no production',
+    '  cannot be about one production.',
+    '- When unsure, return null. Null and "about" both land on the profile, so',
+    '  an unsure guess costs the user nothing. A wrong "show" hides a note they',
+    '  needed and they will not know it happened.',
   ].join('\n');
 }
 

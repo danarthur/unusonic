@@ -275,6 +275,13 @@ export async function confirmCapture(
   const linkedDealId = finalLink?.kind === 'deal' ? finalLink.id : null;
   const linkedEventId = finalLink?.kind === 'event' ? finalLink.id : null;
 
+  // Where the note gets filed. Only meaningful with a production attached --
+  // "true for that one show" says nothing when there is no show -- and the RPC
+  // drops a dangling 'show' for the same reason. Null lands on the profile,
+  // which is the safe direction: noise there is visible and gets fixed in a
+  // tap, while a wrongly demoted note is invisible and never gets corrected.
+  const noteScope = finalLink ? parse.note_scope : null;
+
   // ── Persist the capture row ──────────────────────────────────────────────
   // cortex RPCs must be called with explicit .schema('cortex') — the default
   // schema is public and this function only exists in cortex.
@@ -292,6 +299,7 @@ export async function confirmCapture(
       p_audio_storage_path: null,         // deferred — see header comment
       p_visibility: visibility,
       p_linked_deal_id: linkedDealId,
+      p_note_scope: noteScope ?? undefined,
       p_linked_event_id: linkedEventId,
     });
 

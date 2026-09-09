@@ -496,6 +496,8 @@ export type Database = {
           id: string
           linked_deal_id: string | null
           linked_event_id: string | null
+          note_scope: string | null
+          note_scope_pinned: boolean
           parsed_entity: Json | null
           parsed_follow_up: Json | null
           parsed_note: string | null
@@ -515,6 +517,8 @@ export type Database = {
           id?: string
           linked_deal_id?: string | null
           linked_event_id?: string | null
+          note_scope?: string | null
+          note_scope_pinned?: boolean
           parsed_entity?: Json | null
           parsed_follow_up?: Json | null
           parsed_note?: string | null
@@ -534,6 +538,8 @@ export type Database = {
           id?: string
           linked_deal_id?: string | null
           linked_event_id?: string | null
+          note_scope?: string | null
+          note_scope_pinned?: boolean
           parsed_entity?: Json | null
           parsed_follow_up?: Json | null
           parsed_note?: string | null
@@ -1305,6 +1311,7 @@ export type Database = {
           p_created_follow_up_queue_id?: string
           p_linked_deal_id?: string
           p_linked_event_id?: string
+          p_note_scope?: string
           p_parsed_entity?: Json
           p_parsed_follow_up?: Json
           p_parsed_note?: string

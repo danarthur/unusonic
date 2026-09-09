@@ -45,6 +45,8 @@ import { queryKeys } from '@/shared/api/query-keys';
 import { withFrom } from '@/shared/lib/smart-back';
 import { useCurrentHref } from '@/shared/lib/smart-back-client';
 import { Popover, PopoverTrigger, PopoverContent } from '@/shared/ui/popover';
+import { partitionByScope } from './capture-note-scope';
+import { CaptureShowNotes } from './CaptureShowNotes';
 import {
   Dialog,
   DialogContent,
@@ -140,6 +142,9 @@ function groupCaptures(
   };
 }
 
+/** Module-level so an empty result is referentially stable across renders. */
+const EMPTY_CAPTURES: EntityCapture[] = [];
+
 export function CaptureTimelinePanel({
   workspaceId,
   entityId,
@@ -165,8 +170,7 @@ export function CaptureTimelinePanel({
     enabled: Boolean(workspaceId && entityId),
   });
 
-  const captures =
-    data && 'ok' in data && data.ok ? data.captures : [];
+  const captures = data && 'ok' in data && data.ok ? data.captures : EMPTY_CAPTURES;
 
   // Deep-link: ?capture={id} scrolls to that row and highlights briefly.
   // Also expand visibleCount if the target is past the first page.
@@ -188,7 +192,8 @@ export function CaptureTimelinePanel({
     };
   }, [targetCaptureId, captures, visibleCount]);
 
-  const visibleCaptures = captures.slice(0, visibleCount);
+  const { about, show } = React.useMemo(() => partitionByScope(captures), [captures]);
+  const visibleCaptures = about.slice(0, visibleCount);
   const { mode, groups } = React.useMemo(
     () => groupCaptures(visibleCaptures),
     [visibleCaptures],
@@ -227,14 +232,14 @@ export function CaptureTimelinePanel({
     >
       <div className="flex items-center justify-between">
         <h3 className="stage-label text-[var(--stage-text-secondary)]">Notes</h3>
-        {captures.length > 0 && (
+        {about.length > 0 && (
           <span className="text-[11px] text-[var(--stage-text-tertiary)] tabular-nums">
-            {captures.length}
+            {about.length}
           </span>
         )}
       </div>
 
-      {captures.length === 0 ? (
+      {about.length === 0 ? (
         relationshipId ? null : (
           <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
             No notes yet. Tap the composer on the lobby to leave one.
@@ -281,15 +286,34 @@ export function CaptureTimelinePanel({
         </div>
       )}
 
-      {captures.length > visibleCount && (
+      {about.length > visibleCount && (
         <button
           type="button"
           onClick={() => setVisibleCount((n) => n + 10)}
           className="text-[11px] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
         >
-          Show older ({captures.length - visibleCount} more)
+          Show older ({about.length - visibleCount} more)
         </button>
       )}
+
+      <CaptureShowNotes
+        count={show.length}
+        defaultOpen={Boolean(targetCaptureId && show.some((c) => c.id === targetCaptureId))}
+      >
+        <AnimatePresence initial={false}>
+          {show.map((c) => (
+            <CaptureRow
+              key={c.id}
+              capture={c}
+              workspaceId={workspaceId}
+              entityName={entityName}
+              showProductionPill
+              highlighted={highlightedCaptureId === c.id}
+              onMutated={invalidate}
+            />
+          ))}
+        </AnimatePresence>
+      </CaptureShowNotes>
 
       {/* Compose at the bottom, under what is already there -- the same shape as
           every message thread, and the reason this is one card rather than a

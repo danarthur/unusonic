@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T23:53:11.628Z",
+  "generatedAt": "2026-09-09T00:31:15.771Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -117,7 +117,7 @@
     "src/app/(public)/legal/sms/page.tsx": 210,
     "src/app/(public)/legal/terms/page.tsx": 333,
     "src/app/actions/workspace.ts": 878,
-    "src/app/api/aion/capture/parse/route.ts": 741,
+    "src/app/api/aion/capture/parse/route.ts": 768,
     "src/app/api/aion/chat/route.ts": 464,
     "src/app/api/cron/follow-up-queue/route.ts": 670,
     "src/app/api/cron/payment-reminders/route.ts": 390,
@@ -183,7 +183,7 @@
     "src/widgets/event-dashboard/ui/EventCommandGrid.tsx": 475,
     "src/widgets/event-dashboard/ui/logistics/TimeCapsule.tsx": 574,
     "src/widgets/lobby-capture/ui/CaptureModal.tsx": 969,
-    "src/widgets/network-detail/ui/CaptureTimelinePanel.tsx": 960,
+    "src/widgets/network-detail/ui/CaptureTimelinePanel.tsx": 984,
     "src/widgets/network-detail/ui/CrewKitSection.tsx": 495,
     "src/widgets/network-detail/ui/DossierEditor.tsx": 893,
     "src/widgets/network-detail/ui/WorkingNotesCard.tsx": 477,
