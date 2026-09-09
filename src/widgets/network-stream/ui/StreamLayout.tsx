@@ -4,7 +4,7 @@ import { useCallback, useRef, useState, useTransition, useOptimistic } from 'rea
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown } from 'lucide-react';
-import { NetworkCard } from '@/entities/network';
+import { NetworkCard, NetworkRow } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
@@ -224,7 +224,6 @@ export function StreamLayout({
   // Every grid reserves its own rows; without it a section of bare names
   // renders three blank lines under each card.
   const sortedStarred = sortNodes(starredNodes, sortMode);
-  const innerCircleSlotCount = reservedSlotCount(displayedInnerCircle);
 
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
@@ -438,21 +437,17 @@ export function StreamLayout({
                   className="overflow-hidden"
                 >
                   {displayedInnerCircle.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    <div className="flex flex-col divide-y divide-[var(--stage-edge-subtle)] pb-2">
                       {displayedInnerCircle.map((node) => (
                         <div
                           key={node.id}
-                          className="h-full"
                           onMouseEnter={() => handleNodeHoverEnter(node)}
                           onMouseLeave={handleNodeHoverLeave}
                         >
-                          <NetworkCard
+                          <NetworkRow
                             node={node}
-                            slotCount={innerCircleSlotCount}
-                            layoutId={`node-${node.id}`}
                             onClick={() => onNodeClick?.(node)}
-                  onAffiliateClick={openAffiliate}
-                            onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
+                            onAffiliateClick={openAffiliate}
                           />
                         </div>
                       ))}
@@ -499,6 +494,7 @@ export function StreamLayout({
             className="flex flex-col gap-8"
           >
             <CategorySection
+              layout="rows"
               title={labels.vendors}
               nodes={vendorNodes}
               roleLabels={roleLabels}
@@ -526,6 +522,7 @@ export function StreamLayout({
               layout="rows"
             />
             <CategorySection
+              layout="rows"
               title="Unsorted"
               nodes={unsortedNodes}
               defaultExpanded={false}
