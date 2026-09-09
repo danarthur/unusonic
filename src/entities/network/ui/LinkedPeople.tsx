@@ -34,6 +34,7 @@ import { queryKeys } from '@/shared/api/query-keys';
 import { getLinkedPeople, type LinkedPairing, type LinkedPerson } from '@/features/network-data/api/get-linked-people';
 import { setLinkedStatus } from '@/features/network-data/api/set-linked-status';
 import { EntityAvatar } from './EntityAvatar';
+import { AddLinkedPerson } from './AddLinkedPerson';
 
 const PAIRING_LABEL: Record<LinkedPairing, string> = {
   romantic: 'Partner',
@@ -61,6 +62,8 @@ export interface LinkedPeopleProps {
    * the panel is a peek and does not.
    */
   editable?: boolean;
+  /** Required to add someone: summoning a new person needs the caller's org. */
+  sourceOrgId?: string;
   className?: string;
 }
 
@@ -69,6 +72,7 @@ export function LinkedPeople({
   entityId,
   hrefFor,
   editable = false,
+  sourceOrgId,
   className,
 }: LinkedPeopleProps) {
   const queryClient = useQueryClient();
@@ -118,11 +122,19 @@ export function LinkedPeople({
     );
   };
 
-  if (!data || data.length === 0) return null;
+  const refresh = () =>
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.entities.linkedPeople(workspaceId, entityId),
+    });
+
+  const canAdd = editable && Boolean(sourceOrgId);
+  // Somewhere to start from. Without this the control only appears once there
+  // is already a link, which is the one moment you do not need it.
+  if ((!data || data.length === 0) && !canAdd) return null;
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      {data.map((person) => (
+      {(data ?? []).map((person) => (
         <span key={person.entityId} className="group/link inline-flex items-center">
         <Link
           href={hrefFor(person.entityId)}
@@ -174,6 +186,9 @@ export function LinkedPeople({
           )}
         </span>
       ))}
+      {canAdd && (
+        <AddLinkedPerson entityId={entityId} sourceOrgId={sourceOrgId!} onLinked={refresh} />
+      )}
     </div>
   );
 }

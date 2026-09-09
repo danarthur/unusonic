@@ -77,6 +77,8 @@ export interface EntityRecordShellProps {
   /** Couples get their own avatar treatment, so this is wider than entityType. */
   avatarType?: 'person' | 'company' | 'venue' | 'couple';
   returnPath: string;
+  /** The caller's own org. Needed to summon a person when linking a new one. */
+  sourceOrgId?: string;
   /**
    * The save bar appears only once there is something to save. Omit `onSave`
    * for a read-only record -- the direct-entity view has no form to commit.
@@ -136,6 +138,7 @@ export function EntityRecordShell({
   avatarUrl,
   avatarType,
   returnPath,
+  sourceOrgId,
   dirty = false,
   saving = false,
   onSave,
@@ -194,6 +197,7 @@ export function EntityRecordShell({
                 entityId={entityId}
                 hrefFor={(id) => `/network/entity/${id}`}
                 editable
+                sourceOrgId={sourceOrgId}
               />
             )}
           </div>

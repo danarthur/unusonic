@@ -109,6 +109,7 @@ export function PersonEntityForm({
       avatarUrl={details.identity.avatarUrl}
       avatarType="person"
       returnPath={returnPath}
+      sourceOrgId={sourceOrgId}
       dirty={hasChanges}
       saving={isPending}
       onSave={handleSave}

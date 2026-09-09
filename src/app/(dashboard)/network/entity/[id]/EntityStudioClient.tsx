@@ -392,6 +392,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       avatarUrl={details.identity.avatarUrl}
       avatarType={details.entityDirectoryType as 'person' | 'company' | 'venue' | 'couple' | undefined}
       returnPath={returnPath}
+      sourceOrgId={sourceOrgId}
       dirty={hasChanges}
       saving={isPending}
       onSave={handleSave}
