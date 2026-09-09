@@ -194,7 +194,6 @@ export function TransmissionPanel({
             entityId={details.subjectEntityId}
             entityType={t}
             entityName={details.identity.name ?? null}
-            density="sheet"
             relationshipId={details.relationshipId}
             relationshipNotes={details.notes}
           />

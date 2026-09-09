@@ -5,8 +5,11 @@
  *
  * Single source of truth for what an entity "looks like" at a glance. Mounted
  * in two surfaces:
- *   • NetworkDetailSheet (right-side slide-over, tabbed — density: sheet)
- *   • Entity studio page (/network/entity/[id], full page — density: page)
+ *   • NetworkDetailSheet (right-side slide-over, tabbed)
+ *
+ * Panel-only now. The page composes its own knowledge column from the same
+ * cards and keeps the records in its rail, so the density tier this used to
+ * carry had nothing left to switch on.
  *
  * Grouped into three named zones rather than a flat stack of cards. The stack
  * had grown to seven siblings of equal visual weight, several of them
@@ -37,7 +40,6 @@ import { EmploymentCard } from './EmploymentCard';
 import { TeamCard } from './TeamCard';
 import { EntityProductions } from './EntityProductions';
 import { ReferralsCard } from './ReferralsCard';
-import { PromotedMetricsRow } from './PromotedMetricsRow';
 import { VenueSpecsCompactCard } from './VenueSpecsCompactCard';
 
 export type EntityOverviewEntityType = 'person' | 'company' | 'venue' | 'couple';
@@ -47,14 +49,6 @@ export interface EntityOverviewCardsProps {
   entityId: string;
   entityType: EntityOverviewEntityType;
   entityName: string | null;
-  /**
-   * Layout tier:
-   *   'sheet' — tighter spacing, no promoted-metrics row (the sheet renders
-   *             PromotedMetricsRow separately under the IdentityHeader so it
-   *             slots in with the existing contact strip).
-   *   'page'  — fuller spacing, includes PromotedMetricsRow inline at top.
-   */
-  density?: 'sheet' | 'page';
   /**
    * The relationship in view, when there is one. Lets the notes card host its
    * own composer instead of a second notes card living elsewhere on the sheet.
@@ -69,7 +63,6 @@ export function EntityOverviewCards({
   entityId,
   entityType,
   entityName,
-  density = 'sheet',
   relationshipId = null,
   relationshipNotes = null,
   className,
@@ -84,14 +77,6 @@ export function EntityOverviewCards({
          grouping becomes pre-attentive, at every tier. */
       style={{ gap: 'calc(var(--stage-padding) * 2)' }}
     >
-      {density === 'page' && (
-        <PromotedMetricsRow
-          workspaceId={workspaceId}
-          entityId={entityId}
-          entityType={entityType}
-        />
-      )}
-
       {/*
         Ordered around the moment this sheet actually gets opened: an unfamiliar
         number calls, and in about three seconds you need who is this, what have
@@ -122,13 +107,9 @@ export function EntityOverviewCards({
         {/* Every entity type, now that one reader answers for all of them. A
             company used to be routed to a different, shorter component.
 
-            Only in the sheet. On the page the records rail carries the full
-            productions list, and an individual's page was rendering both --
-            this summary and the full list underneath it. One number, one
-            place: the rail owns productions wherever the rail exists. */}
-        {density === 'sheet' && (
-          <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="summary" />
-        )}
+            The summary lives here and the full list lives in the page's
+            records rail, so neither surface shows it twice. */}
+        <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="summary" />
         {/* Reciprocity runs at both levels: who feeds us, who we feed. */}
         <ReferralsCard workspaceId={workspaceId} entityId={entityId} />
       </Zone>

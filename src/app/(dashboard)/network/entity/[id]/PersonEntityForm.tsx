@@ -8,7 +8,7 @@ import { updateIndividualEntity } from '@/app/(dashboard)/(features)/events/acti
 import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/actions/reclassify-client-entity';
 import type { IndividualAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
-import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
+import { EntityKnowledgeCards } from './EntityKnowledgeCards';
 import { EntityRecordShell } from './EntityRecordShell';
 import { toast } from 'sonner';
 
@@ -88,12 +88,11 @@ export function PersonEntityForm({
       onSave={handleSave}
     >
       {details.subjectEntityId && workspaceId && (
-          <EntityOverviewCards
+          <EntityKnowledgeCards
             workspaceId={workspaceId}
             entityId={details.subjectEntityId}
             entityType="person"
             entityName={displayName || null}
-            density="page"
           />
         )}
 

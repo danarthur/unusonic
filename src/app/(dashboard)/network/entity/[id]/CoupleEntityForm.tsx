@@ -8,7 +8,7 @@ import { updateCoupleEntity } from '@/app/(dashboard)/(features)/events/actions/
 import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/actions/reclassify-client-entity';
 import type { CoupleAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
-import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
+import { EntityKnowledgeCards } from './EntityKnowledgeCards';
 import { EntityRecordShell } from './EntityRecordShell';
 import { toast } from 'sonner';
 
@@ -98,12 +98,11 @@ export function CoupleEntityForm({
       onSave={handleSave}
     >
       {details.subjectEntityId && workspaceId && (
-          <EntityOverviewCards
+          <EntityKnowledgeCards
             workspaceId={workspaceId}
             entityId={details.subjectEntityId}
             entityType="couple"
             entityName={details.identity.name ?? null}
-            density="page"
           />
         )}
 

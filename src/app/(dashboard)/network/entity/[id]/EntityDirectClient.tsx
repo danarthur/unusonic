@@ -8,15 +8,15 @@
  * (e.g. clicking a person in a partner company's Crew tab) instead of a
  * workspace-to-org relationship id. The existing EntityStudioClient
  * dispatcher assumes the latter and would redirect; this page renders the
- * shared EntityOverviewCards stack so the user at least sees the person's
- * Brief, Working notes, capture timeline, and productions.
+ * shared knowledge column so the user at least sees the person's brief,
+ * working notes and capture timeline, with their records in the rail.
  *
  * Full-edit forms (PersonRecordForm) still require a relationship
  * context to work — reaching those is future work, not in scope here.
  */
 
 import * as React from 'react';
-import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
+import { EntityKnowledgeCards } from './EntityKnowledgeCards';
 import { EntityRecordShell } from './EntityRecordShell';
 
 export type EntityDirectClientProps = {
@@ -53,12 +53,11 @@ export function EntityDirectClient({
       avatarType={entityType}
       returnPath={returnPath}
     >
-      <EntityOverviewCards
+      <EntityKnowledgeCards
         workspaceId={workspaceId}
         entityId={entityId}
         entityType={entityType}
         entityName={displayName}
-        density="page"
       />
     </EntityRecordShell>
   );

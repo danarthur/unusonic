@@ -30,7 +30,7 @@ import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { AccordionSection } from './entity-studio-panels';
 import { CrewSkillsSection } from './CrewSkillsSection';
 import { BusinessFunctionsSection } from './BusinessFunctionsSection';
-import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
+import { EntityKnowledgeCards } from './EntityKnowledgeCards';
 import { EntityRecordShell } from './EntityRecordShell';
 import { coiStatus } from '@/shared/lib/crew-profile';
 
@@ -314,12 +314,11 @@ export function PersonRecordForm({
 
         {/* 0a — Overview cards (Brief, Working notes, Captures, Productions) */}
         {workspaceId && (
-          <EntityOverviewCards
+          <EntityKnowledgeCards
             workspaceId={workspaceId}
             entityId={entityId}
             entityType="person"
             entityName={displayName || null}
-            density="page"
           />
         )}
 
