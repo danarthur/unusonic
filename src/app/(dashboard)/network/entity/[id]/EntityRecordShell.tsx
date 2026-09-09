@@ -42,6 +42,8 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { useUnsavedChanges } from '@/shared/lib/use-unsaved-changes';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
 import { EntityRecordsAside } from './EntityRecordsAside';
 
 export interface EntityRecordShellProps {
@@ -88,6 +90,18 @@ export function EntityRecordShell({
   children,
 }: EntityRecordShellProps) {
   const router = useRouter();
+  const navigate = React.useCallback((href: string) => router.push(href), [router]);
+  /*
+    The save bar tells you there is something unsaved; this is what stops you
+    walking away from it. On the App Router a `beforeunload` handler alone
+    looks like a guard and catches nothing -- client-side routing never fires
+    it -- so every in-app link needs intercepting too.
+
+    Accordion toggles are deliberately invisible to this. Warning on
+    progressive disclosure is the fastest way to teach someone to dismiss the
+    dialog without reading it.
+  */
+  const { pendingHref, cancel, confirm, guard } = useUnsavedChanges(dirty, navigate);
 
   return (
     <div className="min-h-screen bg-[var(--stage-void)] pb-32">
@@ -96,7 +110,9 @@ export function EntityRecordShell({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push(returnPath)}
+            onClick={() => {
+              if (guard(returnPath)) router.push(returnPath);
+            }}
             aria-label="Back"
           >
             <ArrowLeft className="size-5" strokeWidth={1.5} />
@@ -160,6 +176,30 @@ export function EntityRecordShell({
           />
         </div>
       </div>
+
+      <Dialog open={pendingHref !== null} onOpenChange={(open) => { if (!open) cancel(); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Leave without saving?</DialogTitle>
+            <DialogClose />
+          </DialogHeader>
+          <p className="px-6 pb-6 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
+            This record has changes that have not been saved. Leaving now discards them.
+          </p>
+          <div className="flex gap-3 px-6 pb-6">
+            <Button variant="outline" size="sm" onClick={cancel} className="flex-1">
+              Stay
+            </Button>
+            <Button
+              size="sm"
+              onClick={confirm}
+              className="flex-1 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
+            >
+              Discard
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
