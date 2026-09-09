@@ -5,7 +5,7 @@ import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Building2,
-  Radar,
+  AtSign,
   Tag,
   DollarSign,
   Users,
@@ -550,7 +550,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             </div>
           </AccordionSection>
 
-          <AccordionSection label="Intelligence" icon={Radar} defaultOpen>
+          {/* Was "Intelligence", which names the scout box at the top and
+              nothing else in here. Everything under it is how you reach them:
+              email, phone, address. A label that describes one control and
+              hides the other six is a label people learn to skip. */}
+          <AccordionSection label="Contact" icon={AtSign} defaultOpen>
             <div className="space-y-3">
               <AionScoutInput
                 value={website}
