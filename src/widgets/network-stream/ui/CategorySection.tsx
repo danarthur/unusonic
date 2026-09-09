@@ -16,10 +16,13 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search } from 'lucide-react';
 
-import { NetworkCard } from '@/entities/network';
+import { NetworkCard, NetworkRow } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
+
+/** Cards until a section says otherwise. */
+const DEFAULT_LAYOUT = 'cards' as const;
 import type { NetworkNode } from '@/entities/network';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { ROLE_GROUPING_THRESHOLD } from '@/entities/network/model/role-vocabulary';
@@ -42,12 +45,22 @@ export interface CategorySectionProps {
   onTogglePreferred?: (node: NetworkNode) => void;
   /** Page-level ordering. One question asked of the directory, not per section. */
   sortMode?: SortMode;
+  /**
+   * Cards or rows.
+   *
+   * Cards are earned rather than default: a section wants them only when it is
+   * small, everyone in it has a face worth recognising, and the task is
+   * comparison. Everywhere else a row says the same things without promising
+   * content a thin record does not have.
+   */
+  layout?: 'cards' | 'rows';
 }
 
 export function CategorySection({
   title,
   nodes,
   sortMode = DEFAULT_SORT,
+  layout,
   emptyLabel = 'Nothing here yet.',
   defaultExpanded = true,
   roleLabels,
@@ -128,6 +141,7 @@ export function CategorySection({
           >
             <CategoryBody
               shown={shown}
+              layout={layout}
               onAffiliateClick={onAffiliateClick}
               search={search}
               emptyLabel={emptyLabel}
@@ -225,6 +239,7 @@ function CategoryBody({
   onNodeHoverEnter,
   onNodeHoverLeave,
   onTogglePreferred,
+  layout = DEFAULT_LAYOUT,
 }: {
   shown: NetworkNode[];
   search: string;
@@ -235,6 +250,7 @@ function CategoryBody({
   onNodeHoverEnter?: (n: NetworkNode) => void;
   onNodeHoverLeave?: () => void;
   onTogglePreferred?: (n: NetworkNode) => void;
+  layout?: 'cards' | 'rows';
 }) {
   if (shown.length === 0) {
     return (
@@ -255,6 +271,26 @@ function CategoryBody({
             Clear filter
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (layout === 'rows') {
+    return (
+      <div className="flex flex-col">
+        {shown.map((node) => (
+          <div
+            key={node.id}
+            onMouseEnter={() => onNodeHoverEnter?.(node)}
+            onMouseLeave={onNodeHoverLeave}
+          >
+            <NetworkRow
+              node={node}
+              onClick={() => onNodeClick?.(node)}
+              onAffiliateClick={onAffiliateClick}
+            />
+          </div>
+        ))}
       </div>
     );
   }
