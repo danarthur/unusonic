@@ -38,6 +38,16 @@ const PAIRING_LABEL: Record<LinkedPairing, string> = {
   family: 'Family',
 };
 
+/**
+ * A pair that has ended keeps its link and says so. NPSP renders the same
+ * thing as "(Former)"; Blackbaud's rule is to end-date rather than delete.
+ * Hiding it would take the second name off a show that really did have two.
+ */
+function labelFor(pairing: LinkedPairing, status: 'current' | 'former'): string {
+  const label = PAIRING_LABEL[pairing];
+  return status === 'former' ? `Former ${label.toLowerCase()}` : label;
+}
+
 export interface LinkedPeopleProps {
   workspaceId: string;
   entityId: string;
@@ -62,15 +72,23 @@ export function LinkedPeople({ workspaceId, entityId, hrefFor, className }: Link
         <Link
           key={person.entityId}
           href={hrefFor(person.entityId)}
+          title={
+            person.status === 'former' && person.endedOn
+              ? `Ended ${person.endedOn}`
+              : undefined
+          }
           className={cn(
             'group inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2',
             'bg-[oklch(1_0_0/0.06)] hover:bg-[oklch(1_0_0/0.10)]',
             'transition-colors duration-[80ms]',
+            // Present but quieter. Brightness is the accent here, so a former
+            // pair steps down a tier rather than taking on a colour.
+            person.status === 'former' && 'opacity-60',
           )}
         >
           <EntityAvatar name={person.name} avatarUrl={person.avatarUrl} entityType="person" sizeClassName="size-5" />
           <span className="stage-badge-text text-[var(--stage-text-tertiary)]">
-            {PAIRING_LABEL[person.pairing]}
+            {labelFor(person.pairing, person.status)}
           </span>
           <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-primary)]">
             {person.name}

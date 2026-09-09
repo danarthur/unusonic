@@ -38,6 +38,8 @@ const JANE = {
   avatarUrl: null,
   pairing: 'romantic' as const,
   anniversary: null,
+  status: 'current' as const,
+  endedOn: null,
 };
 
 beforeEach(() => {
@@ -73,6 +75,30 @@ describe('<LinkedPeople />', () => {
 
     expect(await screen.findByText('Co-host')).toBeTruthy();
     expect(screen.getByText('Family')).toBeTruthy();
+  });
+
+  it('keeps showing a pair that has ended, and says it has', async () => {
+    // The show still happened and the invoice still names both. Hiding a former
+    // partner takes the second name off a record that really did have two --
+    // which is why Blackbaud's rule is to end-date rather than delete, and why
+    // NPSP renders the result as "(Former)" instead of dropping it.
+    getLinkedPeople.mockResolvedValue([
+      { ...JANE, status: 'former' as const, endedOn: '2026-02-14' },
+    ]);
+    renderChips();
+
+    expect(await screen.findByText('Former partner')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Jane Okafor/ })).toBeTruthy();
+  });
+
+  it('carries the end date without spending a line on it', async () => {
+    getLinkedPeople.mockResolvedValue([
+      { ...JANE, status: 'former' as const, endedOn: '2026-02-14' },
+    ]);
+    renderChips();
+
+    const link = await screen.findByRole('link', { name: /Jane Okafor/ });
+    expect(link.getAttribute('title')).toBe('Ended 2026-02-14');
   });
 
   it('renders nothing when nobody is linked', async () => {

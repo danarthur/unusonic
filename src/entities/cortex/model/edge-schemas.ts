@@ -14,6 +14,17 @@ import { z } from 'zod';
 export const coHostContextSchema = z.object({
   pairing: z.enum(['romantic', 'co_host', 'family']),
   anniversary_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  /**
+   * Absent means current. Every row written before this existed reads that way,
+   * which is why there is no backfill and nothing changes meaning.
+   *
+   * A pair that ends keeps its edge -- Blackbaud's published rule is to add an
+   * end date rather than delete, and NPSP renders the result as "(Former)".
+   * Divorce is not an edge case in wedding software, and deleting the edge
+   * deletes the reason a past deal had two names on it.
+   */
+  status: z.enum(['current', 'former']).nullable().optional(),
+  ended_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 export type CoHostContext = z.infer<typeof coHostContextSchema>;
 

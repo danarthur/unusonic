@@ -35,6 +35,13 @@ export type LinkedPerson = {
   pairing: LinkedPairing;
   /** Only set for romantic pairs, and only when someone entered one. */
   anniversary: string | null;
+  /**
+   * Absent in the stored context means current -- every edge written before
+   * the status existed reads that way, which is why there was no backfill.
+   * A former pair is shown, never hidden: the show still happened.
+   */
+  status: 'current' | 'former';
+  endedOn: string | null;
 };
 
 const PAIRINGS: LinkedPairing[] = ['romantic', 'co_host', 'family'];
@@ -75,7 +82,8 @@ export async function getLinkedPeople(entityId: string): Promise<LinkedPerson[]>
     const person = byId.get(edge.target_entity_id as string);
     // An edge pointing at an entity we cannot read is not worth a broken chip.
     if (!person) return [];
-    const context = edge.context_data as { anniversary_date?: unknown } | null;
+    const context = edge.context_data as
+      { anniversary_date?: unknown; status?: unknown; ended_on?: unknown } | null;
     const anniversary =
       typeof context?.anniversary_date === 'string' ? context.anniversary_date : null;
     return [{
@@ -84,6 +92,8 @@ export async function getLinkedPeople(entityId: string): Promise<LinkedPerson[]>
       avatarUrl: person.avatar_url ?? null,
       pairing: readPairing(edge.context_data),
       anniversary,
+      status: context?.status === 'former' ? 'former' : 'current',
+      endedOn: typeof context?.ended_on === 'string' ? context.ended_on : null,
     }];
   });
 }
