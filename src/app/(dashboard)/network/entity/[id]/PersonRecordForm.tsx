@@ -8,7 +8,6 @@ import {
   User,
   Briefcase,
   ShieldCheck,
-  AlertTriangle,
   CheckCircle2,
   Contact,
   Instagram,
@@ -29,6 +28,7 @@ import { AccordionSection } from './entity-studio-panels';
 import { CrewSkillsSection } from './CrewSkillsSection';
 import { BusinessFunctionsSection } from './BusinessFunctionsSection';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
+import { CrewKitSection, RosterStatusCard } from '@/widgets/network-detail';
 import { EntityRecordShell } from './EntityRecordShell';
 import { useConnectionDelete } from './use-connection-delete';
 import { coiStatus } from '@/shared/lib/crew-profile';
@@ -135,8 +135,6 @@ export function PersonRecordForm({
     initialAttrs?.emergency_contact?.phone ?? ''
   );
   const [instagram, setInstagram] = React.useState(initialAttrs?.instagram ?? '');
-  const [doNotRebook, setDoNotRebook] = React.useState(details.doNotRebook ?? false);
-  const [dnrConfirmPending, setDnrConfirmPending] = React.useState(false);
   const [avatarUrl, setAvatarUrl] = React.useState(details.identity.avatarUrl ?? '');
   const [hasChanges, setHasChanges] = React.useState(false);
 
@@ -241,9 +239,8 @@ export function PersonRecordForm({
             ? { name: emergencyName || null, phone: emergencyPhone || null }
             : null,
         instagram: instagram || null,
-        // Only the ROSTER_MEMBER edge stores this. Sending it on a PARTNER
-        // edge would silently no-op, which is worse than not offering it.
-        doNotRebook: isRosterMember ? doNotRebook : undefined,
+        // Written by RosterStatusCard, immediately and on its own. Sending it
+        // from here too would give the flag two writers.
       });
 
       if (result.ok) {
@@ -404,88 +401,33 @@ export function PersonRecordForm({
           </div>
         </AccordionSection>
 
-        {/* Both commit on use, so neither belongs to this form's Save. */}
+        {/* All three commit on use, so none belongs to this form's Save. Kit
+            only ever existed in the drawer, where it was one of the blocks
+            making a peek eighteen deep -- and a freelancer's gear matters at
+            least as much as an employee's, so it is not roster-only here. */}
         <CrewSkillsSection entityId={entityId} />
         <BusinessFunctionsSection entityId={entityId} />
+        <CrewKitSection entityId={entityId} />
 
-        {/* 4 — Status. Employment, so roster only: the member role comes from
-            workspace_members and do-not-rebook writes to the ROSTER_MEMBER
-            edge. A freelancer's equivalent is being preferred at all, which is
-            the control at the foot of the page. */}
-        {isRosterMember && (
-        <AccordionSection label="Status" icon={ShieldCheck} defaultOpen>
-          {details.memberRole && (
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center rounded-full border border-[var(--stage-edge-subtle)]/50 bg-[oklch(1_0_0_/_0.10)]/20 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wide">
-                {details.memberRole}
-              </span>
-            </div>
-          )}
-          <div className="space-y-3 pt-1">
-            <TogglePill
-              active={doNotRebook}
-              onToggle={() => {
-                if (!doNotRebook) {
-                  setDnrConfirmPending(true);
-                } else {
-                  setDoNotRebook(false);
-                  setDnrConfirmPending(false);
-                  mark();
-                }
-              }}
-              label="Do not rebook"
-              icon={AlertTriangle}
-              variant="warning"
-            />
-            <AnimatePresence>
-              {dnrConfirmPending && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -4, height: 0 }}
-                  transition={STAGE_MEDIUM}
-                  className="overflow-hidden"
-                >
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl border-l-[3px] border-l-[var(--color-unusonic-warning)] bg-[var(--stage-surface)] px-3 py-2.5">
-                    <AlertTriangle className="size-3.5 text-[var(--color-unusonic-warning)] flex-shrink-0" strokeWidth={1.5} />
-                    <p className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-warning)] flex-1">
-                      This member won&apos;t appear in scheduling suggestions.
-                    </p>
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setDoNotRebook(true);
-                          setDnrConfirmPending(false);
-                          mark();
-                        }}
-                        className="h-7 px-2 text-xs text-[var(--color-unusonic-warning)] hover:bg-[var(--color-unusonic-warning)]/15"
-                      >
-                        Confirm
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDnrConfirmPending(false)}
-                        className="h-7 px-2 text-xs text-[var(--stage-text-secondary)]"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {doNotRebook && !dnrConfirmPending && (
-              <p className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-warning)]">
-                Member will not appear in scheduling suggestions.
-              </p>
-            )}
-          </div>
-        </AccordionSection>
+        {/* 4 — Status. Employment, so roster only.
+
+            The whole card moved here out of the drawer, and it brought the two
+            operations this page did not have: archive, and remove from the
+            roster. `softDeleteGhostRelationship` never matched a ROSTER_MEMBER
+            edge, so until now a staff member was the one record with no way to
+            be removed from their own page.
+
+            Its do-not-rebook toggle is the only one now. The accordion used to
+            carry a second copy that went through this form's Save, so the flag
+            had two writers and the page could show a stale toggle after the
+            card wrote. */}
+        {isRosterMember && details.canAssignElevatedRole && (
+          <RosterStatusCard
+            details={details}
+            sourceOrgId={sourceOrgId}
+            onRemoved={() => router.push(returnPath)}
+            onSaved={() => router.refresh()}
+          />
         )}
 
         {/* 5 — Compliance */}

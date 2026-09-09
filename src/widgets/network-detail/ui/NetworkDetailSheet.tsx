@@ -262,7 +262,6 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
                     workspaceId={workspaceId ?? null}
                     sourceOrgId={sourceOrgId}
                     onRefresh={handleRefresh}
-                    onClose={handleClose}
                   />
                 </motion.div>
               )}

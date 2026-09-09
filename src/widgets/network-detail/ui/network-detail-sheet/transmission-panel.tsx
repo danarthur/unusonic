@@ -15,21 +15,18 @@
 import * as React from 'react';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { EntityAssignments } from '../EntityAssignments';
-import { CrewKitSection } from '../CrewKitSection';
 import { QuickBookAction } from '../QuickBookAction';
 import { EntityOverviewCards } from '../EntityOverviewCards';
 import {
   InternalMemberRoleCard,
   InternalMemberFieldsCard,
 } from './member-cards';
-import { InviteCard, RosterStatusCard } from './roster-actions';
 
 export interface TransmissionPanelProps {
   details: NodeDetail;
   workspaceId: string | null;
   sourceOrgId: string;
   onRefresh: () => void;
-  onClose: () => void;
   /** Unused — kept so callers can pass the same prop set as the crew tab. */
   pendingCrew?: NodeDetailCrewMember[];
 }
@@ -39,7 +36,6 @@ export function TransmissionPanel({
   workspaceId,
   sourceOrgId,
   onRefresh,
-  onClose,
 }: TransmissionPanelProps) {
   // Same destination as the header's "Open full profile", so a count and the
   // button cannot drift apart.
@@ -164,11 +160,6 @@ export function TransmissionPanel({
         <EntityAssignments entityId={details.subjectEntityId} variant="summary" />
       )}
 
-      {/* ── Employee: Kit (equipment profile) ── */}
-      {!isPartner && details.subjectEntityId && (
-        <CrewKitSection entityId={details.subjectEntityId} />
-      )}
-
       {/* ── Employee: Quick-book card ── */}
       {!isPartner && details.subjectEntityId && (
         <QuickBookAction
@@ -218,24 +209,16 @@ export function TransmissionPanel({
         </div>
       )}
 
-      {/* ── Employee: Invite card ── */}
-      {!isPartner && (details.inviteStatus === 'ghost' || details.inviteStatus === 'invited') && (
-        <InviteCard
-          details={details}
-          sourceOrgId={sourceOrgId}
-          onSaved={onRefresh}
-        />
-      )}
+      {/*
+        Kit, the invite prompt and the roster-status card used to close out this
+        panel. All three are things you do to a record rather than things you
+        read off one, and each now lives on the record page: kit beside the
+        skills, the invite as a banner at the top, and roster status where it
+        also carries archive and remove.
 
-      {/* ── Employee: Roster status card ── */}
-      {!isPartner && details.canAssignElevatedRole && (
-        <RosterStatusCard
-          details={details}
-          sourceOrgId={sourceOrgId}
-          onRemoved={onClose}
-          onSaved={onRefresh}
-        />
-      )}
+        A drawer that offers every operation is not a peek, it is the page with
+        less room.
+      */}
     </>
   );
 }
