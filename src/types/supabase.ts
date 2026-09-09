@@ -1235,6 +1235,10 @@ export type Database = {
         Args: { p_lock?: boolean; p_session_id: string; p_title: string }
         Returns: undefined
       }
+      set_capture_note_scope: {
+        Args: { p_capture_id: string; p_note_scope: string }
+        Returns: boolean
+      }
       submit_pill_feedback: {
         Args: { p_feedback: string; p_line_id: string }
         Returns: boolean

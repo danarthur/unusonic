@@ -22,12 +22,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MoreHorizontal,
   Lock,
-  Users,
-  Pencil,
-  Link2,
-  Trash2,
   FileText,
   X,
   Search,
@@ -44,7 +39,7 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { queryKeys } from '@/shared/api/query-keys';
 import { withFrom } from '@/shared/lib/smart-back';
 import { useCurrentHref } from '@/shared/lib/smart-back-client';
-import { Popover, PopoverTrigger, PopoverContent } from '@/shared/ui/popover';
+import { CaptureRowMenu } from './CaptureRowMenu';
 import { partitionByScope } from './capture-note-scope';
 import { CaptureShowNotes } from './CaptureShowNotes';
 import {
@@ -546,193 +541,6 @@ function CaptureRow({
 }
 
 // ── Row menu ─────────────────────────────────────────────────────────────────
-
-function CaptureRowMenu({
-  capture,
-  isOwn,
-  expanded,
-  onToggleTranscript,
-  onStartEdit,
-  onStartReassign,
-  onMutated,
-}: {
-  capture: EntityCapture;
-  isOwn: boolean;
-  expanded: boolean;
-  onToggleTranscript: () => void;
-  onStartEdit: () => void;
-  onStartReassign: () => void;
-  onMutated: () => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [pendingVisibilityConfirm, setPendingVisibilityConfirm] = React.useState(false);
-  const [pendingDelete, setPendingDelete] = React.useState(false);
-
-  const isPrivate = capture.visibility === 'user';
-
-  const handleVisibility = async () => {
-    const next = isPrivate ? 'workspace' : 'user';
-    // Confirm on user→workspace promotion only; workspace→user is always safe.
-    if (isPrivate && !pendingVisibilityConfirm) {
-      setPendingVisibilityConfirm(true);
-      return;
-    }
-    setPendingVisibilityConfirm(false);
-    const result = await updateCapture({
-      action: 'visibility',
-      captureId: capture.id,
-      visibility: next,
-    });
-    if (!result.ok) {
-      toast.error(result.error, { duration: Infinity });
-      return;
-    }
-    toast.success(next === 'workspace' ? 'Shared with team.' : 'Made private.');
-    setOpen(false);
-    onMutated();
-  };
-
-  const handleDelete = async () => {
-    if (!pendingDelete) {
-      setPendingDelete(true);
-      return;
-    }
-    setPendingDelete(false);
-    const result = await updateCapture({
-      action: 'delete',
-      captureId: capture.id,
-    });
-    if (!result.ok) {
-      toast.error(result.error, { duration: Infinity });
-      return;
-    }
-    toast.success('Deleted.');
-    setOpen(false);
-    onMutated();
-  };
-
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) {
-          setPendingVisibilityConfirm(false);
-          setPendingDelete(false);
-        }
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Capture actions"
-          className={cn(
-            'shrink-0 p-1 rounded-md',
-            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
-            'hover:bg-[oklch(1_0_0/0.06)] transition-colors',
-            'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-          )}
-        >
-          <MoreHorizontal className="size-3.5" strokeWidth={1.5} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-56 p-1">
-        <MenuItem
-          icon={<FileText className="size-3.5" />}
-          label={expanded ? 'Hide transcript' : 'Show transcript'}
-          onClick={() => {
-            onToggleTranscript();
-            setOpen(false);
-          }}
-          disabled={!capture.transcript}
-        />
-        {isOwn && (
-          <>
-            <MenuItem
-              icon={<Pencil className="size-3.5" />}
-              label="Edit"
-              onClick={() => {
-                onStartEdit();
-                setOpen(false);
-              }}
-            />
-            <MenuItem
-              icon={<Link2 className="size-3.5" />}
-              label="Reassign"
-              onClick={() => {
-                onStartReassign();
-                setOpen(false);
-              }}
-            />
-            <MenuItem
-              icon={
-                isPrivate ? (
-                  <Users className="size-3.5" />
-                ) : (
-                  <Lock className="size-3.5" />
-                )
-              }
-              label={
-                pendingVisibilityConfirm
-                  ? 'Confirm share with team?'
-                  : isPrivate
-                    ? 'Share with team'
-                    : 'Make private'
-              }
-              onClick={handleVisibility}
-              variant={pendingVisibilityConfirm ? 'warning' : 'default'}
-            />
-            <MenuItem
-              icon={<Trash2 className="size-3.5" />}
-              label={pendingDelete ? 'Confirm delete?' : 'Delete'}
-              onClick={handleDelete}
-              variant={pendingDelete ? 'danger' : 'default'}
-            />
-          </>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function MenuItem({
-  icon,
-  label,
-  onClick,
-  disabled,
-  variant = 'default',
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: 'default' | 'warning' | 'danger';
-}) {
-  const colorClass =
-    variant === 'danger'
-      ? 'text-[var(--color-unusonic-error)]'
-      : variant === 'warning'
-        ? 'text-[var(--color-unusonic-warning)]'
-        : 'text-[var(--stage-text-primary)]';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        'w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-xs',
-        'hover:bg-[oklch(1_0_0/0.06)] transition-colors',
-        'disabled:opacity-40 disabled:cursor-not-allowed',
-        colorClass,
-      )}
-    >
-      <span className="text-[var(--stage-text-tertiary)]">{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-// ── Edit mode ────────────────────────────────────────────────────────────────
 
 function CaptureEditor({
   capture,

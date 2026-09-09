@@ -47,6 +47,19 @@ export type UpdateCaptureInput =
       visibility: CaptureVisibility;
     }
   | {
+      /**
+       * Move a note between the profile and its show, by hand.
+       *
+       * Pins the placement: the classifier must never move a note a person
+       * placed, because a correction that can be undone by the next parse stops
+       * being made at all.
+       */
+      action: 'scope';
+      captureId: string;
+      /** 'about' keeps it on the profile, 'show' demotes it, null unclassifies. */
+      noteScope: 'about' | 'show' | null;
+    }
+  | {
       action: 'delete';
       captureId: string;
     };
@@ -191,6 +204,25 @@ export async function updateCapture(
       if (oldEntityId) revalidatePath(`/network/entity/${oldEntityId}`);
       if (input.newEntityId) revalidatePath(`/network/entity/${input.newEntityId}`);
       revalidatePath('/lobby');
+      return { ok: true };
+    }
+
+    case 'scope': {
+      const { data, error } = await cortex.rpc('set_capture_note_scope', {
+        p_capture_id: input.captureId,
+        // The RPC accepts NULL to unclassify; the generated arg type does not
+        // model that, and passing undefined would drop the argument entirely.
+        p_note_scope: input.noteScope as string,
+      });
+      if (error) return { ok: false, error: error.message };
+      // The RPC returns false rather than raising when it refuses -- a note that
+      // is not yours, or 'show' with no show attached. Saying nothing happened
+      // beats reporting a success that did not occur.
+      if (data === false) {
+        return { ok: false, error: 'Could not move that note.' };
+      }
+
+      invalidate();
       return { ok: true };
     }
 
