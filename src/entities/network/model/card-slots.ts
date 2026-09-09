@@ -160,7 +160,7 @@ const BY_SHAPE: Record<'person' | 'company' | 'venue', SlotProducer[]> = {
   venue: [region, owes, weOwe, lastShow, affiliates],
 };
 
-function shapeOf(node: NetworkNode): 'person' | 'company' | 'venue' {
+export function shapeOf(node: NetworkNode): 'person' | 'company' | 'venue' {
   const t = node.identity.entityType;
   if (t === 'venue') return 'venue';
   if (t === 'company') return 'company';

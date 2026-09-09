@@ -27,9 +27,26 @@
 import * as React from 'react';
 import { cn } from '@/shared/lib/utils';
 import { EntityAvatar } from './EntityAvatar';
-import { isFlagged } from '../model/card-slots';
+import { isFlagged, shapeOf } from '../model/card-slots';
 import { formatUsd, formatDay, formatUpcoming, parseShowDate } from '../model/format-facts';
 import type { NetworkNode } from '../model/types';
+
+/**
+ * Which facts a row carries, by what the entity is.
+ *
+ * A venue has no rate and never owes us anything, so printing those columns on
+ * eighty venue rows is eighty rows of dead space -- the same mistake the card
+ * made before its slots were ordered per shape. Region is not here because it
+ * is already the subtitle: a venue's deciding fact belongs next to its name,
+ * not out on the right with the numbers.
+ */
+const FACTS_BY_SHAPE: Record<'person' | 'company' | 'venue', RowFact[]> = {
+  person: ['next', 'lastShow', 'rate', 'money'],
+  company: ['next', 'lastShow', 'money'],
+  venue: ['next', 'lastShow'],
+};
+
+type RowFact = 'next' | 'lastShow' | 'rate' | 'money';
 
 export interface NetworkRowProps {
   node: NetworkNode;
@@ -105,6 +122,43 @@ function moneyOf(node: NetworkNode): { value: string; label: string } | null {
 }
 
 /**
+ * The right-hand facts, in a fixed order.
+ *
+ * They drop from the right as the row narrows -- the ones nearest the name
+ * survive longest, because those are the ones asked about most.
+ */
+function RowFacts({ node, facts, now }: { node: NetworkNode; facts: RowFact[]; now: Date }) {
+  const money = moneyOf(node);
+  const rate = node.meta.rate;
+
+  return (
+    <>
+      {facts.includes('rate') && (
+        <Fact
+          label="Rate"
+          value={rate ? `${formatUsd(rate.amount)}${rate.unit ? ` / ${rate.unit}` : ''}` : null}
+          className="w-24 xl:flex"
+        />
+      )}
+      {facts.includes('lastShow') && (
+        <Fact label="Last show" value={lastShowLabel(node, now)} className="w-20 lg:flex" />
+      )}
+      {facts.includes('next') && (
+        <Fact label="Next" value={nextShowLabel(node, now)} className="w-20 sm:flex" />
+      )}
+      {facts.includes('money') && (
+        <Fact
+          label={money?.label ?? 'Owes'}
+          value={money?.value ?? null}
+          tone="warning"
+          className="w-20 sm:flex"
+        />
+      )}
+    </>
+  );
+}
+
+/**
  * People at this company. Often the only place they surface on the contacts
  * page at all, so they stay reachable rather than becoming plain text.
  */
@@ -143,8 +197,7 @@ function Affiliates({
 export function NetworkRow({ node, onClick, onAffiliateClick }: NetworkRowProps) {
   const now = React.useMemo(() => new Date(), []);
   const subtitle = subtitleOf(node);
-  const money = moneyOf(node);
-  const rate = node.meta.rate;
+  const facts = FACTS_BY_SHAPE[shapeOf(node)];
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -160,7 +213,8 @@ export function NetworkRow({ node, onClick, onAffiliateClick }: NetworkRowProps)
       onClick={onClick}
       onKeyDown={handleKeyDown}
       className={cn(
-        'group flex w-full cursor-pointer items-center gap-3 rounded-[var(--stage-radius-nested)] px-3 py-2',
+        'group flex w-full cursor-pointer items-center gap-4 rounded-[var(--stage-radius-nested)]',
+        'px-3 py-2.5 sm:px-4',
         'text-left transition-colors duration-[80ms] hover:bg-[oklch(1_0_0_/_0.04)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
         node.meta.archived && 'opacity-40',
@@ -187,12 +241,7 @@ export function NetworkRow({ node, onClick, onAffiliateClick }: NetworkRowProps)
         )}
       </div>
 
-      {/* Facts drop from the right as the row narrows: the ones nearest the
-          name survive longest, because they are the ones asked about most. */}
-      <Fact label="Rate" value={rate ? `${formatUsd(rate.amount)}${rate.unit ? ` / ${rate.unit}` : ''}` : null} className="xl:flex w-24" />
-      <Fact label="Last show" value={lastShowLabel(node, now)} className="lg:flex w-20" />
-      <Fact label="Next" value={nextShowLabel(node, now)} className="sm:flex w-20" />
-      <Fact label={money?.label ?? 'Owes'} value={money?.value ?? null} tone="warning" className="sm:flex w-20" />
+      <RowFacts node={node} facts={facts} now={now} />
 
       <Affiliates node={node} onAffiliateClick={onAffiliateClick} />
     </div>

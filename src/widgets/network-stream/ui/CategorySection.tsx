@@ -277,7 +277,10 @@ function CategoryBody({
 
   if (layout === 'rows') {
     return (
-      <div className="flex flex-col">
+      // Divided rather than gapped: a hairline is what tells the eye where one
+      // row ends when they sit flush. Padded at the foot so the last row does
+      // not run into whatever follows the section.
+      <div className="flex flex-col divide-y divide-[var(--stage-edge-subtle)] pb-2">
         {shown.map((node) => (
           <div
             key={node.id}

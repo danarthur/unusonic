@@ -47,7 +47,13 @@ export function EntityAvatar({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center justify-center overflow-hidden bg-[var(--stage-surface-nested)]',
+        // An edge, not a heavier fill. On a row the avatar sits on the page
+        // ground rather than inside a panel, where a nested surface is close
+        // enough to the background that a monogram disappears into it -- and
+        // the house rule for nesting past the surface ceiling is border, not
+        // more fill.
+        'flex shrink-0 items-center justify-center overflow-hidden',
+        'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]',
         sizeClassName,
         isPersonal ? 'rounded-full' : 'rounded-[var(--stage-radius-nested)]',
         className,
