@@ -9,6 +9,9 @@ import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/acti
 import type { CoupleAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/shared/api/query-keys';
+import { getLinkedPeople } from '@/features/network-data/api/get-linked-people';
 import { EntityRecordShell } from './EntityRecordShell';
 import { useConnectionDelete } from './use-connection-delete';
 import { toast } from 'sonner';
@@ -72,6 +75,18 @@ export function CoupleEntityForm({
       }
     });
   };
+
+  const { data: linked } = useQuery({
+    queryKey: queryKeys.entities.linkedPeople(workspaceId ?? '', details.subjectEntityId ?? ''),
+    queryFn: () => getLinkedPeople(details.subjectEntityId ?? ''),
+    staleTime: 60_000,
+    enabled: Boolean(workspaceId && details.subjectEntityId),
+  });
+  // Former links still block it: the edge is what would be orphaned, and it
+  // survives the pair ending on purpose.
+  const linkedTo = linked && linked.length > 0
+    ? linked.map((p) => p.name).join(' and ')
+    : null;
 
   const handleRemove = useConnectionDelete({
     relationshipId: details.relationshipId,
@@ -196,6 +211,21 @@ export function CoupleEntityForm({
               Reclassify
             </h3>
           </div>
+          {/*
+            Somebody who is already linked to another person IS a couple --
+            two nodes and an edge, which is what the show flow writes. Offering
+            to "change to couple" said the opposite, and taking it would have
+            cleared their name, email and phone, filled in nothing in their
+            place, and left the other partner pointing at a nameless shell.
+          */}
+          {linkedTo ? (
+            <div className="px-5 py-4">
+              <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
+                Linked to {linkedTo}. Two people who are linked are already a couple —
+                remove the link before changing what this record is.
+              </p>
+            </div>
+          ) : (
           <div className="px-5 py-4 space-y-3">
             <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
               Change this client record type. Existing field data from the old type will be cleared.
@@ -223,6 +253,7 @@ export function CoupleEntityForm({
               </Button>
             </div>
           </div>
+          )}
         </section>
     </EntityRecordShell>
   );
