@@ -38,13 +38,30 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { useUnsavedChanges } from '@/shared/lib/use-unsaved-changes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '@/shared/ui/popover';
+import { cn } from '@/shared/lib/utils';
 import { EntityRecordsAside } from './EntityRecordsAside';
+
+/**
+ * An entry in the header's overflow menu.
+ *
+ * Polaris' placement rule for a record: delete is a secondary action with
+ * critical tone, in the page-header overflow, never a page primary action --
+ * and typical object actions sit at the bottom of the list, so the caller
+ * orders them with delete last.
+ */
+export interface RecordAction {
+  label: string;
+  onSelect: () => void;
+  /** Destructive. Rendered in the error tone, and placed last by convention. */
+  critical?: boolean;
+}
 
 export interface EntityRecordShellProps {
   /** The directory entity this page is about. Null on records with no entity row yet. */
@@ -68,9 +85,45 @@ export interface EntityRecordShellProps {
   onSave?: () => void;
   /** Actions that belong beside the save bar rather than in the body. */
   headerActions?: React.ReactNode;
+  /** Overflow-menu entries. Delete belongs here, not in a danger zone. */
+  actions?: RecordAction[];
   /** Full-width, above the columns. The employee invite prompt is the one user. */
   banner?: React.ReactNode;
   children: React.ReactNode;
+}
+
+function RecordOverflow({ actions }: { actions: RecordAction[] }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="More actions">
+          <MoreHorizontal className="size-5" strokeWidth={1.5} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56 p-1">
+        {actions.map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              action.onSelect();
+            }}
+            className={cn(
+              'w-full rounded-lg px-3 py-2 text-left text-[length:var(--stage-data-size)]',
+              'transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.06)]',
+              action.critical
+                ? 'text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10'
+                : 'text-[var(--stage-text-primary)]',
+            )}
+          >
+            {action.label}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function EntityRecordShell({
@@ -86,6 +139,7 @@ export function EntityRecordShell({
   saving = false,
   onSave,
   headerActions,
+  actions,
   banner,
   children,
 }: EntityRecordShellProps) {
@@ -135,6 +189,7 @@ export function EntityRecordShell({
 
         <div className="flex shrink-0 items-center gap-3">
           {headerActions}
+          {actions && actions.length > 0 && <RecordOverflow actions={actions} />}
           <AnimatePresence>
             {dirty && onSave && (
               <motion.div

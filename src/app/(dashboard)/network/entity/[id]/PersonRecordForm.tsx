@@ -13,7 +13,6 @@ import {
   Contact,
   Instagram,
   Send,
-  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
@@ -24,7 +23,6 @@ import { updateEmployeeEntityAttrs } from '@/features/talent-management/api/upda
 import { updateEntityAvatar } from '@/features/talent-management/api/update-entity-avatar';
 import { AvatarUpload } from '@/features/team-invite/ui/AvatarUpload';
 import { deployInvites } from '@/features/team-invite/api/actions';
-import { softDeleteGhostRelationship } from '@/features/network-data';
 import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { AccordionSection } from './entity-studio-panels';
@@ -32,6 +30,7 @@ import { CrewSkillsSection } from './CrewSkillsSection';
 import { BusinessFunctionsSection } from './BusinessFunctionsSection';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
 import { EntityRecordShell } from './EntityRecordShell';
+import { useConnectionDelete } from './use-connection-delete';
 import { coiStatus } from '@/shared/lib/crew-profile';
 
 // ─── Proficiency helpers ───────────────────────────────────────────────────────
@@ -160,22 +159,18 @@ export function PersonRecordForm({
     }
   };
 
-  const [confirmRemove, setConfirmRemove] = React.useState(false);
-  const [removing, setRemoving] = React.useState(false);
-
   const mark = () => setHasChanges(true);
 
-  const handleRemoveFromPreferred = async () => {
-    setRemoving(true);
-    const result = await softDeleteGhostRelationship(details.id, sourceOrgId);
-    setRemoving(false);
-    if (result.ok) {
-      toast.success('Removed from preferred.');
-      router.push(returnPath);
-    } else {
-      toast.error(result.error ?? 'Could not remove.');
-    }
-  };
+  // Only the partner edge. `softDeleteGhostRelationship` matches VENDOR /
+  // VENUE_PARTNER / CLIENT / PARTNER, so offering this on a ROSTER_MEMBER would
+  // fail -- and taking someone off the staff is a different act anyway.
+  const handleRemove = useConnectionDelete({
+    relationshipId: isRosterMember ? null : details.id,
+    sourceOrgId,
+    returnPath,
+    name: details.identity.name || 'Contact',
+    removedMessage: 'Removed from preferred.',
+  });
 
   // ── Avatar handler ────────────────────────────────────────────────────────────
   const handleAvatarChange = React.useCallback(async (url: string) => {
@@ -277,6 +272,11 @@ export function PersonRecordForm({
       dirty={hasChanges}
       saving={isPending}
       onSave={handleSave}
+      actions={
+        handleRemove
+          ? [{ label: 'Remove from preferred', onSelect: handleRemove, critical: true }]
+          : undefined
+      }
       banner={
         isRosterMember && isGhostMember ? (
           <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-4">
@@ -581,64 +581,6 @@ export function PersonRecordForm({
             />
           </div>
         </AccordionSection>
-
-        {/* Removing them from preferred is not a form field, so it sits below
-            the form rather than inside it. */}
-        {!isRosterMember && (
-          <div className="flex items-center gap-3 pt-2">
-            <AnimatePresence mode="wait">
-              {confirmRemove ? (
-                <motion.div
-                  key="confirm"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={STAGE_MEDIUM}
-                  className="flex items-center gap-2"
-                >
-                  <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
-                    Remove from preferred?
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemoveFromPreferred}
-                    disabled={removing}
-                    className="h-7 px-2.5 text-xs text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
-                  >
-                    {removing ? 'Removing…' : 'Confirm'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmRemove(false)}
-                    className="h-7 px-2.5 text-xs text-[var(--stage-text-secondary)]"
-                  >
-                    Cancel
-                  </Button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="idle"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={STAGE_MEDIUM}
-                >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmRemove(true)}
-                    className="h-8 gap-1.5 px-2.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
-                  >
-                    <Trash2 className="size-3.5" strokeWidth={1.5} />
-                    Remove from preferred
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
 
     </EntityRecordShell>
   );

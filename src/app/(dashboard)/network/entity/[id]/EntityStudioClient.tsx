@@ -10,8 +10,6 @@ import {
   DollarSign,
   Users,
   ShieldCheck,
-  RotateCcw,
-  Trash2,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -19,7 +17,6 @@ import {
   updateGhostProfile,
   updateRelationshipMeta,
   addScoutRosterToGhostOrg,
-  softDeleteGhostRelationship,
 } from '@/features/network-data';
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
 import { PersonRecordForm } from './PersonRecordForm';
@@ -28,6 +25,7 @@ import { CoupleEntityForm } from './CoupleEntityForm';
 import { AccordionSection } from './entity-studio-panels';
 import { EntityRecordShell } from './EntityRecordShell';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
+import { useConnectionDelete } from './use-connection-delete';
 import { RosterSection } from './GhostOrgRoster';
 import { VenueSpecsEditor } from './VenueSpecsEditor';
 import { ColorTuner } from '@/features/org-identity';
@@ -99,6 +97,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
     return (
       <PersonEntityForm
         details={details}
+        sourceOrgId={sourceOrgId}
         initialAttrs={initialPersonAttrs ?? { first_name: '', last_name: '', email: undefined, phone: undefined, category: undefined }}
         returnPath={returnPath}
         workspaceId={workspaceId ?? undefined}
@@ -109,6 +108,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
     return (
       <CoupleEntityForm
         details={details}
+        sourceOrgId={sourceOrgId}
         initialAttrs={initialCoupleAttrs ?? { partner_a_first_name: '', partner_a_last_name: '', partner_a_email: undefined, partner_b_first_name: '', partner_b_last_name: '', partner_b_email: undefined, category: undefined }}
         returnPath={returnPath}
         workspaceId={workspaceId ?? undefined}
@@ -154,7 +154,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
   const [paymentTerms, setPaymentTerms] = React.useState((ops.payment_terms as string) ?? '');
   const [defaultCurrency, setDefaultCurrency] = React.useState(details.orgDefaultCurrency ?? 'USD');
   const [resetConfirmOpen, setResetConfirmOpen] = React.useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
 
   const markChanged = React.useCallback(() => setHasChanges(true), []);
 
@@ -176,20 +175,12 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
     setResetConfirmOpen(false);
   }, []);
 
-  const handleDelete = React.useCallback(() => {
-    if (!relationshipId || !sourceOrgId) return;
-    startTransition(async () => {
-      const result = await softDeleteGhostRelationship(relationshipId, sourceOrgId);
-      setDeleteConfirmOpen(false);
-      if (result.ok) {
-        toast.success('Connection deleted. You can restore it within 30 days from the Network page.');
-        router.push(returnPath);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }, [relationshipId, sourceOrgId, router]);
+  const handleDelete = useConnectionDelete({
+    relationshipId: relationshipId || null,
+    sourceOrgId,
+    returnPath,
+    name: name || details.identity.name || 'Connection',
+  });
 
   const handleEnrich = React.useCallback(
     (data: ScoutResult) => {
@@ -385,6 +376,12 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       dirty={hasChanges}
       saving={isPending}
       onSave={handleSave}
+      actions={[
+        { label: 'Reset all fields', onSelect: () => setResetConfirmOpen(true) },
+        ...(handleDelete
+          ? [{ label: 'Remove connection', onSelect: handleDelete, critical: true }]
+          : []),
+      ]}
     >
           {/* What we know, above what you edit -- the same column order the
               person pages carry. This page had none of it: no brief, no
@@ -684,36 +681,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             />
           </AccordionSection>
 
-          <section className="stage-panel rounded-2xl overflow-hidden" data-surface="surface">
-            <div className="px-5 py-4 border-b border-[var(--stage-edge-subtle)]">
-              <h3 className="stage-label">
-                Danger zone
-              </h3>
-            </div>
-            <div className="px-5 py-4 flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setResetConfirmOpen(true)}
-                className="gap-2 border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well)]"
-              >
-                <RotateCcw className="size-4" strokeWidth={1.5} />
-                Reset all fields
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteConfirmOpen(true)}
-                className="gap-2 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
-              >
-                <Trash2 className="size-4" strokeWidth={1.5} />
-                Delete connection
-              </Button>
-            </div>
-          </section>
-
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -734,30 +701,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete this connection?</DialogTitle>
-            <DialogClose />
-          </DialogHeader>
-          <p className="px-6 pb-6 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
-            This connection will be removed from your network. You can restore it within 30 days from the Network page. After that it may be permanently deleted.
-          </p>
-          <div className="flex gap-3 px-6 pb-6">
-            <Button variant="outline" size="sm" onClick={() => setDeleteConfirmOpen(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleDelete}
-              disabled={isPending}
-              className="flex-1 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
-            >
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </EntityRecordShell>
   );
 }

@@ -10,6 +10,7 @@ import type { IndividualAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
 import { EntityRecordShell } from './EntityRecordShell';
+import { useConnectionDelete } from './use-connection-delete';
 import { toast } from 'sonner';
 
 const LABEL = 'stage-label';
@@ -19,11 +20,14 @@ export function PersonEntityForm({
   initialAttrs,
   returnPath,
   workspaceId,
+  sourceOrgId,
 }: {
   details: NodeDetail;
   initialAttrs: IndividualAttrs;
   returnPath: string;
   workspaceId?: string;
+  /** The caller's own org. softDeleteGhostRelationship authorises against it. */
+  sourceOrgId: string;
 }) {
   const router = useRouter();
   const [firstName, setFirstName] = React.useState(initialAttrs.first_name ?? '');
@@ -59,6 +63,13 @@ export function PersonEntityForm({
     });
   };
 
+  const handleRemove = useConnectionDelete({
+    relationshipId: details.relationshipId,
+    sourceOrgId,
+    returnPath,
+    name: details.identity.name || 'Client',
+  });
+
   const handleReclassify = (newType: 'couple' | 'company') => {
     if (!entityId) return;
     startReclassify(async () => {
@@ -86,6 +97,11 @@ export function PersonEntityForm({
       dirty={hasChanges}
       saving={isPending}
       onSave={handleSave}
+      actions={
+        handleRemove
+          ? [{ label: 'Remove connection', onSelect: handleRemove, critical: true }]
+          : undefined
+      }
     >
       {details.subjectEntityId && workspaceId && (
           <EntityKnowledgeCards
