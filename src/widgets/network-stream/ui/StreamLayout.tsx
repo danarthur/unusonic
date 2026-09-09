@@ -4,13 +4,13 @@ import { useCallback, useRef, useState, useTransition, useOptimistic } from 'rea
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown } from 'lucide-react';
-import { NetworkCard, NetworkRow } from '@/entities/network';
-import { reservedSlotCount } from '@/entities/network/model/card-slots';
+import { NetworkRow } from '@/entities/network';
 import { rowFactsFor } from '@/entities/network/model/row-facts';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
 import { SortControl } from './SortControl';
 import { CategoryChips, type CategoryFilter } from './CategoryChips';
+import { RosterSection } from './RosterSection';
 import { FileContactControl } from './FileContactControl';
 
 /** Referentially stable, so filtering a section out does not churn its props. */
@@ -53,24 +53,6 @@ function isOtherNode(n: NetworkNode): boolean {
 // Crew zone: role grouping
 // =============================================================================
 
-function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
-  const groups = new Map<string, NetworkNode[]>();
-  for (const node of nodes) {
-    const key = node.roleGroup || 'Other';
-    const arr = groups.get(key) ?? [];
-    arr.push(node);
-    groups.set(key, arr);
-  }
-  // Sort groups alphabetically, but "Other" always last
-  const sorted = new Map<string, NetworkNode[]>();
-  const keys = [...groups.keys()].sort((a, b) => {
-    if (a === 'Other') return 1;
-    if (b === 'Other') return -1;
-    return a.localeCompare(b);
-  });
-  for (const key of keys) sorted.set(key, groups.get(key)!);
-  return sorted;
-}
 
 // =============================================================================
 // Category membership
@@ -158,11 +140,8 @@ export function StreamLayout({
     }
   }, []);
   const [, startTransition] = useTransition();
-  const [crewSearch, setCrewSearch] = useState('');
   const [innerCircleSearch, setInnerCircleSearch] = useState('');
-  const [crewExpanded, setCrewExpanded] = useState(true);
   const [innerCircleExpanded, setInnerCircleExpanded] = useState(true);
-  const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT);
   const [category, setCategory] = useState<CategoryFilter>('all');
 
@@ -214,17 +193,6 @@ export function StreamLayout({
     });
   };
 
-  // Crew zone: search, role grouping and filtering
-  const searchedCrewNodes = sortNodes(filterNodes(crewNodes, crewSearch), sortMode);
-  const roleGroups = groupByRole(searchedCrewNodes);
-  const allRoleKeys = [...groupByRole(crewNodes).keys()]; // Use unfiltered for pill labels
-  const filteredCrewNodes = activeRoleFilter
-    ? searchedCrewNodes.filter((n) => (n.roleGroup || 'Other') === activeRoleFilter)
-    : searchedCrewNodes;
-  const filteredRoleGroups = activeRoleFilter
-    ? new Map([[activeRoleFilter, filteredCrewNodes]])
-    : roleGroups;
-
   // Inner Circle zone: search
   const displayedInnerCircle = sortNodes(filterNodes(innerCircleNodes, innerCircleSearch), sortMode);
 
@@ -263,147 +231,16 @@ export function StreamLayout({
         onNodeHoverLeave={handleNodeHoverLeave}
         onToggleStar={onToggleStar ? handleToggleStar : undefined}
       />
-
-      {/* ── Roster — staff, contractors and freelancers (ROSTER_MEMBER / PARTNER) ── */}
-      {crewNodes.length > 0 && shows('roster') && (
-        <section>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setCrewExpanded((v) => !v)}
-              className="flex items-center gap-2 text-left group"
-            >
-              <h2 className="stage-label text-[var(--stage-text-secondary)]">
-                {labels.roster}
-              </h2>
-              <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-                {crewNodes.length}
-              </span>
-              <ChevronDown
-                className={cn(
-                  'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
-                  crewExpanded && 'rotate-180'
-                )}
-              />
-            </button>
-            {crewExpanded && (
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Search crew…"
-                  aria-label="Search crew"
-                  value={crewSearch}
-                  onChange={(e) => setCrewSearch(e.target.value)}
-                  className={cn(
-                    'stage-input h-8 !pl-7 pr-3 text-xs',
-                    'focus-visible:outline-none',
-                    crewSearch ? 'w-40' : 'w-28 focus:w-40'
-                  )}
-                />
-              </div>
-            )}
-          </div>
-
-          <AnimatePresence>
-            {crewExpanded && (
-              <motion.div
-                key="crew-content"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={STAGE_MEDIUM}
-                className="overflow-hidden"
-              >
-                {/* Role filter pills */}
-                {allRoleKeys.length > 1 && (
-                  <div className="mb-4 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRoleFilter(null)}
-                      className={cn(
-                        'rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
-                        !activeRoleFilter
-                          ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                          : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                      )}
-                    >
-                      All
-                    </button>
-                    {allRoleKeys.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setActiveRoleFilter(activeRoleFilter === key ? null : key)}
-                        className={cn(
-                          'flex items-center gap-1.5 rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
-                          activeRoleFilter === key
-                            ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                            : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                        )}
-                      >
-                        {key}
-                        <span
-                          className={cn(
-                            'rounded-full px-1.5 py-px stage-badge-text tabular-nums',
-                            activeRoleFilter === key
-                              ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
-                              : 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
-                          )}
-                        >
-                          {roleGroups.get(key)?.length ?? 0}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Role-grouped cards */}
-                {filteredCrewNodes.length > 0 ? (
-                  <div className="flex flex-col gap-6">
-                    {[...filteredRoleGroups.entries()].map(([role, groupNodes]) => (
-                      <div key={role}>
-                        {/* Only show role header if there are multiple groups and no active filter */}
-                        {allRoleKeys.length > 1 && !activeRoleFilter && (
-                          <p className="mb-2 stage-label text-[var(--stage-text-secondary)]/60">
-                            {role}
-                          </p>
-                        )}
-                        <div className="grid grid-cols-2 gap-[var(--stage-gap)] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                          {groupNodes.map((node) => (
-                            <div
-                              key={node.id}
-                              className="h-full"
-                              onMouseEnter={() => handleNodeHoverEnter(node)}
-                              onMouseLeave={handleNodeHoverLeave}
-                            >
-                              <NetworkCard
-                                node={node}
-                                slotCount={reservedSlotCount(groupNodes)}
-                                layoutId={`node-${node.id}`}
-                                onClick={() => onNodeClick?.(node)}
-                  onAffiliateClick={openAffiliate}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <p className="stage-label text-[var(--stage-text-secondary)]">
-                      No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{crewSearch}&rdquo;</span>
-                    </p>
-                    <button type="button" onClick={() => { setCrewSearch(''); setActiveRoleFilter(null); }} className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline">
-                      Clear filter
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
+      {shows('roster') && (
+        <RosterSection
+          nodes={crewNodes}
+          label={labels.roster}
+          sortMode={sortMode}
+          onNodeClick={onNodeClick}
+          onAffiliateClick={openAffiliate}
+          onNodeHoverEnter={handleNodeHoverEnter}
+          onNodeHoverLeave={handleNodeHoverLeave}
+        />
       )}
 
       {/* ── Clients — anyone on a CLIENT edge, person or company ── */}
@@ -526,6 +363,7 @@ export function StreamLayout({
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
               sortMode={sortMode}
+              onRowChanged={() => router.refresh()}
             />
             <CategorySection
               title={labels.venues}
@@ -537,6 +375,7 @@ export function StreamLayout({
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
               sortMode={sortMode}
+              onRowChanged={() => router.refresh()}
               /* Rooms, not faces. A venue's deciding fact is where it is, an
                  avatar tile says nothing about it, and there are more of them
                  than of anyone else -- so this is the clearest case in the
@@ -557,6 +396,7 @@ export function StreamLayout({
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
               sortMode={sortMode}
+              onRowChanged={() => router.refresh()}
             />
           </motion.div>
         )}

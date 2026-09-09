@@ -57,6 +57,8 @@ export interface CategorySectionProps {
   layout?: 'cards' | 'rows';
   /** A trailing control per row, for sections that offer one. Rows only. */
   renderRowAction?: (node: NetworkNode) => React.ReactNode;
+  /** Called after an inline edit on a row, so the page can re-read. */
+  onRowChanged?: () => void;
 }
 
 export function CategorySection({
@@ -65,6 +67,7 @@ export function CategorySection({
   sortMode = DEFAULT_SORT,
   layout,
   renderRowAction,
+  onRowChanged,
   emptyLabel = 'Nothing here yet.',
   defaultExpanded = true,
   roleLabels,
@@ -147,6 +150,7 @@ export function CategorySection({
               shown={shown}
               layout={layout}
               renderRowAction={renderRowAction}
+              onRowChanged={onRowChanged}
               onAffiliateClick={onAffiliateClick}
               search={search}
               emptyLabel={emptyLabel}
@@ -246,6 +250,7 @@ function CategoryBody({
   onTogglePreferred,
   layout = DEFAULT_LAYOUT,
   renderRowAction,
+  onRowChanged,
 }: {
   shown: NetworkNode[];
   search: string;
@@ -259,6 +264,7 @@ function CategoryBody({
   layout?: 'cards' | 'rows';
   /** A trailing control per row, for sections that offer one. Rows only. */
   renderRowAction?: (node: NetworkNode) => React.ReactNode;
+  onRowChanged?: () => void;
 }) {
   if (shown.length === 0) {
     return (
@@ -302,6 +308,7 @@ function CategoryBody({
               node={node}
               facts={facts}
               action={renderRowAction?.(node)}
+              onChanged={onRowChanged}
               onClick={() => onNodeClick?.(node)}
               onAffiliateClick={onAffiliateClick}
             />

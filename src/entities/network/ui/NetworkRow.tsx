@@ -30,6 +30,7 @@ import { EntityAvatar } from './EntityAvatar';
 import { isFlagged } from '../model/card-slots';
 import type { RowFact } from '../model/row-facts';
 import { formatUsd, formatDay, formatUpcoming, parseShowDate } from '../model/format-facts';
+import { EditableRate } from './EditableRate';
 import type { NetworkNode } from '../model/types';
 
 export interface NetworkRowProps {
@@ -42,6 +43,8 @@ export interface NetworkRowProps {
   facts: RowFact[];
   /** Trailing control, when the list this row is in offers one. */
   action?: React.ReactNode;
+  /** Called after an inline edit lands, so the list can re-read. */
+  onChanged?: () => void;
   onClick?: () => void;
   onAffiliateClick?: (entityId: string) => void;
 }
@@ -119,18 +122,38 @@ function moneyOf(node: NetworkNode): { value: string; label: string } | null {
  * They drop from the right as the row narrows -- the ones nearest the name
  * survive longest, because those are the ones asked about most.
  */
-function RowFacts({ node, facts, now }: { node: NetworkNode; facts: RowFact[]; now: Date }) {
+function RowFacts({
+  node,
+  facts,
+  now,
+  onChanged,
+}: {
+  node: NetworkNode;
+  facts: RowFact[];
+  now: Date;
+  onChanged?: () => void;
+}) {
   const money = moneyOf(node);
-  const rate = node.meta.rate;
+  // Only people have one, even where the column exists because the list also
+  // holds people.
+  const canEditRate =
+    node.identity.entityType === 'person' || node.identity.entityType === 'couple';
 
   return (
     <>
       {facts.includes('rate') && (
-        <Fact
-          label="Rate"
-          value={rate ? `${formatUsd(rate.amount)}${rate.unit ? ` / ${rate.unit}` : ''}` : null}
-          className="w-24 xl:flex"
-        />
+        <div className="hidden w-24 min-w-0 shrink-0 flex-col items-end xl:flex">
+          <span className="stage-badge-text text-[var(--stage-text-tertiary)]">Rate</span>
+          {canEditRate ? (
+            <EditableRate
+              entityId={node.entityId}
+              rate={node.meta.rate ?? null}
+              onSaved={onChanged}
+            />
+          ) : (
+            <span className="opacity-0" aria-hidden>—</span>
+          )}
+        </div>
       )}
       {facts.includes('lastShow') && (
         <Fact label="Last show" value={lastShowLabel(node, now)} className="w-20 lg:flex" />
@@ -186,7 +209,7 @@ function Affiliates({
   );
 }
 
-export function NetworkRow({ node, facts, action, onClick, onAffiliateClick }: NetworkRowProps) {
+export function NetworkRow({ node, facts, action, onChanged, onClick, onAffiliateClick }: NetworkRowProps) {
   const now = React.useMemo(() => new Date(), []);
   const subtitle = subtitleOf(node);
 
@@ -232,7 +255,7 @@ export function NetworkRow({ node, facts, action, onClick, onAffiliateClick }: N
         )}
       </div>
 
-      <RowFacts node={node} facts={facts} now={now} />
+      <RowFacts node={node} facts={facts} now={now} onChanged={onChanged} />
 
       <Affiliates node={node} onAffiliateClick={onAffiliateClick} />
 
