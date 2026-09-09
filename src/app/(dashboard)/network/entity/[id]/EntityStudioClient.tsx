@@ -21,7 +21,6 @@ import {
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
 import { PersonRecordForm } from './PersonRecordForm';
 import { PersonEntityForm } from './PersonEntityForm';
-import { CoupleEntityForm } from './CoupleEntityForm';
 import { AccordionSection } from './entity-studio-panels';
 import { EntityRecordShell } from './EntityRecordShell';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
@@ -104,12 +103,32 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
       />
     );
   }
-  if (dirType === 'couple' && initialCoupleAttrs !== undefined) {
+  /*
+    A legacy `type='couple'` row, shown as the person it mostly is.
+
+    Nothing creates these any more -- production holds none, and the three
+    reclassify doors that could mint one are closed. But the type column has no
+    constraint, so a row could still arrive by restore or direct write, and
+    falling through to the company form would render it as something it is not.
+
+    Partner A's fields become the person's. Partner B's strings stay untouched in
+    the JSONB: nothing here writes them, and the way to bring that person back is
+    to add them as their own record and link the two, which is what every couple
+    created since the show flow already looks like.
+  */
+  if (dirType === 'couple') {
+    const a = initialCoupleAttrs;
     return (
-      <CoupleEntityForm
+      <PersonEntityForm
         details={details}
         sourceOrgId={sourceOrgId}
-        initialAttrs={initialCoupleAttrs ?? { partner_a_first_name: '', partner_a_last_name: '', partner_a_email: undefined, partner_b_first_name: '', partner_b_last_name: '', partner_b_email: undefined, category: undefined }}
+        initialAttrs={{
+          first_name: a?.partner_a_first_name ?? '',
+          last_name: a?.partner_a_last_name ?? '',
+          email: a?.partner_a_email,
+          phone: undefined,
+          category: a?.category,
+        }}
         returnPath={returnPath}
         workspaceId={workspaceId ?? undefined}
       />

@@ -85,7 +85,7 @@ export function PersonEntityForm({
     name: details.identity.name || 'Client',
   });
 
-  const handleReclassify = (newType: 'couple' | 'company') => {
+  const handleReclassify = (newType: 'company') => {
     if (!entityId) return;
     startReclassify(async () => {
       const result = await reclassifyClientEntity(entityId, newType);
@@ -194,18 +194,10 @@ export function PersonEntityForm({
           <div className="px-5 py-4 space-y-3">
             <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
               Change this client record type. Existing field data from the old type will be cleared.
+              If there are two of them, add the second person and link them rather than
+              changing this record.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={reclassifyPending}
-                onClick={() => handleReclassify('couple')}
-                className="border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well)]"
-              >
-                Change to couple
-              </Button>
               <Button
                 type="button"
                 variant="outline"

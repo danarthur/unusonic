@@ -21,7 +21,7 @@ type IndividualEditSheetProps = {
     displayName: string;
   };
   onSaved?: () => void;
-  onChangeType?: (newType: 'company' | 'couple') => Promise<void>;
+  onChangeType?: (newType: 'company') => Promise<void>;
 };
 
 export function IndividualEditSheet({ open, onOpenChange, entityId, initialValues, onSaved, onChangeType }: IndividualEditSheetProps) {
@@ -101,8 +101,12 @@ export function IndividualEditSheet({ open, onOpenChange, entityId, initialValue
             <div className="pt-4 border-t border-[oklch(1_0_0_/_0.10)] space-y-2">
               <p className="stage-label">Client type</p>
               <p className="text-xs text-[var(--stage-text-secondary)]/70">Switch if this client was entered as the wrong type.</p>
+              {/* "Pair" is gone. Two hosts are two person records joined by a
+                  CO_HOST edge, which is what the create-show flow already
+                  writes -- converting this one record into a couple cleared its
+                  name, email and phone and put nothing in their place. */}
               <div className="flex gap-2">
-                {([['company', 'Company'], ['couple', 'Pair']] as const).map(([type, label]) => (
+                {([['company', 'Company']] as const).map(([type, label]) => (
                   <button
                     key={type}
                     type="button"

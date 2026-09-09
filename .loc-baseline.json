@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T22:01:27.336Z",
+  "generatedAt": "2026-09-09T22:18:56.209Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -67,7 +67,7 @@
     "src/app/(dashboard)/(features)/events/components/proposal-builder/inspectors.tsx": 980,
     "src/app/(dashboard)/(features)/events/components/proposal-builder/sidebar.tsx": 391,
     "src/app/(dashboard)/(features)/events/components/proposal-builder/team-picker.tsx": 508,
-    "src/app/(dashboard)/(features)/events/components/stakeholder-grid.tsx": 843,
+    "src/app/(dashboard)/(features)/events/components/stakeholder-grid.tsx": 845,
     "src/app/(dashboard)/(features)/events/components/stream-card.tsx": 679,
     "src/app/(dashboard)/(features)/events/components/stream-filter-chips.tsx": 683,
     "src/app/(dashboard)/(features)/events/components/stream.tsx": 472,
@@ -84,7 +84,7 @@
     "src/app/(dashboard)/layout.tsx": 263,
     "src/app/(dashboard)/lobby/LobbyBentoGrid.tsx": 441,
     "src/app/(dashboard)/lobby/stage-prototype/page-client.tsx": 501,
-    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 706,
+    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 725,
     "src/app/(dashboard)/network/entity/[id]/page.tsx": 216,
     "src/app/(dashboard)/network/entity/[id]/PersonRecordForm.tsx": 529,
     "src/app/(dashboard)/network/entity/[id]/VenueSpecsEditor.tsx": 647,
