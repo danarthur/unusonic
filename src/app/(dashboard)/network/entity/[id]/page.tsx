@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { getNetworkNodeDetails } from '@/features/network-data';
 import { resolveRelationshipId } from '@/features/network-data/api/resolve-relationship-id';
+import { getLinkedPeople } from '@/features/network-data/api/get-linked-people';
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
@@ -143,10 +144,21 @@ async function EntityContent({ id, returnPath, kindParam }: { id: string; return
     workspaceId = srcEntity?.owner_workspace_id ?? null;
   }
 
+  /*
+    Who this person is linked to, read here rather than queried again in the
+    form. The shell's own chip already fetches this; a second copy in the body
+    was one client query for one boolean, and it is the only reason
+    PersonEntityForm needed a QueryClient at all.
+  */
+  const linkedNames = details.subjectEntityId
+    ? (await getLinkedPeople(details.subjectEntityId)).map((person) => person.name)
+    : [];
+
   return (
     <>
       <AionPageContextSetter type="entity" entityId={details.subjectEntityId ?? id} label={details.identity.name ?? null} />
       <EntityStudioClient
+        linkedNames={linkedNames}
         details={details}
         sourceOrgId={sourceOrgId}
         returnPath={returnPath}

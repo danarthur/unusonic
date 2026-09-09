@@ -9,9 +9,6 @@ import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/acti
 import type { IndividualAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
-import { useQuery } from '@tanstack/react-query';
-import { queryKeys } from '@/shared/api/query-keys';
-import { getLinkedPeople } from '@/features/network-data/api/get-linked-people';
 import { EntityRecordShell } from './EntityRecordShell';
 import { useConnectionDelete } from './use-connection-delete';
 import { toast } from 'sonner';
@@ -24,6 +21,7 @@ export function PersonEntityForm({
   returnPath,
   workspaceId,
   sourceOrgId,
+  linkedNames,
 }: {
   details: NodeDetail;
   initialAttrs: IndividualAttrs;
@@ -31,6 +29,12 @@ export function PersonEntityForm({
   workspaceId?: string;
   /** The caller's own org. softDeleteGhostRelationship authorises against it. */
   sourceOrgId: string;
+  /**
+   * Who this person is already linked to. Read on the server rather than
+   * queried here -- the shell's chip already fetches it, and a second copy in
+   * the body was one client query for one boolean.
+   */
+  linkedNames?: string[];
 }) {
   const router = useRouter();
   const [firstName, setFirstName] = React.useState(initialAttrs.first_name ?? '');
@@ -66,17 +70,9 @@ export function PersonEntityForm({
     });
   };
 
-  const { data: linked } = useQuery({
-    queryKey: queryKeys.entities.linkedPeople(workspaceId ?? '', details.subjectEntityId ?? ''),
-    queryFn: () => getLinkedPeople(details.subjectEntityId ?? ''),
-    staleTime: 60_000,
-    enabled: Boolean(workspaceId && details.subjectEntityId),
-  });
-  // Former links still block it: the edge is what would be orphaned, and it
-  // survives the pair ending on purpose.
-  const linkedTo = linked && linked.length > 0
-    ? linked.map((p) => p.name).join(' and ')
-    : null;
+  // Former links count too: the edge is what would be orphaned, and it survives
+  // the pair ending on purpose.
+  const linkedTo = linkedNames && linkedNames.length > 0 ? linkedNames.join(' and ') : null;
 
   const handleRemove = useConnectionDelete({
     relationshipId: details.relationshipId,

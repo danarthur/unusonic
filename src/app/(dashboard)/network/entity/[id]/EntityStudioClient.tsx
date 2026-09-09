@@ -50,13 +50,15 @@ interface EntityStudioClientProps {
   initialVenueAttrs?: VenueAttrs | null;
   /** Resolved workspace ID for document operations. */
   workspaceId?: string | null;
+  /** Names this person is linked to. Read on the server; see page.tsx. */
+  linkedNames?: string[];
 }
 
 /**
  * Route dispatcher — renders one of three form components based on entity type.
  * Hooks must not be called here; each sub-component manages its own hook lifecycle.
  */
-export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs, initialEmployeeAttrs, initialVenueAttrs, workspaceId }: EntityStudioClientProps) {
+export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs, initialEmployeeAttrs, initialVenueAttrs, workspaceId, linkedNames }: EntityStudioClientProps) {
   const dirType = details.entityDirectoryType;
 
   if (details.kind === 'internal_employee' || details.kind === 'extended_team') {
@@ -97,6 +99,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
       <PersonEntityForm
         details={details}
         sourceOrgId={sourceOrgId}
+        linkedNames={linkedNames}
         initialAttrs={initialPersonAttrs ?? { first_name: '', last_name: '', email: undefined, phone: undefined, category: undefined }}
         returnPath={returnPath}
         workspaceId={workspaceId ?? undefined}
@@ -122,6 +125,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
       <PersonEntityForm
         details={details}
         sourceOrgId={sourceOrgId}
+        linkedNames={linkedNames}
         initialAttrs={{
           first_name: a?.partner_a_first_name ?? '',
           last_name: a?.partner_a_last_name ?? '',
