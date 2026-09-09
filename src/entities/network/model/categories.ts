@@ -66,16 +66,41 @@ export function rolesOf(node: NetworkNode): RoleEdge[] {
   return [];
 }
 
+/**
+ * Which category a PARTNER edge puts someone in.
+ *
+ * PARTNER is a documented catch-all: summonPartner writes it for freelance
+ * people and for partner companies alike, so it cannot decide this alone. A
+ * company is never someone you put on a job, and a person on a PARTNER edge
+ * and nothing else is the freelancer pattern that summonPersonGhost writes.
+ *
+ * The case this exists for is a person holding BOTH: a client or a vendor who
+ * also carries a partner edge. Those were landing in the roster as well as
+ * their real category -- so a coordinator who hires you, or a client, appeared
+ * in your own crew. The outward-facing role is the true one, and PARTNER
+ * alongside it adds nothing, so it contributes no category rather than
+ * inventing a second one.
+ *
+ * Deliberately not keyed on tier or gravity. Those are preference axes and must
+ * not move anyone between categories.
+ */
+function partnerCategory(node: NetworkNode, roles: RoleEdge[]): NetworkCategory | null {
+  if (node.identity.entityType !== 'person') return 'vendors';
+
+  const worksWithUs = roles.some(
+    (r) => r === 'CLIENT' || r === 'VENDOR' || r === 'VENUE_PARTNER',
+  );
+  return worksWithUs ? null : 'roster';
+}
+
 export function categoriesOf(node: NetworkNode): NetworkCategory[] {
   const roles = rolesOf(node);
 
   const out = new Set<NetworkCategory>();
   for (const role of roles) {
     if (role === 'PARTNER') {
-      // A company you partner with is a business relationship, not a person you
-      // can staff a show with. People default to roster; companies to vendors,
-      // which is closer to true than roster and avoids a fifth category.
-      out.add(node.identity.entityType === 'person' ? 'roster' : 'vendors');
+      const partnerCat = partnerCategory(node, roles);
+      if (partnerCat) out.add(partnerCat);
       continue;
     }
     const cat = ROLE_TO_CATEGORY[role];

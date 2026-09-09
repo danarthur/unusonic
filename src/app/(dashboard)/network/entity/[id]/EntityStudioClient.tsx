@@ -85,15 +85,14 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
     );
   }
 
-  // External-partner persons split by relationship direction. Freelancers /
-  // vendors get the FreelancerEntityForm (skills, business functions, day
-  // rates). Clients are people we work FOR, not people we hire — they need
-  // the plain PersonEntityForm without crew fields.
+  // The freelancer form carries crew fields -- skills, day rates -- so it
+  // belongs only to people we BOOK. It used to go to every partner person who
+  // was not a client, which swept in vendors: a coordinator on a VENDOR edge
+  // was offered a day rate and a skill list as though she were crew. PARTNER is
+  // the freelancer edge (summonPersonGhost); VENDOR is an outside party.
   if (details.kind === 'external_partner' && dirType === 'person') {
-    const isClient = details.direction === 'client'
-      || details.relationshipTypeRaw === 'client'
-      || details.relationshipTypeRaw === 'client_company';
-    if (!isClient) {
+    const isFreelancer = details.relationshipTypeRaw === 'partner';
+    if (isFreelancer) {
       return (
         <FreelancerEntityForm
           details={details}

@@ -55,12 +55,14 @@ describe('categoriesOf', () => {
     // "1909" in the live workspace — a venue that also sub-rents gear.
     expect(categoriesOf(node({ roles: ['VENUE_PARTNER', 'VENDOR'] })))
       .toEqual(['vendors', 'venues']);
-    // Alex Barnhart — a client who is also a partner. He is a person, so the
-    // PARTNER edge resolves to roster.
+    // Alex Barnhart — a client who also carries a partner edge. PARTNER is a
+    // catch-all and adds nothing next to a role that already says what he is,
+    // so he is a client and NOT also crew. He used to appear in both, which is
+    // how people who hire you ended up in your own roster.
     expect(categoriesOf(node({
       roles: ['CLIENT', 'PARTNER'],
       identity: { name: 'Alex Barnhart', avatarUrl: null, label: '', entityType: 'person' },
-    }))).toEqual(['clients', 'roster']);
+    }))).toEqual(['clients']);
   });
 
   it('returns categories in the fixed order regardless of role order', () => {
@@ -97,12 +99,34 @@ describe('categoriesOf', () => {
   });
 
   it('isInCategory matches every category a node holds', () => {
-    const n = node({
-      roles: ['CLIENT', 'PARTNER'],
-      identity: { name: 'x', avatarUrl: null, label: '', entityType: 'person' },
-    });
+    // Two real roles, so the node is genuinely in both.
+    const n = node({ roles: ['CLIENT', 'VENDOR'] });
     expect(isInCategory(n, 'clients')).toBe(true);
-    expect(isInCategory(n, 'roster')).toBe(true);
-    expect(isInCategory(n, 'vendors')).toBe(false);
+    expect(isInCategory(n, 'vendors')).toBe(true);
+    expect(isInCategory(n, 'venues')).toBe(false);
+    expect(isInCategory(n, 'roster')).toBe(false);
+  });
+
+  it('does not put someone who hires us in our own roster', () => {
+    // A PARTNER edge next to a CLIENT or VENDOR edge says nothing new -- it is
+    // a catch-all written by summonPartner for freelancers and partner
+    // companies alike. Treating it as roster is how a coordinator who books you
+    // ended up filed as your crew, with a profile offering her a day rate.
+    const coordinator = node({
+      roles: ['VENDOR', 'PARTNER'],
+      identity: { name: 'Brandi Jane', avatarUrl: null, label: 'Planner', entityType: 'person' },
+    });
+    expect(categoriesOf(coordinator)).toEqual(['vendors']);
+    expect(isInCategory(coordinator, 'roster')).toBe(false);
+  });
+
+  it('still puts a plain freelancer in the roster', () => {
+    // PARTNER alone on a person IS the freelancer pattern summonPersonGhost
+    // writes. Nothing about this change should reach them.
+    const freelancer = node({
+      roles: ['PARTNER'],
+      identity: { name: 'Mike Sincere', avatarUrl: null, label: 'DJ', entityType: 'person' },
+    });
+    expect(categoriesOf(freelancer)).toEqual(['roster']);
   });
 });
