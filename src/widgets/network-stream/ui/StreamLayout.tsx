@@ -11,6 +11,7 @@ import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
 import { SortControl } from './SortControl';
 import { CategoryChips, type CategoryFilter } from './CategoryChips';
+import { FileContactControl } from './FileContactControl';
 
 /** Referentially stable, so filtering a section out does not churn its props. */
 const EMPTY_NODES: NetworkNode[] = [];
@@ -232,8 +233,7 @@ export function StreamLayout({
   const sortedStarred = sortNodes(starredNodes, sortMode);
   const clientFacts = rowFactsFor(displayedInnerCircle);
 
-  // Only categories that have something in them, in the order the page renders
-  // them, so the chips never offer a section that is not there.
+  // Only categories with something in them, in page order.
   const categoryOptions = ([
     { id: 'roster', label: labels.roster, count: crewNodes.length },
     { id: 'clients', label: labels.clients, count: innerCircleNodes.length },
@@ -549,6 +549,8 @@ export function StreamLayout({
               nodes={shows('unsorted') ? unsortedNodes : EMPTY_NODES}
               defaultExpanded={false}
               emptyLabel="Nothing waiting to be filed."
+              // A lane needs a way out, or it only grows.
+              renderRowAction={(node) => <FileContactControl node={node} />}
               onNodeClick={onNodeClick}
               onAffiliateClick={openAffiliate}
               onNodeHoverEnter={handleNodeHoverEnter}

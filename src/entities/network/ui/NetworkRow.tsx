@@ -40,6 +40,8 @@ export interface NetworkRowProps {
    * eye moves down it.
    */
   facts: RowFact[];
+  /** Trailing control, when the list this row is in offers one. */
+  action?: React.ReactNode;
   onClick?: () => void;
   onAffiliateClick?: (entityId: string) => void;
 }
@@ -184,7 +186,7 @@ function Affiliates({
   );
 }
 
-export function NetworkRow({ node, facts, onClick, onAffiliateClick }: NetworkRowProps) {
+export function NetworkRow({ node, facts, action, onClick, onAffiliateClick }: NetworkRowProps) {
   const now = React.useMemo(() => new Date(), []);
   const subtitle = subtitleOf(node);
 
@@ -233,6 +235,8 @@ export function NetworkRow({ node, facts, onClick, onAffiliateClick }: NetworkRo
       <RowFacts node={node} facts={facts} now={now} />
 
       <Affiliates node={node} onAffiliateClick={onAffiliateClick} />
+
+      {action}
     </div>
   );
 }

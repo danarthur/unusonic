@@ -55,6 +55,8 @@ export interface CategorySectionProps {
    * content a thin record does not have.
    */
   layout?: 'cards' | 'rows';
+  /** A trailing control per row, for sections that offer one. Rows only. */
+  renderRowAction?: (node: NetworkNode) => React.ReactNode;
 }
 
 export function CategorySection({
@@ -62,6 +64,7 @@ export function CategorySection({
   nodes,
   sortMode = DEFAULT_SORT,
   layout,
+  renderRowAction,
   emptyLabel = 'Nothing here yet.',
   defaultExpanded = true,
   roleLabels,
@@ -143,6 +146,7 @@ export function CategorySection({
             <CategoryBody
               shown={shown}
               layout={layout}
+              renderRowAction={renderRowAction}
               onAffiliateClick={onAffiliateClick}
               search={search}
               emptyLabel={emptyLabel}
@@ -241,6 +245,7 @@ function CategoryBody({
   onNodeHoverLeave,
   onTogglePreferred,
   layout = DEFAULT_LAYOUT,
+  renderRowAction,
 }: {
   shown: NetworkNode[];
   search: string;
@@ -252,6 +257,8 @@ function CategoryBody({
   onNodeHoverLeave?: () => void;
   onTogglePreferred?: (n: NetworkNode) => void;
   layout?: 'cards' | 'rows';
+  /** A trailing control per row, for sections that offer one. Rows only. */
+  renderRowAction?: (node: NetworkNode) => React.ReactNode;
 }) {
   if (shown.length === 0) {
     return (
@@ -294,6 +301,7 @@ function CategoryBody({
             <NetworkRow
               node={node}
               facts={facts}
+              action={renderRowAction?.(node)}
               onClick={() => onNodeClick?.(node)}
               onAffiliateClick={onAffiliateClick}
             />
