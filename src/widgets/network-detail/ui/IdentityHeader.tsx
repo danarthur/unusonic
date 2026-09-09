@@ -128,6 +128,18 @@ export function IdentityHeader({
               {details.identity.label && (
                 <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">{details.identity.label}</span>
               )}
+              {/* Do not rebook, beside the name.
+                  It already lived on the working-notes card, which sits in the
+                  last zone of the panel -- so the most consequential judgement
+                  about a person was the last thing seen, and only by someone
+                  who scrolled. It is the whole reason the panel gets opened
+                  when an unfamiliar number is ringing. */}
+              {details.doNotRebook && (
+                <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 stage-badge-text border-[var(--color-unusonic-warning)]/30 bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)]">
+                  <Circle className="size-2 fill-current" strokeWidth={0} />
+                  Do not rebook
+                </span>
+              )}
             </div>
             {slug && (
               <p className="font-mono text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">unusonic.com/{slug}</p>

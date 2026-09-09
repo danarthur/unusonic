@@ -14,11 +14,26 @@
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affiliation';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { readRate, type PersonRate } from '@/entities/directory/model/read-rate';
+import { getEntityProductions } from './get-entity-productions';
 
 export type PersonMetrics = {
   kind: 'person';
   showCount: number;
-  lastContactAt: string | null;
+  /**
+   * The last show worked together, named.
+   *
+   * The name is not decoration. Memory here is show-shaped -- not "we worked
+   * together in June" but "the Hale wedding" -- so the title is the retrieval
+   * key, and it is how you tell a real record from an invented one.
+   *
+   * Replaces a "last contact" derived from the most recent capture, which
+   * measured when someone was last talked ABOUT rather than last worked with.
+   */
+  lastShow: { title: string | null; date: string | null } | null;
+  /** What they cost, so the staffing question is answered on one line. */
+  rate: PersonRate | null;
 };
 
 export type CompanyMetrics = {
@@ -70,46 +85,43 @@ export async function getPromotedMetrics(
 }
 
 // ── Person ───────────────────────────────────────────────────────────────────
-
 async function getPersonMetrics(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
   entityId: string,
 ): Promise<GetPromotedMetricsResult> {
-  // Shows: count of ops.deal_crew rows for this person (each represents a
-  // show assignment). Best proxy for "shows worked together" without schema
-  // changes. Only count non-declined.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count: crewCount, error: crewErr } = await supabase
-    .schema('ops')
-    .from('deal_crew')
-    .select('id', { count: 'exact', head: true })
-    .eq('workspace_id', workspaceId)
-    .eq('entity_id', entityId)
-    .not('status', 'eq', 'declined');
+  // Counted by the canonical productions reader, not by ops.deal_crew rows.
+  // Crew rows only see people who were CREWED on a show, so a coordinator --
+  // who is a stakeholder and never crew -- read as zero shows in the header
+  // while the productions list directly below it showed several.
+  const [productions, entityRow] = await Promise.all([
+    getEntityProductions(workspaceId, entityId),
+    supabase
+      .schema('directory')
+      .from('entities')
+      .select('attributes')
+      .eq('id', entityId)
+      .maybeSingle(),
+  ]);
 
-  if (crewErr) return { ok: false, error: (crewErr as { message: string }).message };
+  if (!productions.ok) return { ok: false, error: productions.error };
 
-  // Last contact: most recent capture about the person.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lastCapture } = await supabase
-    .schema('cortex')
-    .from('capture_events')
-    .select('created_at')
-    .eq('workspace_id', workspaceId)
-    .eq('resolved_entity_id', entityId)
-    .eq('status', 'confirmed')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const worked = productions.productions.filter((p) => p.band === 'past');
+  // Already sorted newest first by the reader.
+  const last = worked[0] ?? null;
+
+  const attrs = readEntityAttrs(
+    (entityRow.data as { attributes: unknown } | null)?.attributes,
+    'person',
+  );
 
   return {
     ok: true,
     metrics: {
       kind: 'person',
-      showCount: (crewCount as number | null) ?? 0,
-      lastContactAt:
-        (lastCapture as { created_at: string } | null)?.created_at ?? null,
+      showCount: worked.length,
+      lastShow: last ? { title: last.title, date: last.date } : null,
+      rate: readRate(attrs as unknown as Record<string, unknown>),
     },
   };
 }

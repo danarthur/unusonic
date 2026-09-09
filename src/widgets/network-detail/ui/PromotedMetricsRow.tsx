@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * PromotedMetricsRow — the two inline metrics that earn header placement.
+ * PromotedMetricsRow — the few inline metrics that earn header placement.
  *
  * Person:
- *   Shows: 12 · Last contact: 3d ago
+ *   Shows: 12 · Last show: Jun '25 · Hale wedding · Rate: $450 / 4 hrs
  *
  * Company / venue:
  *   Team: 5 · Deals: 12 open · 34 past
@@ -95,6 +95,7 @@ function PersonCells({
 }: {
   metrics: Extract<PromotedMetrics, { kind: 'person' }>;
 }) {
+  const { lastShow, rate } = metrics;
   return (
     <>
       <Cell
@@ -102,13 +103,37 @@ function PersonCells({
         value={metrics.showCount.toString()}
         muted={metrics.showCount === 0}
       />
+      {/* Named, not just dated. Memory here is show-shaped -- "the Hale
+          wedding", not "June" -- so the title is the retrieval key, and it is
+          also how you tell a real record from an invented one. */}
       <Cell
-        label="Last contact"
-        value={metrics.lastContactAt ? formatRelative(metrics.lastContactAt) : '—'}
-        muted={!metrics.lastContactAt}
+        label="Last show"
+        value={lastShow ? formatLastShow(lastShow) : '—'}
+        muted={!lastShow}
       />
+      {rate && (
+        <Cell
+          label="Rate"
+          value={`$${rate.amount.toLocaleString('en-US')}${rate.unit ? ` / ${rate.unit}` : ''}`}
+          muted={false}
+        />
+      )}
     </>
   );
+}
+
+/** "Jun '25 · Hale wedding", or just the date when the show has no title. */
+function formatLastShow(show: { title: string | null; date: string | null }): string {
+  const when = show.date
+    ? new Date(show.date).toLocaleDateString('en-US', {
+        month: 'short',
+        year: '2-digit',
+        // A show date stored as a plain calendar date would otherwise read a
+        // day early anywhere west of Greenwich.
+        timeZone: show.date.length === 10 ? 'UTC' : undefined,
+      })
+    : null;
+  return [when, show.title].filter(Boolean).join(' · ') || '—';
 }
 
 function CompanyCells({
