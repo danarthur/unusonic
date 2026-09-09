@@ -519,6 +519,11 @@ export function StreamLayout({
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
               sortMode={sortMode}
+              /* Rooms, not faces. A venue's deciding fact is where it is, an
+                 avatar tile says nothing about it, and there are more of them
+                 than of anyone else -- so this is the clearest case in the
+                 directory for a row over a card. */
+              layout="rows"
             />
             <CategorySection
               title="Unsorted"
