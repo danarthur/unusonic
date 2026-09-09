@@ -23,8 +23,7 @@ import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model
 /** Cards until a section says otherwise. */
 const DEFAULT_LAYOUT = 'cards' as const;
 import type { NetworkNode } from '@/entities/network';
-import { ROLE_GROUPING_THRESHOLD } from '@/entities/network/model/role-vocabulary';
-import { cn } from '@/shared/lib/utils';
+import { RoleFilterRow, ROLE_FILTER_MIN_ROWS } from './RoleFilterRow';
 
 export interface CategorySectionProps {
   title: string;
@@ -114,10 +113,10 @@ export function CategorySection({
       </div>
 
       {showRoles && (
-        <RoleChipRow
-          rolesPresent={rolesPresent}
-          activeRole={activeRole}
-          roleLabels={roleLabels}
+        <RoleFilterRow
+          roles={rolesPresent}
+          active={activeRole}
+          labels={roleLabels}
           onSelect={setRole}
         />
       )}
@@ -158,7 +157,9 @@ function resolveVisibleNodes({ nodes, roleLabels, search, role, sortMode }: {
   const rolesPresent = roleLabels
     ? [...new Set(nodes.flatMap((n) => n.crewRoles ?? []))].filter((r) => roleLabels[r])
     : [];
-  const showRoles = nodes.length >= ROLE_GROUPING_THRESHOLD && rolesPresent.length > 1;
+  // A screenful, not a headcount. Below this the eye does the filtering and the
+  // control is a decision nobody needed to make.
+  const showRoles = nodes.length >= ROLE_FILTER_MIN_ROWS && rolesPresent.length > 1;
   const activeRole = showRoles ? role : null;
 
   // Was name-only here while the roster searched three fields, so the same
@@ -172,44 +173,6 @@ function resolveVisibleNodes({ nodes, roleLabels, search, role, sortMode }: {
 }
 
 /** Role filter chips. Extracted so CategorySection stays under the complexity cap. */
-function RoleChipRow({
-  rolesPresent,
-  activeRole,
-  roleLabels,
-  onSelect,
-}: {
-  rolesPresent: string[];
-  activeRole: string | null;
-  roleLabels: Record<string, string> | undefined;
-  onSelect: (r: string | null) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {[null, ...rolesPresent].map((r) => {
-        const on = activeRole === r;
-        const label = r === null ? 'All' : (roleLabels?.[r] ?? r);
-        return (
-          <button
-            key={r ?? '__all'}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onSelect(r)}
-            className={cn(
-              'rounded-[var(--stage-radius-input,6px)] px-2 py-0.5 text-[11px] tracking-tight transition-colors',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]',
-              on
-                ? 'bg-[var(--ctx-card)] text-[var(--stage-text-primary)] border border-[oklch(1_0_0_/_0.12)]'
-                : 'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] border border-transparent hover:bg-[oklch(1_0_0_/_0.05)]',
-            )}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /** Card grid or empty state. Extracted to keep CategorySection under the cap. */
 function CategoryBody({
   shown,

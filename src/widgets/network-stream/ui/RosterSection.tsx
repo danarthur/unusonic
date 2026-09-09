@@ -21,7 +21,7 @@ import type { NetworkNode } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, type SortMode } from '@/entities/network/model/sort-nodes';
-import { cn } from '@/shared/lib/utils';
+import { RoleFilterRow, ROLE_FILTER_MIN_ROWS } from './RoleFilterRow';
 
 function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
   const groups = new Map<string, NetworkNode[]>();
@@ -95,50 +95,19 @@ export function RosterSection({
         </h2>
     </div>
 
-          {/* Role filter pills */}
-          {allRoleKeys.length > 1 && (
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setActiveRoleFilter(null)}
-                className={cn(
-                  'rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
-                  !activeRoleFilter
-                    ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                    : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                )}
-              >
-                All
-              </button>
-              {allRoleKeys.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActiveRoleFilter(activeRoleFilter === key ? null : key)}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
-                    activeRoleFilter === key
-                      ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                      : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                  )}
-                >
-                  {key}
-                  <span
-                    className={cn(
-                      'rounded-full px-1.5 py-px stage-badge-text tabular-nums',
-                      activeRoleFilter === key
-                        ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
-                        : 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
-                    )}
-                  >
-                    {roleGroups.get(key)?.length ?? 0}
-                  </span>
-                </button>
-              ))}
+          {/* Subordinate to the tabs, and absent until a section is too long to
+              scan. These used to carry the accent colour, which made a
+              section-level refinement shout louder than the page's navigation. */}
+          {crewNodes.length >= ROLE_FILTER_MIN_ROWS && (
+            <div className="mb-4">
+              <RoleFilterRow
+                roles={allRoleKeys}
+                active={activeRoleFilter}
+                onSelect={setActiveRoleFilter}
+              />
             </div>
           )}
 
-          {/* Role-grouped cards */}
           {filteredCrewNodes.length > 0 ? (
             <div className="flex flex-col gap-6">
               {[...filteredRoleGroups.entries()].map(([role, groupNodes]) => (
