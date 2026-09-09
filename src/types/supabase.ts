@@ -6097,6 +6097,7 @@ export type Database = {
         Args: { p_label: string }
         Returns: string
       }
+      normalize_role_label: { Args: { p_input: string }; Returns: string }
       patch_event_ros_data: {
         Args: { p_event_id: string; p_patch: Json }
         Returns: undefined
@@ -8544,6 +8545,16 @@ export type Database = {
       send_proposal_revision: {
         Args: { p_prev_proposal_id: string; p_revision_note?: string }
         Returns: string
+      }
+      set_co_host_status: {
+        Args: {
+          p_ended_on?: string
+          p_partner_a_id: string
+          p_partner_b_id: string
+          p_status: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       strip_industry_tag: {
         Args: { p_tag: string; p_workspace_id: string }

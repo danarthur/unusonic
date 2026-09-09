@@ -24,12 +24,15 @@
  * @module entities/network/ui/LinkedPeople
  */
 
+import * as React from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowUpRight, Undo2, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import { queryKeys } from '@/shared/api/query-keys';
-import { getLinkedPeople, type LinkedPairing } from '@/features/network-data/api/get-linked-people';
+import { getLinkedPeople, type LinkedPairing, type LinkedPerson } from '@/features/network-data/api/get-linked-people';
+import { setLinkedStatus } from '@/features/network-data/api/set-linked-status';
 import { EntityAvatar } from './EntityAvatar';
 
 const PAIRING_LABEL: Record<LinkedPairing, string> = {
@@ -53,10 +56,22 @@ export interface LinkedPeopleProps {
   entityId: string;
   /** Where the chip points. The record page for that person. */
   hrefFor: (entityId: string) => string;
+  /**
+   * Show the control that ends or restores a link. The record page offers it;
+   * the panel is a peek and does not.
+   */
+  editable?: boolean;
   className?: string;
 }
 
-export function LinkedPeople({ workspaceId, entityId, hrefFor, className }: LinkedPeopleProps) {
+export function LinkedPeople({
+  workspaceId,
+  entityId,
+  hrefFor,
+  editable = false,
+  className,
+}: LinkedPeopleProps) {
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: queryKeys.entities.linkedPeople(workspaceId, entityId),
     queryFn: () => getLinkedPeople(entityId),
@@ -64,13 +79,52 @@ export function LinkedPeople({ workspaceId, entityId, hrefFor, className }: Link
     enabled: Boolean(workspaceId && entityId),
   });
 
+  const setStatus = async (
+    person: LinkedPerson,
+    status: 'current' | 'former',
+    announce = true,
+  ) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await setLinkedStatus(
+      entityId,
+      person.entityId,
+      status,
+      status === 'former' ? today : null,
+    );
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.entities.linkedPeople(workspaceId, entityId),
+    });
+    if (!announce) return;
+    // Undo rather than a confirmation. Nothing was destroyed -- the edge is
+    // still there either way -- so interrupting first would be friction for a
+    // change that is one click to reverse.
+    toast.success(
+      status === 'former'
+        ? `${person.name} marked as former.`
+        : `${person.name} restored.`,
+      {
+        duration: 8_000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void setStatus(person, status === 'former' ? 'current' : 'former', false);
+          },
+        },
+      },
+    );
+  };
+
   if (!data || data.length === 0) return null;
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
       {data.map((person) => (
+        <span key={person.entityId} className="group/link inline-flex items-center">
         <Link
-          key={person.entityId}
           href={hrefFor(person.entityId)}
           title={
             person.status === 'former' && person.endedOn
@@ -97,7 +151,28 @@ export function LinkedPeople({ workspaceId, entityId, hrefFor, className }: Link
             className="size-3 shrink-0 text-[var(--stage-text-secondary)] opacity-0 transition-opacity group-hover:opacity-100"
             strokeWidth={1.5}
           />
-        </Link>
+          </Link>
+          {editable && (
+            <button
+              type="button"
+              onClick={() => void setStatus(person, person.status === 'former' ? 'current' : 'former')}
+              aria-label={
+                person.status === 'former'
+                  ? `Restore ${person.name} as ${PAIRING_LABEL[person.pairing].toLowerCase()}`
+                  : `Mark ${person.name} as former ${PAIRING_LABEL[person.pairing].toLowerCase()}`
+              }
+              className={cn(
+                'rounded-full p-1 text-[var(--stage-text-tertiary)]',
+                'opacity-0 transition-opacity group-hover/link:opacity-100 focus-visible:opacity-100',
+                'hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]',
+              )}
+            >
+              {person.status === 'former'
+                ? <Undo2 className="size-3" strokeWidth={1.5} />
+                : <X className="size-3" strokeWidth={1.5} />}
+            </button>
+          )}
+        </span>
       ))}
     </div>
   );

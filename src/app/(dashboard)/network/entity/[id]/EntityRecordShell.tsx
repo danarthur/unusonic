@@ -193,6 +193,7 @@ export function EntityRecordShell({
                 workspaceId={workspaceId}
                 entityId={entityId}
                 hrefFor={(id) => `/network/entity/${id}`}
+                editable
               />
             )}
           </div>

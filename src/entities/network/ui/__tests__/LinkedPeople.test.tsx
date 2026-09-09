@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const getLinkedPeople = vi.fn();
@@ -17,9 +17,19 @@ vi.mock('@/features/network-data/api/get-linked-people', () => ({
   getLinkedPeople: (...a: unknown[]) => getLinkedPeople(...a),
 }));
 
+const setLinkedStatus = vi.fn();
+vi.mock('@/features/network-data/api/set-linked-status', () => ({
+  setLinkedStatus: (...a: unknown[]) => setLinkedStatus(...a),
+}));
+
+const toastSuccess = vi.fn();
+vi.mock('sonner', () => ({
+  toast: { success: (...a: unknown[]) => toastSuccess(...a), error: vi.fn() },
+}));
+
 import { LinkedPeople } from '../LinkedPeople';
 
-function renderChips() {
+function renderChips(editable = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -27,6 +37,7 @@ function renderChips() {
         workspaceId="ws-1"
         entityId="ent-a"
         hrefFor={(id) => `/network/entity/${id}`}
+        editable={editable}
       />
     </QueryClientProvider>,
   );
@@ -45,6 +56,7 @@ const JANE = {
 beforeEach(() => {
   vi.clearAllMocks();
   getLinkedPeople.mockResolvedValue([]);
+  setLinkedStatus.mockResolvedValue({ ok: true });
 });
 
 describe('<LinkedPeople />', () => {
@@ -116,5 +128,54 @@ describe('<LinkedPeople />', () => {
 
     await screen.findByRole('link', { name: /Jane Okafor/ });
     expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+});
+
+describe('<LinkedPeople /> ending a link', () => {
+  it('offers no control in the panel, which is a peek', async () => {
+    getLinkedPeople.mockResolvedValue([JANE]);
+    renderChips(false);
+
+    await screen.findByRole('link', { name: /Jane Okafor/ });
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('ends the link with today’s date, and never deletes it', async () => {
+    getLinkedPeople.mockResolvedValue([JANE]);
+    renderChips(true);
+    const button = await screen.findByRole('button', { name: /Mark Jane Okafor as former partner/ });
+
+    fireEvent.click(button);
+
+    await waitFor(() => expect(setLinkedStatus).toHaveBeenCalled());
+    const [self, partner, status, endedOn] = setLinkedStatus.mock.calls[0];
+    expect([self, partner, status]).toEqual(['ent-a', 'ent-b', 'former']);
+    expect(endedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('offers an undo rather than asking first', async () => {
+    // Nothing is destroyed either way -- the edge survives both directions --
+    // so a confirmation would be friction on a one-click-reversible change.
+    getLinkedPeople.mockResolvedValue([JANE]);
+    renderChips(true);
+    fireEvent.click(await screen.findByRole('button', { name: /Mark Jane Okafor as former/ }));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(toastSuccess.mock.calls[0][1].action.label).toBe('Undo');
+
+    setLinkedStatus.mockClear();
+    toastSuccess.mock.calls[0][1].action.onClick();
+    await waitFor(() => expect(setLinkedStatus).toHaveBeenCalledWith('ent-a', 'ent-b', 'current', null));
+  });
+
+  it('restores a former pair', async () => {
+    getLinkedPeople.mockResolvedValue([{ ...JANE, status: 'former' as const, endedOn: '2026-02-14' }]);
+    renderChips(true);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Restore Jane Okafor as partner/ }));
+
+    await waitFor(() =>
+      expect(setLinkedStatus).toHaveBeenCalledWith('ent-a', 'ent-b', 'current', null),
+    );
   });
 });
