@@ -11,7 +11,7 @@
  * shared EntityOverviewCards stack so the user at least sees the person's
  * Brief, Working notes, capture timeline, and productions.
  *
- * Full-edit forms (FreelancerEntityForm, etc.) still require a relationship
+ * Full-edit forms (PersonRecordForm) still require a relationship
  * context to work — reaching those is future work, not in scope here.
  */
 

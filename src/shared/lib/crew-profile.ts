@@ -4,7 +4,7 @@
  * Used by:
  *   - NetworkCard (entity layer) — completeness pill on person nodes
  *   - ProductionTeamCard / ConfirmedCrewRow (CRM) — completeness pill, COI dot, proficiency chips
- *   - EmployeeEntityForm — COI status dot next to expiry input
+ *   - PersonRecordForm — COI status dot next to expiry input
  *   - MemberDetailSheet — proficiency label on skill rows
  */
 

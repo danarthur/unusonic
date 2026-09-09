@@ -12,10 +12,8 @@ import {
   CheckCircle2,
   Contact,
   Instagram,
-  Wrench,
-  X,
-  Landmark,
   Send,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
@@ -24,43 +22,19 @@ import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { updateEmployeeEntityAttrs } from '@/features/talent-management/api/update-employee-entity';
 import { updateEntityAvatar } from '@/features/talent-management/api/update-entity-avatar';
-import {
-  addCrewSkill,
-  removeCrewSkill,
-  updateCrewSkillProficiency,
-  getCrewSkillsForEntity,
-} from '@/features/talent-management/api/crew-skill-actions';
-import { listWorkspaceSkillPresets, listWorkspaceCanonicalRoles } from '@/features/talent-management/api/skill-preset-actions';
-import {
-  getEntityCapabilities,
-  addEntityCapability,
-  removeEntityCapability,
-  listWorkspaceCapabilityPresets,
-  type EntityCapabilityRow,
-} from '@/features/talent-management/api/capability-actions';
 import { AvatarUpload } from '@/features/team-invite/ui/AvatarUpload';
 import { deployInvites } from '@/features/team-invite/api/actions';
+import { softDeleteGhostRelationship } from '@/features/network-data';
 import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
 import { AccordionSection } from './entity-studio-panels';
+import { CrewSkillsSection } from './CrewSkillsSection';
+import { BusinessFunctionsSection } from './BusinessFunctionsSection';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { EntityRecordShell } from './EntityRecordShell';
-import type { CrewSkillDTO, SkillLevel } from '@/entities/talent';
 import { coiStatus } from '@/shared/lib/crew-profile';
 
 // ─── Proficiency helpers ───────────────────────────────────────────────────────
-
-const PROFICIENCY_LEVELS: { value: SkillLevel; label: string }[] = [
-  { value: 'junior', label: 'Junior' },
-  { value: 'mid',    label: 'Mid'    },
-  { value: 'senior', label: 'Senior' },
-  { value: 'lead',   label: 'Lead'   },
-];
-
-const FALLBACK_SKILL_PRESETS = [
-  'Audio A1', 'Audio A2', 'DJ', 'Lighting', 'Video', 'Camera Op',
-  'Stage Manager', 'Rigging', 'GrandMA3', 'Backline', 'Sales',
-];
 
 // ─── Spring constant ───────────────────────────────────────────────────────────
 
@@ -110,7 +84,7 @@ function TogglePill({
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
-interface EmployeeEntityFormProps {
+interface PersonRecordFormProps {
   details: NodeDetail;
   sourceOrgId: string;
   initialAttrs: PersonAttrs | null;
@@ -120,15 +94,29 @@ interface EmployeeEntityFormProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function EmployeeEntityForm({
+export function PersonRecordForm({
   details,
   sourceOrgId,
   initialAttrs,
   returnPath,
   workspaceId,
-}: EmployeeEntityFormProps) {
+}: PersonRecordFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = React.useTransition();
+
+  /*
+    One body, two edges. A roster member and a preferred freelancer are the
+    same record with the same fields -- name, skills, compliance, emergency
+    contact -- and the freelancer's page was simply the shorter of two copies.
+    That short copy is why a freelancer, the person most likely to need a W-9
+    and a COI on file, had nowhere to record either.
+
+    What actually differs is employment, so that is the only thing gated:
+    portal access and do-not-rebook belong to the roster, and removing someone
+    from preferred belongs to the partner edge.
+  */
+  const isRosterMember =
+    details.kind === 'internal_employee' || details.kind === 'extended_team';
 
   // ── Field state ──────────────────────────────────────────────────────────────
   const [firstName, setFirstName] = React.useState(initialAttrs?.first_name ?? '');
@@ -172,23 +160,22 @@ export function EmployeeEntityForm({
     }
   };
 
-  // ── Skills state ──────────────────────────────────────────────────────────────
-  const [crewSkills, setCrewSkills] = React.useState<CrewSkillDTO[]>([]);
-  const [skillPresets, setSkillPresets] = React.useState<string[]>([]);
-  // Phase 2.1 — canonical roles drive the feasibility chip's pool counts.
-  // Surfaced in their own optgroup at the top of the picker so the user knows
-  // which tags carry that special weight.
-  const [canonicalRoles, setCanonicalRoles] = React.useState<string[]>([]);
-  const [addSkillTag, setAddSkillTag] = React.useState('');
-  const [addSkillLevel, setAddSkillLevel] = React.useState<SkillLevel | ''>('');
-  const [skillsLoading, setSkillsLoading] = React.useState(false);
-
-  // ── Capabilities state ─────────────────────────────────────────────────────
-  const [capabilities, setCapabilities] = React.useState<EntityCapabilityRow[]>([]);
-  const [capPresets, setCapPresets] = React.useState<string[]>([]);
-  const [capLoading, setCapLoading] = React.useState(false);
+  const [confirmRemove, setConfirmRemove] = React.useState(false);
+  const [removing, setRemoving] = React.useState(false);
 
   const mark = () => setHasChanges(true);
+
+  const handleRemoveFromPreferred = async () => {
+    setRemoving(true);
+    const result = await softDeleteGhostRelationship(details.id, sourceOrgId);
+    setRemoving(false);
+    if (result.ok) {
+      toast.success('Removed from preferred.');
+      router.push(returnPath);
+    } else {
+      toast.error(result.error ?? 'Could not remove.');
+    }
+  };
 
   // ── Avatar handler ────────────────────────────────────────────────────────────
   const handleAvatarChange = React.useCallback(async (url: string) => {
@@ -202,103 +189,6 @@ export function EmployeeEntityForm({
       toast.error(result.error);
     }
   }, [details.subjectEntityId, router]);
-
-  // ── Skills load ───────────────────────────────────────────────────────────────
-  React.useEffect(() => {
-    if (!details.subjectEntityId) return;
-    let cancelled = false;
-    getCrewSkillsForEntity(details.subjectEntityId).then((s) => {
-      if (!cancelled) setCrewSkills(s);
-    });
-    return () => { cancelled = true; };
-  }, [details.subjectEntityId]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    Promise.all([listWorkspaceSkillPresets(), listWorkspaceCanonicalRoles()]).then(([presets, roles]) => {
-      if (cancelled) return;
-      setSkillPresets(presets.length > 0 ? presets : FALLBACK_SKILL_PRESETS);
-      setCanonicalRoles(roles);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  // ── Capabilities load ──────────────────────────────────────────────────────
-  React.useEffect(() => {
-    if (!details.subjectEntityId) return;
-    let cancelled = false;
-    getEntityCapabilities(details.subjectEntityId).then((c) => {
-      if (!cancelled) setCapabilities(c);
-    });
-    listWorkspaceCapabilityPresets().then((p) => {
-      if (!cancelled) setCapPresets(p);
-    });
-    return () => { cancelled = true; };
-  }, [details.subjectEntityId]);
-
-  const handleAddSkill = async () => {
-    if (!details.subjectEntityId || !addSkillTag) return;
-    setSkillsLoading(true);
-    const result = await addCrewSkill({
-      entity_id: details.subjectEntityId,
-      skill_tag: addSkillTag,
-      proficiency: addSkillLevel || undefined,
-    });
-    setSkillsLoading(false);
-    if (result.ok) {
-      toast.success('Skill added.');
-      setAddSkillTag('');
-      setAddSkillLevel('');
-      getCrewSkillsForEntity(details.subjectEntityId).then(setCrewSkills);
-    } else {
-      toast.error(result.error);
-    }
-  };
-
-  const handleRemoveSkill = async (id: string) => {
-    if (!details.subjectEntityId) return;
-    const result = await removeCrewSkill({ crew_skill_id: id });
-    if (result.ok) {
-      setCrewSkills((prev) => prev.filter((s) => s.id !== id));
-    } else {
-      toast.error(result.error);
-    }
-  };
-
-  const handleUpdateProficiency = async (id: string, proficiency: SkillLevel) => {
-    if (!details.subjectEntityId) return;
-    const result = await updateCrewSkillProficiency({ crew_skill_id: id, proficiency });
-    if (result.ok) {
-      setCrewSkills((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, proficiency } : s))
-      );
-    } else {
-      toast.error(result.error);
-    }
-  };
-
-  // ── Capability handlers ─────────────────────────────────────────────────────
-  const handleAddCapability = async (cap: string) => {
-    if (!details.subjectEntityId || !cap) return;
-    setCapLoading(true);
-    const result = await addEntityCapability({ entity_id: details.subjectEntityId, capability: cap });
-    setCapLoading(false);
-    if (result.ok) {
-      toast.success('Function added.');
-      getEntityCapabilities(details.subjectEntityId).then(setCapabilities);
-    } else {
-      toast.error(result.error);
-    }
-  };
-
-  const handleRemoveCapability = async (id: string) => {
-    const result = await removeEntityCapability({ capability_id: id });
-    if (result.ok) {
-      setCapabilities((prev) => prev.filter((c) => c.id !== id));
-    } else {
-      toast.error(result.error);
-    }
-  };
 
   // ── Ghost guard ───────────────────────────────────────────────────────────────
   if (!details.subjectEntityId) {
@@ -356,14 +246,18 @@ export function EmployeeEntityForm({
             ? { name: emergencyName || null, phone: emergencyPhone || null }
             : null,
         instagram: instagram || null,
-        doNotRebook,
+        // Only the ROSTER_MEMBER edge stores this. Sending it on a PARTNER
+        // edge would silently no-op, which is worse than not offering it.
+        doNotRebook: isRosterMember ? doNotRebook : undefined,
       });
 
       if (result.ok) {
         toast.success('Saved.');
         setHasChanges(false);
+        // Stay on the record. The two forms disagreed here -- one navigated
+        // back to /network on save, the other stayed -- and you save a profile
+        // to keep working on it, not to leave it.
         router.refresh();
-        router.push(returnPath);
       } else {
         toast.error(result.error);
       }
@@ -376,7 +270,7 @@ export function EmployeeEntityForm({
       entityType="person"
       workspaceId={workspaceId ?? null}
       name={displayName}
-      eyebrow="Roster member"
+      eyebrow={isRosterMember ? 'Roster member' : 'Preferred freelancer'}
       avatarUrl={avatarUrl || details.identity.avatarUrl}
       avatarType="person"
       returnPath={returnPath}
@@ -384,7 +278,7 @@ export function EmployeeEntityForm({
       saving={isPending}
       onSave={handleSave}
       banner={
-        isGhostMember ? (
+        isRosterMember && isGhostMember ? (
           <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-4">
             <div className="min-w-0">
               <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
@@ -511,182 +405,15 @@ export function EmployeeEntityForm({
           </div>
         </AccordionSection>
 
-        {/* 3 — Roles & skills (Phase 2.1: split picker by canonical-role-vs-other) */}
-        <AccordionSection label="Roles & skills" icon={Wrench} defaultOpen>
-          <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)] -mt-2 mb-2 leading-relaxed">
-            Crew roles drive the feasibility chip&rsquo;s pool counts. Other skills are granular technical capabilities (gear, software, certifications).
-          </p>
+        {/* Both commit on use, so neither belongs to this form's Save. */}
+        <CrewSkillsSection entityId={entityId} />
+        <BusinessFunctionsSection entityId={entityId} />
 
-          {/* Existing skills */}
-          <div className="space-y-2">
-            <AnimatePresence initial={false}>
-              {crewSkills.map((s) => {
-                const isCanonicalRole = canonicalRoles.some(
-                  (r) => r.toLowerCase() === s.skill_tag.toLowerCase(),
-                );
-                return (
-                  <motion.div
-                    key={s.id}
-                    layout
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={STAGE_MEDIUM}
-                    className="overflow-hidden"
-                  >
-                    <div className="flex items-center gap-2 rounded-xl border border-[var(--stage-edge-subtle)]/50 bg-[var(--ctx-card)] px-3 py-2">
-                      <span className="flex-1 flex items-baseline gap-2 min-w-0">
-                        <span className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] truncate">{s.skill_tag}</span>
-                        {isCanonicalRole && (
-                          <span
-                            className="text-[10px] uppercase tracking-[0.05em] text-[var(--stage-text-tertiary)] shrink-0"
-                            title="This skill is a canonical crew role and drives feasibility chip pool counts."
-                          >
-                            Role
-                          </span>
-                        )}
-                      </span>
-                      <select
-                        value={s.proficiency ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value as SkillLevel;
-                          if (val) handleUpdateProficiency(s.id, val);
-                        }}
-                        className="stage-input px-2 py-0.5 text-xs"
-                      >
-                        <option value="">Level</option>
-                        {PROFICIENCY_LEVELS.map((l) => (
-                          <option key={l.value} value={l.value}>{l.label}</option>
-                        ))}
-                      </select>
-                      <motion.button
-                        type="button"
-                        onClick={() => handleRemoveSkill(s.id)}
-                        transition={STAGE_MEDIUM}
-                        className="text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] transition-colors duration-[80ms] hover:bg-[oklch(1_0_0/0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-unusonic-error)] ring-offset-2 ring-offset-[var(--stage-void)] rounded"
-                        aria-label={`Remove ${s.skill_tag}`}
-                      >
-                        <X className="size-3.5" strokeWidth={1.5} />
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-
-          {crewSkills.length === 0 && (
-            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Nothing tagged yet.</p>
-          )}
-
-          {/* Add form */}
-          <div className="flex gap-2 pt-1">
-            <select
-              value={addSkillTag}
-              onChange={(e) => setAddSkillTag(e.target.value)}
-              className="stage-input flex-1"
-            >
-              <option value="">Add role or skill…</option>
-              {(() => {
-                const taken = new Set(crewSkills.map((s) => s.skill_tag.toLowerCase()));
-                // Canonical roles first (drives chip), then other skill presets
-                // that aren't already canonical roles. Both filtered to exclude
-                // tags the user has already added.
-                const rolesToShow = canonicalRoles.filter((r) => !taken.has(r.toLowerCase()));
-                const canonicalLower = new Set(canonicalRoles.map((r) => r.toLowerCase()));
-                const otherToShow = skillPresets.filter(
-                  (s) => !taken.has(s.toLowerCase()) && !canonicalLower.has(s.toLowerCase()),
-                );
-                return (
-                  <>
-                    {rolesToShow.length > 0 && (
-                      <optgroup label="Crew roles · drives feasibility chip">
-                        {rolesToShow.map((t) => <option key={`role-${t}`} value={t}>{t}</option>)}
-                      </optgroup>
-                    )}
-                    {otherToShow.length > 0 && (
-                      <optgroup label="Other skills">
-                        {otherToShow.map((t) => <option key={`skill-${t}`} value={t}>{t}</option>)}
-                      </optgroup>
-                    )}
-                  </>
-                );
-              })()}
-            </select>
-            <select
-              value={addSkillLevel}
-              onChange={(e) => setAddSkillLevel(e.target.value as SkillLevel | '')}
-              className="stage-input px-2"
-            >
-              <option value="">Level</option>
-              {PROFICIENCY_LEVELS.map((l) => (
-                <option key={l.value} value={l.value}>{l.label}</option>
-              ))}
-            </select>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleAddSkill}
-              disabled={!addSkillTag || skillsLoading}
-            >
-              Add
-            </Button>
-          </div>
-        </AccordionSection>
-
-        {/* 3b — Business Functions (Capabilities) */}
-        <AccordionSection label="Business functions" icon={Landmark} defaultOpen>
-          {/* Assigned capabilities */}
-          <div className="flex flex-wrap gap-2">
-            <AnimatePresence initial={false}>
-              {capabilities.map((cap) => (
-                <motion.span
-                  key={cap.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={STAGE_MEDIUM}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stage-edge-subtle)]/30 bg-[oklch(1_0_0_/_0.10)]/15 px-3 py-1 text-xs font-medium text-[var(--stage-text-secondary)]"
-                >
-                  {cap.capability}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveCapability(cap.id)}
-                    className="ml-0.5 text-[var(--stage-text-tertiary)] hover:text-[var(--color-unusonic-error)] transition-colors duration-[80ms]"
-                    aria-label={`Remove ${cap.capability}`}
-                  >
-                    <X className="size-3" strokeWidth={1.5} />
-                  </button>
-                </motion.span>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          {/* Add capability from presets */}
-          {capPresets.filter((p) => !capabilities.some((c) => c.capability === p)).length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {capPresets
-                .filter((p) => !capabilities.some((c) => c.capability === p))
-                .map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => handleAddCapability(preset)}
-                    disabled={capLoading}
-                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--stage-edge-subtle)]/40 px-2.5 py-1 text-field-label font-medium text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)] hover:border-[var(--stage-edge-subtle)]/60 transition-colors duration-[80ms] disabled:opacity-45"
-                  >
-                    + {preset}
-                  </button>
-                ))}
-            </div>
-          )}
-
-          {capabilities.length === 0 && capPresets.length === 0 && (
-            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">No business functions configured.</p>
-          )}
-        </AccordionSection>
-
-        {/* 4 — Status */}
+        {/* 4 — Status. Employment, so roster only: the member role comes from
+            workspace_members and do-not-rebook writes to the ROSTER_MEMBER
+            edge. A freelancer's equivalent is being preferred at all, which is
+            the control at the foot of the page. */}
+        {isRosterMember && (
         <AccordionSection label="Status" icon={ShieldCheck} defaultOpen>
           {details.memberRole && (
             <div className="flex flex-wrap items-center gap-3">
@@ -760,6 +487,7 @@ export function EmployeeEntityForm({
             )}
           </div>
         </AccordionSection>
+        )}
 
         {/* 5 — Compliance */}
         <AccordionSection label="Compliance" icon={ShieldCheck}>
@@ -854,6 +582,64 @@ export function EmployeeEntityForm({
             />
           </div>
         </AccordionSection>
+
+        {/* Removing them from preferred is not a form field, so it sits below
+            the form rather than inside it. */}
+        {!isRosterMember && (
+          <div className="flex items-center gap-3 pt-2">
+            <AnimatePresence mode="wait">
+              {confirmRemove ? (
+                <motion.div
+                  key="confirm"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={STAGE_MEDIUM}
+                  className="flex items-center gap-2"
+                >
+                  <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
+                    Remove from preferred?
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveFromPreferred}
+                    disabled={removing}
+                    className="h-7 px-2.5 text-xs text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
+                  >
+                    {removing ? 'Removing…' : 'Confirm'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmRemove(false)}
+                    className="h-7 px-2.5 text-xs text-[var(--stage-text-secondary)]"
+                  >
+                    Cancel
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="idle"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={STAGE_MEDIUM}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmRemove(true)}
+                    className="h-8 gap-1.5 px-2.5 text-xs text-[var(--stage-text-secondary)] hover:text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
+                  >
+                    <Trash2 className="size-3.5" strokeWidth={1.5} />
+                    Remove from preferred
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
     </EntityRecordShell>
   );

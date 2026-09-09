@@ -169,13 +169,17 @@ export async function updateEmployeeEntityAttrs(
     }
   }
 
-  // 6. Update display_name on the entity
+  // 6. Update display_name on the entity.
+  //    Scoped to the caller's workspace as well as the id -- RLS covers this,
+  //    but this is now the single write path for both roster members and
+  //    preferred freelancers, so the guard is stated rather than assumed.
   const displayName = [first_name, last_name].filter(Boolean).join(' ');
   await supabase
     .schema('directory')
     .from('entities')
     .update({ display_name: displayName })
-    .eq('id', entityId);
+    .eq('id', entityId)
+    .eq('owner_workspace_id', workspaceId);
 
   // 7. Revalidate and return
   revalidatePath('/network');

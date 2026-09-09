@@ -26,8 +26,7 @@ import {
 } from '@/features/network-data';
 import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
-import { EmployeeEntityForm } from './EmployeeEntityForm';
-import { FreelancerEntityForm } from './FreelancerEntityForm';
+import { PersonRecordForm } from './PersonRecordForm';
 import { PersonEntityForm } from './PersonEntityForm';
 import { CoupleEntityForm } from './CoupleEntityForm';
 import { AccordionSection } from './entity-studio-panels';
@@ -67,7 +66,7 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
 
   if (details.kind === 'internal_employee' || details.kind === 'extended_team') {
     return (
-      <EmployeeEntityForm
+      <PersonRecordForm
         details={details}
         sourceOrgId={sourceOrgId}
         initialAttrs={initialEmployeeAttrs ?? null}
@@ -77,24 +76,25 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
     );
   }
 
-  // The freelancer form carries crew fields -- skills, day rates -- so it
-  // belongs only to people we BOOK. It used to go to every partner person who
-  // was not a client, which swept in vendors: a coordinator on a VENDOR edge
-  // was offered a day rate and a skill list as though she were crew. PARTNER is
-  // the freelancer edge (summonPersonGhost); VENDOR is an outside party.
-  if (details.kind === 'external_partner' && dirType === 'person') {
-    const isFreelancer = details.relationshipTypeRaw === 'partner';
-    if (isFreelancer) {
-      return (
-        <FreelancerEntityForm
-          details={details}
-          sourceOrgId={sourceOrgId}
-          initialAttrs={initialEmployeeAttrs ?? null}
-          returnPath={returnPath ?? '/network'}
-          workspaceId={workspaceId ?? undefined}
-        />
-      );
-    }
+  // People we BOOK share the roster body: same fields, same skills, same
+  // compliance -- the edge decides only whether employment applies. It stays
+  // scoped to PARTNER, the freelancer edge (summonPersonGhost), because a
+  // VENDOR is an outside party and a coordinator on a vendor edge should not
+  // be offered a skill list as though she were crew.
+  if (
+    details.kind === 'external_partner' &&
+    dirType === 'person' &&
+    details.relationshipTypeRaw === 'partner'
+  ) {
+    return (
+      <PersonRecordForm
+        details={details}
+        sourceOrgId={sourceOrgId}
+        initialAttrs={initialEmployeeAttrs ?? null}
+        returnPath={returnPath ?? '/network'}
+        workspaceId={workspaceId ?? undefined}
+      />
+    );
   }
 
   if (dirType === 'person' && initialPersonAttrs !== undefined) {
