@@ -17,7 +17,9 @@
 
 import { NextResponse } from 'next/server';
 import { generateObject } from 'ai';
-import { z } from 'zod';
+import { CaptureParseSchema, type CaptureParseResult } from './schema';
+
+export type { CaptureParseResult };
 import { createClient } from '@/shared/api/supabase/server';
 import { getModel } from '@/app/api/aion/lib/models';
 import { canExecuteAionAction } from '@/features/intelligence/lib/aion-gate';
@@ -26,131 +28,6 @@ import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affilia
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
-
-// ── Output schema ────────────────────────────────────────────────────────────
-
-const CaptureParseSchema = z.object({
-  entity: z
-    .object({
-      type: z.enum(['person', 'company', 'venue', 'ambiguous']),
-      name: z.string().describe('The person, company, or venue name as spoken in the transcript'),
-      matched_entity_id: z
-        .string()
-        .nullable()
-        .describe(
-          'If a workspace entity in the provided list matches with high confidence, return its id. Otherwise null.',
-        ),
-      new_entity_proposal: z
-        .object({
-          name: z.string(),
-          type: z.enum(['person', 'company', 'venue']),
-          role_hint: z
-            .string()
-            .nullable()
-            .describe('Any role/title mentioned (e.g. "GM", "event planner"). Null if none or if venue.'),
-          organization_hint: z
-            .string()
-            .nullable()
-            .describe('Any company/venue affiliation mentioned. Null if none.'),
-        })
-        .nullable()
-        .describe('Only populate when matched_entity_id is null — this becomes a ghost entity.'),
-      match_candidates: z
-        .array(
-          z.object({
-            entity_id: z.string(),
-            name: z.string(),
-            confidence: z.number(),
-          }),
-        )
-        .describe(
-          'Candidate existing entities when the LLM is unsure. Also populated server-side after an ILIKE fallback match. The review card shows these as picker buttons when `matched_entity_id` is null. Empty array when no plausible candidates.',
-        ),
-    })
-    .nullable()
-    .describe('Null if the transcript names no person or company at all.'),
-
-  follow_up: z
-    .object({
-      text: z.string().describe('A concise reminder for the user, not a message to send.'),
-      suggested_channel: z.enum(['call', 'email', 'sms', 'unspecified']),
-      suggested_when: z
-        .string()
-        .nullable()
-        .describe('ISO 8601 date or null. Convert relative phrases like "next Monday" if clear.'),
-    })
-    .nullable()
-    .describe('Null if the transcript does not imply a follow-up action.'),
-
-  note: z
-    .string()
-    .nullable()
-    .describe(
-      'A short fact about the entity (role, context, preference, quirk, or a detail about one production). Null if none. Do NOT restate information already captured by the entity identity (the name, the organization the entity belongs to, or the role the entity already has) — that would be redundant with the Who field. Focus on what this capture adds beyond identity. Use note_scope to say which kind of fact it is.',
-    ),
-
-  note_scope: z
-    .enum(['about', 'show'])
-    .nullable()
-    .describe(
-      'Where this note belongs. "show" ONLY when the note is true for one production and nothing else — times, running order, song requests or bans, room layout, headcounts, name pronunciations, meal counts. "about" when it would change how you work with this entity next time, including things that happened on one show ("showed up two hours late", "stayed late when the cake was delayed"). Null when unsure. Null and "about" both render on the profile, so an unsure guess costs nothing; a wrong "show" hides something the user needed.',
-    ),
-
-  linked_production: z
-    .object({
-      kind: z.enum(['deal', 'event']),
-      id: z.string().describe(
-        'Must be one of the ids from the provided list (deals or events). Do not invent.',
-      ),
-      title: z.string().nullable().describe(
-        'The display title of the matched production — server-replaces this with the canonical title after validation. Can be null; LLM may leave empty.',
-      ),
-    })
-    .nullable()
-    .describe(
-      'When the transcript mentions a specific production ("Ally Emily wedding", "the Hilton gig"), pick the matching deal OR event from the provided lists. Null when no production is mentioned or no match is confident.',
-    ),
-
-  working_notes_signals: z
-    .object({
-      communication_style: z
-        .string()
-        .nullable()
-        .describe(
-          'A DURABLE communication preference about the person (how to contact them, their style, quirks). ≤100 chars, lowercase imperative ("prefers text over email", "anxious about audio — over-confirm", "decisive, skip the long pitch"). Null when the transcript does not state one. Do NOT invent; only populate when the transcript explicitly signals a preference.',
-        ),
-      dnr_reason: z
-        .enum(['paid_late', 'unreliable', 'abuse', 'contractual', 'other'])
-        .nullable()
-        .describe(
-          'When the transcript explicitly flags this person as do-not-rebook / avoid / blacklist / never work with again, choose the closest reason. Null when the transcript does not flag them.',
-        ),
-      dnr_note: z
-        .string()
-        .nullable()
-        .describe(
-          'Free-text justification for the DNR flag (≤120 chars). Only set when dnr_reason is set. Null otherwise.',
-        ),
-      preferred_channel: z
-        .enum(['call', 'email', 'sms'])
-        .nullable()
-        .describe(
-          'The channel the person prefers for contact. Only set when the transcript EXPLICITLY says so ("just text her", "call only, no email"). Null when no explicit preference is stated.',
-        ),
-    })
-    .nullable()
-    .describe(
-      'Durable facts about how to work with this person. These populate the Working Notes card on the entity page. Return null when the transcript contains no working-notes signals (most captures will be null — only populate when signals are clear and explicit).',
-    ),
-
-  confidence: z
-    .number()
-    .describe(
-      'A float from 0 to 1. Use ≥0.85 only when the entity match is unambiguous and the intent is clear. Below 0.5 when ambiguous or low signal. Drives whether the review card auto-saves or asks for review.',
-    ),
-});
-
-export type CaptureParseResult = z.infer<typeof CaptureParseSchema>;
 
 // ── Context fetch ────────────────────────────────────────────────────────────
 
@@ -433,6 +310,15 @@ function buildSystemPrompt(
     '  provided lists. Do not invent ids.',
     '- linked_production is independent of the entity — a capture can be about a',
     '  person AND reference the production they are working on. Both get linked.',
+    '',
+    'RATE — only when it is what we pay this person:',
+    '- "Marcus is four fifty for a four hour" -> amount 450, unit "4 hrs"',
+    '- "she wants five hundred plus gear"     -> amount 500, note "plus gear"',
+    '- "the Ridge charges three hundred for the extra hour" -> null. That is a',
+    '  venue fee, not a person rate.',
+    '- "Ivory and Oak still owes me eight hundred" -> null. That is a balance.',
+    '- A rate that is already on file is not overwritten, so a wrong guess here',
+    '  is sticky on a person who has none. When unsure, return null.',
     '',
     'NOTE SCOPE — where the note gets filed:',
     '- The question is NOT "does it mention a show". It is "would this change',

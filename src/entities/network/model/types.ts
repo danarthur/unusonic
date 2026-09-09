@@ -90,6 +90,13 @@ export type NetworkNode = {
     payable_balance?: number;
     /** ISO date string from cortex.relationships.created_at — when this connection was established. */
     connectedSince?: string;
+    /**
+     * What this person costs to book, before any one show.
+     *
+     * "What do they cost" is the second question when staffing, right after
+     * "are they free" -- and before this it lived only in the text of a note.
+     */
+    rate?: { amount: number; unit: string | null } | null;
     /** W-9 on file — populated for person (roster member) nodes. */
     w9_status?: boolean | null;
     /** COI expiry ISO date string — populated for person (roster member) nodes. */

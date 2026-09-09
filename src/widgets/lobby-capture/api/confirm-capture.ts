@@ -29,6 +29,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { syncCaptureToMemory } from '@/app/api/aion/lib/capture-memory-sync';
 import type { CaptureParseResult } from '@/app/api/aion/capture/parse/route';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 
 export type CaptureVisibility = 'user' | 'workspace';
 
@@ -77,6 +78,43 @@ export type ConfirmCaptureResult =
  * Phase 2 — read current working notes, upsert ONLY fields that are currently
  * null. The user's manual entries are sacred; Aion fills the empty slots.
  */
+/**
+ * Record what a person costs, when nothing is on file yet.
+ *
+ * Reads the existing attributes through the typed reader and patches back
+ * through patch_entity_attributes, which merges rather than replaces -- writing
+ * the blob wholesale would drop every other attribute on the entity.
+ */
+async function autoFillRate(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generics vary; only .schema()/.rpc() are used.
+  supabase: any,
+  entityId: string,
+  rate: NonNullable<CaptureParseResult['rate']>,
+): Promise<void> {
+  if (!Number.isFinite(rate.amount) || rate.amount <= 0) return;
+
+  const { data: row } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('attributes')
+    .eq('id', entityId)
+    .maybeSingle();
+
+  const attrs = readEntityAttrs((row as { attributes: unknown } | null)?.attributes, 'person');
+  if (attrs.rate_amount != null) return;
+
+  const patch: Record<string, unknown> = { rate_amount: rate.amount };
+  const unit = rate.unit?.trim();
+  if (unit) patch.rate_unit = unit;
+  const note = rate.note?.trim();
+  if (note) patch.rate_note = note;
+
+  await supabase.schema('directory').rpc('patch_entity_attributes', {
+    p_entity_id: entityId,
+    p_attributes: patch,
+  });
+}
+
 async function autoFillWorkingNotes(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
@@ -327,6 +365,24 @@ export async function confirmCapture(
   }
 
   // ── Auto-populate Working notes (Phase 2) ────────────────────────────────
+  // A spoken rate, when the person has none on file.
+  //
+  // Fill-only, like the working-notes signals above: a rate already recorded is
+  // a number quoted from, and having a misheard "four fifty" silently replace a
+  // real 550 is worse than never hearing it. Changing an existing rate stays a
+  // deliberate edit.
+  if (
+    resolvedEntityId
+    && parse.rate
+    && (resolvedEntityType === 'person' || resolvedEntityType === 'couple')
+  ) {
+    try {
+      await autoFillRate(supabase, resolvedEntityId, parse.rate);
+    } catch (err) {
+      console.error('[confirmCapture] autoFillRate failed:', err);
+    }
+  }
+
   // Only when the parse surfaced explicit signals AND the entity is a person
   // or couple. NEVER overwrites existing values — the user's hand-entry is
   // sacred. Best-effort.

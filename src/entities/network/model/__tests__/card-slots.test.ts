@@ -166,3 +166,30 @@ describe('money runs both ways', () => {
       .toEqual(['Owes $2,400', 'You owe $800']);
   });
 });
+
+describe('rate', () => {
+  it('says what the number buys, because a bare amount is ambiguous', () => {
+    const n = node({}, { rate: { amount: 450, unit: '4 hrs' } });
+    expect(resolveCardSlots(n, NOW).map((s) => s.text)).toEqual(['$450 / 4 hrs']);
+  });
+
+  it('renders a rate with no stated unit rather than inventing one', () => {
+    const n = node({}, { rate: { amount: 450, unit: null } });
+    expect(resolveCardSlots(n, NOW).map((s) => s.text)).toEqual(['$450']);
+  });
+
+  // Availability outranks price: you cannot book someone who is not free.
+  it('ranks below when they are next booked and when they last worked', () => {
+    const n = node({}, {
+      nextBooked: '2026-11-01',
+      nextConfirmed: true,
+      lastWorked: '2026-08-16',
+      rate: { amount: 450, unit: '4 hrs' },
+    });
+    expect(resolveCardSlots(n, NOW).map((s) => s.text)).toEqual([
+      'Booked Nov 1',
+      'Last show Aug 16',
+      '$450 / 4 hrs',
+    ]);
+  });
+});

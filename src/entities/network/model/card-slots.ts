@@ -159,6 +159,18 @@ const lastShow: SlotProducer = (node, now) => {
   return show ? { key: 'last', text: `Last show ${formatDay(show, now)}`, numeric: true } : null;
 };
 
+/**
+ * What they cost. Second question when staffing, right after "are they free" --
+ * and the reason a rate is worth a slot at all is that a scan is where you
+ * compare it against everyone else's.
+ */
+const rate: SlotProducer = (node) => {
+  const r = node.meta.rate;
+  if (!r) return null;
+  const per = r.unit ? ` / ${r.unit}` : '';
+  return { key: 'rate', text: `${formatUsd(r.amount)}${per}`, numeric: true };
+};
+
 const region: SlotProducer = (node) =>
   node.meta.region ? { key: 'region', text: node.meta.region } : null;
 
@@ -193,7 +205,7 @@ const affiliates: SlotProducer = (node) => {
  * decision, so place outranks everything.
  */
 const BY_SHAPE: Record<'person' | 'company' | 'venue', SlotProducer[]> = {
-  person: [owes, weOwe, nextBooked, lastShow, employer, region],
+  person: [owes, weOwe, nextBooked, lastShow, rate, employer, region],
   company: [owes, weOwe, affiliates, lastShow, region],
   venue: [region, owes, weOwe, lastShow, affiliates],
 };

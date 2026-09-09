@@ -24,6 +24,7 @@ import {
   fetchWorkedWithNodes,
 } from './stream-helpers';
 import { readEntityRegion } from '@/entities/directory/model/read-region';
+import { readRate } from '@/entities/directory/model/read-rate';
 import { attachShowDates } from './show-dates';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
@@ -168,6 +169,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const coiExpiry = (attrs[PERSON_ATTR.coi_expiry] as string | null) ?? null;
     const market = (attrs[PERSON_ATTR.market] as string | null) ?? null;
     const unionStatus = (attrs[PERSON_ATTR.union_status] as string | null) ?? null;
+    const rate = readRate(attrs);
     return {
       id: edge.id,
       entityId: edge.source_entity_id,
@@ -188,6 +190,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         coi_expiry: coiExpiry,
         market,
         region: market,
+        rate,
         union_status: unionStatus,
       },
     };
@@ -236,6 +239,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
     const relType = edge.relationship_type as NetworkNode['relationshipType'];
     const email = readContactEmail(entityType, attrs);
+    const rate = readRate(attrs);
     // Only persons on PARTNER / VENDOR edges act as "freelancers" with a
     // job-title-based roleGroup. CLIENT-edge persons are wedding hosts or
     // individual clients and should NOT be grouped with crew.
@@ -272,6 +276,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         ...(payable > 0 ? { payable_balance: payable } : {}),
         ...(refCount > 0 ? { referral_count: refCount } : {}),
         region: readEntityRegion(entityType, attrs),
+        rate,
         connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
       },
     };

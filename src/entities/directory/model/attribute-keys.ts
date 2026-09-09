@@ -39,6 +39,18 @@ export const PERSON_ATTR = {
   market: 'market',
   /** Union affiliation — e.g. "IATSE Local 33", "Teamsters", "Non-union" */
   union_status: 'union_status',
+  /**
+   * Reference day rate, e.g. 450. What they cost, before any one show.
+   *
+   * Distinct from ops.deal_crew.day_rate, which is what was actually agreed on
+   * a specific booking. This is the number you quote from before you book, and
+   * before this existed it had nowhere to live but the text of a note.
+   */
+  rate_amount: 'rate_amount',
+  /** What the rate buys — "4 hrs", "day", "hr". A bare number is ambiguous. */
+  rate_unit: 'rate_unit',
+  /** Conditions in their own words, e.g. "500 if over an hour drive". */
+  rate_note: 'rate_note',
   /** CDL (Commercial Driver's License) — boolean */
   cdl: 'cdl',
   /** W-9 on file — boolean */
