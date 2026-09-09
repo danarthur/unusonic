@@ -19,6 +19,7 @@ import { ChevronDown, Search } from 'lucide-react';
 import { NetworkCard } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { filterNodes } from '@/entities/network/model/search-node';
+import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
 import type { NetworkNode } from '@/entities/network';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { ROLE_GROUPING_THRESHOLD } from '@/entities/network/model/role-vocabulary';
@@ -39,11 +40,14 @@ export interface CategorySectionProps {
   onNodeHoverEnter?: (node: NetworkNode) => void;
   onNodeHoverLeave?: () => void;
   onTogglePreferred?: (node: NetworkNode) => void;
+  /** Page-level ordering. One question asked of the directory, not per section. */
+  sortMode?: SortMode;
 }
 
 export function CategorySection({
   title,
   nodes,
+  sortMode = DEFAULT_SORT,
   emptyLabel = 'Nothing here yet.',
   defaultExpanded = true,
   roleLabels,
@@ -59,12 +63,9 @@ export function CategorySection({
 
   if (nodes.length === 0) return null;
 
-  const { rolesPresent, showRoles, activeRole, shown } = resolveVisibleNodes(
-    nodes,
-    roleLabels,
-    search,
-    role,
-  );
+  const { rolesPresent, showRoles, activeRole, shown } = resolveVisibleNodes({
+    nodes, roleLabels, search, role, sortMode,
+  });
 
   return (
     <div className="flex flex-col gap-5">
@@ -151,12 +152,13 @@ export function CategorySection({
  * small workspace stays flat and a large one gains structure without either
  * having to configure anything.
  */
-function resolveVisibleNodes(
-  nodes: NetworkNode[],
-  roleLabels: Record<string, string> | undefined,
-  search: string,
-  role: string | null,
-) {
+function resolveVisibleNodes({ nodes, roleLabels, search, role, sortMode }: {
+  nodes: NetworkNode[];
+  roleLabels: Record<string, string> | undefined;
+  search: string;
+  role: string | null;
+  sortMode: SortMode;
+}) {
   const rolesPresent = roleLabels
     ? [...new Set(nodes.flatMap((n) => n.crewRoles ?? []))].filter((r) => roleLabels[r])
     : [];
@@ -169,7 +171,8 @@ function resolveVisibleNodes(
   // A person holding two roles matches under both -- never filed under one.
   if (activeRole) shown = shown.filter((n) => (n.crewRoles ?? []).includes(activeRole));
 
-  return { rolesPresent, showRoles, activeRole, shown };
+  // Sorted last, so the order holds whatever the search and role filters left.
+  return { rolesPresent, showRoles, activeRole, shown: sortNodes(shown, sortMode) };
 }
 
 /** Role filter chips. Extracted so CategorySection stays under the complexity cap. */

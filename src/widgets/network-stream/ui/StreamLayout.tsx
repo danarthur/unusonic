@@ -3,10 +3,13 @@
 import { useCallback, useRef, useState, useTransition, useOptimistic } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown, Star } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
 import { NetworkCard } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { filterNodes } from '@/entities/network/model/search-node';
+import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
+import { SortControl } from './SortControl';
+import { StarredStrip } from './StarredStrip';
 import { GenesisState } from './GenesisState';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -154,6 +157,7 @@ export function StreamLayout({
   const [crewExpanded, setCrewExpanded] = useState(true);
   const [innerCircleExpanded, setInnerCircleExpanded] = useState(true);
   const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT);
 
   const [optimisticNodes, dispatchOptimistic] = useOptimistic(
     nodes,
@@ -204,7 +208,7 @@ export function StreamLayout({
   };
 
   // Crew zone: search, role grouping and filtering
-  const searchedCrewNodes = filterNodes(crewNodes, crewSearch);
+  const searchedCrewNodes = sortNodes(filterNodes(crewNodes, crewSearch), sortMode);
   const roleGroups = groupByRole(searchedCrewNodes);
   const allRoleKeys = [...groupByRole(crewNodes).keys()]; // Use unfiltered for pill labels
   const filteredCrewNodes = activeRoleFilter
@@ -215,50 +219,30 @@ export function StreamLayout({
     : roleGroups;
 
   // Inner Circle zone: search
-  const displayedInnerCircle = filterNodes(innerCircleNodes, innerCircleSearch);
+  const displayedInnerCircle = sortNodes(filterNodes(innerCircleNodes, innerCircleSearch), sortMode);
 
-  // Every grid reserves its own rows. Missing this, a section of bare names
-  // renders three blank lines under each card -- the hollow look the
-  // reservation exists to prevent, on the crew grid at the top of the page.
-  const starredSlotCount = reservedSlotCount(starredNodes);
+  // Every grid reserves its own rows; without it a section of bare names
+  // renders three blank lines under each card.
+  const sortedStarred = sortNodes(starredNodes, sortMode);
   const innerCircleSlotCount = reservedSlotCount(displayedInnerCircle);
 
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
 
-      {/* ── Starred — this user's own shortcuts, above everything ── */}
-      {starredNodes.length > 0 && (
-        <div className="flex flex-col gap-5">
-          <div className="flex items-center gap-2">
-            <Star size={12} strokeWidth={1.5} className="text-[var(--stage-text-secondary)]" />
-            <h2 className="stage-label text-[var(--stage-text-secondary)]">Starred</h2>
-            <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-              {starredNodes.length}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {starredNodes.map((node) => (
-              <div
-                key={`starred-${node.id}`}
-                className="h-full"
-                onMouseEnter={() => handleNodeHoverEnter(node)}
-                onMouseLeave={handleNodeHoverLeave}
-              >
-                {/* No layoutId here on purpose: this node also renders in its
-                    category below, and two elements sharing a layoutId make
-                    Framer Motion animate between them. */}
-                <NetworkCard
-                  node={node}
-                  slotCount={starredSlotCount}
-                  onClick={() => onNodeClick?.(node)}
-                  onAffiliateClick={openAffiliate}
-                  onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
-                />
-              </div>
-            ))}
-          </div>
+      {/* One ordering for the page: the question is asked of the directory. */}
+      {!showGenesis && (
+        <div className="flex justify-end">
+          <SortControl value={sortMode} onChange={setSortMode} />
         </div>
       )}
+      <StarredStrip
+        nodes={sortedStarred}
+        onNodeClick={onNodeClick}
+        onAffiliateClick={openAffiliate}
+        onNodeHoverEnter={handleNodeHoverEnter}
+        onNodeHoverLeave={handleNodeHoverLeave}
+        onToggleStar={onToggleStar ? handleToggleStar : undefined}
+      />
 
       {/* ── Roster — staff, contractors and freelancers (ROSTER_MEMBER / PARTNER) ── */}
       {crewNodes.length > 0 && (
@@ -523,6 +507,7 @@ export function StreamLayout({
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+              sortMode={sortMode}
             />
             <CategorySection
               title={labels.venues}
@@ -533,6 +518,7 @@ export function StreamLayout({
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+              sortMode={sortMode}
             />
             <CategorySection
               title="Unsorted"
@@ -544,6 +530,7 @@ export function StreamLayout({
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+              sortMode={sortMode}
             />
           </motion.div>
         )}
