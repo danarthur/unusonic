@@ -14,7 +14,7 @@
  */
 
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
@@ -23,6 +23,8 @@ import {
   type PromotedMetrics,
 } from '../api/get-promoted-metrics';
 import { formatRelative } from '@/shared/lib/format-relative';
+import { InlineField } from '@/shared/ui/inline-field';
+import { setPersonRate } from '@/features/network-data/api/set-person-rate';
 
 export interface PromotedMetricsRowProps {
   workspaceId: string;
@@ -44,6 +46,13 @@ export function PromotedMetricsRow({
     enabled: Boolean(workspaceId && entityId),
   });
 
+  const queryClient = useQueryClient();
+  const invalidate = React.useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ['entity-promoted-metrics', workspaceId, entityId, entityType],
+    });
+  }, [queryClient, workspaceId, entityId, entityType]);
+
   const metrics = data && 'ok' in data && data.ok ? data.metrics : null;
   if (!metrics) return null;
 
@@ -59,7 +68,7 @@ export function PromotedMetricsRow({
       )}
     >
       {metrics.kind === 'person' ? (
-        <PersonCells metrics={metrics} />
+        <PersonCells metrics={metrics} entityId={entityId} onRateSaved={invalidate} />
       ) : metrics.kind === 'venue' ? (
         <VenueCells metrics={metrics} />
       ) : (
@@ -92,8 +101,12 @@ function VenueCells({
 
 function PersonCells({
   metrics,
+  entityId,
+  onRateSaved,
 }: {
   metrics: Extract<PromotedMetrics, { kind: 'person' }>;
+  entityId: string;
+  onRateSaved: () => void;
 }) {
   const { lastShow, rate } = metrics;
   return (
@@ -111,13 +124,33 @@ function PersonCells({
         value={lastShow ? formatLastShow(lastShow) : '—'}
         muted={!lastShow}
       />
-      {rate && (
-        <Cell
+      {/* The one number here you would want to change while looking at it, and
+          the cell used to vanish entirely when it was empty -- which is exactly
+          when you want somewhere to put it. It stays, and says so. */}
+      <span className="inline-flex items-baseline gap-1">
+        <span className="text-[10px] uppercase tracking-wider text-[var(--stage-text-secondary)]">
+          Rate
+        </span>
+        <InlineField
+          value={rate ? String(rate.amount) : null}
+          display={`$${rate?.amount.toLocaleString('en-US') ?? ''}${rate?.unit ? ` / ${rate.unit}` : ''}`}
           label="Rate"
-          value={`$${rate.amount.toLocaleString('en-US')}${rate.unit ? ` / ${rate.unit}` : ''}`}
-          muted={false}
+          emptyLabel="Add"
+          placeholder="450"
+          inputMode="decimal"
+          onCommit={async (next) => {
+            const amount = next === null ? null : Number(next.replace(/[$,\s]/g, ''));
+            if (amount !== null && !Number.isFinite(amount)) {
+              return { ok: false as const, error: 'That does not look like a rate.' };
+            }
+            const result = await setPersonRate(entityId, amount);
+            if (result.ok) onRateSaved();
+            return result;
+          }}
+          inputClassName="w-20"
+          className="px-1 -mx-1 text-[var(--stage-text-primary)]"
         />
-      )}
+      </span>
     </>
   );
 }
