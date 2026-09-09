@@ -74,32 +74,55 @@ export const DEAL_COLUMNS =
 
 export const EVENT_COLUMNS =
   'id, title, starts_at, status, lifecycle_status, deal_id, client_entity_id';
-
-const DEAL_PRE_CONTRACT = new Set(['inquiry', 'proposal', 'contract_sent']);
-const DEAL_BOOKED = new Set(['contract_signed', 'deposit_received', 'won']);
-const DEAL_DEAD = new Set(['lost']);
+/**
+ * `deals.status` holds the stage KIND, not the stage name.
+ *
+ * Stages are configurable per workspace -- inquiry, proposal, contract_sent and
+ * the rest live in ops.pipeline_stages and can be renamed or replaced -- but
+ * every stage rolls up to one of three kinds, and those are stable. An earlier
+ * version matched hardcoded stage NAMES against a column that only ever holds
+ * kinds, and appeared to work purely because "won" and "lost" happen to be both
+ * a kind and a stage.
+ */
+const DEAL_WON = 'won';
+const DEAL_LOST = 'lost';
 
 /**
  * Which band a production belongs in.
  *
- * The event wins when one exists: after handover its status and date are what
- * actually happened, while the deal's proposed date is a guess nobody went back
- * to correct.
+ * The date decides more than the stage does. A proposal whose date has passed
+ * is not still in play -- the show either happened or it did not, and either
+ * way it is over. Leaving it under "In play" is how a dead deal from last
+ * spring sits at the top of a profile looking like live work.
+ *
+ * `date` is the event's start when there is one and the proposed date
+ * otherwise, so a handed-off show is judged on when it actually happens.
  */
 export function classifyBand(
   dealStatus: string | null,
   eventStatus: string | null,
-  eventStartsAt: string | null,
+  date: string | null,
   now: Date = new Date(),
 ): ProductionBand {
-  if (eventStatus) {
-    return eventStartsAt && new Date(eventStartsAt) < now ? 'past' : 'booked';
-  }
-  if (!dealStatus) return 'in_play';
-  if (DEAL_DEAD.has(dealStatus)) return 'past';
-  if (DEAL_BOOKED.has(dealStatus)) return 'booked';
-  if (DEAL_PRE_CONTRACT.has(dealStatus)) return 'in_play';
-  return 'in_play';
+  const hasPassed = date ? new Date(date) < now : false;
+
+  if (dealStatus === DEAL_LOST) return 'past';
+  // Handed off, or won and awaiting handover: real work either way.
+  if (eventStatus || dealStatus === DEAL_WON) return hasPassed ? 'past' : 'booked';
+  return hasPassed ? 'past' : 'in_play';
+}
+
+/**
+ * Whether this production is a show actually worked, rather than one that died.
+ *
+ * The past band holds both -- a wedding delivered last spring and a proposal
+ * that went quiet -- and counting them together would inflate "12 shows" with
+ * work that never happened. An event exists only after handover, so its
+ * presence is itself proof the show became real.
+ */
+export function wasWorked(production: EntityProduction): boolean {
+  return production.band === 'past'
+    && (production.dealStatus === DEAL_WON || production.eventId !== null);
 }
 
 /** Pretty phrase for a stakeholder role enum. */
@@ -176,7 +199,7 @@ function productionFromDeal(deal: DealRow, input: ComposeInput, now: Date): Enti
     status: event.status ?? deal.status,
     dealStatus: deal.status,
     archetype: deal.event_archetype,
-    band: classifyBand(deal.status, event.status, event.startsAt, now),
+    band: classifyBand(deal.status, event.status, event.startsAt ?? deal.proposed_date, now),
     role: collapseRole(deal, input),
     amountEstimated: deal.budget_estimated,
     href: event.id ? `/events?eventId=${event.id}` : `/events?dealId=${deal.id}`,

@@ -36,6 +36,14 @@ interface NetworkCardProps {
   onTogglePreferred?: (relationshipId: string) => void;
   className?: string;
   layoutId?: string;
+  /**
+   * Detail rows to reserve, so every card in a grid lines up.
+   *
+   * Defaults to the maximum. Callers rendering a grid should pass
+   * reservedSlotCount() for that grid instead, so a directory with little on
+   * file does not render as a wall of tall, half-empty cards.
+   */
+  slotCount?: number;
 }
 
 /** One detail line. Empty renders as reserved space so rows stay aligned. */
@@ -84,6 +92,28 @@ function SlotRow({
   );
 }
 
+/** This user's own pin. Personal and silent — colleagues do not see it. */
+function StarButton({ starred, onToggle }: { starred: boolean; onToggle: (e: React.MouseEvent) => void }) {
+  const label = starred ? 'Remove star' : 'Star for quick access';
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={cn(
+        'absolute top-2.5 right-2.5 z-10 rounded p-1 transition-colors duration-[80ms]',
+        starred
+          ? 'text-[var(--stage-text-primary)]'
+          : 'text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--stage-text-primary)]/70',
+      )}
+      title={label}
+      aria-label={label}
+      aria-pressed={starred}
+    >
+      <Star size={14} strokeWidth={1.5} className={starred ? 'fill-[var(--stage-text-primary)]' : ''} />
+    </button>
+  );
+}
+
 export function NetworkCard({
   node,
   onClick,
@@ -91,6 +121,7 @@ export function NetworkCard({
   onTogglePreferred,
   className,
   layoutId,
+  slotCount = CARD_SLOT_COUNT,
 }: NetworkCardProps) {
   const slots = React.useMemo(() => resolveCardSlots(node), [node]);
   const isStarred = node.starred === true;
@@ -134,24 +165,7 @@ export function NetworkCard({
       )}
       transition={STAGE_MEDIUM}
     >
-      {/* This user's own pin. Personal and silent — colleagues do not see it. */}
-      {onTogglePreferred && (
-        <button
-          type="button"
-          onClick={handleToggleStar}
-          className={cn(
-            'absolute top-2.5 right-2.5 z-10 rounded p-1 transition-colors duration-[80ms]',
-            isStarred
-              ? 'text-[var(--stage-text-primary)]'
-              : 'text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--stage-text-primary)]/70',
-          )}
-          title={isStarred ? 'Remove star' : 'Star for quick access'}
-          aria-label={isStarred ? 'Remove star' : 'Star for quick access'}
-          aria-pressed={isStarred}
-        >
-          <Star size={14} strokeWidth={1.5} className={isStarred ? 'fill-[var(--stage-text-primary)]' : ''} />
-        </button>
-      )}
+      {onTogglePreferred && <StarButton starred={isStarred} onToggle={handleToggleStar} />}
 
       <div className="flex min-w-0 items-start gap-3">
         <EntityAvatar
@@ -176,9 +190,11 @@ export function NetworkCard({
           </p>
 
           {/* Fixed rows so a sparse entity does not collapse the layout and
-              knock every card below it out of alignment. */}
-          <div className="mt-2 flex flex-col gap-0.5">
-            {Array.from({ length: CARD_SLOT_COUNT }, (_, i) => (
+              knock every card beside it out of alignment. The count is the
+              grid's, not this card's, so nobody reserves space for data that
+              nothing in view actually has. */}
+          <div className={cn('flex flex-col gap-0.5', slotCount > 0 && 'mt-2')}>
+            {Array.from({ length: slotCount }, (_, i) => (
               <SlotRow key={slots[i]?.key ?? `empty-${i}`} slot={slots[i]} onAffiliateClick={onAffiliateClick} />
             ))}
           </div>

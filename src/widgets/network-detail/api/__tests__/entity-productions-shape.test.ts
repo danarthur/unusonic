@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyBand,
+  wasWorked,
   composeProductions,
   type DealRow,
   type EventRow,
@@ -51,32 +52,62 @@ function input(over: Partial<ComposeInput> = {}): ComposeInput {
   };
 }
 
+// deals.status holds the stage KIND -- working / won / lost -- not the stage
+// name. Stage names are configurable per workspace; the kinds are not.
 describe('classifyBand', () => {
-  it('treats a deal with no status as still in play', () => {
+  const FUTURE = '2026-12-01';
+  const PAST = '2026-01-01';
+
+  it('treats an undated working deal as in play', () => {
     expect(classifyBand(null, null, null, NOW)).toBe('in_play');
+    expect(classifyBand('working', null, null, NOW)).toBe('in_play');
   });
 
-  it('puts pre-contract statuses in play', () => {
-    for (const s of ['inquiry', 'proposal', 'contract_sent']) {
-      expect(classifyBand(s, null, null, NOW)).toBe('in_play');
-    }
+  it('keeps a working deal in play while its date is ahead', () => {
+    expect(classifyBand('working', null, FUTURE, NOW)).toBe('in_play');
   });
 
-  it('puts signed work in booked', () => {
-    for (const s of ['contract_signed', 'deposit_received', 'won']) {
-      expect(classifyBand(s, null, null, NOW)).toBe('booked');
-    }
+  // The bug this replaces: a proposal from three months ago sat under "In play"
+  // looking like live work, because the stage still said proposal.
+  it('does not leave a working deal in play once its date has passed', () => {
+    expect(classifyBand('working', null, PAST, NOW)).toBe('past');
   });
 
-  it('puts a lost deal in the past rather than leaving it in play', () => {
-    expect(classifyBand('lost', null, null, NOW)).toBe('past');
+  it('puts won work in booked until it happens, then past', () => {
+    expect(classifyBand('won', null, FUTURE, NOW)).toBe('booked');
+    expect(classifyBand('won', null, PAST, NOW)).toBe('past');
   });
 
-  // After handover the event is what actually happened; the deal's proposed
-  // date is a guess nobody went back to correct.
-  it('lets the event override the deal status', () => {
-    expect(classifyBand('inquiry', 'scheduled', '2026-12-01T00:00:00.000Z', NOW)).toBe('booked');
-    expect(classifyBand('inquiry', 'scheduled', '2026-01-01T00:00:00.000Z', NOW)).toBe('past');
+  it('puts a lost deal in the past whatever its date says', () => {
+    expect(classifyBand('lost', null, FUTURE, NOW)).toBe('past');
+  });
+
+  // An event only exists after handover, so its presence means real work.
+  it('treats a handed-off show as booked, then past once it has happened', () => {
+    expect(classifyBand('working', 'planned', FUTURE, NOW)).toBe('booked');
+    expect(classifyBand('working', 'planned', PAST, NOW)).toBe('past');
+  });
+});
+
+describe('wasWorked', () => {
+  const base = { band: 'past' as const, dealStatus: null, eventId: null };
+
+  it('counts a won show that has happened', () => {
+    expect(wasWorked({ ...base, dealStatus: 'won' } as never)).toBe(true);
+  });
+
+  it('counts a handed-off show even before its deal was marked won', () => {
+    expect(wasWorked({ ...base, eventId: 'e1' } as never)).toBe(true);
+  });
+
+  // A proposal that went quiet lands in the past band too, and counting it
+  // would inflate "12 shows" with work that never happened.
+  it('does not count a proposal that simply expired', () => {
+    expect(wasWorked({ ...base, dealStatus: 'working' } as never)).toBe(false);
+  });
+
+  it('does not count anything still ahead', () => {
+    expect(wasWorked({ band: 'booked', dealStatus: 'won', eventId: 'e1' } as never)).toBe(false);
   });
 });
 

@@ -17,6 +17,7 @@ import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affilia
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import { readRate, type PersonRate } from '@/entities/directory/model/read-rate';
 import { getEntityProductions } from './get-entity-productions';
+import { wasWorked } from './entity-productions-shape';
 
 export type PersonMetrics = {
   kind: 'person';
@@ -106,7 +107,10 @@ async function getPersonMetrics(
 
   if (!productions.ok) return { ok: false, error: productions.error };
 
-  const worked = productions.productions.filter((p) => p.band === 'past');
+  // Worked, not merely past. The past band also holds proposals that went
+  // quiet, and counting those would inflate "12 shows" with work that never
+  // happened.
+  const worked = productions.productions.filter(wasWorked);
   // Already sorted newest first by the reader.
   const last = worked[0] ?? null;
 

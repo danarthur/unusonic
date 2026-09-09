@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveCardSlots, isFlagged, CARD_SLOT_COUNT } from '../card-slots';
+import { resolveCardSlots, isFlagged, reservedSlotCount, CARD_SLOT_COUNT } from '../card-slots';
 import type { NetworkNode } from '../types';
 
 const NOW = new Date('2026-09-08T12:00:00.000Z');
@@ -191,5 +191,35 @@ describe('rate', () => {
       'Last show Aug 16',
       '$450 / 4 hrs',
     ]);
+  });
+});
+
+describe('reservedSlotCount', () => {
+  it('reserves nothing when no card in the grid has anything to show', () => {
+    expect(reservedSlotCount([node(), node(), node()], NOW)).toBe(0);
+  });
+
+  // The alignment rule: every card in a grid reserves the same rows, so the
+  // eye can run down a column. It just does not reserve rows for data that
+  // nothing in view actually has.
+  it('reserves as many rows as the densest card needs', () => {
+    const sparse = node();
+    const oneLine = node({}, { outstanding_balance: 2400 });
+    expect(reservedSlotCount([sparse, oneLine], NOW)).toBe(1);
+  });
+
+  it('never reserves more than the slot limit', () => {
+    const full = node(
+      { employer: { entityId: 'c', name: 'Pure Lavish' } },
+      {
+        outstanding_balance: 2400,
+        payable_balance: 800,
+        nextBooked: '2026-11-01',
+        nextConfirmed: true,
+        lastWorked: '2026-08-16',
+        region: 'Napa, CA',
+      },
+    );
+    expect(reservedSlotCount([full], NOW)).toBe(CARD_SLOT_COUNT);
   });
 });

@@ -219,6 +219,25 @@ function shapeOf(node: NetworkNode): 'person' | 'company' | 'venue' {
   return 'person';
 }
 
+/**
+ * How many detail rows a set of cards should reserve.
+ *
+ * Reserving the full three on every card is right when the data is there and
+ * wrong when it is not: a directory of ghosts with nothing but names renders as
+ * a grid of tall, mostly-empty boxes. Sizing the reservation to the densest
+ * card present keeps every card in the grid aligned -- which is the whole point
+ * -- while letting a sparse workspace stay compact. It grows on its own as the
+ * directory fills in.
+ */
+export function reservedSlotCount(nodes: NetworkNode[], now: Date = new Date()): number {
+  let most = 0;
+  for (const node of nodes) {
+    most = Math.max(most, resolveCardSlots(node, now).length);
+    if (most === CARD_SLOT_COUNT) break;
+  }
+  return most;
+}
+
 /** The detail lines for one card, in render order. */
 export function resolveCardSlots(node: NetworkNode, now: Date = new Date()): CardSlot[] {
   const slots: CardSlot[] = [];

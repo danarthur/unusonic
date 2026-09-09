@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search } from 'lucide-react';
 
 import { NetworkCard } from '@/entities/network';
+import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import type { NetworkNode } from '@/entities/network';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { ROLE_GROUPING_THRESHOLD } from '@/entities/network/model/role-vocabulary';
@@ -253,6 +254,10 @@ function CategoryBody({
     );
   }
 
+  // One reservation for the whole grid, so cards align without any of them
+  // holding space for a field none of them has.
+  const slotCount = reservedSlotCount(shown);
+
   return (
     <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {shown.map((node) => (
@@ -268,6 +273,7 @@ function CategoryBody({
             onClick={() => onNodeClick?.(node)}
             onAffiliateClick={onAffiliateClick}
             onTogglePreferred={onTogglePreferred ? () => onTogglePreferred(node) : undefined}
+            slotCount={slotCount}
           />
         </div>
       ))}
