@@ -41,8 +41,7 @@ export type NetworkNode = {
     /** Entity type from directory.entities.type — used to pick correct avatar icon */
     entityType?: 'person' | 'company' | 'venue' | 'couple';
   };
-  /** Grouping key for the Crew zone — derived from job_title or first skill tag. Null renders under "Other". */
-  roleGroup?: string | null;
+
   /**
    * Whether the CURRENT user has starred this entity. Personal and silent --
    * colleagues do not see it, and it never affects category membership. The

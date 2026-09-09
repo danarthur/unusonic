@@ -245,6 +245,7 @@ export function StreamLayout({
       {shows('roster') && (
         <RosterSection
           nodes={crewNodes}
+          roleLabels={roleLabels}
           query={query}
           label={labels.roster}
           sortMode={sortMode}

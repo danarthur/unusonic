@@ -23,10 +23,23 @@ import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, type SortMode } from '@/entities/network/model/sort-nodes';
 import { RoleFilterRow, ROLE_FILTER_MIN_ROWS } from './RoleFilterRow';
 
+/**
+ * Group by the controlled role, not the typed job title.
+ *
+ * The title is free text and holds three different kinds of thing at once --
+ * "DJ" is a craft, "Sales" a department, "Director of Ops" a position -- so a
+ * filter built on it cannot satisfy the rule that people should be able to
+ * predict what values a filter offers. crew_skills.role_tag is the normalised
+ * value every other section already uses.
+ *
+ * First role wins for grouping, because a list cannot show one person twice.
+ * Filtering still matches every role they hold, which is what the category
+ * sections do.
+ */
 function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
   const groups = new Map<string, NetworkNode[]>();
   for (const node of nodes) {
-    const key = node.roleGroup || 'Other';
+    const key = node.crewRoles?.[0] ?? 'Other';
     const arr = groups.get(key) ?? [];
     arr.push(node);
     groups.set(key, arr);
@@ -44,6 +57,8 @@ function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
 
 export interface RosterSectionProps {
   nodes: NetworkNode[];
+  /** Role slug to display label, from the workspace's crew vocabulary. */
+  roleLabels?: Record<string, string>;
   /** The page's one search query. This section no longer owns an input. */
   query: string;
   label: string;
@@ -56,6 +71,7 @@ export interface RosterSectionProps {
 
 export function RosterSection({
   nodes: crewNodes,
+  roleLabels,
   query,
   label,
   sortMode,
@@ -67,11 +83,16 @@ export function RosterSection({
   const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
 
   const searchedCrewNodes = sortNodes(filterNodes(crewNodes, query), sortMode);
-  const roleGroups = groupByRole(searchedCrewNodes);
+  // Grouping earns its place on the same terms the filter does. Three headers
+  // over one person each is structure nobody asked for.
+  const grouped = crewNodes.length >= ROLE_FILTER_MIN_ROWS;
+  const roleGroups = grouped
+    ? groupByRole(searchedCrewNodes)
+    : new Map([['__all', searchedCrewNodes]]);
   // Unfiltered, so the pills keep their labels while a search is narrowing.
-  const allRoleKeys = [...groupByRole(crewNodes).keys()];
+  const allRoleKeys = [...new Set(crewNodes.flatMap((n) => n.crewRoles ?? []))];
   const filteredCrewNodes = activeRoleFilter
-    ? searchedCrewNodes.filter((n) => (n.roleGroup || 'Other') === activeRoleFilter)
+    ? searchedCrewNodes.filter((n) => (n.crewRoles ?? []).includes(activeRoleFilter))
     : searchedCrewNodes;
   const filteredRoleGroups = activeRoleFilter
     ? new Map([[activeRoleFilter, filteredCrewNodes]])
@@ -103,6 +124,7 @@ export function RosterSection({
               <RoleFilterRow
                 roles={allRoleKeys}
                 active={activeRoleFilter}
+                labels={roleLabels}
                 onSelect={setActiveRoleFilter}
               />
             </div>
@@ -112,10 +134,13 @@ export function RosterSection({
             <div className="flex flex-col gap-6">
               {[...filteredRoleGroups.entries()].map(([role, groupNodes]) => (
                 <div key={role}>
-                  {/* Only show role header if there are multiple groups and no active filter */}
-                  {allRoleKeys.length > 1 && !activeRoleFilter && (
+                  {/* A header only when grouping is actually on and more than
+                      one group survives. The single synthetic group carries no
+                      heading, and neither does a filtered view -- the chip
+                      already says which role is showing. */}
+                  {grouped && role !== '__all' && !activeRoleFilter && (
                     <p className="mb-2 stage-label text-[var(--stage-text-secondary)]/60">
-                      {role}
+                      {roleLabels?.[role] ?? role}
                     </p>
                   )}
                   <div className="grid grid-cols-2 gap-[var(--stage-gap)] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">

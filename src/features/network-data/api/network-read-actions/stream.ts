@@ -176,7 +176,6 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       kind: isExternal ? 'extended_team' : 'internal_employee',
       gravity: 'core',
       relationshipType: 'ROSTER_MEMBER',
-      roleGroup: jobTitle || null,
       identity: { name, avatarUrl, label: jobTitle || role || 'Member', entityType },
       meta: {
         email: email ?? undefined,
@@ -255,7 +254,6 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       kind: 'external_partner',
       gravity: 'inner_circle',
       relationshipType: relType,
-      roleGroup: personJobTitle,
       identity: {
         name: partner?.display_name ?? 'Unknown',
         // Was hard-coded null, so a preferred partner -- the people most likely
