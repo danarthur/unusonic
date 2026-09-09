@@ -76,11 +76,48 @@ export function VenueSpecsCompactCard({ workspaceId, entityId }: VenueSpecsCompa
                   {row.sub}
                 </p>
               )}
+              <ConfirmedOn iso={specs.confirmedOn[ATTR_BY_ROW[row.key] ?? '']} />
             </div>
           </div>
         ))}
       </dl>
     </motion.div>
+  );
+}
+
+/**
+ * Which stored attribute each row came from, so a row can show when its fact
+ * was last confirmed. Rows with no entry are ones capture never dates.
+ */
+const ATTR_BY_ROW: Record<string, string> = {
+  capacity: 'capacity',
+  'load-in': 'load_in_notes',
+  curfew: 'curfew',
+  power: 'power_notes',
+  parking: 'parking_notes',
+  dock: 'dock_address',
+  access: 'access_notes',
+};
+
+/** "Aug '24" — short enough to sit under a value without competing with it. */
+function confirmedLabel(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const month = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+  return `confirmed ${month} '${String(d.getUTCFullYear()).slice(2)}`;
+}
+
+/**
+ * A venue fact with no date is one you cannot act on. Rooms change hands, get
+ * renovated, and get limiters fitted after a noise complaint, so the date is
+ * what tells you whether to ring and check.
+ */
+function ConfirmedOn({ iso }: { iso: string | undefined }) {
+  const label = confirmedLabel(iso);
+  if (!label) return null;
+  return (
+    <p className="mt-0.5 stage-badge-text text-[var(--stage-text-tertiary)]">{label}</p>
   );
 }
 

@@ -33,6 +33,13 @@ export type VenueSpecs = {
   dockAddress: string | null;
   dockHours: string | null;
   formattedAddress: string | null;
+  /**
+   * When each fact was last confirmed, keyed by its attribute name.
+   *
+   * A spec with no date is a spec you cannot act on: venues change hands, get
+   * renovated, and get limiters fitted after a noise complaint.
+   */
+  confirmedOn: Record<string, string>;
 };
 
 export type GetVenueSpecsResult =
@@ -87,6 +94,7 @@ export async function getVenueSpecs(
       dockAddress: attrs.dock_address ?? null,
       dockHours: attrs.dock_hours ?? null,
       formattedAddress: attrs.formatted_address ?? null,
+      confirmedOn: (attrs.specs_confirmed as Record<string, string> | null) ?? {},
     },
   };
 }
@@ -107,5 +115,6 @@ function emptySpecs(): VenueSpecs {
     dockAddress: null,
     dockHours: null,
     formattedAddress: null,
+    confirmedOn: {},
   };
 }

@@ -259,6 +259,7 @@ export const VenueAttrsSchema = z.object({
   [VENUE_ATTR.curfew]: optStr,
   [VENUE_ATTR.house_power_amps]: z.union([z.string(), z.number()]).nullable().optional(),
   [VENUE_ATTR.union_local]: optStr,
+  [VENUE_ATTR.specs_confirmed]: z.record(z.string(), z.string()).nullable().optional(),
   [VENUE_ATTR.house_pa_included]: z.boolean().nullable().optional(),
   [VENUE_ATTR.house_lighting_included]: z.boolean().nullable().optional(),
   [VENUE_ATTR.wifi_credentials]: optStr,

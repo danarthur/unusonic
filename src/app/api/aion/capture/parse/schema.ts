@@ -115,6 +115,28 @@ export const CaptureParseSchema = z.object({
       'What this PERSON costs to book, when the transcript states it plainly ("Marcus is four fifty for a four hour"). Null otherwise, which is most captures. Do NOT populate from a price the client is paying, from an invoice or an amount owed, or from a venue fee — this is only what we pay this person to work. When unsure whether the number is their rate or someone else\'s, return null.',
     ),
 
+  venue_facts: z
+    .object({
+      load_in_notes: z
+        .string()
+        .nullable()
+        .describe('How you get gear in: door, dock, stairs, which entrance. Verbatim and short.'),
+      parking_notes: z.string().nullable().describe('Where to park, and anything that makes it hard.'),
+      power_notes: z
+        .string()
+        .nullable()
+        .describe('Where power is and what is on it, e.g. "only two circuits by the head table".'),
+      curfew: z.string().nullable().describe('Hard stop time, e.g. "11:00 PM". Null unless stated.'),
+      capacity: z.number().nullable().describe('Headcount the room holds. Null unless stated as a number.'),
+      access_notes: z.string().nullable().describe('Anything else about getting in or moving around.'),
+      venue_contact_name: z.string().nullable().describe('The house contact, when named.'),
+      venue_contact_phone: z.string().nullable().describe('Their number, when spoken.'),
+    })
+    .nullable()
+    .describe(
+      'Standing facts about a VENUE -- the things asked at every venue, every time. Only populate when the capture is about a venue and the transcript states the fact plainly. Null for people and companies, and null for anything true of one show rather than of the room ("cocktail hour is outside if it is dry" is a show note, not a venue fact).',
+    ),
+
   working_notes_signals: z
     .object({
       communication_style: z

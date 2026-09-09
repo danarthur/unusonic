@@ -30,6 +30,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { syncCaptureToMemory } from '@/app/api/aion/lib/capture-memory-sync';
 import type { CaptureParseResult } from '@/app/api/aion/capture/parse/route';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { decideVenueFact, normaliseFact } from './venue-facts';
 
 export type CaptureVisibility = 'user' | 'workspace';
 
@@ -109,6 +110,62 @@ async function autoFillRate(
   const note = rate.note?.trim();
   if (note) patch.rate_note = note;
 
+  await supabase.schema('directory').rpc('patch_entity_attributes', {
+    p_entity_id: entityId,
+    p_attributes: patch,
+  });
+}
+
+/**
+ * Land spoken venue facts in the spec fields.
+ *
+ * A venue's standing facts have a fixed shape, because the same questions get
+ * asked at every venue every time: how do I get in, where do I park, where is
+ * power, when do I have to stop. That makes them a form being filled in over
+ * years, one voice note at a time -- not a list. A form can show what is still
+ * missing; a list of notes never can.
+ *
+ * Fill-only, with one addition: hearing a fact that already matches what is on
+ * file re-stamps its date. Venues go stale in specific ways -- new management,
+ * a renovation, a limiter fitted after a noise complaint -- so "confirmed Aug
+ * '24" is the difference between a spec you act on and one you ring to check.
+ *
+ * A spoken value that CONTRADICTS what is stored is deliberately not written.
+ * Sending someone to the wrong dock on a misheard sentence is worse than
+ * missing an update, and changing a spec stays a deliberate edit.
+ */
+async function autoFillVenueFacts(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generics vary; only .schema()/.rpc() are used.
+  supabase: any,
+  entityId: string,
+  facts: NonNullable<CaptureParseResult['venue_facts']>,
+): Promise<void> {
+  const { data: row } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('attributes')
+    .eq('id', entityId)
+    .maybeSingle();
+
+  const attrs = readEntityAttrs((row as { attributes: unknown } | null)?.attributes, 'venue');
+  const current = attrs as unknown as Record<string, unknown>;
+  const confirmedOn = { ...((attrs.specs_confirmed as Record<string, string> | null) ?? {}) };
+  const today = new Date().toISOString().slice(0, 10);
+
+  const patch: Record<string, unknown> = {};
+  let touched = false;
+
+  for (const [key, spoken] of Object.entries(facts)) {
+    const outcome = decideVenueFact(spoken, current[key]);
+    if (outcome === 'skip') continue;
+    if (outcome === 'fill') patch[key] = normaliseFact(spoken);
+    confirmedOn[key] = today;
+    touched = true;
+  }
+
+  if (!touched) return;
+
+  patch.specs_confirmed = confirmedOn;
   await supabase.schema('directory').rpc('patch_entity_attributes', {
     p_entity_id: entityId,
     p_attributes: patch,
@@ -365,6 +422,15 @@ export async function confirmCapture(
   }
 
   // ── Auto-populate Working notes (Phase 2) ────────────────────────────────
+  // Venue facts, when the capture is about a venue.
+  if (resolvedEntityId && parse.venue_facts && resolvedEntityType === 'venue') {
+    try {
+      await autoFillVenueFacts(supabase, resolvedEntityId, parse.venue_facts);
+    } catch (err) {
+      console.error('[confirmCapture] autoFillVenueFacts failed:', err);
+    }
+  }
+
   // A spoken rate, when the person has none on file.
   //
   // Fill-only, like the working-notes signals above: a rate already recorded is

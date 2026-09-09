@@ -193,6 +193,15 @@ export const VENUE_ATTR = {
   house_power_amps: 'house_power_amps',
   /** IATSE local number / name — e.g. "IATSE Local 33" */
   union_local: 'union_local',
+  /**
+   * When each venue fact was last confirmed, keyed by attribute name.
+   *
+   * Venue facts go stale in specific ways -- new management, a renovation, a
+   * limiter fitted after a noise complaint -- and a spec with no date is a spec
+   * you cannot trust enough to act on. "Curfew 11 · confirmed Aug '24" tells
+   * you to ring and check; "Curfew 11" does not.
+   */
+  specs_confirmed: 'specs_confirmed',
   /** Whether house PA system is included */
   house_pa_included: 'house_pa_included',
   /** Whether house lighting rig is included */
