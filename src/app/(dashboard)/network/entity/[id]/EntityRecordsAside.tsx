@@ -32,6 +32,7 @@ import { ReferralsCard } from '@/widgets/network-detail/ui/ReferralsCard';
 import { TeamCard } from '@/widgets/network-detail/ui/TeamCard';
 import { EmploymentCard } from '@/widgets/network-detail/ui/EmploymentCard';
 import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
+import { HISTORY_ANCHOR } from '@/widgets/network-detail/ui/RecordHistoryCounts';
 
 export interface EntityRecordsAsideProps {
   entityId: string | null;
@@ -57,12 +58,22 @@ export function EntityRecordsAside({ entityId, entityType, workspaceId }: Entity
         <EmploymentCard workspaceId={workspaceId} entityId={entityId} />
       )}
       <EntityAssignments entityId={entityId} variant="full" />
+      {/* The ids are where the panel's history counts land. `scroll-mt` keeps
+          the card clear of the sticky header once it has been jumped to. */}
       {workspaceId && (
-        <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="full" />
+        <div id={HISTORY_ANCHOR.productions} className="scroll-mt-24">
+          <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="full" />
+        </div>
       )}
-      <EntityMoney entityId={entityId} variant="full" />
+      <div id={HISTORY_ANCHOR.money} className="scroll-mt-24">
+        <EntityMoney entityId={entityId} variant="full" />
+      </div>
       {/* Reciprocity is a ledger, so it sits with the other ledger. */}
-      {workspaceId && <ReferralsCard workspaceId={workspaceId} entityId={entityId} />}
+      {workspaceId && (
+        <div id={HISTORY_ANCHOR.referrals} className="scroll-mt-24">
+          <ReferralsCard workspaceId={workspaceId} entityId={entityId} />
+        </div>
+      )}
       {workspaceId && (
         <EntityDocumentsCard
           entityId={entityId}

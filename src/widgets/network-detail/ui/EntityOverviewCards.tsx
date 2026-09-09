@@ -38,8 +38,7 @@ import { CaptureTimelinePanel } from './CaptureTimelinePanel';
 import { WorkingNotesCard } from './WorkingNotesCard';
 import { EmploymentCard } from './EmploymentCard';
 import { TeamCard } from './TeamCard';
-import { EntityProductions } from './EntityProductions';
-import { ReferralsCard } from './ReferralsCard';
+import { RecordHistoryCounts } from './RecordHistoryCounts';
 import { VenueSpecsCompactCard } from './VenueSpecsCompactCard';
 
 export type EntityOverviewEntityType = 'person' | 'company' | 'venue' | 'couple';
@@ -55,6 +54,8 @@ export interface EntityOverviewCardsProps {
    */
   relationshipId?: string | null;
   relationshipNotes?: string | null;
+  /** The record page for this node. Segments of the history row link into it. */
+  recordHref?: string;
   className?: string;
 }
 
@@ -65,6 +66,7 @@ export function EntityOverviewCards({
   entityName,
   relationshipId = null,
   relationshipNotes = null,
+  recordHref,
   className,
 }: EntityOverviewCardsProps) {
   const { isPersonOrCouple, isCompanyOrVenue, isVenue } = entityShape(entityType);
@@ -103,16 +105,18 @@ export function EntityOverviewCards({
         )}
       </Zone>
 
-      <Zone label="What we've done together">
-        {/* Every entity type, now that one reader answers for all of them. A
-            company used to be routed to a different, shorter component.
-
-            The summary lives here and the full list lives in the page's
-            records rail, so neither surface shows it twice. */}
-        <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="summary" />
-        {/* Reciprocity runs at both levels: who feeds us, who we feed. */}
-        <ReferralsCard workspaceId={workspaceId} entityId={entityId} />
-      </Zone>
+      {/* What we've done together, as counts rather than three lists.
+          Productions, the referral ledger and the invoices were the bulk of
+          what made this drawer eighteen blocks long, and the page next door
+          holds a better version of all three. The number is the signal: it
+          tells you whether the click is worth making. */}
+      {recordHref && (
+        <RecordHistoryCounts
+          workspaceId={workspaceId}
+          entityId={entityId}
+          recordHref={recordHref}
+        />
+      )}
 
       {/*
         Judgement and its sources, last. The brief above is the glance; these are

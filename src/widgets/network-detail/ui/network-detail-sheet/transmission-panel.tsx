@@ -14,7 +14,6 @@
 
 import * as React from 'react';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
-import { EntityMoney } from '../EntityMoney';
 import { EntityAssignments } from '../EntityAssignments';
 import { CrewKitSection } from '../CrewKitSection';
 import { QuickBookAction } from '../QuickBookAction';
@@ -42,6 +41,9 @@ export function TransmissionPanel({
   onRefresh,
   onClose,
 }: TransmissionPanelProps) {
+  // Same destination as the header's "Open full profile", so a count and the
+  // button cannot drift apart.
+  const recordHref = `/network/entity/${details.id}?kind=${details.kind}`;
   const isPartner = details.kind === 'external_partner';
 
   return (
@@ -61,13 +63,6 @@ export function TransmissionPanel({
               <p className="text-lg font-mono tabular-nums text-[var(--stage-text-primary)] mt-0.5">${details.totalPaid.toLocaleString()}</p>
             </div>
           )}
-        </div>
-      )}
-
-      {/* ── Partner: Ledger card ── */}
-      {isPartner && (
-        <div className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)]" data-surface="elevated">
-          {details.subjectEntityId && <EntityMoney entityId={details.subjectEntityId} variant="summary" />}
         </div>
       )}
 
@@ -196,6 +191,7 @@ export function TransmissionPanel({
             entityName={details.identity.name ?? null}
             relationshipId={details.relationshipId}
             relationshipNotes={details.notes}
+            recordHref={recordHref}
           />
         );
       })()}
@@ -204,12 +200,12 @@ export function TransmissionPanel({
           EntityOverviewCards, rather than in a second card down here. */}
 
       {/* ── Active shows ──
-          Same reason: for a person this repeats the "Booked" band of
-          PersonProductionsPanel. Kept for companies and venues, which have no
-          productions panel of their own. */}
-      {details.active_events.length > 0
-        && details.entityDirectoryType !== 'person'
-        && details.entityDirectoryType !== 'couple' && (
+          Every entity type now. This used to be hidden for people because it
+          repeated the productions list's "Booked" band; with that list
+          collapsed to a count, hiding it left a person's panel with no answer
+          to "what are they on next" -- which is the one thing a count cannot
+          give you, because it is the dates you need. */}
+      {details.active_events.length > 0 && (
         <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]">
           <h3 className="stage-label text-[var(--stage-text-secondary)] mb-2">
             Active shows
