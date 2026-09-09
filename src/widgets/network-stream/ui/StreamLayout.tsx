@@ -10,6 +10,10 @@ import { rowFactsFor } from '@/entities/network/model/row-facts';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
 import { SortControl } from './SortControl';
+import { CategoryChips, type CategoryFilter } from './CategoryChips';
+
+/** Referentially stable, so filtering a section out does not churn its props. */
+const EMPTY_NODES: NetworkNode[] = [];
 import { StarredStrip } from './StarredStrip';
 import { GenesisState } from './GenesisState';
 import { cn } from '@/shared/lib/utils';
@@ -159,6 +163,7 @@ export function StreamLayout({
   const [innerCircleExpanded, setInnerCircleExpanded] = useState(true);
   const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT);
+  const [category, setCategory] = useState<CategoryFilter>('all');
 
   const [optimisticNodes, dispatchOptimistic] = useOptimistic(
     nodes,
@@ -227,12 +232,26 @@ export function StreamLayout({
   const sortedStarred = sortNodes(starredNodes, sortMode);
   const clientFacts = rowFactsFor(displayedInnerCircle);
 
+  // Only categories that have something in them, in the order the page renders
+  // them, so the chips never offer a section that is not there.
+  const categoryOptions = ([
+    { id: 'roster', label: labels.roster, count: crewNodes.length },
+    { id: 'clients', label: labels.clients, count: innerCircleNodes.length },
+    { id: 'vendors', label: labels.vendors, count: vendorNodes.length },
+    { id: 'venues', label: labels.venues, count: venueNodes.length },
+    { id: 'unsorted', label: 'Unsorted', count: unsortedNodes.length },
+  ] as const).filter((o) => o.count > 0).map((o) => ({ ...o }));
+
+  /** A section renders when nothing is filtered, or when it is the one asked for. */
+  const shows = (id: CategoryFilter) => category === 'all' || category === id;
+
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
 
-      {/* One ordering for the page: the question is asked of the directory. */}
+      {/* Narrow to one kind, and order the result. */}
       {!showGenesis && (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CategoryChips value={category} onChange={setCategory} options={categoryOptions} />
           <SortControl value={sortMode} onChange={setSortMode} />
         </div>
       )}
@@ -246,7 +265,7 @@ export function StreamLayout({
       />
 
       {/* ── Roster — staff, contractors and freelancers (ROSTER_MEMBER / PARTNER) ── */}
-      {crewNodes.length > 0 && (
+      {crewNodes.length > 0 && shows('roster') && (
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
             <button
@@ -388,7 +407,7 @@ export function StreamLayout({
       )}
 
       {/* ── Clients — anyone on a CLIENT edge, person or company ── */}
-      {innerCircleNodes.length > 0 && (
+      {innerCircleNodes.length > 0 && shows('clients') && (
         <>
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -499,7 +518,7 @@ export function StreamLayout({
             <CategorySection
               layout="rows"
               title={labels.vendors}
-              nodes={vendorNodes}
+              nodes={shows('vendors') ? vendorNodes : EMPTY_NODES}
               roleLabels={roleLabels}
               onNodeClick={onNodeClick}
               onAffiliateClick={openAffiliate}
@@ -510,7 +529,7 @@ export function StreamLayout({
             />
             <CategorySection
               title={labels.venues}
-              nodes={venueNodes}
+              nodes={shows('venues') ? venueNodes : EMPTY_NODES}
               roleLabels={roleLabels}
               onNodeClick={onNodeClick}
               onAffiliateClick={openAffiliate}
@@ -527,7 +546,7 @@ export function StreamLayout({
             <CategorySection
               layout="rows"
               title="Unsorted"
-              nodes={unsortedNodes}
+              nodes={shows('unsorted') ? unsortedNodes : EMPTY_NODES}
               defaultExpanded={false}
               emptyLabel="Nothing waiting to be filed."
               onNodeClick={onNodeClick}
