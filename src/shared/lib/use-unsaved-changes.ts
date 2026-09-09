@@ -23,9 +23,18 @@
  *     tab, a download, a modified click the user meant to open elsewhere, or a
  *     link to where they already are.
  *
- * Not covered: the browser's own Back button inside a single-page session.
- * Catching that needs a sentinel history entry, and a guard that corrupts the
- * back stack is worse than an unguarded back button.
+ * The browser's own Back button needs a third mechanism again. Inside a
+ * single-page session it fires neither `beforeunload` nor a click, so the only
+ * way to catch it is to have somewhere to land: while the form is dirty the
+ * hook pushes one duplicate history entry, and a Back press pops onto it rather
+ * than off the page. The entry is re-pushed each time so the guard survives
+ * repeated presses, and leaving goes to `fallbackHref` -- where the page's own
+ * Back button goes -- rather than unwinding the stack by a computed count,
+ * which is the part that goes wrong when the record was the first page opened.
+ *
+ * The cost, stated plainly: after saving, one Back press can land on that
+ * duplicate and appear to do nothing before the second leaves. A silent no-op
+ * is a smaller price than silently discarding what someone typed.
  *
  * @module shared/lib/use-unsaved-changes
  */
@@ -92,6 +101,8 @@ export interface UnsavedChangesGuard {
 export function useUnsavedChanges(
   dirty: boolean,
   navigate: (href: string) => void,
+  /** Where a caught Back press goes once the user accepts losing the changes. */
+  fallbackHref?: string,
 ): UnsavedChangesGuard {
   const [pendingHref, setPendingHref] = React.useState<string | null>(null);
 
@@ -136,6 +147,30 @@ export function useUnsavedChanges(
     document.addEventListener('click', onClick, true);
     return () => document.removeEventListener('click', onClick, true);
   }, []);
+
+  // ── The Back button ────────────────────────────────────────────────────────
+  const fallbackRef = React.useRef(fallbackHref);
+  React.useEffect(() => {
+    fallbackRef.current = fallbackHref;
+  }, [fallbackHref]);
+
+  React.useEffect(() => {
+    if (!dirty || typeof window === 'undefined') return;
+
+    // Somewhere to land. Without this the first Back press has already left the
+    // page by the time anything could ask about it.
+    window.history.pushState({ unusonicUnsavedGuard: true }, '', window.location.href);
+
+    const onPopState = () => {
+      if (!dirtyRef.current) return;
+      // Put the landing place back, so a second press is caught too.
+      window.history.pushState({ unusonicUnsavedGuard: true }, '', window.location.href);
+      setPendingHref(fallbackRef.current ?? window.location.pathname);
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [dirty]);
 
   const guard = React.useCallback(
     (href: string) => {

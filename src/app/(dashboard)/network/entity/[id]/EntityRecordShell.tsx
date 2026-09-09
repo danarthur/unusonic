@@ -159,7 +159,7 @@ export function EntityRecordShell({
     progressive disclosure is the fastest way to teach someone to dismiss the
     dialog without reading it.
   */
-  const { pendingHref, cancel, confirm, guard } = useUnsavedChanges(dirty, navigate);
+  const { pendingHref, cancel, confirm, guard } = useUnsavedChanges(dirty, navigate, returnPath);
 
   return (
     <div className="min-h-screen bg-[var(--stage-void)] pb-32">

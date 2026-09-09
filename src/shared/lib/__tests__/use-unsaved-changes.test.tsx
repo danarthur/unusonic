@@ -177,3 +177,63 @@ describe('useUnsavedChanges', () => {
     expect(result.current.pendingHref).toBeNull();
   });
 });
+
+describe('useUnsavedChanges and the Back button', () => {
+  it('gives a Back press somewhere to land while the form is dirty', () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderHook(() => useUnsavedChanges(true, vi.fn(), '/network'));
+
+    expect(pushState).toHaveBeenCalledWith(
+      { unusonicUnsavedGuard: true },
+      '',
+      window.location.href,
+    );
+    pushState.mockRestore();
+  });
+
+  it('pushes nothing while the form is clean', () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderHook(() => useUnsavedChanges(false, vi.fn(), '/network'));
+
+    expect(pushState).not.toHaveBeenCalled();
+    pushState.mockRestore();
+  });
+
+  it('asks, and offers the page’s own destination', () => {
+    const { result } = renderHook(() => useUnsavedChanges(true, vi.fn(), '/network'));
+
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+
+    expect(result.current.pendingHref).toBe('/network');
+  });
+
+  it('restores the landing place, so a second press is caught too', () => {
+    renderHook(() => useUnsavedChanges(true, vi.fn(), '/network'));
+    const pushState = vi.spyOn(window.history, 'pushState');
+
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+
+    expect(pushState).toHaveBeenCalledTimes(1);
+    pushState.mockRestore();
+  });
+
+  it('leaves a clean form’s Back press alone', () => {
+    const { result } = renderHook(() => useUnsavedChanges(false, vi.fn(), '/network'));
+
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+
+    expect(result.current.pendingHref).toBeNull();
+  });
+
+  it('goes where the page’s own Back goes, not back by a computed count', () => {
+    // Unwinding the stack by a count is the part that breaks when the record
+    // was the first page opened in the tab.
+    const navigate = vi.fn();
+    const { result } = renderHook(() => useUnsavedChanges(true, navigate, '/network'));
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+
+    act(() => { result.current.confirm(); });
+
+    expect(navigate).toHaveBeenCalledWith('/network');
+  });
+});
