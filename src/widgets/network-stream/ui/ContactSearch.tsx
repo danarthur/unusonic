@@ -33,9 +33,13 @@ export interface ContactSearchProps {
 
 export function ContactSearch({ value, onChange, scopeLabel }: ContactSearchProps) {
   return (
-    <div className="relative w-full">
+    // Capped rather than full-bleed. Prominence is what matters -- a muted field
+    // pushes people into browsing -- but a field spanning the whole window reads
+    // as a banner rather than a control, and sits out of step with every other
+    // control on this page, which is content-width.
+    <div className="relative w-full max-w-sm">
       <Search
-        className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--stage-text-secondary)]/60"
+        className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--stage-text-secondary)]/60"
         strokeWidth={1.5}
       />
       <input
@@ -46,17 +50,16 @@ export function ContactSearch({ value, onChange, scopeLabel }: ContactSearchProp
         // thing to remember.
         placeholder={scopeLabel ? `Search in ${scopeLabel}…` : 'Search contacts…'}
         aria-label={scopeLabel ? `Search in ${scopeLabel}` : 'Search contacts'}
-        className={cn(
-          'stage-input h-9 w-full !pl-9 pr-9 text-sm',
-          'focus-visible:outline-none',
-        )}
+        // stage-input supplies its own 12px inset; the extra left room is for
+        // the icon, the right for the clear button.
+        className={cn('stage-input h-9 w-full !pl-8 !pr-8', 'focus-visible:outline-none')}
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--stage-text-secondary)] transition-colors hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--stage-text-secondary)] transition-colors hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]"
         >
           <X className="size-3.5" strokeWidth={1.5} />
         </button>

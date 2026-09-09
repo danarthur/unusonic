@@ -8,7 +8,7 @@ import { rowFactsFor } from '@/entities/network/model/row-facts';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
 import { SortControl } from './SortControl';
-import { CategoryChips, type CategoryFilter } from './CategoryChips';
+import { CategoryTabs, type CategoryFilter } from './CategoryTabs';
 import { ContactSearch } from './ContactSearch';
 import { RosterSection } from './RosterSection';
 import { FileContactControl } from './FileContactControl';
@@ -215,17 +215,21 @@ export function StreamLayout({
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
 
-      {/* One search, above everything, always present. Then narrow to one kind,
-          and order the result. */}
+      {/*
+        Navigation first, then the controls that act on what it chose. Every
+        system surveyed orders it this way -- Polaris, SAP, Salesforce, Carbon
+        all put the scope switcher above the search, nearest the page title,
+        because it decides what the rest of the page even is.
+      */}
       {!showGenesis && (
-        <div className="flex flex-col gap-3">
-          <ContactSearch
-            value={query}
-            onChange={setQuery}
-            scopeLabel={categoryOptions.find((o) => o.id === category)?.label ?? null}
-          />
+        <div className="flex flex-col gap-4">
+          <CategoryTabs value={category} onChange={setCategory} options={categoryOptions} />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CategoryChips value={category} onChange={setCategory} options={categoryOptions} />
+            <ContactSearch
+              value={query}
+              onChange={setQuery}
+              scopeLabel={categoryOptions.find((o) => o.id === category)?.label ?? null}
+            />
             <SortControl value={sortMode} onChange={setSortMode} />
           </div>
         </div>
