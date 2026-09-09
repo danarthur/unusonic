@@ -28,7 +28,7 @@ import { AccordionSection } from './entity-studio-panels';
 import { CrewSkillsSection } from './CrewSkillsSection';
 import { BusinessFunctionsSection } from './BusinessFunctionsSection';
 import { EntityKnowledgeCards } from './EntityKnowledgeCards';
-import { CrewKitSection, RosterStatusCard } from '@/widgets/network-detail';
+import { CrewKitSection, DoNotRebookCard, RosterStatusCard } from '@/widgets/network-detail';
 import { EntityRecordShell } from './EntityRecordShell';
 import { useConnectionDelete } from './use-connection-delete';
 import { coiStatus } from '@/shared/lib/crew-profile';
@@ -422,6 +422,22 @@ export function PersonRecordForm({
             carry a second copy that went through this form's Save, so the flag
             had two writers and the page could show a stale toggle after the
             card wrote. */}
+        {/* The same judgement, for someone we book rather than employ. The
+            roster's version travels inside RosterStatusCard with archive and
+            remove; a freelancer has neither, so the flag stands alone. */}
+        {!isRosterMember && details.canAssignElevatedRole && (
+          <div className="stage-panel rounded-2xl px-5 py-4" data-surface="surface">
+            <DoNotRebookCard
+              relationshipId={details.id}
+              sourceOrgId={sourceOrgId}
+              flagged={details.doNotRebook ?? false}
+              setByName={details.lastModifiedByName}
+              setAt={details.lastModifiedAt}
+              onSaved={() => router.refresh()}
+            />
+          </div>
+        )}
+
         {isRosterMember && details.canAssignElevatedRole && (
           <RosterStatusCard
             details={details}

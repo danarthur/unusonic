@@ -1,5 +1,6 @@
 'use server';
 
+import { BOOKABLE_EDGE_TYPES, orgEndOf } from '@/entities/cortex/model/bookable-edges';
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
@@ -185,9 +186,20 @@ export async function archiveRosterMember(
 // ─── setDoNotRebook ───────────────────────────────────────────────────────────
 
 /**
- * Sets the `do_not_rebook` flag on a ROSTER_MEMBER edge context_data.
- * Triggers an amber indicator on the NetworkCard and blocks the member from
- * appearing in crew scheduling suggestions.
+ * Sets the `do_not_rebook` flag on a relationship's context_data. Triggers the
+ * amber indicator on the contact card and blocks the person from appearing in
+ * crew scheduling suggestions.
+ *
+ * Used to be roster-only, on both writers, while every READER already handled
+ * any edge type -- so a freelancer could be flagged by the card and never
+ * flagged by a human. The comment on `isFlagged` had already argued the point:
+ * outside relationships are "where 'never again' is the more consequential
+ * judgement, and the ones most likely to be re-booked by someone who was not
+ * there the first time".
+ *
+ * Still owner/admin only: `patch_relationship_context` requires it, and one
+ * person deciding the workspace will never hire someone again should be a
+ * decision with a name on it.
  */
 export async function setDoNotRebook(
   relationshipId: string,
@@ -202,20 +214,20 @@ export async function setDoNotRebook(
   const { data: edge } = await supabase
     .schema('cortex')
     .from('relationships')
-    .select('id, source_entity_id, target_entity_id')
+    .select('id, source_entity_id, target_entity_id, relationship_type')
     .eq('id', relationshipId)
-    .eq('relationship_type', 'ROSTER_MEMBER')
+    .in('relationship_type', [...BOOKABLE_EDGE_TYPES])
     .maybeSingle();
 
-  if (!edge) return { ok: false, error: 'Member not found.' };
-  if (edge.target_entity_id !== auth.orgDirEntityId) {
-    return { ok: false, error: 'Member not found.' };
+  if (!edge) return { ok: false, error: 'Not found.' };
+  if (orgEndOf(edge) !== auth.orgDirEntityId) {
+    return { ok: false, error: 'Not found.' };
   }
 
   const { error: rpcErr } = await supabase.rpc('patch_relationship_context', {
     p_source_entity_id: edge.source_entity_id,
     p_target_entity_id: edge.target_entity_id,
-    p_relationship_type: 'ROSTER_MEMBER',
+    p_relationship_type: edge.relationship_type,
     p_patch: { do_not_rebook: value },
   });
 

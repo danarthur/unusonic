@@ -16,9 +16,9 @@ import { Button } from '@/shared/ui/button';
 import {
   archiveRosterMember,
   removeRosterMember,
-  setDoNotRebook,
 } from '@/features/network-data';
 import { deployInvites } from '@/features/team-invite/api/actions';
+import { DoNotRebookCard } from '../DoNotRebookCard';
 import type { NodeDetail } from '@/features/network-data';
 
 export function InviteCard({
@@ -109,21 +109,6 @@ export function RosterStatusCard({
   const [removeError, setRemoveError] = React.useState<string | null>(null);
   const [forceCount, setForceCount] = React.useState<number | null>(null);
 
-  // DNR state
-  const [dnrSaving, setDnrSaving] = React.useState(false);
-  const [dnrError, setDnrError] = React.useState<string | null>(null);
-
-  const handleDnrToggle = async () => {
-    setDnrSaving(true);
-    setDnrError(null);
-    const result = await setDoNotRebook(details.id, sourceOrgId, !doNotRebook);
-    setDnrSaving(false);
-    if (result.ok) {
-      onSaved();
-    } else {
-      setDnrError(result.error);
-    }
-  };
 
   const handleArchive = async () => {
     setArchiving(true);
@@ -158,48 +143,14 @@ export function RosterStatusCard({
         Roster actions
       </h3>
 
-      {/* Do-not-rebook */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1">
-            <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">Do not rebook</p>
-            <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
-              Flags this person in scheduling suggestions.
-            </p>
-          </div>
-          {doNotRebook ? (
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[var(--color-unusonic-warning)]/15 px-2.5 py-1 text-xs font-medium text-[var(--color-unusonic-warning)]">
-                Flagged
-              </span>
-              <button
-                type="button"
-                onClick={handleDnrToggle}
-                disabled={dnrSaving}
-                className="rounded-lg px-2.5 py-1 text-xs text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] transition-colors disabled:opacity-[0.45]"
-              >
-                Clear
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleDnrToggle}
-              disabled={dnrSaving}
-              className="rounded-lg border border-[var(--stage-edge-top)] px-3 py-1.5 text-xs text-[var(--stage-text-secondary)] hover:border-[var(--color-unusonic-warning)]/50 hover:text-[var(--color-unusonic-warning)] transition-colors disabled:opacity-[0.45]"
-            >
-              Flag do not rebook
-            </button>
-          )}
-        </div>
-        {doNotRebook && details.lastModifiedByName && (
-          <p className="text-xs text-[var(--stage-text-tertiary)]">
-            Set by {details.lastModifiedByName}
-            {details.lastModifiedAt ? ` · ${new Date(details.lastModifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
-          </p>
-        )}
-        {dnrError && <p role="alert" className="text-[length:var(--stage-label-size)] text-[var(--color-unusonic-error)]">{dnrError}</p>}
-      </div>
+      <DoNotRebookCard
+        relationshipId={details.id}
+        sourceOrgId={sourceOrgId}
+        flagged={doNotRebook}
+        setByName={details.lastModifiedByName}
+        setAt={details.lastModifiedAt}
+        onSaved={onSaved}
+      />
 
       {/* Archive / Unarchive */}
       <div className="space-y-1 pt-1 border-t border-[var(--stage-edge-top)]">

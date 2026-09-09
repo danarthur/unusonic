@@ -8,3 +8,4 @@ export { AionScoutInput } from './ui/AionScoutInput';
 export { AionScoutInput as AionInput } from './ui/AionScoutInput';
 export { CrewKitSection } from './ui/CrewKitSection';
 export { RosterStatusCard } from './ui/network-detail-sheet/roster-actions';
+export { DoNotRebookCard } from './ui/DoNotRebookCard';
