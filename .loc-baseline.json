@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T22:35:56.332Z",
+  "generatedAt": "2026-09-09T23:20:03.379Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -20,10 +20,10 @@
     "src/app/(dashboard)/(features)/catalog/page-client.tsx": 680,
     "src/app/(dashboard)/(features)/events/[id]/run-of-show/run-of-show-client.tsx": 573,
     "src/app/(dashboard)/(features)/events/actions/compile-and-send-day-sheet.ts": 399,
-    "src/app/(dashboard)/(features)/events/actions/deal-actions.ts": 375,
+    "src/app/(dashboard)/(features)/events/actions/deal-actions.ts": 384,
     "src/app/(dashboard)/(features)/events/actions/deal-crew/main.ts": 887,
     "src/app/(dashboard)/(features)/events/actions/deal-crew/search.ts": 400,
-    "src/app/(dashboard)/(features)/events/actions/deal-stakeholders.ts": 741,
+    "src/app/(dashboard)/(features)/events/actions/deal-stakeholders.ts": 747,
     "src/app/(dashboard)/(features)/events/actions/follow-up-actions.ts": 611,
     "src/app/(dashboard)/(features)/events/actions/get-aion-card-for-deal.ts": 833,
     "src/app/(dashboard)/(features)/events/actions/get-crm-gigs.ts": 382,
@@ -39,7 +39,7 @@
     "src/app/(dashboard)/(features)/events/components/close-out-card.tsx": 578,
     "src/app/(dashboard)/(features)/events/components/confirmed-crew-row.tsx": 580,
     "src/app/(dashboard)/(features)/events/components/conflicts-panel.tsx": 514,
-    "src/app/(dashboard)/(features)/events/components/create-gig-modal.tsx": 943,
+    "src/app/(dashboard)/(features)/events/components/create-gig-modal.tsx": 935,
     "src/app/(dashboard)/(features)/events/components/create-gig-modal/date-stage.tsx": 1098,
     "src/app/(dashboard)/(features)/events/components/create-gig-modal/feasibility-chip.tsx": 743,
     "src/app/(dashboard)/(features)/events/components/crew-detail-rail.tsx": 837,

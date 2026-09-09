@@ -35,6 +35,7 @@ import { getLinkedPeople, type LinkedPairing, type LinkedPerson } from '@/featur
 import { setLinkedStatus } from '@/features/network-data/api/set-linked-status';
 import { EntityAvatar } from './EntityAvatar';
 import { AddLinkedPerson } from './AddLinkedPerson';
+import { EndDatePrompt, today } from './EndDatePrompt';
 
 const PAIRING_LABEL: Record<LinkedPairing, string> = {
   romantic: 'Partner',
@@ -76,6 +77,9 @@ export function LinkedPeople({
   className,
 }: LinkedPeopleProps) {
   const queryClient = useQueryClient();
+  // Which chip is asking for a date. Restoring stays one click -- there is no
+  // date to give back.
+  const [endingFor, setEndingFor] = React.useState<string | null>(null);
   const { data } = useQuery({
     queryKey: queryKeys.entities.linkedPeople(workspaceId, entityId),
     queryFn: () => getLinkedPeople(entityId),
@@ -87,13 +91,14 @@ export function LinkedPeople({
     person: LinkedPerson,
     status: 'current' | 'former',
     announce = true,
+    /** The day it actually ended, which is often not the day you heard. */
+    endedOn?: string,
   ) => {
-    const today = new Date().toISOString().slice(0, 10);
     const result = await setLinkedStatus(
       entityId,
       person.entityId,
       status,
-      status === 'former' ? today : null,
+      status === 'former' ? endedOn ?? today() : null,
     );
     if (!result.ok) {
       toast.error(result.error);
@@ -164,10 +169,26 @@ export function LinkedPeople({
             strokeWidth={1.5}
           />
           </Link>
-          {editable && (
+          {editable && endingFor === person.entityId && (
+            <EndDatePrompt
+              name={person.name}
+              onCancel={() => setEndingFor(null)}
+              onConfirm={(endedOn) => {
+                setEndingFor(null);
+                void setStatus(person, 'former', true, endedOn);
+              }}
+            />
+          )}
+          {editable && endingFor !== person.entityId && (
             <button
               type="button"
-              onClick={() => void setStatus(person, person.status === 'former' ? 'current' : 'former')}
+              onClick={() => {
+                if (person.status === 'former') {
+                  void setStatus(person, 'current');
+                } else {
+                  setEndingFor(person.entityId);
+                }
+              }}
               aria-label={
                 person.status === 'former'
                   ? `Restore ${person.name} as ${PAIRING_LABEL[person.pairing].toLowerCase()}`

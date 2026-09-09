@@ -1,6 +1,7 @@
 'use server';
  
 
+import { syncDealMainContact } from './sync-deal-main-contact';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { resolveWorkspaceOrgEntityId } from '@/entities/organization/api/resolve-workspace-org-entity';
@@ -416,6 +417,11 @@ export async function setPrimaryHost(
     .eq('id', targetStakeholderId)
     .eq('deal_id', dealId);
   if (promoteErr) return { success: false, error: promoteErr.message };
+
+  // The deal is filed under whoever is primary, so the column that answers
+  // "who is this for" has to follow the star rather than drift behind it.
+  const synced = await syncDealMainContact(dealId);
+  if (!synced.ok) console.error('[CRM] setPrimaryHost main_contact sync:', synced.error);
 
   return {
     success: true,

@@ -140,17 +140,44 @@ describe('<LinkedPeople /> ending a link', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('ends the link with today’s date, and never deletes it', async () => {
+  it('asks when it ended rather than assuming today', async () => {
+    // September is when you were told; February is when it happened. Stamping
+    // the day you heard puts a wrong fact in the record and calls it history.
     getLinkedPeople.mockResolvedValue([JANE]);
     renderChips(true);
-    const button = await screen.findByRole('button', { name: /Mark Jane Okafor as former partner/ });
+    fireEvent.click(await screen.findByRole('button', { name: /Mark Jane Okafor as former partner/ }));
 
-    fireEvent.click(button);
+    const date = await screen.findByLabelText(/Date Jane Okafor stopped being linked/);
+    // Nothing is written until the date is confirmed.
+    expect(setLinkedStatus).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(setLinkedStatus).toHaveBeenCalled());
-    const [self, partner, status, endedOn] = setLinkedStatus.mock.calls[0];
-    expect([self, partner, status]).toEqual(['ent-a', 'ent-b', 'former']);
-    expect(endedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    fireEvent.change(date, { target: { value: '2026-02-14' } });
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Jane Okafor is a former link/ }));
+
+    await waitFor(() =>
+      expect(setLinkedStatus).toHaveBeenCalledWith('ent-a', 'ent-b', 'former', '2026-02-14'),
+    );
+  });
+
+  it('defaults the date to today, because that is usually right', async () => {
+    getLinkedPeople.mockResolvedValue([JANE]);
+    renderChips(true);
+    fireEvent.click(await screen.findByRole('button', { name: /Mark Jane Okafor as former/ }));
+
+    const date = await screen.findByLabelText(/Date Jane Okafor stopped being linked/);
+    expect((date as HTMLInputElement).value).toBe(new Date().toISOString().slice(0, 10));
+  });
+
+  it('writes nothing if the prompt is dismissed', async () => {
+    getLinkedPeople.mockResolvedValue([JANE]);
+    renderChips(true);
+    fireEvent.click(await screen.findByRole('button', { name: /Mark Jane Okafor as former/ }));
+    await screen.findByLabelText(/Date Jane Okafor stopped being linked/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(setLinkedStatus).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/stopped being linked/)).toBeNull();
   });
 
   it('offers an undo rather than asking first', async () => {
@@ -159,6 +186,9 @@ describe('<LinkedPeople /> ending a link', () => {
     getLinkedPeople.mockResolvedValue([JANE]);
     renderChips(true);
     fireEvent.click(await screen.findByRole('button', { name: /Mark Jane Okafor as former/ }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Confirm Jane Okafor is a former link/ }),
+    );
 
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
     expect(toastSuccess.mock.calls[0][1].action.label).toBe('Undo');
