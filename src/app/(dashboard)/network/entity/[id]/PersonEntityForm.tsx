@@ -2,19 +2,14 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Save } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { updateIndividualEntity } from '@/app/(dashboard)/(features)/events/actions/update-individual-entity';
 import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/actions/reclassify-client-entity';
 import type { IndividualAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
-import { EntityProductions } from '@/widgets/network-detail/ui/EntityProductions';
-import { EntityMoney } from '@/widgets/network-detail/ui/EntityMoney';
-import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { EntityRecordShell } from './EntityRecordShell';
 import { toast } from 'sonner';
 
 const LABEL = 'stage-label';
@@ -79,46 +74,20 @@ export function PersonEntityForm({
   };
 
   return (
-    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)] border-b border-[var(--stage-edge-subtle)] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" strokeWidth={1.5} />
-          </Button>
-          <div>
-            <p className="stage-label">
-              Individual profile
-            </p>
-            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
-              {displayName || 'Individual Client'}
-            </h1>
-          </div>
-        </div>
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={STAGE_MEDIUM}
-              className="flex items-center gap-3"
-            >
-              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Unsaved changes</span>
-              <Button
-                onClick={handleSave}
-                disabled={isPending}
-                className="gap-2 stage-btn stage-btn-primary"
-              >
-                <Save className="size-4" strokeWidth={1.5} />
-                Save
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        {details.subjectEntityId && workspaceId && (
+    <EntityRecordShell
+      entityId={details.subjectEntityId ?? null}
+      entityType="person"
+      workspaceId={workspaceId ?? null}
+      name={displayName || 'Individual Client'}
+      eyebrow="Individual profile"
+      avatarUrl={details.identity.avatarUrl}
+      avatarType="person"
+      returnPath={returnPath}
+      dirty={hasChanges}
+      saving={isPending}
+      onSave={handleSave}
+    >
+      {details.subjectEntityId && workspaceId && (
           <EntityOverviewCards
             workspaceId={workspaceId}
             entityId={details.subjectEntityId}
@@ -171,27 +140,6 @@ export function PersonEntityForm({
           </div>
         </section>
 
-        {details.subjectEntityId && (
-          <>
-            {workspaceId && (
-              <EntityProductions
-                workspaceId={workspaceId}
-                entityId={details.subjectEntityId}
-                variant="full"
-              />
-            )}
-            <EntityMoney entityId={details.subjectEntityId} variant="full" />
-          </>
-        )}
-
-        {details.subjectEntityId && workspaceId && (
-          <EntityDocumentsCard
-            entityId={details.subjectEntityId}
-            entityType="person"
-            workspaceId={workspaceId}
-          />
-        )}
-
         <section className="stage-panel rounded-2xl overflow-hidden" data-surface="surface">
           <div className="px-5 py-4 border-b border-[var(--stage-edge-subtle)]">
             <h3 className="stage-label">
@@ -226,7 +174,6 @@ export function PersonEntityForm({
             </div>
           </div>
         </section>
-      </div>
-    </div>
+    </EntityRecordShell>
   );
 }

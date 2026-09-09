@@ -120,8 +120,15 @@ export function EntityOverviewCards({
 
       <Zone label="What we've done together">
         {/* Every entity type, now that one reader answers for all of them. A
-            company used to be routed to a different, shorter component. */}
-        <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="summary" />
+            company used to be routed to a different, shorter component.
+
+            Only in the sheet. On the page the records rail carries the full
+            productions list, and an individual's page was rendering both --
+            this summary and the full list underneath it. One number, one
+            place: the rail owns productions wherever the rail exists. */}
+        {density === 'sheet' && (
+          <EntityProductions workspaceId={workspaceId} entityId={entityId} variant="summary" />
+        )}
         {/* Reciprocity runs at both levels: who feeds us, who we feed. */}
         <ReferralsCard workspaceId={workspaceId} entityId={entityId} />
       </Zone>

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
-  Save,
   User,
   Briefcase,
   ShieldCheck,
@@ -43,9 +42,9 @@ import { AvatarUpload } from '@/features/team-invite/ui/AvatarUpload';
 import { deployInvites } from '@/features/team-invite/api/actions';
 import type { NodeDetail } from '@/features/network-data';
 import type { PersonAttrs } from '@/shared/lib/entity-attrs';
-import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { AccordionSection } from './entity-studio-panels';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
+import { EntityRecordShell } from './EntityRecordShell';
 import type { CrewSkillDTO, SkillLevel } from '@/entities/talent';
 import { coiStatus } from '@/shared/lib/crew-profile';
 
@@ -372,50 +371,20 @@ export function EmployeeEntityForm({
   };
 
   return (
-    <div className="min-h-screen bg-[var(--stage-void)] relative pb-24">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)] border-b border-[var(--stage-edge-subtle)]/50 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" strokeWidth={1.5} />
-          </Button>
-          <div>
-            <p className="stage-label">
-              Roster member
-            </p>
-            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
-              {displayName}
-            </h1>
-          </div>
-        </div>
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={STAGE_MEDIUM}
-              className="flex items-center gap-3"
-            >
-              <span className="hidden sm:block text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Unsaved changes</span>
-              <Button
-                onClick={handleSave}
-                disabled={isPending}
-                variant="outline"
-                size="sm"
-                className="gap-2 stage-btn stage-btn-primary"
-              >
-                <Save className="size-4" strokeWidth={1.5} />
-                Save
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      {/* ── Invite banner ────────────────────────────────────────────────── */}
-      {isGhostMember && (
-        <div className="max-w-2xl mx-auto px-6 pt-6">
+    <EntityRecordShell
+      entityId={entityId}
+      entityType="person"
+      workspaceId={workspaceId ?? null}
+      name={displayName}
+      eyebrow="Roster member"
+      avatarUrl={avatarUrl || details.identity.avatarUrl}
+      avatarType="person"
+      returnPath={returnPath}
+      dirty={hasChanges}
+      saving={isPending}
+      onSave={handleSave}
+      banner={
+        isGhostMember ? (
           <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface)] p-4">
             <div className="min-w-0">
               <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">
@@ -445,11 +414,9 @@ export function EmployeeEntityForm({
               </span>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-4">
+        ) : null
+      }
+    >
 
         {/* 0a — Overview cards (Brief, Working notes, Captures, Productions) */}
         {workspaceId && (
@@ -888,16 +855,6 @@ export function EmployeeEntityForm({
           </div>
         </AccordionSection>
 
-        {/* 8 — Documents */}
-        {details.subjectEntityId && workspaceId && (
-          <EntityDocumentsCard
-            entityId={details.subjectEntityId}
-            entityType="person"
-            workspaceId={workspaceId}
-          />
-        )}
-
-      </div>
-    </div>
+    </EntityRecordShell>
   );
 }

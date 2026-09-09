@@ -4,14 +4,14 @@ import * as React from 'react';
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Save, User, Briefcase, Star, Loader2, X, Plus, Trash2, Landmark } from 'lucide-react';
+import { User, Briefcase, Star, Loader2, X, Plus, Trash2, Landmark } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
-import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { AccordionSection } from './entity-studio-panels';
+import { EntityRecordShell } from './EntityRecordShell';
 import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { softDeleteGhostRelationship } from '@/features/network-data';
 import { updatePreferredPerson } from '@/features/network-data/api/update-preferred-person';
@@ -84,6 +84,16 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
   const [removing, setRemoving] = React.useState(false);
 
   const [isPending, startTransition] = useTransition();
+
+  // Save writes exactly these five fields; skills and capabilities commit the
+  // moment they change. Comparing against what loaded is more honest than a
+  // markChanged() on every setter, and cannot drift when a field is added.
+  const hasChanges =
+    firstName !== (initialAttrs?.first_name ?? '') ||
+    lastName !== (initialAttrs?.last_name ?? '') ||
+    email !== (initialAttrs?.email ?? '') ||
+    phone !== (initialAttrs?.phone ?? '') ||
+    jobTitle !== (initialAttrs?.job_title ?? '');
 
   // Load skills + presets + capabilities on mount
   React.useEffect(() => {
@@ -195,41 +205,20 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
   );
 
   return (
-    <div className="min-h-screen bg-[var(--stage-void)]">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)] border-b border-[var(--stage-edge-subtle)] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" strokeWidth={1.5} />
-          </Button>
-          <div>
-            <p className="stage-label">
-              Preferred freelancer
-            </p>
-            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
-              {[firstName, lastName].filter(Boolean).join(' ') || details.identity.name}
-            </h1>
-          </div>
-        </div>
-        <AnimatePresence>
-          {isPending && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={STAGE_MEDIUM}
-              className="flex items-center gap-3"
-            >
-              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Saving...</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      {/* Body */}
-      <div className="mx-auto max-w-2xl px-6 py-8 pb-32 space-y-3">
-
-          {/* Overview cards — Brief, Working notes, Captures, Productions */}
+    <EntityRecordShell
+      entityId={entityId || null}
+      entityType="person"
+      workspaceId={workspaceId ?? null}
+      name={[firstName, lastName].filter(Boolean).join(' ') || details.identity.name}
+      eyebrow="Preferred freelancer"
+      avatarUrl={details.identity.avatarUrl}
+      avatarType="person"
+      returnPath={returnPath}
+      dirty={hasChanges}
+      saving={isPending}
+      onSave={handleSave}
+    >
+          {/* Overview cards — Brief, Working notes, Captures */}
           {workspaceId && entityId && (
             <EntityOverviewCards
               workspaceId={workspaceId}
@@ -390,15 +379,6 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
             )}
           </AccordionSection>
 
-          {/* Documents */}
-          {entityId && workspaceId && (
-            <EntityDocumentsCard
-              entityId={entityId}
-              entityType="person"
-              workspaceId={workspaceId}
-            />
-          )}
-
           {/* Business Functions */}
           <AccordionSection label="Business functions" icon={Landmark} defaultOpen>
             <div className="flex flex-wrap gap-2">
@@ -444,10 +424,11 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
             )}
           </AccordionSection>
 
-        </div>
-
-      {/* Footer */}
-      <div className="border-t border-[var(--stage-edge-subtle)] bg-[var(--stage-void)] px-6 py-4 flex items-center justify-between gap-3">
+      {/* Removing them from preferred is not a form field, so it sits below the
+          form rather than inside it. Save lives in the shell header now -- this
+          page used to carry an always-on Save at the bottom while every other
+          subtype's appeared on dirty in the header. */}
+      <div className="flex items-center gap-3 pt-2">
         {/* Remove from preferred */}
         <AnimatePresence mode="wait">
           {confirmRemove ? (
@@ -498,16 +479,7 @@ export function FreelancerEntityForm({ details, sourceOrgId, initialAttrs, retur
             </motion.div>
           )}
         </AnimatePresence>
-
-        <Button
-          onClick={handleSave}
-          disabled={isPending}
-          className="h-9 gap-2 rounded-xl px-4 text-sm font-medium stage-btn stage-btn-primary disabled:opacity-[0.45]"
-        >
-          {isPending ? <Loader2 className="size-4 animate-spin" strokeWidth={1.5} /> : <Save className="size-4" strokeWidth={1.5} />}
-          Save
-        </Button>
       </div>
-    </div>
+    </EntityRecordShell>
   );
 }

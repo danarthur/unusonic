@@ -3,18 +3,13 @@
 import * as React from 'react';
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft,
-  Save,
-  Globe,
   Building2,
   Radar,
   Tag,
   DollarSign,
   Users,
   FileText,
-  ChevronDown,
   RotateCcw,
   Trash2,
 } from 'lucide-react';
@@ -36,17 +31,14 @@ import { FreelancerEntityForm } from './FreelancerEntityForm';
 import { PersonEntityForm } from './PersonEntityForm';
 import { CoupleEntityForm } from './CoupleEntityForm';
 import { AccordionSection } from './entity-studio-panels';
+import { EntityRecordShell } from './EntityRecordShell';
 import { VenueSpecsEditor } from './VenueSpecsEditor';
-import { EntityRecordsAside } from './EntityRecordsAside';
 import { ColorTuner } from '@/features/org-identity';
 import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
-import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
-import { cn } from '@/shared/lib/utils';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 const LABEL = 'stage-label';
 
@@ -377,66 +369,19 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
   };
 
   return (
-    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)]  border-b border-[var(--stage-edge-subtle)] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" strokeWidth={1.5} />
-          </Button>
-          {/*
-            Identity, rendered the same way it is on the card and in the panel.
-            It is the one thing meant to repeat across the three surfaces --
-            seeing the same mark is how you know a click kept you on the same
-            person. The eyebrow used to read "Profile", which named the page
-            rather than the entity, and so said nothing.
-          */}
-          <div className="flex items-center gap-3">
-            <EntityAvatar
-              name={name || details.identity.name || ''}
-              avatarUrl={details.identity.avatarUrl}
-              entityType={details.entityDirectoryType as 'person' | 'company' | 'venue' | 'couple' | undefined}
-            />
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
-                {name || 'Untitled Entity'}
-              </h1>
-              <p className="truncate stage-label">{details.identity.label}</p>
-            </div>
-          </div>
-        </div>
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={STAGE_MEDIUM}
-              className="flex items-center gap-3"
-            >
-              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Unsaved changes</span>
-              <Button
-                onClick={handleSave}
-                disabled={isPending}
-                className="gap-2 stage-btn stage-btn-primary"
-              >
-                <Save className="size-4" strokeWidth={1.5} />
-                Save
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        {/*
-          Two columns, because width is the whole reason this page exists
-          alongside the panel. A drawer stacks; a page juxtaposes -- you change
-          a fact on the left while the history that justifies it stays in view
-          on the right. One column below lg, where the page has no width
-          advantage to offer and the panel is already full-screen anyway.
-        */}
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-          <div className="min-w-0 space-y-3">
+    <EntityRecordShell
+      entityId={details.subjectEntityId ?? null}
+      entityType={(details.entityDirectoryType as 'person' | 'company' | 'venue' | null) ?? 'company'}
+      workspaceId={workspaceId ?? null}
+      name={name || details.identity.name || ''}
+      eyebrow={details.identity.label}
+      avatarUrl={details.identity.avatarUrl}
+      avatarType={details.entityDirectoryType as 'person' | 'company' | 'venue' | 'couple' | undefined}
+      returnPath={returnPath}
+      dirty={hasChanges}
+      saving={isPending}
+      onSave={handleSave}
+    >
           <AccordionSection label="Identity" icon={Building2} defaultOpen>
             <div className="space-y-3">
               <div className="flex items-center gap-4">
@@ -726,15 +671,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
               </Button>
             </div>
           </section>
-          </div>
-
-          <EntityRecordsAside
-            entityId={details.subjectEntityId ?? null}
-            entityType={(details.entityDirectoryType as 'person' | 'company' | 'venue' | null) ?? null}
-            workspaceId={workspaceId ?? null}
-          />
-        </div>
-      </div>
 
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
         <DialogContent className="max-w-sm">
@@ -780,7 +716,7 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </EntityRecordShell>
   );
 }
 
