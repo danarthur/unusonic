@@ -13,8 +13,6 @@
  */
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Search } from 'lucide-react';
 
 import { NetworkCard, NetworkRow } from '@/entities/network';
 import { rowFactsFor } from '@/entities/network/model/row-facts';
@@ -25,7 +23,6 @@ import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model
 /** Cards until a section says otherwise. */
 const DEFAULT_LAYOUT = 'cards' as const;
 import type { NetworkNode } from '@/entities/network';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { ROLE_GROUPING_THRESHOLD } from '@/entities/network/model/role-vocabulary';
 import { cn } from '@/shared/lib/utils';
 
@@ -34,8 +31,6 @@ export interface CategorySectionProps {
   nodes: NetworkNode[];
   /** Shown under the title when the category is empty of search results. */
   emptyLabel?: string;
-  /** Collapsed by default for lower-traffic categories. */
-  defaultExpanded?: boolean;
   /** Role slug -> label, for the role filter. Empty disables role filtering. */
   roleLabels?: Record<string, string>;
   onNodeClick?: (node: NetworkNode) => void;
@@ -59,6 +54,18 @@ export interface CategorySectionProps {
   renderRowAction?: (node: NetworkNode) => React.ReactNode;
   /** Called after an inline edit on a row, so the page can re-read. */
   onRowChanged?: () => void;
+  /**
+   * The page's one search query.
+   *
+   * Sections used to own their own input. Three of them existed with three
+   * labels and three thresholds, each searching only its own list -- so a name
+   * filed in a section you were not looking at returned nothing, and read as
+   * nothing. Scope is a dimension of one search now, never a boundary with its
+   * own box.
+   */
+  query?: string;
+  /** Clears the page search from a section's empty state. */
+  onClearQuery?: () => void;
 }
 
 export function CategorySection({
@@ -68,8 +75,9 @@ export function CategorySection({
   layout,
   renderRowAction,
   onRowChanged,
+  query = '',
+  onClearQuery,
   emptyLabel = 'Nothing here yet.',
-  defaultExpanded = true,
   roleLabels,
   onNodeClick,
   onAffiliateClick,
@@ -77,57 +85,35 @@ export function CategorySection({
   onNodeHoverLeave,
   onTogglePreferred,
 }: CategorySectionProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const [search, setSearch] = useState('');
   const [role, setRole] = useState<string | null>(null);
 
   if (nodes.length === 0) return null;
 
   const { rolesPresent, showRoles, activeRole, shown } = resolveVisibleNodes({
-    nodes, roleLabels, search, role, sortMode,
+    nodes, roleLabels, search: query, role, sortMode,
   });
+
+  // A section whose every row was filtered out says nothing rather than
+  // printing a heading over an empty space -- the page-level empty state
+  // speaks for all of them at once.
+  if (query.trim() && shown.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          className="flex items-center gap-2 text-left"
-        >
-          <h2 className="stage-label text-[var(--stage-text-secondary)]">{title}</h2>
-          <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-            {nodes.length}
+        {/* A heading, not a control. Collapsing was a second way to do what the
+            category chips already do, and it was what made a section's search
+            disappear -- collapsed rows were unmounted, so neither this page's
+            search nor the browser's own find-in-page could reach them. */}
+        <h2 className="flex items-center gap-2 stage-label text-[var(--stage-text-secondary)]">
+          {title}
+          <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums">
+            {shown.length === nodes.length ? nodes.length : `${shown.length} of ${nodes.length}`}
           </span>
-          <ChevronDown
-            className={cn(
-              'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
-              expanded && 'rotate-180',
-            )}
-          />
-        </button>
-
-        {/* Search earns its place once a category is too long to scan. */}
-        {expanded && nodes.length > 8 && (
-          <div className="relative ml-auto">
-            <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search…"
-              aria-label={`Search ${title}`}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={cn(
-                'stage-input h-8 !pl-7 pr-3 text-xs focus-visible:outline-none',
-                search ? 'w-40' : 'w-28 focus:w-40',
-              )}
-            />
-          </div>
-        )}
+        </h2>
       </div>
 
-      {showRoles && expanded && (
+      {showRoles && (
         <RoleChipRow
           rolesPresent={rolesPresent}
           activeRole={activeRole}
@@ -136,33 +122,20 @@ export function CategorySection({
         />
       )}
 
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            key="body"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={STAGE_MEDIUM}
-            className="overflow-hidden"
-          >
-            <CategoryBody
-              shown={shown}
-              layout={layout}
-              renderRowAction={renderRowAction}
-              onRowChanged={onRowChanged}
-              onAffiliateClick={onAffiliateClick}
-              search={search}
-              emptyLabel={emptyLabel}
-              onClearSearch={() => setSearch('')}
-              onNodeClick={onNodeClick}
-              onNodeHoverEnter={onNodeHoverEnter}
-              onNodeHoverLeave={onNodeHoverLeave}
-              onTogglePreferred={onTogglePreferred}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CategoryBody
+        shown={shown}
+        layout={layout}
+        renderRowAction={renderRowAction}
+        onRowChanged={onRowChanged}
+        onAffiliateClick={onAffiliateClick}
+        search={query}
+        emptyLabel={emptyLabel}
+        onClearSearch={onClearQuery ?? (() => {})}
+        onNodeClick={onNodeClick}
+        onNodeHoverEnter={onNodeHoverEnter}
+        onNodeHoverLeave={onNodeHoverLeave}
+        onTogglePreferred={onTogglePreferred}
+      />
     </div>
   );
 }

@@ -16,14 +16,11 @@
  */
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown } from 'lucide-react';
 import { NetworkCard } from '@/entities/network';
 import type { NetworkNode } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, type SortMode } from '@/entities/network/model/sort-nodes';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { cn } from '@/shared/lib/utils';
 
 function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
@@ -47,6 +44,8 @@ function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
 
 export interface RosterSectionProps {
   nodes: NetworkNode[];
+  /** The page's one search query. This section no longer owns an input. */
+  query: string;
   label: string;
   sortMode: SortMode;
   onNodeClick?: (node: NetworkNode) => void;
@@ -57,6 +56,7 @@ export interface RosterSectionProps {
 
 export function RosterSection({
   nodes: crewNodes,
+  query,
   label,
   sortMode,
   onNodeClick,
@@ -64,11 +64,9 @@ export function RosterSection({
   onNodeHoverEnter: handleNodeHoverEnter,
   onNodeHoverLeave: handleNodeHoverLeave,
 }: RosterSectionProps) {
-  const [crewSearch, setCrewSearch] = useState('');
-  const [crewExpanded, setCrewExpanded] = useState(true);
   const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
 
-  const searchedCrewNodes = sortNodes(filterNodes(crewNodes, crewSearch), sortMode);
+  const searchedCrewNodes = sortNodes(filterNodes(crewNodes, query), sortMode);
   const roleGroups = groupByRole(searchedCrewNodes);
   // Unfiltered, so the pills keep their labels while a search is narrowing.
   const allRoleKeys = [...groupByRole(crewNodes).keys()];
@@ -80,57 +78,23 @@ export function RosterSection({
     : roleGroups;
 
   if (crewNodes.length === 0) return null;
+  // Filtered to nothing: the page-level empty state speaks for every section at
+  // once, rather than each printing a heading over empty space.
+  if (query.trim() && searchedCrewNodes.length === 0) return null;
 
   return (
   <section>
     <div className="mb-3 flex items-center justify-between gap-3">
-      <button
-        type="button"
-        onClick={() => setCrewExpanded((v) => !v)}
-        className="flex items-center gap-2 text-left group"
-      >
-        <h2 className="stage-label text-[var(--stage-text-secondary)]">
+        <h2 className="flex items-center gap-2 stage-label text-[var(--stage-text-secondary)]">
           {label}
+          <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums">
+            {searchedCrewNodes.length === crewNodes.length
+              ? crewNodes.length
+              : `${searchedCrewNodes.length} of ${crewNodes.length}`}
+          </span>
         </h2>
-        <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-          {crewNodes.length}
-        </span>
-        <ChevronDown
-          className={cn(
-            'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
-            crewExpanded && 'rotate-180'
-          )}
-        />
-      </button>
-      {crewExpanded && (
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search crew…"
-            aria-label="Search crew"
-            value={crewSearch}
-            onChange={(e) => setCrewSearch(e.target.value)}
-            className={cn(
-              'stage-input h-8 !pl-7 pr-3 text-xs',
-              'focus-visible:outline-none',
-              crewSearch ? 'w-40' : 'w-28 focus:w-40'
-            )}
-          />
-        </div>
-      )}
     </div>
 
-    <AnimatePresence>
-      {crewExpanded && (
-        <motion.div
-          key="crew-content"
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={STAGE_MEDIUM}
-          className="overflow-hidden"
-        >
           {/* Role filter pills */}
           {allRoleKeys.length > 1 && (
             <div className="mb-4 flex flex-wrap gap-1.5">
@@ -207,18 +171,21 @@ export function RosterSection({
               ))}
             </div>
           ) : (
+            // Only reachable via a role pill now: a search that matches nothing
+            // here hides the section entirely, so the page can answer once.
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <p className="stage-label text-[var(--stage-text-secondary)]">
-                No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{crewSearch}&rdquo;</span>
+                Nobody in that role right now.
               </p>
-              <button type="button" onClick={() => { setCrewSearch(''); setActiveRoleFilter(null); }} className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline">
-                Clear filter
+              <button
+                type="button"
+                onClick={() => setActiveRoleFilter(null)}
+                className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline"
+              >
+                Show everyone
               </button>
             </div>
           )}
-        </motion.div>
-      )}
-    </AnimatePresence>
   </section>
   );
 }

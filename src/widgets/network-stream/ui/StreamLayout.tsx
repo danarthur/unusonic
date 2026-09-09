@@ -3,13 +3,13 @@
 import { useCallback, useRef, useState, useTransition, useOptimistic } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown } from 'lucide-react';
 import { NetworkRow } from '@/entities/network';
 import { rowFactsFor } from '@/entities/network/model/row-facts';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
 import { SortControl } from './SortControl';
 import { CategoryChips, type CategoryFilter } from './CategoryChips';
+import { ContactSearch } from './ContactSearch';
 import { RosterSection } from './RosterSection';
 import { FileContactControl } from './FileContactControl';
 
@@ -140,10 +140,9 @@ export function StreamLayout({
     }
   }, []);
   const [, startTransition] = useTransition();
-  const [innerCircleSearch, setInnerCircleSearch] = useState('');
-  const [innerCircleExpanded, setInnerCircleExpanded] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT);
   const [category, setCategory] = useState<CategoryFilter>('all');
+  const [query, setQuery] = useState('');
 
   const [optimisticNodes, dispatchOptimistic] = useOptimistic(
     nodes,
@@ -194,7 +193,7 @@ export function StreamLayout({
   };
 
   // Inner Circle zone: search
-  const displayedInnerCircle = sortNodes(filterNodes(innerCircleNodes, innerCircleSearch), sortMode);
+  const displayedInnerCircle = sortNodes(filterNodes(innerCircleNodes, query), sortMode);
 
   // Every grid reserves its own rows; without it a section of bare names
   // renders three blank lines under each card.
@@ -216,11 +215,19 @@ export function StreamLayout({
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
 
-      {/* Narrow to one kind, and order the result. */}
+      {/* One search, above everything, always present. Then narrow to one kind,
+          and order the result. */}
       {!showGenesis && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CategoryChips value={category} onChange={setCategory} options={categoryOptions} />
-          <SortControl value={sortMode} onChange={setSortMode} />
+        <div className="flex flex-col gap-3">
+          <ContactSearch
+            value={query}
+            onChange={setQuery}
+            scopeLabel={categoryOptions.find((o) => o.id === category)?.label ?? null}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CategoryChips value={category} onChange={setCategory} options={categoryOptions} />
+            <SortControl value={sortMode} onChange={setSortMode} />
+          </div>
         </div>
       )}
       <StarredStrip
@@ -234,6 +241,7 @@ export function StreamLayout({
       {shows('roster') && (
         <RosterSection
           nodes={crewNodes}
+          query={query}
           label={labels.roster}
           sortMode={sortMode}
           onNodeClick={onNodeClick}
@@ -244,86 +252,36 @@ export function StreamLayout({
       )}
 
       {/* ── Clients — anyone on a CLIENT edge, person or company ── */}
-      {innerCircleNodes.length > 0 && shows('clients') && (
+      {displayedInnerCircle.length > 0 && shows('clients') && (
         <>
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setInnerCircleExpanded((v) => !v)}
-                className="flex items-center gap-2 text-left group"
-              >
-                <h2 className="stage-label text-[var(--stage-text-secondary)]">
-                  {labels.clients}
-                </h2>
-                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-                  {innerCircleNodes.length}
+              <h2 className="flex items-center gap-2 stage-label text-[var(--stage-text-secondary)]">
+                {labels.clients}
+                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums">
+                  {displayedInnerCircle.length === innerCircleNodes.length
+                    ? innerCircleNodes.length
+                    : `${displayedInnerCircle.length} of ${innerCircleNodes.length}`}
                 </span>
-                <ChevronDown
-                  className={cn(
-                    'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
-                    innerCircleExpanded && 'rotate-180'
-                  )}
-                />
-              </button>
-              {innerCircleExpanded && innerCircleNodes.length > 3 && (
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search partners…"
-                    aria-label="Search inner circle"
-                    value={innerCircleSearch}
-                    onChange={(e) => setInnerCircleSearch(e.target.value)}
-                    className={cn(
-                      'stage-input h-8 !pl-7 pr-3 text-xs',
-                      'focus-visible:outline-none',
-                      innerCircleSearch ? 'w-40' : 'w-28 focus:w-40'
-                    )}
+              </h2>
+            </div>
+            <div className="flex flex-col divide-y divide-[var(--stage-edge-subtle)] pb-2">
+              {displayedInnerCircle.map((node) => (
+                <div
+                  key={node.id}
+                  onMouseEnter={() => handleNodeHoverEnter(node)}
+                  onMouseLeave={handleNodeHoverLeave}
+                >
+                  <NetworkRow
+                    node={node}
+                    facts={clientFacts}
+                    onClick={() => onNodeClick?.(node)}
+                    onAffiliateClick={openAffiliate}
+                    onChanged={() => router.refresh()}
                   />
                 </div>
-              )}
+              ))}
             </div>
-            <AnimatePresence>
-              {innerCircleExpanded && (
-                <motion.div
-                  key="inner-circle-content"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={STAGE_MEDIUM}
-                  className="overflow-hidden"
-                >
-                  {displayedInnerCircle.length > 0 ? (
-                    <div className="flex flex-col divide-y divide-[var(--stage-edge-subtle)] pb-2">
-                      {displayedInnerCircle.map((node) => (
-                        <div
-                          key={node.id}
-                          onMouseEnter={() => handleNodeHoverEnter(node)}
-                          onMouseLeave={handleNodeHoverLeave}
-                        >
-                          <NetworkRow
-                            node={node}
-                            facts={clientFacts}
-                            onClick={() => onNodeClick?.(node)}
-                            onAffiliateClick={openAffiliate}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <p className="stage-label text-[var(--stage-text-secondary)]">
-                        No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{innerCircleSearch}&rdquo;</span>
-                      </p>
-                      <button type="button" onClick={() => setInnerCircleSearch('')} className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline">
-                        Clear filter
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </section>
         </>
       )}
@@ -363,6 +321,8 @@ export function StreamLayout({
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
               sortMode={sortMode}
+              query={query}
+              onClearQuery={() => setQuery('')}
               onRowChanged={() => router.refresh()}
             />
             <CategorySection
@@ -375,6 +335,8 @@ export function StreamLayout({
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
               sortMode={sortMode}
+              query={query}
+              onClearQuery={() => setQuery('')}
               onRowChanged={() => router.refresh()}
               /* Rooms, not faces. A venue's deciding fact is where it is, an
                  avatar tile says nothing about it, and there are more of them
@@ -386,7 +348,6 @@ export function StreamLayout({
               layout="rows"
               title="Unsorted"
               nodes={shows('unsorted') ? unsortedNodes : EMPTY_NODES}
-              defaultExpanded={false}
               emptyLabel="Nothing waiting to be filed."
               // A lane needs a way out, or it only grows.
               renderRowAction={(node) => <FileContactControl node={node} />}
@@ -396,6 +357,8 @@ export function StreamLayout({
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
               sortMode={sortMode}
+              query={query}
+              onClearQuery={() => setQuery('')}
               onRowChanged={() => router.refresh()}
             />
           </motion.div>
