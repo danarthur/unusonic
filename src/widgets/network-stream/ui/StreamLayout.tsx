@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown } from 'lucide-react';
 import { NetworkCard, NetworkRow } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
+import { rowFactsFor } from '@/entities/network/model/row-facts';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
 import { SortControl } from './SortControl';
@@ -224,6 +225,7 @@ export function StreamLayout({
   // Every grid reserves its own rows; without it a section of bare names
   // renders three blank lines under each card.
   const sortedStarred = sortNodes(starredNodes, sortMode);
+  const clientFacts = rowFactsFor(displayedInnerCircle);
 
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
@@ -446,6 +448,7 @@ export function StreamLayout({
                         >
                           <NetworkRow
                             node={node}
+                            facts={clientFacts}
                             onClick={() => onNodeClick?.(node)}
                             onAffiliateClick={openAffiliate}
                           />

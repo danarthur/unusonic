@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search } from 'lucide-react';
 
 import { NetworkCard, NetworkRow } from '@/entities/network';
+import { rowFactsFor } from '@/entities/network/model/row-facts';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { filterNodes } from '@/entities/network/model/search-node';
 import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
@@ -276,6 +277,9 @@ function CategoryBody({
   }
 
   if (layout === 'rows') {
+    // One column set for the whole list: Material's rule is that content may
+    // run ragged between rows but position may not.
+    const facts = rowFactsFor(shown);
     return (
       // Divided rather than gapped: a hairline is what tells the eye where one
       // row ends when they sit flush. Padded at the foot so the last row does
@@ -289,6 +293,7 @@ function CategoryBody({
           >
             <NetworkRow
               node={node}
+              facts={facts}
               onClick={() => onNodeClick?.(node)}
               onAffiliateClick={onAffiliateClick}
             />

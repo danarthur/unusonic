@@ -27,29 +27,19 @@
 import * as React from 'react';
 import { cn } from '@/shared/lib/utils';
 import { EntityAvatar } from './EntityAvatar';
-import { isFlagged, shapeOf } from '../model/card-slots';
+import { isFlagged } from '../model/card-slots';
+import type { RowFact } from '../model/row-facts';
 import { formatUsd, formatDay, formatUpcoming, parseShowDate } from '../model/format-facts';
 import type { NetworkNode } from '../model/types';
 
-/**
- * Which facts a row carries, by what the entity is.
- *
- * A venue has no rate and never owes us anything, so printing those columns on
- * eighty venue rows is eighty rows of dead space -- the same mistake the card
- * made before its slots were ordered per shape. Region is not here because it
- * is already the subtitle: a venue's deciding fact belongs next to its name,
- * not out on the right with the numbers.
- */
-const FACTS_BY_SHAPE: Record<'person' | 'company' | 'venue', RowFact[]> = {
-  person: ['next', 'lastShow', 'rate', 'money'],
-  company: ['next', 'lastShow', 'money'],
-  venue: ['next', 'lastShow'],
-};
-
-type RowFact = 'next' | 'lastShow' | 'rate' | 'money';
-
 export interface NetworkRowProps {
   node: NetworkNode;
+  /**
+   * Columns for the whole list this row belongs to, from rowFactsFor().
+   * Decided per list rather than per row so the columns do not shift as the
+   * eye moves down it.
+   */
+  facts: RowFact[];
   onClick?: () => void;
   onAffiliateClick?: (entityId: string) => void;
 }
@@ -194,10 +184,9 @@ function Affiliates({
   );
 }
 
-export function NetworkRow({ node, onClick, onAffiliateClick }: NetworkRowProps) {
+export function NetworkRow({ node, facts, onClick, onAffiliateClick }: NetworkRowProps) {
   const now = React.useMemo(() => new Date(), []);
   const subtitle = subtitleOf(node);
-  const facts = FACTS_BY_SHAPE[shapeOf(node)];
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
