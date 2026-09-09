@@ -17,7 +17,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileEdit, Globe } from 'lucide-react';
+import { FileEdit } from 'lucide-react';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { networkQueries } from '@/features/network-data/api/queries';
 import { queryKeys } from '@/shared/api/query-keys';
@@ -37,6 +37,8 @@ import { PromotedMetricsRow } from './PromotedMetricsRow';
 import { ContactStrip } from './network-detail-sheet/contact-strip';
 import { TransmissionPanel } from './network-detail-sheet/transmission-panel';
 import { getTabsForDetail, type TabId } from './network-detail-sheet/shared';
+import { useNeighbours, type VisibleEntry } from '@/widgets/network-stream/model/visible-order';
+import { PeekNav } from './PeekNav';
 
 interface NetworkDetailSheetProps {
   /** When provided, useQuery fetches details internally. */
@@ -57,6 +59,7 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
   const { workspaceId } = useWorkspace();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<TabId>('transmission');
+  const { previous, next, position } = useNeighbours(nodeId);
 
   // Fetch details via useQuery when nodeId/kind are provided; fall back to prop.
   // `placeholderData: keepPreviousData` holds the previous entity's payload
@@ -142,34 +145,32 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
         data-surface="surface"
       >
         <SheetHeader>
+          {/* Step through what is on screen without closing. A peek you cannot
+              move within is a cramped page: you open the wrong contact and the
+              only way to the next is to close, find your place, and open
+              again. */}
+          <PeekNav
+            previous={previous}
+            next={next}
+            position={position}
+            onGo={(entry: VisibleEntry) =>
+              router.push(`/network?nodeId=${encodeURIComponent(entry.id)}&kind=${encodeURIComponent(entry.kind)}`)
+            }
+          />
           <SheetTitle className="truncate">{details.identity.name}</SheetTitle>
           <div className="flex shrink-0 items-center gap-1">
-            {/* Ghost partner — edit their external entity profile */}
-            {isPartner && details.isGhost && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(`/network/entity/${details.id}?kind=external_partner${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
-                className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)]"
-              >
-                <FileEdit className="size-4" strokeWidth={1.5} />
-                Edit
-              </Button>
-            )}
-            {/* Internal employee / contractor — navigate to their person entity studio */}
-            {!isPartner && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(`/network/entity/${details.id}?kind=${details.kind}${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
-                className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)]"
-              >
-                <FileEdit className="size-4" strokeWidth={1.5} />
-                Edit
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--stage-text-secondary)]" aria-label="View profile">
-              <Globe className="size-4" strokeWidth={1.5} />
+            {/* One way through, and it does not say "Edit". Edit warns you are
+                about to change something, which makes a page you might only
+                want to READ feel like a place to avoid -- and this is where the
+                full history and the documents live. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/network/entity/${details.id}?kind=${details.kind}${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
+              className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]"
+            >
+              <FileEdit className="size-4" strokeWidth={1.5} />
+              Open full profile
             </Button>
             <SheetClose />
           </div>

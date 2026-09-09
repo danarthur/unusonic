@@ -11,6 +11,7 @@ import { SortControl } from './SortControl';
 import { CategoryTabs, type CategoryFilter } from './CategoryTabs';
 import { ContactSearch } from './ContactSearch';
 import { RosterSection } from './RosterSection';
+import { usePublishVisibleOrder } from '../model/visible-order';
 import { FileContactControl } from './FileContactControl';
 
 /** Referentially stable, so filtering a section out does not churn its props. */
@@ -200,6 +201,7 @@ export function StreamLayout({
   const sortedStarred = sortNodes(starredNodes, sortMode);
   const clientFacts = rowFactsFor(displayedInnerCircle);
 
+
   // Only categories with something in them, in page order.
   const categoryOptions = ([
     { id: 'roster', label: labels.roster, count: crewNodes.length },
@@ -211,6 +213,17 @@ export function StreamLayout({
 
   /** A section renders when nothing is filtered, or when it is the one asked for. */
   const shows = (id: CategoryFilter) => category === 'all' || category === id;
+  // Publish the order on screen so the panel can step through it. Section order
+  // top to bottom, because that is the sequence being read.
+  usePublishVisibleOrder(
+    [
+      ...(shows('roster') ? filterNodes(crewNodes, query) : []),
+      ...(shows('clients') ? displayedInnerCircle : []),
+      ...(shows('vendors') ? filterNodes(vendorNodes, query) : []),
+      ...(shows('venues') ? filterNodes(venueNodes, query) : []),
+      ...(shows('unsorted') ? filterNodes(unsortedNodes, query) : []),
+    ].map((n) => ({ id: n.id, kind: n.kind })),
+  );
 
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
