@@ -8,6 +8,7 @@ import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getCurrentOrgId } from '@/features/network/api/actions';
 import { getNetworkNodeDetails } from '@/features/network-data';
+import { resolveRelationshipId } from '@/features/network-data/api/resolve-relationship-id';
 import { createClient } from '@/shared/api/supabase/server';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
@@ -59,18 +60,32 @@ async function EntityContent({ id, returnPath, kindParam }: { id: string; return
     kindParam === 'internal_employee' ? 'internal_employee'
     : kindParam === 'extended_team' ? 'extended_team'
     : 'external_partner';
-  const details = await getNetworkNodeDetails(id, kind, sourceOrgId);
+  let details = await getNetworkNodeDetails(id, kind, sourceOrgId);
+
+  // ── Second try: the id might be an ENTITY id ──────────────────────────────
+  // `getNetworkNodeDetails` takes a relationship id, and plenty of callers only
+  // have an entity one — a partner chip, a company's crew tab, an "about X"
+  // capture chip. They used to fall straight through to the read-first view,
+  // which is the same person with most of their record missing. Look the edge
+  // up and try again first.
+  let resolvedKind = kind;
+  if (!details) {
+    const resolved = await resolveRelationshipId(id, sourceOrgId);
+    if (resolved) {
+      details = await getNetworkNodeDetails(resolved.relationshipId, resolved.kind, sourceOrgId);
+      resolvedKind = resolved.kind;
+    }
+  }
 
   // ── Direct-entity fallback ────────────────────────────────────────────────
-  // `getNetworkNodeDetails` is built around workspace-to-org relationship ids.
-  // Callers that only have an ENTITY id (crew-tab clicks, `about X` capture
-  // chips, etc.) won't resolve — fall back to a minimal read-first view
-  // fetched from directory.entities directly.
+  // Now a genuine last resort: an entity this org has no edge to at all.
   if (!details) {
     return await renderDirectEntity(id, returnPath ?? '/network');
   }
 
-  if (hasExplicitKind) {
+  // Only validate a kind the CALLER asserted. When we resolved it ourselves the
+  // check is circular, and it would redirect the very cases this exists to fix.
+  if (hasExplicitKind && resolvedKind === kind) {
     if (kind === 'external_partner' && (!details.isGhost || details.kind !== 'external_partner')) {
       redirect('/network');
     }
