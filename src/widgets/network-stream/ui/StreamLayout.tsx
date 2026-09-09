@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown, Star } from 'lucide-react';
 import { NetworkCard } from '@/entities/network';
+import { reservedSlotCount } from '@/entities/network/model/card-slots';
 import { GenesisState } from './GenesisState';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -227,6 +228,12 @@ export function StreamLayout({
   // Inner Circle zone: search
   const displayedInnerCircle = searchFilter(innerCircleNodes, innerCircleSearch);
 
+  // Every grid reserves its own rows. Missing this, a section of bare names
+  // renders three blank lines under each card -- the hollow look the
+  // reservation exists to prevent, on the crew grid at the top of the page.
+  const starredSlotCount = reservedSlotCount(starredNodes);
+  const innerCircleSlotCount = reservedSlotCount(displayedInnerCircle);
+
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
 
@@ -253,6 +260,7 @@ export function StreamLayout({
                     Framer Motion animate between them. */}
                 <NetworkCard
                   node={node}
+                  slotCount={starredSlotCount}
                   onClick={() => onNodeClick?.(node)}
                   onAffiliateClick={openAffiliate}
                   onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
@@ -378,6 +386,7 @@ export function StreamLayout({
                             >
                               <NetworkCard
                                 node={node}
+                                slotCount={reservedSlotCount(groupNodes)}
                                 layoutId={`node-${node.id}`}
                                 onClick={() => onNodeClick?.(node)}
                   onAffiliateClick={openAffiliate}
@@ -466,6 +475,7 @@ export function StreamLayout({
                         >
                           <NetworkCard
                             node={node}
+                            slotCount={innerCircleSlotCount}
                             layoutId={`node-${node.id}`}
                             onClick={() => onNodeClick?.(node)}
                   onAffiliateClick={openAffiliate}

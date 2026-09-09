@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T00:39:41.992Z",
+  "generatedAt": "2026-09-09T02:18:33.800Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -117,7 +117,7 @@
     "src/app/(public)/legal/sms/page.tsx": 210,
     "src/app/(public)/legal/terms/page.tsx": 333,
     "src/app/actions/workspace.ts": 878,
-    "src/app/api/aion/capture/parse/route.ts": 768,
+    "src/app/api/aion/capture/parse/route.ts": 662,
     "src/app/api/aion/chat/route.ts": 464,
     "src/app/api/cron/follow-up-queue/route.ts": 670,
     "src/app/api/cron/payment-reminders/route.ts": 390,
@@ -187,7 +187,7 @@
     "src/widgets/network-detail/ui/CrewKitSection.tsx": 495,
     "src/widgets/network-detail/ui/DossierEditor.tsx": 893,
     "src/widgets/network-detail/ui/WorkingNotesCard.tsx": 477,
-    "src/widgets/network-stream/ui/StreamLayout.tsx": 554,
+    "src/widgets/network-stream/ui/StreamLayout.tsx": 564,
     "src/widgets/org-dashboard/ui/OrgDashboardSheet.tsx": 522
   }
 }
