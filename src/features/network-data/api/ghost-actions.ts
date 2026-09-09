@@ -278,11 +278,28 @@ export async function createGhostWithContact(
   });
   if (!ghost.ok) return { success: false, error: ghost.error };
 
-  // Update ghost org profile if we have website/email
-  if (payload.website || payload.email) {
-    const profileAttrs: Record<string, unknown> = {};
-    if (payload.website) profileAttrs.website = payload.website;
-    if (payload.email) profileAttrs.support_email = payload.email;
+  /*
+    Write everything the sheet collected. Six of these -- w9Status, coiExpiry,
+    paymentTerms, dockAddress, venuePmName, venuePmPhone -- were declared, filled
+    in, sent, and then dropped: only website and email were ever persisted.
+    Compliance and terms go into operational_settings, the bag the record page
+    reads back. The org is new, so there is nothing to merge with.
+  */
+  const profileAttrs: Record<string, unknown> = {};
+  if (payload.website) profileAttrs.website = payload.website;
+  if (payload.email) profileAttrs.support_email = payload.email;
+
+  const ops: Record<string, unknown> = {};
+  if (payload.w9Status !== undefined) ops.w9_status = payload.w9Status;
+  if (payload.coiExpiry) ops.coi_expiry = payload.coiExpiry;
+  if (payload.paymentTerms) ops.payment_terms = payload.paymentTerms;
+  if (Object.keys(ops).length > 0) profileAttrs.operational_settings = ops;
+
+  if (payload.dockAddress) profileAttrs.dock_address = payload.dockAddress;
+  if (payload.venuePmName) profileAttrs.venue_contact_name = payload.venuePmName;
+  if (payload.venuePmPhone) profileAttrs.venue_contact_phone = payload.venuePmPhone;
+
+  if (Object.keys(profileAttrs).length > 0) {
     await supabase.rpc('patch_entity_attributes', {
       p_entity_id: ghost.id,
       p_attributes: profileAttrs,

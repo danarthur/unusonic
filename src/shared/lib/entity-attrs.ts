@@ -64,14 +64,22 @@ const AddressSchema = z
 
 /**
  * OrgOperationalSettings sub-object (attributes.operational_settings).
- * Contains: tax_id, payment_terms, entity_type, doing_business_as, phone.
+ * Contains: tax_id, payment_terms, w9_status, coi_expiry, entity_type,
+ * doing_business_as, phone.
  * `entity_type` stores the Scout-written value (not in a top-level COMPANY_ATTR key —
  * see attribute-keys.ts for the NOTE on Scout-written fields).
+ *
+ * A Zod object strips what it does not name, so anything written into this bag
+ * and not listed here is silently discarded on the next save. Company
+ * compliance lives here rather than at the top of attributes because this is
+ * the bag `orgOperationalSettings` exposes to the record page.
  */
 const OperationalSettingsSchema = z
   .object({
     tax_id: z.string().nullable().optional(),
     payment_terms: z.string().nullable().optional(),
+    w9_status: z.boolean().nullable().optional(),
+    coi_expiry: z.string().nullable().optional(),
     entity_type: z.string().nullable().optional(),
     doing_business_as: z.string().nullable().optional(),
     phone: z.string().nullable().optional(),

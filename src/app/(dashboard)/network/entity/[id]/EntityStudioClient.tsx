@@ -9,33 +9,31 @@ import {
   Tag,
   DollarSign,
   Users,
-  FileText,
+  ShieldCheck,
   RotateCcw,
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
-import { Textarea } from '@/shared/ui/textarea';
 import {
   updateGhostProfile,
-  updateRelationshipNotes,
   updateRelationshipMeta,
-  addContactToGhostOrg,
   addScoutRosterToGhostOrg,
   softDeleteGhostRelationship,
 } from '@/features/network-data';
-import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
 import { PersonRecordForm } from './PersonRecordForm';
 import { PersonEntityForm } from './PersonEntityForm';
 import { CoupleEntityForm } from './CoupleEntityForm';
 import { AccordionSection } from './entity-studio-panels';
 import { EntityRecordShell } from './EntityRecordShell';
+import { EntityKnowledgeCards } from './EntityKnowledgeCards';
+import { RosterSection } from './GhostOrgRoster';
 import { VenueSpecsEditor } from './VenueSpecsEditor';
 import { ColorTuner } from '@/features/org-identity';
 import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
-import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
+import type { NodeDetail } from '@/features/network-data';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
 
@@ -150,7 +148,8 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
   const [lifecycle, setLifecycle] = React.useState(details.lifecycleStatus ?? 'active');
   const [blacklistReason, setBlacklistReason] = React.useState(details.blacklistReason ?? '');
   const [localTags, setLocalTags] = React.useState<string[]>(tags);
-  const [notes, setNotes] = React.useState(details.notes ?? '');
+  const [w9Status, setW9Status] = React.useState(Boolean(ops.w9_status ?? false));
+  const [coiExpiry, setCoiExpiry] = React.useState((ops.coi_expiry as string) ?? '');
   const [taxId, setTaxId] = React.useState((ops.tax_id as string) ?? '');
   const [paymentTerms, setPaymentTerms] = React.useState((ops.payment_terms as string) ?? '');
   const [defaultCurrency, setDefaultCurrency] = React.useState(details.orgDefaultCurrency ?? 'USD');
@@ -170,7 +169,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
     setPhone('');
     setAddress({ street: '', city: '', state: '', postal_code: '', country: '' });
     setLocalTags([]);
-    setNotes('');
     setTaxId('');
     setPaymentTerms('');
     setDefaultCurrency('USD');
@@ -245,11 +243,13 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
         formData.set('address_postal_code', mergedAddress.postal_code);
         formData.set('address_country', mergedAddress.country);
         formData.set('category', relType === 'client' ? 'client' : relType === 'partner' ? 'coordinator' : relType);
-        formData.set('taxId', taxId);
+        formData.set('w9Status', String(w9Status));
+      formData.set('coiExpiry', coiExpiry);
+      formData.set('taxId', taxId);
         formData.set('paymentTerms', paymentTerms);
         formData.set('defaultCurrency', defaultCurrency);
 
-        const [profileResult, relResult, notesResult] = await Promise.all([
+        const [profileResult, relResult] = await Promise.all([
           updateGhostProfile(ghostOrgId, formData),
           updateRelationshipMeta(relationshipId, sourceOrgId, {
             type: (relType === 'client' ? 'client_company' : relType) as 'vendor' | 'venue' | 'client_company' | 'partner',
@@ -257,13 +257,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             blacklistReason: lifecycle === 'blacklisted' ? blacklistReason : null,
             tags: mergedTags.length ? mergedTags : null,
           }),
-          updateRelationshipNotes(relationshipId, notes),
         ]);
 
         const err =
           profileResult.error ||
-          (relResult.ok === false ? relResult.error : null) ||
-          (notesResult.ok === false ? notesResult.error : null);
+          (relResult.ok === false ? relResult.error : null);
         if (err) {
           toast.error(err);
           return;
@@ -304,10 +302,15 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       relType,
       lifecycle,
       blacklistReason,
-      notes,
       taxId,
       paymentTerms,
       defaultCurrency,
+      // Enrich rebuilds the whole FormData, compliance included. Leaving these
+      // out meant a scout run after editing the W-9 would post the values the
+      // page loaded with.
+      w9Status,
+      coiExpiry,
+      router,
     ]
   );
 
@@ -332,11 +335,13 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       formData.set('address_postal_code', address.postal_code);
       formData.set('address_country', address.country);
       formData.set('category', relType === 'client' ? 'client' : relType === 'partner' ? 'coordinator' : relType);
+      formData.set('w9Status', String(w9Status));
+      formData.set('coiExpiry', coiExpiry);
       formData.set('taxId', taxId);
       formData.set('paymentTerms', paymentTerms);
       formData.set('defaultCurrency', defaultCurrency);
 
-      const [profileResult, relResult, notesResult] = await Promise.all([
+      const [profileResult, relResult] = await Promise.all([
         updateGhostProfile(ghostOrgId, formData),
         updateRelationshipMeta(relationshipId, sourceOrgId, {
           type: (relType === 'client' ? 'client_company' : relType) as 'vendor' | 'venue' | 'client_company' | 'partner',
@@ -344,10 +349,9 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
           blacklistReason: lifecycle === 'blacklisted' ? blacklistReason : null,
           tags: localTags.length ? localTags : null,
         }),
-        updateRelationshipNotes(relationshipId, notes),
       ]);
 
-      const err = profileResult.error || (relResult.ok === false ? relResult.error : null) || (notesResult.ok === false ? notesResult.error : null);
+      const err = profileResult.error || (relResult.ok === false ? relResult.error : null);
       if (err) {
         toast.error(err);
       } else {
@@ -382,6 +386,79 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       saving={isPending}
       onSave={handleSave}
     >
+          {/* What we know, above what you edit -- the same column order the
+              person pages carry. This page had none of it: no brief, no
+              captures, and a Notes accordion that was a second editor for the
+              relationship note the capture panel already composes. */}
+          {details.subjectEntityId && workspaceId && (
+            <EntityKnowledgeCards
+              workspaceId={workspaceId}
+              entityId={details.subjectEntityId}
+              entityType={(details.entityDirectoryType as 'company' | 'venue') ?? 'company'}
+              entityName={name || details.identity.name || null}
+              relationshipId={details.relationshipId}
+              relationshipNotes={details.notes}
+            />
+          )}
+
+          <AccordionSection label="Classification" icon={Tag} defaultOpen>
+            <div className="space-y-2">
+              <div>
+                <label className={LABEL}>Relationship role</label>
+                <select
+                  value={relType}
+                  onChange={(e) => { setRelType(e.target.value as 'vendor' | 'partner' | 'client'); markChanged(); }}
+                  className="stage-input mt-1 w-full"
+                >
+                  <option value="vendor">Vendor</option>
+                  <option value="client">Client</option>
+                  <option value="partner">Partner</option>
+                </select>
+              </div>
+              <div>
+                <label className={LABEL}>Lifecycle</label>
+                <select
+                  value={lifecycle}
+                  onChange={(e) => { setLifecycle(e.target.value as 'prospect' | 'active' | 'dormant' | 'blacklisted'); markChanged(); }}
+                  className="stage-input mt-1 w-full"
+                >
+                  <option value="prospect">Prospect</option>
+                  <option value="active">Active</option>
+                  <option value="dormant">Dormant</option>
+                  <option value="blacklisted">Blacklisted</option>
+                </select>
+              </div>
+              {lifecycle === 'blacklisted' && (
+                <div>
+                  <label className={LABEL}>Blacklist reason</label>
+                  <Input
+                    value={blacklistReason}
+                    onChange={(e) => { setBlacklistReason(e.target.value); markChanged(); }}
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
+                  />
+                </div>
+              )}
+              <div>
+                <label className={LABEL}>Tags</label>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {localTags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)] px-2 py-0.5 text-xs"
+                    >
+                      {t}
+                      <button type="button" onClick={() => { setLocalTags(localTags.filter((x) => x !== t)); markChanged(); }}>×</button>
+                    </span>
+                  ))}
+                  <div className="flex gap-1">
+                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-[var(--ctx-well)]" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
+                    <Button type="button" variant="ghost" size="sm" onClick={addTag}>Add</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </AccordionSection>
+
           <AccordionSection label="Identity" icon={Building2} defaultOpen>
             <div className="space-y-3">
               <div className="flex items-center gap-4">
@@ -529,63 +606,38 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             </div>
           </AccordionSection>
 
-          <AccordionSection label="Classification" icon={Tag} defaultOpen>
-            <div className="space-y-2">
-              <div>
-                <label className={LABEL}>Relationship role</label>
-                <select
-                  value={relType}
-                  onChange={(e) => { setRelType(e.target.value as 'vendor' | 'partner' | 'client'); markChanged(); }}
-                  className="stage-input mt-1 w-full"
-                >
-                  <option value="vendor">Vendor</option>
-                  <option value="client">Client</option>
-                  <option value="partner">Partner</option>
-                </select>
-              </div>
-              <div>
-                <label className={LABEL}>Lifecycle</label>
-                <select
-                  value={lifecycle}
-                  onChange={(e) => { setLifecycle(e.target.value as 'prospect' | 'active' | 'dormant' | 'blacklisted'); markChanged(); }}
-                  className="stage-input mt-1 w-full"
-                >
-                  <option value="prospect">Prospect</option>
-                  <option value="active">Active</option>
-                  <option value="dormant">Dormant</option>
-                  <option value="blacklisted">Blacklisted</option>
-                </select>
-              </div>
-              {lifecycle === 'blacklisted' && (
+          {/* Compliance. The add-connection sheet asks a vendor for a W-9 and a
+              COI expiry at the moment you know them, and this page had nowhere
+              to show either -- so they were collected and never seen again. */}
+          {(relType === 'vendor' || relType === 'partner') && (
+            <AccordionSection label="Compliance" icon={ShieldCheck}>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={w9Status}
+                    onChange={(e) => { setW9Status(e.target.checked); markChanged(); }}
+                    className="size-4 rounded border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]"
+                  />
+                  <span className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
+                    W-9 on file
+                  </span>
+                </label>
                 <div>
-                  <label className={LABEL}>Blacklist reason</label>
+                  <label className={LABEL}>COI expiry</label>
+                  <p className="stage-label text-[var(--stage-text-tertiary)] mt-0.5 mb-1.5">
+                    Certificate of Insurance expiry date — used for compliance tracking.
+                  </p>
                   <Input
-                    value={blacklistReason}
-                    onChange={(e) => { setBlacklistReason(e.target.value); markChanged(); }}
-                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
+                    type="date"
+                    value={coiExpiry}
+                    onChange={(e) => { setCoiExpiry(e.target.value); markChanged(); }}
+                    className="bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
                   />
                 </div>
-              )}
-              <div>
-                <label className={LABEL}>Tags</label>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {localTags.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)] px-2 py-0.5 text-xs"
-                    >
-                      {t}
-                      <button type="button" onClick={() => { setLocalTags(localTags.filter((x) => x !== t)); markChanged(); }}>×</button>
-                    </span>
-                  ))}
-                  <div className="flex gap-1">
-                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-[var(--ctx-well)]" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
-                    <Button type="button" variant="ghost" size="sm" onClick={addTag}>Add</Button>
-                  </div>
-                </div>
               </div>
-            </div>
-          </AccordionSection>
+            </AccordionSection>
+          )}
 
           {(relType === 'vendor' || relType === 'partner') && (
             <AccordionSection label="Financial" icon={DollarSign}>
@@ -622,16 +674,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
               initialAttributes={initialVenueAttrs}
             />
           )}
-
-          <AccordionSection label="Notes" icon={FileText} defaultOpen>
-            <Textarea
-              value={notes}
-              onChange={(e) => { setNotes(e.target.value); markChanged(); }}
-              placeholder="Internal notes about this partner…"
-              className="min-h-[100px] resize-y bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
-              rows={4}
-            />
-          </AccordionSection>
 
           <AccordionSection label="Roster" icon={Users}>
             <RosterSection
@@ -717,89 +759,5 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
         </DialogContent>
       </Dialog>
     </EntityRecordShell>
-  );
-}
-
-function RosterSection({
-  crew,
-  sourceOrgId,
-  ghostOrgId,
-  onRefresh,
-}: {
-  crew: NodeDetailCrewMember[];
-  sourceOrgId: string;
-  ghostOrgId: string;
-  onRefresh: () => void;
-}) {
-  const [showAdd, setShowAdd] = React.useState(false);
-  const [saving, setSaving] = React.useState(false);
-  const addRef = React.useRef<HTMLDivElement>(null);
-
-  const handleAdd = async () => {
-    const el = addRef.current;
-    if (!el) return;
-    const get = (n: string) => (el.querySelector(`[name="${n}"]`) as HTMLInputElement)?.value?.trim() ?? '';
-    setSaving(true);
-    const result = await addContactToGhostOrg(sourceOrgId, ghostOrgId, {
-      firstName: get('ac_firstName') || 'Contact',
-      lastName: get('ac_lastName'),
-      email: get('ac_email') || undefined,
-      role: get('ac_role') || undefined,
-      jobTitle: get('ac_jobTitle') || undefined,
-    });
-    setSaving(false);
-    if (result.ok) {
-      setShowAdd(false);
-      onRefresh();
-    } else {
-      toast.error(result.error ?? 'Failed to add contact');
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <ul className="space-y-2">
-        {crew.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] px-3 py-2">
-            <div className="size-10 rounded-full bg-[var(--stage-surface-raised)] flex items-center justify-center overflow-hidden">
-              {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" /> : <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">{(m.name?.[0] ?? '?').toUpperCase()}</span>}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{m.name}</p>
-              {(() => {
-                const visibleEmail = displayableEmail(m.email);
-                const subtitle = [m.jobTitle, visibleEmail].filter(Boolean).join(' · ');
-                return subtitle ? (
-                  <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] truncate">{subtitle}</p>
-                ) : null;
-              })()}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {!showAdd ? (
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2 border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)]">
-          Add contact
-        </Button>
-      ) : (
-        <div ref={addRef} className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_firstName" placeholder="First name" className="bg-[var(--ctx-well)]" />
-            <Input name="ac_lastName" placeholder="Last name" className="bg-[var(--ctx-well)]" />
-          </div>
-          <Input name="ac_email" type="email" placeholder="Email" className="bg-[var(--ctx-well)]" />
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_role" placeholder="Role" className="bg-[var(--ctx-well)]" />
-            <Input name="ac_jobTitle" placeholder="Job title" className="bg-[var(--ctx-well)]" />
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleAdd} disabled={saving} className="border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)]">
-              {saving ? 'Saving…' : 'Add'}
-            </Button>
-            <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setShowAdd(false)}>Cancel</Button>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }

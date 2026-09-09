@@ -353,21 +353,21 @@ export function PersonRecordForm({
             </div>
           </div>
           <div>
+            <label className={LABEL}>Phone</label>
+            <Input
+              value={phone ?? ''}
+              onChange={(e) => { setPhone(e.target.value); mark(); }}
+              placeholder="+1 (555) 000-0000"
+              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
+            />
+          </div>
+          <div>
             <label className={LABEL}>Email</label>
             <Input
               type="email"
               value={email ?? ''}
               onChange={(e) => { setEmail(e.target.value); mark(); }}
               placeholder="crew@example.com"
-              className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
-            />
-          </div>
-          <div>
-            <label className={LABEL}>Phone</label>
-            <Input
-              value={phone ?? ''}
-              onChange={(e) => { setPhone(e.target.value); mark(); }}
-              placeholder="+1 (555) 000-0000"
               className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
             />
           </div>

@@ -50,6 +50,14 @@ export type UpdateGhostProfilePayload = {
   defaultCurrency?: string | null;
   taxId?: string | null;
   paymentTerms?: string | null;
+  /**
+   * Company compliance. Lives in operational_settings beside tax_id and
+   * payment_terms rather than at the top of attributes: that bag is what
+   * `orgOperationalSettings` exposes and what the record page reads, and a
+   * second home for the same fact is how the two drift.
+   */
+  w9Status?: boolean | null;
+  coiExpiry?: string | null;
   category?: string | null;
 };
 
@@ -100,6 +108,15 @@ export async function updateGhostProfile(
   const paymentTerms = isFormData
     ? strOrNull((formData as FormData).get('paymentTerms'))
     : (formData as UpdateGhostProfilePayload).paymentTerms ?? null;
+  const w9Status = isFormData
+    ? (() => {
+        const raw = (formData as FormData).get('w9Status');
+        return raw === null ? null : raw === 'true';
+      })()
+    : (formData as UpdateGhostProfilePayload).w9Status ?? null;
+  const coiExpiry = isFormData
+    ? strOrNull((formData as FormData).get('coiExpiry'))
+    : (formData as UpdateGhostProfilePayload).coiExpiry ?? null;
   const category = isFormData
     ? strOrNull((formData as FormData).get('category'))
     : (formData as UpdateGhostProfilePayload).category ?? null;
@@ -148,6 +165,10 @@ export async function updateGhostProfile(
     entity_type: entityType ?? existingOps.entity_type ?? null,
     tax_id: taxId ?? existingOps.tax_id ?? null,
     payment_terms: paymentTerms ?? existingOps.payment_terms ?? null,
+    // A false W-9 is a real answer, so `??` on a boolean would pin it to true
+    // once set. Only an absent field falls through to the existing value.
+    w9_status: w9Status === null ? existingOps.w9_status ?? null : w9Status,
+    coi_expiry: coiExpiry ?? existingOps.coi_expiry ?? null,
     phone: phoneVal ?? existingOps.phone ?? null,
   };
 
