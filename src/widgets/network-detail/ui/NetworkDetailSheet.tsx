@@ -34,6 +34,7 @@ import { NodeCrewList } from './NodeCrewList';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { PromotedMetricsRow } from './PromotedMetricsRow';
+import { LinkedPeople } from '@/entities/network/ui/LinkedPeople';
 import { ContactStrip } from './network-detail-sheet/contact-strip';
 import { TransmissionPanel } from './network-detail-sheet/transmission-panel';
 import { getTabsForDetail, type TabId } from './network-detail-sheet/shared';
@@ -182,6 +183,18 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
               sourceOrgId={sourceOrgId}
               onSummonSuccess={handleRefresh}
             />
+
+            {/* Who else is on this record, directly under the name. The graph
+                has carried this since the show was created and nothing has ever
+                read it. */}
+            {workspaceId && details.subjectEntityId && (
+              <LinkedPeople
+                workspaceId={workspaceId}
+                entityId={details.subjectEntityId}
+                hrefFor={(id) => `/network/entity/${id}`}
+                className="px-6 pb-2"
+              />
+            )}
 
             {/* Promoted metrics — two that earn inline placement per §10 */}
             {workspaceId && details.subjectEntityId && (() => {

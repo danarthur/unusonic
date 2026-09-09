@@ -41,6 +41,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Save, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
+import { LinkedPeople } from '@/entities/network/ui/LinkedPeople';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { useUnsavedChanges } from '@/shared/lib/use-unsaved-changes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
@@ -184,6 +185,16 @@ export function EntityRecordShell({
               </h1>
               <p className="truncate stage-label">{eyebrow}</p>
             </div>
+            {/* In the header, not a tab. Blackbaud puts the spouse in the
+                constituent profile header for the same reason: a person you
+                have to go looking for might as well not be linked. */}
+            {workspaceId && entityId && (
+              <LinkedPeople
+                workspaceId={workspaceId}
+                entityId={entityId}
+                hrefFor={(id) => `/network/entity/${id}`}
+              />
+            )}
           </div>
         </div>
 

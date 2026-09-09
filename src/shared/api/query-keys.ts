@@ -39,6 +39,8 @@ export const queryKeys = {
       ["entities", wsId, "detail", entityId, "referrals"] as const,
     venueSpecs: (wsId: string, entityId: string) =>
       ["entities", wsId, "detail", entityId, "venueSpecs"] as const,
+    linkedPeople: (wsId: string, entityId: string) =>
+      ["entities", wsId, "detail", entityId, "linkedPeople"] as const,
   },
 
   catalog: {
