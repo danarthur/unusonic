@@ -1,5 +1,6 @@
 'use client';
 
+import { coupleDisplayName } from '@/entities/network/model/couple-name';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Building2, Heart, Users, Music, MapPin, Wallet } from 'lucide-react';
 import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
@@ -56,19 +57,6 @@ interface CastChip {
 
 function fullName(p: PersonHostFormState): string {
   return [p.firstName.trim(), p.lastName.trim()].filter(Boolean).join(' ');
-}
-
-function coupleDisplayName(a: PersonHostFormState, b: PersonHostFormState): string {
-  const aF = a.firstName.trim();
-  const aL = a.lastName.trim();
-  const bF = b.firstName.trim();
-  const bL = b.lastName.trim();
-  if (!aF && !bF) return '';
-  const sameLast = aL && bL && aL.toLowerCase() === bL.toLowerCase();
-  if (sameLast) return `${aF} & ${bF} ${aL}`.trim();
-  const a2 = [aF, aL].filter(Boolean).join(' ');
-  const b2 = [bF, bL].filter(Boolean).join(' ');
-  return [a2, b2].filter(Boolean).join(' & ');
 }
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });

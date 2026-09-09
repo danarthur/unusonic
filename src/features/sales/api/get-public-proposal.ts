@@ -5,6 +5,7 @@
  * @module features/sales/api/get-public-proposal
  */
 
+import { coupleDisplayName, splitDisplayName } from '@/entities/network/model/couple-name';
 import 'server-only';
 
 import { getSystemClient } from '@/shared/api/supabase/system';
@@ -80,6 +81,60 @@ export async function getPublicProposal(token: string): Promise<PublicProposalDT
         .eq('owner_workspace_id', workspaceId)
         .maybeSingle();
       if (orgEntityDirect) clientName = orgEntityDirect.display_name ?? null;
+    }
+  }
+
+  /*
+    No organisation means the client is a person, or two of them.
+
+    A couple's deal carries no `organization_id` -- the show flow makes each
+    partner their own entity and joins them with an edge -- so this used to
+    leave clientName null and the proposal fell back to showing its own title
+    where the client's name belongs. The PDF hides the Client row entirely.
+
+    Derived from the host stakeholders every time rather than stored. NPSP
+    caches its household name and then ships a Refresh batch that "overwrites
+    custom entries with no undo capability"; the whole failure mode comes from
+    keeping a copy that can drift from the people it describes.
+  */
+  if (!clientName) {
+    const { data: hostRows } = await crossSchema
+      .schema('ops')
+      .from('deal_stakeholders')
+      .select('entity_id, contact_name_at_deal, is_primary, display_order')
+      .eq('deal_id', dealId)
+      .eq('role', 'host')
+      .order('is_primary', { ascending: false })
+      .order('display_order', { ascending: true, nullsFirst: false })
+      .limit(2);
+
+    const names: string[] = [];
+    for (const row of hostRows ?? []) {
+      if (row.entity_id) {
+        const { data: hostEntity } = await crossSchema
+          .schema('directory')
+          .from('entities')
+          .select('display_name')
+          .eq('id', row.entity_id)
+          .eq('owner_workspace_id', workspaceId)
+          .maybeSingle();
+        if (hostEntity?.display_name) {
+          names.push(hostEntity.display_name);
+          continue;
+        }
+      }
+      // Frozen at deal time, so a renamed contact does not rewrite an old
+      // proposal that a client may already be looking at.
+      if (row.contact_name_at_deal) names.push(row.contact_name_at_deal);
+    }
+
+    if (names.length >= 2) {
+      clientName = coupleDisplayName(
+        splitDisplayName(names[0]),
+        splitDisplayName(names[1]),
+      ) || names.join(' & ');
+    } else if (names.length === 1) {
+      clientName = names[0];
     }
   }
 
