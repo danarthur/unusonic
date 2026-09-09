@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown, Star } from 'lucide-react';
 import { NetworkCard } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
+import { filterNodes } from '@/entities/network/model/search-node';
 import { GenesisState } from './GenesisState';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -202,20 +203,8 @@ export function StreamLayout({
     });
   };
 
-  // Shared search filter
-  function searchFilter(nodes: NetworkNode[], query: string): NetworkNode[] {
-    if (!query.trim()) return nodes;
-    const q = query.toLowerCase();
-    return nodes.filter(
-      (n) =>
-        n.identity.name.toLowerCase().includes(q) ||
-        (n.identity.label ?? '').toLowerCase().includes(q) ||
-        (n.meta.tags ?? []).some((t) => t.toLowerCase().includes(q))
-    );
-  }
-
   // Crew zone: search, role grouping and filtering
-  const searchedCrewNodes = searchFilter(crewNodes, crewSearch);
+  const searchedCrewNodes = filterNodes(crewNodes, crewSearch);
   const roleGroups = groupByRole(searchedCrewNodes);
   const allRoleKeys = [...groupByRole(crewNodes).keys()]; // Use unfiltered for pill labels
   const filteredCrewNodes = activeRoleFilter
@@ -226,7 +215,7 @@ export function StreamLayout({
     : roleGroups;
 
   // Inner Circle zone: search
-  const displayedInnerCircle = searchFilter(innerCircleNodes, innerCircleSearch);
+  const displayedInnerCircle = filterNodes(innerCircleNodes, innerCircleSearch);
 
   // Every grid reserves its own rows. Missing this, a section of bare names
   // renders three blank lines under each card -- the hollow look the

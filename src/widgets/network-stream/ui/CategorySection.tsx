@@ -18,6 +18,7 @@ import { ChevronDown, Search } from 'lucide-react';
 
 import { NetworkCard } from '@/entities/network';
 import { reservedSlotCount } from '@/entities/network/model/card-slots';
+import { filterNodes } from '@/entities/network/model/search-node';
 import type { NetworkNode } from '@/entities/network';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { ROLE_GROUPING_THRESHOLD } from '@/entities/network/model/role-vocabulary';
@@ -92,7 +93,7 @@ export function CategorySection({
             <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
             <input
               type="text"
-              placeholder="Filter…"
+              placeholder="Search…"
               aria-label={`Search ${title}`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -162,8 +163,9 @@ function resolveVisibleNodes(
   const showRoles = nodes.length >= ROLE_GROUPING_THRESHOLD && rolesPresent.length > 1;
   const activeRole = showRoles ? role : null;
 
-  const q = search.trim().toLowerCase();
-  let shown = q ? nodes.filter((n) => n.identity.name.toLowerCase().includes(q)) : nodes;
+  // Was name-only here while the roster searched three fields, so the same
+  // query found somebody in one section and missed them in another.
+  let shown = filterNodes(nodes, search);
   // A person holding two roles matches under both -- never filed under one.
   if (activeRole) shown = shown.filter((n) => (n.crewRoles ?? []).includes(activeRole));
 
