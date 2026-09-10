@@ -7117,6 +7117,7 @@ export type Database = {
           onboarding_persona_completed: boolean | null
           onboarding_step: number | null
           onboarding_summary: string | null
+          passkey_nudge_dismissed_at: string | null
           persona: Database["public"]["Enums"]["user_persona"] | null
           recovery_setup_at: string | null
           updated_at: string | null
@@ -7134,6 +7135,7 @@ export type Database = {
           onboarding_persona_completed?: boolean | null
           onboarding_step?: number | null
           onboarding_summary?: string | null
+          passkey_nudge_dismissed_at?: string | null
           persona?: Database["public"]["Enums"]["user_persona"] | null
           recovery_setup_at?: string | null
           updated_at?: string | null
@@ -7151,6 +7153,7 @@ export type Database = {
           onboarding_persona_completed?: boolean | null
           onboarding_step?: number | null
           onboarding_summary?: string | null
+          passkey_nudge_dismissed_at?: string | null
           persona?: Database["public"]["Enums"]["user_persona"] | null
           recovery_setup_at?: string | null
           updated_at?: string | null
@@ -8327,6 +8330,21 @@ export type Database = {
       create_default_location: {
         Args: { p_location_name?: string; p_workspace_id: string }
         Returns: string
+      }
+      create_workspace_with_owner: {
+        Args: {
+          p_modules_enabled?: string[]
+          p_name: string
+          p_organization_type: string
+          p_owner_display_name: string
+          p_owner_email: string
+          p_persona: string
+          p_pms_integration_enabled?: boolean
+          p_signalpay_enabled?: boolean
+          p_slug: string
+          p_subscription_tier: string
+        }
+        Returns: Json
       }
       current_entity_id: { Args: never; Returns: string }
       deal_in_workspace: { Args: { p_deal_id: string }; Returns: boolean }
