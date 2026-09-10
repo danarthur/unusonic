@@ -34,21 +34,7 @@ export interface WorkspacePermissions {
   manage_locations: boolean;
 }
 
-const OWNER_PERMISSIONS: WorkspacePermissions = {
-  view_finance: true,
-  view_planning: true,
-  view_ros: true,
-  manage_team: true,
-  manage_locations: true,
-};
 
-const DEFAULT_MEMBER_PERMISSIONS: WorkspacePermissions = {
-  view_finance: false,
-  view_planning: true,
-  view_ros: true,
-  manage_team: false,
-  manage_locations: false,
-};
 
 export interface SetupWorkspaceResult {
   success: boolean;
@@ -68,121 +54,25 @@ export interface SetupWorkspaceResult {
 // Creates workspace, default location, and owner membership
 // ============================================================================
 
-/**
- * Sets up a complete workspace with default location and owner membership
- * 
- * This is the primary action for workspace creation - it:
- * 1. Creates a new Workspace
- * 2. Creates a default 'Main Office' location
- * 3. Assigns the creator as 'owner' with all permissions
- * 
- * @param name - The workspace name
- * @param locationName - Optional custom name for the primary location (defaults to 'Main Office')
- * @param department - Optional department for the owner (e.g., 'Executive', 'Operations')
- */
-export async function setupInitialWorkspace(
-  name: string,
-  locationName: string = 'Main Office',
-  department?: string
-): Promise<SetupWorkspaceResult> {
-  const supabase = await createClient();
-  
-  // Get authenticated user
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: 'Not authenticated' };
-  }
-  
-  // Validate input
-  if (!name.trim()) {
-    return { success: false, error: 'Workspace name is required' };
-  }
-  
-  try {
-    // Step 1: Create the workspace
-    const { data: workspace, error: workspaceError } = await supabase
-      .from('workspaces')
-      .insert({
-        name: name.trim(),
-        created_by: user.id,
-      })
-      .select()
-      .single();
-    
-    if (workspaceError || !workspace) {
-      console.error('[Workspace] Create error:', workspaceError);
-      return { 
-        success: false, 
-        error: workspaceError?.message || 'Failed to create workspace' 
-      };
-    }
-    
-    // Step 2: Create the default location
-    const { data: location, error: locationError } = await supabase
-      .from('locations')
-      .insert({
-        workspace_id: workspace.id,
-        name: locationName.trim(),
-        is_primary: true,
-      })
-      .select()
-      .single();
-    
-    if (locationError) {
-      console.error('[Workspace] Location create error:', locationError);
-      // Rollback workspace creation
-      await supabase.from('workspaces').delete().eq('id', workspace.id);
-      return { 
-        success: false, 
-        error: locationError.message || 'Failed to create default location' 
-      };
-    }
-    
-    // Step 3: Add the creator as owner with full permissions
-    const { error: memberError } = await supabase
-      .from('workspace_members')
-      .insert({
-        workspace_id: workspace.id,
-        user_id: user.id,
-        role: 'owner',
-        department: department?.trim() || 'Executive',
-        permissions: OWNER_PERMISSIONS,
-        primary_location_id: location?.id,
-      });
-    
-    if (memberError) {
-      console.error('[Workspace] Member create error:', memberError);
-      // Rollback
-      await supabase.from('locations').delete().eq('id', location.id);
-      await supabase.from('workspaces').delete().eq('id', workspace.id);
-      return { 
-        success: false, 
-        error: memberError.message || 'Failed to assign ownership' 
-      };
-    }
-    
-    revalidatePath('/');
-    
-    return {
-      success: true,
-      workspace: {
-        id: workspace.id,
-        name: workspace.name,
-      },
-      location: location ? {
-        id: location.id,
-        name: location.name,
-      } : undefined,
-    };
-    
-  } catch (e) {
-    console.error('[Workspace] Unexpected error:', e);
-    return { 
-      success: false, 
-      error: 'An unexpected error occurred' 
-    };
-  }
-}
+/*
+  setupInitialWorkspace lived here and is gone.
+
+  Dead in two independent ways: nothing in the codebase called it, and its
+  second statement inserted into a `locations` table that does not exist in
+  the database. It would have failed on any invocation it ever received.
+
+  It also carried the exact defect that produced an orphaned workspace in
+  production: it created the workspace with the AUTHENTICATED client, then
+  rolled back with `supabase.from('workspaces').delete()` -- and
+  public.workspaces has RLS policies for INSERT and SELECT and none for
+  DELETE. That statement matches zero rows and PostgREST does not call it an
+  error, so the rollback would have reported success while leaving the
+  workspace behind.
+
+  `complete-setup.ts` is the live path and does this correctly, through the
+  service-role client. A dead creation path with a silent rollback is worse
+  than no path.
+*/
 
 // ============================================================================
 // Update Member Permissions
