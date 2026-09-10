@@ -72,7 +72,13 @@ export interface EntityRecordShellProps {
   workspaceId: string | null;
   /** What the header says, and what the avatar is drawn from. */
   name: string;
-  /** The eyebrow above the name: "Roster member", "Preferred freelancer", … */
+  /**
+   * The eyebrow above the name: "Roster member", "Freelancer", "Venue", …
+   *
+   * What they are, never how they rank. Tier is a separate judgement with its
+   * own treatment on the contact card; asserting it here made "Preferred" mean
+   * nothing.
+   */
   eyebrow: string;
   avatarUrl?: string | null;
   /** Couples get their own avatar treatment, so this is wider than entityType. */

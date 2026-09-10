@@ -262,7 +262,14 @@ export function PersonRecordForm({
       entityType="person"
       workspaceId={workspaceId ?? null}
       name={displayName}
-      eyebrow={isRosterMember ? 'Roster member' : 'Preferred freelancer'}
+      /*
+        Not "Preferred freelancer". Preferred is a real tier on the edge --
+        `context_data.tier`, meaning first call -- and the page was printing it
+        as decoration on everyone. Every partner edge in production carries
+        `standard`, so the word was false for every person it appeared on, and
+        it devalues the badge the contact card shows when the tier IS preferred.
+      */
+      eyebrow={isRosterMember ? 'Roster member' : 'Freelancer'}
       avatarUrl={avatarUrl || details.identity.avatarUrl}
       avatarType="person"
       returnPath={returnPath}
