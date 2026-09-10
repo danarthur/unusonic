@@ -26,6 +26,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getModel } from '@/app/api/aion/lib/models';
 import type { CaptureVisibility } from '@/widgets/lobby-capture/api/confirm-capture';
 import { AFFILIATION_RELATIONSHIP_TYPES } from '@/entities/network/model/affiliation';
+import { briefSafeAttributes } from '@/entities/directory/model/brief-attributes';
 
 export type EntitySummary = {
   narrative: string;
@@ -70,16 +71,21 @@ type EntityRow = {
   attributes: Record<string, unknown> | null;
 };
 
-function formatFallbackNarrative(entity: EntityRow | null): string {
-  // Used when there are no captures yet — the LLM has nothing to synthesize.
-  // Stay neutral about relationship: a CLIENT entity here was misnarrated
-  // as "on your roster" before, which conflates clients with crew. The
-  // fallback should describe what we know (the entity exists) and prompt
-  // for the action that builds real context (a capture).
-  if (!entity) return 'No notes yet — capture a voice note to start building context.';
-  const name = entity.display_name ?? 'This contact';
-  return `No captures on ${name} yet. Leave a voice note to start building context.`;
-}
+/*
+  There is no fallback narrative any more.
+
+  It used to say "No captures on Allegra Ramsey yet. Leave a voice note to start
+  building context." -- a card, with a heading and a sparkle, whose entire
+  content was an invitation to write the thing it is meant to summarise. The
+  capture timeline directly beneath it is already empty and already has a
+  composer, so the invitation was there twice and the brief was there for
+  nothing.
+
+  An empty narrative means the card renders nothing at all. On the LLM-failure
+  path that is deliberate too: saying "no captures yet" when captures exist
+  would be a wrong sentence, and a missing card is a smaller lie than a false
+  one.
+*/
 
 
 /**
@@ -143,7 +149,7 @@ export async function getEntitySummary(
     return {
       ok: true,
       summary: {
-        narrative: formatFallbackNarrative(null),
+        narrative: '',
         pinnedFacts: [],
         lastTouchAt: null,
         captureCount: 0,
@@ -198,7 +204,7 @@ export async function getEntitySummary(
     return {
       ok: true,
       summary: {
-        narrative: formatFallbackNarrative(entity),
+        narrative: '',
         pinnedFacts: [],
         lastTouchAt: null,
         captureCount: 0,
@@ -243,9 +249,15 @@ export async function getEntitySummary(
     })
     .join('\n');
 
-  const attrs = entity.attributes ?? {};
-  const attrLines = Object.entries(attrs)
-    .filter(([, v]) => v != null && v !== '' && v !== false)
+  /*
+    An allowlist, because the alternative shipped a sentence nobody wrote.
+
+    This used to be Object.entries(attributes) -- every key on the row. On
+    production data it produced "Brandi Jane is a ghost", pinned, about a real
+    coordinator: `is_ghost` means "has not claimed an account", and the model
+    had no way to know that was a fact about our records rather than about her.
+  */
+  const attrLines = briefSafeAttributes(entity.attributes as Record<string, unknown> | null)
     .slice(0, 8)
     .map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`)
     .join('\n');
@@ -282,8 +294,15 @@ export async function getEntitySummary(
     'Each ≤60 chars, lowercase imperative ("prefers text over email", "lead',
     'coordinator at Pure Lavish"). Max 5. Empty when nothing durable.',
     '',
+    'The cards around this brief already show the name, the role, the contact',
+    'details, the shows, the money and the documents. Never restate them.',
+    'Write only what someone would have to READ THE NOTES to know: a pattern',
+    'across captures, a preference, a warning, a judgement. "Is a client with',
+    'contact details on file" is a failure — it is the card above, in prose.',
+    '',
     'Do not invent facts. If the notes are thin, the summary and pinned',
-    'facts should be thin. Silence beats embellishment.',
+    'facts should be thin. Silence beats embellishment: return an empty',
+    'narrative rather than a sentence saying there is nothing to report.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -336,7 +355,7 @@ export async function getEntitySummary(
     return {
       ok: true,
       summary: {
-        narrative: formatFallbackNarrative(entity),
+        narrative: '',
         pinnedFacts: [],
         lastTouchAt,
         captureCount: captures.length,

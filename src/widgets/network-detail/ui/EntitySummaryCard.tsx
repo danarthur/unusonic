@@ -124,6 +124,19 @@ export function EntitySummaryCard({
 
   const pinnedFacts = summary.pinnedFacts ?? [];
 
+  /*
+    Nothing to say, so nothing said.
+
+    The brief exists to hold what you would otherwise have to read the notes to
+    know. With no captures there is no such thing, and the card used to spend a
+    heading and a sparkle on "leave a voice note to start building context" --
+    directly above a capture timeline that is also empty and already has a
+    composer in it.
+  */
+  if (!summary.narrative.trim() && pinnedFacts.length === 0) {
+    return null;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 2 }}
