@@ -326,10 +326,10 @@ export async function getPendingEquipmentForWorkspace(): Promise<PendingEquipmen
   const { data: entities } = await supabase
     .schema('directory')
     .from('entities')
-    .select('id, name')
+    .select('id, display_name')
     .in('id', entityIds);
 
-  const entityMap = new Map((entities ?? []).map((e) => [e.id, e.name ?? 'Unknown']));
+  const entityMap = new Map((entities ?? []).map((e) => [e.id, e.display_name ?? 'Unknown']));
 
   return equipment.map((e) => ({
     id: e.id,

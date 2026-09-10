@@ -66,7 +66,10 @@ export async function getRevenueTrend(period?: RevenueTrendPeriod): Promise<Reve
     .from('proposals')
     .select('id, signed_at, accepted_at')
     .eq('workspace_id', workspaceId)
-    .in('status', ['accepted', 'signed']);
+    // `accepted` is the terminal status. 'signed' is not a member of the
+    // proposal_status enum, and naming it made Postgres reject the query --
+    // so this widget has been rendering empty rather than wrong.
+    .eq('status', 'accepted');
 
   if (error || !proposals?.length) {
     return buildEmptyMonths(now);

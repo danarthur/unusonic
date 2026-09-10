@@ -90,7 +90,7 @@ export async function updateMemberIdentity(input: UpdateMemberIdentityInput): Pr
   const existingCtx = (rel.context_data as Record<string, unknown>) ?? {};
 
   // Build updated context_data patch
-  const ctxPatch: JsonObject = { ...existingCtx };
+  const ctxPatch: JsonObject = { ...(existingCtx as JsonObject) };
   if (parsed.data.first_name !== undefined) ctxPatch.first_name = parsed.data.first_name ?? null;
   if (parsed.data.last_name !== undefined) ctxPatch.last_name = parsed.data.last_name ?? null;
   if (parsed.data.job_title !== undefined) ctxPatch.job_title = parsed.data.job_title ?? null;

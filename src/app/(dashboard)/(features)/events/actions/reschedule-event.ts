@@ -53,7 +53,7 @@ export async function rescheduleEvent(
     const { data: event, error: eventError } = await supabase
       .schema('ops')
       .from('events')
-      .select('id, start_at')
+      .select('id, starts_at')
       .eq('id', eventId)
       .in('project_id', projectIds)
       .maybeSingle();
@@ -69,7 +69,7 @@ export async function rescheduleEvent(
 
     // Step 3: build new start_at — preserve existing time component, replace date.
     // Postgres normalises timestamptz to UTC on storage, so getUTCHours() is correct here.
-    const existingStartAt = (event as { start_at: string | null }).start_at;
+    const existingStartAt = event.starts_at;
     let timePart = '08:00:00';
     if (existingStartAt) {
       const existingDate = new Date(existingStartAt);
@@ -85,7 +85,7 @@ export async function rescheduleEvent(
     const { error: updateError } = await supabase
       .schema('ops')
       .from('events')
-      .update({ start_at: newStartAt })
+      .update({ starts_at: newStartAt })
       .eq('id', eventId);
 
     if (updateError) {

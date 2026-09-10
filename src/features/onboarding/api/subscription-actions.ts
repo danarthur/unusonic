@@ -137,20 +137,9 @@ export async function saveTier(
   return { success: true };
 }
 
-/**
- * Mark UnusonicPay prompt as shown (for Autonomous tier eligibility).
- */
-export async function markUnusonicPayPrompted(): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: 'Not authenticated' };
+/*
+  markUnusonicPayPrompted lived here and is gone. It set
+  `profiles.onboarding_signalpay_prompted`, a column that does not exist, so the
+  update answered 400 -- and nothing called it, so nothing noticed.
+*/
 
-  const { error } = await supabase
-    .from('profiles')
-    .update({ onboarding_signalpay_prompted: true })
-    .eq('id', user.id);
-
-  if (error) return { success: false, error: error.message };
-  revalidatePath('/');
-  return { success: true };
-}
