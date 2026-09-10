@@ -23,6 +23,7 @@
  * @module app/network/entity/EntityKnowledgeCards
  */
 
+import { PromotedMetricsRow } from '@/widgets/network-detail/ui/PromotedMetricsRow';
 import { EntitySummaryCard } from '@/widgets/network-detail/ui/EntitySummaryCard';
 import { WorkingNotesCard } from '@/widgets/network-detail/ui/WorkingNotesCard';
 import { CaptureTimelinePanel } from '@/widgets/network-detail/ui/CaptureTimelinePanel';
@@ -49,6 +50,15 @@ export function EntityKnowledgeCards({
 
   return (
     <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide)' }}>
+      {/* The computed facts, back on the page.
+          P3 took EntityOverviewCards off the record page and this went with it,
+          in its density='page' branch -- so the panel kept a fact strip and the
+          page, which has more room for one, had none. */}
+      <PromotedMetricsRow
+        workspaceId={workspaceId}
+        entityId={entityId}
+        entityType={entityType}
+      />
       <EntitySummaryCard workspaceId={workspaceId} entityId={entityId} entityType={entityType} />
       {isPersonOrCouple && <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />}
       <CaptureTimelinePanel

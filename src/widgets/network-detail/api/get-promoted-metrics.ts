@@ -33,6 +33,15 @@ export type PersonMetrics = {
    * measured when someone was last talked ABOUT rather than last worked with.
    */
   lastShow: { title: string | null; date: string | null } | null;
+  /**
+   * The next show already booked, named.
+   *
+   * The strip could say when someone was last out but not when they are next,
+   * which is the question actually asked before picking up the phone. Booked
+   * only: a proposal in play is not a show you have, and promising one would be
+   * the kind of confident wrong statement this strip exists to avoid.
+   */
+  nextShow: { title: string | null; date: string | null } | null;
   /** What they cost, so the staffing question is answered on one line. */
   rate: PersonRate | null;
 };
@@ -114,6 +123,11 @@ async function getPersonMetrics(
   // Already sorted newest first by the reader.
   const last = worked[0] ?? null;
 
+  // Signed and still ahead. The reader sorts newest first, so the soonest
+  // booked show is the last of them.
+  const booked = productions.productions.filter((p) => p.band === 'booked' && p.date);
+  const next = booked.length > 0 ? booked[booked.length - 1] : null;
+
   const attrs = readEntityAttrs(
     (entityRow.data as { attributes: unknown } | null)?.attributes,
     'person',
@@ -125,6 +139,7 @@ async function getPersonMetrics(
       kind: 'person',
       showCount: worked.length,
       lastShow: last ? { title: last.title, date: last.date } : null,
+      nextShow: next ? { title: next.title, date: next.date } : null,
       rate: readRate(attrs as unknown as Record<string, unknown>),
     },
   };

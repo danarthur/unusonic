@@ -108,7 +108,7 @@ function PersonCells({
   entityId: string;
   onRateSaved: () => void;
 }) {
-  const { lastShow, rate } = metrics;
+  const { lastShow, nextShow, rate } = metrics;
   return (
     <>
       <Cell
@@ -121,9 +121,16 @@ function PersonCells({
           also how you tell a real record from an invented one. */}
       <Cell
         label="Last show"
-        value={lastShow ? formatLastShow(lastShow) : '—'}
+        value={lastShow ? formatShow(lastShow) : '—'}
         muted={!lastShow}
       />
+      {/* Only when there is one. The strip could say when somebody was last out
+          and not when they are next, which is the question actually asked
+          before picking up the phone -- but a cell reading "—" for everyone
+          without a booking is four characters of nothing on every record. */}
+      {nextShow && (
+        <Cell label="Next show" value={formatShow(nextShow)} muted={false} />
+      )}
       {/* The one number here you would want to change while looking at it, and
           the cell used to vanish entirely when it was empty -- which is exactly
           when you want somewhere to put it. It stays, and says so. */}
@@ -156,7 +163,7 @@ function PersonCells({
 }
 
 /** "Jun '25 · Hale wedding", or just the date when the show has no title. */
-function formatLastShow(show: { title: string | null; date: string | null }): string {
+function formatShow(show: { title: string | null; date: string | null }): string {
   const when = show.date
     ? new Date(show.date).toLocaleDateString('en-US', {
         month: 'short',
