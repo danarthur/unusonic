@@ -54,7 +54,7 @@ export async function setPersonRate(
     return { ok: false, error: 'Only people have a rate.' };
   }
 
-  const { error } = await supabase.schema('directory').rpc('patch_entity_attributes', {
+  const { error } = await supabase.rpc('patch_entity_attributes', {
     p_entity_id: entityId,
     // A merge, so clearing has to write the null rather than omit the key.
     p_attributes: { [PERSON_ATTR.rate_amount]: amount === null ? null : Math.round(amount) },

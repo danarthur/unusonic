@@ -390,8 +390,9 @@ export async function confirmCapture(
       p_parsed_follow_up: finalFollowUp ?? null,
       p_parsed_note: finalNote && finalNote.length > 0 ? finalNote : undefined,
       p_resolved_entity_id: resolvedEntityId ?? undefined,
-      p_created_follow_up_queue_id: null, // deferred — see header comment ?? undefined,
-      p_audio_storage_path: null,         // deferred — see header comment ?? undefined,
+      // Both deferred — see header comment.
+      p_created_follow_up_queue_id: undefined,
+      p_audio_storage_path: undefined,
       p_visibility: visibility,
       p_linked_deal_id: linkedDealId ?? undefined,
       p_note_scope: noteScope ?? undefined,

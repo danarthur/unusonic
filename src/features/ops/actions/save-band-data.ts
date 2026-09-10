@@ -2,6 +2,7 @@
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 /* ── Types ───────────────────────────────────────────────────────── */
 
@@ -135,9 +136,9 @@ export async function saveBandGigData(
   if (!assignment) return { ok: false, error: 'Not assigned to this event.' };
 
   // Atomic JSONB merge via RPC — prevents race conditions with concurrent saves
-  const { error } = await ctx.supabase.rpc('patch_event_ros_data', {
+  const { error } = await ctx.supabase.schema('ops').rpc('patch_event_ros_data', {
     p_event_id: eventId,
-    p_patch: data as unknown as Record<string, unknown>,
+    p_patch: data as unknown as JsonObject,
   });
 
   if (error) return { ok: false, error: 'Failed to save.' };

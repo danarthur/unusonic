@@ -3,6 +3,8 @@
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import { flattenTimelines, type DjProgramDataV3, type SaveDjPrepResult } from '@/features/ops/lib/dj-prep-schema';
+import type { JsonObject } from '@/shared/lib/jsonb';
+import type { TablesInsert } from '@/types/supabase';
 
 /**
  * Save DJ program data to the event's run_of_show_data JSONB.
@@ -42,14 +44,14 @@ export async function saveDjPrep(
   if (!assignment) return { ok: false, error: 'Not assigned to this event.' };
 
   // If saving v3 timelines, also write flattened dj_program_moments for Bridge API compat
-  const patch = { ...data } as Record<string, unknown>;
+  const patch = { ...data } as JsonObject;
   if (data.dj_program_timelines) {
     const flatMoments = flattenTimelines(data.dj_program_timelines);
     patch.dj_program_moments = flatMoments;
   }
 
   // Atomic JSONB merge via RPC
-  const { error } = await supabase.rpc('patch_event_ros_data', {
+  const { error } = await supabase.schema('ops').rpc('patch_event_ros_data', {
     p_event_id: eventId,
     p_patch: patch,
   });
@@ -76,12 +78,7 @@ export async function saveDjPrep(
       const multiTimeline = (timelines?.length ?? 0) > 1;
       let globalSort = 0;
 
-      const cueInserts: {
-        event_id: string; title: string; start_time: string | null;
-        duration_minutes: number; type: 'stage'; notes: string;
-        sort_order: number; is_pre_show: boolean;
-        assigned_crew: unknown[]; assigned_gear: unknown[];
-      }[] = [];
+      const cueInserts: TablesInsert<'run_of_show_cues'>[] = [];
 
       for (const tl of (timelines ?? [])) {
         for (const moment of tl.moments) {

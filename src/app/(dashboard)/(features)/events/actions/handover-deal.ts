@@ -648,7 +648,7 @@ async function seedDjClientInfo(
 
   // Merge into existing run_of_show_data without clobbering other keys.
   // Surfaces RPC failures so DJ prep never silently lands blank.
-  const { error: rpcError } = await supabase.rpc('patch_event_ros_data', {
+  const { error: rpcError } = await supabase.schema('ops').rpc('patch_event_ros_data', {
     p_event_id: eventId,
     p_patch: {
       dj_client_details: details,
