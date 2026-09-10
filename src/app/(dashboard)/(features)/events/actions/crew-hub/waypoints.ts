@@ -17,6 +17,7 @@ import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { TIME_24H_RE, WAYPOINT_KINDS, type CrewWaypoint, type WaypointKind } from './types';
+import type { TablesUpdate } from '@/types/supabase';
 
 export async function listCrewWaypoints(dealCrewId: string): Promise<CrewWaypoint[]> {
   const parsed = z.string().uuid().safeParse(dealCrewId);
@@ -169,7 +170,7 @@ export async function updateCrewWaypoint(input: {
   try {
     const supabase = await createClient();
 
-    const dbPatch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const dbPatch: TablesUpdate<{ schema: 'ops' }, 'deal_crew_waypoints'> = { updated_at: new Date().toISOString() };
     if ('kind' in parsed.data.patch && parsed.data.patch.kind !== undefined) {
       dbPatch.kind = parsed.data.patch.kind;
       // If we're switching away from custom, clear the stale custom_label so

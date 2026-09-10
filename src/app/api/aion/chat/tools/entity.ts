@@ -17,6 +17,7 @@ import {
   VenueAttrsSchema,
 } from '@/shared/lib/entity-attrs';
 import { WRITE_DENIED, type AionToolContext } from './types';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 export function createEntityTools(ctx: AionToolContext) {
   const { workspaceId, canWrite } = ctx;
@@ -239,7 +240,7 @@ export function createEntityTools(ctx: AionToolContext) {
       }
 
       // Build attribute patch based on entity type
-      const patch: Record<string, unknown> = {};
+      const patch: JsonObject = {};
 
       if (entity.type === 'person') {
         if (params.firstName !== undefined) patch[PERSON_ATTR.first_name] = params.firstName;
@@ -313,7 +314,7 @@ export function createEntityTools(ctx: AionToolContext) {
         return { error: `Invalid relationship type. Use: ${validTypes.join(', ')}` };
       }
 
-      const contextData: Record<string, unknown> = {
+      const contextData: JsonObject = {
         tier: params.tier ?? 'preferred',
         lifecycle_status: 'active',
         deleted_at: null,
@@ -349,7 +350,7 @@ export function createEntityTools(ctx: AionToolContext) {
     execute: async (params) => {
       if (!canWrite) return WRITE_DENIED;
 
-      const patch: Record<string, unknown> = {};
+      const patch: JsonObject = {};
       if (params.tier !== undefined) patch.tier = params.tier;
       if (params.lifecycleStatus !== undefined) patch.lifecycle_status = params.lifecycleStatus;
       if (params.jobTitle !== undefined) patch.job_title = params.jobTitle;

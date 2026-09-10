@@ -13,6 +13,7 @@ import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../../model/types';
 import { resolveRequiredRoles, type RequiredRole, type PackageDefinition } from '../package-types';
 import { upsertEmbedding, observeUpsert, buildContextHeader } from '@/app/api/aion/lib/embeddings';
+import type { TablesUpdate } from '@/types/supabase';
 
 /** Base URL for public links (proposal, claim, etc.). Prefer NEXT_PUBLIC_APP_URL; on Vercel fall back to VERCEL_URL so links in emails are always absolute. */
 function getPublicBaseUrl(): string {
@@ -1052,9 +1053,9 @@ export async function updateProposalItem(
     'is_optional',
     'is_client_visible',
   ];
-  const update: Record<string, unknown> = {};
+  const update: TablesUpdate<'proposal_items'> = {};
   for (const key of allowedKeys) {
-    if (key in patch) update[key] = patch[key];
+    if (key in patch) Object.assign(update, { [key]: patch[key] });
   }
   if (Object.keys(update).length === 0) return { success: true };
 
@@ -1113,9 +1114,9 @@ export async function updateProposal(
     'scope_notes',
     'deposit_deadline_days',
   ];
-  const update: Record<string, unknown> = {};
+  const update: TablesUpdate<'proposals'> = {};
   for (const key of allowedKeys) {
-    if (key in patch) update[key] = patch[key];
+    if (key in patch) Object.assign(update, { [key]: patch[key] });
   }
   if (Object.keys(update).length === 0) return { success: true };
 

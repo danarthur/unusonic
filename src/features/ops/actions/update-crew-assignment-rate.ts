@@ -5,6 +5,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { getUserRoleSlug } from '@/shared/lib/permissions';
 import { revalidatePath } from 'next/cache';
+import type { TablesUpdate } from '@/types/supabase';
 
 /**
  * Updates the pay rate on a crew_assignment row.
@@ -41,7 +42,7 @@ export async function updateCrewAssignmentRate(
     return { success: false, error: 'Assignment not found or access denied.' };
   }
 
-  const updatePayload: Record<string, unknown> = { pay_rate: payRate };
+  const updatePayload: TablesUpdate<{ schema: 'ops' }, 'crew_assignments'> = { pay_rate: payRate };
   if (payRateType) {
     updatePayload.pay_rate_type = payRateType;
   }

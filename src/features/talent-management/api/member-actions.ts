@@ -8,6 +8,7 @@ import { updateMemberIdentitySchema, addSkillSchema, removeSkillSchema } from '.
 import type { UpdateMemberIdentityInput, AddSkillInput, RemoveSkillInput } from '../model/schema';
 import { addCrewSkill, removeCrewSkill } from './crew-skill-actions';
 import { getCallerWorkspaceRole } from '@/entities/organization/api/caller-workspace-role';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 export async function getMemberForSheet(orgMemberId: string): Promise<OrgMemberWithSkillsDTO | null> {
   return getOrgMemberWithSkills(orgMemberId);
@@ -89,7 +90,7 @@ export async function updateMemberIdentity(input: UpdateMemberIdentityInput): Pr
   const existingCtx = (rel.context_data as Record<string, unknown>) ?? {};
 
   // Build updated context_data patch
-  const ctxPatch: Record<string, unknown> = { ...existingCtx };
+  const ctxPatch: JsonObject = { ...existingCtx };
   if (parsed.data.first_name !== undefined) ctxPatch.first_name = parsed.data.first_name ?? null;
   if (parsed.data.last_name !== undefined) ctxPatch.last_name = parsed.data.last_name ?? null;
   if (parsed.data.job_title !== undefined) ctxPatch.job_title = parsed.data.job_title ?? null;

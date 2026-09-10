@@ -11,6 +11,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { createGhostOrg } from '@/entities/organization';
 import { getCurrentEntityAndOrg, orgTypeToCortex } from './network-helpers';
 import { addScoutRosterToGhostOrg } from './member-actions';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 // ---------------------------------------------------------------------------
 // summonPartner / summonPartnerAsGhost / summonPersonGhost
@@ -236,7 +237,7 @@ export async function createGhostWithContact(
     const result = await summonPersonGhost(sourceOrgId, payload.name, personRel);
     if (!result.ok) return { success: false, error: result.error };
     // Update person attributes if provided
-    const personPatch: Record<string, unknown> = {};
+    const personPatch: JsonObject = {};
     if (payload.email) personPatch.email = payload.email;
     if (payload.phone) personPatch.phone = payload.phone;
     if (payload.market) personPatch.market = payload.market;
@@ -285,11 +286,11 @@ export async function createGhostWithContact(
     Compliance and terms go into operational_settings, the bag the record page
     reads back. The org is new, so there is nothing to merge with.
   */
-  const profileAttrs: Record<string, unknown> = {};
+  const profileAttrs: JsonObject = {};
   if (payload.website) profileAttrs.website = payload.website;
   if (payload.email) profileAttrs.support_email = payload.email;
 
-  const ops: Record<string, unknown> = {};
+  const ops: JsonObject = {};
   if (payload.w9Status !== undefined) ops.w9_status = payload.w9Status;
   if (payload.coiExpiry) ops.coi_expiry = payload.coiExpiry;
   if (payload.paymentTerms) ops.payment_terms = payload.paymentTerms;

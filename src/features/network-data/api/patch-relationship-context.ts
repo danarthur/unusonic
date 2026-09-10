@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/shared/api/supabase/server';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 /**
  * Merges a JSONB patch into a cortex.relationships context_data field.
@@ -20,7 +21,7 @@ export async function patchRelationshipContext(
   sourceEntityId: string,
   targetEntityId: string,
   relationshipType: string,
-  patch: Record<string, unknown>
+  patch: JsonObject
 ): Promise<{ success: true } | { success: false; error: string }> {
   const supabase = await createClient();
 

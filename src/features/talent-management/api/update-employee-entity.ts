@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { PERSON_ATTR } from '@/entities/directory/model/attribute-keys';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 // ─── Input schema ─────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export async function updateEmployeeEntityAttrs(
 
   // 3. Build attributes patch — only include fields that are not undefined.
   //    Empty string → null (clear the field).
-  const patch: Record<string, unknown> = {};
+  const patch: JsonObject = {};
 
   patch[PERSON_ATTR.first_name] = first_name;
 

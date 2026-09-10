@@ -3,6 +3,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { RunOfShowData } from '@/entities/event/api/get-event-summary';
+import type { Json } from '@/types/supabase';
 
 export type UpdateFlightCheckResult =
   | { success: true }
@@ -44,7 +45,7 @@ export async function updateFlightCheckStatus(
   const { error: updateErr } = await supabase
     .schema('ops')
     .from('events')
-    .update({ run_of_show_data: merged as Record<string, unknown> })
+    .update({ run_of_show_data: merged as unknown as Json })
     .eq('id', eventId);
 
   if (updateErr) {

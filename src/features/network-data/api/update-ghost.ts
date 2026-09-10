@@ -13,6 +13,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { CompanyAttrsSchema } from '@/shared/lib/entity-attrs';
 import { COMPANY_ATTR } from '@/features/network-data/model/attribute-keys';
 import { ZodError } from 'zod';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 function nameValid(v: string): boolean {
   return typeof v === 'string' && v.trim().length > 1;
@@ -158,8 +159,8 @@ export async function updateGhostProfile(
 
   // Merge operational settings safely
   const existingAttrs = (ghost.attributes as Record<string, unknown>) ?? {};
-  const existingOps = (existingAttrs[COMPANY_ATTR.operational_settings] as Record<string, unknown>) ?? {};
-  const ops: Record<string, unknown> = {
+  const existingOps = (existingAttrs[COMPANY_ATTR.operational_settings] as JsonObject) ?? {};
+  const ops: JsonObject = {
     ...existingOps,
     doing_business_as: doingBusinessAs ?? existingOps.doing_business_as ?? null,
     entity_type: entityType ?? existingOps.entity_type ?? null,
@@ -172,7 +173,7 @@ export async function updateGhostProfile(
     phone: phoneVal ?? existingOps.phone ?? null,
   };
 
-  const attrPatch: Record<string, unknown> = {
+  const attrPatch: JsonObject = {
     [COMPANY_ATTR.website]: website?.trim() || null,
     [COMPANY_ATTR.brand_color]: brandColor?.trim() || null,
     [COMPANY_ATTR.support_email]: supportEmail?.trim() || null,

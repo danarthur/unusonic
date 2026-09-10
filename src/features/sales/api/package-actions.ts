@@ -9,6 +9,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import type { Package } from '@/types/supabase';
 import { generateAndUpsertEmbedding } from './catalog-embeddings';
 import { observeUpsert } from '@/app/api/aion/lib/embeddings';
+import type { TablesUpdate } from '@/types/supabase';
 
 // NOTE: do NOT re-export `Package` from this 'use server' file.
 // Next 16's server-action bundler produces a value-level re-export for
@@ -303,7 +304,7 @@ export async function updatePackage(
   input: UpdatePackageInput
 ): Promise<UpdatePackageResult> {
   const supabase = await createClient();
-  const updates: Record<string, unknown> = {};
+  const updates: TablesUpdate<'packages'> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() ?? null;
   if (input.category !== undefined) updates.category = input.category;
