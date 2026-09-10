@@ -4,7 +4,7 @@
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
 import type { OrgMemberWithSkillsDTO, EmploymentStatus, OrgMemberRole } from '../model/types';
-import { getTalentSkillsByOrgMemberId } from './get-talent-skills';
+import { getTalentSkillsByEntityId } from './get-talent-skills';
 
 /**
  * Fetch a single roster member by cortex.relationships.id with their talent_skills.
@@ -39,9 +39,9 @@ export async function getOrgMemberWithSkills(
     const attrs = (personEnt.data?.attributes as Record<string, unknown>) ?? {};
     const email = (attrs.email as string | null) ?? null;
 
-    // Skills via legacy org_member_id stored in context_data (crosswalk)
-    const legacyOrgMemberId = (ctx.org_member_id as string | null) ?? null;
-    const skills = legacyOrgMemberId ? await getTalentSkillsByOrgMemberId(legacyOrgMemberId) : [];
+    // Skills hang off the person entity in ops.crew_skills. The legacy
+    // org_member_id crosswalk this used pointed at a table that is gone.
+    const skills = personEnt.data?.id ? await getTalentSkillsByEntityId(personEnt.data.id) : [];
 
     const orgId = targetOrgEnt.data?.legacy_org_id ?? rel.target_entity_id;
 
@@ -100,8 +100,7 @@ export async function getOrgMemberByProfileAndOrg(
       const attrs = (personRes.data.attributes as Record<string, unknown>) ?? {};
       const email = (attrs.email as string | null) ?? null;
 
-      const legacyOrgMemberId = (ctx.org_member_id as string | null) ?? null;
-      const skills = legacyOrgMemberId ? await getTalentSkillsByOrgMemberId(legacyOrgMemberId) : [];
+      const skills = personRes.data.id ? await getTalentSkillsByEntityId(personRes.data.id) : [];
 
       return {
         id: rel.id,

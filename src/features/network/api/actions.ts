@@ -7,7 +7,7 @@
 'use server';
 
 import 'server-only';
-import { unstable_noStore, revalidatePath } from 'next/cache';
+import { unstable_noStore } from 'next/cache';
 import { cookies } from 'next/headers';
 import { createClient } from '@/shared/api/supabase/server';
 import type { NetworkGraph, ValidateInvitationResult } from '../model/types';
@@ -245,22 +245,19 @@ export async function getNetworkGraph(
 
   const orgEntityMap = new Map((orgEntities ?? []).map((e) => [e.id, e]));
 
-  // Private data (org_private_data is still in public schema)
-  const legacyOrgIds = (orgEntities ?? [])
-    .map((e) => e.legacy_org_id)
-    .filter(Boolean) as string[];
+  /*
+    Private notes and internal rating are not read here any more.
 
-  const { data: privateData } = legacyOrgIds.length > 0
-    ? await supabase
-        .from('org_private_data')
-        .select('subject_org_id, private_notes, internal_rating')
-        .eq('owner_org_id', current_org_id)
-        .in('subject_org_id', legacyOrgIds)
-    : { data: [] };
-
-  const privateByLegacyOrgId = new Map(
-    (privateData ?? []).map((p) => [p.subject_org_id, p])
-  );
+    They were stored in `public.org_private_data`, keyed by
+    (owner_org_id, subject_org_id). That table does not exist -- PostgREST
+    answers 404 -- so this always produced an empty map and every org rendered
+    with `private_notes: null`. Rather than keep the shape of a read that
+    cannot succeed, the fields are null explicitly, and the write path says so
+    out loud. See docs/audits/schema-drift-2026-09-10.md for the replacement:
+    the notes belong on `directory.entity_working_notes`, which is already the
+    per-entity, workspace-scoped place for exactly this.
+  */
+  const privateByLegacyOrgId = new Map<string, { private_notes: string | null; internal_rating: number | null }>();
 
   // Get all MEMBER/ROSTER_MEMBER relationships for these org entities
   const { data: memberRels } = await supabase
@@ -295,32 +292,34 @@ export async function getNetworkGraph(
 
   const personEntityMap = new Map((personEntities ?? []).map((e) => [e.id, e]));
 
-  // Get skills via stored org_member_id in ROSTER_MEMBER context_data
-  const orgMemberIds = deduped
-    .filter((r) => r.relationship_type === 'ROSTER_MEMBER')
-    .map((r) => (r.context_data as Record<string, string>)?.org_member_id)
-    .filter(Boolean) as string[];
+  /*
+    Skills, from ops.crew_skills by entity id.
 
-  const { data: skillRows } = orgMemberIds.length > 0
+    This went to `public.talent_skills` by a legacy `org_member_id` carried in
+    the ROSTER_MEMBER edge -- a table that does not exist, so every roster in
+    the network graph came back with no skill tags at all. crew_skills is
+    keyed on the person's entity id and is scoped to the caller's workspaces by
+    RLS, so no crosswalk is needed.
+  */
+  const { data: skillRows } = personEntityIds.length > 0
     ? await supabase
-        .from('talent_skills')
-        .select('org_member_id, skill_tag')
-        .in('org_member_id', orgMemberIds)
+        .schema('ops')
+        .from('crew_skills')
+        .select('entity_id, skill_tag')
+        .in('entity_id', personEntityIds)
     : { data: [] };
 
-  const skillsByOrgMemberId = new Map<string, string[]>();
+  const skillsByEntityId = new Map<string, string[]>();
   for (const s of skillRows ?? []) {
-    const list = skillsByOrgMemberId.get(s.org_member_id) ?? [];
+    const list = skillsByEntityId.get(s.entity_id) ?? [];
     list.push(s.skill_tag);
-    skillsByOrgMemberId.set(s.org_member_id, list);
+    skillsByEntityId.set(s.entity_id, list);
   }
 
-  // Build a map from relationship_id to skill_tags (via org_member_id in context_data)
   const skillsByRelId = new Map<string, string[]>();
   for (const rel of deduped) {
     if (rel.relationship_type !== 'ROSTER_MEMBER') continue;
-    const omId = (rel.context_data as Record<string, string>)?.org_member_id;
-    if (omId) skillsByRelId.set(rel.id, skillsByOrgMemberId.get(omId) ?? []);
+    skillsByRelId.set(rel.id, skillsByEntityId.get(rel.source_entity_id) ?? []);
   }
 
   // Group rels by org entity
@@ -666,19 +665,22 @@ export async function updatePrivateNotes(
   const { orgId } = await getCurrentEntityAndOrg(supabase);
   if (!orgId) return { ok: false, error: 'Not authorized.' };
 
-  const payload = {
-    subject_org_id,
-    owner_org_id: orgId,
-    private_notes: private_notes ?? null,
-    internal_rating: internal_rating ?? null,
-  };
+  /*
+    This wrote to `public.org_private_data`, which does not exist. The upsert
+    404'd, the error was returned -- but the two callers (the client card on a
+    deal, and the Private notes tab in the network sheet) both show a generic
+    failure, so what an owner saw was their typed notes vanishing with a shrug.
 
-  const { error } = await supabase.from('org_private_data').upsert(payload, {
-    onConflict: 'subject_org_id,owner_org_id',
-    ignoreDuplicates: false,
-  });
-  if (error) return { ok: false, error: error.message };
-  revalidatePath('/events');
-  revalidatePath('/network');
-  return { ok: true };
+    Refusing plainly is better than a 404 relayed as a message. The feature
+    comes back on `directory.entity_working_notes` with a `private_notes`
+    column; until then this does not pretend.
+  */
+  void supabase;
+  void subject_org_id;
+  void private_notes;
+  void internal_rating;
+  return {
+    ok: false,
+    error: 'Private notes are not available yet. Nothing was saved.',
+  };
 }

@@ -49,15 +49,14 @@ export type OrgMemberUpdate = Partial<OrgMemberRow>;
  * Migrate callers to ops.crew_skills via getCrewSkillsForEntity.
  *
  * Skill node for display (e.g. badge under member name). */
-export interface TalentSkillDTO {
-  id: string;
-  skill_tag: string;
-  proficiency: SkillLevel;
-  hourly_rate: number | null;
-  verified: boolean;
-}
+/*
+  TalentSkillDTO stood here, describing a row of `public.talent_skills`. That
+  table does not exist; skills live in `ops.crew_skills`, keyed by the person's
+  entity id rather than a legacy org_member_id. CrewSkillDTO is that row, and
+  is now the only one.
+*/
 
-/** Skill record from ops.crew_skills — replaces TalentSkillDTO for new code. */
+/** Skill record from ops.crew_skills. */
 export interface CrewSkillDTO {
   id: string;
   skill_tag: string;
@@ -102,7 +101,7 @@ export interface OrgMemberWithSkillsDTO {
    * @deprecated Legacy skills from public.talent_skills. Use getCrewSkillsForEntity() instead.
    * Kept for backward-compat with callers that haven't migrated. Do not read this field in new code.
    */
-  skills: TalentSkillDTO[];
+  skills: CrewSkillDTO[];
   /** From profiles join (fallback when first_name/last_name empty). */
   profiles?: { full_name: string | null; email: string | null } | null;
 }

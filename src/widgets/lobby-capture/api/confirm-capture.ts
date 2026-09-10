@@ -226,11 +226,11 @@ async function autoFillWorkingNotes(
   await supabase.schema('directory').rpc('upsert_entity_working_notes', {
     p_workspace_id: workspaceId,
     p_entity_id: entityId,
-    p_communication_style: patch.p_communication_style ?? null,
-    p_dnr_flagged: patch.p_dnr_flagged ?? null,
-    p_dnr_reason: patch.p_dnr_reason ?? null,
-    p_dnr_note: patch.p_dnr_note ?? null,
-    p_preferred_channel: patch.p_preferred_channel ?? null,
+    p_communication_style: patch.p_communication_style ?? undefined,
+    p_dnr_flagged: patch.p_dnr_flagged ?? undefined,
+    p_dnr_reason: patch.p_dnr_reason ?? undefined,
+    p_dnr_note: patch.p_dnr_note ?? undefined,
+    p_preferred_channel: patch.p_preferred_channel ?? undefined,
     p_source: 'capture',
   });
 }
@@ -388,14 +388,14 @@ export async function confirmCapture(
       p_transcript: transcript,
       p_parsed_entity: parse.entity ?? null,
       p_parsed_follow_up: finalFollowUp ?? null,
-      p_parsed_note: finalNote && finalNote.length > 0 ? finalNote : null,
-      p_resolved_entity_id: resolvedEntityId,
-      p_created_follow_up_queue_id: null, // deferred — see header comment
-      p_audio_storage_path: null,         // deferred — see header comment
+      p_parsed_note: finalNote && finalNote.length > 0 ? finalNote : undefined,
+      p_resolved_entity_id: resolvedEntityId ?? undefined,
+      p_created_follow_up_queue_id: null, // deferred — see header comment ?? undefined,
+      p_audio_storage_path: null,         // deferred — see header comment ?? undefined,
       p_visibility: visibility,
-      p_linked_deal_id: linkedDealId,
+      p_linked_deal_id: linkedDealId ?? undefined,
       p_note_scope: noteScope ?? undefined,
-      p_linked_event_id: linkedEventId,
+      p_linked_event_id: linkedEventId ?? undefined,
     });
 
   if (rpcError) {

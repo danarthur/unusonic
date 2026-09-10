@@ -49,7 +49,7 @@ export async function setLinkedStatus(
     p_partner_a_id: entityId,
     p_partner_b_id: partnerEntityId,
     p_status: status,
-    p_ended_on: status === 'former' ? endedOn ?? null : null,
+    p_ended_on: status === 'former' ? endedOn ?? undefined : undefined,
   });
   if (error) return { ok: false, error: error.message };
 

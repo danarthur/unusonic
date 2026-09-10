@@ -1,20 +1,33 @@
 'use server';
 
+/**
+ * Skills for one person.
+ *
+ * These read `ops.crew_skills`, keyed by the person's `directory.entities` id.
+ * They used to read `public.talent_skills` by a legacy `org_member_id` carried
+ * in the ROSTER_MEMBER edge's context_data -- a table that does not exist, so
+ * the query 404'd, the `if (error) return []` swallowed it, and every roster
+ * badge and skill list in the product has been empty since. RLS on
+ * `ops.crew_skills` scopes rows to the caller's workspaces, so the entity id is
+ * enough to ask with.
+ *
+ * @module entities/talent/api/get-talent-skills
+ */
+
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
-import type { TalentSkillDTO } from '../model/types';
+import type { CrewSkillDTO } from '../model/types';
 
-/**
- * Fetch all talent_skills for an org_member (for badges / expanded card).
- */
-export async function getTalentSkillsByOrgMemberId(
-  orgMemberId: string
-): Promise<TalentSkillDTO[]> {
+/** Every skill on record for this person, for badges and the expanded card. */
+export async function getTalentSkillsByEntityId(
+  entityId: string
+): Promise<CrewSkillDTO[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from('talent_skills')
+    .schema('ops')
+    .from('crew_skills')
     .select('id, skill_tag, proficiency, hourly_rate, verified')
-    .eq('org_member_id', orgMemberId)
+    .eq('entity_id', entityId)
     .order('skill_tag');
 
   if (error) return [];
@@ -27,17 +40,14 @@ export async function getTalentSkillsByOrgMemberId(
   }));
 }
 
-/**
- * Fetch skill tags only (for roster badges). Returns array of skill_tag strings.
- */
-export async function getSkillTagsByOrgMemberId(
-  orgMemberId: string
-): Promise<string[]> {
+/** Skill tags only, for roster badges. */
+export async function getSkillTagsByEntityId(entityId: string): Promise<string[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from('talent_skills')
+    .schema('ops')
+    .from('crew_skills')
     .select('skill_tag')
-    .eq('org_member_id', orgMemberId)
+    .eq('entity_id', entityId)
     .order('skill_tag');
 
   if (error) return [];

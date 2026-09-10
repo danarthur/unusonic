@@ -13,7 +13,6 @@ import 'server-only';
 
 import { createClient } from '@/shared/api/supabase/server';
 import type { CapabilityKey } from '@/shared/lib/permission-registry';
-import { capabilityToLegacyPermission } from '@/shared/lib/permission-registry';
 
 // ============================================================================
 // Types
@@ -38,9 +37,6 @@ export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer' | 'employee'
 
 // Re-export for callers that want the new capability type
 export type { CapabilityKey } from '@/shared/lib/permission-registry';
-
-// Owner and admin have all permissions by default
-const ELEVATED_ROLES: WorkspaceRole[] = ['owner', 'admin'];
 
 // Employee role slug — used for portal routing checks
 const EMPLOYEE_ROLE_SLUG = 'employee';
@@ -68,14 +64,18 @@ export async function hasCapability(
   const effectiveUserId = userId || (await supabase.auth.getUser()).data.user?.id;
   if (!effectiveUserId) return false;
 
-  // RPC uses auth.uid() for the check; if we're checking another user we must use a different path.
-  // For now, member_has_capability only supports "current user". So if userId is provided and different from current user,
-  // fall back to legacy hasPermission for that user (or we'd need an RPC that accepts p_user_id).
+  /*
+    `member_has_capability` reads auth.uid(), so it can only answer for the
+    caller. Asking about somebody else returns false.
+
+    This used to fall back to `hasPermission`, which read a
+    `workspace_members.permissions` column that does not exist -- so the
+    fallback returned false too, by way of a 400 rather than a decision.
+    Returning false directly is the same answer without the round trip, and it
+    is honest about the limit: what this needs is an RPC taking p_user_id.
+  */
   const { data: { user } } = await supabase.auth.getUser();
   if (user && userId && user.id !== userId) {
-    // Caller asked for a different user; RPC uses auth.uid(). Use legacy path if this capability maps to a legacy key.
-    const legacyKey = capabilityToLegacyPermission(capabilityKey);
-    if (legacyKey) return hasPermission(userId, workspaceId, legacyKey as PermissionKey);
     return false;
   }
 
@@ -87,123 +87,22 @@ export async function hasCapability(
   return data === true;
 }
 
-// ============================================================================
-// Core Permission Check (legacy keys; can delegate to hasCapability when mapped)
-// ============================================================================
+/*
+  hasPermission and hasPermissions lived here and are gone.
 
-/**
- * Checks if a user has a specific permission in a workspace
- * 
- * Uses the database function `member_has_permission` which:
- * - Returns TRUE for owners (all permissions)
- * - Returns TRUE for admins (most permissions)
- * - Checks JSONB permissions for members/viewers
- * 
- * @param userId - The user ID to check (optional, defaults to current user)
- * @param workspaceId - The workspace ID
- * @param permissionKey - The permission to check
- * @returns boolean indicating if user has permission
- * 
- * @example
- * const canViewFinance = await hasPermission(userId, workspaceId, 'view_finance');
- * if (!canViewFinance) {
- *   redirect('/unauthorized');
- * }
- */
-export async function hasPermission(
-  userId: string | null,
-  workspaceId: string,
-  permissionKey: PermissionKey
-): Promise<boolean> {
-  const supabase = await createClient();
-  
-  // If no userId provided, use current authenticated user
-  const effectiveUserId = userId || (await supabase.auth.getUser()).data.user?.id;
-  
-  if (!effectiveUserId) {
-    return false;
-  }
-  
-  // Query the workspace membership and check permissions
-  const { data: member, error } = await supabase
-    .from('workspace_members')
-    .select('role, permissions')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', effectiveUserId)
-    .single();
-  
-  if (error || !member) {
-    return false;
-  }
-  
-  // Owners and admins have all permissions
-  if (ELEVATED_ROLES.includes(member.role as WorkspaceRole)) {
-    return true;
-  }
-  
-  // Check JSONB permissions for regular members
-  const permissions = member.permissions as WorkspacePermissions | null;
-  return permissions?.[permissionKey] ?? false;
-}
+  Both selected `role, permissions` from `public.workspace_members`. There is no
+  `permissions` column -- capabilities moved onto the member's role -- so the
+  query returned a 400, the `if (error) return false` fired, and both functions
+  denied everyone, workspace owners included. They had no callers, which is the
+  only reason nothing broke.
 
-// ============================================================================
-// Batch Permission Check
-// ============================================================================
+  `hasCapability` above is the live path: role_id -> ops.workspace_roles ->
+  ops.workspace_role_permissions, through `member_has_capability`.
 
-/**
- * Checks multiple permissions at once for efficiency
- * 
- * @param userId - The user ID to check
- * @param workspaceId - The workspace ID
- * @param permissionKeys - Array of permissions to check
- * @returns Object with permission keys as keys and booleans as values
- * 
- * @example
- * const perms = await hasPermissions(userId, workspaceId, ['view_finance', 'manage_team']);
- * // { view_finance: true, manage_team: false }
- */
-export async function hasPermissions(
-  userId: string | null,
-  workspaceId: string,
-  permissionKeys: PermissionKey[]
-): Promise<Record<PermissionKey, boolean>> {
-  const supabase = await createClient();
-  
-  const effectiveUserId = userId || (await supabase.auth.getUser()).data.user?.id;
-  
-  // Default all to false
-  const result: Record<PermissionKey, boolean> = {
-    view_finance: false,
-    view_planning: false,
-    view_ros: false,
-    manage_team: false,
-    manage_locations: false,
-  };
-  
-  if (!effectiveUserId) {
-    return result;
-  }
-  
-  const { data: member, error } = await supabase
-    .from('workspace_members')
-    .select('role, permissions')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', effectiveUserId)
-    .single();
-  
-  if (error || !member) {
-    return result;
-  }
-  
-  const isElevated = ELEVATED_ROLES.includes(member.role as WorkspaceRole);
-  const permissions = member.permissions as WorkspacePermissions | null;
-  
-  for (const key of permissionKeys) {
-    result[key] = isElevated || (permissions?.[key] ?? false);
-  }
-  
-  return result;
-}
+  The PermissionKey / WorkspacePermissions types stay for
+  `capabilityToLegacyPermission`, which maps a capability back to a legacy key
+  for the one place that still needs it.
+*/
 
 // ============================================================================
 // Role Check
@@ -273,55 +172,12 @@ export async function isEmployee(workspaceId: string): Promise<boolean> {
 // Convenience Methods
 // ============================================================================
 
-/**
- * Checks if user can view finance data
- */
-export async function canViewFinance(
-  userId: string | null,
-  workspaceId: string
-): Promise<boolean> {
-  return hasPermission(userId, workspaceId, 'view_finance');
-}
-
-/**
- * Checks if user can view planning data
- */
-export async function canViewPlanning(
-  userId: string | null,
-  workspaceId: string
-): Promise<boolean> {
-  return hasPermission(userId, workspaceId, 'view_planning');
-}
-
-/**
- * Checks if user can view run-of-show data
- */
-export async function canViewROS(
-  userId: string | null,
-  workspaceId: string
-): Promise<boolean> {
-  return hasPermission(userId, workspaceId, 'view_ros');
-}
-
-/**
- * Checks if user can manage team members
- */
-export async function canManageTeam(
-  userId: string | null,
-  workspaceId: string
-): Promise<boolean> {
-  return hasPermission(userId, workspaceId, 'manage_team');
-}
-
-/**
- * Checks if user can manage locations
- */
-export async function canManageLocations(
-  userId: string | null,
-  workspaceId: string
-): Promise<boolean> {
-  return hasPermission(userId, workspaceId, 'manage_locations');
-}
+/*
+  canViewFinance, canViewPlanning, canViewROS, canManageTeam and
+  canManageLocations were one-line wrappers around hasPermission, and had no
+  callers. They go with it. Ask `hasCapability(userId, workspaceId, key)` with a
+  key from the permission registry.
+*/
 
 // ============================================================================
 // Deal stakeholder overrides (contextual access)
@@ -353,6 +209,7 @@ export async function canAccessDealFinancials(
   if (!dirEnt?.id) return false;
 
   const { data: stake, error } = await supabase
+    .schema('ops')
     .from('deal_stakeholders')
     .select('id')
     .eq('deal_id', dealId)
@@ -386,6 +243,7 @@ export async function canAccessDealProposals(
   if (!dirEnt?.id) return false;
 
   const { data: stake, error } = await supabase
+    .schema('ops')
     .from('deal_stakeholders')
     .select('id')
     .eq('deal_id', dealId)
@@ -400,24 +258,10 @@ export async function canAccessDealProposals(
 // Guard Functions (for use in Server Components/Actions)
 // ============================================================================
 
-/**
- * Throws an error if user doesn't have permission
- * Use in server actions to protect endpoints
- * 
- * @throws Error if permission denied
- */
-export async function requirePermission(
-  userId: string | null,
-  workspaceId: string,
-  permissionKey: PermissionKey,
-  errorMessage: string = 'Permission denied'
-): Promise<void> {
-  const allowed = await hasPermission(userId, workspaceId, permissionKey);
-  
-  if (!allowed) {
-    throw new Error(errorMessage);
-  }
-}
+/*
+  requirePermission threw when hasPermission said no. Same story: no callers,
+  and the check underneath it could not succeed. Guard with `hasCapability`.
+*/
 
 /**
  * Throws an error if user isn't at least the specified role

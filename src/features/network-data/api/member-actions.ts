@@ -26,10 +26,10 @@ export async function updateGhostMember(
   const { data: result, error } = await supabase.rpc('update_ghost_member', {
     p_creator_org_id: sourceOrgId,
     p_member_id: memberId,
-    p_role: payload.role ?? null,
-    p_job_title: payload.jobTitle ?? null,
-    p_avatar_url: payload.avatarUrl ?? null,
-    p_phone: payload.phone ?? null,
+    p_role: payload.role ?? undefined,
+    p_job_title: payload.jobTitle ?? undefined,
+    p_avatar_url: payload.avatarUrl ?? undefined,
+    p_phone: payload.phone ?? undefined,
   });
 
   if (error) return { ok: false, error: error.message };

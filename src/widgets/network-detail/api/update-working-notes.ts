@@ -55,11 +55,11 @@ export async function updateWorkingNotes(
     .rpc('upsert_entity_working_notes', {
       p_workspace_id: workspaceId,
       p_entity_id: entityId,
-      p_communication_style: patch.communicationStyle ?? null,
-      p_dnr_flagged: patch.dnr?.flagged ?? null,
-      p_dnr_reason: patch.dnr?.reason ?? null,
-      p_dnr_note: patch.dnr?.note ?? null,
-      p_preferred_channel: patch.preferredChannel ?? null,
+      p_communication_style: patch.communicationStyle ?? undefined,
+      p_dnr_flagged: patch.dnr?.flagged ?? undefined,
+      p_dnr_reason: patch.dnr?.reason ?? undefined,
+      p_dnr_note: patch.dnr?.note ?? undefined,
+      p_preferred_channel: patch.preferredChannel ?? undefined,
       p_source: 'manual',
     });
 

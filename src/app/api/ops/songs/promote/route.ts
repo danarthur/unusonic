@@ -92,7 +92,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     p_event_id: input.eventId,
     p_entry_id: input.entryId,
     p_tier: input.tier,
-    p_assigned_moment_id: input.assignedMomentId ?? null,
+    p_assigned_moment_id: input.assignedMomentId ?? undefined,
   });
 
   const row = Array.isArray(data) ? data[0] : data;

@@ -268,7 +268,7 @@ export async function upsertGhostMember(
     p_last_name: last_name,
     p_email: emailTrim,
     p_role: (role === 'manager' ? 'member' : role) as RpcOrgMemberRole,
-    p_job_title: job_title?.trim() || null,
+    p_job_title: job_title?.trim() || undefined,
   });
 
   if (rpcErr) {

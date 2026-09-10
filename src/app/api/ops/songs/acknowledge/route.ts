@@ -89,7 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { data, error } = await supabase.rpc('ops_songs_acknowledge_client_request', {
     p_event_id: input.eventId,
     p_entry_id: input.entryId,
-    p_moment_label: input.momentLabel ?? null,
+    p_moment_label: input.momentLabel ?? undefined,
   });
 
   const row = Array.isArray(data) ? data[0] : data;

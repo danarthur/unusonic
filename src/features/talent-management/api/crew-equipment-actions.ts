@@ -282,7 +282,7 @@ export async function reviewCrewEquipment(
   const { error } = await supabase.rpc('review_crew_equipment', {
     p_crew_equipment_id: parsed.data.crew_equipment_id,
     p_decision: parsed.data.decision,
-    p_rejection_reason: parsed.data.rejection_reason ?? null,
+    p_rejection_reason: parsed.data.rejection_reason ?? undefined,
   });
 
   if (error) return { ok: false, error: error.message };

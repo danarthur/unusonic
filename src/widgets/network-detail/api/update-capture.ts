@@ -142,8 +142,8 @@ export async function updateCapture(
     case 'edit': {
       const { error } = await cortex.rpc('update_capture_content', {
         p_capture_id: input.captureId,
-        p_transcript: input.transcript ?? null,
-        p_parsed_note: input.parsedNote ?? null,
+        p_transcript: input.transcript ?? undefined,
+        p_parsed_note: input.parsedNote ?? undefined,
       });
       if (error) return { ok: false, error: error.message };
 
