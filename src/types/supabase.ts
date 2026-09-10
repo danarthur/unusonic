@@ -8537,6 +8537,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_workspace_label_pack: {
+        Args: { p_pack: string; p_workspace_id: string }
+        Returns: Json
+      }
       strip_industry_tag: {
         Args: { p_tag: string; p_workspace_id: string }
         Returns: undefined

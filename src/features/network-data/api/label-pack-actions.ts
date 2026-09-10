@@ -39,12 +39,32 @@ export async function setWorkspaceLabelPack(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!workspaceId) return { ok: false, error: 'Missing workspace.' };
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('workspaces')
-    .update({ network_label_pack: pack })
-    .eq('id', workspaceId);
 
+  /*
+    Through an RPC, because the direct update could never work and said nothing.
+
+    `public.workspaces` has RLS policies for INSERT and SELECT and none for
+    UPDATE, so this matched zero rows -- and PostgREST does not treat a zero-row
+    update as an error. The action returned ok, the picker showed success, and
+    the setting had never once been written since it shipped.
+
+    A policy would have been the smaller change and the wrong one: broad enough
+    to permit this column, it would also permit stripe_customer_id and
+    subscription_status. One column, one function, one check.
+  */
+  const { data, error } = await supabase.rpc('set_workspace_label_pack', {
+    p_workspace_id: workspaceId,
+    p_pack: pack,
+  });
   if (error) return { ok: false, error: error.message };
+
+  // The RPC reports a miss rather than raising, so a silent no-op stays
+  // impossible rather than merely unlikely.
+  const result = data as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) {
+    return { ok: false, error: result?.error ?? 'Could not change the vocabulary.' };
+  }
+
   revalidatePath('/network');
   revalidatePath('/settings');
   return { ok: true };
