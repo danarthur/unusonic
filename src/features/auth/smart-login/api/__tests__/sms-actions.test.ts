@@ -1,5 +1,7 @@
 /**
- * Phase 6 — `sendSmsOtpAction` + `verifySmsOtpAction` + `toggleSmsSigninEnabled`.
+ * Phase 6 — `sendSmsOtpAction` + `verifySmsOtpAction`.
+ *
+ * `toggleSmsSigninEnabled` has its own file next door.
  *
  * We mock the three heavy dependencies (service role client, Supabase
  * server client, and the edge-function fetch) so the tests exercise the
@@ -106,7 +108,6 @@ vi.mock('@/shared/api/supabase/system', () => ({
 import {
   sendSmsOtpAction,
   verifySmsOtpAction,
-  toggleSmsSigninEnabled,
 } from '../sms-actions';
 
 beforeEach(() => {
@@ -422,74 +423,6 @@ describe('verifySmsOtpAction — hash compare', () => {
       email: 'user@example.com',
       code: '123456',
     });
-    expect(result.ok).toBe(false);
-  });
-});
-
-// ─── toggleSmsSigninEnabled ─────────────────────────────────────────────────
-
-describe('toggleSmsSigninEnabled', () => {
-  it('blocks when caller is unauthenticated', async () => {
-    createServerClientMock.mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
-    });
-
-    const result = await toggleSmsSigninEnabled('ws-1', true);
-    expect(result.ok).toBe(false);
-  });
-
-  it('blocks when user_has_workspace_role returns false', async () => {
-    createServerClientMock.mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u' } } }) },
-      rpc: rpcMock.mockResolvedValue({ data: false, error: null }),
-      from: vi.fn(),
-    });
-
-    const result = await toggleSmsSigninEnabled('ws-1', true);
-    expect(result.ok).toBe(false);
-    expect(rpcMock).toHaveBeenCalledWith('user_has_workspace_role', {
-      p_workspace_id: 'ws-1',
-      p_roles: ['owner', 'admin'],
-    });
-  });
-
-  it('persists the change when caller is an owner', async () => {
-    const fromBuilder = {
-      update: updateMock.mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      select: vi.fn().mockResolvedValue({ data: [{ id: 'ws-1' }], error: null }),
-    };
-    createServerClientMock.mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u' } } }) },
-      rpc: rpcMock.mockResolvedValue({ data: true, error: null }),
-      from: vi.fn(() => fromBuilder),
-    });
-
-    const result = await toggleSmsSigninEnabled('ws-1', true);
-    expect(result.ok).toBe(true);
-    expect(updateMock).toHaveBeenCalledWith({ sms_signin_enabled: true });
-  });
-
-  /*
-    The shape this action shipped in for months. `public.workspaces` had no
-    UPDATE policy, so the statement matched zero rows -- and PostgREST does not
-    call that an error. The old assertion here passed against a mock that
-    resolved `{ error: null }`, which is exactly what production was returning
-    while the setting stayed false.
-  */
-  it('reports failure when the update matches no rows', async () => {
-    const fromBuilder = {
-      update: updateMock.mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      select: vi.fn().mockResolvedValue({ data: [], error: null }),
-    };
-    createServerClientMock.mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u' } } }) },
-      rpc: rpcMock.mockResolvedValue({ data: true, error: null }),
-      from: vi.fn(() => fromBuilder),
-    });
-
-    const result = await toggleSmsSigninEnabled('ws-1', true);
     expect(result.ok).toBe(false);
   });
 });

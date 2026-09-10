@@ -190,7 +190,7 @@ export async function removeSkillFromMember(input: RemoveSkillInput): Promise<Me
 export async function getWorkspaceMemberByOrgMemberId(
   orgMemberId: string,
   workspaceId: string
-): Promise<{ workspaceMemberId: string; roleId: string | null } | null> {
+): Promise<{ userId: string; roleId: string | null } | null> {
   const supabase = await createClient();
 
   // orgMemberId is cortex.relationships.id
@@ -214,11 +214,14 @@ export async function getWorkspaceMemberByOrgMemberId(
 
   const { data: wm } = await supabase
     .from('workspace_members')
-    .select('id, role_id')
+    .select('role_id')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .maybeSingle();
   if (!wm) return null;
 
-  return { workspaceMemberId: wm.id, roleId: wm.role_id ?? null };
+  // The user id is the identity. `workspace_members` has no id column, so the
+  // `workspaceMemberId` this used to return was undefined, and the role select
+  // it fed then filtered on undefined.
+  return { userId, roleId: wm.role_id ?? null };
 }

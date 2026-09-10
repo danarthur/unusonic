@@ -21,33 +21,19 @@ import {
   type OffboardTeamMemberPayload,
 } from '@/app/actions/offboard-team-member-schema';
 import { canAddSeat } from '@/shared/lib/seat-limits';
+import { writeLanded } from '@/shared/lib/write-landed';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface WorkspacePermissions {
-  view_finance: boolean;
-  view_planning: boolean;
-  view_ros: boolean;
-  manage_team: boolean;
-  manage_locations: boolean;
-}
+/*
+  WorkspacePermissions and SetupWorkspaceResult lived here.
 
-
-
-export interface SetupWorkspaceResult {
-  success: boolean;
-  error?: string;
-  workspace?: {
-    id: string;
-    name: string;
-  };
-  location?: {
-    id: string;
-    name: string;
-  };
-}
+  The first described a `workspace_members.permissions` column that no longer
+  exists; capabilities now hang off the member's role. The second described the
+  return of a function deleted in the commit before this one.
+*/
 
 // ============================================================================
 // Setup Initial Workspace
@@ -74,145 +60,41 @@ export interface SetupWorkspaceResult {
   than no path.
 */
 
-// ============================================================================
-// Update Member Permissions
-// ============================================================================
+/*
+  updateMemberPermissions and updateMemberDepartment lived here and are gone.
 
-/**
- * Updates a member's permissions in a workspace
- * Requires manage_team permission or owner/admin role
- */
-export async function updateMemberPermissions(
-  workspaceId: string,
-  memberId: string,
-  permissions: Partial<WorkspacePermissions>
-): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: 'Not authenticated' };
-  }
-  
-  // Check if user has permission to manage team
-  const { data: currentMember } = await supabase
-    .from('workspace_members')
-    .select('role, permissions')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .single();
-  
-  if (!currentMember) {
-    return { success: false, error: 'Not a member of this workspace' };
-  }
-  
-  const canManage = 
-    currentMember.role === 'owner' || 
-    currentMember.role === 'admin' ||
-    (currentMember.permissions as WorkspacePermissions)?.manage_team;
-  
-  if (!canManage) {
-    return { success: false, error: 'Insufficient permissions' };
-  }
-  
-  // Get target member's current permissions
-  const { data: targetMember } = await supabase
-    .from('workspace_members')
-    .select('role, permissions')
-    .eq('id', memberId)
-    .eq('workspace_id', workspaceId)
-    .single();
-  
-  if (!targetMember) {
-    return { success: false, error: 'Member not found' };
-  }
-  
-  // Prevent modifying owner permissions (unless you're the owner)
-  if (targetMember.role === 'owner' && currentMember.role !== 'owner') {
-    return { success: false, error: 'Cannot modify owner permissions' };
-  }
-  
-  // Merge permissions
-  const updatedPermissions = {
-    ...(targetMember.permissions as WorkspacePermissions),
-    ...permissions,
-  };
-  
-  const { error } = await supabase
-    .from('workspace_members')
-    .update({ permissions: updatedPermissions })
-    .eq('id', memberId);
-  
-  if (error) {
-    return { success: false, error: error.message };
-  }
-  
-  revalidatePath('/settings');
-  return { success: true };
-}
+  `public.workspace_members` holds four columns -- workspace_id, user_id, role,
+  role_id. There is no `id`, no `permissions` and no `department`. Both actions
+  selected `role, permissions` before doing anything else, so both returned a
+  400 and bailed out with "Not a member of this workspace" shown to the
+  workspace owner.
 
-// ============================================================================
-// Update Member Department
-// ============================================================================
+  They are not repaired, because what they were built on moved. Per-member
+  JSONB permissions were replaced by roles: a member carries a `role_id` into
+  `ops.workspace_roles`, whose permissions live in
+  `ops.workspace_role_permissions`, and `member_has_capability` is what reads
+  them. That model has its own editor at /settings/roles. Reinstating a second,
+  per-member way to grant the same capabilities would put the two out of step
+  the first time anyone used it.
 
-/**
- * Updates a member's department
- * Requires manage_team permission or owner/admin role
- */
-export async function updateMemberDepartment(
-  workspaceId: string,
-  memberId: string,
-  department: string
-): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: 'Not authenticated' };
-  }
-  
-  // Check if user has permission to manage team
-  const { data: currentMember } = await supabase
-    .from('workspace_members')
-    .select('role, permissions')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .single();
-  
-  if (!currentMember) {
-    return { success: false, error: 'Not a member of this workspace' };
-  }
-  
-  const canManage = 
-    currentMember.role === 'owner' || 
-    currentMember.role === 'admin' ||
-    (currentMember.permissions as WorkspacePermissions)?.manage_team;
-  
-  if (!canManage) {
-    return { success: false, error: 'Insufficient permissions' };
-  }
-  
-  const { error } = await supabase
-    .from('workspace_members')
-    .update({ department: department.trim() })
-    .eq('id', memberId)
-    .eq('workspace_id', workspaceId);
-  
-  if (error) {
-    return { success: false, error: error.message };
-  }
-  
-  revalidatePath('/settings');
-  return { success: true };
-}
-
+  Department has no replacement because it had no reader beyond its own input.
+*/
 
 // ============================================================================
 // Get Workspace Members
 // ============================================================================
 
+/**
+ * A member of a workspace.
+ *
+ * There is no member id, because there is no member id column: the primary key
+ * of `public.workspace_members` is (workspace_id, user_id). This type used to
+ * claim an `id`, a `department`, a `permissions` object, a `primaryLocationId`
+ * and a `joinedAt`, none of which the table has -- so the select that filled it
+ * returned a 400 and every caller saw an empty team.
+ */
 export interface WorkspaceMemberData {
-  id: string;
+  /** The identity of a member, and the half of the key that is not the workspace. */
   userId: string;
   email: string;
   fullName: string | null;
@@ -222,10 +104,6 @@ export interface WorkspaceMemberData {
   /** Resolved role from workspace_roles when role_id is set. */
   roleId: string | null;
   roleName: string | null;
-  department: string | null;
-  permissions: WorkspacePermissions;
-  primaryLocationId: string | null;
-  joinedAt: string;
   /** Cortex ROSTER_MEMBER edge ID (null if no roster entry). */
   rosterEdgeId: string | null;
   /** Admin override portal profile key (null = auto-detect). */
@@ -243,14 +121,9 @@ export async function getWorkspaceMembers(
   const { data: members, error } = await supabase
     .from('workspace_members')
     .select(`
-      id,
       user_id,
       role,
       role_id,
-      department,
-      permissions,
-      primary_location_id,
-      created_at,
       profiles:user_id (
         email,
         full_name,
@@ -263,8 +136,7 @@ export async function getWorkspaceMembers(
       )
     `)
     .eq('workspace_id', workspaceId)
-    .order('role')
-    .order('created_at', { ascending: true });
+    .order('role');
 
   if (error) {
     return { success: false, error: error.message };
@@ -318,7 +190,6 @@ export async function getWorkspaceMembers(
     const roleName = roleRow && typeof roleRow === 'object' && roleRow !== null && 'name' in roleRow ? (roleRow as { name: string }).name : null;
     const roster = rosterMap.get(m.user_id);
     return {
-      id: m.id,
       userId: m.user_id,
       email: profile?.email || '',
       fullName: profile?.full_name || null,
@@ -326,10 +197,6 @@ export async function getWorkspaceMembers(
       role: m.role as 'owner' | 'admin' | 'member' | 'viewer',
       roleId: m.role_id ?? null,
       roleName,
-      department: m.department,
-      permissions: m.permissions as WorkspacePermissions,
-      primaryLocationId: m.primary_location_id,
-      joinedAt: m.created_at,
       rosterEdgeId: roster?.edgeId ?? null,
       portalProfile: roster?.portalProfile ?? null,
     };
@@ -371,18 +238,11 @@ export async function offboardTeamMember(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: 'Not authenticated.' };
 
-  const { data: currentMember } = await supabase
-    .from('workspace_members')
-    .select('role, permissions')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  const canManage =
-    currentMember?.role === 'owner' ||
-    currentMember?.role === 'admin' ||
-    (currentMember?.permissions as WorkspacePermissions)?.manage_team;
-  if (!currentMember || !canManage) {
+  const { data: canManage } = await supabase.rpc('user_has_workspace_role', {
+    p_workspace_id: workspaceId,
+    p_roles: ['owner', 'admin'],
+  });
+  if (canManage !== true) {
     return { success: false, error: 'You do not have permission to offboard members in this workspace.' };
   }
 
@@ -392,7 +252,7 @@ export async function offboardTeamMember(
 
   const { data: targetRow } = await supabase
     .from('workspace_members')
-    .select('id, role')
+    .select('role')
     .eq('workspace_id', workspaceId)
     .eq('user_id', targetUserId)
     .maybeSingle();
@@ -406,7 +266,7 @@ export async function offboardTeamMember(
   if (isOwner) {
     const { count, error: countErr } = await supabase
       .from('workspace_members')
-      .select('id', { count: 'exact', head: true })
+      .select('user_id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .eq('role', 'owner');
     if (countErr || (count ?? 0) <= 1) {
@@ -418,14 +278,21 @@ export async function offboardTeamMember(
   }
 
   // Step 2: Revoke software access — delete from workspace_members.
-  const { error: deleteWmErr } = await supabase
-    .from('workspace_members')
-    .delete()
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', targetUserId);
-
-  if (deleteWmErr) {
-    return { success: false, error: deleteWmErr.message ?? 'Failed to revoke access.' };
+  // `.select()` so a zero-row delete is a failure rather than a success. The
+  // authenticated client cannot delete from public.workspace_members at all --
+  // the table has no DELETE policy -- and without this the action would report
+  // that it had revoked access it had not revoked.
+  const revoked = writeLanded(
+    await supabase
+      .from('workspace_members')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', targetUserId)
+      .select('user_id'),
+    'the access change',
+  );
+  if (!revoked.ok) {
+    return { success: false, error: revoked.error };
   }
 
   // Step 3: Roster management (only for full_offboard).
@@ -548,17 +415,14 @@ export async function inviteTeamMember(
     return { success: false, error: 'This workspace does not match your organization. Use the correct workspace.' };
   }
 
-  const { data: currentMember } = await supabase
-    .from('workspace_members')
-    .select('role, permissions')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  const canManage =
-    currentMember?.role === 'owner' ||
-    currentMember?.role === 'admin' ||
-    (currentMember?.permissions as WorkspacePermissions)?.manage_team;
-  if (!currentMember || !canManage) {
+  // Through the RPC, because the membership row no longer carries a
+  // `permissions` column -- selecting it here returned a 400, so this gate
+  // denied everyone, the workspace owner included.
+  const { data: canManage } = await supabase.rpc('user_has_workspace_role', {
+    p_workspace_id: workspaceId,
+    p_roles: ['owner', 'admin'],
+  });
+  if (canManage !== true) {
     return { success: false, error: 'You do not have permission to invite team members to this workspace.' };
   }
 
@@ -572,7 +436,7 @@ export async function inviteTeamMember(
     p_last_name: last_name.trim(),
     p_email: email.trim(),
     p_role: dbRole,
-    p_job_title: job_title?.trim() || null,
+    p_job_title: job_title?.trim() || undefined,
   });
 
   if (rpcErr) {
@@ -685,84 +549,13 @@ async function rollbackRosterStep(
   console.warn('[inviteTeamMember] Rollback: ghost roster entry left in cortex (no workspace access).');
 }
 
-// ============================================================================
-// Get Workspace Locations
-// ============================================================================
+/*
+  getWorkspaceLocations and addLocation lived here, along with LocationData.
 
-export interface LocationData {
-  id: string;
-  name: string;
-  address: string | null;
-  isPrimary: boolean;
-}
+  Both queried `public.locations`, a table that does not exist -- PostgREST
+  answers 404 -- so the Settings locations panel has been listing nothing and
+  its add button returning an error for as long as the table has been absent.
 
-/**
- * Fetches all locations for a workspace
- */
-export async function getWorkspaceLocations(
-  workspaceId: string
-): Promise<{ success: boolean; locations?: LocationData[]; error?: string }> {
-  const supabase = await createClient();
-  
-  const { data: locations, error } = await supabase
-    .from('locations')
-    .select('id, name, address, is_primary')
-    .eq('workspace_id', workspaceId)
-    .order('is_primary', { ascending: false })
-    .order('name');
-  
-  if (error) {
-    return { success: false, error: error.message };
-  }
-  
-  const formattedLocations: LocationData[] = locations.map((l) => ({
-    id: l.id,
-    name: l.name,
-    address: l.address,
-    isPrimary: l.is_primary,
-  }));
-  
-  return { success: true, locations: formattedLocations };
-}
-
-// ============================================================================
-// Add Location
-// ============================================================================
-
-/**
- * Adds a new location to the workspace
- */
-export async function addLocation(
-  workspaceId: string,
-  name: string,
-  address?: string
-): Promise<{ success: boolean; location?: LocationData; error?: string }> {
-  const supabase = await createClient();
-  
-  const { data: location, error } = await supabase
-    .from('locations')
-    .insert({
-      workspace_id: workspaceId,
-      name: name.trim(),
-      address: address?.trim() || null,
-      is_primary: false,
-    })
-    .select()
-    .single();
-  
-  if (error) {
-    return { success: false, error: error.message };
-  }
-  
-  revalidatePath('/settings');
-  
-  return {
-    success: true,
-    location: {
-      id: location.id,
-      name: location.name,
-      address: location.address,
-      isPrimary: location.is_primary,
-    },
-  };
-}
+  There is nothing to restore. A place a show happens is a `directory.entities`
+  row of type 'venue', which is where the rest of the product already looks.
+*/

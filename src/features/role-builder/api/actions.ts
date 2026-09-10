@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@/shared/api/supabase/server';
+import { writeLanded } from '@/shared/lib/write-landed';
 import { revalidatePath } from 'next/cache';
 import type { CapabilityKey } from '@/shared/lib/permission-registry';
 import type { PermissionScope } from '../model/permission-metadata';
@@ -207,7 +208,7 @@ export async function updateCustomRole(
  */
 export async function updateMemberRole(
   workspaceId: string,
-  memberId: string,
+  targetUserId: string,
   roleId: string
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
@@ -219,7 +220,7 @@ export async function updateMemberRole(
 
   const { data: currentMember } = await supabase
     .from('workspace_members')
-    .select('role, permissions')
+    .select('role')
     .eq('workspace_id', workspaceId)
     .eq('user_id', user.id)
     .single();
@@ -228,21 +229,16 @@ export async function updateMemberRole(
     return { success: false, error: 'Not a member of this workspace' };
   }
 
-  const canManage =
-    currentMember.role === 'owner' ||
-    currentMember.role === 'admin' ||
-    (currentMember.permissions as { manage_team?: boolean } | null)?.manage_team;
-
-  if (!canManage) {
+  if (currentMember.role !== 'owner' && currentMember.role !== 'admin') {
     return { success: false, error: 'Insufficient permissions' };
   }
 
   const { data: targetMember } = await supabase
     .from('workspace_members')
     .select('role')
-    .eq('id', memberId)
+    .eq('user_id', targetUserId)
     .eq('workspace_id', workspaceId)
-    .single();
+    .maybeSingle();
 
   if (!targetMember) {
     return { success: false, error: 'Member not found' };
@@ -251,7 +247,7 @@ export async function updateMemberRole(
   if (targetMember.role === 'owner') {
     const { count, error: countErr } = await supabase
       .from('workspace_members')
-      .select('id', { count: 'exact', head: true })
+      .select('user_id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .eq('role', 'owner');
     if (countErr || (count ?? 0) <= 1) {
@@ -278,14 +274,21 @@ export async function updateMemberRole(
     observer: 'viewer',
   };
   const legacyRole = systemSlugToLegacy[roleRow.slug] ?? 'member';
-  const { error } = await supabase
-    .from('workspace_members')
-    .update({ role_id: roleId, role: legacyRole })
-    .eq('id', memberId)
-    .eq('workspace_id', workspaceId);
 
-  if (error) {
-    return { success: false, error: error.message };
+  // `public.workspace_members` has no UPDATE policy, so this matches zero rows
+  // and PostgREST calls that a success. Until the policy lands, the action has
+  // to notice for itself.
+  const landed = writeLanded(
+    await supabase
+      .from('workspace_members')
+      .update({ role_id: roleId, role: legacyRole })
+      .eq('user_id', targetUserId)
+      .eq('workspace_id', workspaceId)
+      .select('user_id'),
+    'the role',
+  );
+  if (!landed.ok) {
+    return { success: false, error: landed.error };
   }
 
   revalidatePath('/settings');

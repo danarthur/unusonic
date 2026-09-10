@@ -1,6 +1,17 @@
 /**
  * Team Management Component
- * Manage workspace members, departments, and permissions
+ *
+ * Who is in the workspace, and what role each of them holds. What a role can
+ * do is decided in one place, /settings/roles, and read back through
+ * `member_has_capability`.
+ *
+ * There used to be a per-member permissions grid and a department select here.
+ * Both wrote to `public.workspace_members` columns that do not exist, so both
+ * had been failing on every click; and the grid granted the same five
+ * capabilities the role editor grants, which is a second source of truth for
+ * the same question. Removing it is not a reduction -- the toggles never once
+ * saved.
+ *
  * @module app/(dashboard)/settings/components/team-management
  */
 
@@ -14,25 +25,10 @@ import {
   Users, 
   Shield, 
   ChevronDown, 
-  ChevronUp,
   Check, 
   X, 
-  Loader2,
-  User,
-  Building,
-  Eye,
-  EyeOff,
-  Calendar,
-  Wallet,
-  ClipboardList,
-  MapPin,
 } from 'lucide-react';
-import { 
-  updateMemberPermissions, 
-  updateMemberDepartment,
-  type WorkspaceMemberData,
-  type WorkspacePermissions,
-} from '@/app/actions/workspace';
+import type { WorkspaceMemberData } from '@/app/actions/workspace';
 import { WorkspaceRoleSelect } from '@/features/role-builder';
 import { PortalProfileSelect } from '@/features/team-invite/ui/PortalProfileSelect';
 import { updatePortalProfile } from '@/features/team-invite';
@@ -48,61 +44,9 @@ interface TeamManagementProps {
   currentUserRole: 'owner' | 'admin' | 'member' | 'viewer';
 }
 
-interface PermissionConfig {
-  key: keyof WorkspacePermissions;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
 // ============================================================================
 // Constants
 // ============================================================================
-
-const PERMISSION_CONFIGS: PermissionConfig[] = [
-  {
-    key: 'view_finance',
-    label: 'View Finance',
-    description: 'Access financial reports and QuickBooks data',
-    icon: Wallet,
-  },
-  {
-    key: 'view_planning',
-    label: 'View Planning',
-    description: 'Access event planning and scheduling',
-    icon: Calendar,
-  },
-  {
-    key: 'view_ros',
-    label: 'View Run of Show',
-    description: 'Access production run-of-show documents',
-    icon: ClipboardList,
-  },
-  {
-    key: 'manage_team',
-    label: 'Lead Team',
-    description: 'Add/remove members and fix permissions',
-    icon: Users,
-  },
-  {
-    key: 'manage_locations',
-    label: 'Tune Locations',
-    description: 'Add and fix office locations',
-    icon: MapPin,
-  },
-];
-
-const DEPARTMENTS = [
-  'Executive',
-  'Operations',
-  'DJ',
-  'Sales',
-  'Marketing',
-  'Finance',
-  'Production',
-  'Logistics',
-  'Other',
-];
 
 const ROLE_COLORS: Record<string, string> = {
   owner: 'bg-[var(--color-unusonic-warning)]/10 text-[var(--color-unusonic-warning)] border-[var(--color-unusonic-warning)]/20',
@@ -126,46 +70,6 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
   const springConfig = STAGE_MEDIUM;
 
   const canManage = currentUserRole === 'owner' || currentUserRole === 'admin';
-  
-  const handleTogglePermission = async (
-    memberId: string,
-    permissionKey: keyof WorkspacePermissions,
-    currentValue: boolean
-  ) => {
-    if (!canManage) return;
-    
-    setError(null);
-    setSavingId(`${memberId}-${permissionKey}`);
-    
-    startTransition(async () => {
-      const result = await updateMemberPermissions(workspaceId, memberId, {
-        [permissionKey]: !currentValue,
-      });
-      
-      if (!result.success) {
-        setError(result.error || 'Failed to update permission');
-      }
-      
-      setSavingId(null);
-    });
-  };
-  
-  const handleDepartmentChange = async (memberId: string, department: string) => {
-    if (!canManage) return;
-    
-    setError(null);
-    setSavingId(`${memberId}-department`);
-    
-    startTransition(async () => {
-      const result = await updateMemberDepartment(workspaceId, memberId, department);
-      
-      if (!result.success) {
-        setError(result.error || 'Failed to update department');
-      }
-      
-      setSavingId(null);
-    });
-  };
   
   const handlePortalProfileChange = async (rosterEdgeId: string, profileKey: string | null) => {
     if (!canManage) return;
@@ -227,7 +131,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
       {/* Members List */}
       <div className="space-y-3">
         {members.map((member) => {
-          const isExpanded = expandedMember === member.id;
+          const isExpanded = expandedMember === member.userId;
           const isOwner = member.role === 'owner';
           const initials = member.fullName
             ? member.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -235,13 +139,13 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
           
           return (
             <motion.div
-              key={member.id}
+              key={member.userId}
               layout
               className="rounded-xl border border-[var(--stage-border)] overflow-hidden bg-[var(--stage-surface-elevated)]"
             >
               {/* Member Header */}
               <button
-                onClick={() => toggleExpand(member.id)}
+                onClick={() => toggleExpand(member.userId)}
                 disabled={isOwner || !canManage}
                 className="stage-hover overflow-hidden w-full p-4 flex items-center gap-4 transition-colors disabled:cursor-default"
               >
@@ -272,12 +176,6 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                   <div className="flex items-center gap-2 mt-0.5">
                     {member.fullName && (
                       <p className="text-xs text-[var(--stage-text-secondary)] truncate">{member.email}</p>
-                    )}
-                    {member.department && (
-                      <>
-                        <span className="text-[var(--stage-text-secondary)]/30">•</span>
-                        <span className="text-xs text-[var(--stage-text-secondary)]">{member.department}</span>
-                      </>
                     )}
                   </div>
                 </div>
@@ -311,7 +209,7 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                       {/* Role Select (workspace_roles: system + custom) */}
                       <WorkspaceRoleSelect
                         workspaceId={workspaceId}
-                        memberId={member.id}
+                        userId={member.userId}
                         value={member.roleId}
                         disabled={isPending}
                         onSuccess={() => router.refresh()}
@@ -324,84 +222,6 @@ export function TeamManagement({ workspaceId, members, currentUserRole }: TeamMa
                           disabled={isPending && savingId === `${member.rosterEdgeId}-portal-profile`}
                         />
                       )}
-                      {/* Department Select */}
-                      <div>
-                        <label className="block stage-field-label mb-2">
-                          Department
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={member.department || ''}
-                            onChange={(e) => handleDepartmentChange(member.id, e.target.value)}
-                            disabled={isPending && savingId === `${member.id}-department`}
-                            className="w-full px-3 py-2.5 rounded-xl appearance-none
-                              bg-[var(--ctx-well)] border border-[var(--stage-border)]
-                              text-[var(--stage-text-primary)] text-sm
-                              focus:outline-none focus-visible:border-[var(--stage-accent)] focus-visible:ring-2 focus-visible:ring-[var(--stage-accent-muted)]
-                              disabled:opacity-45 disabled:cursor-not-allowed
-                              transition-colors duration-100"
-                          >
-                            <option value="">Select department...</option>
-                            {DEPARTMENTS.map((dept) => (
-                              <option key={dept} value={dept}>{dept}</option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--stage-text-secondary)] pointer-events-none" />
-                          {isPending && savingId === `${member.id}-department` && (
-                            <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--stage-text-secondary)] animate-spin" />
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Permissions Grid */}
-                      <div>
-                        <label className="block stage-field-label mb-3">
-                          Permissions
-                        </label>
-                        <div className="space-y-2">
-                          {PERMISSION_CONFIGS.map((perm) => {
-                            const Icon = perm.icon;
-                            const isEnabled = member.permissions[perm.key];
-                            const isSaving = isPending && savingId === `${member.id}-${perm.key}`;
-                            
-                            return (
-                              <button
-                                key={perm.key}
-                                onClick={() => handleTogglePermission(member.id, perm.key, isEnabled)}
-                                disabled={isSaving}
-                                className={`w-full p-3 rounded-xl border flex items-center gap-3 transition-colors duration-[80ms]
-                                  ${isEnabled
-                                    ? 'bg-[var(--color-unusonic-success)]/5 border-[var(--color-unusonic-success)]/20'
-                                    : 'bg-[var(--stage-surface)] border-[var(--stage-border)] hover:border-[oklch(1_0_0_/_0.15)]'
-                                  }
-                                  disabled:opacity-45 disabled:cursor-not-allowed`}
-                              >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center
-                                  ${isEnabled ? 'bg-[var(--color-unusonic-success)]/10' : 'bg-[var(--stage-surface)]'}`}>
-                                  <Icon className={`w-4 h-4 ${isEnabled ? 'text-[var(--color-unusonic-success)]' : 'text-[var(--stage-text-secondary)]'}`} />
-                                </div>
-                                
-                                <div className="flex-1 text-left">
-                                  <p className={`text-sm font-medium ${isEnabled ? 'text-[var(--stage-text-primary)]' : 'text-[var(--stage-text-secondary)]'}`}>
-                                    {perm.label}
-                                  </p>
-                                  <p className="text-field-label text-[var(--stage-text-secondary)]/70">{perm.description}</p>
-                                </div>
-                                
-                                {isSaving ? (
-                                  <Loader2 className="w-5 h-5 text-[var(--stage-text-secondary)] animate-spin" />
-                                ) : isEnabled ? (
-                                  <div className="w-6 h-6 rounded-full bg-[var(--color-unusonic-success)] flex items-center justify-center">
-                                    <Check className="w-3.5 h-3.5 text-[oklch(1_0_0)]" />
-                                  </div>
-                                ) : (
-                                  <div className="w-6 h-6 rounded-full border-2 border-[var(--stage-border-hover)]" />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
                   </motion.div>
                 )}
