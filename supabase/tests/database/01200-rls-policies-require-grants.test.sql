@@ -21,14 +21,18 @@
 -- protection, where writes go through SECURITY DEFINER RPCs), so it must NOT
 -- have a grant.
 --
--- A column-level grant counts. `public.workspaces` is deliberately built that
--- way: table UPDATE is revoked and re-granted on the settings columns only, so
--- an owner can change the portal theme and cannot change subscription_tier.
--- `has_table_privilege` is false there and the policy is still reachable, which
--- is the distinction this test has to make -- an outage is "no privilege at
--- all", not "privilege on some columns". `has_any_column_privilege` is true for
--- a table-level grant as well, so this only ever widens what passes; DELETE
--- keeps the table-level check because Postgres has no column-level DELETE.
+-- One table is granted per column rather than per table: `public.workspaces`
+-- revokes table UPDATE and re-grants the settings columns, so an owner can
+-- change the portal theme and cannot change subscription_tier. That is a
+-- deliberate exception, and it is listed as one below rather than relaxing the
+-- rule for everybody.
+--
+-- The first version of this accepted `has_any_column_privilege` everywhere,
+-- which sounds equivalent and is not: that predicate is satisfied by ONE
+-- granted column, so a settings column added without a grant would 42501 on
+-- every write and this test would stay green -- the exact outage class in the
+-- header, admitted by the fix for it. Hence the named exception plus the
+-- exact-set assertion at the bottom.
 
 BEGIN;
 SELECT plan(2);
@@ -41,7 +45,9 @@ INSERT INTO grant_exceptions VALUES
   ('cortex', 'aion_refusal_log', NULL,
    'Written by service role only; no session-client caller.'),
   ('directory', 'entity_documents', 'DELETE',
-   'Documents are archived via UPDATE (status = archived); no hard-delete path.');
+   'Documents are archived via UPDATE (status = archived); no hard-delete path.'),
+  ('public', 'workspaces', 'UPDATE',
+   'Granted per column, not per table — see the exact-set assertion below.');
 
 CREATE TEMP VIEW policy_grant_gaps AS
 WITH pol AS (
@@ -79,13 +85,7 @@ WHERE
     OR 0 = ANY(e.polroles)
     OR (SELECT oid FROM pg_roles WHERE rolname = 'authenticated') = ANY(e.polroles)
   )
-  AND NOT (
-    has_table_privilege('authenticated', e.reloid, e.priv)
-    OR (
-      e.priv IN ('SELECT', 'INSERT', 'UPDATE')
-      AND has_any_column_privilege('authenticated', e.reloid, e.priv)
-    )
-  )
+  AND NOT has_table_privilege('authenticated', e.reloid, e.priv)
   AND NOT EXISTS (
     SELECT 1 FROM grant_exceptions x
     WHERE x.sch = e.sch AND x.tbl = e.tbl AND (x.priv IS NULL OR x.priv = e.priv)
@@ -101,18 +101,25 @@ SELECT is(
          '')
 );
 
--- The other half of the workspaces design: the column grant is what keeps the
--- UPDATE policy from being a way to change the plan you are paying for. A
--- future migration that reaches for a plain `GRANT UPDATE ON public.workspaces`
--- would satisfy the test above and fail this one.
-SELECT is(
-  (SELECT count(*)::int FROM unnest(ARRAY[
-     'stripe_customer_id', 'stripe_subscription_id', 'subscription_tier',
-     'billing_status', 'extra_seats', 'trial_ends_at'
-   ]) AS col
-   WHERE has_column_privilege('authenticated', 'public.workspaces', col, 'UPDATE')),
-  0,
-  'authenticated cannot update the commercial columns on public.workspaces'
+-- The exception above is only safe if the exception is exactly what we think it
+-- is. Assert the granted set, not a denylist of six names somebody has to
+-- remember to extend: this fails if a commercial column is granted, if a plain
+-- `GRANT UPDATE ON public.workspaces` lands, AND if a settings column is added
+-- without its grant -- which is the case the first version of this test missed.
+SELECT set_eq(
+  $$SELECT column_name::text
+      FROM information_schema.column_privileges
+     WHERE table_schema = 'public' AND table_name = 'workspaces'
+       AND grantee = 'authenticated' AND privilege_type = 'UPDATE'$$,
+  ARRAY[
+    'portal_theme_preset', 'portal_theme_config',
+    'default_deposit_percent', 'default_deposit_deadline_days',
+    'default_balance_due_days_before_event',
+    'sms_signin_enabled', 'require_equipment_verification',
+    'sending_domain', 'resend_domain_id', 'sending_domain_status',
+    'sending_from_name', 'sending_from_localpart', 'dmarc_status'
+  ],
+  'authenticated may update exactly the settings columns on public.workspaces'
 );
 
 SELECT * FROM finish();

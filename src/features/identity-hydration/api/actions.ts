@@ -125,9 +125,9 @@ export async function completeOnboarding(): Promise<{ success: boolean; error?: 
 
   Joining a workspace goes through `public.invitations` and
   `acceptEmployeeInvite`. The two SECURITY DEFINER functions from the invite-code
-  design -- `regenerate_invite_code` and `workspace_joinable_by_invite` -- are
-  still in the database and reference the same absent columns; they raise if
-  called, and nothing calls them.
+  design -- `regenerate_invite_code` and `workspace_joinable_by_invite` -- were
+  dropped in 20260910220000; both referenced the same absent columns, and
+  `workspace_joinable_by_invite` was executable by `anon`.
 */
 
 export async function uploadAvatar(formData: FormData): Promise<{

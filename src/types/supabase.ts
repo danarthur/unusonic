@@ -8389,10 +8389,6 @@ export type Database = {
         Returns: Json
       }
       get_ghost_entity_by_email: { Args: { p_email: string }; Returns: string }
-      get_member_permissions: {
-        Args: { p_user_id?: string; p_workspace_id: string }
-        Returns: Json
-      }
       get_member_role_slug: {
         Args: { p_workspace_id: string }
         Returns: string
@@ -8451,10 +8447,6 @@ export type Database = {
         Args: { p_permission_key: string; p_workspace_id: string }
         Returns: boolean
       }
-      member_has_permission: {
-        Args: { p_permission_key: string; p_workspace_id: string }
-        Returns: boolean
-      }
       merge_industry_tags: {
         Args: { p_from_tag: string; p_to_tag: string; p_workspace_id: string }
         Returns: undefined
@@ -8497,10 +8489,6 @@ export type Database = {
         Returns: boolean
       }
       purge_expired_sms_otp_codes: { Args: never; Returns: undefined }
-      regenerate_invite_code: {
-        Args: { p_workspace_id: string }
-        Returns: string
-      }
       remove_catalog_item_assignee: {
         Args: { p_assignee_id: string }
         Returns: undefined
@@ -8601,10 +8589,6 @@ export type Database = {
         Returns: boolean
       }
       workspace_created_by_me: {
-        Args: { p_workspace_id: string }
-        Returns: boolean
-      }
-      workspace_joinable_by_invite: {
         Args: { p_workspace_id: string }
         Returns: boolean
       }

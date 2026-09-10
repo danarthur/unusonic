@@ -198,7 +198,6 @@ async function autoFillWorkingNotes(
   // Build the patch: only include fields that are empty today and have a signal.
   const patch: {
     p_communication_style?: string;
-    p_dnr_flagged?: boolean;
     p_dnr_reason?: string;
     p_dnr_note?: string;
     p_preferred_channel?: string;
@@ -209,8 +208,21 @@ async function autoFillWorkingNotes(
     patch.p_communication_style = trimmedCommStyle;
   }
 
-  if (signals.dnr_reason && !current?.dnr_flagged) {
-    patch.p_dnr_flagged = true;
+  /*
+    A capture does not raise do-not-rebook.
+
+    It used to: an LLM-extracted `dnr_reason` set `dnr_flagged = true` outright,
+    on the same code path that is forbidden from writing a private note. The
+    risk ordering was backwards. A wrong sentence in a notes field is
+    embarrassing and editable; a wrong "never book this person again" on a
+    freelancer is their livelihood, and it renders as a warning chip on their
+    record and feeds the state chip on the card.
+
+    The reason and note are still captured, so nothing the model noticed is
+    lost -- they land as an unflagged suggestion an owner can act on from the
+    "How to handle" card. Only the flag itself now needs a person.
+  */
+  if (signals.dnr_reason && !current?.dnr_flagged && !current?.dnr_reason) {
     patch.p_dnr_reason = signals.dnr_reason;
     const note = signals.dnr_note?.trim();
     if (note) patch.p_dnr_note = note;
@@ -224,16 +236,30 @@ async function autoFillWorkingNotes(
   if (Object.keys(patch).length === 0) return;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await supabase.schema('directory').rpc('upsert_entity_working_notes', {
+  const { data: wrote, error: notesErr } = await supabase.schema('directory').rpc('upsert_entity_working_notes', {
     p_workspace_id: workspaceId,
     p_entity_id: entityId,
     p_communication_style: patch.p_communication_style ?? undefined,
-    p_dnr_flagged: patch.p_dnr_flagged ?? undefined,
     p_dnr_reason: patch.p_dnr_reason ?? undefined,
     p_dnr_note: patch.p_dnr_note ?? undefined,
     p_preferred_channel: patch.p_preferred_channel ?? undefined,
     p_source: 'capture',
   });
+
+  /*
+    The result is checked. This RPC returns FALSE rather than raising when it
+    refuses -- wrong workspace, unowned entity, a value outside a closed list --
+    and the call used to be a bare `await`, so a refusal was indistinguishable
+    from a write. That is the silent-write defect this branch exists to end,
+    and it was sitting in the branch's own capture path.
+  */
+  if (notesErr || wrote === false) {
+    console.warn('[capture] working-notes auto-fill refused', {
+      workspaceId,
+      entityId,
+      reason: notesErr?.message ?? 'rpc returned false',
+    });
+  }
 }
 
 function splitName(name: string): { first: string; last: string | null } {

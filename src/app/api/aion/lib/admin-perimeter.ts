@@ -14,7 +14,7 @@
  *   }
  *
  * Tiny on purpose — anything more elaborate (role hierarchies, scoped
- * permissions) lives in workspace_members + member_has_permission. This
+ * permissions) lives in workspace_members + member_has_capability. This
  * perimeter is a coarse "is this person allowed to see cross-workspace
  * Aion telemetry?" gate, nothing more.
  */

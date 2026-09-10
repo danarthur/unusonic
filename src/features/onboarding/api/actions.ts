@@ -241,20 +241,22 @@ export async function claimGhostOrganizationBySlug(
     return { ok: false, error: relErr.message ?? 'Failed to link you to the organization.' };
   }
 
-  // Ensure workspace_members
-  const { data: existingMember } = await supabase
-    .from('workspace_members')
-    .select('user_id')
-    .eq('workspace_id', orgWorkspaceId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!existingMember) {
-    await supabase.from('workspace_members').insert({
-      workspace_id: orgWorkspaceId,
-      user_id: user.id,
-      role: 'owner',
-    });
-  }
+  /*
+    Claiming a ghost org does NOT grant workspace membership.
+
+    It used to insert the claimer as `owner` of `orgWorkspaceId` -- and a ghost
+    org's `owner_workspace_id` is the workspace of whoever CREATED the ghost.
+    Every unclaimed company entity in production points at a workspace that has
+    members. So claiming a ghost by slug would have made a stranger an owner of
+    the creating company's tenant, with read access to their deals.
+
+    It was inert only because ghosts are created without a `handle` and this
+    flow looks up by handle. That is a coincidence, not a control.
+
+    The claim still does what it should: it links the claimer's person entity to
+    the org and marks the org claimed. Access to a workspace comes from an
+    invitation, which is a deliberate act by somebody who already belongs to it.
+  */
 
   // Mark onboarding complete
   await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);

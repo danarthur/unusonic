@@ -107,8 +107,14 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         name: (entity as any).display_name,
         type: entityType,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        isGhost: !(entity as any).claimed_by_user_id, attributes: attrs,
+        /*
+          `isGhost` is not sent. It is an internal marker meaning "has not
+          signed up yet", and handing it to a model is how an owner was told
+          that a real coordinator "is a ghost". Whether somebody has an account
+          is almost never the answer to a question about a show; when it is, it
+          belongs in the tool that asks it, phrased for a person.
+        */
+        attributes: attrs,
         relationships, deals: deals.slice(0, 5), openInvoices: money.openInvoices,
       }, searched);
     },

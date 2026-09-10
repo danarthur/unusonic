@@ -470,14 +470,26 @@ export function toIONContext(
     emitValue(k, v);
   }
 
-  // Step 2: emit remaining unknown keys from the raw JSONB (Scout-written, future keys, etc.)
-  const emitted = new Set(Object.keys(result));
-  if (raw != null && typeof raw === 'object') {
-    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      if (emitted.has(k)) continue;
-      emitValue(k, v);
-    }
-  }
+  /*
+    There is no step 2.
+
+    This used to walk the raw JSONB and emit every key the typed accessor did
+    not already know about -- Scout-written keys, future keys, anything. That
+    made the whole thing a DENYLIST: six SENTINEL_KEYS were stripped and
+    everything else went to the model, including internal flags nobody had
+    thought about yet.
+
+    That polarity is what put "Brandi Jane is a ghost" in front of an owner. The
+    generated brief was deleted over it, but the brief was the symptom; this
+    function is the channel, and it feeds Aion chat, which is a larger surface
+    than the brief ever had.
+
+    `readEntityAttrs` above IS the allowlist: a key reaches the model when
+    somebody has declared it in the typed schema, which is also the moment they
+    decide it is fit to say out loud. A new attribute stops being visible to
+    Aion until it is declared -- that is the intended cost, and it is cheaper
+    than the alternative.
+  */
 
   return result;
 }

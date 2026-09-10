@@ -516,7 +516,24 @@ export async function inviteTeamMember(
 
   const legacyRole = WORKSPACE_ROLE_SLUG_TO_LEGACY[roleRow.slug] ?? 'member';
 
-  const { error: insertErr } = await supabase.from('workspace_members').insert({
+  /*
+    Through the system client, because adding somebody OTHER than yourself to a
+    workspace is a privileged act and the session client can no longer do it.
+
+    `public.workspace_members` used to carry an INSERT policy of
+    `WITH CHECK (user_id = auth.uid())` -- no constraint on workspace_id, none
+    on role -- which let any signed-in user make themselves owner of any
+    workspace. 20260910180000 removed it and revoked INSERT. This statement
+    never satisfied that policy anyway (it inserts the invitee, not the caller),
+    so it has been failing since the policy landed; the invite email went out
+    first and `rollbackRosterStep` only warns.
+
+    The authorisation for this write is the owner/admin check above.
+  */
+  // AUTHZ-OK: gated by the `user_has_workspace_role(owner, admin)` RPC at the
+  // top of this action, and by `canAddSeat` on the workspace's seat limit. The
+  // rule cannot see an RPC called by name rather than an imported helper.
+  const { error: insertErr } = await system.from('workspace_members').insert({
     workspace_id: workspaceId,
     user_id: invitedUserId,
     role_id: workspace_role_id,
