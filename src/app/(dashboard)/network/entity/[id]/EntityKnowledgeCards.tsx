@@ -62,7 +62,7 @@ export function EntityKnowledgeCards({
         a company has as much claim to as a person. Gating it to person/couple
         left a company's record page with nowhere to record either.
       */}
-      <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
+      <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} entityType={entityType} />
       <CaptureTimelinePanel
         workspaceId={workspaceId}
         entityId={entityId}

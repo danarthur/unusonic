@@ -10,19 +10,12 @@ export type EmploymentStatus = 'internal_employee' | 'external_contractor';
 export type SkillLevel = Database['public']['Enums']['skill_level'];
 export type OrgMemberRole = 'owner' | 'admin' | 'manager' | 'member' | 'restricted';
 
-export interface TalentSkillRow {
-  id: string;
-  org_member_id: string;
-  skill_tag: string;
-  proficiency?: SkillLevel | null;
-  hourly_rate?: number | null;
-  verified?: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-}
-
-export type TalentSkillInsert = Partial<TalentSkillRow> & Pick<TalentSkillRow, 'org_member_id' | 'skill_tag'>;
-export type TalentSkillUpdate = Partial<Omit<TalentSkillRow, 'id'>>;
+/*
+  TalentSkillRow, TalentSkillInsert and TalentSkillUpdate stood here, describing
+  `public.talent_skills` keyed on `org_member_id`. That table does not exist --
+  skills are `ops.crew_skills`, keyed on the person's entity id -- so these were
+  the shape of nothing. CrewSkillDTO below is the row that is really stored.
+*/
 
 // Legacy row shapes (org_members table dropped in Session 10; kept for backward compat)
 export interface OrgMemberRow {

@@ -117,7 +117,7 @@ export function EntityOverviewCards({
       <Zone label="What we know">
         {/* Every entity type: do-not-rebook and private notes are as much a
             company's as a person's. */}
-        <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
+        <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} entityType={entityType} />
         <CaptureTimelinePanel
           workspaceId={workspaceId}
           entityId={entityId}

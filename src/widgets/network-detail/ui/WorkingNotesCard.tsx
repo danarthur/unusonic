@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * WorkingNotesCard — three workspace-scoped facts per person.
+ * WorkingNotesCard — what a workspace privately knows about a contact.
  *
  * Renders only when something is populated. The Day.ai pattern: empty fields
  * look like a half-built product, so we hide them until a real value lands.
@@ -43,6 +43,12 @@ import { formatRelative } from '@/shared/lib/format-relative';
 export interface WorkingNotesCardProps {
   workspaceId: string;
   entityId: string;
+  /**
+   * What the contact is, so the card can leave out fields that mean nothing
+   * for them. A venue's contact preference lives on the venue's own PM fields,
+   * not here; offering both is two homes for one answer.
+   */
+  entityType?: 'person' | 'company' | 'venue' | 'couple';
 }
 
 const DNR_REASONS: { value: WorkingNotesDnrReason; label: string }[] = [
@@ -59,7 +65,7 @@ const CHANNELS: { value: WorkingNotesChannel; label: string; Icon: typeof Phone 
   { value: 'sms', label: 'Text', Icon: MessageCircle },
 ];
 
-export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProps) {
+export function WorkingNotesCard({ workspaceId, entityId, entityType }: WorkingNotesCardProps) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = React.useState(false);
 
@@ -88,10 +94,14 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
   // Hide entirely on loading — skeleton feels heavy for a potentially-empty card.
   if (isLoading) return null;
 
+  // A venue has `venue_contact_name`/`venue_pm_phone` of its own; a second
+  // "preferred channel" here would be a competing answer to the same question.
+  const showsChannel = entityType !== 'venue';
+
   const hasContent =
     !!notes?.communicationStyle ||
     notes?.dnrFlagged ||
-    !!notes?.preferredChannel ||
+    (showsChannel && !!notes?.preferredChannel) ||
     !!notes?.privateNotes;
 
   // Empty state + not editing → render a subtle "Add" affordance that fits
@@ -152,6 +162,7 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
         {editing ? (
           <WorkingNotesEditor
             key="edit"
+            showsChannel={showsChannel}
             initial={notes ?? DEFAULT_NOTES}
             onCancel={() => setEditing(false)}
             onSave={async (patch) => {
@@ -161,7 +172,7 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
             saving={mutation.isPending}
           />
         ) : (
-          <WorkingNotesDisplay key="view" notes={notes!} />
+          <WorkingNotesDisplay key="view" notes={notes!} showsChannel={showsChannel} />
         )}
       </AnimatePresence>
     </motion.div>
@@ -200,8 +211,8 @@ function AionFilled({ field, autoFilled }: { field: WorkingNotesFieldKey; autoFi
 
 // ── Display mode ─────────────────────────────────────────────────────────────
 
-function WorkingNotesDisplay({ notes }: { notes: WorkingNotes }) {
-  const channel = notes.preferredChannel
+function WorkingNotesDisplay({ notes, showsChannel }: { notes: WorkingNotes; showsChannel: boolean }) {
+  const channel = showsChannel && notes.preferredChannel
     ? CHANNELS.find((c) => c.value === notes.preferredChannel)
     : null;
   const autoFilled = notes.autoFilledFields;
@@ -300,11 +311,13 @@ function WorkingNotesEditor({
   onCancel,
   onSave,
   saving,
+  showsChannel,
 }: {
   initial: WorkingNotes;
   onCancel: () => void;
   onSave: (patch: UpdateWorkingNotesPatch) => Promise<void> | void;
   saving: boolean;
+  showsChannel: boolean;
 }) {
   const [commStyle, setCommStyle] = React.useState(initial.communicationStyle ?? '');
   const [channel, setChannel] = React.useState<WorkingNotesChannel | ''>(
@@ -386,6 +399,7 @@ function WorkingNotesEditor({
       </div>
 
       {/* Preferred channel */}
+      {showsChannel && (
       <div className="space-y-1">
         <Label>Preferred channel</Label>
         <div className="flex gap-1.5">
@@ -409,6 +423,7 @@ function WorkingNotesEditor({
           ))}
         </div>
       </div>
+      )}
 
       {/* DNR */}
       <div className="space-y-1.5">

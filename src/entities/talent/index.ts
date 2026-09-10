@@ -4,7 +4,6 @@ export {
   getOrgMemberByProfileAndOrg,
 } from './api/get-org-member-with-skills';
 export type {
-  TalentSkillRow,
   CrewSkillDTO,
   CrewEquipmentDTO,
   EquipmentCategory,

@@ -257,7 +257,7 @@ export async function getNetworkGraph(
     the notes belong on `directory.entity_working_notes`, which is already the
     per-entity, workspace-scoped place for exactly this.
   */
-  const privateByLegacyOrgId = new Map<string, { private_notes: string | null; internal_rating: number | null }>();
+  const privateByLegacyOrgId = new Map<string, { private_notes: string | null }>();
 
   // Get all MEMBER/ROSTER_MEMBER relationships for these org entities
   const { data: memberRels } = await supabase
@@ -370,7 +370,6 @@ export async function getNetworkGraph(
       created_by_org_id: (attrs[COMPANY_ATTR.created_by_org_id] as string | null) ?? null,
       category: (attrs[COMPANY_ATTR.category] as NetworkGraph['organizations'][0]['category']) ?? null,
       private_notes: priv?.private_notes ?? null,
-      internal_rating: priv?.internal_rating ?? null,
       roster,
     };
   }).filter(Boolean) as NetworkGraph['organizations'];
