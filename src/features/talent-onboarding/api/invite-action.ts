@@ -64,6 +64,12 @@ export async function inviteTalent(
   if (!orgDirEnt) {
     return { ok: false, error: 'Organization not found.' };
   }
+  // Skills and capabilities are workspace-scoped rows; an org entity that
+  // belongs to no workspace has nowhere to put them.
+  const orgWorkspaceId = orgDirEnt.owner_workspace_id;
+  if (!orgWorkspaceId) {
+    return { ok: false, error: 'That organization is not linked to a workspace.' };
+  }
 
   const { data: membershipRel } = await supabase
     .schema('cortex').from('relationships')
@@ -98,7 +104,7 @@ export async function inviteTalent(
           display_name: [first_name, last_name].filter(Boolean).join(' ').trim() || profileEmail,
           type: 'person',
           claimed_by_user_id: profileId,
-          owner_workspace_id: orgDirEnt.owner_workspace_id ?? null,
+          owner_workspace_id: orgWorkspaceId,
           attributes: { email: profileEmail, is_ghost: false, first_name: first_name ?? null, last_name: last_name ?? null },
         })
         .select('id')
@@ -139,7 +145,7 @@ export async function inviteTalent(
     if (skill_tags.length > 0) {
       const skillRows = skill_tags.map((skill_tag) => ({
         entity_id: inviteeDirEnt.id,
-        workspace_id: orgDirEnt.owner_workspace_id,
+        workspace_id: orgWorkspaceId,
         skill_tag: skill_tag.trim(),
       }));
       const { error: skillsError } = await supabase.schema('ops').from('crew_skills').insert(skillRows);
@@ -151,7 +157,7 @@ export async function inviteTalent(
     if (capabilities.length > 0) {
       const capRows = capabilities.map((capability) => ({
         entity_id: inviteeDirEnt.id,
-        workspace_id: orgDirEnt.owner_workspace_id,
+        workspace_id: orgWorkspaceId,
         capability: capability.trim(),
       }));
       await supabase.schema('ops').from('entity_capabilities').insert(capRows);
@@ -178,7 +184,7 @@ export async function inviteTalent(
         display_name: [first_name, last_name].filter(Boolean).join(' ').trim() || emailTrim,
         type: 'person',
         claimed_by_user_id: null,
-        owner_workspace_id: orgDirEnt.owner_workspace_id ?? null,
+        owner_workspace_id: orgWorkspaceId,
         attributes: { is_ghost: true, email: emailTrim, first_name: first_name ?? null, last_name: last_name ?? null },
       })
       .select('id')
@@ -219,7 +225,7 @@ export async function inviteTalent(
   if (skill_tags.length > 0) {
     const skillRows = skill_tags.map((skill_tag) => ({
       entity_id: ghostDirEnt.id,
-      workspace_id: orgDirEnt.owner_workspace_id,
+      workspace_id: orgWorkspaceId,
       skill_tag: skill_tag.trim(),
     }));
     const { error: skillsError } = await supabase.schema('ops').from('crew_skills').insert(skillRows);
@@ -231,7 +237,7 @@ export async function inviteTalent(
   if (capabilities.length > 0) {
     const capRows = capabilities.map((capability) => ({
       entity_id: ghostDirEnt.id,
-      workspace_id: orgDirEnt.owner_workspace_id,
+      workspace_id: orgWorkspaceId,
       capability: capability.trim(),
     }));
     await supabase.schema('ops').from('entity_capabilities').insert(capRows);
