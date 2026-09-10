@@ -26,8 +26,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
-import { getEntityRoles } from '@/features/network-data/api/get-entity-roles';
-import { fileContact, type FileableRole } from '@/features/network-data/api/file-contact';
+import { getEntityRoles } from '../api/get-entity-roles';
+import { fileContact, type FileableRole } from '../api/file-contact';
 
 /**
  * The words the directory uses, not the edge names. PARTNER is the freelancer

@@ -135,12 +135,17 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // ─── Legacy brand enforcement ───────────────────────────────────────────────
+  // ─── Legacy brand + FSD layering ────────────────────────────────────────────
+  // Both belong on the whole tree. Layering in particular has to see
+  // `src/shared/lib`, which the design-system block above deliberately does not
+  // cover — widening that glob instead would drag every design rule into files
+  // they were never written for.
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
     plugins: { "stage-engineering": stageEngineering },
     rules: {
       "stage-engineering/no-legacy-brand": "warn",
+      "stage-engineering/no-upward-layer-import": "warn",
     },
   },
 

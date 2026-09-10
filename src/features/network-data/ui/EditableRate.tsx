@@ -20,8 +20,8 @@
 import * as React from 'react';
 import { cn } from '@/shared/lib/utils';
 import { InlineField } from '@/shared/ui/inline-field';
-import { setPersonRate } from '@/features/network-data/api/set-person-rate';
-import { formatUsd } from '../model/format-facts';
+import { setPersonRate } from '../api/set-person-rate';
+import { formatUsd } from '@/entities/network/model/format-facts';
 import type { PersonRate } from '@/entities/directory/model/read-rate';
 
 export interface EditableRateProps {

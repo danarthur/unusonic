@@ -1142,6 +1142,93 @@ const webhookVerifyBeforeParse = {
 };
 
 
+// ── no-upward-layer-import ───────────────────────────────────────────────────
+//
+// Feature-Sliced Design: App → Widgets → Features → Entities → Shared.
+// A layer may import from layers BELOW it and never from layers above.
+//
+// CLAUDE.md has said this since the architecture was chosen and nothing
+// enforced it, so the codebase accumulated 61 upward imports before anyone
+// counted. That is the same shape as the SECURITY DEFINER revoke rule: written
+// down, remembered by hand, forgotten in the usual way.
+//
+// What an upward import costs: a Shared primitive that reaches into `app/`
+// cannot be lifted into another project, and — more practically — it makes the
+// dependency graph a cycle, so "what does this break" stops having an answer.
+//
+// The existing violations are held in the ESLint baseline rather than fixed in
+// one pass. The rule's job is that the number goes down and never up.
+//
+// Type-only imports count. A type from a higher layer drags that layer's
+// vocabulary downward even when nothing ships at runtime, and it is usually the
+// first step toward a value import.
+
+const FSD_RANK = {
+  shared: 0,
+  entities: 1,
+  features: 2,
+  widgets: 3,
+  app: 4,
+};
+
+/** The layer a file belongs to, or null when it is outside the FSD tree. */
+function fsdLayerOfFile(filename) {
+  const m = /(?:^|[\\/])src[\\/](shared|entities|features|widgets|app)[\\/]/.exec(filename);
+  return m ? m[1] : null;
+}
+
+/** The layer an import specifier targets, or null. */
+function fsdLayerOfSpecifier(value) {
+  const m = /^@\/(shared|entities|features|widgets|app)(?:\/|$)/.exec(value);
+  return m ? m[1] : null;
+}
+
+const noUpwardLayerImport = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Enforce Feature-Sliced Design layering: a layer may not import from a layer above it.",
+    },
+    schema: [],
+    messages: {
+      upward:
+        "FSD: {{from}} may not import from {{to}}. Layers import downward only " +
+        "(app → widgets → features → entities → shared). Move the shared piece " +
+        "down, or invert the dependency by passing it in.",
+    },
+  },
+  create(context) {
+    const from = fsdLayerOfFile(context.filename ?? context.getFilename());
+    if (!from) return {};
+
+    function check(node, value) {
+      if (typeof value !== "string") return;
+      const to = fsdLayerOfSpecifier(value);
+      if (!to) return;
+      if (FSD_RANK[to] > FSD_RANK[from]) {
+        context.report({ node, messageId: "upward", data: { from, to } });
+      }
+    }
+
+    return {
+      ImportDeclaration(node) {
+        check(node, node.source.value);
+      },
+      ExportNamedDeclaration(node) {
+        if (node.source) check(node, node.source.value);
+      },
+      ExportAllDeclaration(node) {
+        if (node.source) check(node, node.source.value);
+      },
+      ImportExpression(node) {
+        if (node.source?.type === "Literal") check(node, node.source.value);
+      },
+    };
+  },
+};
+
+
 // ── Plugin export ────────────────────────────────────────────────────────────
 
 const plugin = {
@@ -1167,6 +1254,8 @@ const plugin = {
     // Audit redesign 2026-04-29 — prospective security checks
     "no-mutation-without-authz": noMutationWithoutAuthz,
     "webhook-verify-before-parse": webhookVerifyBeforeParse,
+    // FSD layering — CLAUDE.md's rule, finally enforced
+    "no-upward-layer-import": noUpwardLayerImport,
   },
 };
 

@@ -28,8 +28,8 @@ import {
   linkPartner,
   type LinkablePerson,
   type Pairing,
-} from '@/features/network-data/api/link-partner';
-import { EntityAvatar } from './EntityAvatar';
+} from '../api/link-partner';
+import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 
 const PAIRING_OPTIONS: { value: Pairing; label: string }[] = [
   { value: 'romantic', label: 'Partner' },

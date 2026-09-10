@@ -30,7 +30,6 @@ import { EntityAvatar } from './EntityAvatar';
 import { isFlagged } from '../model/card-slots';
 import type { RowFact } from '../model/row-facts';
 import { formatUsd, formatDay, formatUpcoming, parseShowDate } from '../model/format-facts';
-import { EditableRate } from './EditableRate';
 import type { NetworkNode } from '../model/types';
 
 export interface NetworkRowProps {
@@ -43,8 +42,15 @@ export interface NetworkRowProps {
   facts: RowFact[];
   /** Trailing control, when the list this row is in offers one. */
   action?: React.ReactNode;
-  /** Called after an inline edit lands, so the list can re-read. */
-  onChanged?: () => void;
+  /**
+   * The rate editor, supplied by the caller.
+   *
+   * A row is an entity-layer component and the editor calls a feature's server
+   * action, so it cannot be constructed here without importing upward. The row
+   * still decides WHETHER a rate is editable -- that is a layout and identity
+   * question it owns; the caller only decides what the editor is.
+   */
+  rateEditor?: React.ReactNode;
   onClick?: () => void;
   onAffiliateClick?: (entityId: string) => void;
 }
@@ -126,12 +132,12 @@ function RowFacts({
   node,
   facts,
   now,
-  onChanged,
+  rateEditor,
 }: {
   node: NetworkNode;
   facts: RowFact[];
   now: Date;
-  onChanged?: () => void;
+  rateEditor?: React.ReactNode;
 }) {
   const money = moneyOf(node);
   // Only people have one, even where the column exists because the list also
@@ -144,12 +150,8 @@ function RowFacts({
       {facts.includes('rate') && (
         <div className="hidden w-24 min-w-0 shrink-0 flex-col items-end xl:flex">
           <span className="stage-badge-text text-[var(--stage-text-tertiary)]">Rate</span>
-          {canEditRate ? (
-            <EditableRate
-              entityId={node.entityId}
-              rate={node.meta.rate ?? null}
-              onSaved={onChanged}
-            />
+          {canEditRate && rateEditor ? (
+            rateEditor
           ) : (
             <span className="opacity-0" aria-hidden>—</span>
           )}
@@ -209,7 +211,7 @@ function Affiliates({
   );
 }
 
-export function NetworkRow({ node, facts, action, onChanged, onClick, onAffiliateClick }: NetworkRowProps) {
+export function NetworkRow({ node, facts, action, rateEditor, onClick, onAffiliateClick }: NetworkRowProps) {
   const now = React.useMemo(() => new Date(), []);
   const subtitle = subtitleOf(node);
 
@@ -255,7 +257,7 @@ export function NetworkRow({ node, facts, action, onChanged, onClick, onAffiliat
         )}
       </div>
 
-      <RowFacts node={node} facts={facts} now={now} onChanged={onChanged} />
+      <RowFacts node={node} facts={facts} now={now} rateEditor={rateEditor} />
 
       <Affiliates node={node} onAffiliateClick={onAffiliateClick} />
 

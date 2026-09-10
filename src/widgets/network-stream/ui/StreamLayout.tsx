@@ -24,6 +24,7 @@ import type { NetworkNode } from '@/entities/network';
 import { isInCategory, isUnsorted } from '@/entities/network/model/categories';
 import { categoryLabels, DEFAULT_LABEL_PACK, type LabelPack } from '@/entities/network/model/label-packs';
 import { CategorySection } from './CategorySection';
+import { EditableRate } from '@/features/network-data/ui/EditableRate';
 
 // =============================================================================
 // Helpers: classify nodes into zones using existing kind/gravity/entityType
@@ -295,7 +296,13 @@ export function StreamLayout({
                     facts={clientFacts}
                     onClick={() => onNodeClick?.(node)}
                     onAffiliateClick={openAffiliate}
-                    onChanged={() => router.refresh()}
+                    rateEditor={
+                      <EditableRate
+                        entityId={node.entityId}
+                        rate={node.meta.rate ?? null}
+                        onSaved={() => router.refresh()}
+                      />
+                    }
                   />
                 </div>
               ))}

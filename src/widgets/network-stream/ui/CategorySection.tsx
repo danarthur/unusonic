@@ -24,6 +24,7 @@ import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model
 const DEFAULT_LAYOUT = 'cards' as const;
 import type { NetworkNode } from '@/entities/network';
 import { RoleFilterRow, ROLE_FILTER_MIN_ROWS } from './RoleFilterRow';
+import { EditableRate } from '@/features/network-data/ui/EditableRate';
 
 export interface CategorySectionProps {
   title: string;
@@ -244,7 +245,13 @@ function CategoryBody({
               node={node}
               facts={facts}
               action={renderRowAction?.(node)}
-              onChanged={onRowChanged}
+              rateEditor={
+                <EditableRate
+                  entityId={node.entityId}
+                  rate={node.meta.rate ?? null}
+                  onSaved={onRowChanged}
+                />
+              }
               onClick={() => onNodeClick?.(node)}
               onAffiliateClick={onAffiliateClick}
             />

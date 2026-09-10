@@ -35,7 +35,7 @@ import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { PromotedMetricsRow } from './PromotedMetricsRow';
 import { EntityStateChip } from './EntityStateChip';
-import { LinkedPeople } from '@/entities/network/ui/LinkedPeople';
+import { LinkedPeople } from '@/features/network-data/ui/LinkedPeople';
 import { ContactStrip } from './network-detail-sheet/contact-strip';
 import { TransmissionPanel } from './network-detail-sheet/transmission-panel';
 import { getTabsForDetail, type TabId } from './network-detail-sheet/shared';

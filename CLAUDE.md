@@ -74,6 +74,17 @@ Migrations: `supabase/migrations/`. Debug SQL: `scripts/debug/` (run in SQL Edit
 
 Layers import only from layers **below**: `App → Widgets → Features → Entities → Shared`
 
+**Enforced** by `stage-engineering/no-upward-layer-import` (2026-09-10). It had been a
+convention for as long as the architecture has existed and nothing checked it, so 60
+upward imports accumulated — those are held in `.eslint-baseline.json` and the ratchet
+means the count can only fall. A new one fails CI.
+
+When a lower-layer component needs something from above, the two fixes are: move the
+component down into the layer that owns what it calls (`LinkedPeople`, `ContactRoles` and
+`AddLinkedPerson` went from `entities/network/ui` to `features/network-data/ui` this way),
+or invert — take the piece as a prop, the way `NetworkRow` takes `rateEditor` so the row
+keeps deciding *whether* a rate is editable while the caller supplies *what* the editor is.
+
 | Layer | Location | Purpose |
 |---|---|---|
 | App | `src/app/` | Routing, layouts only |

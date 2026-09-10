@@ -31,11 +31,11 @@ import { ArrowUpRight, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import { queryKeys } from '@/shared/api/query-keys';
-import { getLinkedPeople, type LinkedPairing, type LinkedPerson } from '@/features/network-data/api/get-linked-people';
-import { setLinkedStatus } from '@/features/network-data/api/set-linked-status';
-import { EntityAvatar } from './EntityAvatar';
+import { getLinkedPeople, type LinkedPairing, type LinkedPerson } from '../api/get-linked-people';
+import { setLinkedStatus } from '../api/set-linked-status';
+import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 import { AddLinkedPerson } from './AddLinkedPerson';
-import { EndDatePrompt, today } from './EndDatePrompt';
+import { EndDatePrompt, today } from '@/entities/network/ui/EndDatePrompt';
 
 const PAIRING_LABEL: Record<LinkedPairing, string> = {
   romantic: 'Partner',
