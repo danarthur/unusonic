@@ -127,8 +127,16 @@ export async function sendClientUpdate(input: {
       }
     }
 
-    // Also check bill_to stakeholder for email
-    if (!clientEmail) {
+    /*
+      Also check the CLIENT edge for an email.
+
+      This block sat outside the `if (orgId)` above and filtered
+      `.eq('source_entity_id', orgId)` with orgId possibly null. PostgREST turns
+      that into `source_entity_id=eq.null`, which matches nothing -- so a deal
+      with no organization silently skipped the fallback instead of skipping it
+      on purpose.
+    */
+    if (!clientEmail && orgId) {
       const { data: edges } = await supabase
         .schema('cortex')
         .from('relationships')

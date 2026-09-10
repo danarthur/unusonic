@@ -139,6 +139,8 @@ export async function getCrewDecisionData(
         // from FK metadata alone. We know there's at least one row per match
         // (that's what !inner guarantees), so read the first element.
         for (const b of eventBookings) {
+          // A booking with no person on it is nobody's conflict.
+          if (!b.entity_id) continue;
           if (!availabilityMap.has(b.entity_id)) {
             const eventRow = Array.isArray(b.event) ? b.event[0] : b.event;
             availabilityMap.set(b.entity_id, {

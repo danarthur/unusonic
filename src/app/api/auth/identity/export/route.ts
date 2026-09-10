@@ -33,7 +33,9 @@ export async function GET() {
   const accountId = Buffer.from(user.id.replace(/-/g, ''), 'hex').toString('base64url').slice(0, 43);
   const items = (passkeys ?? []).map((pk, i) => {
     const itemId = Buffer.from(`${user.id}-${pk.id}`).toString('base64url').slice(0, 43);
-    const created = new Date(pk.created_at).getTime();
+    // `created_at` is nullable on public.passkeys. A passkey with no recorded
+    // creation time exports as created now rather than as Invalid Date.
+    const created = pk.created_at ? new Date(pk.created_at).getTime() : Date.now();
     return {
       id: itemId,
       creationAt: Math.floor(created / 1000),

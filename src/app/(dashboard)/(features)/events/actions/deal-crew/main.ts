@@ -739,7 +739,11 @@ export async function getDealCrewEquipmentNames(dealId: string): Promise<string[
       .eq('workspace_id', workspaceId)
       .not('entity_id', 'is', null);
 
-    const entityIds = (crewRows ?? []).map((r: { entity_id: string }) => r.entity_id);
+    // The query filters `entity_id is not null`, but the column is nullable
+    // and the type does not know about the filter, so narrow it here.
+    const entityIds = (crewRows ?? [])
+      .map((r) => r.entity_id)
+      .filter((id): id is string => id !== null);
     if (entityIds.length === 0) return [];
 
     // Fetch all equipment names for these entities
