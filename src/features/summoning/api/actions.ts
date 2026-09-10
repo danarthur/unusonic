@@ -11,6 +11,8 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { sendSummonEmail } from '@/shared/api/email/send';
 import { randomBytes } from 'crypto';
+import type { JsonObject } from '@/shared/lib/jsonb';
+import type { Json } from '@/types/supabase';
 
 const INVITE_EXPIRY_DAYS = 14;
 
@@ -169,8 +171,8 @@ export async function createPartnerSummon(
     type: 'partner_summon',
     status: 'pending',
     expires_at: expiresAt.toISOString(),
-    payload: payload ?? null,
-  } as Record<string, unknown>);
+    payload: (payload ?? null) as Json,
+  });
 
   if (error) return { ok: false, error: error.message };
 
@@ -453,7 +455,7 @@ export async function finishPartnerClaim(
         .is('ended_at', null)
         .maybeSingle();
 
-      const existingCtx = (existingEdge?.context_data as Record<string, unknown>) ?? {};
+      const existingCtx = (existingEdge?.context_data as JsonObject) ?? {};
 
       // Upsert PARTNER edge from planner to sovereign org
       await supabase.rpc('upsert_relationship', {

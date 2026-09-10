@@ -70,9 +70,20 @@ describe('swapProposalLineItem', () => {
         name: 'New Speaker',
         unit_price: 300,
         actual_cost: 150,
-        is_taxable: true,
+        definition_snapshot: expect.objectContaining({
+          tax_meta: { is_taxable: true },
+        }),
       }),
     );
+
+    /*
+      Not as a top-level column. `proposal_items` has no `is_taxable`, and this
+      assertion used to require one -- so the test passed against a statement
+      Postgres was rejecting outright, and every package swap failed in
+      production while this stayed green.
+    */
+    const written = updateBuilder.update.mock.calls[0][0] as Record<string, unknown>;
+    expect(written).not.toHaveProperty('is_taxable');
   });
 
   it('includes inventory_meta for rental packages', async () => {

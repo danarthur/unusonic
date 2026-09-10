@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/shared/api/supabase/server';
+import type { Json } from '@/types/supabase';
 
 /**
  * Swap a proposal line item's catalog reference with a different package.
@@ -57,8 +58,11 @@ export async function swapProposalLineItem(
       name: newPkg.name,
       unit_price: newPkg.price,
       actual_cost: newPkg.target_cost,
-      definition_snapshot: definitionSnapshot,
-      is_taxable: newPkg.is_taxable,
+      // A structured snapshot on its way into a JSONB column. Taxability
+      // rides inside it as `tax_meta.is_taxable`; `proposal_items` has no
+      // `is_taxable` column, and naming one here made Postgres reject the whole
+      // update -- so swapping a package on a proposal has never once worked.
+      definition_snapshot: definitionSnapshot as unknown as Json,
     })
     .eq('id', proposalItemId);
 
