@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { billToDiffering, type BillToRow } from '../deal-stakeholders';
+import { billToDiffering, type BillToRow } from '../bill-to-diff';
 
 const HOST_A: BillToRow = { id: 'sh-a', role: 'host', entity_id: 'ent-a' };
 const HOST_B: BillToRow = { id: 'sh-b', role: 'host', entity_id: 'ent-b' };

@@ -8,6 +8,7 @@ import { resolveWorkspaceOrgEntityId } from '@/entities/organization/api/resolve
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { DealStakeholderRole } from '../lib/stakeholder-roles';
+import { billToDiffering, type BillToRow } from './bill-to-diff';
 
 // NOTE: do NOT re-export `DealStakeholderRole` from this file.
 // Next.js 16 bundles 'use server' files through a server-action
@@ -427,35 +428,6 @@ export async function setPrimaryHost(
     success: true,
     billToUnchangedFor: await billToOtherThan(supabase, dealId, targetStakeholderId),
   };
-}
-
-export type BillToRow = {
-  id: string;
-  role: string;
-  entity_id: string | null;
-  contact_name_at_deal?: string | null;
-  organization_name_at_deal?: string | null;
-};
-
-/**
- * The bill-to row, when it is somebody other than the new primary host.
- *
- * Null when they are the same person, when nobody is billed yet, or when the
- * bill-to has no entity to compare against -- in that last case we cannot prove
- * a mismatch, and claiming one would be worse than saying nothing.
- */
-export function billToDiffering(
-  rows: BillToRow[],
-  primaryStakeholderId: string,
-): BillToRow | null {
-  const billTo = rows.find((r) => r.role === 'bill_to');
-  if (!billTo) return null;
-
-  const primary = rows.find((r) => r.id === primaryStakeholderId);
-  if (!primary?.entity_id || !billTo.entity_id) return null;
-  if (billTo.entity_id === primary.entity_id) return null;
-
-  return billTo;
 }
 
 /**
