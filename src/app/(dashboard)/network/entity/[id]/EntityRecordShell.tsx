@@ -42,6 +42,7 @@ import { ArrowLeft, Save, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 import { LinkedPeople } from '@/entities/network/ui/LinkedPeople';
+import { ContactRoles } from '@/entities/network/ui/ContactRoles';
 import { EntityStateChip } from '@/widgets/network-detail/ui/EntityStateChip';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { useUnsavedChanges } from '@/shared/lib/use-unsaved-changes';
@@ -149,6 +150,10 @@ function RecordIdentity({
           doNotRebook={doNotRebook}
         />
       )}
+      {/* What they are to us, all of it. A freelancer who also supplies gear
+          can hold both roles and appear in both sections, rather than being
+          missing from wherever the second one would have put him. */}
+      {entityId && <ContactRoles entityId={entityId} />}
       {workspaceId && entityId && (
         <LinkedPeople
           workspaceId={workspaceId}
