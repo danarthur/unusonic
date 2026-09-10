@@ -10,6 +10,7 @@ import type {
   ProposalGearService,
   ProposalGearStandalone,
 } from './plan-gear-from-proposal-types';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 /**
  * Reads a deal's latest proposal and returns a structured plan describing the
@@ -100,10 +101,11 @@ function shouldDecompose(pkg: CatalogRow, childCategories: string[]): boolean {
   return childCategories.some((c) => c === 'rental');
 }
 
-function freezePackageSnapshot(pkg: CatalogRow, decomposed: boolean): Record<string, unknown> {
+/** The snapshot frozen onto a gear row. Stored as JSONB, so typed as such. */
+function freezePackageSnapshot(pkg: CatalogRow, decomposed: boolean): JsonObject {
   const def = typeof pkg.definition === 'string'
-    ? (JSON.parse(pkg.definition) as Record<string, unknown>)
-    : (pkg.definition as Record<string, unknown> | null);
+    ? (JSON.parse(pkg.definition) as JsonObject)
+    : (pkg.definition as JsonObject | null);
   return {
     v: 1,
     name: pkg.name,

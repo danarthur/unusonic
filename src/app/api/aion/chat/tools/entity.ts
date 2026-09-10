@@ -38,7 +38,7 @@ export function createEntityTools(ctx: AionToolContext) {
       if (!canWrite) return WRITE_DENIED;
 
       const displayName = [params.firstName, params.lastName].filter(Boolean).join(' ');
-      const attributes: Record<string, unknown> = {
+      const attributes: JsonObject = {
         is_ghost: true,
         [PERSON_ATTR.first_name]: params.firstName,
         [PERSON_ATTR.last_name]: params.lastName ?? '',
@@ -87,7 +87,7 @@ export function createEntityTools(ctx: AionToolContext) {
     execute: async (params) => {
       if (!canWrite) return WRITE_DENIED;
 
-      const attributes: Record<string, unknown> = {
+      const attributes: JsonObject = {
         is_ghost: true,
         is_claimed: false,
       };
@@ -146,7 +146,7 @@ export function createEntityTools(ctx: AionToolContext) {
     execute: async (params) => {
       if (!canWrite) return WRITE_DENIED;
 
-      const attributes: Record<string, unknown> = {
+      const attributes: JsonObject = {
         is_ghost: true,
         is_claimed: false,
       };
